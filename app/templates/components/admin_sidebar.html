@@ -14,21 +14,23 @@ The library's sidebar-07 shell (components/ui_sidebar.html), collapsible='icon',
 The layouts wrap it in sidebar_wrapper and put the page in sidebar_inset (layouts/admin_base.html):
     organisation switcher (top)
     one search box: "Search or ask..." (Ctrl/Cmd+K)
-    main group: Home, AI chat, Systems, Impact, Changes, Spend, Compliance
-    Architecture group (enterprise and solution architects, review board members)
+    top: Home, AI chat, Approvals (with the number waiting for the person)
+    Work group: Systems, Impact, Changes, Spend, Compliance - each opens onto its pages
+    Model group (every role): one item per ArchiMate layer opening onto its element types,
+        then Frameworks and Composer
     the connect card, until the organisation has connected a source
-    secondary group (bottom): Integrations, Reports, Help
+    secondary group (bottom): Connections, Reports, Help
     user menu (footer): Account, Billing, Team, Settings, Platform admin, Sign out
 
 Budget: scripts/check_sidebar_links.py renders this per role and counts its links.
 ===============================================================================
 #}
-{% from 'components/ui_sidebar.html' import sidebar, sidebar_gap, sidebar_container, sidebar_inner, sidebar_header, sidebar_content, sidebar_footer, sidebar_group, sidebar_group_label, sidebar_menu, sidebar_menu_item, sidebar_menu_button, sidebar_menu_sub, sidebar_menu_sub_item, sidebar_menu_sub_button, sidebar_rail %}
+{% from 'components/ui_sidebar.html' import sidebar, sidebar_gap, sidebar_container, sidebar_inner, sidebar_header, sidebar_content, sidebar_footer, sidebar_group, sidebar_group_label, sidebar_menu, sidebar_menu_item, sidebar_menu_button, sidebar_menu_sub, sidebar_menu_sub_item, sidebar_menu_sub_button, sidebar_menu_badge, sidebar_rail %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/input.html' import input %}
 {% from 'components/button.html' import button %}
 {% import 'components/card.html' as card %}
-{% set nav = sidebar_navigation(current_user) if current_user.is_authenticated else {'main': [], 'architecture': [], 'secondary': [], 'user_menu': [], 'connected': none, 'connect_url': none} %}
+{% set nav = sidebar_navigation(current_user) if current_user.is_authenticated else {'main': [], 'work': [], 'model': [], 'secondary': [], 'user_menu': [], 'connected': none, 'connect_url': none, 'cookie_name': none} %}
 {% set collapsed = request.cookies.get('sidebar_state') == 'false' %}
 {% call sidebar(collapsible='icon', variant='sidebar', state=('collapsed' if collapsed else 'expanded'), tag='aside', attrs={'id': 'admin-sidebar', 'data-testid': 'sidebar', 'aria-label': 'Sidebar'}) %}
 {{ sidebar_gap() }}
@@ -173,20 +175,33 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
 {% endcall %}
 
 {# ── Navigation (SidebarContent) ───────────────────────────────────────── #}
+{% macro _sub_links(item) -%}
+{% for child in item.children %}
+{% call sidebar_menu_sub_item() %}
+    {% call sidebar_menu_sub_button(href=child.href, active=child.active, attrs={'data-nav-key': child.key}) %}<span>{{ child.label }}</span>{% endcall %}
+{% endcall %}
+{% endfor %}
+{%- endmacro %}
+
+{# A link entry: one page. The count (Approvals) is shown only when something is waiting. #}
 {% macro _entry(item) -%}
 {% call sidebar_menu_item() %}
     {% call sidebar_menu_button(href=item.href, active=item.active, tooltip=item.label, wrap=true, attrs={'data-nav-key': item.key}) %}
         {% if item.icon %}<i data-lucide="{{ item.icon }}" aria-hidden="true"></i>{% endif %}<span>{{ item.label }}</span>
     {% endcall %}
-    {% if item.children %}
-    {% call sidebar_menu_sub() %}
-        {% for child in item.children %}
-        {% call sidebar_menu_sub_item() %}
-            {% call sidebar_menu_sub_button(href=child.href, active=child.active, attrs={'data-nav-key': child.key}) %}<span>{{ child.label }}</span>{% endcall %}
-        {% endcall %}
-        {% endfor %}
+    {% if item.badge %}{% call sidebar_menu_badge(attrs={'data-testid': 'nav-count-' ~ item.key, 'aria-label': item.badge ~ ' waiting'}) %}{{ item.badge }}{% endcall %}{% endif %}
+{% endcall %}
+{%- endmacro %}
+
+{# A collapsible entry: it opens its sub-items and has no page of its own. Sub-items of a closed
+   entry wait inside a template and are placed on the page when it is opened (nav_items.js). #}
+{% macro _toggle(item) -%}
+{% call sidebar_menu_item(attrs={'data-nav-item': item.key, 'data-open': 'true' if item.open else 'false'}) %}
+    {% call sidebar_menu_button(active=item.active and not item.open, tooltip=item.label, wrap=true, attrs={'data-nav-key': item.key, 'data-nav-toggle': item.key, 'aria-expanded': 'true' if item.open else 'false', 'aria-controls': 'nav-sub-' ~ item.key}) %}
+        {% if item.icon %}<i data-lucide="{{ item.icon }}" aria-hidden="true"></i>{% endif %}<span>{{ item.label }}</span><i data-lucide="chevron-right" class="ml-auto transition-transform {{ 'rotate-90' if item.open }}" data-nav-chevron aria-hidden="true"></i>
     {% endcall %}
-    {% endif %}
+    {% call sidebar_menu_sub(id='nav-sub-' ~ item.key, attrs={'hidden': true} if not item.open else {}) %}{% if item.open %}{{ _sub_links(item) }}{% endif %}{% endcall %}
+    {% if not item.open %}<template data-nav-children="{{ item.key }}">{{ _sub_links(item) }}</template>{% endif %}
 {% endcall %}
 {%- endmacro %}
 
@@ -199,11 +214,20 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     </div>
     {% endif %}
 
-    {% if nav.architecture %}
-    <div data-testid="nav-architecture">
+    {% if nav.work %}
+    <div data-testid="nav-work">
     {% call sidebar_group() %}
-        {{ sidebar_group_label(text='Architecture') }}
-        {% call sidebar_menu() %}{% for item in nav.architecture %}{{ _entry(item) }}{% endfor %}{% endcall %}
+        {{ sidebar_group_label(text='Work') }}
+        {% call sidebar_menu() %}{% for item in nav.work %}{{ _toggle(item) }}{% endfor %}{% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+
+    {% if nav.model %}
+    <div data-testid="nav-model">
+    {% call sidebar_group() %}
+        {{ sidebar_group_label(text='Model') }}
+        {% call sidebar_menu() %}{% for item in nav.model %}{% if item.toggle %}{{ _toggle(item) }}{% else %}{{ _entry(item) }}{% endif %}{% endfor %}{% endcall %}
     {% endcall %}
     </div>
     {% endif %}
@@ -274,3 +298,4 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
 {% endcall %}{# sidebar #}
 
 <script src="{{ url_for('static', filename='js/sidebar/sidebar_shell.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sidebar/nav_items.js') }}" data-cookie="{{ nav.cookie_name or '' }}"></script>

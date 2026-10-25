@@ -1296,6 +1296,26 @@ class AIChatApprovalService:
         )
         return [approval.to_dict() for approval in approvals]
 
+    @staticmethod
+    def _approver_queue_query(actor):
+        """The pending same-organisation approvals ``actor`` may review (the queue's one filter)."""
+        return AIChatCRUDApproval.query.filter_by(
+            organization_id=actor.organization_id,
+            status=ApprovalStatus.PENDING,
+        ).filter(
+            db.or_(
+                AIChatCRUDApproval.user_id.is_(None),
+                AIChatCRUDApproval.user_id != actor.id,
+            )
+        )
+
+    def count_approver_queue(self) -> int:
+        """How many items the approvals inbox lists for this person (0 when they may not open it)."""
+        actor, actor_error = self._acting_user(require_general=True)
+        if actor_error:
+            return 0
+        return self._approver_queue_query(actor).count()
+
     def get_approver_queue(self) -> Dict[str, Any]:
         """Pending same-org approvals a different user may review.
 
@@ -1309,16 +1329,7 @@ class AIChatApprovalService:
         if actor_error:
             return actor_error
         approvals = (
-            AIChatCRUDApproval.query.filter_by(
-                organization_id=actor.organization_id,
-                status=ApprovalStatus.PENDING,
-            )
-            .filter(
-                db.or_(
-                    AIChatCRUDApproval.user_id.is_(None),
-                    AIChatCRUDApproval.user_id != actor.id,
-                )
-            )
+            self._approver_queue_query(actor)
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
         )
