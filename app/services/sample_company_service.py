@@ -66,6 +66,16 @@ _CAPABILITIES = [
     ("Run customer support", None, 2, 3),
 ]
 
+# What kind of capability each is: selling differentiates this shop, taking payments and
+# fulfilling orders run it, and support is what every shop needs.
+_CAPABILITY_TYPES = {
+    "Sell to customers online": "strategic",
+    "Process online payments": "operational",
+    "Track customer orders": "operational",
+    "Manage stock": "operational",
+    "Run customer support": "supporting",
+}
+
 # (title, likelihood, impact, owner role, mitigation, element name)
 _RISKS = [
     ("Payments provider outage stops checkout", 3, 5,
@@ -236,6 +246,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             organization_id=org_id, source_table=SOURCE_TABLE, source_id=str(row.id),
         ).first()
         if projected is not None:
+            projected.capability_type = _CAPABILITY_TYPES[name]
             db.session.refresh(row)
             if projected.archimate_element_id is None and row.archimate_element_id:
                 # The mirror element is created after the first projection; carry its id across.
