@@ -336,6 +336,10 @@ def test_backfill_leaves_unprovenanced_roadmap_task_null_with_two_orgs(app):
                 text("DELETE FROM roadmap_tasks WHERE id = ANY(:ids)"), {"ids": task_ids}
             )
             db.session.execute(
+                text("DELETE FROM soc2_audit_log WHERE organization_id IN (:a, :b)"),
+                {"a": org_a.id, "b": org_b.id},
+            )
+            db.session.execute(
                 text("DELETE FROM users WHERE id IN (:a, :b)"), {"a": user_a.id, "b": user_b.id}
             )
             db.session.execute(
@@ -451,6 +455,10 @@ def test_backfill_dry_run_changes_nothing(app):
             db.session.rollback()
             db.session.execute(
                 text("DELETE FROM roadmap_tasks WHERE id = ANY(:ids)"), {"ids": task_ids}
+            )
+            db.session.execute(
+                text("DELETE FROM soc2_audit_log WHERE organization_id IN (:a, :b)"),
+                {"a": org_a.id, "b": org_b.id},
             )
             db.session.execute(
                 text("DELETE FROM users WHERE id IN (:a, :b)"), {"a": user_a.id, "b": user_b.id}

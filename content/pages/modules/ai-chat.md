@@ -13,15 +13,13 @@ icon: message-square
 
 # AI Chat
 
-*One chat interface for your AI assistant to query the model directly — instead of guessing at an
-answer it can't check.*
+*Ask about your organisation in plain words and read an answer that names the records behind it.*
 
-## What Entelim is building
+## What it does
 
-A chat page where every generated narrative lands, backed by direct access to the same questions Ask
-answers — so an AI assistant reasons from your real model, not from a plausible-sounding guess.
+The AI chat is the one place to ask. Ask what breaks if a system fails, who owns it, which risks reach it or what it costs. The answer cites the records it came from, and any change it suggests waits in your approval queue until a person approves it.
 
-Available now on a paid plan. [See plans](/pricing).
+Available now on every plan, including the free Community plan. [See plans](/pricing).
 
 ## Related
 

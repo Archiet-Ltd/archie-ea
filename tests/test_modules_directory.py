@@ -79,22 +79,12 @@ def test_modules_directory_includes_zone_sourced_link(app, db_session, make_org)
 
 
 def test_modules_directory_includes_curated_more_tools(app, db_session, make_org):
-    """Corrected 20 Sep 2026 — this test previously asserted "Stakeholder Map"
-    and "Batch Import" as proof the More-tools section itself renders.
-    Neither actually proves that: Stakeholder Map IS a zone link
-    (role_access.py's _MY_WORK_LINKS, several roles) and Batch Import IS a
-    zone link too (_ADMIN_LINKS, platform_admin's zone) — both are only
-    absent from More-tools for the default `enterprise_architect` test user
-    because the zone-vs-More-tools dedup correctly drops the More-tools copy
-    for whichever roles already have the zone copy. "Chief Architect
-    Synthesis" (solution_design.architect_synthesis) is verified absent from
-    every entry in role_access.py's SIDEBAR_ZONES (_HOME_LINKS,
-    _LIBRARY_LINKS, _GOVERNANCE_LINKS, _ADMIN_LINKS, _MY_WORK_LINKS) — it is
-    genuinely More-tools-only, so it actually tests what this test claims to
-    test."""
+    """The weekly briefing is listed under its own name, and the retired
+    workbench name is gone."""
     client = _make_logged_in_client(app, db_session, make_org)
     html = client.get("/modules").get_data(as_text=True)
-    assert "Chief Architect Synthesis" in html
+    assert "Weekly Briefing" in html
+    assert "Chief Architect Synthesis" not in html
 
 
 def test_modules_directory_sends_the_twin_map_to_the_composer(app, db_session, make_org):

@@ -144,10 +144,8 @@ def _chief_architect_workbench():
 @solution_design_bp.route("/architect-synthesis", methods=["GET"])
 @login_required
 def architect_synthesis():
-    """Enterprise-wide Chief Architect Workbench."""
-    return render_template(
-        "solutions/architect_synthesis.html", synthesis=_chief_architect_workbench()
-    )
+    """The workbench's address now opens the weekly briefing."""
+    return redirect("/solutions/briefings")
 
 
 @solution_design_bp.route("/architect-synthesis/api", methods=["GET"])
@@ -409,37 +407,30 @@ def solution_migration_roadmap_generate(solution_id):
 @solution_design_bp.route("/briefings", methods=["GET"])
 @login_required
 def ea_briefings():
-    """Enterprise Architecture briefing — latest digest + history."""
-    from app.modules.solutions_strategic.v2.services.enterprise_briefing_service import (
-        EnterpriseBriefingService,
-    )
+    """The weekly briefing: this week first, earlier weeks listed."""
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.solutions_strategic.v2.services import weekly_briefing
 
-    latest = EnterpriseBriefingService.latest()
-    history = EnterpriseBriefingService.history()
-    return render_template(
-        "solutions/ea_briefing.html",
-        latest=latest.to_dict() if latest else None,
-        history=[b.to_dict() for b in history],
-    )
+    org_id = current_org_id()
+    if org_id is None:
+        return render_template("errors/404.html"), 404
+    week = weekly_briefing.parse_week(request.args.get("week"))
+    briefing = weekly_briefing.build(org_id, week)
+    return render_template("solutions/weekly_briefing.html", briefing=briefing)
 
 
 @solution_design_bp.route("/briefings/<int:briefing_id>", methods=["GET"])
 @login_required
 def ea_briefing_detail(briefing_id):
-    """A specific past briefing."""
+    """A stored briefing opens the weekly briefing for the week it was made."""
     from app.models.strategic import EnterpriseBriefing
-    from app.modules.solutions_strategic.v2.services.enterprise_briefing_service import (
-        EnterpriseBriefingService,
-    )
+    from app.modules.solutions_strategic.v2.services import weekly_briefing
 
-    b = db.session.get(EnterpriseBriefing, briefing_id)
-    if b is None:
+    stored = db.session.get(EnterpriseBriefing, briefing_id)
+    if stored is None or stored.generated_at is None:
         return render_template("errors/404.html"), 404
-    return render_template(
-        "solutions/ea_briefing.html",
-        latest=b.to_dict(),
-        history=[x.to_dict() for x in EnterpriseBriefingService.history()],
-    )
+    week = weekly_briefing.week_start_for(stored.generated_at.date())
+    return redirect(f"/solutions/briefings?week={week.isoformat()}")
 
 
 @solution_design_bp.route("/briefings/api/generate", methods=["POST"])

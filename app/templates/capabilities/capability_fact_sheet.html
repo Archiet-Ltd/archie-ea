@@ -1,7 +1,13 @@
+{# shadcn-reference: preview@e55b60b #}
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/metrics_card.html" import metrics_card %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/badge.html" import badge %}
+{% from "components/button.html" import button %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/select.html" import native_select %}
 
 {% block title %}{{ cap.name }} — Capability Fact Sheet{% endblock %}
 
@@ -43,7 +49,7 @@
     {# Completeness ring #}
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
-      <div class="relative shrink-0" style="width:76px;height:76px"> {# inline-style-ok: fixed ring geometry #}
+      <div class="relative shrink-0" style="width:76px;height:76px">
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="3"></circle>
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring }}" stroke-width="3"
@@ -68,9 +74,9 @@
       </p>
       {% if maturity.current_pct is not none %}
       <div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden relative">
-        <div class="h-full bg-primary rounded-full" style="width:{{ maturity.current_pct }}%"></div> {# inline-style-ok: data-driven progress #}
+        <div class="h-full bg-primary rounded-full" style="width:{{ maturity.current_pct }}%"></div>
         {% if maturity.target_pct is not none %}
-        <span class="absolute top-0 h-full w-0.5 bg-foreground/70" style="left:{{ maturity.target_pct }}%"></span> {# inline-style-ok: target marker #}
+        <span class="absolute top-0 h-full w-0.5 bg-foreground/70" style="left:{{ maturity.target_pct }}%"></span>
         {% endif %}
       </div>
       {% endif %}
@@ -81,7 +87,7 @@
       </p>
     </div>
 
-    {{ metrics_card(title='Strategic importance',
+    {{ metrics_card(title='Importance',
         value=(cap.strategic_importance if cap.strategic_importance is not none else '—'),
         icon='target',
         footer_text='ROI score: ' ~ (cap.roi_score if cap.roi_score is not none else '—')) }}
@@ -100,12 +106,38 @@
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
       <div class="flex flex-wrap gap-2 mt-2">
         {% for m in completeness.missing %}
-        <span class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5">{{ m }}</span>
+        {% call badge(variant='warning') %}{{ m }}{% endcall %}
         {% endfor %}
       </div>
     </div>
   </div>
   {% endif %}
+
+  {# ── Capability type ─────────────────────────────────────────────────── #}
+  <div class="mb-4">
+  {% call panel('Capability type', 'tags') %}
+    <div class="flex flex-wrap items-center gap-3">
+      <p class="text-sm text-muted-foreground">This capability is</p>
+      {% if capability_type %}
+        {% call badge('info' if capability_type == 'strategic' else 'neutral' if capability_type == 'operational' else 'secondary') %}<span data-testid="capability-type">{{ type_labels[capability_type] }}</span>{% endcall %}
+        <p class="text-sm text-muted-foreground">{{ type_help[capability_type] }}</p>
+      {% else %}
+        <p class="text-sm text-muted-foreground">not yet classified.</p>
+      {% endif %}
+    </div>
+    {% if can_edit_type and capability_type %}
+    <form method="post" action="{{ url_for('enterprise_crud.set_capability_type_route', capability_id=cap.id) }}" class="mt-4 flex flex-wrap items-end gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% call form_group(id='capability_type', label='Change the type', help_text='Strategic: differentiates the company, so invest and measure. Operational: runs it day to day, so keep it reliable. Supporting: every company needs it, so buy it.') %}
+        {{ native_select(id='capability_type', name='capability_type', aria_label='Capability type', class='w-56',
+            options=[('strategic', 'Strategic'), ('operational', 'Operational'), ('supporting', 'Supporting')],
+            selected=capability_type) }}
+      {% endcall %}
+      {{ button(text='Save type', type='submit', testid='save-capability-type') }}
+    </form>
+    {% endif %}
+  {% endcall %}
+  </div>
 
   {# ── Detail panels ───────────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -115,7 +147,7 @@
       {{ drow('Code', cap.code) }}
       {{ drow('Level', cap.level) }}
       {{ drow('Business domain', cap.business_domain) }}
-      {{ drow('Business owner', cap.business_owner) }}
+      {{ drow('Business owner', owners | map(attribute='user_name') | join(', ') if owners else cap.business_owner) }}
       {{ drow('IT owner', cap.it_owner) }}
       {{ drow('Maturity assessed', maturity.assessed) }}
     </dl>
@@ -156,11 +188,12 @@
   {# ── Impact graph link ───────────────────────────────────────────────── #}
   {% if archimate_element_id %}
   <div class="mt-4">
-    <a href="{{ url_for('archimate.element_impact_graph_page', element_id=archimate_element_id) }}"
-       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-      <i data-lucide="git-fork" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-      View impact graph — what depends on this capability
-    </a>
+    {{ button(
+        text='View impact graph — what depends on this capability',
+        variant='outline',
+        icon='git-fork',
+        href=url_for('archimate.element_impact_graph_page', element_id=archimate_element_id)
+    ) }}
   </div>
   {% endif %}
 

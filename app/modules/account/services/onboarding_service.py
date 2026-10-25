@@ -48,6 +48,9 @@ FRAMEWORKS = (
     ("cobit2019", "COBIT 2019", "IT governance"),
 )
 
+KINDS = (("startup", "Startup"), ("scaleup", "Scale-up"), ("enterprise", "Enterprise"))
+
+_KIND_KEYS = {key for key, _label in KINDS}
 _INDUSTRY_KEYS = {key for key, _label, _model in INDUSTRIES}
 _FRAMEWORK_KEYS = {key for key, _label, _note in FRAMEWORKS}
 
@@ -70,16 +73,26 @@ def _write(org, section: str, values: Dict[str, Any]) -> None:
 def choices(org) -> Dict[str, Any]:
     """The industry and frameworks the organisation recorded, or nothing."""
     context = _context(org)
-    return {"industry": context.get("industry"), "frameworks": list(context.get("frameworks") or [])}
+    return {
+        "kind": context.get("kind"),
+        "industry": context.get("industry"),
+        "frameworks": list(context.get("frameworks") or []),
+    }
 
 
 def settings_card(org) -> Dict[str, Any]:
     """What Settings shows so the two choices can be changed after sign-up."""
-    return {"industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org)}
+    return {"kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org)}
 
 
-def save_choices(org, industry: Optional[str], frameworks: List[str]) -> Dict[str, Any]:
-    """Record the industry and the frameworks; an unknown value is refused, an empty one clears."""
+def save_choices(
+    org, industry: Optional[str], frameworks: List[str], kind: Optional[str] = None
+) -> Dict[str, Any]:
+    """Record the company kind, the industry and the frameworks; an unknown value is refused, an empty
+    industry or framework list clears. An empty kind leaves the stored answer as it was."""
+    kind = (kind or "").strip() or None
+    if kind is not None and kind not in _KIND_KEYS:
+        raise ValueError("Choose a company kind from the list.")
     industry = (industry or "").strip() or None
     if industry is not None and industry not in _INDUSTRY_KEYS:
         raise ValueError("Choose an industry from the list.")
@@ -87,6 +100,8 @@ def save_choices(org, industry: Optional[str], frameworks: List[str]) -> Dict[st
     if any(key not in _FRAMEWORK_KEYS for key in wanted):
         raise ValueError("Choose frameworks from the list.")
     context = _context(org)
+    if kind is not None:
+        context["kind"] = kind
     context["industry"] = industry
     context["frameworks"] = wanted
     _write(org, "company_context", context)
@@ -127,6 +142,11 @@ def mark_finished(org) -> None:
     state.setdefault("finished_at", datetime.utcnow().isoformat())
     _write(org, "onboarding", state)
     db.session.commit()
+
+
+def skipped_sources(org) -> bool:
+    """True once sign-up is finished and no source was given, so the dashboard can say so."""
+    return is_finished(org) and not any_source_given(org)
 
 
 def is_finished(org) -> bool:
