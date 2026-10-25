@@ -240,10 +240,10 @@ def test_broken_chains_are_counted_listed_and_never_cross_organisations(
     org_b = make_org("trace-broken-b")
     with tenant_ctx(org_a.id):
         component, process, node, other = _broken_estate(db_session, org_a, "A")
-        capability = _element(db_session, org_a, "Pay suppliers A", "Capability", "strategy")
+        _element(db_session, org_a, "Pay suppliers A", "Capability", "strategy")
         db_session.commit()
     with tenant_ctx(org_b.id):
-        b_app = _element(db_session, org_b, "Only B app", "ApplicationComponent", "application")
+        _element(db_session, org_b, "Only B app", "ApplicationComponent", "application")
         db_session.commit()
     user_a = _user(db_session, org_a, "a")
     user_b = _user(db_session, org_b, "b")
