@@ -341,6 +341,12 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register principle tenancy backfill CLI: {e}")
 
     try:
+        from app.commands.backfill_vendor_links import init_app as init_vendor_links
+        init_vendor_links(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register vendor link backfill CLI: {e}")
+
+    try:
         from app.commands.backfill_outcome_org import init_app as init_outcome_org
         init_outcome_org(app)
         app.logger.info("✅ Outcome tenancy backfill CLI command registered")
