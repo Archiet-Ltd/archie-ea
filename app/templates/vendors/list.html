@@ -6,6 +6,9 @@
 {% from "components/status_badge.html" import status_badge %}
 {% from "components/workbench_table.html" import workbench_table with context %}
 {% from "components/modal.html" import modal %}
+{% from "components/button.html" import button %}
+{% from "components/input.html" import input, textarea %}
+{% from "components/select.html" import native_select %}
 
 {% block title %}Vendor Catalogue{% endblock %}
 
@@ -84,12 +87,10 @@
            tests/smoke/test_vendor_dialog_controls.py, whose own selector is (rightly) unscoped
            since it targets the header action specifically. #}
         <span class="mt-3 block" x-show="!hasActiveFilters">
-          <button type="button" @click="Platform.modal.open('create-vendor')" aria-label="Add your first vendor"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add your first vendor</button>
+          {{ button('Add your first vendor', on_click='Platform.modal.open(\'create-vendor\')', aria_label='Add your first vendor') }}
         </span>
         <span class="mt-3 block" x-show="hasActiveFilters" x-cloak>
-          <button type="button" @click="clearAllFilters()" aria-label="Clear filters"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Clear filters</button>
+          {{ button('Clear filters', on_click='clearAllFilters()', aria_label='Clear filters') }}
         </span>
       {% endset %}
       {% call workbench_table(
@@ -124,7 +125,7 @@
         <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
         <td class="px-4 py-3 align-middle">
           <div>
-            <button type="button" @click="openEditModal(row)" class="font-medium text-left hover:text-primary hover:underline transition-colors" x-text="row.name"></button>
+            {{ button(on_click='openEditModal(row)', attrs_dict={'x-text': 'row.name'}) }}
             <template x-if="row.website">
               <a :href="row.website" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block" x-text="row.website"></a>
             </template>
@@ -167,11 +168,7 @@
               <i data-lucide="eye" class="h-3 w-3"></i>
               View
             </a>
-            <button type="button" @click.stop="openEditModal(row)"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-              <i data-lucide="pencil" class="h-3 w-3"></i>
-              Edit
-            </button>
+            {{ button('Edit', on_click='openEditModal(row)') }}
           </div>
         </td>
       {% endcall %}
@@ -195,64 +192,50 @@
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-medium mb-1">Vendor Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" x-model="editForm.name" required maxlength="200"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="Vendor name" aria-label="Vendor Name">
+        {{ input(placeholder='Vendor name', class='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', maxlength='200', required=true, aria_label='Vendor Name', attrs_dict={'x-model': 'editForm.name'}) }}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium mb-1">Vendor Type</label>
-          <select x-model="editForm.vendor_type"
-                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Vendor Type">
-            <option value="">Select type...</option>
+          {% call native_select(class='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', aria_label='Vendor Type', attrs_dict={'x-model': 'editForm.vendor_type'}) %}
+<option value="">Select type...</option>
             <option value="software_vendor">Software Vendor</option>
             <option value="saas_platform">SaaS Platform</option>
             <option value="cloud_provider">Cloud Provider</option>
             <option value="systems_integrator">Systems Integrator</option>
             <option value="consulting_partner">Consulting Partner</option>
             <option value="managed_service_provider">Managed Service Provider</option>
-          </select>
+{% endcall %}
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Country</label>
-          <input type="text" x-model="editForm.country"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                 placeholder="e.g. United Kingdom" aria-label="Country">
+          {{ input(placeholder='e.g. United Kingdom', class='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', aria_label='Country', attrs_dict={'x-model': 'editForm.country'}) }}
         </div>
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Website</label>
-        <input type="url" x-model="editForm.website"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="https://example.com" aria-label="Website">
+        {{ input(placeholder='https://example.com', class='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', type='url', aria_label='Website', attrs_dict={'x-model': 'editForm.website'}) }}
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Status</label>
-        <select x-model="editForm.status"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Status">
-          <option value="active">Active</option>
+        {% call native_select(class='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', aria_label='Status', attrs_dict={'x-model': 'editForm.status'}) %}
+<option value="active">Active</option>
           <option value="inactive">Inactive</option>
           <option value="catalog">Catalog</option>
           <option value="contracted">Contracted</option>
           <option value="deployed">Deployed</option>
-        </select>
+{% endcall %}
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Description</label>
-        <textarea x-model="editForm.description" rows="3"
-                  class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Brief description" aria-label="Description"></textarea>
+        {{ textarea(placeholder='Brief description', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', rows=3, aria_label='Description', attrs_dict={'x-model': 'editForm.description'}) }}
       </div>
       <div x-show="editError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="editError"></div>
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-      <button type="button" data-modal-close="edit-vendor-modal"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-      <button type="button" @click="saveEdit()" :disabled="editSaving"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="editSaving" x-cloak></i>
-        <span x-text="editSaving ? 'Saving...' : 'Save Changes'"></span>
-      </button>
+      {{ button('Cancel', attrs_dict={'data-modal-close': 'edit-vendor-modal'}) }}
+      {% call button(on_click='saveEdit()', attrs_dict={':disabled': 'editSaving'}) %}<i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="editSaving" x-cloak></i>
+        <span x-text="editSaving ? 'Saving...' : 'Save Changes'"></span>{% endcall %}
     </div>
   {% endcall %}
 
@@ -262,18 +245,11 @@
       This will permanently delete the selected vendors and cannot be undone.
       Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
     </p>
-    <input type="text" x-model="deleteConfirmText"
-           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
-           placeholder="DELETE" @keydown.enter="executeBulkDelete()" aria-label="DELETE">
+    {{ input(placeholder='DELETE', class='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4', aria_label='DELETE', attrs_dict={'x-model': 'deleteConfirmText', '@keydown.enter': 'executeBulkDelete()'}) }}
     <div class="flex justify-end gap-3">
-      <button type="button" data-modal-close="bulk-delete-confirm-modal"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-      <button type="button" @click="executeBulkDelete()"
-              :disabled="deleteConfirmText !== 'DELETE' || deleteInProgress"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak></i>
-        <span x-text="deleteInProgress ? 'Deleting...' : 'Delete'"></span>
-      </button>
+      {{ button('Cancel', attrs_dict={'data-modal-close': 'bulk-delete-confirm-modal'}) }}
+      {% call button(on_click='executeBulkDelete()', attrs_dict={':disabled': 'deleteConfirmText !== \'DELETE\' || deleteInProgress'}) %}<i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak></i>
+        <span x-text="deleteInProgress ? 'Deleting...' : 'Delete'"></span>{% endcall %}
     </div>
   {% endcall %}
 
@@ -283,48 +259,35 @@
       <form @submit.prevent="submitCreateVendor()" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% call form_group(id='cv-name', label='Vendor Name', required=true) %}
-          <input type="text" id="cv-name" name="name" x-model="formData.name" required maxlength="200"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                 placeholder="Enter vendor name">
+          {{ input(id='cv-name', name='name', placeholder='Enter vendor name', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', maxlength='200', required=true, attrs_dict={'x-model': 'formData.name'}) }}
         {% endcall %}
         <div class="grid grid-cols-1 gap-4">
           {% call form_group(id='cv-type', label='Vendor Type') %}
-            <select id="cv-type" name="vendor_type" x-model="formData.vendor_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="">Select type...</option>
+            {% call native_select(id='cv-type', name='vendor_type', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs_dict={'x-model': 'formData.vendor_type'}) %}
+<option value="">Select type...</option>
               <option value="software_vendor">Software Vendor</option>
               <option value="saas_platform">SaaS Platform</option>
               <option value="cloud_provider">Cloud Provider</option>
               <option value="systems_integrator">Systems Integrator</option>
               <option value="consulting_partner">Consulting Partner</option>
               <option value="managed_service_provider">Managed Service Provider</option>
-            </select>
+{% endcall %}
           {% endcall %}
           {% call form_group(id='cv-country', label='Country') %}
-            <input type="text" id="cv-country" name="country" x-model="formData.country"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                   placeholder="e.g. United Kingdom">
+            {{ input(id='cv-country', name='country', placeholder='e.g. United Kingdom', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs_dict={'x-model': 'formData.country'}) }}
           {% endcall %}
         </div>
         {% call form_group(id='cv-website', label='Website') %}
-          <input type="url" id="cv-website" name="website" x-model="formData.website"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                 placeholder="https://example.com">
+          {{ input(id='cv-website', name='website', placeholder='https://example.com', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', type='url', attrs_dict={'x-model': 'formData.website'}) }}
         {% endcall %}
         {% call form_group(id='cv-description', label='Description') %}
-          <textarea id="cv-description" name="description" x-model="formData.description" rows="3"
-                    class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Brief description of the vendor"></textarea>
+          {{ textarea(id='cv-description', name='description', placeholder='Brief description of the vendor', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', rows=3, attrs_dict={'x-model': 'formData.description'}) }}
         {% endcall %}
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
         <div class="flex justify-end gap-3 pt-2 border-t border-border">
-          <button type="button" @click="Platform.modal.close('create-vendor')"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
-          <button type="submit" :disabled="submitting"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
-            <span x-text="submitting ? 'Creating...' : 'Create Vendor'"></span>
-          </button>
+          {{ button('Cancel', on_click='Platform.modal.close(\'create-vendor\')') }}
+          {% call button(type='submit', attrs_dict={':disabled': 'submitting'}) %}<i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
+            <span x-text="submitting ? 'Creating...' : 'Create Vendor'"></span>{% endcall %}
         </div>
       </form>
     </div>

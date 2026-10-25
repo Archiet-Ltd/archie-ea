@@ -2,7 +2,8 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_content %}
-{% from 'components/input.html' import label %}
+{% from 'components/input.html' import label, input, textarea %}
+{% from 'components/select.html' import native_select %}
 
 {% block title %}Create Vendor{% endblock %}
 
@@ -24,44 +25,35 @@
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Vendor Name{% endcall %}
-                        <input type="text" id="name" name="name" required
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                               placeholder="Enter vendor name" aria-label="Enter vendor name">
+                        {{ input(id='name', name='name', placeholder='Enter vendor name', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', required=true, aria_label='Enter vendor name') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='vendor_type') %}Vendor Type{% endcall %}
-                        <select id="vendor_type" name="vendor_type"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Type">
-                            <option value="">Select Type</option>
+                        {% call native_select(id='vendor_type', name='vendor_type', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', aria_label='Select Type') %}
+<option value="">Select Type</option>
                             <option value="software_vendor">Software Vendor</option>
                             <option value="saas_platform">SaaS Platform</option>
                             <option value="cloud_provider">Cloud Provider</option>
                             <option value="systems_integrator">Systems Integrator</option>
                             <option value="consulting_partner">Consulting Partner</option>
                             <option value="managed_service_provider">Managed Service Provider</option>
-                        </select>
+{% endcall %}
                     </div>
                 </div>
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    <textarea id="description" name="description" rows="3"
-                              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              placeholder="Describe the vendor and their offerings" aria-label="Describe the vendor and their offerings"></textarea>
+                    {{ textarea(id='description', name='description', placeholder='Describe the vendor and their offerings', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, aria_label='Describe the vendor and their offerings') }}
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='website') %}Website{% endcall %}
-                        <input type="url" id="website" name="website"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                               placeholder="https://vendor.com" aria-label="https://vendor.com">
+                        {{ input(id='website', name='website', placeholder='https://vendor.com', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', type='url', aria_label='https://vendor.com') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='headquarters_location') %}Headquarters Location{% endcall %}
-                        <input type="text" id="headquarters_location" name="headquarters_location"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                               placeholder="e.g. San Francisco, CA" aria-label="e.g. San Francisco, CA">
+                        {{ input(id='headquarters_location', name='headquarters_location', placeholder='e.g. San Francisco, CA', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', aria_label='e.g. San Francisco, CA') }}
                     </div>
                 </div>
 
