@@ -14224,6 +14224,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
@@ -14247,17 +14248,27 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 2
+    "button": 2,
+    "link": 2,
+    "table": 1
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/table.html"
    ],
    "frame": "dashboard-01",
    "inhouse_components": [
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/empty_state.html",
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -14311,6 +14322,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
@@ -14335,11 +14347,14 @@
    "confidence": "high",
    "controls": {
     "button": 2,
-    "link": 3,
+    "link": 2,
     "table": 2
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/table.html"
    ],
    "frame": "dashboard-01",
    "inhouse_components": [
@@ -14347,7 +14362,12 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/empty_state.html",
+    "components/table.html",
+    "components/tabs.html",
     "macros/page_shell.html"
    ],
    "original": "preview",
@@ -16457,22 +16477,23 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
-    "components/data_card.html",
+    "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
     "components/filter_bar.html",
+    "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/pagination_controls.html",
     "components/provenance.html",
     "components/search_bar.html",
     "components/select.html",
@@ -16480,11 +16501,12 @@
     "components/status_badge.html",
     "components/table.html",
     "components/tabs.html",
+    "components/workbench_table.html",
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
-   "basis": "declared",
-   "block": "board",
+   "basis": "rule",
+   "block": "data-table",
    "charts": [],
    "components": [
     "alert",
@@ -16530,23 +16552,23 @@
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
-   "original": "gap:G-4",
-   "page_type": "board",
+   "original": "example:tasks",
+   "page_type": "data-table",
    "persona": "portfolio_manager",
-   "reason": "Requirements backlog as a board: four priority columns with count badges and a move menu on the shared board.",
+   "reason": "Backlog prioritisation table.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: cards",
-     "url": "https://ui.shadcn.com/examples/cards"
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: Kanban",
-     "image": "docs/design/reference/basecoat-kanban.webp"
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
     }
    },
    "spec": null,
    "status": "mapped",
-   "tier": "C4",
+   "tier": "B",
    "type_changed": false
   },
   "app/templates/batch_import/batch_review.html": {
@@ -22377,9 +22399,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 1,
+    "button": 1,
+    "link": 2,
     "table": 1,
-    "testid": 2
+    "testid": 1
    },
    "extends": [
     "layouts/admin_base.html"
@@ -22389,7 +22412,11 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/_breadcrumb_root.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/dense_table.html",
+    "components/empty_state.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -22464,8 +22491,9 @@
    ],
    "confidence": "high",
    "controls": {
+    "link": 3,
     "table": 1,
-    "testid": 2
+    "testid": 1
    },
    "extends": [
     "layouts/admin_base.html"
@@ -22475,7 +22503,9 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/_breadcrumb_root.html",
+    "components/dense_table.html",
+    "components/empty_state.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -22550,9 +22580,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 1,
+    "button": 1,
+    "link": 3,
     "table": 1,
-    "testid": 2
+    "testid": 1
    },
    "extends": [
     "layouts/admin_base.html"
@@ -22562,7 +22593,10 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/_breadcrumb_root.html",
+    "components/button.html",
+    "components/dense_table.html",
+    "components/empty_state.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -30553,12 +30587,13 @@
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
-    "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
@@ -30567,23 +30602,25 @@
     "components/empty_state.html",
     "components/error_boundary.html",
     "components/filter_bar.html",
-    "components/form_field.html",
+    "components/gantt_timeline.html",
     "components/inline_hint.html",
-    "components/input.html",
     "components/loading_state.html",
+    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
     "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
+    "components/review_queue_panel.html",
     "components/skeleton.html",
     "components/status_badge.html",
+    "components/status_indicator.html",
     "components/tabs.html",
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
-   "basis": "declared",
-   "block": "board",
+   "basis": "rule",
+   "block": "dashboard",
    "charts": [],
    "components": [
     "alert",
@@ -30625,12 +30662,12 @@
    "reason": "Product roadmap in Now, Next and Later lanes with a sprint timeline; time-axis form.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: cards",
-     "url": "https://ui.shadcn.com/examples/cards"
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: Kanban",
-     "image": "docs/design/reference/basecoat-kanban.webp"
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
    "spec": null,
