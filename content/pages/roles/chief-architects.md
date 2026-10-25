@@ -60,8 +60,8 @@ lives in five different places.
   health, at-risk hotspots and the coverage and maturity shortfalls behind them.
 - **The tech radar**, where each device, system software and technology service already in the model is
   classed adopt, trial, assess or hold, with a rationale, review date and requesting initiative recorded.
-- **Ask**, and the twin map it opens into, for a plain question about one element and what it connects to —
-  see [Digital twin of your organisation](/modules/digital-twin).
+- **The AI chat**, for a plain question about one element and what it connects to; any element then opens in
+  the Composer — see [Digital twin of your organisation](/modules/digital-twin).
 - **Roadmaps**, with plateaus, the gap register and work packages on one timeline — see
   [Roadmaps](/modules/roadmaps).
 
@@ -112,7 +112,7 @@ layers, and design work is tracked through the stages of TOGAF's Architecture De
 
 ### Can the CTO see these numbers without a paid seat?
 
-Yes. Anyone who only reads a dashboard or asks a question on Ask is free on every plan. An editor seat is
+Yes. Anyone who only reads a dashboard or asks a question in the AI chat is free on every plan. An editor seat is
 for people who change the model: recording a decision, classifying technology, taking a review forward.
 
 ### Who needs a paid seat?

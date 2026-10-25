@@ -762,6 +762,10 @@ _ARB_REVIEWS = [
      "standards_exception", "medium", "submitted", 5, None, None),
     ("LQ-ARB-2026-009", "Introduce a vendor risk score into supplier selection",
      "architecture_change", "low", "submitted", 2, None, None),
+    ("LQ-ARB-2026-010", "Adopt a single customer identifier across the estate",
+     "architecture_change", "high", "under_review", 18, None, None),
+    ("LQ-ARB-2026-011", "Exception to the approved database standard for Field Service",
+     "standards_exception", "medium", "submitted", 26, None, None),
 ]
 
 # ── application owners ─────────────────────────────────────────────────────
@@ -943,6 +947,12 @@ _CAPABILITIES = [
 ]
 
 # ── risks ──────────────────────────────────────────────────────────────────
+
+# (risk title, earlier residual (likelihood, impact), residual now)
+_RISING_RISKS = [
+    ("Event Relay single point of failure", (3, 4), (4, 5)),
+    ("Calibration Ledger data corruption", (2, 4), (4, 4)),
+]
 
 _RISKS = [
     # (title, likelihood, impact, status, owner, mitigation, archimate_element_name)
@@ -2244,6 +2254,56 @@ def _seed_order_to_delivery(org_id) -> int:
     return 1
 
 
+# Days before today on which the demonstration model's records were added, repeated down the list of
+# records. Every third record names a connected source, the rest were added by hand, so the Overview's
+# chart of records added has a shape across the last 90 days instead of a single day.
+_HISTORY_DAYS_AGO = (0, 1, 2, 4, 5, 8, 11, 12, 15, 19, 23, 27, 31, 36, 40, 47, 53, 58, 66, 74, 83)
+
+
+def spread_history(org_id, days_ago=_HISTORY_DAYS_AGO, now=None):
+    """Date an organisation's model records across the last 90 days in the change history.
+
+    Only the first version of each record moves (when it was added), and every third record names a connected
+    source, in its first version and on the record itself. Records, relationships and the dates they carry are
+    otherwise untouched. Returns how many records were dated; 0 when the history holds none.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.models.entity_history import EntityHistory
+
+    now = now or _dt.datetime.utcnow()
+    rows = (
+        db.session.query(EntityHistory)
+        .filter(
+            EntityHistory.organization_id == org_id,
+            EntityHistory.table_name.in_(["archimate_elements", "archimate_relationships"]),
+        )
+        .order_by(EntityHistory.table_name, EntityHistory.record_id, EntityHistory.valid_from, EntityHistory.id)
+        .all()
+    )
+    from app.models import ArchiMateElement
+
+    first = {}
+    for row in rows:
+        first.setdefault((row.table_name, row.record_id), row)
+    for index, row in enumerate(first.values()):
+        moved = now - _dt.timedelta(days=days_ago[index % len(days_ago)], hours=index % 5)
+        row.valid_from = min(row.valid_from, moved)
+        snapshot = dict(row.snapshot or {})
+        if index % 3 == 0:
+            snapshot["source_kind"] = "connector"
+            snapshot["source_label"] = "GitHub"
+            if row.table_name == "archimate_elements":
+                element = db.session.get(ArchiMateElement, row.record_id)
+                if element is not None and element.organization_id == org_id and element.source_kind is None:
+                    element.source_kind = "connector"
+                    element.source_label = "GitHub"
+        row.snapshot = snapshot
+        flag_modified(row, "snapshot")
+    db.session.flush()
+    return len(first)
+
+
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
@@ -2721,6 +2781,34 @@ def seed_demo_company() -> dict:
             db.session.flush()
         stats["risks_created"] = risks_created
 
+        # Two risks whose score has risen in the last week, so the weekly
+        # briefing has movement to report. Skipped once a risk has history.
+        from app.models.risk_score_history import RiskScoreHistory
+
+        rising_created = 0
+        for title, was, now_score in _RISING_RISKS:
+            risk = (
+                db.session.query(Risk)
+                .filter(Risk.organization_id == org_id, Risk.title == title)
+                .first()
+            )
+            if risk is None or db.session.query(RiskScoreHistory).filter(
+                RiskScoreHistory.risk_id == risk.id
+            ).first():
+                continue
+            risk.residual_likelihood, risk.residual_impact = now_score
+            for (likelihood, impact), days_ago in ((was, 21), (now_score, 2)):
+                db.session.add(RiskScoreHistory(
+                    risk_id=risk.id, score_kind="residual",
+                    likelihood=likelihood, impact=impact,
+                    recorded_at=_dt.datetime.utcnow() - _dt.timedelta(days=days_ago),
+                    organization_id=org_id,
+                ))
+            rising_created += 1
+        if rising_created:
+            db.session.flush()
+        stats["rising_risks_created"] = rising_created
+
         # ── 9. programmes ───────────────────────────────────────────────
         existing_progs = {
             p.code
@@ -3009,6 +3097,8 @@ def seed_demo_company() -> dict:
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
 
+        db.session.commit()
+        stats["history_dated"] = spread_history(org_id)
         db.session.commit()
 
     return stats
