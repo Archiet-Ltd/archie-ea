@@ -4760,8 +4760,16 @@ def edit_solution(solution_id: int):
     """Edit an existing solution."""
     solution = Solution.query.get_or_404(solution_id)
 
-    # Verify ownership
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    # D6/D8: editing used to be refused to every architect who had not
+    # personally created the record, even an enterprise architect reviewing
+    # someone else's design. Everyone in the organisation can read a
+    # solution; only an architect role, the org's admin, or the creator can
+    # change it.
+    if not (
+        current_user.can_edit_solutions()
+        or is_active_org_admin()
+        or solution.created_by_id == current_user.id
+    ):
         flash("You don't have permission to edit this solution", "error")
         abort(403)
 
@@ -8261,6 +8269,19 @@ def solution_sad_download(solution_id: int):
     solution = db.session.get(Solution, solution_id)
     if not solution:
         abort(404)
+
+    # D6/D8: the document download had no role check at all -- anyone
+    # signed in to the organisation could fetch it, while the UI told
+    # architects they were refused (the refusal lived only in the edit
+    # path, inconsistently). Reading the solution is open to the whole
+    # organisation; downloading its document follows the same rule as
+    # editing it.
+    if not (
+        current_user.can_edit_solutions()
+        or is_active_org_admin()
+        or solution.created_by_id == current_user.id
+    ):
+        abort(403)
 
     html_content = get_sad_html(solution_id)
     safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in solution.name)[:60]
