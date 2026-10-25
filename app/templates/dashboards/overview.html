@@ -22,9 +22,9 @@
 {% set cost = o.run_cost %}
 {% set act = o.activity %}
 {% set sourced = o.sourced %}
-{% set chart_1 = 'hsl(var(--chart-1))' %}
-{% set chart_2 = 'hsl(var(--chart-2))' %}
-{% set chart_3 = 'hsl(var(--chart-3))' %}
+{% set chart_1 = o.chart_colours[0] %}
+{% set chart_2 = o.chart_colours[1] %}
+{% set chart_3 = o.chart_colours[2] %}
 
 {#- One of the three icon cards: a figure with its change, and the sentence that says what it means. -#}
 {% macro stat_card(testid, icon, tone, label, value, badge, good, sentence, href, exact=none) %}

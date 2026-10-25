@@ -415,6 +415,8 @@ def build_overview(org_id, user, now=None):
         "areas": _areas(org_id),
         "table": table,
         "ranges": RANGES,
+        # the chart ramp tokens as colours a chart can draw with
+        "chart_colours": ["hsl(var(--chart-%d))" % n for n in (1, 2, 3)],
     }
 
 
