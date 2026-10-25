@@ -205,7 +205,7 @@
       {{ d.card_head('Applications by area', 'The business area each application serves') }}
       {% call ui.card_content(class='flex flex-col gap-4') %}
         {% if o.areas %}
-        {{ d.chart('bar', o.areas, [{'key': 'applications', 'label': 'Applications', 'color': chart_1}], x='area', class='aspect-auto h-[280px] w-full', label='Applications by business area') }}
+        {{ d.chart('bar', o.areas, [{'key': 'applications', 'label': 'Applications', 'color': chart_1}], x='area', class='aspect-auto h-[280px] w-full', label='Applications by business area', testid='areas-chart') }}
         {% else %}
         <p class="text-sm text-muted-foreground" data-testid="areas-empty">Appears once applications are in the model.</p>
         {% endif %}
@@ -217,11 +217,13 @@
       {{ d.card_head('Recent changes', 'The latest changes to the model') }}
       {% call ui.card_content() %}
         {% if act and act.recent %}
+        <div data-testid="recent-changes">
         {% call ui.item_group(class='gap-1') %}
           {% for change in act.recent %}
           {% call ui.item(size='sm', class='px-0') %}{% call ui.item_media() %}{{ d.icon_tile('share-2' if change.kind == 'relationship' else 'box') }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=change.name) }}{{ ui.item_description(text=change.action ~ (' by ' ~ change.by if change.by else '') ~ ', ' ~ change.when.strftime('%d %b %Y')) }}{% endcall %}{% endcall %}
           {% endfor %}
         {% endcall %}
+        </div>
         {% else %}
         <p class="text-sm text-muted-foreground" data-testid="recent-empty">{% if act is none %}The change history could not be read. Reload the page to try again.{% else %}No change has been recorded yet. The latest changes appear here.{% endif %}</p>
         {% endif %}

@@ -542,3 +542,42 @@ def get_cost_summary_for_org(org_id: int) -> Dict[str, Any]:
         "application_count": result.application_count or 0,
         "applications_with_cost": apps_with_cost,
     }
+
+def state_contract(app: ApplicationComponent, vendor_name: str, annual_cost, months_ago: int = 6):
+    """Give an application one active contract stating its annual cost, the Spend page's source.
+
+    Idempotent: an application that already has an active contract keeps it. The vendor is found by
+    name or created, so two applications of one vendor share it. Returns the contract.
+    """
+    import datetime as _dt
+
+    from app import db
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    existing = VendorContract.query.filter_by(
+        organization_id=app.organization_id, application_id=app.id, status="active"
+    ).first()
+    if existing is not None:
+        return existing
+    vendor = VendorOrganization.query.filter_by(name=vendor_name).first()
+    if vendor is None:
+        vendor = VendorOrganization(name=vendor_name)
+        db.session.add(vendor)
+        db.session.flush()
+    contract = VendorContract(
+        organization_id=app.organization_id,
+        application_id=app.id,
+        vendor_id=vendor.id,
+        contract_name="%s agreement for %s" % (vendor_name, app.name),
+        contract_number="AGR-%d-%d" % (app.organization_id, app.id),
+        contract_type="subscription",
+        contract_category="software",
+        annual_cost=float(annual_cost),
+        currency=get_reporting_currency(app.organization_id),
+        start_date=_dt.date.today() - _dt.timedelta(days=30 * months_ago),
+        status="active",
+    )
+    db.session.add(contract)
+    db.session.flush()
+    return contract

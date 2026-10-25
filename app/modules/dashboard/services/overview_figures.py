@@ -237,11 +237,40 @@ def _history(org_id, now):
         return None
 
 
-def _name_of(change):
+def _application_names(changes):
+    """Names of the applications that ownership changes refer to, by application id."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    ids = {
+        (c.snapshot or c.previous_snapshot or {}).get("application_id")
+        for c in changes
+        if c.table_name in ("application_owners", "application_ownership")
+    }
+    ids = {i for i in ids if isinstance(i, int)}
+    if not ids:
+        return {}
+    rows = db.session.execute(
+        db.select(ApplicationComponent.id, ApplicationComponent.name).where(ApplicationComponent.id.in_(ids))
+    ).all()
+    return dict(rows)
+
+
+def _name_of(change, applications=None):
+    """What a change row is about: the record's name, or its type and name once the record is deleted."""
     snapshot = change.snapshot or {}
+    before = change.previous_snapshot or {}
+    kind = change.kind or "Record"
     if change.table_name == "archimate_relationships":
-        return "%s relationship" % (snapshot.get("type") or "A").replace("_", " ").capitalize()
-    return snapshot.get("name") or "An element"
+        relation = (snapshot.get("type") or before.get("type") or "").replace("_", " ")
+        return "%s relationship" % relation.capitalize() if relation else "Relationship"
+    if change.table_name in ("application_owners", "application_ownership"):
+        app_id = snapshot.get("application_id") or before.get("application_id")
+        app_name = (applications or {}).get(app_id)
+        return "Owner of %s" % app_name if app_name else kind
+    name = change.label or snapshot.get("name") or before.get("name")
+    if not name:
+        return kind
+    return "%s %s" % (kind, name) if change.action == "delete" else name
 
 
 def _is_connected(change):
@@ -300,6 +329,7 @@ def _activity(changes, now):
         for i in range(7)
     ]
     recent = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)[:5]
+    applications = _application_names(recent)
     return {
         "ranges": ranges,
         "default_range": default_range,
@@ -319,7 +349,7 @@ def _activity(changes, now):
         },
         "recent": [
             {
-                "name": _name_of(c),
+                "name": _name_of(c, applications),
                 "action": {"insert": "Added", "update": "Updated", "delete": "Removed"}.get(c.action, c.action),
                 "by": c.changed_by_name,
                 "when": c.valid_from,

@@ -514,3 +514,37 @@ def test_every_figure_legend_and_label_reads_in_both_themes(browser, live_server
             expect(found).to_be_visible()
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_figure_cards_are_neutral_and_the_charts_use_the_brand_colour(browser, live_server, orgs, theme):
+    """The cards sit on the plain card surface as in the library's Overview; the bars are the brand colour and its tint."""
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        page.select_option('[data-testid="activity-range"]', "90d")
+        page.wait_for_timeout(1500)
+        page.evaluate("document.getAnimations().forEach(a => a.finish())")
+        surfaces = page.evaluate(
+            """() => ['card-run-cost', 'card-relationships', 'card-no-owner', 'year-card'].map(id => {
+              const el = document.querySelector('[data-testid="' + id + '"]');
+              const card = el.matches('[data-slot=card]') ? el : el.querySelector('[data-slot=card]');
+              return getComputedStyle(card).backgroundColor; })"""
+        )
+        assert len(set(surfaces)) == 1, surfaces
+        hues = page.evaluate(
+            """() => {
+              const hue = c => { const [r, g, b] = c.match(/[\\d.]+/g).slice(0, 3).map(v => v / 255);
+                const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min; if (!d) return -1;
+                const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4; return Math.round(((h * 60) + 360) % 360); };
+              const fills = new Set([...document.querySelectorAll('[data-testid="activity-range-90d"] .recharts-bar-rectangle path, [data-testid="year-card"] .recharts-bar-rectangle path')]
+                .map(e => getComputedStyle(e).fill).filter(f => f && f !== 'none'));
+              return [...fills].map(hue); }"""
+        )
+        assert len(hues) >= 2, hues
+        assert all(200 <= h <= 230 for h in hues), hues  # every bar is a shade of the brand blue
+        card = page.locator('[data-testid="year-card"]').inner_text()
+        assert re.search(r"\+\d+%\s+on last year", card), card
+    finally:
+        context.close()

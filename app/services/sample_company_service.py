@@ -57,6 +57,16 @@ _APPLICATIONS = [
      "Datadog", 7200, 500, "Track customer orders"),
 ]
 
+# The business area each sample application serves, as the Overview groups them.
+_AREAS = {
+    "Payments service": "Finance", "Customer web app": "Sales", "Order management system": "Operations",
+    "Inventory system": "Operations", "Notification service": "Customer service", "Identity provider": "IT",
+    "Finance system": "Finance", "Data warehouse": "IT", "Document management": "Corporate",
+    "Monitoring dashboard": "IT",
+}
+# Vendor of an application the company builds itself: it has no contract with anyone.
+_IN_HOUSE = "In-house"
+
 # (name, the file's capability element or None, current maturity, target maturity)
 _CAPABILITIES = [
     ("Process online payments", "Process online payments", 3, 4),
@@ -190,7 +200,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.models.solution_models import Solution
     from app.commands.project_capabilities import SOURCE_TABLE
     from app.models.unified_capability import UnifiedCapability
-    from app.services.application_cost_accessor import sync_cost_fact
+    from app.services.application_cost_accessor import state_contract, sync_cost_fact
     from app.services.capability_ownership_service import set_capability_owner
 
     elements = {
@@ -267,6 +277,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             license_cost_annual=licence,
             infrastructure_cost_monthly=infra,
             total_cost_of_ownership=licence + 12 * infra,
+            business_domain=_AREAS.get(name),
             business_criticality="high",
             strategic_importance="high",
         )
@@ -282,7 +293,12 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             mirrors.append(int(app.archimate_element_id))
         note("application_components", app)
         for column in ("total_cost_of_ownership", "license_cost_annual", "infrastructure_cost_monthly"):
-            sync_cost_fact(app, column, "USD")
+            sync_cost_fact(app, column)
+        if app.vendor_name and app.vendor_name != _IN_HOUSE:
+            # The Spend page reads contracts, so the application's cost is stated there too and the
+            # run cost on the Overview, the Spend page and the canvas's cost box add up to one figure.
+            note("vendor_contracts", state_contract(app, app.vendor_name, app.total_cost_of_ownership,
+                                                    months_ago=3 + app.id % 8))
         if capability:
             mapping = ApplicationCapabilityMapping(
                 organization_id=org_id,
@@ -372,7 +388,7 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     """
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_owner import ApplicationOwner
-    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk
     from app.models.solution_models import Solution
@@ -393,6 +409,7 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         return model.query.filter(model.id.in_(ids), model.organization_id == org_id).all()
 
     for model, table in (
+        (VendorContract, "vendor_contracts"),
         (ApplicationCapabilityMapping, "application_capability_mapping"),
         (ApplicationOwner, "application_owners"),
     ):
@@ -412,6 +429,17 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
             db.session.delete(row)
     db.session.flush()
     return import_restore_service.restore(org_id, user_id, log.id, [])
+
+
+def date_the_load(org_id: int, since) -> int:
+    """Date the records this load added across the last 90 days, so the Overview's chart has a shape.
+
+    Only the history written since ``since`` moves; whatever the organisation recorded before the load keeps
+    its date. Returns how many records were dated.
+    """
+    from app.services.history_spread import spread_history
+
+    return spread_history(org_id, rest=("import", SOURCE_LABEL), since=since)
 
 
 def work_out_connections(org_id: int) -> None:
