@@ -64,6 +64,8 @@ def test_portfolio_manager_creates_views_and_finds_blocked_work_packages(browser
         page.fill("#name", blocker_name)
         page.select_option("#programme_id", label=second_programme)
         page.fill("#description", "Campaign tooling for the growth initiative")
+        page.fill("#start_date", "2026-11-01")
+        page.fill("#end_date", "2027-01-31")
         with page.expect_response(
             lambda r: r.url.endswith(CREATE) and r.request.method == "POST", timeout=PAGE_TIMEOUT
         ):
@@ -80,6 +82,8 @@ def test_portfolio_manager_creates_views_and_finds_blocked_work_packages(browser
         page.fill("#name", blocked_name)
         page.select_option("#programme_id", label=first_programme)
         page.fill("#description", "Renew billing depends on campaign tooling")
+        page.fill("#start_date", "2026-11-01")
+        page.fill("#end_date", "2027-03-31")
         with page.expect_response(
             lambda r: r.url.endswith(CREATE) and r.request.method == "POST", timeout=PAGE_TIMEOUT
         ):

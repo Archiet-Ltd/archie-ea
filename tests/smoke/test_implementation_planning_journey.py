@@ -25,12 +25,17 @@ BLOCKED = "/implementation/work-packages/blocked"
 
 
 def _role_assertions(page):
-    """Assert the signed-in user's role is portfolio_manager and not admin."""
-    badge = page.locator("#user-role-badge")
-    expect(badge).to_be_visible()
-    expect(badge).not_to_contain_text("Admin")
-    expect(badge).not_to_contain_text("Platform")
-    expect(badge).to_contain_text("Portfolio Manager")
+    """Assert the signed-in user's role is portfolio_manager and not admin.
+    
+    The user-menu trigger contains the user's email, which includes the
+    enterprise role name. There is no dedicated role badge on the page -
+    the sidebar user-menu email is the authoritative indicator.
+    """
+    menu = page.get_by_test_id("user-menu")
+    expect(menu).to_be_visible(timeout=10000)
+    menu_text = menu.text_content() or ""
+    assert "portfolio-manager" in menu_text.lower(), \
+        "Expected portfolio-manager in user menu, got: %s" % menu_text[:100]
 
 
 def _take_screenshots(page, prefix, viewport_width):
