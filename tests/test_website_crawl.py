@@ -451,3 +451,115 @@ def test_an_unclear_page_follows_the_rendering_strategy_answer(answer, expected)
     words = "<p>%s</p>" % ("some words " * 40)
     html = "<html><body>%s%s</body></html>" % (words, "<script src='/x.js'></script>" * 6)
     assert needs_browser("https://x.test/", html, 200, llm=lambda p: json.dumps(answer)) is expected
+
+
+# ---------------------------------------------------------------- company name from home page
+
+_HOME_DOCS_PAGES = {
+    "/": (200, "text/html", """<!doctype html><html><head>
+<title>Cal.com | Scheduling infrastructure for everyone</title>
+<meta property="og:site_name" content="Cal.com">
+</head><body><h1>Welcome to Cal.com</h1><p>Open source scheduling.</p>
+<a href="/docs">Docs</a></body></html>"""),
+    "/docs": (200, "text/html", """<!doctype html><html><head>
+<title>Cal.com Docs — Developer Documentation</title>
+</head><body><h1>Documentation</h1><p>API reference.</p>
+<a href="/">Home</a></body></html>"""),
+    "/robots.txt": (200, "text/plain", ""),
+}
+
+
+def test_the_company_name_comes_from_the_home_page_not_a_sub_page(make_org):
+    """A site whose home page and docs page differ (like cal.com vs Cal.com Docs):
+    the name must be what the home page calls itself."""
+    import json
+
+    from app.modules.organization.website_crawl import (crawl_organization_website,
+                                                         pending_website_proposals)
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return json.dumps({"business_model": {}, "company_stage": {},
+                               "technology_stack": {}, "competitive_positioning": {},
+                               "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        html = prompt.split("```html", 1)[1].rsplit("```", 1)[0] if "```html" in prompt else ""
+        url_line = next((line for line in prompt.splitlines() if "Page URL" in line), "")
+        out = {"company": {}, "field_confidence": {}}
+        if "/docs" in url_line or "Developer Documentation" in html:
+            # A sub-page whose title differs from the home page — the model might well
+            # read it and answer with the page's own title as the company name.
+            out["company"] = {"name": "Cal.com Docs"}
+            out["field_confidence"] = {"company_name": 1.0}
+        elif "Scheduling infrastructure" in html or "og:site_name" in html:
+            out["company"] = {"name": "Cal.com"}
+            out["field_confidence"] = {"company_name": 0.9}
+        return json.dumps(out)
+
+    site = _Site(_HOME_DOCS_PAGES)
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=model)
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert names, "no company name was proposed"
+        name_row = names[0]
+        assert name_row["value"] == "Cal.com", "got %r from %s" % (name_row["value"], name_row["source_url"])
+        # The name came from the home page, not docs
+        assert _path(name_row["source_url"]) == "/"
+        assert name_row["confidence"] < 1.0  # the home page model gave 0.9
+    finally:
+        site.stop()
+
+
+_NO_NAME_PAGES = {
+    "/": (200, "text/html", """<!doctype html><html><head>
+<title></title>
+</head><body><h1></h1><p>A page with no company name, no og:site_name and an empty title.</p>
+<a href="/about">About</a></body></html>"""),
+    "/about": (200, "text/html", """<!doctype html><html><head>
+<title>Mystery Corp | About us</title>
+</head><body><h1>About Mystery Corp</h1><p>We are a mystery.</p></body></html>"""),
+    "/robots.txt": (200, "text/plain", ""),
+}
+
+
+def test_the_name_confidence_is_not_100_percent_when_the_home_page_gives_none(make_org):
+    """A home page with no site name, no og:site_name and an empty title: whatever name
+    another page gives, its confidence is capped at the default floor, never 100%."""
+    import json
+
+    from app.modules.organization.website_crawl import (crawl_organization_website,
+                                                         pending_website_proposals)
+    from app.modules.organization.website_crawl.service import DEFAULT_CONFIDENCE
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return json.dumps({"business_model": {}, "company_stage": {},
+                               "technology_stack": {}, "competitive_positioning": {},
+                               "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        url_line = next((line for line in prompt.splitlines() if "Page URL" in line), "")
+        out = {"company": {}, "field_confidence": {}}
+        if "/about" in url_line:
+            out["company"] = {"name": "Mystery Corp"}
+            out["field_confidence"] = {"company_name": 1.0}
+        return json.dumps(out)
+
+    site = _Site(_NO_NAME_PAGES)
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=model)
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert names, "no company name was proposed"
+        assert names[0]["value"] == "Mystery Corp"
+        # The home page gave no name — whatever another page says must not be 100%
+        assert names[0]["confidence"] <= DEFAULT_CONFIDENCE, names[0]["confidence"]
+        assert names[0]["confidence_basis"] == "default"
+    finally:
+        site.stop()
