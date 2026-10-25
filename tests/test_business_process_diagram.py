@@ -78,7 +78,7 @@ def test_exported_xml_is_bpmn_with_every_kind_of_shape(db_session, make_org, ten
                     "BPMNShape", "BPMNEdge"):
             assert tag in found, tag
         lanes = root.findall(".//b:lane", NS)
-        assert [l.get("name") for l in lanes][:3] == ["Service Desk Operator", "Logistics Planner", "Quality Assurance Lead"]
+        assert [ln.get("name") for ln in lanes][:3] == ["Service Desk Operator", "Logistics Planner", "Quality Assurance Lead"]
         gateway = root.find(".//b:exclusiveGateway", NS)
         labels = sorted(f.get("name") for f in root.findall(".//b:sequenceFlow", NS) if f.get("sourceRef") == gateway.get("id"))
         assert labels == ["No", "Yes"]
@@ -127,6 +127,20 @@ def test_a_subprocess_shape_is_a_child_process(db_session, make_org, tenant_ctx)
         assert child.parent_process_id == process.id
         assert child.name == "Pack and inspect order"
         assert child.archimate_element_id
+
+
+def test_a_sub_process_drawn_again_keeps_its_one_child(db_session, make_org, tenant_ctx):
+    from app.models.process_data import BusinessProcess
+    from app.modules.business_architecture import bpmn_service
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        process, roles, flow = _seeded(db_session, org)
+        again = bpmn_service.order_to_delivery_flow([(r.id, r.name) for r in roles])  # the same drawing, no child ids
+        saved = bpmn_service.save_flow(process, again, org.id)
+        assert BusinessProcess.query.filter_by(parent_process_id=process.id).count() == 1
+        assert next(n for n in saved["nodes"] if n["type"] == "subprocess")["processId"] == next(
+            n for n in flow["nodes"] if n["type"] == "subprocess")["processId"]
 
 
 def test_message_and_sequence_flows_keep_to_their_own_kind(db_session, make_org, tenant_ctx):

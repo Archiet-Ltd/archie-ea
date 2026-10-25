@@ -16,7 +16,6 @@ from where it is drawn and the drawing and the XML agree on geometry.
 from __future__ import annotations
 
 import re
-from xml.etree import ElementTree as ET
 from xml.sax.saxutils import quoteattr
 
 from defusedxml import ElementTree as SafeET
@@ -28,7 +27,7 @@ from app.models.process_data import BusinessProcess
 POOL_X = 0
 POOL_GAP = 40
 POOL_MIN_WIDTH = 700
-POOL_PAD = 80
+POOL_PAD = 40
 POOL_HEADER = 30
 LANE_HEIGHT = 160
 
@@ -224,6 +223,13 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
     for node in out["nodes"]:
         if node["type"] != "subprocess" or node["processId"]:
             continue
+        # A sub-process drawn again (an import, a redraw) finds its child by name rather than making a second one.
+        taken = {n["processId"] for n in out["nodes"] if n["processId"]}
+        same = BusinessProcess.query.filter_by(parent_process_id=process.id, name=node["label"] or NODE_LABELS["subprocess"]).all()
+        reuse = next((c for c in same if c.id not in taken), None)
+        if reuse is not None:
+            node["processId"] = reuse.id
+            continue
         child = BusinessProcess(
             name=node["label"] or NODE_LABELS["subprocess"],
             parent_process_id=process.id,
@@ -409,8 +415,8 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
                 lane_nodes[(ref.text or "").strip()] = lane.get("id")
         if not lanes:
             lanes = [{"id": "lane_" + str(pool_id), "name": pool_name or "Lane", "roleId": None, "box": None}]
-        lanes.sort(key=lambda l: (l["box"] or {}).get("y", 0))
-        pool = {"id": pool_id, "name": pool_name, "lanes": [{k: l[k] for k in ("id", "name", "roleId")} for l in lanes]}
+        lanes.sort(key=lambda ln: (ln["box"] or {}).get("y", 0))
+        pool = {"id": pool_id, "name": pool_name, "lanes": [{k: ln[k] for k in ("id", "name", "roleId")} for ln in lanes]}
         flow["pools"].append(pool)
         # A file drawn by another tool places its pools its own way; shift this pool onto the editor's grid.
         theirs = shapes.get(pool_id)
@@ -431,7 +437,7 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
             box = shapes.get(el.get("id"))
             w, h = NODE_SIZES[kind]
             lane_id = lane_nodes.get(el.get("id")) or lanes[0]["id"]
-            lane_index = next(i for i, l in enumerate(lanes) if l["id"] == lane_id)
+            lane_index = next(i for i, ln in enumerate(lanes) if ln["id"] == lane_id)
             if box:
                 x = int(round(box["x"] - pool_dx))
                 y = int(round(box["y"] - pool_dy))
@@ -476,39 +482,41 @@ def order_to_delivery_flow(roles: list[tuple[int, str]]) -> dict:
     def link(fid, a, b, label="", kind="sequence"):
         flow["flows"].append({"id": fid, "type": kind, "source": a, "target": b, "label": label})
 
-    put("order", "task", "lane4", 120, "Place order", pool="pool2")
-    put("received", "intermediate", "lane4", 1300, "Delivery received", pool="pool2")
-    put("start", "start", "lane1", 40)
-    put("receive", "task", "lane1", 130, "Receive customer order")
-    put("stock", "xor", "lane2", 300, "Stock available?")
-    put("reserve", "task", "lane2", 420, "Reserve replacement stock", dy=10)
-    put("replenish", "task", "lane2", 420, "Replenish component stock", dy=86)
-    put("split", "and", "lane2", 580)
-    put("pack", "subprocess", "lane3", 680, "Pack and inspect order")
-    put("schedule", "task", "lane2", 680, "Schedule dispatch")
-    put("join", "and", "lane2", 840)
-    put("ship", "task", "lane2", 940, "Ship customer order")
-    put("wait", "event", "lane2", 1100)
-    put("delivered", "intermediate", "lane1", 1190, "Delivery confirmed")
-    put("returned", "intermediate", "lane3", 1190, "Return requested")
-    put("done", "end", "lane1", 1330, "Order delivered")
-    put("back", "end", "lane3", 1330, "Order returned")
+    put("order", "task", "lane4", 150, "Place order", pool="pool2")
+    put("received", "intermediate", "lane4", 1000, "Delivery received", pool="pool2")
+    put("start", "start", "lane1", 80)
+    put("receive", "task", "lane1", 150, "Receive customer order")
+    put("stock", "xor", "lane2", 290, "Stock available?")
+    put("reserve", "task", "lane2", 390, "Reserve replacement stock", dy=10)
+    put("replenish", "task", "lane2", 390, "Replenish component stock", dy=86)
+    put("merge", "xor", "lane2", 520)
+    put("split", "and", "lane2", 600)
+    put("pack", "subprocess", "lane3", 690, "Pack and inspect order")
+    put("schedule", "task", "lane2", 690, "Schedule dispatch")
+    put("join", "and", "lane2", 830)
+    put("ship", "task", "lane2", 910, "Ship customer order")
+    put("wait", "event", "lane2", 1050)
+    put("delivered", "intermediate", "lane1", 1130, "Delivery confirmed")
+    put("returned", "intermediate", "lane3", 1130, "Return requested")
+    put("done", "end", "lane1", 1250, "Order delivered")
+    put("back", "end", "lane3", 1250, "Order returned")
     link("f1", "start", "receive")
     link("f2", "receive", "stock")
     link("f3", "stock", "reserve", "Yes")
     link("f4", "stock", "replenish", "No")
-    link("f5", "replenish", "reserve")
-    link("f6", "reserve", "split")
-    link("f7", "split", "pack")
-    link("f8", "split", "schedule")
-    link("f9", "pack", "join")
-    link("f10", "schedule", "join")
-    link("f11", "join", "ship")
-    link("f12", "ship", "wait")
-    link("f13", "wait", "delivered")
-    link("f14", "wait", "returned")
-    link("f15", "delivered", "done")
-    link("f16", "returned", "back")
+    link("f5", "reserve", "merge")
+    link("f6", "replenish", "merge")
+    link("f7", "merge", "split")
+    link("f8", "split", "pack")
+    link("f9", "split", "schedule")
+    link("f10", "pack", "join")
+    link("f11", "schedule", "join")
+    link("f12", "join", "ship")
+    link("f13", "ship", "wait")
+    link("f14", "wait", "delivered")
+    link("f15", "wait", "returned")
+    link("f16", "delivered", "done")
+    link("f17", "returned", "back")
     link("m1", "order", "receive", "Order", "message")
     link("m2", "ship", "received", "Goods", "message")
     return flow

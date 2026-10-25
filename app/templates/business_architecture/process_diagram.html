@@ -1,0 +1,282 @@
+{% extends "layouts/composer_base.html" %}
+{# design-block: board #}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/diagram/header.html' import diagram_header with context %}
+{% from 'components/diagram/status_line.html' import diagram_status_line with context %}
+{% from 'components/diagram/toolbar.html' import icon_button, toggle_item with context %}
+
+{% block title %}{{ process.name }} — process diagram{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Business processes', 'href': url_for('business_architecture.processes', view='diagram')},
+    {'text': process.name, 'current': true}
+]) }}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/joint.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bpmn_editor.css') }}">
+{% endblock %}
+
+{% macro palette_item(type, label, icon) %}
+{% call button(variant='ghost', size='sm', class='h-auto w-full !justify-start gap-2 px-2 py-1.5 font-normal', disabled=false,
+               attrs_dict={'@click': "addNode('" ~ type ~ "')", 'draggable': 'true', '@dragstart': "dragStart($event, '" ~ type ~ "')",
+                           'data-testid': 'palette-' ~ type, ':disabled': '!canEdit'}) %}
+  <i data-lucide="{{ icon }}" class="h-4 w-4 shrink-0" aria-hidden="true"></i><span>{{ label }}</span>
+{% endcall %}
+{% endmacro %}
+
+{% block content %}
+<h1 class="sr-only">{{ process.name }}: process diagram</h1>
+<div x-data="bpmnEditor({{ {'title': process.name, 'canEdit': can_edit, 'flow': flow,
+        'urls': {'flow': url_for('business_architecture.save_process_flow', process_id=process.id),
+                 'export': url_for('business_architecture.export_process_bpmn', process_id=process.id),
+                 'import': url_for('business_architecture.import_process_bpmn', process_id=process.id),
+                 'diagramBase': url_for('business_architecture.processes') ~ '/'}}|tojson|forceescape }})"
+     class="flex h-full w-full min-w-0 flex-col" data-testid="bpmn-editor">
+
+  <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card">
+    {{ diagram_header(purposes={'bpmn': 'How this process runs, step by step, and which business role does each step'}) }}
+    <div class="ml-auto flex flex-wrap items-center gap-2 px-4 py-2">
+      {% if parent %}{{ button(text='Part of ' ~ parent.name, variant='ghost', size='sm', icon='corner-left-up', href=url_for('business_architecture.process_diagram', process_id=parent.id), testid='bpmn-parent') }}{% endif %}
+      {{ button(text='All processes', variant='outline', size='sm', icon='list', href=url_for('business_architecture.processes', view='diagram'), testid='bpmn-all') }}
+      {% call button(variant='outline', size='sm', icon='upload', testid='bpmn-import-open', attrs_dict={'@click': 'importOpen = true; importError = \'\'; importNotes = []', ':disabled': '!canEdit'}) %}Import BPMN{% endcall %}
+      {% call button(variant='default', size='sm', icon='download', testid='bpmn-export', attrs_dict={'@click': 'exportXml()'}) %}Export BPMN{% endcall %}
+    </div>
+  </div>
+
+  <div class="shrink-0 border-b border-border bg-card px-3 py-2" data-testid="bpmn-toolbar">
+    <div class="flex items-center gap-2 overflow-x-auto md:flex-wrap md:overflow-visible" role="toolbar" aria-label="Diagram tools">
+      {{ icon_button('Show or hide the shapes list', 'toggleRail()', 'panel-left', pressed_expr='railOpen', testid='bpmn-rail-toggle') }}
+      <div class="inline-flex" role="group" aria-label="Tool">
+        {{ toggle_item('Select', "tool === 'select'", "setTool('select')", icon='mouse-pointer-click', text='Select', testid='tool-select') }}
+        {{ toggle_item('Connect two shapes with a flow', "tool === 'connect'", "setTool('connect')", icon='arrow-up-right', text='Connect', testid='tool-connect') }}
+        {{ toggle_item('Pan', "tool === 'pan'", "setTool('pan')", icon='hand', text='Pan', testid='tool-pan') }}
+      </div>
+      <div class="inline-flex items-center gap-1" role="group" aria-label="Zoom">
+        {{ icon_button('Zoom out', 'zoomBy(0.8)', 'zoom-out', testid='zoom-out') }}
+        <span class="min-w-14 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="zoom-percent" x-text="zoomPercent + '%'"></span>
+        {{ icon_button('Zoom in', 'zoomBy(1.25)', 'zoom-in', testid='zoom-in') }}
+        {{ icon_button('Fit the diagram to the view', 'fit()', 'maximize', testid='zoom-fit') }}
+      </div>
+      <div class="inline-flex items-center gap-1" role="group" aria-label="History">
+        {{ icon_button('Undo', 'undo()', 'undo-2', disabled_expr='!canUndo || !canEdit', testid='history-undo') }}
+        {{ icon_button('Redo', 'redo()', 'redo-2', disabled_expr='!canRedo || !canEdit', testid='history-redo') }}
+      </div>
+      <div class="inline-flex items-center gap-1" role="group" aria-label="Structure">
+        {% call button(variant='outline', size='sm', icon='rows-3', testid='add-lane', attrs_dict={'@click': 'addLane()', ':disabled': '!canEdit'}) %}<span class="hidden md:inline">Add lane</span>{% endcall %}
+        {% call button(variant='outline', size='sm', icon='layout-list', testid='add-pool', attrs_dict={'@click': 'addPool()', ':disabled': '!canEdit'}) %}<span class="hidden md:inline">Add pool</span>{% endcall %}
+        {% call button(variant='outline', size='sm', icon='trash-2', testid='action-delete', attrs_dict={'@click': 'deleteSelected()', ':disabled': '!selected || !canEdit'}) %}<span class="hidden md:inline">Delete</span>{% endcall %}
+      </div>
+    </div>
+  </div>
+
+  <div x-show="!canEdit" x-cloak class="shrink-0 border-b border-border bg-muted px-4 py-2 text-sm text-muted-foreground" data-testid="bpmn-readonly">
+    You can read this diagram and export it. Only an architect can change it; ask an administrator in Team settings.
+  </div>
+
+  <div class="flex min-h-0 flex-1 flex-col md:flex-row">
+    {# Left: shapes to add, and the shapes already drawn #}
+    <aside x-show="railOpen" x-cloak class="flex max-h-72 w-full shrink-0 flex-col border-b border-border bg-card md:max-h-none md:w-64 md:border-b-0 md:border-r" aria-label="Shapes" data-testid="bpmn-rail">
+      <div class="inline-flex shrink-0 border-b border-border" role="group" aria-label="Shapes list">
+        {% call button(variant='ghost', size='sm', class='h-10 flex-1 rounded-none', attrs_dict={'@click': "railTab = 'add'", ':aria-pressed': "railTab === 'add'", ':class': "railTab === 'add' ? 'bg-accent text-foreground' : ''", 'data-testid': 'rail-tab-add'}) %}Add{% endcall %}
+        {% call button(variant='ghost', size='sm', class='h-10 flex-1 rounded-none', attrs_dict={'@click': "railTab = 'view'", ':aria-pressed': "railTab === 'view'", ':class': "railTab === 'view' ? 'bg-accent text-foreground' : ''", 'data-testid': 'rail-tab-view'}) %}In this diagram{% endcall %}
+      </div>
+      <div x-show="railTab === 'add'" class="min-h-0 flex-1 overflow-y-auto p-2" data-testid="bpmn-palette">
+        <p class="px-2 pb-2 text-xs text-muted-foreground">Click a shape to add it to the selected lane, or drag it into a lane.</p>
+        <p class="px-2 pb-1 pt-2 text-xs font-medium uppercase text-muted-foreground">Events</p>
+        {{ palette_item('start', 'Start event', 'play-circle') }}
+        {{ palette_item('intermediate', 'Intermediate event', 'circle-dot') }}
+        {{ palette_item('end', 'End event', 'stop-circle') }}
+        <p class="px-2 pb-1 pt-3 text-xs font-medium uppercase text-muted-foreground">Activities</p>
+        {{ palette_item('task', 'Task', 'square') }}
+        {{ palette_item('subprocess', 'Sub-process', 'plus-square') }}
+        <p class="px-2 pb-1 pt-3 text-xs font-medium uppercase text-muted-foreground">Gateways</p>
+        {{ palette_item('xor', 'Exclusive gateway', 'x') }}
+        {{ palette_item('and', 'Parallel gateway', 'plus') }}
+        {{ palette_item('event', 'Event-based gateway', 'diamond') }}
+      </div>
+      <div x-show="railTab === 'view'" x-cloak class="flex min-h-0 flex-1 flex-col" data-testid="bpmn-finder">
+        <div class="flex flex-col gap-2 border-b border-border p-3">
+          <p class="text-xs text-muted-foreground"><span class="font-medium tabular-nums text-foreground" data-testid="finder-count" x-text="finderRows().length"></span>
+            <span x-text="finderQuery ? ('of ' + flow.nodes.length + ' steps match') : (flow.nodes.length === 1 ? 'step in this diagram' : 'steps in this diagram')"></span></p>
+          {{ input(type='search', placeholder='Find a step', aria_label='Find a step in this diagram', size='xs', attrs_dict={'x-model': 'finderQuery', 'data-testid': 'finder-search'}) }}
+        </div>
+        <ul class="min-h-0 flex-1 overflow-y-auto p-2" data-testid="finder-list">
+          <template x-for="row in finderRows()" :key="row.id">
+            <li>
+              {% call button(variant='ghost', size='sm', class='h-auto w-full !justify-start px-2 py-1 text-left font-normal', attrs_dict={'@click': 'reveal(row.id)', ':data-testid': "'finder-row-' + row.id"}) %}
+                <span class="flex min-w-0 flex-col"><span class="truncate text-sm" x-text="row.label"></span><span class="truncate text-xs text-muted-foreground" x-text="row.kind + (row.lane ? ' · ' + row.lane : '')"></span></span>
+              {% endcall %}
+            </li>
+          </template>
+        </ul>
+        <div x-show="flow.nodes.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-muted-foreground" data-testid="finder-empty">
+          <p>No steps are drawn yet. Add a start event from the Add tab and it is listed here.</p>
+          {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': "railTab = 'add'"}) %}Open the shapes{% endcall %}
+        </div>
+      </div>
+    </aside>
+
+    {# The drawing #}
+    <section class="relative min-h-[360px] min-w-0 flex-1 bg-background" aria-label="Process diagram" data-testid="bpmn-canvas">
+      <div x-ref="paper" class="bpmn-paper absolute inset-0 overflow-hidden" role="img" :aria-label="'BPMN diagram of ' + viewTitle + ': ' + flow.nodes.length + ' steps, ' + flow.flows.length + ' flows'"><div x-ref="surface"></div></div>
+      <div x-show="flow.nodes.length === 0" x-cloak class="pointer-events-none absolute inset-x-0 top-6 flex justify-center px-4" data-testid="bpmn-empty">
+        <div class="pointer-events-auto max-w-sm rounded-lg border border-border bg-card">
+          {{ empty_state(icon='workflow', title='Nothing is drawn for this process yet', description='Add a start event from the shapes list, then the tasks that follow it. Each lane is a business role.', compact=true, padding='py-6') }}
+        </div>
+      </div>
+    </section>
+
+    {# Right: what is selected #}
+    <aside class="flex max-h-72 w-full shrink-0 flex-col overflow-y-auto border-t border-border bg-card md:max-h-none md:w-72 md:border-l md:border-t-0" aria-label="Selection" data-testid="bpmn-properties">
+      <div class="flex flex-col gap-4 p-4">
+        <template x-if="!selected">
+          <div class="text-sm text-muted-foreground" data-testid="props-empty">
+            <p class="font-medium text-foreground">Nothing selected</p>
+            <p class="mt-1">Click a shape or a flow to rename it. Click a lane's name on the left edge to link it to a business role.</p>
+            <p class="mt-3 text-xs">Connect: choose Connect, then click the shape a flow starts from and the shape it ends at.</p>
+          </div>
+        </template>
+
+        <template x-if="selectedNodeData()">
+          <div class="flex flex-col gap-3" data-testid="props-node">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium" for="bpmn-node-label">Name</label>
+              {{ input(id='bpmn-node-label', size='sm', aria_label='Name of the selected step', attrs_dict={'x-ref': 'label', ':value': 'selectedNodeData().label', '@input': 'setLabel($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-label'}) }}
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium" for="bpmn-node-type">Shape</label>
+              {% call native_select(id='bpmn-node-type', size='sm', aria_label='Shape type', attrs_dict={'@change': 'setNodeType($event.target.value)', ':disabled': '!canEdit', 'data-testid': 'props-type'}) %}
+                <optgroup label="Events"><option value="start" :selected="selectedNodeData().type === 'start'">Start event</option><option value="intermediate" :selected="selectedNodeData().type === 'intermediate'">Intermediate event</option><option value="end" :selected="selectedNodeData().type === 'end'">End event</option></optgroup>
+                <optgroup label="Activities"><option value="task" :selected="selectedNodeData().type === 'task'">Task</option><option value="subprocess" :selected="selectedNodeData().type === 'subprocess'">Sub-process</option></optgroup>
+                <optgroup label="Gateways"><option value="xor" :selected="selectedNodeData().type === 'xor'">Exclusive gateway</option><option value="and" :selected="selectedNodeData().type === 'and'">Parallel gateway</option><option value="event" :selected="selectedNodeData().type === 'event'">Event-based gateway</option></optgroup>
+              {% endcall %}
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium" for="bpmn-node-lane">Lane (the business role who does it)</label>
+              {% call native_select(id='bpmn-node-lane', size='sm', aria_label='Lane', attrs_dict={'@change': 'setNodeLane($event.target.value)', ':disabled': '!canEdit', 'data-testid': 'props-lane'}) %}
+                <template x-for="l in laneOptions()" :key="l.id"><option :value="l.id" :selected="l.id === selectedNodeData().lane" x-text="l.name"></option></template>
+              {% endcall %}
+            </div>
+            <template x-if="selectedNodeData().type === 'subprocess'">
+              <div class="rounded-md border border-border p-3 text-sm" data-testid="props-subprocess">
+                <template x-if="childUrl(selectedNodeData())">
+                  <div class="flex flex-col gap-2">
+                    <p class="text-muted-foreground">This step is its own process, with its own diagram.</p>
+                    {% call button(variant='outline', size='sm', icon='arrow-right', attrs_dict={'@click': 'flush().then(() => window.location.assign(childUrl(selectedNodeData())))', 'data-testid': 'open-subprocess'}) %}Open the sub-process{% endcall %}
+                  </div>
+                </template>
+                <template x-if="!childUrl(selectedNodeData())">
+                  <p class="text-muted-foreground">Once saved, this step becomes a process of its own that you can open and draw.</p>
+                </template>
+              </div>
+            </template>
+            {% call button(variant='outline', size='sm', icon='trash-2', class='text-destructive', attrs_dict={'@click': 'deleteSelected()', ':disabled': '!canEdit', 'data-testid': 'props-delete'}) %}Delete this shape{% endcall %}
+          </div>
+        </template>
+
+        <template x-if="selectedFlowData()">
+          <div class="flex flex-col gap-3" data-testid="props-flow">
+            <p class="text-sm text-muted-foreground" x-text="selectedFlowData().type === 'message' ? 'Message flow between two pools' : 'Sequence flow'"></p>
+            <p class="text-sm" x-text="selectedFlowEnds()"></p>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium" for="bpmn-flow-label">Label</label>
+              {{ input(id='bpmn-flow-label', size='sm', placeholder='For example Yes or No', aria_label='Label of the selected flow', attrs_dict={'x-ref': 'label', ':value': 'selectedFlowData().label', '@input': 'setLabel($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-flow-label'}) }}
+            </div>
+            {% call button(variant='outline', size='sm', icon='trash-2', class='text-destructive', attrs_dict={'@click': 'deleteSelected()', ':disabled': '!canEdit', 'data-testid': 'props-delete'}) %}Delete this flow{% endcall %}
+          </div>
+        </template>
+
+        <template x-if="selectedLaneData()">
+          <div class="flex flex-col gap-3" data-testid="props-lane">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium" for="bpmn-pool-name">Pool</label>
+              {{ input(id='bpmn-pool-name', size='sm', aria_label='Pool name', attrs_dict={':value': 'selectedLaneData().pool.name', '@input': 'setPoolName($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-pool-name'}) }}
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium" for="bpmn-lane-name">Lane name</label>
+              {{ input(id='bpmn-lane-name', size='sm', aria_label='Lane name', attrs_dict={'x-ref': 'label', ':value': 'selectedLaneData().lane.name', '@input': 'setLabel($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-lane-name'}) }}
+            </div>
+            <div class="flex flex-col gap-1.5" data-testid="props-role">
+              <label class="text-sm font-medium" for="bpmn-role-search">Business role</label>
+              <template x-if="selectedLaneData().lane.roleId">
+                <div class="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm" data-testid="role-linked">
+                  <span class="min-w-0 truncate" x-text="selectedLaneData().lane.name"></span>
+                  {% call badge('info') %}Linked{% endcall %}
+                </div>
+              </template>
+              <template x-if="!selectedLaneData().lane.roleId">
+                <p class="text-sm text-muted-foreground" data-testid="role-unlinked">This lane is not linked to a business role in your model.</p>
+              </template>
+              {{ input(id='bpmn-role-search', type='search', size='sm', placeholder='Search business roles', aria_label='Search business roles', autocomplete='off',
+                       attrs_dict={'x-model': 'roleQuery', '@input': 'searchRoles()', '@focus': 'searchRoles()', ':disabled': '!canEdit', 'data-testid': 'role-search'}) }}
+              <ul x-show="roleOpen" x-cloak class="flex flex-col rounded-md border border-border" data-testid="role-results">
+                <template x-for="r in roleResults" :key="r.id">
+                  <li>{% call button(variant='ghost', size='sm', class='h-auto w-full !justify-start rounded-none px-3 py-1.5 text-left font-normal', attrs_dict={'@click': 'pickRole(r)', ':data-testid': "'role-' + r.id"}) %}<span x-text="r.name"></span>{% endcall %}</li>
+                </template>
+                <li x-show="roleResults.length === 0 && !roleError" class="px-3 py-2 text-sm text-muted-foreground" data-testid="role-none">No business role matches. Add the role in architecture elements, then link it here.</li>
+                <li x-show="roleError" class="px-3 py-2 text-sm text-destructive" x-text="roleError"></li>
+              </ul>
+              <template x-if="selectedLaneData().lane.roleId">
+                {% call button(variant='ghost', size='sm', class='self-start', attrs_dict={'@click': 'clearRole()', ':disabled': '!canEdit', 'data-testid': 'role-clear'}) %}Unlink the role{% endcall %}
+              </template>
+            </div>
+            {% call button(variant='outline', size='sm', icon='trash-2', class='text-destructive', attrs_dict={'@click': 'removeLane(selected.id)', ':disabled': '!canEdit', 'data-testid': 'props-delete-lane'}) %}Remove this lane{% endcall %}
+            <p class="text-xs text-muted-foreground" x-show="!laneIsEmpty(selected.id)">A lane with steps in it cannot be removed. Move or delete them first.</p>
+          </div>
+        </template>
+      </div>
+    </aside>
+  </div>
+
+  {# Key to the two kinds of flow #}
+  <div class="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground" data-testid="bpmn-legend" aria-label="Flow key" role="group">
+    <span class="inline-flex items-center gap-2"><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="34" y2="5" class="bpmn-key-line"/><polygon points="34,1 42,5 34,9" class="bpmn-key-fill"/></svg>Sequence flow, inside a pool</span>
+    <span class="inline-flex items-center gap-2"><svg width="44" height="10" aria-hidden="true"><circle cx="4" cy="5" r="3" class="bpmn-key-open"/><line x1="8" y1="5" x2="34" y2="5" class="bpmn-key-line bpmn-key-dash"/><polygon points="34,1 42,5 34,9" class="bpmn-key-open"/></svg>Message flow, between pools</span>
+  </div>
+
+  {{ diagram_status_line(element_noun='step', relation_noun='flow') }}
+
+  {% call dialog(open_expr='importOpen', close_expr='importOpen = false', title='Import a BPMN 2.0 file',
+                 description='The diagram on this page is replaced by the file. Lanes that match a business role in your model are linked to it.', start_hidden=false) %}
+    <div class="flex flex-col gap-3" data-testid="bpmn-import-dialog">
+      {{ input(id='bpmn-import-file', type='file', aria_label='BPMN 2.0 file', attrs_dict={'x-ref': 'importFile', 'accept': '.bpmn,.xml,application/xml,text/xml', 'data-testid': 'bpmn-import-file'}) }}
+      <p x-show="importError" x-cloak class="text-sm text-destructive" role="alert" x-text="importError" data-testid="bpmn-import-error"></p>
+      <ul x-show="importNotes.length" x-cloak class="list-disc pl-5 text-sm text-muted-foreground" data-testid="bpmn-import-notes">
+        <template x-for="note in importNotes" :key="note"><li x-text="note"></li></template>
+      </ul>
+      <div class="flex justify-end gap-2">
+        {% call button(variant='outline', attrs_dict={'@click': 'importOpen = false'}) %}Close{% endcall %}
+        {% call button(variant='default', attrs_dict={'@click': 'importXml()', ':disabled': 'importBusy', 'data-testid': 'bpmn-import-submit'}) %}<span x-text="importBusy ? 'Importing…' : 'Import'"></span>{% endcall %}
+      </div>
+    </div>
+  {% endcall %}
+
+  {% call dialog(open_expr='showShortcutsModal', close_expr='showShortcutsModal = false', title='Keyboard shortcuts', start_hidden=false) %}
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Del</kbd></dt><dd>Delete the selected shape, flow or lane</dd>
+      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Ctrl</kbd>+<kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Z</kbd></dt><dd>Undo</dd>
+      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Shift</kbd> + drag</dt><dd>Pan the drawing</dd>
+      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Esc</kbd></dt><dd>Stop connecting</dd>
+    </dl>
+  {% endcall %}
+</div>
+
+<script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/lodash.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/backbone-min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/joint.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/bpmn/bpmn_editor.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { if (window.lucide) { window.lucide.createIcons(); } });</script>
+{% endblock %}
+
+{% block modals %}{% endblock %}
