@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 83 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 87 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -533,6 +533,9 @@ to reconfirm the count before trusting it:**
 | `dialog-title` | a dialog, sheet or drawer with no title | ratchet @ 65 |
 | `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
 | `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
+| `legacy-macro-calls` | a call to an old macro (`empty_state`, `page_header`, `modal`, `dense_table`, `shadcn_*`) outside the file that defines it | ratchet @ 429 |
+| `raw-button` | a hand-written button tag instead of the button component | ratchet @ 2254 |
+| `missing-value-placeholder` | a bare dash, N/A or zero standing in for a missing value instead of `explained_value` | ratchet @ 563 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |
 | `air-gap` | a UI asset loaded from a public CDN | ratchet @ 0 |
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
@@ -579,6 +582,7 @@ to reconfirm the count before trusting it:**
 | `deployed-deps` | installed packages below the pinned floors | must be 0 (boot-health job only) |
 | `js-build` | committed `js/bundles/*.js` stale vs a rebuild | must pass |
 | `console-reporting` | `console.*` calls in shipped JS/templates | ratchet @ 0 |
+| `content-placeholders` | "Nothing here yet", "No data" or "N/A" placeholder text in templates and JS | ratchet @ 153, only falls |
 | `js-syntax` | shipped JS that fails to parse in a real engine | must pass |
 | `css-build` | committed `tailwind-output.css` stale vs a rebuild | must pass (needs Tailwind CLI) |
 | `sri` | `integrity=` hash not matching the file it guards | must be 0 |

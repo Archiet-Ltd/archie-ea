@@ -8,17 +8,17 @@
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 
-{% block title %}Business Model Canvas{% endblock %}
+{% block title %}Canvases{% endblock %}
 
 {% block content %}
 <div class="flex-1 overflow-auto">
   <div class="p-6 space-y-6">
     {{ page_header(
-        title='Business Model Canvas',
-        description='Osterwalder/Pigneur canvases paired with a Ross/Weill operating-model archetype.',
+        title='Canvases',
+        description='Strategy canvases drawn from your ArchiMate model: the same elements appear on every canvas that shows them.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Business Model Canvas'}
+            {'label': 'Canvases'}
         ],
         actions=[
              {'text': 'New Canvas', 'icon': 'plus', 'onclick': "Platform.modal.open('bmc-create-modal')", 'variant': 'default'},
@@ -37,7 +37,9 @@
             {% call card.card_description() %}{{ c.description[:120] }}{% if c.description|length > 120 %}…{% endif %}{% endcall %}
             {% endif %}
           {% endcall %}
-          {% call card.card_content() %}
+          {% call card.card_content(class='flex flex-wrap items-center gap-2') %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground" data-testid="bmc-canvas-type-{{ c.id }}">{{ type_names.get(c.canvas_type or 'business_model_canvas', 'Canvas') }}</span>
+            {% if not c.canvas_type or c.canvas_type == 'lean_canvas' %}
             {% if c.operating_model_type %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
               {{ c.operating_model_type | capitalize }}
@@ -46,6 +48,7 @@
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
               No operating model set
             </span>
+            {% endif %}
             {% endif %}
           {% endcall %}
           {% call card.card_footer() %}
@@ -58,8 +61,8 @@
     {% else %}
     {{ empty_state(
         icon='layout-grid',
-        title='No Business Model Canvases yet',
-        description='Create your first canvas to map value propositions, channels, and cost/revenue structure against an operating-model archetype.',
+        title='No canvases yet',
+        description='Create your first canvas and pick the framework: the boxes fill from the elements already in your model.',
         cta_text='New Canvas',
         cta_onclick="Platform.modal.open('bmc-create-modal')",
         cta_icon='plus'
@@ -68,9 +71,15 @@
   </div>
 </div>
 
-{% call modal(id='bmc-create-modal', title='New Business Model Canvas', description='Give it a name — you can fill in the 9 blocks next.', size='default') %}
+{% call modal(id='bmc-create-modal', title='New canvas', description='Pick the framework and give it a name. Its boxes fill from your model.', size='default') %}
 <form method="POST" action="{{ url_for('business_model.create') }}" class="space-y-4" data-testid="bmc-create-form">
   {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='bmc-type') %}Framework{% endcall %}
+    {% call native_select(id='bmc-type', name='canvas_type', attrs_dict={'data-testid': 'bmc-type-select'}) %}
+      {% for key, name in canvas_types %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+    {% endcall %}
+  </div>
   <div class="flex flex-col gap-1.5">
     {% call label(for='bmc-name', required=true) %}Name{% endcall %}
     {{ input(id='bmc-name', name='name', required=true, placeholder='e.g. Core Retail Business', attrs_dict={'maxlength': '256'}) }}

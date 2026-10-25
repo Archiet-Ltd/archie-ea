@@ -371,7 +371,7 @@
                 </div>
             </template>
             <template x-if="(archimateElements || []).filter(e => e.layer === 'data' || e.layer === 'application' && e.element_type?.toLowerCase().includes('data')).length === 0">
-                <p class="text-sm text-muted-foreground italic">No data layer elements linked to this solution.</p>
+                <p class="text-sm text-muted-foreground italic">This solution has no data-layer elements linked yet. Generate the architecture to add them.</p>
             </template>
         </div>
     </template>

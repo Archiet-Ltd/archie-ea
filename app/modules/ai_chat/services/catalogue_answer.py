@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from flask import url_for
 
-from app.modules.intelligence.services.nl_query_interpreter import interpret
+from app.modules.intelligence.services.nl_query_interpreter import asks_for_superlative, interpret
 from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,11 @@ def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
         return False
     if interpretation["entry_id"] != "what_breaks_if_fails":
         return True
-    return bool(interpretation.get("params", {}).get("service")) or "single point" in question.lower()
+    return (
+        bool(interpretation.get("params", {}).get("service"))
+        or "single point" in question.lower()
+        or asks_for_superlative(question)
+    )
 
 
 def _page_for(citation: Dict[str, Any]) -> Optional[str]:
@@ -66,13 +70,21 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
     result = run_entry(entry_id, organization_id, **interpretation["params"])
     seen: Set[Tuple[Any, Any]] = set()
     records: List[Dict[str, Any]] = []
+    rows_by_id = {row.get("id"): row for row in result.get("rows") or [] if isinstance(row, dict)}
     for citation in result.get("citations") or []:
         page = _page_for(citation)
         key = (citation.get("type"), citation.get("id"))
         if page is None or key in seen:
             continue
         seen.add(key)
-        records.append({"name": citation.get("name") or "Unnamed record", "kind": citation["type"], "url": page})
+        record = {"name": citation.get("name") or "Unnamed record", "kind": citation["type"], "url": page}
+        row = rows_by_id.get(citation.get("id")) or {}
+        count = row.get("depends_on_count")
+        if count:
+            record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")
+        if row.get("source_line"):
+            record["source_line"] = row["source_line"]
+        records.append(record)
     return {
         "entry_id": entry_id,
         "title": CATALOGUE[entry_id].title,

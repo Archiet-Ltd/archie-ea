@@ -108,9 +108,29 @@ def _sub_capabilities(cap_id: int) -> List[Dict[str, Any]]:
              "maturity": getattr(k, "current_maturity_level", None)} for k in kids]
 
 
+def unified_capability_for(cap: Any) -> Any:
+    """The one UnifiedCapability row that holds the type judgment for ``cap``."""
+    from app.models.unified_capability import UnifiedCapability  # noqa: PLC0415
+
+    return (UnifiedCapability.query
+            .filter_by(source_table="business_capability", source_id=str(cap.id),
+                       organization_id=cap.organization_id)
+            .first())
+
+
 def build_capability_fact_sheet(cap: Any) -> Dict[str, Any]:
     """Assemble the full fact sheet for one BusinessCapability instance."""
+    unified = unified_capability_for(cap)
+    owners = []
+    if unified is not None and cap.organization_id is not None:
+        from app.models.application_owner import ApplicationOwner  # noqa: PLC0415
+
+        owners = ApplicationOwner.get_display_rows_for_element(
+            "capability", unified.id, cap.organization_id
+        )
     return {
+        "owners": owners,
+        "capability_type": getattr(unified, "capability_type", None),
         "cap": cap,
         "completeness": _completeness(cap),
         "maturity": _maturity(cap),
