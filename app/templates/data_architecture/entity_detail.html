@@ -5,6 +5,9 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/input.html' import input %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/form_field.html' import form_group %}
 
 {% block title %}{{ entity.name }} — Data Entity — {{ config.APP_NAME }}{% endblock %}
 
@@ -96,60 +99,46 @@
     {% endcall %}
 
     {# CRUD matrix: one row per application recorded as accessing this entity. #}
-    <section class="rounded-lg border border-border bg-card" aria-labelledby="crud-matrix-heading" data-crud-matrix>
+    {% call card(class='') %}
+    <section aria-labelledby="crud-matrix-heading" data-crud-matrix>
         <div class="px-5 py-4 border-b border-border">
             <h2 id="crud-matrix-heading" class="text-lg font-semibold text-foreground">CRUD matrix</h2>
             <p class="text-xs text-muted-foreground mt-0.5">Which applications create, read, update or delete {{ entity.name }}.</p>
         </div>
-        <div class="p-5">
-            {% if access_rows %}
-            <div class="overflow-x-auto">
-                <table class="dense-table min-w-full text-sm">
-                    <caption class="sr-only">Applications and the operations they perform on {{ entity.name }}</caption>
-                    <thead>
-                        <tr class="border-b bg-muted/50">
-                            <th scope="col" class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">Application</th>
-                            {% for letter, label in crud_labels %}
-                            <th scope="col" class="text-center text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3" title="{{ label }}">{{ letter }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in access_rows %}
-                        <tr class="border-b" data-crud-row="{{ row.name }}">
-                            <th scope="row" class="text-left px-4 py-3 font-medium text-foreground">
-                                {% if row.application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
-                                <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline">{{ row.name }}</a>
-                                {% else %}{{ row.name }}{% endif %}
-                            </th>
-                            {% for letter, label in crud_labels %}
-                            {% set value = row.cells.get(letter) %}
-                            <td class="text-center px-4 py-3" data-crud-cell="{{ letter }}"
-                                data-crud-value="{{ 'yes' if value is sameas true else ('no' if value is sameas false else 'unspecified') }}">
-                                {% if value is sameas true %}
-                                <span class="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md text-xs font-semibold bg-primary/10 text-info-emphasis border border-primary/30" title="{{ label }}s">{{ letter }}</span>
-                                <span class="sr-only">{{ label }}s</span>
-                                {% elif value is sameas false %}
-                                <span class="text-muted-foreground" aria-hidden="true">&middot;</span>
-                                <span class="sr-only">Does not {{ label|lower }}</span>
-                                {% else %}
-                                <span class="text-xs text-muted-foreground" title="Writes, but whether it creates, updates or deletes is not recorded">W?</span>
-                                <span class="sr-only">Writes; {{ label|lower }} not recorded</span>
-                                {% endif %}
-                            </td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="text-center py-8" data-crud-empty>
-                <p class="text-sm font-medium text-foreground">No application access recorded</p>
-                <p class="text-xs text-muted-foreground mt-1">Record below which applications create, read, update or delete this entity.</p>
-            </div>
-            {% endif %}
+        {% if access_rows %}
+        {% call dense_table(columns=[('Application', ''), ('Create', 'text-center'), ('Read', 'text-center'), ('Update', 'text-center'), ('Delete', 'text-center')], caption='Applications and the operations they perform on ' ~ entity.name, rows=access_rows|length, flush=true) %}
+            {% for row in access_rows %}
+            <tr class="h-10 border-b border-border" data-crud-row="{{ row.name }}">
+                <th scope="row" class="px-4 text-left align-middle text-sm font-medium text-foreground">
+                    {% if row.application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
+                    <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline">{{ row.name }}</a>
+                    {% else %}{{ row.name }}{% endif %}
+                </th>
+                {% for letter, label in crud_labels %}
+                {% set value = row.cells.get(letter) %}
+                <td class="px-4 text-center align-middle text-sm" data-crud-cell="{{ letter }}"
+                    data-crud-value="{{ 'yes' if value is sameas true else ('no' if value is sameas false else 'unspecified') }}">
+                    {% if value is sameas true %}
+                    {% call badge('info') %}{{ letter }}{% endcall %}
+                    <span class="sr-only">{{ label }}s</span>
+                    {% elif value is sameas false %}
+                    <span class="text-muted-foreground" aria-hidden="true">&middot;</span>
+                    <span class="sr-only">Does not {{ label|lower }}</span>
+                    {% else %}
+                    <span class="text-xs text-muted-foreground" title="Writes, but whether it creates, updates or deletes is not recorded">W?</span>
+                    <span class="sr-only">Writes; {{ label|lower }} not recorded</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        {% endcall %}
+        {% else %}
+        <div class="px-5 py-8 text-center" data-crud-empty>
+            <p class="text-sm font-medium text-foreground">No application access recorded</p>
+            <p class="text-xs text-muted-foreground mt-1">Record below which applications create, read, update or delete this entity.</p>
         </div>
+        {% endif %}
 
         {# Record access: an application from the portfolio and the operations it performs. #}
         <form method="post" action="{{ url_for('data_architecture.record_data_entity_access', entity_id=entity.id) }}"
@@ -159,20 +148,15 @@
             <h3 class="text-sm font-semibold text-foreground">Record application access</h3>
             <div class="flex flex-wrap items-end gap-4">
                 <div class="relative w-72">
-                    <label for="access-application" class="block text-sm font-medium text-muted-foreground mb-1">Application</label>
-                    <input type="text" id="access-application" autocomplete="off"
-                           x-model="query" @input.debounce.300ms="search()"
-                           role="combobox" :aria-expanded="results.length > 0 ? 'true' : 'false'" aria-controls="access-application-results"
-                           placeholder="Search applications..."
-                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    {% call form_group(id='access-application', label='Application') %}
+                        {{ input(id='access-application', size='sm', autocomplete='off', placeholder='Search applications...', attrs_dict={'x-model': 'query', '@input.debounce.300ms': 'search()', 'role': 'combobox', ':aria-expanded': "results.length > 0 ? 'true' : 'false'", 'aria-controls': 'access-application-results'}) }}
+                    {% endcall %}
                     <ul id="access-application-results" role="listbox" x-show="results.length > 0" x-cloak
                         @click.outside="results = []"
-                        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-64 overflow-y-auto">
+                        class="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-card">
                         <template x-for="app in results" :key="app.id">
                             <li role="option">
-                                <button type="button" @click="choose(app)"
-                                        class="block w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                        x-text="app.name"></button>
+                                {{ button(variant='ghost', size='sm', class='w-full justify-start font-normal', attrs_dict={'@click': 'choose(app)', 'x-text': 'app.name'}) }}
                             </li>
                         </template>
                     </ul>
@@ -181,19 +165,14 @@
                 <fieldset class="flex items-center gap-4">
                     <legend class="sr-only">Operations</legend>
                     {% for letter, label in crud_labels %}
-                    <label class="inline-flex items-center gap-1.5 text-sm text-foreground">
-                        <input type="checkbox" name="operations" value="{{ letter }}" class="rounded border-input text-primary focus-visible:ring-ring">
-                        {{ label }}
-                    </label>
+                    {{ checkbox(id='access-op-' ~ letter, name='operations', value=letter, label=label) }}
                     {% endfor %}
                 </fieldset>
-                <button type="submit" :disabled="!selected"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Record access
-                </button>
+                {{ button(text='Record access', type='submit', attrs_dict={':disabled': '!selected'}) }}
             </div>
         </form>
     </section>
+    {% endcall %}
 </div>
 
 <script>
