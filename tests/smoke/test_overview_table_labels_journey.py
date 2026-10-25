@@ -256,7 +256,7 @@ def test_every_area_has_its_label_and_its_count(browser, live_server, orgs, view
         page.wait_for_timeout(1200)
         labels = chart.locator("svg .recharts-cartesian-axis-tick-value").all_text_contents()
         # a long name may be set on two lines; it is still the whole name
-        assert sorted(re.sub(r"\s+", "", l) for l in labels) == sorted(re.sub(r"\s+", "", a) for a in AREAS), labels
+        assert sorted(re.sub(r"\s+", "", text) for text in labels) == sorted(re.sub(r"\s+", "", a) for a in AREAS), labels
         box = chart.bounding_box()
         boxes = chart.locator("svg .recharts-cartesian-axis-tick-value").evaluate_all(
             "els => els.map(e => { const r = e.getBoundingClientRect(); return {t: e.textContent, l: r.left, r: r.right}; })")
