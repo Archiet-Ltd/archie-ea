@@ -79,6 +79,7 @@ def test_business_architect_creates_gap_plateau_and_work_package(browser, live_s
         wp_link = page.get_by_test_id("roadmap-wp-link").filter(has_text=wp_name)
         expect(wp_link).to_be_visible(timeout=PAGE_TIMEOUT)
         wp_id = wp["work_package"]["id"]
+        assert wp_link.get_attribute("href").endswith("/work-packages/" + str(wp_id))
         with page.expect_navigation(timeout=PAGE_TIMEOUT) as nav:
             wp_link.click()
         assert nav.value.ok
