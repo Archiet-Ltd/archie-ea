@@ -360,8 +360,8 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
 </div>
 
 <script>
-function investmentMatrix() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('investmentMatrix', () => ({
         capabilities: INVESTMENT_CAPABILITIES,
         search: '',
         priorityFilter: '',
@@ -484,15 +484,15 @@ function investmentMatrix() {
             a.click();
             URL.revokeObjectURL(url);
         }
-    };
-}
+    }));
+});
 
 /* AI priority suggestions panel (CTO advisory). Calls
    POST /architecture/api/investment-priorities/ai-suggest, which reads this
    page's own investment analysis and writes nothing back — the result is
    rendered here only. */
-function investmentSuggestionsPanel() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('investmentSuggestionsPanel', () => ({
         loading: false,
         error: null,
         suggestions: null,
@@ -519,8 +519,8 @@ function investmentSuggestionsPanel() {
                 if (window.lucide) lucide.createIcons();
             }
         }
-    };
-}
+    }));
+});
 </script>
 
 <script src="/static/vendor/chart.umd.min.js"></script>
