@@ -4792,9 +4792,9 @@
       "controls": {
         "button": 54,
         "form": 1,
-        "link": 1,
-        "modal": 4,
-        "testid": 6
+        "link": 4,
+        "modal": 3,
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -8043,7 +8043,7 @@
       "confidence": "high",
       "controls": {
         "link": 1,
-        "testid": 1
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -9888,7 +9888,7 @@
         "form": 2,
         "link": 3,
         "modal": 2,
-        "testid": 10
+        "testid": 9
       },
       "extends": [
         "layouts/admin_base.html"
@@ -30776,7 +30776,8 @@
         "components/modal.html",
         "macros/kanban_board.html",
         "macros/page_shell.html",
-        "components/dropdown_menu.html"
+        "components/dropdown_menu.html",
+        "components/select.html"
       ],
       "original": "gap:G-4",
       "page_type": "board",
@@ -32750,7 +32751,7 @@
       "controls": {
         "button": 4,
         "link": 1,
-        "modal": 2,
+        "modal": 1,
         "table": 1,
         "testid": 5
       },
