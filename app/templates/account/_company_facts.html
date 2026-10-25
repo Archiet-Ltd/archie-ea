@@ -11,9 +11,9 @@
             {{ checkbox(id='fact-keep-' ~ fact.id, checked=(fact.percent >= 50), attrs_dict={'data-fact-keep': '', 'aria-label': 'Keep ' ~ fact.label}) }}
             <span class="w-36 shrink-0 text-sm font-medium" data-testid="fact-label">{{ fact.label }}</span>
             <div class="min-w-48 flex-1">{{ input(id='fact-value-' ~ fact.id, value=fact.text, size='sm', aria_label=fact.label ~ ' value', attrs_dict={'data-fact-value': ''}) }}</div>
-            <p class="w-full truncate pl-7 text-xs text-muted-foreground sm:w-56 sm:pl-0">
-                <a href="{{ fact.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url | replace('https://', '') | replace('http://', '') }}</a>
-                · {{ fact.percent }}% sure
+            <p class="flex w-full min-w-0 flex-wrap gap-x-1 pl-7 text-xs text-muted-foreground sm:w-72 sm:flex-nowrap sm:pl-0">
+                <a href="{{ fact.source_url }}" class="min-w-0 truncate text-primary hover:underline" title="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url | replace('https://', '') | replace('http://', '') }}</a>
+                <span class="shrink-0 whitespace-nowrap" data-testid="fact-confidence">&middot; {{ fact.percent }}% sure{% if fact.read_on %} &middot; read {{ fact.read_on }}{% endif %}</span>
             </p>
         </li>
         {% endfor %}

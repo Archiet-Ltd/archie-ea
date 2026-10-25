@@ -60,12 +60,34 @@ def consenting(org) -> bool:
     return bool(site.get("consent_at"))
 
 
-def _company_name(org) -> str:
+PLACEHOLDER_ENDING = "'s Workspace"  # what a new organisation is called until its company name is confirmed
+
+
+def is_placeholder_name(name: Optional[str]) -> bool:
+    """True for the stand-in name given at sign-up ("Casey Startup's Workspace"), which names no company."""
+    return str(name or "").strip().endswith(PLACEHOLDER_ENDING)
+
+
+def company_name(org) -> str:
+    """The name the person confirmed; else the organisation's own name; empty while that is still the stand-in."""
     from ..website_crawl.confirm import PROFILE_KEY
 
     held = ((org.settings or {}).get(PROFILE_KEY) or {}).get("company_name")
     value = (held or {}).get("value") if isinstance(held, dict) else None
-    return str(value or org.name or "").strip()
+    named = str(value or "").strip()
+    if named:
+        return named
+    own = str(org.name or "").strip()
+    return "" if is_placeholder_name(own) else own
+
+
+def company_domain(org) -> str:
+    """The company's web address from the site it gave at sign-up (no scheme, no www), or empty."""
+    from urllib.parse import urlparse
+
+    url = (((org.settings or {}).get("onboarding") or {}).get("website") or {}).get("url") or ""
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower() if url else ""
+    return host[4:] if host.startswith("www.") else host
 
 
 def _context(org) -> Dict[str, Any]:
@@ -110,26 +132,83 @@ def _date(text: Optional[str]) -> Optional[datetime]:
     return None
 
 
-def _checksum(source: str, url: Optional[str], title: str, subject: str = "") -> str:
-    """Once per organisation, per subject: one article about two companies is a signal for each."""
-    return hashlib.sha256(("|".join([source, subject, url or "", title])).encode("utf8")).hexdigest()
+def _checksum(source: str, day: str, title: str, subject: str = "") -> str:
+    """Once per organisation, per subject: one article about two companies is a signal for each, and the same
+    source, title and date is one signal whatever address it was found at."""
+    return hashlib.sha256(("|".join([source, subject, day or "", title])).encode("utf8")).hexdigest()
+
+
+def _day(value: Optional[datetime]) -> str:
+    return value.date().isoformat() if value else ""
+
+
+def _same_item_key(row: OrganizationSignal) -> tuple:
+    return (row.source, row.subject, row.title, _day(row.published_at))
+
+
+# ----------------------------------------------------------------------------- tidying
+
+def tidy(org_id: int, org=None) -> int:
+    """Remove what should never have been kept: signals stored under the stand-in name, and, for the confirmed
+    company, hits from a free-text search that are not about it, and repeats of one source, title and date. Returns how many went.
+    The caller commits. Works only on this organisation's rows."""
+    from app.models.organization import Organization
+
+    org = org or db.session.get(Organization, org_id)
+    removed = 0
+    rows = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id).all()
+    name, domain = (company_name(org), company_domain(org)) if org is not None else ("", "")
+    searched = {s.key for s in src.REGISTRY if s.searched}
+    for row in rows:
+        gone = is_placeholder_name(row.subject) or (
+            bool(name) and row.subject == name and row.source in searched
+            and not src.is_about(row.title, name, domain, src.own_link(row.url, row.details)))
+        if gone:
+            db.session.delete(row)
+            removed += 1
+    seen = set()  # the same source, title and date is one signal: keep the first stored
+    for row in sorted(rows, key=lambda r: r.id):
+        if row in db.session.deleted:
+            continue
+        key = _same_item_key(row)
+        if key in seen:
+            db.session.delete(row)
+            removed += 1
+        seen.add(key)
+    return removed
 
 
 # ----------------------------------------------------------------------------- writing
 
+def _relevant(source: src.Source, subject: str, domain: str, items: List[src.Item], is_company: bool) -> List[src.Item]:
+    """What a free-text search gave back, less each hit that names neither the company nor its web address
+    in its title.
+    Only the confirmed company is held to this. Sources that already match on the company's own records are left as they are."""
+    if not source.searched or not is_company:
+        return items
+    return [i for i in items if src.is_about(i.title, subject, domain, src.own_link(i.url, i.details))]
+
+
 def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item], is_company: bool, now: datetime) -> int:
     kept = 0
+    if is_placeholder_name(subject):
+        return 0  # a stand-in name is never searched and nothing is ever kept under it
     for item in items[:MAX_PER_SOURCE]:
         if not item.title:
             continue
-        digest = _checksum(source.key, item.url, item.title, subject)
+        title, published = item.title[:500], _date(item.published)
+        digest = _checksum(source.key, _day(published), title, subject)
         row = OrganizationSignal.query.filter_by(organization_id=org_id, checksum=digest).first()
+        if row is None:  # an older row for the same source, title and date, stored under another address
+            row = next((r for r in OrganizationSignal.query.filter_by(
+                organization_id=org_id, source=source.key, subject=subject, title=title).all()
+                if _day(r.published_at) == _day(published)), None)
         if row is None:
             row = OrganizationSignal(organization_id=org_id, checksum=digest, source=source.key, created_at=now)
             db.session.add(row)
         row.kind, row.source_label, row.subject = source.kind, source.label, subject
-        row.title, row.summary, row.url = item.title[:500], (item.summary or "")[:2000], (item.url or None)
-        row.published_at, row.fetched_at, row.details = _date(item.published), now, item.details or None
+        row.title, row.summary, row.url = title, (item.summary or "")[:2000], (item.url or None)
+        row.published_at, row.fetched_at, row.details = published, now, item.details or None
         row.pestle_factor = pestle_factor(row.kind, row.title, row.summary)
         kept += 1
     return kept
@@ -161,7 +240,7 @@ def _sentiment(org_id: int, subject: str, mentions: List[OrganizationSignal], mo
             row.swot_quadrant = swot_quadrant(is_company, row.sentiment_score)
     topics = [t.get("topic") for t in result.get("trending_topics") or [] if t.get("topic")][:5]
     label = overall.get("label") or ("positive" if score > 0.2 else "negative" if score < -0.2 else "neutral")
-    digest = _checksum("sentiment_analysis", None, now.date().isoformat(), subject)
+    digest = _checksum("sentiment_analysis", "", now.date().isoformat(), subject)
     row = OrganizationSignal.query.filter_by(organization_id=org_id, checksum=digest).first()
     if row is None:
         row = OrganizationSignal(organization_id=org_id, checksum=digest, source="sentiment_analysis", created_at=now)
@@ -197,15 +276,20 @@ def refresh_organization(
     org = db.session.get(Organization, org_id)
     if org is None:
         raise SignalsRefused("That organisation does not exist.")
+    with tenant_scope(org_id):
+        if tidy(org_id):
+            db.session.commit()
+    org = db.session.get(Organization, org_id)  # the scope detached the row loaded above
     if not consenting(org):
         raise SignalsRefused("The organisation has not agreed to its public footprint being read.")
     mine = dict((org.settings or {}).get(SETTINGS_KEY) or {})
     last = _date(mine.get("refreshed_at"))
     if not force and last and now - last < REFRESH_EVERY:
         raise SignalsRefused("The signals were refreshed %s ago; they are read once a day." % _ago(now - last))
-    name, ctx = _company_name(org), _context(org)
+    name, ctx = company_name(org), _context(org)
     if not name:
-        raise SignalsRefused("The organisation has no company name to search for.")
+        raise SignalsRefused("The company name has not been confirmed yet, so there is nothing to search for.")
+    domain = company_domain(org)
     http = http or src.Http()
     if llm is None:
         from ..website_crawl.service import default_model
@@ -218,7 +302,8 @@ def refresh_organization(
         for source in src.REGISTRY:
             reason = src.skipped_reason(source, ctx)
             if reason:
-                report["sources"][source.key] = {"label": source.label, "skipped": reason}
+                logger.info("signal source %s left out for organisation %s: %s", source.key, org_id, reason)
+                report["sources"][source.key] = {"label": source.label, "skipped": reason, "unread": "needs " in reason}
                 continue
             total, failure = 0, None
             for subject, is_company in subjects:
@@ -226,7 +311,12 @@ def refresh_organization(
                     continue
                 try:
                     items = source.fetch(http, subject, ctx)
+                    if source.searched and is_company and domain:  # the company's web address is searched as well as its name
+                        seen = {(i.url, i.title) for i in items}
+                        items = items + [i for i in source.fetch(http, domain, ctx) if (i.url, i.title) not in seen]
+                    items = _relevant(source, subject, domain, items, is_company)
                 except src.SourceFailed as exc:
+                    logger.warning("signal source %s failed for organisation %s: %s", source.key, org_id, exc)
                     failure = "%s %s" % (source.label, exc)
                     break
                 except Exception as exc:  # one source's bug or changed answer never stops the others
@@ -258,7 +348,9 @@ def refresh_organization(
         org = db.session.get(Organization, org_id)  # the scope detached the row loaded above
         fresh = dict((org.settings or {}).get(SETTINGS_KEY) or {})
         fresh["refreshed_at"] = now.isoformat()
-        fresh["last_report"] = {k: v for k, v in report["sources"].items()}
+        # what is kept for the page is only whether a source was read; the detail stays in the server log
+        fresh["last_report"] = {k: {"label": v["label"], "unread": bool(v.get("unread") or v.get("failed"))}
+                                for k, v in report["sources"].items()}
         settings = dict(org.settings or {})
         settings[SETTINGS_KEY] = fresh
         org.settings = settings
@@ -294,12 +386,12 @@ SIGNALS_TASK = "company_signals_refresh"
 
 
 def queue_signals_refresh(org_id: int):
-    """Queue the first reading for an organisation that agreed to it; None when it has not."""
+    """Queue the first reading for an organisation that agreed to it and has a company name to search for; None when not."""
     from app.models.organization import Organization
     from app.services.job_queue_service import get_job_queue_service
 
     org = db.session.get(Organization, org_id)
-    if org is None or not consenting(org):
+    if org is None or not consenting(org) or not company_name(org):
         return None
     return get_job_queue_service().create_job("Read the company's public signals", SIGNALS_TASK, {}, organization_id=org_id)
 
@@ -332,12 +424,18 @@ def signals_for_profile(org_id: int, limit: int = 50) -> List[Dict[str, Any]]:
     from app.models.organization import Organization
 
     org = db.session.get(Organization, org_id)
-    name = _company_name(org) if org is not None else None
-    query = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id)
-    if name:
-        query = query.filter(OrganizationSignal.subject == name)
-    rows = query.order_by(db.func.coalesce(OrganizationSignal.published_at, OrganizationSignal.fetched_at).desc()).limit(limit).all()
-    return [_row(r) for r in rows]
+    name = company_name(org) if org is not None else None
+    if not name:
+        return []  # until the company is confirmed there is nothing to show
+    query = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id, OrganizationSignal.subject == name)
+    rows = query.order_by(db.func.coalesce(OrganizationSignal.published_at, OrganizationSignal.fetched_at).desc(), OrganizationSignal.id).all()
+    shown, seen = [], set()
+    for r in rows:  # the same source, title and date is shown once
+        key = _same_item_key(r)
+        if key not in seen:
+            seen.add(key)
+            shown.append(_row(r))
+    return shown[:limit]
 
 
 def framework_view(org_id: int, framework: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -363,8 +461,8 @@ def framework_view(org_id: int, framework: str) -> Dict[str, List[Dict[str, Any]
 
 
 def refresh_state(org) -> Dict[str, Any]:
-    """What the profile card says about reading: whether the organisation agreed, when it last ran, what was left out and why."""
+    """What the profile card says about reading: whether the organisation agreed, when it last ran, and whether
+    some sources could not be read (never which, or why: that is for the server log)."""
     mine = (org.settings or {}).get(SETTINGS_KEY) or {}
-    skipped = {v["label"]: v["skipped"] for v in (mine.get("last_report") or {}).values() if v.get("skipped")}
-    failed = [v["failed"] for v in (mine.get("last_report") or {}).values() if v.get("failed")]
-    return {"agreed": consenting(org), "refreshed_at": _date(mine.get("refreshed_at")), "skipped": skipped, "failed": failed}
+    unread = any(v.get("unread") for v in (mine.get("last_report") or {}).values())
+    return {"agreed": consenting(org), "refreshed_at": _date(mine.get("refreshed_at")), "some_unread": unread}

@@ -79,6 +79,10 @@ def proposals(org_id: int):
     for row in facts:
         row["text"] = display(row["value"])
         row["percent"] = int(round(float(row.get("confidence") or 0) * 100))
+        try:
+            row["read_on"] = datetime.fromisoformat(str(row.get("fetched_at"))).strftime("%d %b %Y")
+        except ValueError:
+            row["read_on"] = None
     return facts, completeness
 
 
@@ -244,6 +248,7 @@ def confirm(org, user, decisions: List[Dict[str, Any]]) -> Dict[str, int]:
     settings = dict(org.settings or {})
     profile = dict(settings.get(PROFILE_KEY) or {})
     kept = corrected_count = closed = 0
+    named = None
     now = datetime.utcnow()
     for approval in rows:
         decision = by_id[approval.id]
@@ -270,6 +275,8 @@ def confirm(org, user, decisions: List[Dict[str, Any]]) -> Dict[str, int]:
             profile[field] = held + [entry]
         else:
             profile[field] = entry
+        if field == "company_name" and str(value).strip():
+            named = str(value).strip()[:200]
         element = _element(org.id, field, value, payload, corrected, user)
         approval.status = ApprovalStatus.APPROVED
         approval.approved_at = approval.executed_at = now
@@ -281,6 +288,11 @@ def confirm(org, user, decisions: List[Dict[str, Any]]) -> Dict[str, int]:
     settings[PROFILE_KEY] = profile
     org.settings = settings
     flag_modified(org, "settings")
+    if named:
+        org.name = named  # the confirmed company name is the organisation's name wherever it is shown
+        from app.modules.organization.public_signals import tidy
+
+        tidy(org.id, org)  # nothing stored under the stand-in name survives the confirmation
     db.session.commit()
     return {"confirmed": kept, "corrected": corrected_count, "left_out": closed}
 

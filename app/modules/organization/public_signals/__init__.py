@@ -1,6 +1,10 @@
 from .service import (  # noqa: F401
+    PLACEHOLDER_ENDING,
     SignalsRefused,
+    company_domain,
+    company_name,
     consenting,
+    is_placeholder_name,
     framework_view,
     queue_signals_refresh,
     refresh_all,
@@ -8,4 +12,5 @@ from .service import (  # noqa: F401
     refresh_state,
     run_signals_job,
     signals_for_profile,
+    tidy,
 )

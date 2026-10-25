@@ -310,6 +310,7 @@ mechanisms:
   class: queue
   disposition: keep
   tenant_context: jobs carry organisation_id in their payload; model-health jobs run under tenant_scope
+  instances: 2
 - kind: thread
   file: app/services/webhook_service.py
   entry: WebhookService.publish_event

@@ -170,7 +170,7 @@
         {% call card() %}
             {% call card_header() %}
                 {% call card_title() %}Public signals{% endcall %}
-                {% call card_description() %}What the public sources say about {{ current_user.organization.name }}, with where each came from and when. Read once a day{% if sig_state.refreshed_at %}; last read {{ sig_state.refreshed_at.strftime('%d %b %Y') }}{% endif %}.{% endcall %}
+                {% call card_description() %}What the public sources say about {{ company.company_name or current_user.organization.name }}, with where each came from and when. Read once a day{% if sig_state.refreshed_at %}; last read {{ sig_state.refreshed_at.strftime('%d %b %Y') }}{% endif %}.{% endcall %}
             {% endcall %}
             {% call card_content() %}
                 {% if company.signals %}
@@ -185,20 +185,19 @@
                             <div class="flex flex-wrap gap-1">
                             {% if sig.pestle_factor %}{% call badge('neutral') %}{{ sig.pestle_factor | capitalize }}{% endcall %}{% endif %}
                             {% if sig.swot_quadrant %}{% call badge('info') %}{{ sig.swot_quadrant | capitalize }}{% endcall %}{% endif %}
-                            {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-muted-foreground" title="No PESTLE factor or SWOT quadrant applies to this signal.">&mdash;</span>{% endif %}
+                            {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-xs text-muted-foreground" data-testid="signal-informs-none">Not matched to PESTLE or SWOT</span>{% endif %}
                             </div>
                         </td>
                     </tr>
                     {% endfor %}
                 {% endcall %}
+                {% elif not company.company_name %}
+                {{ empty_state(icon='newspaper', title='Confirm your company name first', description='The public sources are searched for the company name you confirm from your website, so nothing has been read yet.', compact=True, class='py-6') }}
                 {% else %}
                 {{ empty_state(icon='newspaper', title='No public signals have been read yet', description='Your company agreed to its public footprint being read. The sources are read once a day, and again when you confirm your profile. Read them now to see the first signals.', cta_text='Read the public sources now', cta_href=url_for('account.signals_refresh'), cta_method='post', compact=True, class='py-6') }}
                 {% endif %}
-                {% if sig_state.skipped or sig_state.failed %}
-                {% set left_out = [] %}
-                {% for label, why in sig_state.skipped.items() %}{% set _ = left_out.append(label ~ ' ' ~ why) %}{% endfor %}
-                {% for why in sig_state.failed %}{% set _ = left_out.append(why) %}{% endfor %}
-                <p class="mt-3 text-xs text-muted-foreground" data-testid="company-signals-left-out">Left out of the last reading: {{ left_out | join('; ') }}.</p>
+                {% if sig_state.some_unread %}
+                <p class="mt-3 text-xs text-muted-foreground" data-testid="company-signals-left-out">Some public sources could not be read today; we try again tomorrow.</p>
                 {% endif %}
             {% endcall %}
         {% endcall %}

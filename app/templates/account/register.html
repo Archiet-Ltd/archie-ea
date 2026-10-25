@@ -71,6 +71,9 @@
     </div>
     {{ check.password_check('password', 0) }}
     {% elif step == 2 %}
+    {% for notice in get_flashed_messages(category_filter=['signup-notice']) %}
+    {% call alert('success', testid='signup-notice') %}{{ notice }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+    {% endfor %}
     {% include 'account/_signup_sources.html' %}
     {% elif step == 3 %}
     {% include 'account/_signup_company.html' %}

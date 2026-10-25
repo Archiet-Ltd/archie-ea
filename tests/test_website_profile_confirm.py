@@ -189,3 +189,36 @@ def test_the_confirm_route_records_for_the_signed_in_organisation_only(read, cli
     assert confirm.asked(second.settings)["goal"] is None and _elements(second.id, "BusinessService") == {}
     refused = client.post("/account/welcome/profile", json={"size_band": "huge"})
     assert refused.status_code == 400
+
+
+def test_the_confirmed_company_name_becomes_the_organisations_name_and_only_its_own(read):
+    from app import db
+    from app.modules.organization import public_signals
+    from app.modules.organization.website_crawl import confirm
+
+    first, second, person = _o(read, "first"), _o(read, "second"), _p(read, "first")
+    first.name = "Casey Startup's Workspace"
+    second.name = "Robin Startup's Workspace"
+    db.session.commit()
+    assert public_signals.company_name(first) == ""  # the stand-in names no company
+
+    confirm.confirm(first, person, _decisions(first, edits={"Acme Robotics Ltd": "Acme Robotics Group"})[0])
+    db.session.expire_all()
+    assert _o(read, "first").name == "Acme Robotics Group"
+    assert public_signals.company_name(_o(read, "first")) == "Acme Robotics Group"
+    assert _o(read, "second").name == "Robin Startup's Workspace"  # the other organisation is untouched
+
+
+def test_a_company_name_left_unticked_leaves_the_organisations_name_alone(read):
+    from app import db
+    from app.modules.organization.website_crawl import confirm
+
+    org, person = _o(read, "first"), _p(read, "first")
+    org.name = "Casey Startup's Workspace"
+    db.session.commit()
+    decisions, facts = _decisions(org)
+    for decision, fact in zip(decisions, facts):
+        decision["accept"] = fact["field"] != "company_name"
+    confirm.confirm(org, person, decisions)
+    db.session.expire_all()
+    assert _o(read, "first").name == "Casey Startup's Workspace"

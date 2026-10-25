@@ -151,9 +151,11 @@ def add_routes(bp, access) -> None:
         only and is held to once a day, so anyone shown the button on their account page may press it."""
         from flask import flash
 
-        from app.modules.organization.public_signals import queue_signals_refresh
+        from app.modules.organization.public_signals import company_name, queue_signals_refresh
 
-        if queue_signals_refresh(g.current_org_id) is None:
+        if not company_name(_org()):
+            flash("Confirm your company name first; the public sources are searched for that name.", "error")
+        elif queue_signals_refresh(g.current_org_id) is None:
             flash("Your company has not agreed to its public footprint being read, so there is nothing to refresh.", "error")
         else:
             flash("Reading the public sources now. New signals appear here in a few minutes.", "success")

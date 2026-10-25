@@ -9,6 +9,7 @@ why and can ask for a reading; a company that did not agree sees no card.
 
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -123,7 +124,9 @@ def test_signals_show_their_source_date_and_what_they_inform(browser, live_serve
             assert row.bounding_box()["x"] + row.bounding_box()["width"] <= page.viewport_size["width"]
         assert table.evaluate("t => t.scrollWidth <= t.parentElement.clientWidth + 1")
         assert "Other Co ships" not in card.inner_text()
-        expect(card.locator('[data-testid="company-signals-left-out"]')).to_contain_text("Alpha Vantage needs ALPHAVANTAGE_API_KEY to be set")
+        expect(card.locator('[data-testid="company-signals-left-out"]')).to_have_text(
+            "Some public sources could not be read today; we try again tomorrow.")
+        assert not re.search(r"_KEY|\b[45]\d\d\b", card.inner_text()), "the card shows a variable name or a status code"
         _shot(page, shot)
         context.close()
 
