@@ -493,3 +493,48 @@ def test_currency_is_named_on_overview_and_prices_are_usd(browser, server, peopl
                     new_page_obj.close()
     finally:
         context.close()
+
+
+# --------------------------------------------------------------------------- #
+# 7. One currency source: reporting_currency drives every money figure
+# --------------------------------------------------------------------------- #
+
+def test_org_currency_reads_reporting_currency_column(browser, server, people, app):
+    """An org whose reporting_currency is EUR shows the euro sign on the overview,
+    names EUR once, and the overview reads the one stored column."""
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, str(server), people)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Finish").click()
+        organisation = _organisation_name_of(app, email)
+        _assert_signed_in_on_dashboard(page, organisation)
+
+        # A fresh sign-up gets the platform default currency.
+        expect(page.locator("#main-content")).to_contain_text("Figures in GBP", timeout=PAGE_TIMEOUT)
+
+        # Change the organisation's reporting_currency to EUR.
+        with app.app_context():
+            from app import db
+            from app.models.organization import Organization
+            from app.models.user import User
+
+            user = User.find_by_email(email)
+            org = db.session.get(Organization, user.organization_id)
+            org.reporting_currency = "EUR"
+            db.session.commit()
+            db.session.remove()
+
+        # After reload, the overview reads the one stored column and shows EUR.
+        page.goto(server + "/dashboard/overview", wait_until="domcontentloaded")
+        expect(page.locator("#main-content")).to_contain_text("Figures in EUR", timeout=PAGE_TIMEOUT)
+
+        # The currency is named exactly once on the page.
+        main_text = page.locator("#main-content").inner_text()
+        assert main_text.count("Figures in EUR") == 1, (
+            "currency named %d times, expected once" % main_text.count("Figures in EUR"))
+    finally:
+        context.close()
