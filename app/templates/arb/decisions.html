@@ -4,6 +4,10 @@
 {% from 'components/data_card.html' import data_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/badge.html' import badge %}
 
 {% block title %}Decision Register{% endblock %}
 
@@ -48,69 +52,52 @@
             <div class="flex flex-wrap gap-4 items-end">
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1">Horizon</label>
-                    <select x-model="filterHorizon"
-                            class="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[140px]" aria-label="Horizon">
-                        <option value="">All Horizons</option>
-                        {% for h in valid_horizons %}
-                        <option value="{{ h }}">{{ h | replace('_', ' ') | title }}</option>
-                        {% endfor %}
-                    </select>
+                    {% set horizon_options = [('', 'All Horizons')] %}
+                    {% for h in valid_horizons %}
+                    {% set _ = horizon_options.append((h, h | replace('_', ' ') | title)) %}
+                    {% endfor %}
+                    {{ native_select(aria_label='Horizon', options=horizon_options, attrs_dict={'x-model': 'filterHorizon'}) }}
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1">Authority Level</label>
-                    <select x-model="filterAuthority"
-                            class="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[160px]" aria-label="Authority Level">
-                        <option value="">All Authority Levels</option>
-                        {% for a in valid_authority_levels %}
-                        <option value="{{ a }}">{{ a | replace('_', ' ') | title }}</option>
-                        {% endfor %}
-                    </select>
+                    {% set auth_options = [('', 'All Authority Levels')] %}
+                    {% for a in valid_authority_levels %}
+                    {% set _ = auth_options.append((a, a | replace('_', ' ') | title)) %}
+                    {% endfor %}
+                    {{ native_select(aria_label='Authority Level', options=auth_options, attrs_dict={'x-model': 'filterAuthority'}) }}
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-                    <select x-model="filterStatus"
-                            class="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[140px]" aria-label="Status">
-                        <option value="">All Statuses</option>
-                        {% for s in valid_statuses %}
-                        <option value="{{ s }}">{{ s | replace('_', ' ') | title }}</option>
-                        {% endfor %}
-                    </select>
+                    {% set status_options = [('', 'All Statuses')] %}
+                    {% for s in valid_statuses %}
+                    {% set _ = status_options.append((s, s | replace('_', ' ') | title)) %}
+                    {% endfor %}
+                    {{ native_select(aria_label='Status', options=status_options, attrs_dict={'x-model': 'filterStatus'}) }}
                 </div>
                 <div class="flex items-center gap-2 pb-1">
-                    <input type="checkbox" id="enterprise-only" x-model="enterpriseOnly"
-                           class="rounded border border-input h-4 w-4 accent-primary">
-                    <label for="enterprise-only" class="text-sm font-medium text-muted-foreground cursor-pointer">
-                        Enterprise only
-                    </label>
+                    {{ checkbox(id='enterprise-only', label='Enterprise only', attrs_dict={'x-model': 'enterpriseOnly'}) }}
                 </div>
             </div>
         </div>
 
         <!-- Decisions Table -->
         <div class="bg-card border border-border rounded-lg overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead class="bg-muted/50 border-b border-border">
-                    <tr>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Horizon</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Authority Level</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Valid From</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Enterprise</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
+            {% call table(class='w-full') %}
+                {% call table_header() %}
+                    {% call table_row() %}
+                        {% call table_head() %}Title{% endcall %}
+                        {% call table_head() %}Type{% endcall %}
+                        {% call table_head() %}Horizon{% endcall %}
+                        {% call table_head() %}Authority Level{% endcall %}
+                        {% call table_head() %}Status{% endcall %}
+                        {% call table_head() %}Valid From{% endcall %}
+                        {% call table_head() %}Enterprise{% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% call table_body() %}
                     {% for d in decisions %}
-                    <tr data-row
-                        x-show="
-                            (filterHorizon === '' || '{{ d.horizon or '' }}' === filterHorizon) &&
-                            (filterAuthority === '' || '{{ d.authority_level or '' }}' === filterAuthority) &&
-                            (filterStatus === '' || '{{ d.status or '' }}' === filterStatus) &&
-                            (!enterpriseOnly || {{ 'true' if d.enterprise_level else 'false' }})
-                        "
-                        class="hover:bg-muted/30 transition-colors">
-                        <td class="px-4 py-3">
+                    {% call table_row(attrs_dict={'x-show': "(filterHorizon === '' || '" ~ (d.horizon or '') ~ "' === filterHorizon) && (filterAuthority === '' || '" ~ (d.authority_level or '') ~ "' === filterAuthority) && (filterStatus === '' || '" ~ (d.status or '') ~ "' === filterStatus) && (!enterpriseOnly || " ~ ('true' if d.enterprise_level else 'false') ~ ")", 'data-row': ''}) %}
+                        {% call table_cell() %}
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-mono text-muted-foreground">{{ d.decision_id }}</span>
                                 <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
@@ -118,31 +105,20 @@
                                     {{ d.title }}
                                 </a>
                             </div>
-                        </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        {% endcall %}
+                        {% call table_cell(class='text-muted-foreground') %}
                             {{ (d.decision_type or '—') | replace('_', ' ') | title }}
-                        </td>
-                        <td class="px-4 py-3">
-                            {% if d.horizon == 'strategic' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info-emphasis">
-                                Strategic
-                            </span>
-                            {% elif d.horizon == 'tactical' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary/90">
-                                Tactical
-                            </span>
-                            {% elif d.horizon == 'operational' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
-                                Operational
-                            </span>
-                            {% else %}
-                            <span class="text-muted-foreground">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        {% endcall %}
+                        {% call table_cell() %}
+                            {% if d.horizon == 'strategic' %}{% call badge(variant='info') %}Strategic{% endcall %}
+                            {% elif d.horizon == 'tactical' %}{% call badge(variant='info') %}Tactical{% endcall %}
+                            {% elif d.horizon == 'operational' %}{% call badge(variant='neutral') %}Operational{% endcall %}
+                            {% else %}<span class="text-muted-foreground">—</span>{% endif %}
+                        {% endcall %}
+{% call table_cell(class='text-muted-foreground') %}
                             {{ (d.authority_level or '—') | replace('_', ' ') | title }}
-                        </td>
-                        <td class="px-4 py-3">
+                        {% endcall %}
+                        {% call table_cell() %}
                             {% if d.status == 'accepted' %}
                                 {{ status_badge('Accepted', 'success') }}
                             {% elif d.status == 'proposed' %}
@@ -158,11 +134,11 @@
                             {% else %}
                                 {{ status_badge((d.status or 'unknown') | replace('_', ' ') | title, 'neutral') }}
                             {% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-muted-foreground text-xs">
+                        {% endcall %}
+                        {% call table_cell(class='text-muted-foreground text-xs') %}
                             {{ (d.valid_from | string)[:10] if d.valid_from else '—' }}
-                        </td>
-                        <td class="px-4 py-3">
+                        {% endcall %}
+                        {% call table_cell() %}
                             {% if d.enterprise_level %}
                             <span class="inline-flex items-center gap-1 text-warning-emphasis" title="Enterprise decision">
                                 <i data-lucide="star" class="w-3.5 h-3.5 fill-current" aria-hidden="true"></i>
@@ -171,11 +147,11 @@
                             {% else %}
                             <span class="text-muted-foreground text-xs">—</span>
                             {% endif %}
-                        </td>
-                    </tr>
+                        {% endcall %}
+                    {% endcall %}
                     {% else %}
-                    <tr>
-                        <td colspan="7">
+                    {% call table_row() %}
+                        <td colspan="{{ 7 if 'arch_decisions.create_decision' in flask.current_app.view_functions else 7 }}">
                             {% if 'arch_decisions.create_decision' in flask.current_app.view_functions %}
                             {{ empty_state(icon='file-text', title='No decisions recorded yet',
                                            description='The register holds the architecture decisions your organisation has taken, with their status, horizon and authority level. Record the first one to start the trail.',
@@ -184,19 +160,15 @@
                                            cta_icon='plus',
                                            padding='py-8') }}
                             {% else %}
-                            {# The decision-authoring blueprint failed to register on this boot, so
-                               there is no create route to link to; doing it anyway would BuildError
-                               and 500 every page that renders the sidebar.
-                               empty-state-ok: create route absent on this boot #}
                             {{ empty_state(icon='file-text', title='No decisions recorded yet',
                                            description='The decision register is empty and the decision-authoring module is unavailable on this deployment. Ask your platform admin to check the architecture-decisions blueprint.',
                                            padding='py-8') }}
                             {% endif %}
                         </td>
-                    </tr>
+                    {% endcall %}
                     {% endfor %}
-                </tbody>
-            </table>
+                {% endcall %}
+            {% endcall %}
         </div>
     </div>
 </div>

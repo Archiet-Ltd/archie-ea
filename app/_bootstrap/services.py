@@ -21,6 +21,11 @@ def init_services(app, config_name):
     from app.services.archimate_backbone import register_archimate_listeners
     register_archimate_listeners()
 
+    # Naming a vendor on a system writes the link to the vendor record.
+    from app.services import vendor_register
+
+    app.add_template_global(vendor_register.page_summary, "vendor_page")
+
 
 def _check_session_configuration(app, config_name):
     """FAR-012: Check session configuration for potential stability issues."""

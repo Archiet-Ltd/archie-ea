@@ -242,8 +242,10 @@ def _build_solution_traceability_fallback_matrix(limit=50):
 @architect_ui_bp.route("/roadmap-builder/")
 @login_required
 def roadmap_builder():
-    """Redirect to Enterprise Roadmap (capability-roadmap). Roadmap Builder is retired."""
-    return redirect(url_for("main.capability_roadmap"))
+    """Roadmap Builder is retired: the one roadmap replaces it."""
+    from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+
+    return redirect_to_roadmap("strategic")
 
 
 # =============================================================================
@@ -512,11 +514,30 @@ def load_sample_company():
     company's figures. Returns JSON {"already_loaded": true} or
     {"success": true, "redirect": "..."} depending on state.
     """
+    wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
+
+    # One load at a time per organisation. A second press while the first is still
+    # working (a double tap on a phone) waits for it, then finds the sample loaded and
+    # says so, instead of importing the file twice or racing it for the same rows.
+    # A wait that does not end becomes a plain "try again" message, never a page that
+    # never answers.
+    from app.services import sample_company_service as _sample
+
+    try:
+        with _sample.one_load_at_a_time(g.current_org_id):
+            return _load_sample_company_locked(wants_json)
+    except _sample.LoadBusy:
+        error = "The sample company is still loading. Wait a moment, then press See a sample company again."
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 503
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+
+def _load_sample_company_locked(wants_json):
     import os
     from app.services import sample_company_service
     from app.services.archimate_import_service import ArchiMateImportService, ImportRequestError
-
-    wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
 
     # Check if sample is already loaded (by looking for the model name)
     from app.models.archimate_core import ArchiMateElement
@@ -581,6 +602,8 @@ def load_sample_company():
             sample_company_service.add_working_data(g.current_org_id, current_user, point)
             db.session.commit()
             sample_company_service.work_out_connections(g.current_org_id)
+            sample_company_service.date_the_load(g.current_org_id, point.started_at)
+            db.session.commit()
         except Exception:
             db.session.rollback()
             current_app.logger.exception("sample company working data not added")
@@ -855,6 +878,11 @@ def traceability_matrix():
     """Cross-layer traceability matrix across Strategy/Business/Application/Technology."""
     from app.services.archimate_traceability_service import ArchiMateTraceabilityService, get_archimate_gap_analysis
 
+    from app.modules.intelligence.services.traceability_check_service import (
+        TraceabilityCheckService,
+        broken_chains,
+    )
+
     service = ArchiMateTraceabilityService()
     direction = request.args.get('direction', 'forward')
     pivot_type = request.args.get('pivot_type', 'ApplicationComponent')
@@ -890,8 +918,18 @@ def traceability_matrix():
         fallback_matrix = _build_solution_traceability_fallback_matrix(limit=50)
         if fallback_matrix:
             matrix = fallback_matrix
+    element_id = request.args.get('element', type=int)
+    element_check = None
+    broken = None
+    if element_id is not None:
+        element_check = TraceabilityCheckService.check(element_id, getattr(g, 'current_org_id', None))
+    else:
+        broken = broken_chains(getattr(g, 'current_org_id', None))
     return render_template(
         "archimate_views/traceability.html",
+        element_id=element_id,
+        element_check=element_check,
+        broken=broken,
         matrix=matrix,
         gap_analysis=gap_analysis,
         store_counts=_traceability_store_counts(),

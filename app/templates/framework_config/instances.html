@@ -1,84 +1,86 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/progress.html' import progress %}
 
 {% block title %}Framework Instances{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {{ page_header(
-        title='Framework Instances', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Framework Instances'}],
-        description='Active configuration instances across the organisation'
-    ) }}
+<div class="flex flex-1 flex-col @container/main">
+    <div class="flex flex-1 flex-col gap-2">
+        <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            <div class="px-4 lg:px-6">
+                {{ page_header(
+                    title='Framework Instances',
+                    description='Active configuration instances across the organisation',
+                    breadcrumbs=[
+                        {'label': 'Home', 'href': '/'},
+                        {'label': 'Framework Instances'}
+                    ]
+                ) }}
+            </div>
 
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <table class="dense-table w-full text-sm">
-            <thead>
-                <tr class="border-b border-border">
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Instance</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Organisation Unit</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Maturity</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Implementation</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Status</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Created</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for instance in instances %}
-                <tr class="hover:bg-muted/30">
-                    <td class="px-6 py-3">
-                        <a href="{{ url_for('framework_config_ui.instance_details', instance_id=instance.id) }}"
-                           class="font-medium text-foreground hover:text-primary hover:underline">
-                            {{ instance.instance_name }}
-                        </a>
-                        {% if instance.instance_description %}
-                        <p class="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{{ instance.instance_description }}</p>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-3 text-muted-foreground">{{ instance.organization_unit or '—' }}</td>
-                    <td class="px-6 py-3 text-muted-foreground">
-                        {{ instance.current_maturity_level or 1 }}/5
-                    </td>
-                    <td class="px-6 py-3">
-                        <div class="flex items-center gap-2">
-                            <div class="w-24 bg-muted rounded-full h-1.5">
-                                <div class="bg-primary h-1.5 rounded-full"
-                                     style="width: {{ [instance.implementation_percentage or 0, 100] | min }}%"></div>
-                            </div>
-                            <span class="text-xs text-muted-foreground">{{ (instance.implementation_percentage or 0) | int }}%</span>
-                        </div>
-                    </td>
-                    <td class="px-6 py-3">
-                        {% set s = instance.status or 'planning' %}
-                        {% if s == 'operational' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Operational</span>
-                        {% elif s == 'implementing' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Implementing</span>
-                        {% elif s == 'optimizing' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Optimizing</span>
-                        {% elif s == 'retiring' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Retiring</span>
+            <div class="px-4 lg:px-6">
+                {% call table() %}
+                    {% call table_header() %}
+                    <tr>
+                        {% call table_head() %}Instance{% endcall %}
+                        {% call table_head() %}Organisation Unit{% endcall %}
+                        {% call table_head() %}Maturity{% endcall %}
+                        {% call table_head() %}Implementation{% endcall %}
+                        {% call table_head() %}Status{% endcall %}
+                        {% call table_head() %}Created{% endcall %}
+                    </tr>
+                    {% endcall %}
+                    {% call table_body() %}
+                        {% for instance in instances %}
+                        {% call table_row() %}
+                            {% call table_cell() %}
+                                <a href="{{ url_for('framework_config_ui.instance_details', instance_id=instance.id) }}"
+                                   class="font-medium text-foreground hover:text-primary hover:underline">
+                                    {{ instance.instance_name }}
+                                </a>
+                                {% if instance.instance_description %}
+                                <p class="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{{ instance.instance_description }}</p>
+                                {% endif %}
+                            {% endcall %}
+                            {% call table_cell(class='text-muted-foreground') %}{{ instance.organization_unit or '—' }}{% endcall %}
+                            {% call table_cell(class='text-muted-foreground') %}{{ instance.current_maturity_level or 1 }}/5{% endcall %}
+                            {% call table_cell() %}
+                                <div class="flex items-center gap-2">
+                                    <div class="w-24">
+                                        {{ progress(value=(instance.implementation_percentage or 0)|int, class='h-1.5') }}
+                                    </div>
+                                    <span class="text-xs text-muted-foreground">{{ (instance.implementation_percentage or 0) | int }}%</span>
+                                </div>
+                            {% endcall %}
+                            {% call table_cell() %}
+                                {% set s = instance.status or 'planning' %}
+                                {% if s == 'operational' %}
+                                    {% call badge(variant='success') %}Operational{% endcall %}
+                                {% elif s == 'implementing' %}
+                                    {% call badge(variant='info') %}Implementing{% endcall %}
+                                {% elif s == 'optimizing' %}
+                                    {% call badge(variant='info') %}Optimizing{% endcall %}
+                                {% elif s == 'retiring' %}
+                                    {% call badge(variant='warning') %}Retiring{% endcall %}
+                                {% else %}
+                                    {% call badge(variant='neutral') %}{{ s | title }}{% endcall %}
+                                {% endif %}
+                            {% endcall %}
+                            {% call table_cell(class='text-muted-foreground text-xs') %}
+                                {{ instance.created_at.strftime('%d %b %Y') if instance.created_at else '—' }}
+                            {% endcall %}
+                        {% endcall %}
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">{{ s | title }}</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-3 text-muted-foreground text-xs">
-                        {{ instance.created_at.strftime('%d %b %Y') if instance.created_at else '—' }}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" class="px-6 py-12 text-center">
-                        <div class="flex flex-col items-center gap-3 text-muted-foreground">
-                            <i data-lucide="layers" class="w-10 h-10 opacity-30" aria-hidden="true"></i>
-                            <p class="text-sm font-medium">No framework instances found</p>
-                            <p class="text-xs">Deploy a configuration template to create the first instance.</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        {{ table_empty_state(message='No framework instances found', icon='layers') }}
+                        {% endfor %}
+                    {% endcall %}
+                {% endcall %}
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

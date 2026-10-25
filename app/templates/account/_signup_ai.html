@@ -1,0 +1,55 @@
+{# Sign-up step 3: the AI provider. The built-in AI needs nothing; an own key is tested before it is kept. #}
+{% set provider_names = providers | map(attribute=1) | join(' or ') %}
+<div data-signup-steps data-url-ai-test="{{ url_for('account.welcome_ai_test') }}"
+     {% if own_key %}data-key-saved="true"{% endif %}
+     class="space-y-6" data-testid="signup-ai"
+     x-data="{ ownKey: {{ 'true' if (paying or own_key) else 'false' }} }">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}Your AI provider{% endcall %}
+            {% call card_description() %}Optional. {{ config.APP_NAME }} answers your questions either way.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-6') %}
+            {% macro own_key_card() %}
+            <div class="space-y-3" data-testid="signup-own-key" x-show="ownKey" x-cloak>
+                <h2 class="text-sm font-semibold">Add your own AI key</h2>
+                <p class="text-sm text-muted-foreground">Your questions go only to the provider you choose, and are never slowed by shared limits. That provider bills your organisation for them.</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="space-y-1.5">
+                        {% call label(for='welcome-provider') %}AI provider{% endcall %}
+                        {{ native_select(id='welcome-provider', name='provider', options=providers, class='w-full') }}
+                    </div>
+                    <div class="space-y-1.5">
+                        {% call label(for='welcome-key') %}AI key{% endcall %}
+                        {{ input(id='welcome-key', type='password', placeholder='Paste your key', attrs_dict={'autocomplete': 'off'}) }}
+                    </div>
+                </div>
+                <p class="text-xs text-muted-foreground">The key is encrypted for your organisation only and never shown again.</p>
+                {{ button(text='Test key', variant='outline' if not paying else 'default', size='sm', testid='signup-test-key', attrs_dict={'data-action': 'test-key'}) }}
+                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="key" data-testid="signup-key-status">{% if own_key %}Your questions go to {{ own_key }}, and your organisation pays {{ own_key }} for them.{% endif %}</p>
+            </div>
+            {% endmacro %}
+            {% macro built_in_card() %}
+            <div class="space-y-2" data-testid="signup-built-in">
+                <h2 class="text-sm font-semibold">Use the built-in AI</h2>
+                <p class="text-sm text-muted-foreground">Nothing to set up. Questions are answered by {{ config.APP_NAME }}'s own provider, and you can add your own key later in Settings.</p>
+            </div>
+            {% endmacro %}
+            {% if paying %}
+                {{ own_key_card() }}
+            {% else %}
+                {{ built_in_card() }}
+                {{ button(text='Add your own key', variant='outline', size='sm', testid='signup-show-key', attrs_dict={'x-show': '!ownKey', '@click': 'ownKey = true'}) }}
+                {{ own_key_card() }}
+            {% endif %}
+        {% endcall %}
+        {% call card_footer(class='sticky bottom-0 justify-between border-t border-border bg-card') %}
+            {{ button(text='Previous', variant='ghost', icon='arrow-left', href=url_for('account.welcome', step=3), testid='signup-previous') }}
+            <form method="post" action="{{ url_for('account.welcome_finish') }}" class="contents">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                {{ button(text='Use the built-in AI for now' if paying else 'Finish', type='submit', variant='outline' if paying else 'default', testid='signup-finish', attrs_dict={'data-finish': ''}) }}
+            </form>
+        {% endcall %}
+    {% endcall %}
+</div>
+<script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>

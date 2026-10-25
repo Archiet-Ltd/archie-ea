@@ -1,4 +1,5 @@
-"""Journey: the sidebar's "Search navigation..." box returns individual pages, each labelled with its zone,
+"""Journey: the sidebar's search box ("Search or ask...") returns individual pages, each labelled with
+the sidebar entry it sits under,
 matches either spelling of a variant word, and never lists a page the persona cannot open.
 
 The box previously gave results the module catalogue but matched whole zones (a hit on one label
@@ -35,7 +36,8 @@ def _modules(client, q):
 def test_impact_analysis_is_found_by_name_and_opens_the_right_page(app, client):
     login(client, _persona(app, "solution_architect"))
     hits = _modules(client, "impact")
-    assert any(h["name"] == "Impact Analysis" and h["url"] == "/strategic/impact-analysis" for h in hits), hits
+    # Navigation v3: "Impact" is the job entry, landing on the canonical impact page (ADR-0015).
+    assert hits[0]["name"] == "Impact" and hits[0]["url"] == "/enterprise/analysis/impact-analysis", hits
 
 
 def test_a_hit_carries_the_persona_own_zone_name(app, client):
@@ -43,15 +45,16 @@ def test_a_hit_carries_the_persona_own_zone_name(app, client):
     hits = _modules(client, "vendor")
     matched = [h for h in hits if h["name"] == "Vendors"]
     assert matched, hits
-    assert matched[0]["zone"] in ("Library", "My work", "Home", "Governance", "Admin"), matched[0]
+    # Labelled with the sidebar entry the page sits under (navigation v3).
+    assert matched[0]["zone"] == "Systems", matched[0]
 
 
-def test_a_hit_outside_the_persona_own_zones_is_labelled_all_modules(app, client):
-    """Duplicate Detection is not in a solution architect's own zones, only reachable via /modules/."""
+def test_a_page_with_no_entry_of_its_own_is_labelled_with_the_entry_it_sits_under(app, client):
+    """Duplicate detection has no sidebar entry; it sits under Systems (what we have)."""
     login(client, _persona(app, "solution_architect"))
     hits = _modules(client, "duplicate")
     assert hits, "expected at least one module hit for 'duplicate'"
-    assert all(h["zone"] == "All modules" for h in hits), hits
+    assert all(h["zone"] == "Systems" for h in hits), hits
 
 
 @pytest.mark.parametrize("query,expected_name", [("license", "Licences"), ("licence", "Licences")])

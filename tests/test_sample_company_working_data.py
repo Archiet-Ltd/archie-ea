@@ -51,7 +51,7 @@ def _figure(html, testid):
     return match.group(1)
 
 
-def test_loading_the_sample_gives_applications_with_owners_costs_and_a_health_score(
+def test_loading_the_sample_gives_applications_with_owners_and_costs(
     client, login_as, make_org
 ):
     org, other = make_org(), make_org()
@@ -77,10 +77,10 @@ def test_loading_the_sample_gives_applications_with_owners_costs_and_a_health_sc
 
     login_as(client, user)
     page = client.get("/dashboard/overview").get_data(as_text=True)
-    assert _figure(page, "health-kpi-applications") == str(counts["applications"])
-    assert _figure(page, "health-score-value") not in ("", "—", "0")
+    welcome = re.search(r'data-testid="welcome-applications"[^>]*>\s*<span[^>]*>\s*(\d+)\s*<', page)
+    assert welcome, "the welcome card does not show the applications"
+    assert welcome.group(1) == str(counts["applications"])
     assert counts["solutions"] > 0
-    assert _figure(page, "health-kpi-solutions") == str(counts["solutions"])
     assert _counts(other.id) == other_before
 
 
@@ -100,7 +100,7 @@ def test_removing_the_sample_returns_to_setup_and_leaves_nothing(client, login_a
     response = client.post("/architecture/sample-company/remove", follow_redirects=True)
     page = response.get_data(as_text=True)
     assert "Sample company removed" in page
-    assert 'data-testid="guided-setup"' in page
+    assert "Connect GitHub and your model is built for you" in page
     assert _counts(org.id) == before
     assert _counts(other.id) == other_loaded
 

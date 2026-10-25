@@ -1,13 +1,11 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/form_field.html' import form_group, form_footer %}
-{% from "components/card.html" import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/data_card.html" import data_card %}
-{% from "components/status_badge.html" import status_badge %}
 {% from "components/workbench_table.html" import workbench_table with context %}
 {% from "components/modal.html" import modal %}
 
-{% block title %}Vendor Catalogue{% endblock %}
+{% block title %}Vendors{% endblock %}
 
 {% block extra_head_js %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -17,17 +15,19 @@
 </script>
 <script src="{{ url_for('static', filename='js/vendors/create_modal.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vendors/vendor_list_table.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendors/mapping.js') }}"></script>
 {% endblock %}
 
 {% block content %}
 <div class="space-y-6" x-data="vendorListTable()" x-cloak>
 
+  {% set vp = vendor_page() %}
   {{ page_header(
-      title='Vendor Catalogue',
-      description='Manage and explore your vendor ecosystem',
+      title='Vendors',
+      description='The vendors your systems and contracts already name, what they supply and when they renew',
       breadcrumbs=[
           {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Vendor Catalogue'}
+          {'label': 'Vendors'}
       ],
       actions=[
           {'text': 'Add Vendor', 'icon': 'plus', 'onclick': 'Platform.modal.open("create-vendor")', 'variant': 'default'},
@@ -35,29 +35,101 @@
       ]
   ) }}
 
-  {# Metrics Cards #}
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-8">
-    {{ data_card(icon='building', icon_color='blue', value=stats.total|default(0)|dash, label='Total Vendors', subtitle='In vendor catalogue') }}
-    {{ data_card(icon='check-circle', icon_color='green', value=stats.active|default(0)|dash, label='Active Vendors', subtitle=(((stats.active|default(0) / stats.total|default(1)) * 100)|round(0)|string ~ '% of total') if (stats.total or 0) > 0 else '—') }}
-    {{ data_card(icon='star', icon_color='purple', value=stats.strategic|default(0)|dash, label='Strategic Vendors', subtitle='High-value partnerships') }}
-    {{ data_card(icon='package', icon_color='amber', value=stats.total_products|default(0)|dash, label='Product Portfolio', subtitle='Across all vendors') }}
-    {# Portfolio ACV card #}
-    {% if (stats.total_acv or 0) > 1000000 %}
-      {% set acv_display = '$' ~ ('%.1f'|format(stats.total_acv / 1000000)) ~ 'M' %}
-    {% elif (stats.total_acv or 0) > 1000 %}
-      {% set acv_display = '$' ~ ('%.0f'|format(stats.total_acv / 1000)) ~ 'K' %}
-    {% elif (stats.total_acv or 0) > 0 %}
-      {% set acv_display = '$' ~ ('%.0f'|format(stats.total_acv)) %}
-    {% else %}
-      {% set acv_display = '—' %}
+  {# The answer first: one sentence from the same register the table below lists. #}
+  {% if vp %}
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="vendors-answer" role="status">
+    <p class="text-base font-medium">
+      {% if vp.vendor_count %}
+        {{ vp.vendor_count }} vendor{{ '' if vp.vendor_count == 1 else 's' }} supply
+        {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
+        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}None renew within 90 days.{% endif %}
+      {% elif vp.total_systems %}
+        None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.
+      {% else %}
+        You have no systems yet, so there are no vendors to list.
+      {% endif %}
+    </p>
+    <p class="mt-1 text-sm text-muted-foreground">
+      {% if vp.unmapped_count %}
+        {{ vp.unmapped_count }} of your systems have no vendor recorded.
+        <a href="?tab=mapping" @click.prevent="showTab('mapping')" class="text-primary hover:underline">Set the vendor</a>.
+      {% elif vp.total_systems %}
+        Every system has a vendor recorded.
+      {% else %}
+        <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline">Add your first system</a> and name its vendor.
+      {% endif %}
+      {% if vp.annual_cost is not none %}
+        Annual cost across vendors: {{ vp.annual_cost|currency }}.
+      {% endif %}
+    </p>
+  </div>
+  {% else %}
+  <div class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-emphasis" role="alert">
+    The vendor list could not be read just now. Reload the page; if it persists, tell your administrator.
+  </div>
+  {% endif %}
+
+  <div role="tablist" aria-label="Vendor views" class="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground">
+    <button type="button" role="tab" id="tab-vendors" aria-controls="panel-vendors" :aria-selected="tab === 'vendors'"
+            @click="showTab('vendors')" :class="tab === 'vendors' ? 'bg-background text-foreground' : ''"
+            class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Vendors</button>
+    <button type="button" role="tab" id="tab-mapping" aria-controls="panel-mapping" :aria-selected="tab === 'mapping'"
+            @click="showTab('mapping')" :class="tab === 'mapping' ? 'bg-background text-foreground' : ''"
+            class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      Mapping{% if vp and vp.unmapped_count %} <span class="ml-2 rounded-full bg-primary/10 px-2 text-xs text-primary">{{ vp.unmapped_count }}</span>{% endif %}
+    </button>
+  </div>
+
+  <div id="panel-mapping" role="tabpanel" aria-labelledby="tab-mapping" x-show="tab === 'mapping'" x-cloak>
+    {% if vp and vp.unmapped_count %}
+    <p class="mb-3 text-sm" data-testid="mapping-answer">
+      <strong>{{ vp.unmapped_count }}</strong> of your systems have no vendor recorded. Pick the vendor for each; it is saved straight away.
+    </p>
+    <ul class="divide-y divide-border rounded-lg border border-border bg-card" data-testid="mapping-list">
+      {% for system in vp.unmapped %}
+      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between" x-data="vendorMapRow({{ system.id }})">
+        <div class="min-w-0">
+          <a href="{{ url_for('unified_applications.application_detail', id=system.id) }}" class="font-medium text-primary hover:underline break-words">{{ system.name }}</a>
+          <p class="text-xs text-muted-foreground">{{ system.lifecycle_status|replace('_', ' ')|title if system.lifecycle_status else 'Lifecycle not recorded' }}</p>
+        </div>
+        <div class="relative w-full sm:w-72">
+          <div class="flex gap-2">
+            <input type="text" x-model="query" @input="search()" @focus="search()" @keydown.enter.prevent="saveTyped()"
+                   @keydown.escape="open = false" autocomplete="off" role="combobox" aria-autocomplete="list" :aria-expanded="open"
+                   aria-label="Vendor for {{ system.name }}" placeholder="Search or type a vendor"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <button type="button" @click="saveTyped()" :disabled="saving" aria-label="Save the vendor choice for {{ system.name }}"
+                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">Save</button>
+          </div>
+          <ul x-show="open && choices.length" x-cloak role="listbox"
+              class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-card shadow-sm">
+            <template x-for="vendor in choices" :key="vendor.id">
+              <li role="option"><button type="button" @click="choose(vendor)" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted" x-text="vendor.name"></button></li>
+            </template>
+          </ul>
+          <p x-show="error" x-cloak class="mt-1 text-xs text-destructive-emphasis" x-text="error" role="alert"></p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if vp.unmapped_count > vp.unmapped|length %}
+    <p class="mt-2 text-xs text-muted-foreground">Showing the first {{ vp.unmapped|length }}; set these and the rest follow.</p>
     {% endif %}
-    {{ data_card(icon='banknote', icon_color='cyan', value=acv_display, label='Portfolio ACV', subtitle='Contracted + deployed ACV') }}
-    {# Renewals due card #}
-    {{ data_card(icon='calendar-clock', icon_color='amber' if (stats.renewals_due or 0) > 0 else 'gray', value=stats.renewals_due|default(0)|dash, label='Renewals Due (90d)', subtitle='Contracts expiring within 90 days') }}
+    {% elif vp and vp.total_systems %}
+    <div class="rounded-lg border border-border bg-card p-6 text-sm" data-testid="mapping-answer">
+      <p class="font-medium">Every one of your {{ vp.total_systems }} systems has a vendor recorded.</p>
+      <p class="mt-1 text-muted-foreground">New systems that name no vendor will be listed here.</p>
+    </div>
+    {% elif vp %}
+    <div class="rounded-lg border border-border bg-card p-6 text-sm" data-testid="mapping-answer">
+      <p class="font-medium">You have no systems yet.</p>
+      <p class="mt-1 text-muted-foreground">Add a system, then set its vendor here.</p>
+    </div>
+    {% endif %}
   </div>
 
   {# Main layout: table + side panel #}
-  <div class="flex flex-col lg:flex-row gap-6">
+  <div id="panel-vendors" role="tabpanel" aria-labelledby="tab-vendors" x-show="tab === 'vendors'" class="flex flex-col lg:flex-row gap-6">
 
     {# LEFT: Table Card — uses workbench_table macro.
        min-w-0 overrides the flex item's default min-width:auto -- without it, a flex
@@ -96,23 +168,12 @@
           columns=[
               {'key': 'row_number', 'label': '#'},
               {'key': 'name', 'label': 'Vendor', 'sortable': true},
-              {'key': 'vendor_type', 'label': 'Type'},
-              {'key': 'products_count', 'label': 'Products'},
-              {'key': 'enterprise_readiness_score', 'label': 'Readiness'},
-              {'key': 'status', 'label': 'Status'},
-              {'key': 'contract_status', 'label': 'Contract'},
-              {'key': 'mcda_score', 'label': 'Score'},
+              {'key': 'system_count', 'label': 'Systems'},
+              {'key': 'annual_cost', 'label': 'Annual cost'},
+              {'key': 'next_renewal', 'label': 'Next renewal'},
               {'label': 'Actions', 'align': 'right'},
           ],
-          filters=[
-              {'key': 'vendor_type', 'label': 'Types', 'options': vendor_type_filter_options or []},
-              {'key': 'contract_status', 'label': 'Statuses', 'options': [
-                  {'value': 'catalog', 'label': 'Catalog'},
-                  {'value': 'contracted', 'label': 'Contracted'},
-                  {'value': 'deployed', 'label': 'Deployed'},
-                  {'value': 'inactive', 'label': 'Inactive'},
-              ]},
-          ],
+          filters=[],
           selectable=true,
           search_placeholder='Search vendors...',
           empty_icon='building',
@@ -130,34 +191,21 @@
             </template>
           </div>
         </td>
-        <td class="px-4 py-3 align-middle">
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted border border-border" x-text="formatVendorType(row.vendor_type)"></span>
+        <td class="px-4 py-3 align-middle text-sm">
+          <a :href="'{{ url_for('unified_applications.vendor_detail', vendor_id=0) }}'.replace('/0', '/' + row.id) + '#vendor-systems'"
+             class="text-primary hover:underline"
+             x-text="row.system_count + (row.system_count === 1 ? ' system' : ' systems')"></a>
+          <p class="text-xs text-muted-foreground" x-show="row.system_count === 0">None of your systems name it yet</p>
         </td>
-        <td class="px-4 py-3 align-middle">
-          <span class="text-sm text-muted-foreground" x-text="(row.products_count || 0) + ' product(s)'"></span>
+        <td class="px-4 py-3 align-middle text-sm tabular-nums">
+          <span x-show="row.annual_cost !== null && row.annual_cost !== undefined" x-text="(row.annual_cost === null || row.annual_cost === undefined) ? '' : (window.currencyManager ? window.currencyManager.format(row.annual_cost) : row.annual_cost)"></span>
+          <span x-show="(row.annual_cost === null || row.annual_cost === undefined)" class="text-xs text-muted-foreground"
+                x-text="row.cost_visible === false ? 'Not shown for your role' : 'No cost recorded'"></span>
         </td>
-        <td class="px-4 py-3 align-middle">
-          <div class="flex items-center gap-2">
-            <div class="flex-1 bg-muted h-2 rounded-full overflow-hidden max-w-[100px]">
-              <div class="h-full bg-primary" :style="'width: ' + (row.enterprise_readiness_score || 0) + '%'"></div><!-- inline-style-ok -->
-            </div>
-            <span class="text-sm font-medium" x-text="(row.enterprise_readiness_score || 0) + '%'"></span>
-          </div>
-        </td>
-        <td class="px-4 py-3 align-middle">
-          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="statusClass(row.status)" x-text="(row.status || 'unknown')"></span>
-        </td>
-        <td class="px-4 py-3 align-middle">
-          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="contractClass(row.contract_status)" x-text="(row.contract_status || 'catalog')"></span>
-        </td>
-        <td class="px-4 py-3 align-middle">
-          <template x-if="$store.vendorScores && $store.vendorScores[row.id] != null">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info border border-info/30"
-                  x-text="$store.vendorScores[row.id] + '/100'"></span>
-          </template>
-          <template x-if="!$store.vendorScores || $store.vendorScores[row.id] == null">
-            <span class="text-xs text-muted-foreground">—</span>
-          </template>
+        <td class="px-4 py-3 align-middle text-sm">
+          <span x-show="row.next_renewal" x-text="row.next_renewal"></span>
+          <span x-show="row.renewal_due" class="ml-2 inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis">Due within 90 days</span>
+          <span x-show="!row.next_renewal" class="text-xs text-muted-foreground">No contract renewal ahead</span>
         </td>
         <td class="px-4 py-3 align-middle text-right" @click.stop>
           <div class="flex items-center gap-2 justify-end">
@@ -334,31 +382,4 @@
 
 </div>
 
-<script>
-/* FRAG-036: Lazy-load vendor scores from ranking endpoint */
-document.addEventListener('alpine:init', () => {
-  Alpine.store('vendorScores', {});
-});
-document.addEventListener('DOMContentLoaded', function () {
-  Platform.fetch.get('/api/vendors/ranking', {}, { silent: true })
-    .then(data => {
-      // Platform.fetch already threw if response not ok, so we are in success path.
-      // However, the API may return { success: false, error: ... }.
-      // We must still treat that as an error.
-      if (!data.success) throw new Error(data.error || 'vendor ranking unavailable');
-      const scores = {};
-      (data.ranking || []).forEach(v => {
-        if (v.vendor_option_id) scores[v.vendor_option_id] = v.total_score;
-      });
-      if (window.Alpine && Alpine.store) {
-        Alpine.store('vendorScores', scores);
-      }
-    })
-    .catch(err => {
-      // The store stays empty — no invented scores — and the user is told why
-      // the column is blank.
-      Platform.toast.error('Could not load vendor scores — the score column is unknown, not unscored.');
-    });
-});
-</script>
 {% endblock %}

@@ -124,6 +124,7 @@ def test_the_explanation_names_each_drawn_link_who_drew_it_when_and_the_rule(
     assert why["derived_id"] == row_id
     assert why["rule"] == "A serving link followed by a serving link gives a serving link, by the ArchiMate derivation table."
     assert why["complete"] is True
+    assert why["plain"] == f"{names['mainframe']} reaches {names['portal']} through {names['gateway']}."
     links = why["links"]
     assert [link["relationship_id"] for link in links] == [ids["second"], ids["first"]]
     assert [link["position"] for link in links] == [1, 2]
@@ -317,7 +318,7 @@ def test_a_link_sentence_follows_the_one_wording_table_and_never_has_a_gap():
         "CRM accesses Customer."
     )
     assert link_sentence(source_name=None, target_name="Portal", relation_type="Serving") is None
-    assert link_sentence(source_name="A", target_name="B", relation_type="Unknown") is None
+    assert link_sentence(source_name="A", target_name="B", relation_type="Unknown") == "A and B are linked."
 
 
 def test_every_absence_code_an_explanation_carries_is_in_the_one_vocabulary():

@@ -294,9 +294,8 @@
         const iconElement = document.getElementById('domain-icon');
         iconElement.innerHTML = `<i data-lucide="${config.icon}" class="h-5 w-5"></i>`;
 
-        // Update colors using safe class mapping
-        const bgClass = getColorClass(config.color || 'primary', 'bg');
-        iconElement.className = `flex h-9 w-9 items-center justify-center rounded-lg ${bgClass} text-primary-foreground transition-all duration-300`; // token-migration-ok
+        // The icon is read by assistive technology only; showing it put a coloured tile on its own row above the toolbar.
+        iconElement.className = 'sr-only';
 
         // Re-initialize lucide icons
         lucide.createIcons();
@@ -430,7 +429,7 @@
             }
         } catch (_estateErr) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError('We could not answer that just now.', () => _retryTurn(message, timestamp));
+            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
             return;
         }
 
@@ -486,7 +485,7 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError(_streamErr.message, null, { adminLink: true });
+                appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
                 return;
             }
             /* fall through to non-streaming */
@@ -576,10 +575,10 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError(errorMessage || fullError, null, { adminLink: true });
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
-                    appendError(fullError, () => _retryTurn(message, timestamp));
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
                 }
             } else {
                 // Add AI response to history
@@ -613,8 +612,11 @@
                        same way the streamed path does rather than as an
                        ordinary answer that happens to mention Admin
                        -> API Settings. */
+                    answeredBy: data.answered_by || null,
                     error: data.agent_error || null
                 });
+
+                showAnsweredBy({ answeredBy: data.answered_by, error: data.agent_error });
 
                 // Genome extraction — fires after every AI response when ?mode=genome
                 if (window._genomePanelInstance) {
@@ -624,7 +626,34 @@
 
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError(`Network error: ${error.message}`, () => _retryTurn(message, timestamp));
+            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+        }
+    }
+
+    // The chat frame runs from where it starts to the bottom edge of the window, so the composer sits on
+    // that edge whatever sits above the frame (a banner, the sample-company line). The class height is the
+    // fallback until this runs.
+    function fitChatFrame() {
+        const frame = document.getElementById('chat-frame');
+        if (!frame) return;
+        const top = frame.getBoundingClientRect().top;
+        frame.style.height = Math.max(448, window.innerHeight - top) + 'px';
+    }
+    fitChatFrame();
+    window.addEventListener('resize', fitChatFrame);
+    window.addEventListener('load', fitChatFrame);
+
+    // The line under the composer names the provider and model that answered
+    // this turn; a turn nobody answered names none.
+    function showAnsweredBy(meta) {
+        const el = document.getElementById('chat-model-name');
+        if (!el) return;
+        const by = meta && !meta.error ? meta.answeredBy : null;
+        if (by && by.model) {
+            const provider = by.provider ? String(by.provider).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' · ' : '';
+            el.textContent = provider + by.model;
+        } else {
+            el.textContent = 'no model answered';
         }
     }
 
@@ -695,6 +724,7 @@
                         trail: _trail,
                         actions: result.actions || [],
                         pendingApprovals: result.pendingApprovals || [],
+                        answeredBy: result.answeredBy || null,
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
@@ -705,6 +735,7 @@
                         error: result.error || null
                     };
                     state.chatHistory.push({ role: 'ai', content: result.text, timestamp, metadata: meta });
+                    showAnsweredBy(meta);
                     finaliseStreamedMessage(wrap, result.text, meta);
                     wrap = null;   // finalised in place; nothing left to drop
                     // Genome panel extraction is an optional side-panel enrichment;
@@ -1263,6 +1294,18 @@ Would you like me to provide more details about the extracted elements or help y
   var render = window.ArchieChat.render;
   function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
+  // The search box above the list narrows it by title; an empty box shows every chat.
+  function filterSessionList() {
+    var box = document.getElementById('chat-history-search');
+    var q = box ? box.value.trim().toLowerCase() : '';
+    document.querySelectorAll('#session-list .js-thr').forEach(function (row) {
+      row.classList.toggle('hidden', q !== '' && row.textContent.toLowerCase().indexOf(q) === -1);
+    });
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'chat-history-search') filterSessionList();
+  });
+
   window.loadSessionList = async function () {
     var c = document.getElementById('session-list');
     if (!c) return;
@@ -1284,19 +1327,20 @@ Would you like me to provide more details about the extracted elements or help y
         var active = (x.id === window.__threadId) ? ' bg-accent' : '';
         // An unparsable timestamp renders as an em dash, never as a blank that
         // would read as "this conversation has no date".
-        var d = '—'; try { d = new Date(x.updated_at || x.created_at).toLocaleDateString(); } catch (e) { /* swallow-ok: date formatting of one row; the em dash above already tells the user the date is unknown */ }
-        return '<div class="js-thr group relative flex items-center rounded-lg border border-border hover:bg-accent/50 transition-colors' + active + '" data-id="' + esc(x.id) + '">' +
+        var d = '—'; try { d = new Date(x.updated_at || x.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch (e) { /* swallow-ok: date formatting of one row; the em dash above already tells the user the date is unknown */ }
+        return '<div class="js-thr group relative flex items-center rounded-lg border border-border hover:bg-accent/50 transition-colors' + active + '" data-thread-id="' + esc(x.id) + '">' +
           '<button type="button" class="js-thr-open flex-1 text-left p-3 min-w-0">' +
-          '<div class="font-medium text-xs truncate">' + esc(x.title || 'New chat') + '</div>' +
+          '<div class="font-medium text-sm truncate">' + esc(x.title || 'New chat') + '</div>' +
           '<div class="text-xs text-muted-foreground mt-1">' + esc(d) + (x.message_count ? ' · ' + x.message_count + ' messages' : '') + '</div></button>' +
           '<button type="button" class="js-thr-del opacity-0 group-hover:opacity-100 shrink-0 p-2 text-muted-foreground hover:text-destructive" title="Delete conversation" aria-label="Delete conversation"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button></div>';
       }).join('');
       c.querySelectorAll('.js-thr').forEach(function (row) {
-        var id = row.getAttribute('data-id');
+        var id = row.getAttribute('data-thread-id');
         var o = row.querySelector('.js-thr-open'); if (o) o.addEventListener('click', function () { window.loadSession(id); });
         var del = row.querySelector('.js-thr-del'); if (del) del.addEventListener('click', function (e) { e.stopPropagation(); window.deleteConversation(id); });
       });
       if (window.lucide) lucide.createIcons();
+      filterSessionList();
     } catch (e) {
       c.innerHTML = '<p class="text-xs text-destructive text-center py-4">Couldn\'t load conversations.</p>';
     }

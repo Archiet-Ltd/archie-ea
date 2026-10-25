@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -144,8 +145,8 @@ def _get_configured_chat_models():
                 model_info["recommended_for"] = ["Complex reasoning", "Analysis"]
             elif provider_name == "gemini":
                 model_info["recommended_for"] = ["Multi-modal", "General tasks"]
-            elif provider_name == "deepseek":
-                model_info["recommended_for"] = ["Code analysis", "Technical tasks"]
+            elif provider_name == "nvidia":
+                model_info["recommended_for"] = ["General conversation", "Technical tasks"]
 
             models.append(model_info)
 
@@ -688,6 +689,8 @@ def send_message():
                 # reader can check the answer against the rows rather than
                 # trusting it.
                 "sources": agent_result.get("sources", []),
+                # The provider and model that answered; absent when none did.
+                "answered_by": agent_result.get("answered_by"),
                 # AgentRunner._fallback() persists a friendly "couldn't be
                 # completed" response AND keeps the raw failure reason on the
                 # same dict; without this field the UI could not tell an
@@ -722,7 +725,7 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": "Unable to connect to AI service. Please check your API configuration in Admin > API Settings.",
+                    "error": ASSISTANT_UNAVAILABLE,
                     "error_type": "connection",
                 }
             ),
@@ -750,7 +753,7 @@ def send_message():
             return (
                 jsonify(
                     {
-                        "error": "AI service authentication failed. Please verify your API key in Admin > API Settings.",
+                        "error": ASSISTANT_UNAVAILABLE,
                         "error_type": "auth",
                     }
                 ),

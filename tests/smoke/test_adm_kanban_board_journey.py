@@ -56,14 +56,14 @@ def test_adm_board_renders_through_the_shared_shell(browser, live_server, seeded
         # The one shared board shell is present (the same shell the portfolio board uses).
         assert page.locator(".kanban-board").count() == 1, "the ADM board does not render the shared kanban-board shell"
 
-        # The ten ADM phases are the lanes, inside the shared shell.
+        # Preliminary and A to H are the lanes, inside the shared shell; Requirements Management is the panel beside them.
         lanes = page.locator(".kanban-board .kanban-column")
-        assert lanes.count() == 10, "the ADM board does not show its ten phase lanes"
+        assert lanes.count() == 9, "the ADM board does not show its nine phase lanes"
 
         # The status summary shows the work-in-progress limits on the limited statuses.
         summary = page.get_by_test_id("adm-status-summary").inner_text()
         for limit in ADM_WIP.values():
-            assert f"/ {limit}" in summary, "a status WIP limit %s is not shown on the board" % limit
+            assert f"of {limit} limit" in summary, "a status WIP limit %s is not shown on the board" % limit
     finally:
         context.close()
 

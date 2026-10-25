@@ -26,6 +26,7 @@ flask --app manage backfill-kanban-card-org || echo 'WARN kanban card tenancy ba
 flask --app manage backfill-saved-diagram-tenancy || echo 'WARN saved-diagram tenancy backfill skipped - composer diagrams keep nullable organization_id until it runs; rows left NULL are invisible to every org (CMP-01)'
 flask --app manage drop-audit-log-viewpoint-fk || echo 'WARN audit-log viewpoint-FK drop skipped - composer audit writes keep failing with a FK violation until it runs (CMP-03)'
 flask --app manage backfill-architect-role
+flask --app manage backfill-vendor-links || echo 'WARN vendor link backfill skipped - systems that name a vendor only as text stay out of the Vendors list until it runs'
 flask --app manage backfill-decision-register-consolidation || echo 'WARN decision register consolidation backfill skipped - decision_ledger rows remain untenanted and architecture_decision_records rows stay unpaired with the canonical register until it runs' >&2
 flask --app manage backfill-solution-risk-merge || echo 'WARN solution risk merge backfill skipped - solution risks stay unlinked from the one risk register (no risk_entity_links row, no shared score history) until it runs'
 # RUN-01: copy ARB, ArchiMate composer and rationalisation audit history into
@@ -149,6 +150,11 @@ if [ -f /tmp/project-capabilities-report.json ]; then
     cat /tmp/project-capabilities-report.json
     echo '--- end report ---'
 fi
+
+# Every capability carries a type (strategic, operational or supporting). Untyped rows get
+# the starting rule; a type someone has set is never changed. Idempotent.
+flask --app manage backfill-capability-types --apply \
+    || echo 'WARN capability type backfill failed - some capabilities may show as untyped until it is re-run' >&2
 
 # ADR 0008 -- retire the remaining four superseded capability stores
 # (capabilities, enterprise_capabilities, archimate_capabilities,

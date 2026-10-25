@@ -22,7 +22,7 @@ EXPECTED_H2 = [
     "Licensed under AGPL-3.0.",
     "How Entelim compares.",
     "Questions.",
-    "Import your model. Get a cited answer in minutes.",
+    "Connect your tools. Get a cited answer.",
 ]
 
 
@@ -48,7 +48,8 @@ def test_removed_markup_is_gone(home_html, removed):
 
 
 def test_section_order_follows_the_design(home_html):
-    h2s = [_text(m) for m in re.findall(r"<h2[^>]*>(.*?)</h2>", home_html, flags=re.S)]
+    page = home_html[home_html.index('data-testid="home-hero"'):].split("<footer")[0]  # the page's own sections, not the menus
+    h2s = [_text(m) for m in re.findall(r"<h2[^>]*>(.*?)</h2>", page, flags=re.S)]
     assert h2s == EXPECTED_H2
 
 
@@ -67,7 +68,7 @@ def test_every_details_sits_inside_the_faq_column(home_html):
 
 
 def test_pricing_table_has_five_headers_and_four_rows(home_html):
-    table = re.search(r'<table class="public-table">(.*?)</table>', home_html, flags=re.S)
+    table = re.search(r'<table[^>]*class="[^"]*public-table[^"]*"[^>]*>(.*?)</table>', home_html, flags=re.S)
     assert table, "pricing table not found"
     head, body = table.group(1).split("</thead>")
     assert [_text(h) for h in re.findall(r"<th[^>]*>(.*?)</th>", head, flags=re.S)] == [
@@ -80,8 +81,8 @@ def test_pricing_table_has_five_headers_and_four_rows(home_html):
 
 
 def test_hero_figure_is_a_real_answer_and_not_the_stale_list(home_html):
-    assert "img/home/impact-answer.webp" in home_html
-    assert "img/home/impact-answer-mobile.webp" in home_html
+    assert "img/home/chat-answer.webp" in home_html
+    assert "img/home/chat-answer-mobile.webp" in home_html
     assert "product-portfolio" not in home_html
 
 

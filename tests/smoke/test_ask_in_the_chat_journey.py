@@ -46,7 +46,7 @@ def _role_of(live_server, email):
 
 def _load_sample(page, base):
     page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_role("button", name="Load sample").first.click()
+    page.get_by_test_id("first-action-sample").click()
     expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
@@ -77,7 +77,7 @@ def test_the_fresh_owner_asks_in_the_chat_and_reads_cited_cards(browser, live_se
 
         # What to ask first, and the scope and model stated.
         expect(page.get_by_text("How can I help you today?")).to_be_visible()
-        expect(page.get_by_test_id("first-question-suggestion")).to_be_visible()
+        expect(page.get_by_test_id("first-question-suggestion")).to_have_count(4, timeout=PAGE_TIMEOUT)
         scope = page.get_by_test_id("chat-scope").inner_text()
         assert "Sample Org" in scope and "Model:" in scope, scope
         _shot(page, "chat-empty", width)
@@ -205,7 +205,7 @@ def test_the_answer_is_kept_in_the_conversation_history(browser, live_server, se
         expect(messages).to_contain_text(QUESTION, timeout=PAGE_TIMEOUT)
         expect(messages).to_contain_text("%d connections" % count)
         _shot(page, "chat-history", 1440)
-        page.get_by_role("tab", name="Chats").click()
+        # the history panel is open beside the conversation
         expect(page.locator("#session-list")).to_contain_text("What breaks if Payments service", timeout=PAGE_TIMEOUT)
 
         # The kept answer opens the stored answer, with the same number of rows.
@@ -224,7 +224,8 @@ def test_the_answer_is_kept_in_the_conversation_history(browser, live_server, se
         other.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(other_page, live_server, other_email)
         other_page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        other_page.get_by_role("tab", name="Chats").click()
+        # wait for the list to load (it says so when empty) before asserting the other chat is absent
+        expect(other_page.locator("#session-list")).to_contain_text("No conversations yet", timeout=PAGE_TIMEOUT)
         expect(other_page.locator("#session-list")).not_to_contain_text("What breaks if Payments service")
     finally:
         other.close()

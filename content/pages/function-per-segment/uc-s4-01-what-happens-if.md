@@ -13,7 +13,7 @@ icon: server-off
 
 **For owner-operators running a services business, no architecture background needed.**
 
-Open Ask, choose "What breaks if ___ fails or is under-resourced?" and type the name of the team, service or system you are worried about. Entelim lists everything recorded as depending on it, up to three steps away, and shows who owns each one. Every line has a Why? button that opens the links behind it in plain words.
+Ask the AI chat in your own words: "what happens if our booking system goes down?" Entelim lists everything recorded as depending on it, up to three steps away, and shows who owns each part and why each link is there.
 
 ## The question
 
@@ -21,21 +21,19 @@ You are not an architect and you do not want to become one. You want a straight 
 
 ## What Entelim answers
 
-On the **Ask** page, the first question reads "What breaks if ___ fails or is under-resourced?". Click it, and a box appears with the prompt "Type a team, service or system name". Choose a match from the list. Under a **Results** heading you get one line per thing that depends on your choice, and a summary line giving the number of connections found for your choice.
+Name the team, service or system in your question. The chat answers with a card for the answer, a summary line giving the number of connections found, and one card for each thing that depends on your choice.
 
-Each line shows:
+Each card shows:
 
-- the **name** of the thing affected
-- the **owner**, or a "missing" marker where none is recorded
-- **Health**, which currently reads "Not recorded yet"
-- a note, "We worked this out — nobody drew it directly", on connections Entelim inferred from the ones you drew
-- **Why?**, which opens a panel with "In plain terms", then "The links behind this" in order, and "Decisions about these things", or "No decision is recorded against them." where there are none
-- **View on twin map**, which opens the same connections as a map
-- **Full detail**, a fold-out for the technical fields (type, layer, depth, chain, rule, confidence), kept out of sight until you ask
+- the **name** of the thing affected, which opens it in the Composer
+- the **owner**, or "No owner recorded" where none is recorded
+- its **health**, or "Health not recorded"
+- the **source** of the connection: where it was read from, or "Worked out from the model" on a connection Entelim inferred from the ones you drew
+- **The links behind this**, which gives the connection in plain terms, the links it came from in order, who drew each one and when, and the decisions about these things, or "No decision is recorded against them." where there are none
 
-When nothing depends on your choice, the page says "Nothing is recorded as depending on this yet", and adds that nothing is missing, there is simply nothing recorded. When it cannot answer, it says "We could not answer that just now." It never fills the gap with a guess.
+When nothing depends on your choice, the answer says "Nothing is recorded as depending on this yet", and adds that nothing is missing, there is simply nothing recorded. It never fills the gap with a guess.
 
-Inferred connections are worked out ahead of time. If that has not happened yet, a notice reads "We haven't worked out the indirect connections for your model yet" with a **Work them out now** button. If the model has changed since, a notice says the connections "may be out of date". An **Indirect connections** panel at the foot of the page shows when they were last worked out, how many are current and how many may be out of date.
+Inferred connections are worked out ahead of time. If that has not happened yet, a notice reads "We haven't worked out the indirect connections for your model yet" with a **Work them out now** button. If the model has changed since, a notice says the connections "may be out of date".
 
 ## Who asks it
 
@@ -43,12 +41,11 @@ The owner or managing director of a services firm who has just heard that a key 
 
 ## How to get your answer
 
-1. Model what you depend on: your systems, your suppliers, your teams, and the connections between them. A spreadsheet import is one way to start.
-2. Open **Ask** and click the first question.
-3. Type the name and pick the match.
-4. Read the list from the top. Use **Why?** on any line you do not recognise.
-5. Pick **View on twin map** to see the same answer as a picture.
-6. Ask the other questions on the page for the same thing: what it is meant to achieve, what could hurt it, who is accountable, what data it holds.
+1. Connect GitHub, or import a file. Entelim proposes the systems and dependencies it finds and you approve them. Suppliers and people you add by hand, or bring in with a spreadsheet.
+2. Open the **AI chat** and ask what happens if the supplier, person or system fails.
+3. Read the cards from the top. Open **The links behind this** on any line you do not recognise.
+4. Click a name to see the same thing in the Composer, with everything it connects to.
+5. Ask the follow-ups in the same chat: what it is meant to achieve, what could hurt it, who is accountable, what data it holds.
 
 ## Doing this without Entelim
 
@@ -59,14 +56,14 @@ You gather the people who know, draw it on a whiteboard and photograph it. It is
 - The answer is only as complete as what has been recorded. A supplier or person that has not been modelled cannot be picked.
 - It follows connections up to three steps from your choice.
 - It does not put a figure on lost revenue or hours of downtime.
-- Health is not yet read from your data, so that field says so.
+- Health shows what is recorded; where none is, the card says so.
 - It lists what depends on the thing you pick. It does not rank the lines by severity.
 
 ## Frequently asked questions
 
 ### Do I need to know ArchiMate or any notation?
 
-No. The page uses plain words. Technical detail sits behind **Full detail** if you want it.
+No. The chat answers in plain words, and every card links to the record behind it if you want the technical detail.
 
 ### What if a person is not in the list?
 
@@ -74,11 +71,11 @@ Then they have not been modelled yet. Add them and their connections, then ask a
 
 ### Is the answer an estimate?
 
-No. It is a list of connections that were drawn, or worked out from ones that were, and each line says which. **Why?** shows the links behind it.
+No. It is a list of connections that were drawn, or worked out from ones that were, and each line says which. **The links behind this** shows them.
 
 ### Can I ask about an owner rather than a system?
 
-Yes. The accountability question on the same page lists who is recorded as responsible for a system.
+Yes. Ask the chat who is accountable for a system and it lists who is recorded as responsible.
 
 ## Related questions and modules
 
