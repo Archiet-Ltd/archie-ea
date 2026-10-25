@@ -104,25 +104,42 @@ let ComposerSearch = (function() {
                     return;
                 }
 
+                /* Draw once, after every node has its place. A synchronous paper
+                 * measures and re-routes each cell as it is added and again as the
+                 * banding moves it, which grows with the square of the element
+                 * count and held the tab for minutes on a populated model. */
                 let cellMap = {};
-                elements.forEach(function(el) {
-                    let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                    let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 0, 0);
-                    self.graph.addCell(node);
-                    cellMap[el.id] = node;
-                    self.canvasElements[el.id] = el;
-                });
+                let cells = [];
+                self.paper.freeze();
+                try {
+                    elements.forEach(function(el) {
+                        let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
+                        let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 0, 0);
+                        cells.push(node);
+                        cellMap[el.id] = node;
+                        self.canvasElements[el.id] = el;
+                    });
 
-                relationships.forEach(function(rel) {
-                    let srcCell = cellMap[rel.source_id];
-                    let tgtCell = cellMap[rel.target_id];
-                    if (!srcCell || !tgtCell) return;
-                    let link = createLink(srcCell, tgtCell, rel.type || 'association', rel.id);
-                    self.graph.addCell(link);
-                });
+                    relationships.forEach(function(rel) {
+                        let srcCell = cellMap[rel.source_id];
+                        let tgtCell = cellMap[rel.target_id];
+                        if (!srcCell || !tgtCell) return;
+                        cells.push(createLink(srcCell, tgtCell, rel.type || 'association', rel.id));
+                    });
 
-                /* Apply layer banding layout */
-                applyLayerBanding(self.graph);
+                    /* One reset instead of an add event per cell. */
+                    self.graph.resetCells(cells);
+
+                    /* Apply layer banding layout */
+                    applyLayerBanding(self.graph);
+                } finally {
+                    /* Draw in batches so the tab keeps answering while a large
+                     * model appears; a small one is drawn in the first batch. */
+                    self.paper.options.async = true;
+                    self.paper.unfreeze({ batchSize: 40 });
+                    self.paper.once('render:done', function() { self.paper.options.async = false; });
+                    self._scheduleMiniMapUpdate();
+                }
 
                 self.elementCount = elements.length;
                 self.relCount = relationships.length;

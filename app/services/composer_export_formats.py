@@ -431,6 +431,8 @@ def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict
                 els = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
                 for el in els:
                     profile = (el.acm_properties or {}).get("profile")
+                    if isinstance(profile, dict):  # written by the property writer as {"value": ..., "source": ...}
+                        profile = profile.get("value")
                     if profile:
                         profiles_present.add(profile)
 

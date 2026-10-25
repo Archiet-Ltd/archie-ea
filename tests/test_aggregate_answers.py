@@ -668,16 +668,16 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         assert f"/api/v1/elements/{head.id}" in targets
         assert f"/api/v1/elements/{tail.id}" in targets
 
-    def test_unresolved_service_returns_plain_reason_not_a_guess(self, app, db_session, make_org):
+    def test_unresolved_service_falls_back_to_single_points_of_failure(self, app, db_session, make_org):
         from app.modules.intelligence.services.query_catalogue import run_entry
 
         org = make_org("breaks-unknown")
         self._seed_chain(org.id)
 
         result = run_entry("what_breaks_if_fails", org.id, service="A Service That Does Not Exist")
-        assert result["total"] == 0
-        assert result["citations"] == []
-        assert "did not match" in result["reason"]
+        # An unmatched service name falls back to the most depended-on systems
+        # rather than returning an empty "name the service" reason.
+        assert "nothing recorded matches" in result["reason"]
 
     def test_no_service_named_returns_single_points_of_failure_with_citations(
         self, app, db_session, make_org

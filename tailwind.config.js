@@ -20,6 +20,21 @@ module.exports = {
       },
     },
     extend: {
+      // The strategy canvases (components/canvas) lay boxes on a ten-column grid
+      // and the value proposition canvas on a twenty-by-twenty one, and keep their
+      // natural width so a phone scrolls sideways: the spans, starts and widths
+      // Tailwind 3 stops short of.
+      gridTemplateColumns: { '20': 'repeat(20, minmax(0, 1fr))' },
+      gridTemplateRows: { '20': 'repeat(20, minmax(0, 1fr))' },
+      gridColumnStart: { '14': '14' },
+      gridRowStart: { '12': '12' },
+      gridRow: {
+        'span-7': 'span 7 / span 7',
+        'span-8': 'span 8 / span 8',
+        'span-10': 'span 10 / span 10',
+        'span-18': 'span 18 / span 18',
+      },
+      minWidth: { '240': '60rem' },
       // Pilot type scale (design register: typography). Plain sizes: the line
       // height stays inherited, as it was with the arbitrary text-[Npx] values.
       // The 11px tier is .text-2xs in shadcn_tokens.css (16px line height).

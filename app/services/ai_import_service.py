@@ -11,6 +11,7 @@ Integrates all AI services to provide comprehensive AI-powered import:
 This replaces the basic pattern-matching with sophisticated AI analysis.
 """
 
+from app.services.change_source import records_changes_as
 import json
 import logging
 from dataclasses import dataclass
@@ -2067,6 +2068,7 @@ Provide analysis in JSON format:
                 "validation_method": "error",
             }
 
+    @records_changes_as("import")
     def import_with_ai_analysis(
         self,
         app_data: Dict[str, Any],
@@ -2268,6 +2270,7 @@ Provide analysis in JSON format:
 
         return result
 
+    @records_changes_as("import")
     def bulk_import_with_ai(self, applications_data: List[Dict], **kwargs) -> Dict:
         """Bulk import with AI - calls import_with_ai_analysis for each app."""
         results = {

@@ -1941,59 +1941,59 @@
       "allowed_macros": [
         "components/accessibility_helpers.html",
         "components/alert.html",
-        "components/avatar.html",
         "components/badge.html",
         "components/breadcrumb.html",
         "components/breadcrumb_nav.html",
         "components/button.html",
-        "components/canvas_box.html",
         "components/card.html",
         "components/checkbox.html",
         "components/confirmation_dialog.html",
-        "components/data_card.html",
+        "components/data_table.html",
         "components/dense_table.html",
-        "components/detail_meta.html",
         "components/dialog.html",
         "components/dropdown_menu.html",
         "components/empty_state.html",
         "components/error_boundary.html",
+        "components/filter_bar.html",
+        "components/filter_panel.html",
         "components/form_field.html",
         "components/inline_hint.html",
         "components/input.html",
         "components/loading_state.html",
-        "components/metrics_card.html",
         "components/modal.html",
         "components/page_header.html",
-        "components/progress.html",
+        "components/pagination_controls.html",
         "components/provenance.html",
+        "components/search_bar.html",
         "components/select.html",
         "components/skeleton.html",
         "components/status_badge.html",
-        "components/status_indicator.html",
+        "components/table.html",
         "components/tabs.html",
-        "components/traceability_panel.html",
-        "macros/form_macros.html",
+        "components/workbench_table.html",
         "macros/page_shell.html"
       ],
       "basis": "rule",
-      "block": "record-detail",
+      "block": "data-table",
       "charts": [],
       "components": [
         "alert",
         "badge",
         "breadcrumb",
         "button",
+        "calendar",
         "card",
         "empty",
+        "field",
+        "input",
         "page-header",
         "page-shell",
         "provenance",
-        "spinner",
-        "tabs",
         "select",
-        "calendar",
+        "skeleton",
+        "spinner",
         "table",
-        "skeleton"
+        "tabs"
       ],
       "confidence": "high",
       "controls": {
@@ -2015,80 +2015,85 @@
         "macros/page_shell.html"
       ],
       "original": "preview",
-      "page_type": "record-detail",
+      "page_type": "data-table",
       "persona": "enterprise_architect",
       "reason": "The model as it stood on a date: a date form, then an elements table and a relationships table.",
       "reference": {
         "shadcn": {
-          "name": "shadcn examples: mail (reading pane)",
-          "url": "https://ui.shadcn.com/examples/mail"
+          "name": "shadcn examples: tasks",
+          "url": "https://ui.shadcn.com/examples/tasks"
         },
         "basecoat": {
-          "name": "flask-basecoat examples: product detail",
-          "image": "docs/design/reference/basecoat-product-detail.webp"
+          "name": "flask-basecoat examples: tasks",
+          "image": "docs/design/reference/basecoat-tasks.webp"
         }
       },
       "spec": null,
       "status": "mapped",
       "tier": "B",
-      "type_changed": false
+      "type_changed": false,
+      "extra_macros": [
+        "components/card.html"
+      ],
+      "note": "A filter card above a results card; both use the library card macro."
     },
     "app/modules/intelligence/templates/intelligence/history_changes.html": {
       "allowed_macros": [
         "components/accessibility_helpers.html",
         "components/alert.html",
-        "components/avatar.html",
         "components/badge.html",
         "components/breadcrumb.html",
         "components/breadcrumb_nav.html",
         "components/button.html",
-        "components/canvas_box.html",
         "components/card.html",
         "components/checkbox.html",
         "components/confirmation_dialog.html",
-        "components/data_card.html",
+        "components/data_table.html",
         "components/dense_table.html",
-        "components/detail_meta.html",
         "components/dialog.html",
         "components/dropdown_menu.html",
         "components/empty_state.html",
         "components/error_boundary.html",
+        "components/filter_bar.html",
+        "components/filter_panel.html",
         "components/form_field.html",
         "components/inline_hint.html",
         "components/input.html",
         "components/loading_state.html",
-        "components/metrics_card.html",
         "components/modal.html",
         "components/page_header.html",
-        "components/progress.html",
+        "components/pagination_controls.html",
         "components/provenance.html",
+        "components/search_bar.html",
         "components/select.html",
         "components/skeleton.html",
         "components/status_badge.html",
-        "components/status_indicator.html",
+        "components/table.html",
         "components/tabs.html",
-        "components/traceability_panel.html",
-        "macros/form_macros.html",
+        "components/workbench_table.html",
         "macros/page_shell.html"
       ],
       "basis": "rule",
-      "block": "record-detail",
+      "block": "data-table",
       "charts": [],
       "components": [
         "alert",
         "badge",
         "breadcrumb",
         "button",
+        "calendar",
         "card",
         "empty",
+        "field",
+        "input",
         "page-header",
         "page-shell",
         "provenance",
+        "select",
+        "skeleton",
         "spinner",
-        "tabs",
-        "calendar",
         "table",
-        "skeleton"
+        "tabs"
       ],
       "confidence": "high",
       "controls": {
@@ -2110,23 +2115,27 @@
         "macros/page_shell.html"
       ],
       "original": "preview",
-      "page_type": "record-detail",
+      "page_type": "data-table",
       "persona": "enterprise_architect",
       "reason": "What changed between two dates: a date form and a change list.",
       "reference": {
         "shadcn": {
-          "name": "shadcn examples: mail (reading pane)",
-          "url": "https://ui.shadcn.com/examples/mail"
+          "name": "shadcn examples: tasks",
+          "url": "https://ui.shadcn.com/examples/tasks"
         },
         "basecoat": {
-          "name": "flask-basecoat examples: product detail",
-          "image": "docs/design/reference/basecoat-product-detail.webp"
+          "name": "flask-basecoat examples: tasks",
+          "image": "docs/design/reference/basecoat-tasks.webp"
         }
       },
       "spec": null,
       "status": "mapped",
       "tier": "B",
-      "type_changed": false
+      "type_changed": false,
+      "extra_macros": [
+        "components/card.html"
+      ],
+      "note": "A filter card above a results card; both use the library card macro."
     },
     "app/modules/intelligence/templates/intelligence/traceability.html": {
       "allowed_macros": [
@@ -4800,9 +4809,9 @@
       "controls": {
         "button": 54,
         "form": 1,
-        "link": 1,
-        "modal": 4,
-        "testid": 6
+        "link": 4,
+        "modal": 3,
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -8051,7 +8060,7 @@
       "confidence": "high",
       "controls": {
         "link": 1,
-        "testid": 1
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -9896,7 +9905,7 @@
         "form": 2,
         "link": 3,
         "modal": 2,
-        "testid": 10
+        "testid": 9
       },
       "extends": [
         "layouts/admin_base.html"
@@ -17344,7 +17353,6 @@
       ],
       "basis": "rule",
       "block": "record-detail",
-      "charts": [],
       "components": [
         "alert",
         "badge",
@@ -17357,32 +17365,27 @@
         "page-header",
         "tabs"
       ],
-      "confidence": "high",
       "controls": {
-        "button": 4,
-        "form": 1,
-        "link": 2,
-        "modal": 1,
+        "button": 6,
+        "form": 4,
+        "link": 3,
+        "modal": 9,
         "testid": 8
       },
       "extends": [
         "layouts/admin_base.html"
       ],
-      "frame": "dashboard-01",
-      "inhouse_components": [
-        "canvas-box:Compose",
-        "modal:Replace",
-        "page-header:Replace"
-      ],
       "macros": [
+        "components/button.html",
+        "components/canvas/index.html",
         "components/canvas_box.html",
+        "components/empty_state.html",
+        "components/input.html",
         "components/modal.html",
-        "components/page_header.html"
+        "components/page_header.html",
+        "components/select.html"
       ],
-      "original": "gap:G-4",
-      "page_type": "board-canvas",
       "persona": "business_architect",
-      "reason": "Business model canvas; nine boxes in the canonical grid.",
       "reference": {
         "shadcn": {
           "name": "shadcn examples: mail (reading pane)",
@@ -17395,8 +17398,22 @@
       },
       "spec": null,
       "status": "mapped",
+      "charts": [],
+      "confidence": "high",
+      "frame": "dashboard-01",
+      "inhouse_components": [
+        "canvas-box:Compose",
+        "modal:Replace",
+        "page-header:Replace"
+      ],
+      "original": "gap:G-4",
+      "page_type": "board-canvas",
+      "reason": "Business model canvas; nine boxes in the canonical grid.",
       "tier": "C4",
-      "type_changed": true
+      "type_changed": true,
+      "extra_macros": [
+        "components/canvas/index.html"
+      ]
     },
     "app/templates/business_model/index.html": {
       "allowed_macros": [
@@ -17435,7 +17452,6 @@
       ],
       "basis": "rule",
       "block": "data-table",
-      "charts": [],
       "components": [
         "alert",
         "badge",
@@ -17450,7 +17466,6 @@
         "select",
         "table"
       ],
-      "confidence": "high",
       "controls": {
         "button": 2,
         "form": 1,
@@ -17461,22 +17476,13 @@
       "extends": [
         "layouts/admin_base.html"
       ],
-      "frame": "dashboard-01",
-      "inhouse_components": [
-        "empty_state:Replace",
-        "modal:Replace",
-        "page-header:Replace"
-      ],
       "macros": [
         "components/card.html",
         "components/empty_state.html",
         "components/modal.html",
         "components/page_header.html"
       ],
-      "original": "example:tasks",
-      "page_type": "data-table",
       "persona": "business_architect",
-      "reason": "Business models list.",
       "reference": {
         "shadcn": {
           "name": "shadcn examples: tasks",
@@ -17489,8 +17495,22 @@
       },
       "spec": null,
       "status": "mapped",
+      "charts": [],
+      "confidence": "high",
+      "frame": "dashboard-01",
+      "inhouse_components": [
+        "empty_state:Replace",
+        "modal:Replace",
+        "page-header:Replace"
+      ],
+      "original": "example:tasks",
+      "page_type": "data-table",
+      "reason": "Business models list.",
       "tier": "B",
-      "type_changed": false
+      "type_changed": false,
+      "extra_macros": [
+        "components/card.html"
+      ]
     },
     "app/templates/business_model/not_found.html": {
       "allowed_macros": [
@@ -30773,7 +30793,8 @@
         "components/modal.html",
         "macros/kanban_board.html",
         "macros/page_shell.html",
-        "components/dropdown_menu.html"
+        "components/dropdown_menu.html",
+        "components/select.html"
       ],
       "original": "gap:G-4",
       "page_type": "board",
@@ -32747,7 +32768,7 @@
       "controls": {
         "button": 4,
         "link": 1,
-        "modal": 2,
+        "modal": 1,
         "table": 1,
         "testid": 5
       },

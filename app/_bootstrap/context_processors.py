@@ -702,6 +702,9 @@ def init_context_processors(app):
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["home_url"] = _template_home_url
 
+    from app.modules.business_model_canvas.box_meta import canvas_box_meta
+    app.jinja_env.globals["canvas_box_meta"] = canvas_box_meta
+
     # NS-006: Register role-based access functions for persona navigation
     from app.utils.role_access import get_sidebar_zones, role_access_context_processor
     role_funcs = role_access_context_processor()
