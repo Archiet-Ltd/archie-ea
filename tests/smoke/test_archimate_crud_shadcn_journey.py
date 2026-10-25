@@ -28,7 +28,7 @@ DASHBOARD_URL = "/architecture/dashboard"
 IMPORT_URL = "/architecture/import/oef"
 RESTORE_URL = "/architecture/import/oef/restore-points"
 
-WALK_DIR = "/home/ubuntu/verify/seats/mg3ac033b/walk"
+WALK_DIR = "/home/ubuntu/verify/seats/mg3ac033d/walk"
 
 OEF_FIXTURE = os.path.join(
     os.path.dirname(__file__), "..", "fixtures", "oef", "archiet_shaped.xml"
