@@ -21,7 +21,16 @@
     {% call card(class='p-4') %}
         <ul class="space-y-2" aria-label="Records this answer rests on">
             {% for record in answer.records %}
-            <li data-catalogue-record>{{ button(text=record.name, variant='link', size='sm', href=record.url, icon='external-link', testid='catalogue-open') }}</li>
+            <li data-catalogue-record>
+                {{ button(text=record.name, variant='link', size='sm', href=record.url, icon='external-link', testid='catalogue-open') }}
+                {% if record.dependents or record.source_line %}
+                <p class="mt-1 text-xs text-muted-foreground">
+                    {% if record.dependents %}<span class="font-medium text-foreground" data-catalogue-count>{{ record.dependents }}</span>{% endif %}
+                    {% if record.dependents and record.source_line %}<span aria-hidden="true"> · </span>{% endif %}
+                    {% if record.source_line %}<span data-catalogue-source>{{ record.source_line }}</span>{% endif %}
+                </p>
+                {% endif %}
+            </li>
             {% endfor %}
         </ul>
     {% endcall %}
