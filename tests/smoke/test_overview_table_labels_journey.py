@@ -282,7 +282,6 @@ def test_no_trend_arrow_when_no_change_and_no_repeated_rows_and_bar_counts_visib
 
             # --- Fix 1: No lucide-icon trending arrows inside stat card badges when change is zero or absent ---
             run_cost_card = dash.locator('[data-testid="card-run-cost"]')
-            run_cost_html = run_cost_card.inner_html()
             change_els = run_cost_card.locator('[data-testid="card-run-cost-change"]')
             if change_els.count():
                 badge_text = change_els.first.inner_text().strip()
