@@ -253,13 +253,15 @@ def test_architect_finds_adds_connects_edits_undoes_exports_and_deletes(browser,
         page.locator("g.joint-element", has_text=names["gateway"]).first.click()
         page.locator("g.joint-element", has_text=process_name).first.click()
         page.locator(".rel-picker-item", has_text=re.compile("^\\s*serving", re.I)).first.click()
+        # The line appears at once, but it is a recorded relationship only when the model has accepted it.
         page.wait_for_function(
-            "(sel) => Alpine.$data(document.querySelector(sel)).graph.getLinks().length > %d" % before["links"],
+            "(sel) => /serving relationship created/.test(Alpine.$data(document.querySelector(sel)).statusText || '')",
             arg=APP, timeout=PAGE_TIMEOUT)
         connected = _graph(page)
         assert connected["links"] == before["links"] + 1
         expect(page.get_by_test_id("status-counts")).to_have_text(_counts_text(connected["elements"], connected["links"]))
         # The legend names every relationship type the diagram draws, and nothing else.
+        expect(page.locator("[data-testid^='legend-']:not([data-testid='legend-empty'])")).to_have_count(len(connected["relTypes"]))
         legend = page.locator("[data-testid^='legend-']:not([data-testid='legend-empty'])").evaluate_all(
             "els => els.map(e => e.getAttribute('data-testid').replace('legend-', ''))")
         assert sorted(legend) == connected["relTypes"] and "serving" in legend

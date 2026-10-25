@@ -1,5 +1,5 @@
 {# Status line: counts that agree with the diagram, the selection, the last message, the save state and the
-   keyboard hints. Reads composerApp (elementCount, relCount, selectedNode, statusText, saveIndicator).
+   keyboard hints. Reads composerApp (shellElementTotal and shellRelTotal, counted from the graph; selectedNode, statusText, saveIndicator).
 
    Usage: {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
           {{ diagram_status_line() }} #}
@@ -8,7 +8,7 @@
 {% macro diagram_status_line() %}
 <footer class="flex h-9 shrink-0 select-none flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-card px-4 text-xs text-muted-foreground" data-testid="diagram-status-line">
   <span class="font-medium text-foreground tabular-nums" data-testid="status-counts"
-        x-text="elementCount + (elementCount === 1 ? ' element, ' : ' elements, ') + relCount + (relCount === 1 ? ' relationship' : ' relationships')"></span>
+        x-text="shellElementTotal + (shellElementTotal === 1 ? ' element, ' : ' elements, ') + shellRelTotal + (shellRelTotal === 1 ? ' relationship' : ' relationships')"></span>
   <span x-show="selectedNode" x-cloak data-testid="status-selection" x-text="selectedNode ? ('Selected: ' + selectedNode.label) : ''"></span>
   <span class="hidden md:inline" x-show="statusText && statusText !== 'Ready'" x-cloak role="status" aria-live="polite" x-text="statusText"></span>
   <span class="ml-auto hidden items-center gap-3 lg:flex">

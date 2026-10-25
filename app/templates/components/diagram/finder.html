@@ -20,10 +20,12 @@
     <template x-for="row in finderRows" :key="row.id">
       <li>
         {% call button(variant='ghost', size='sm', class='h-auto w-full justify-start gap-2 px-2 py-1 text-left font-normal', attrs_dict={'@click': 'shellFocus(row.id)', ':data-testid': '\'finder-row-\' + row.id', ':aria-label': '\'Show \' + row.name + \' on the diagram\''}) %}
-          {{ notation_swatch('row.elType', 'row.layer') }}
-          <span class="flex min-w-0 flex-col">
-            <span class="truncate text-sm" x-text="row.name"></span>
-            <span class="truncate text-xs text-muted-foreground" x-text="row.type"></span>
+          <span class="flex w-full min-w-0 items-center gap-2 text-left">
+            {{ notation_swatch('row.elType', 'row.layer') }}
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate text-sm" x-text="row.name"></span>
+              <span class="truncate text-xs text-muted-foreground" x-text="row.type"></span>
+            </span>
           </span>
         {% endcall %}
       </li>

@@ -64,6 +64,8 @@ let ComposerShell = (function() {
             shellOpenGroups: { business: true, application: true, technology: true },
             finderFilter: '',
             finderItems: [],
+            shellElementTotal: 0,
+            shellRelTotal: 0,
             legendTypes: [],
             canUndoNow: false,
             canRedoNow: false,
@@ -81,7 +83,7 @@ let ComposerShell = (function() {
                     self.canRedoNow = UndoStack.canRedo();
                 };
                 let refresh = function() { self.shellRefresh(); };
-                self.graph.on('add remove reset change:elName', function() { clearTimeout(self._shellTimer); self._shellTimer = setTimeout(refresh, 60); });
+                self.graph.on('add remove reset change:elName change:relType', function() { clearTimeout(self._shellTimer); self._shellTimer = setTimeout(refresh, 60); });
                 self.graph.on('add', function(cell) {
                     if (cell.isLink() && self.connectorStyle !== 'manhattan' && cell.get('routingStyle') === 'manhattan') {
                         self.shellRoute(cell, self.connectorStyle);
@@ -105,10 +107,11 @@ let ComposerShell = (function() {
                 });
                 items.sort(function(a, b) { return a.name.localeCompare(b.name); });
                 self.finderItems = items;
-                /* One count: what the graph holds. The relationship picker and a few other paths add
-                   cells without touching the counters, which left the status line behind the diagram. */
-                self.elementCount = items.length;
-                self.relCount = self.graph.getLinks().length;
+                /* The status line counts what the graph holds. The page's own elementCount and relCount are
+                   adjusted by hand in many places (the relationship picker adds the line first and counts it later),
+                   which left the status line behind the diagram. */
+                self.shellElementTotal = items.length;
+                self.shellRelTotal = self.graph.getLinks().length;
                 let seen = {};
                 self.graph.getLinks().forEach(function(l) {
                     let t = (l.get('relType') || '').toLowerCase();
