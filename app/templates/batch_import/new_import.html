@@ -1,5 +1,9 @@
 {# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
 {% from 'components/page_header.html' import page_header %}
 {% import 'components/card.html' as card %}
 {% import 'components/breadcrumb.html' as breadcrumb %}
@@ -45,14 +49,7 @@
                                 <label for="jobName" class="block text-sm font-medium text-muted-foreground mb-1">
                                     Job Name <span class="text-destructive-emphasis">*</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    id="jobName"
-                                    x-model="form.name"
-                                    placeholder="e.g., Q1 2024 Application Import"
-                                    required
-                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
-                                />
+                                {{ input(type="text", id=("jobName"), placeholder=("e.g., Q1 2024 Application Import"), required=true, size='sm', class="w-full mt-1", attrs_dict={"x-model": ("form.name")}) }}
                                 <p class="text-xs text-muted-foreground mt-1">A descriptive name to identify this import job</p>
                             </div>
 
@@ -70,12 +67,7 @@
  }"
                                             class="relative flex cursor-pointer rounded-lg border p-4 transition-all"
                                         >
-                                            <input
-                                                type="radio"
-                                                x-model="form.archimate_mode"
-                                                :value="mode.value"
-                                                class="sr-only"
-                                             aria-label="Radio field"/>
+                                            {{ input(type="radio", aria_label=("Radio field"), class="sr-only !h-px !w-px !p-0 !border-0", attrs_dict={"x-model": ("form.archimate_mode"), ":value": ("mode.value")}) }}
                                             <div class="flex flex-col">
                                                 <span class="font-medium" x-text="mode.label"></span>
                                                 <span class="text-xs text-muted-foreground mt-1" x-text="mode.description"></span>
@@ -92,8 +84,7 @@
                             <!-- PROG-002: Transformation Programme target -->
                             <div>
                                 <label for="programme-target" class="block text-sm font-medium text-muted-foreground mb-1">Transformation Programme <span class="text-muted-foreground font-normal">(optional)</span></label>
-                                <select id="programme-target" x-model="form.programme_initiative_id"
-                                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm mt-1">
+                                {% call native_select(id=("programme-target"), size='sm', class="w-full mt-1", attrs_dict={"x-model": ("form.programme_initiative_id")}) %}
                                     <option value="">— None — import without programme linkage —</option>
                                     {# DEF-042, Capgemini dry-run: p.initiative_type is nullable
                                        (StrategicInitiative), and this always interpolated it
@@ -102,7 +93,7 @@
                                     <template x-for="p in programmes" :key="p.id">
                                         <option :value="p.id" x-text="p.initiative_type ? (p.name + ' (' + p.initiative_type + ')') : p.name"></option>
                                     </template>
-                                </select>
+                                {% endcall %}
                                 <p x-show="programmesError" x-cloak class="text-xs text-destructive-emphasis mt-1" x-text="programmesError + ' — this list is not empty, it is unread.'"></p>
                                 <p class="text-xs text-muted-foreground mt-1">
                                     Committed systems are linked to the programme's current-state baseline solution —
@@ -144,13 +135,7 @@
                                         class="relative border-2 border-dashed rounded-lg p-8 text-center transition-colors"
                                     >
                                         <label for="fileUpload" class="block text-sm font-medium text-muted-foreground mb-1">Import file</label>
-    <input
-                                            type="file"
-                                            id="fileUpload"
-                                            @change="handleFileSelect($event)"
-                                            accept=".csv,.xlsx,.xls"
-                                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        />
+    {{ input(type="file", id=("fileUpload"), class="absolute w-full", attrs_dict={"@change": ("handleFileSelect($event)"), "accept": (".csv,.xlsx,.xls")}) }}
                                         <div class="flex flex-col items-center">
                                             <i data-lucide="upload-cloud" class="h-12 w-12 text-muted-foreground mb-4" aria-hidden="true"></i>
                                             <p class="text-sm font-medium">
@@ -170,13 +155,9 @@
                                                     <p class="text-xs text-muted-foreground" x-text="formatFileSize(form.file?.size)"></p>
                                                 </div>
                                             </div>
-                                            <button
-                                                type="button"
-                                                @click="form.file = null; form.source_type = null; previewData = []"
-                                                class="text-muted-foreground hover:text-destructive-emphasis transition-colors"
-                                             aria-label="Action">
+                                            {% call button(aria_label=("Action"), variant='bare', size='bare', class="text-muted-foreground hover:text-destructive-emphasis transition-colors", attrs_dict={"@click": ("form.file = null; form.source_type = null; previewData = []")}) %}
                                                 <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
-                                            </button>
+                                            {% endcall %}
                                         </div>
                                     </div>
                                 </div>
@@ -186,14 +167,7 @@
                                 <div class="pt-4 space-y-4">
                                     <div>
                                         <label for="paste-csv-data" class="block text-sm font-medium text-muted-foreground mb-1">Paste CSV Data</label>
-                                        <textarea
-                                            id="paste-csv-data"
-                                            x-model="form.paste_data"
-                                            @input="form.source_type = 'paste'; parsePasteData()"
-                                            placeholder="name,description,vendor,technology&#10;App1,Description of App1,Vendor A,Java&#10;App2,Description of App2,Vendor B,Python"
-                                            rows="10"
-                                            class="flex min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
-                                        ></textarea>
+                                        {% call textarea(id=("paste-csv-data"), placeholder=("name,description,vendor,technology&#10;App1,Description of App1,Vendor A,Java&#10;App2,Description of App2,Vendor B,Python"), rows=("10"), class="min-h-[200px] w-full font-mono mt-1", attrs_dict={"x-model": ("form.paste_data"), "@input": ("form.source_type = 'paste'; parsePasteData()")}) %}{% endcall %}
                                         <p class="text-xs text-muted-foreground mt-1">
                                             Paste CSV data with headers. First row should contain column names.
                                         </p>
@@ -206,21 +180,11 @@
                                     <div class="flex items-center gap-4">
                                         <div class="relative flex-1">
                                             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-                                            <input
-                                                type="text"
-                                                x-model="appSearchQuery"
-                                                @input="searchApplications()"
-                                                placeholder="Search applications..."
-                                                class="flex h-9 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                             aria-label="Search applications..."/>
+                                            {{ input(type="text", placeholder=("Search applications..."), aria_label=("Search applications..."), size='sm', class="w-full pl-10 pr-3", attrs_dict={"x-model": ("appSearchQuery"), "@input": ("searchApplications()")}) }}
                                         </div>
-                                        <button
-                                            type="button"
-                                            @click="selectAllApplications()"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                                         aria-label="Action">
+                                        {% call button(aria_label=("Action"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("selectAllApplications()")}) %}
                                             Select All
-                                        </button>
+                                        {% endcall %}
                                     </div>
 
                                     <div class="border rounded-lg max-h-64 overflow-y-auto">
@@ -238,13 +202,7 @@
                                         </template>
                                         <template x-for="app in availableApplications" :key="app.id">
                                             <label class="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0">
-                                                <input
-                                                    type="checkbox"
-                                                    :value="app.id"
-                                                    :checked="form.selected_applications.includes(app.id)"
-                                                    @change="toggleApplication(app.id)"
-                                                    class="h-4 w-4 rounded border-primary"
-                                                 aria-label="Checkbox field"/>
+                                                {{ checkbox(class="w-4", attrs_dict={":value": ("app.id"), ":checked": ("form.selected_applications.includes(app.id)"), "@change": ("toggleApplication(app.id)"), "aria-label": ("Checkbox field")}) }}
                                                 <div class="flex-1">
                                                     <p class="text-sm font-medium" x-text="app.name"></p>
                                                     <p class="text-xs text-muted-foreground" x-text="app.description || 'No description'"></p>
@@ -273,14 +231,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-muted-foreground mb-1">Batch Size</label>
                                 <div class="flex items-center gap-4 mt-2">
-                                    <input
-                                        type="range"
-                                        x-model="form.batch_size"
-                                        min="5"
-                                        max="50"
-                                        step="5"
-                                        class="flex-1 h-2 bg-secondary rounded-md appearance-none cursor-pointer"
-                                     aria-label="Range field"/>
+                                    {{ input(type="range", aria_label=("Range field"), class="flex-1", attrs_dict={"x-model": ("form.batch_size"), "min": ("5"), "max": ("50"), "step": ("5")}) }}
                                     <span class="text-sm font-medium w-16 text-right" x-text="form.batch_size + ' apps'"></span>
                                 </div>
                                 <p class="text-xs text-muted-foreground mt-1">
@@ -292,24 +243,12 @@
                             <div>
                                 <div class="flex items-center justify-between">
                                     <label class="block text-sm font-medium text-muted-foreground mb-1">Budget Limit (Optional)</label>
-                                    <button
-                                        type="button"
-                                        @click="form.budget_limit = form.budget_limit ? null : 10"
-                                        class="text-xs text-primary hover:underline"
-                                        x-text="form.budget_limit ? 'Remove limit' : 'Set limit'"
-                                     aria-label="Action"></button>
+                                    {% call button(aria_label=("Action"), variant="link", size="xs", attrs_dict={"@click": ("form.budget_limit = form.budget_limit ? null : 10"), "x-text": ("form.budget_limit ? 'Remove limit' : 'Set limit'")}) %}{% endcall %}
                                 </div>
                                 <div x-show="form.budget_limit !== null" x-cloak class="mt-2">
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                                        <input
-                                            type="number"
-                                            x-model="form.budget_limit"
-                                            min="1"
-                                            step="1"
-                                            placeholder="10.00"
-                                            class="flex h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                         aria-label="10.00"/>
+                                        {{ input(type="number", placeholder=("10.00"), aria_label=("10.00"), size='sm', class="w-full pl-8 pr-3", attrs_dict={"x-model": ("form.budget_limit"), "min": ("1"), "step": ("1")}) }}
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
                                         Processing will pause if the budget is exceeded.
@@ -325,17 +264,12 @@
                                         Use AI to generate ArchiMate elements from application data
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    @click="form.ai_generation = !form.ai_generation"
-                                    :class="form.ai_generation ? 'bg-primary' : 'bg-input'"
-                                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors"
-                                 aria-label="Action">
+                                {% call button(aria_label=("Action"), variant="ghost", class="relative w-11 shrink-0", attrs_dict={"@click": ("form.ai_generation = !form.ai_generation"), ":class": ("form.ai_generation ? 'bg-primary' : 'bg-input'")}) %}
                                     <span
                                         :class="form.ai_generation ? 'translate-x-5' : 'translate-x-0'"
                                         class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform translate-y-0.5 ml-0.5"
                                     ></span>
-                                </button>
+                                {% endcall %}
                             </div>
 
                             <!-- Auto Commit Toggle -->
@@ -346,17 +280,12 @@
                                         Automatically commit elements with confidence score above 90%
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    @click="form.auto_commit = !form.auto_commit"
-                                    :class="form.auto_commit ? 'bg-primary' : 'bg-input'"
-                                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors"
-                                 aria-label="Action">
+                                {% call button(aria_label=("Action"), variant="ghost", class="relative w-11 shrink-0", attrs_dict={"@click": ("form.auto_commit = !form.auto_commit"), ":class": ("form.auto_commit ? 'bg-primary' : 'bg-input'")}) %}
                                     <span
                                         :class="form.auto_commit ? 'translate-x-5' : 'translate-x-0'"
                                         class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform translate-y-0.5 ml-0.5"
                                     ></span>
-                                </button>
+                                {% endcall %}
                             </div>
                         </div>
                     </div>
@@ -480,11 +409,7 @@
                 <!-- Submit Button -->
                 {% call card.card() %}
                     <div class="p-6">
-                        <button
-                            type="submit"
-                            :disabled="!canSubmit || submitting"
-                            class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none h-12 px-4 py-2 transition-colors"
-                         aria-label="Submit">
+                        {% call button(type="submit", variant="default", class="w-full justify-center", attrs_dict={":disabled": ("!canSubmit || submitting")}) %}
                             <span x-show="!submitting" x-cloak class="flex items-center">
                                 <i data-lucide="upload" class="mr-2 h-5 w-5" aria-hidden="true"></i>
                                 Create Import Job
@@ -493,7 +418,7 @@
                                 <i data-lucide="loader-2" class="mr-2 h-5 w-5 animate-spin" aria-hidden="true"></i>
                                 Creating...
                             </span>
-                        </button>
+                        {% endcall %}
 
                         <p class="text-xs text-muted-foreground text-center mt-3">
                             The job will be created in "Pending" status. You can start processing from the job detail page.

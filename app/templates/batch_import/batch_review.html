@@ -1,5 +1,12 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/progress.html' import progress_bound %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/button.html' import button %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/table.html' import table %}
 {% from 'components/page_header.html' import page_header %}
 {% import 'components/card.html' as card %}
 {% import 'components/badge.html' as badge %}
@@ -54,21 +61,14 @@
 
                 <!-- Commit Button -->
                 <div class="flex items-center gap-2">
-                    <button type="button"
-                        @click="refreshElements()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Refresh">
+                    {% call button(aria_label=("Refresh"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("refreshElements()")}) %}
                         <i data-lucide="refresh-cw" class="mr-2 h-4 w-4" :class="{ 'animate-spin': refreshing }"></i>
                         Refresh
-                    </button>
-                    <button type="button"
-                        @click="commitBatch()"
-                        :disabled="!canCommit"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success disabled:opacity-50 disabled:pointer-events-none h-10 px-4 py-2 transition-colors"
-                     aria-label="Commit batch to repository">
+                    {% endcall %}
+                    {% call button(aria_label=("Commit batch to repository"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success disabled:opacity-50 disabled:pointer-events-none h-10 px-4 py-2 transition-colors", attrs_dict={"@click": ("commitBatch()"), ":disabled": ("!canCommit")}) %}
                         <i data-lucide="check-circle" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Commit to Repository
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
         </div>
@@ -159,68 +159,24 @@
                 <!-- Search -->
                 <div class="relative">
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        placeholder="Search elements..."
-                        class="flex h-9 w-64 rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                     aria-label="Search elements..."/>
+                    {{ input(type="text", placeholder=("Search elements..."), aria_label=("Search elements..."), size='sm', class="w-64 pl-10 pr-3", attrs_dict={"x-model": ("searchQuery")}) }}
                 </div>
 
                 <!-- Layer Filter -->
-                <div x-data="{ dropOpen: false }" class="relative">
-                    <button type="button"
-                        @click="dropOpen = !dropOpen"
-                        class="flex h-10 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                     aria-label="Open">
-                        <span x-text="filterLayer || 'All Layers'"></span>
-                        <i data-lucide="chevron-down" class="ml-2 h-4 w-4 opacity-50" aria-hidden="true"></i>
-                    </button>
-                    <div
-                        x-show="dropOpen" x-cloak @keydown.escape.window="dropOpen = false" role="dialog" aria-modal="true"
-                        @click.away="dropOpen = false"
-                        x-transition
-                        class="absolute z-50 mt-1 w-48 rounded-md border border-border bg-popover text-popover-foreground hidden" >
-                        <div class="p-1">
-                            <button type="button"
-                                @click="filterLayer = ''; dropOpen = false"
-                                class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                             aria-label="Open">
-                                All Layers
-                            </button>
-                            <template x-for="layer in layerOptions" :key="layer">
-                                <button type="button"
-                                    @click="filterLayer = layer; dropOpen = false"
-                                    class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                                    x-text="layer"
-                                 aria-label="Open"></button>
-                            </template>
-                        </div>
-                    </div>
-                </div>
+                {% call native_select(aria_label="Filter by layer", class="w-48", attrs_dict={"x-model": "filterLayer"}) %}
+                    <option value="">All Layers</option>
+                    <template x-for="layer in layerOptions" :key="layer"><option :value="layer" x-text="layer"></option></template>
+                {% endcall %}
+
 
                 <!-- Status Filter -->
-                <div x-data="{ dropOpen: false }" class="relative">
-                    <button type="button"
-                        @click="dropOpen = !dropOpen"
-                        class="flex h-10 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                     aria-label="Open">
-                        <span x-text="filterStatus || 'All Status'"></span>
-                        <i data-lucide="chevron-down" class="ml-2 h-4 w-4 opacity-50" aria-hidden="true"></i>
-                    </button>
-                    <div
-                        x-show="dropOpen" x-cloak @keydown.escape.window="dropOpen = false" role="dialog" aria-modal="true"
-                        @click.away="dropOpen = false"
-                        x-transition
-                        class="absolute z-50 mt-1 w-40 rounded-md border border-border bg-popover text-popover-foreground hidden" >
-                        <div class="p-1">
-                            <button type="button" @click="filterStatus = ''; dropOpen = false" class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent" aria-label="Open">All Status</button>
-                            <button type="button" @click="filterStatus = 'pending'; dropOpen = false" class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent" aria-label="Open">Pending</button>
-                            <button type="button" @click="filterStatus = 'approved'; dropOpen = false" class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent" aria-label="Open">Approved</button>
-                            <button type="button" @click="filterStatus = 'rejected'; dropOpen = false" class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent" aria-label="Open">Rejected</button>
-                        </div>
-                    </div>
-                </div>
+                {% call native_select(aria_label="Filter by status", class="w-40", attrs_dict={"x-model": "filterStatus"}) %}
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                {% endcall %}
+
 
                 <div class="flex-1"></div>
 
@@ -229,31 +185,21 @@
                     <span class="text-sm text-muted-foreground">
                         <span x-text="selectedElements.length"></span> selected
                     </span>
-                    <button type="button"
-                        @click="bulkApprove()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-9 px-3 transition-colors"
-                     aria-label="Approve selected elements">
+                    {% call button(aria_label=("Approve selected elements"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-9 px-3 transition-colors", attrs_dict={"@click": ("bulkApprove()")}) %}
                         <i data-lucide="check" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Approve
-                    </button>
-                    <button type="button"
-                        @click="bulkReject()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Reject">
+                    {% endcall %}
+                    {% call button(aria_label=("Reject"), variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("bulkReject()")}) %}
                         <i data-lucide="x" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Reject
-                    </button>
+                    {% endcall %}
                 </div>
 
                 <!-- Auto-approve High Confidence -->
-                <button type="button"
-                    @click="autoApproveHighConfidence()"
-                    x-show="summary.pending > 0" x-cloak
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors"
-                 aria-label="Approve">
+                {% call button(aria_label=("Approve"), variant="outline", class="justify-center", attrs_dict={"@click": ("autoApproveHighConfidence()"), "x-show": ("summary.pending > 0"), "x-cloak": ""}) %}
                     <i data-lucide="sparkles" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                     Auto-approve High Confidence
-                </button>
+                {% endcall %}
             </div>
         </div>
     {% endcall %}
@@ -262,30 +208,25 @@
     {% call card.card() %}
         <div class="p-6">
             <div class="rounded-md border">
-                <table class="dense-table w-full caption-bottom text-sm">
+                {% call table(class="dense-table w-full caption-bottom text-sm") %}
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 w-12 px-4 align-middle">
-                                <input
-                                    type="checkbox"
-                                    @change="toggleSelectAll($event)"
-                                    :checked="allSelected"
-                                    class="h-4 w-4 rounded border-primary"
-                                 aria-label="Select all elements"/>
+                                {{ checkbox(class="w-4", attrs_dict={"@change": ("toggleSelectAll($event)"), ":checked": ("allSelected"), "aria-label": ("Select all elements")}) }}
                             </th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                                <button type="button" @click="sortBy('name')" class="inline-flex items-center gap-2 hover:text-foreground" aria-label="Sort">
+                                {% call button(aria_label=("Sort"), variant='bare', size='bare', class="inline-flex items-center gap-2 hover:text-foreground", attrs_dict={"@click": ("sortBy('name')")}) %}
                                     Element Name
                                     <i data-lucide="arrow-up-down" class="h-4 w-4" aria-hidden="true"></i>
-                                </button>
+                                {% endcall %}
                             </th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Type</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Layer</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                                <button type="button" @click="sortBy('confidence')" class="inline-flex items-center gap-2 hover:text-foreground" aria-label="Sort">
+                                {% call button(aria_label=("Sort"), variant='bare', size='bare', class="inline-flex items-center gap-2 hover:text-foreground", attrs_dict={"@click": ("sortBy('confidence')")}) %}
                                     Confidence
                                     <i data-lucide="arrow-up-down" class="h-4 w-4" aria-hidden="true"></i>
-                                </button>
+                                {% endcall %}
                             </th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
                             <th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
@@ -315,20 +256,11 @@
                         <template x-for="element in paginatedElements" :key="element.id">
                             <tr class="border-b transition-colors hover:bg-muted/50" :class="{ 'bg-muted/30': isSelected(element.id) }">
                                 <td class="p-4 align-middle">
-                                    <input
-                                        type="checkbox"
-                                        :checked="isSelected(element.id)"
-                                        @change="toggleSelect(element.id)"
-                                        class="h-4 w-4 rounded border-primary"
-                                     aria-label="Select element"/>
+                                    {{ checkbox(class="w-4", attrs_dict={":checked": ("isSelected(element.id)"), "@change": ("toggleSelect(element.id)"), "aria-label": ("Select element")}) }}
                                 </td>
                                 <td class="p-4 align-middle">
                                     <div class="flex flex-col">
-                                        <button type="button"
-                                            @click="showElementDetail(element)"
-                                            class="font-medium hover:underline text-left"
-                                            x-text="element.name"
-                                         aria-label="View element details"></button>
+                                        {% call button(aria_label=("View element details"), variant="ghost", class="text-left", attrs_dict={"@click": ("showElementDetail(element)"), "x-text": ("element.name")}) %}{% endcall %}
                                         <span class="text-xs text-muted-foreground truncate max-w-xs" x-text="element.source_application"></span>
                                     </div>
                                 </td>
@@ -344,13 +276,7 @@
                                 </td>
                                 <td class="p-4 align-middle">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-16 h-2 rounded-full bg-secondary overflow-hidden">
-                                            <div
-                                                class="h-full transition-all"
-                                                :class="getConfidenceBarClass(element.confidence)"
-                                                :style="'width: ' + element.confidence + '%'"
-                                            ></div>
-                                        </div>
+                                        {{ progress_bound('element.confidence', bar_class_expr='getConfidenceBarClass(element.confidence)', bar_class='', class='w-16') }}
                                         <span class="text-xs font-medium" :class="getConfidenceTextClass(element.confidence)" x-text="element.confidence + '%'"></span>
                                     </div>
                                 </td>
@@ -363,42 +289,24 @@
                                 </td>
                                 <td class="p-4 align-middle text-right">
                                     <div class="flex items-center justify-end gap-1">
-                                        <button type="button"
-                                            @click="approveElement(element.id)"
-                                            x-show="_normApproval(element.approval_status) !== 'approved'" x-cloak
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-success/10 text-success-emphasis h-8 w-8 transition-colors"
-                                            title="Approve"
-                                        >
+                                        {% call button(variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-success/10 text-success-emphasis h-8 w-8 transition-colors", attrs_dict={"@click": ("approveElement(element.id)"), "x-show": ("_normApproval(element.approval_status) !== 'approved'"), "x-cloak": "", "title": ("Approve")}) %}
                                             <i data-lucide="check" class="h-4 w-4" aria-hidden="true"></i>
-                                        </button>
-                                        <button type="button"
-                                            @click="rejectElement(element.id)"
-                                            x-show="_normApproval(element.approval_status) !== 'rejected'" x-cloak
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-destructive/10 text-destructive-emphasis h-8 w-8 transition-colors"
-                                            title="Reject"
-                                        >
+                                        {% endcall %}
+                                        {% call button(variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-destructive/10 text-destructive-emphasis h-8 w-8 transition-colors", attrs_dict={"@click": ("rejectElement(element.id)"), "x-show": ("_normApproval(element.approval_status) !== 'rejected'"), "x-cloak": "", "title": ("Reject")}) %}
                                             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-                                        </button>
-                                        <button type="button"
-                                            @click="showElementDetail(element)"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
-                                            title="View Details"
-                                        >
+                                        {% endcall %}
+                                        {% call button(variant='bare', size='bare', class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8", attrs_dict={"@click": ("showElementDetail(element)"), "title": ("View Details")}) %}
                                             <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
-                                        </button>
-                                        <button type="button"
-                                            @click="editElement(element)"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
-                                            title="Edit"
-                                        >
+                                        {% endcall %}
+                                        {% call button(variant='bare', size='bare', class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8", attrs_dict={"@click": ("editElement(element)"), "title": ("Edit")}) %}
                                             <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>
-                                        </button>
+                                        {% endcall %}
                                     </div>
                                 </td>
                             </tr>
                         </template>
                     </tbody>
-                </table>
+                {% endcall %}
             </div>
 
             <!-- Pagination -->
@@ -407,48 +315,29 @@
                     Showing <span x-text="startIndex + 1"></span> to <span x-text="Math.min(endIndex, filteredElements.length)"></span> of <span x-text="filteredElements.length"></span> elements
                 </div>
                 <div class="flex items-center space-x-2">
-                    <button type="button"
-                        @click="currentPage--"
-                        :disabled="currentPage === 1"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Go to previous page">
+                    {% call button(aria_label=("Go to previous page"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("currentPage--"), ":disabled": ("currentPage === 1")}) %}
                         Previous
-                    </button>
+                    {% endcall %}
                     <span class="text-sm text-muted-foreground">
                         Page <span x-text="currentPage"></span> of <span x-text="totalPages"></span>
                     </span>
-                    <button type="button"
-                        @click="currentPage++"
-                        :disabled="currentPage >= totalPages"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent h-9 px-3"
-                     aria-label="Go to next page">
+                    {% call button(aria_label=("Go to next page"), variant="outline", class="justify-center", attrs_dict={"@click": ("currentPage++"), ":disabled": ("currentPage >= totalPages")}) %}
                         Next
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
         </div>
     {% endcall %}
 
     <!-- Element Detail Modal -->
-    <div
-        x-show="showDetailModal" x-cloak
-        @keydown.escape.window="showDetailModal = false"
-        x-transition
-        class="modal-root fixed inset-0 z-50 flex items-center justify-center"
-    >
-        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showDetailModal = false"></div>
-        <div class="relative z-50 w-full max-w-2xl rounded-lg border bg-background p-6 max-h-[80vh] overflow-y-auto border-border" role="dialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showDetailModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4" aria-label="Close element detail dialog">
-                <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
-
+    {% call dialog(title_expr='selectedElement?.name', open_expr='showDetailModal', close_expr='showDetailModal = false', start_hidden=false) %}
+<div class="max-h-[70vh] overflow-y-auto">
             <div class="mb-6" x-show="selectedElement" x-cloak>
                 <div class="flex items-start gap-4">
                     <div class="flex h-12 w-12 items-center justify-center rounded-lg" :class="getLayerIconBackground(selectedElement?.layer)">
                         <i data-lucide="box" class="h-6 w-6 text-primary-foreground" aria-hidden="true"></i>
                     </div>
                     <div class="flex-1">
-                        <h2 class="text-xl font-semibold" x-text="selectedElement?.name"></h2>
                         <div class="flex items-center gap-2 mt-1">
                             <span
                                 :class="getLayerBadgeClass(selectedElement?.layer)"
@@ -508,13 +397,7 @@
                         <div>
                             <span class="text-muted-foreground">Confidence Score</span>
                             <div class="flex items-center gap-2 mt-1">
-                                <div class="w-20 h-2 rounded-full bg-secondary overflow-hidden">
-                                    <div
-                                        class="h-full"
-                                        :class="getConfidenceBarClass(selectedElement?.confidence)"
-                                        :style="'width: ' + (selectedElement?.confidence || 0) + '%'"
-                                    ></div>
-                                </div>
+                                {{ progress_bound('selectedElement?.confidence || 0', bar_class_expr='getConfidenceBarClass(selectedElement?.confidence)', bar_class='', class='w-20') }}
                                 <span class="font-medium" x-text="(selectedElement?.confidence || 0) + '%'"></span>
                             </div>
                         </div>
@@ -527,95 +410,53 @@
 
                 <!-- Actions -->
                 <div class="flex justify-end gap-2 pt-4 border-t">
-                    <button type="button"
-                        @click="rejectElement(selectedElement?.id); showDetailModal = false"
-                        x-show="_normApproval(selectedElement?.approval_status) !== 'rejected'" x-cloak
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-destructive text-destructive-emphasis hover:bg-destructive/10 h-10 px-4 py-2 transition-colors"
-                     aria-label="Reject">
+                    {% call button(aria_label=("Reject"), variant="outline", class="justify-center", attrs_dict={"@click": ("rejectElement(selectedElement?.id); showDetailModal = false"), "x-show": ("_normApproval(selectedElement?.approval_status) !== 'rejected'"), "x-cloak": ""}) %}
                         <i data-lucide="x" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Reject
-                    </button>
-                    <button type="button"
-                        @click="editElement(selectedElement); showDetailModal = false"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Edit">
+                    {% endcall %}
+                    {% call button(aria_label=("Edit"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("editElement(selectedElement); showDetailModal = false")}) %}
                         <i data-lucide="pencil" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Edit
-                    </button>
-                    <button type="button"
-                        @click="approveElement(selectedElement?.id); showDetailModal = false"
-                        x-show="_normApproval(selectedElement?.approval_status) !== 'approved'" x-cloak
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors"
-                     aria-label="Approve element">
+                    {% endcall %}
+                    {% call button(aria_label=("Approve element"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors", attrs_dict={"@click": ("approveElement(selectedElement?.id); showDetailModal = false"), "x-show": ("_normApproval(selectedElement?.approval_status) !== 'approved'"), "x-cloak": ""}) %}
                         <i data-lucide="check" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Approve
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
-        </div>
-    </div>
+        
+</div>
+{% endcall %}
 
     <!-- Edit Element Modal -->
-    <div
-        x-show="showEditModal" x-cloak
-        @keydown.escape.window="showEditModal = false"
-        x-transition
-        class="modal-root fixed inset-0 z-50 flex items-center justify-center"
-    >
-        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showEditModal = false"></div>
-        <div class="relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 border-border" role="dialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showEditModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Edit">
-                <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
-
-            <h2 class="text-lg font-semibold mb-4">Edit Element</h2>
-
+    {% call dialog(title='Edit Element', open_expr='showEditModal', close_expr='showEditModal = false', start_hidden=false) %}
             <form @submit.prevent="saveElement()" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-                    <input
-                        type="text"
-                        x-model="editingElement.name"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
-                     aria-label="Element name"/>
+                    {{ input(type="text", aria_label=("Element name"), size='sm', class="w-full mt-1", attrs_dict={"x-model": ("editingElement.name")}) }}
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-                    <input
-                        type="text"
-                        x-model="editingElement.element_type"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
-                     aria-label="Element type"/>
+                    {{ input(type="text", aria_label=("Element type"), size='sm', class="w-full mt-1", attrs_dict={"x-model": ("editingElement.element_type")}) }}
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                    <textarea
-                        x-model="editingElement.description"
-                        rows="3"
-                        class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
-                     aria-label="Description"></textarea>
+                    {% call textarea(rows=("3"), aria_label=("Description"), class="min-h-[80px] w-full mt-1", attrs_dict={"x-model": ("editingElement.description")}) %}{% endcall %}
                 </div>
 
                 <div class="flex justify-end gap-2 pt-4">
-                    <button
-                        type="button"
-                        @click="showEditModal = false"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
-                     aria-label="Edit">
+                    {% call button(aria_label=("Edit"), variant='bare', size='bare', class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4", attrs_dict={"@click": ("showEditModal = false")}) %}
                         Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Submit">
+                    {% endcall %}
+                    {% call button(type="submit", aria_label=("Submit"), variant="default", class="justify-center whitespace-nowrap justify-center") %}
                         Save Changes
-                    </button>
+                    {% endcall %}
                 </div>
             </form>
-        </div>
-    </div>
+        
+{% endcall %}
 
     <!-- Commit Confirmation Modal -->
     <div
@@ -626,9 +467,9 @@
     >
         <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCommitModal = false"></div>
         <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showCommitModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4" aria-label="Close commit confirmation dialog">
+            {% call button(aria_label=("Close commit confirmation dialog"), variant='bare', size='bare', class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4", attrs_dict={"@click": ("showCommitModal = false")}) %}
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
+            {% endcall %}
 
             <div class="flex items-center gap-4 mb-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
@@ -666,19 +507,13 @@
             </template>
 
             <div class="flex justify-end gap-2">
-                <button type="button"
-                    @click="showCommitModal = false"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                 aria-label="Cancel commit">
+                {% call button(aria_label=("Cancel commit"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("showCommitModal = false")}) %}
                     Cancel
-                </button>
-                <button type="button"
-                    @click="confirmCommit()"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2"
-                 aria-label="Confirm">
+                {% endcall %}
+                {% call button(aria_label=("Confirm"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2", attrs_dict={"@click": ("confirmCommit()")}) %}
                     <i data-lucide="check-circle" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                     Commit <span x-text="summary.approved"></span> Elements
-                </button>
+                {% endcall %}
             </div>
         </div>
     </div>
@@ -825,7 +660,7 @@ function batchReview(jobId, batchId) {
                 if (!elementsData.success) throw new Error(elementsData.message || elementsData.error || 'Failed to load the batch elements');
                 this.job = jobData.job || jobData.data || this.job;
                 this.batch = batchData.batch || batchData.data || this.batch;
-                this.elements = elementsData.elements || elementsData.data || [];
+                this.elements = (elementsData.elements || elementsData.data || []).map(e => this._viewElement(e));
 
                 this.$nextTick(() => {
                     if (typeof lucide !== 'undefined') {
@@ -837,6 +672,18 @@ function batchReview(jobId, batchId) {
             } finally {
                 this.loading = false;
             }
+        },
+
+        _viewElement(e) {
+            const layer = e.layer || e.archimate_layer || '';
+            const score = e.confidence !== undefined && e.confidence !== null ? e.confidence : e.confidence_score;
+            return Object.assign({}, e, {
+                name: e.name !== undefined ? e.name : (e.element_name || ''),
+                element_type: e.element_type || '',
+                layer: layer ? layer.charAt(0).toUpperCase() + layer.slice(1) : '',
+                confidence: score === undefined || score === null ? 0 : (score <= 1 ? Math.round(score * 100) : Math.round(score)),
+                description: e.description !== undefined ? e.description : (e.element_description || '')
+            });
         },
 
         refreshElements() {
