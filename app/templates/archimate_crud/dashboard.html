@@ -22,6 +22,10 @@
                     <span x-text="layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable'">repository total unavailable</span></span>{% endmacro %}
                 {% macro _ps_actions() %}
                     {{ button(text='Create element', variant='default', icon='plus', attrs_dict={'@click': 'openCreateModal()'}, testid='btn-create-element', aria_label='Create element') }}
+                    {% if can_change_model() %}
+                        {{ button(text='Import', variant='outline', icon='upload', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.import_oef') + "'"}, testid='btn-import-oef', aria_label='Import model file') }}
+                    {% endif %}
+                    {{ button(text='Export', variant='outline', icon='download', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.export_oef') + "'"}, testid='btn-export-oef', aria_label='Export OEF') }}
                     {% set _more_items = [] %}
                     {% if can_change_model() %}
                         {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'href': url_for('architect_ui.import_oef'), 'testid': 'dropdown-import-oef'}] %}
