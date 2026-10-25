@@ -3562,10 +3562,11 @@
         "components/form_field.html",
         "components/inline_hint.html",
         "components/input.html",
-        "components/loading_state.html",
+"components/loading_state.html",
         "components/modal.html",
         "components/page_header.html",
         "components/pagination_controls.html",
+        "components/progress.html",
         "components/provenance.html",
         "components/search_bar.html",
         "components/select.html",
@@ -3590,16 +3591,28 @@
         "page-header",
         "pagination",
         "select",
-        "table",
-        "input-group"
+        "table"
       ],
-      "confidence": "high",
-      "controls": {
-        "button": 1,
-        "form": 1,
-        "link": 3,
-        "table": 1
-      },
+      "description": "Framework configuration instances list",
+      "icon": "layers",
+      "persona": "platform_admin",
+      "patterns": [
+        "P01",
+        "P03",
+        "P23"
+      ],
+      "reference": "example:tasks",
+      "reference_rendered": false,
+      "states": [
+        "loading",
+        "empty-first-use",
+        "empty-no-permission",
+        "error-region",
+        "populated"
+      ],
+      "tier": "B",
+      "type_changed": false
+    },
       "extends": [
         "layouts/admin_base.html"
       ],
