@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import provenance_badge %}
@@ -15,7 +16,7 @@
     {{ page_shell(
         title='Changes',
         subtitle='What changed between two dates, who changed it, and why.',
-        breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.ask')), ('Changes', none)],
+        breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.answers_page')), ('Changes', none)],
     ) }}
 
     <section class="rounded-lg border border-border bg-card p-6">
