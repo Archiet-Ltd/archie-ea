@@ -57,6 +57,7 @@ ROLE_PAGES = (
     ("business-architects", "business_architect"),
     ("security-architects", "security_architect"),
     ("data-architects", "data_architect"),
+    ("startup-founder", "startup_founder"),
 )
 
 
