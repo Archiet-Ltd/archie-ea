@@ -116,7 +116,7 @@ def test_the_architect_reads_the_record_and_reaches_an_element(browser, live_ser
         # The header states the conclusion: owner, stage, score, and the next step.
         assert "Ivo Reed" in page.get_by_test_id("record-owner").inner_text()
         assert page.get_by_test_id("record-stage").inner_text().strip()
-        shown = SCORE.search(page.get_by_test_id("record-score").inner_text())
+        shown = SCORE.search(" ".join(page.get_by_test_id("record-score").inner_text().split()))
         assert shown and shown.group(0) == demo["score"], (shown, demo["score"])
         next_step = page.get_by_test_id("record-next-step")
         assert next_step.is_visible() and "Next step" in next_step.inner_text()

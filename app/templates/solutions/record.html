@@ -76,7 +76,7 @@
   {{ page_shell(solution.name, breadcrumb=[('Solutions', '/solutions/'), (solution.name, None)], stack_actions=True, meta_caller=_meta, actions_caller=_actions) }}
 
   {# Seven tabs. On a phone the strip scrolls sideways instead of wrapping or overflowing the page. #}
-  <nav aria-label="Solution record sections" class="-mx-6 -mt-2 mb-6 overflow-x-auto px-6 sm:mx-0 sm:px-0" data-testid="record-tabs">
+  <nav aria-label="Solution record sections" class="-mt-2 mb-6 overflow-x-auto" data-testid="record-tabs">
     <ul class="flex min-w-max items-center gap-1 border-b border-border text-sm">
       {% for label, href, active in tabs %}
       <li>
