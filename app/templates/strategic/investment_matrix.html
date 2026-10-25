@@ -131,6 +131,13 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                     <option value="MEDIUM">Medium</option>
                     <option value="LOW">Low</option>
                 </select>
+                <select x-model="typeFilter" @change="currentPage = 1; syncSelectAll()"
+                    class="px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Type" data-testid="type-filter">
+                    <option value="">All types</option>
+                    <option value="strategic">Strategic</option>
+                    <option value="operational">Operational</option>
+                    <option value="supporting">Supporting</option>
+                </select>
                 <select id="per-page-selector" data-testid="per-page-selector" x-model.number="perPage" @change="currentPage = 1; syncSelectAll()"
                     class="px-3 py-2 border rounded-md text-sm" aria-label="Per Page">
                     <option value="25">25 / page</option>
@@ -170,6 +177,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                     aria-label="Select all capabilities">
                             </th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Capability</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Type</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Domain</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Strategic Score</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Coverage</th>
@@ -192,6 +200,16 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                         :aria-label="'Select ' + cap.capability_name">
                                 </td>
                                 <td class="p-4 font-medium" x-text="cap.capability_name"></td>
+                                <td class="p-4">
+                                    <span :class="{
+ 'bg-primary/10 text-primary border-primary/30': cap.capability_type === 'strategic',
+ 'bg-muted/50 text-foreground border-border': cap.capability_type === 'operational',
+ 'bg-secondary text-secondary-foreground border-transparent': cap.capability_type === 'supporting'
+ }"
+                                    class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
+                                    data-testid="capability-type"
+                                    x-text="cap.capability_type || '—'"></span>
+                                </td>
                                 <td class="p-4 text-muted-foreground text-sm" x-text="cap.capability_domain"></td>
                                 <td class="p-4 text-sm" x-text="cap.strategic_score + '/25'"></td>
                                 <td class="p-4 text-sm" x-text="cap.coverage_count + ' apps'"></td>
@@ -346,6 +364,7 @@ function investmentMatrix() {
         capabilities: INVESTMENT_CAPABILITIES,
         search: '',
         priorityFilter: '',
+        typeFilter: '',
         perPage: 25,
         currentPage: 1,
         selectAll: false,
@@ -358,7 +377,8 @@ function investmentMatrix() {
                     (cap.capability_name || '').toLowerCase().includes(q) ||
                     (cap.capability_domain || '').toLowerCase().includes(q);
                 const matchPriority = !this.priorityFilter || cap.priority_level === this.priorityFilter;
-                return matchSearch && matchPriority;
+                const matchType = !this.typeFilter || cap.capability_type === this.typeFilter;
+                return matchSearch && matchPriority && matchType;
             });
         },
 
