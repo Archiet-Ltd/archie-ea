@@ -1,25 +1,22 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell, empty_state, section_card %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/dialog.html' import dialog %}
 
 {% block title %}Requirements Traceability{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Requirements Traceability', 'current': true}
-]) }}
-{% endblock %}
 
 {% block content %}
 <div class="flex flex-col space-y-6 animate-in fade-in duration-500"
      x-data="trcApp()"
      x-init="init()">
 
-    {{ page_header(
+    {{ page_shell(
         title='Requirements Traceability',
-        description='End-to-end traceability chain: Business Capability → Requirement → Solution → ADM Kanban. Powered by ArchiMate 3.2 Motivation Layer.'
+        subtitle='End-to-end traceability chain: Business Capability → Requirement → Solution → ADM Kanban. Powered by ArchiMate 3.2 Motivation Layer.',
+        breadcrumb=[('Home', url_for('main.index')), ('Enterprise Architecture', url_for('enterprise.enterprise_dashboard')), ('Requirements Traceability', None)]
     ) }}
 
     <!-- Summary chips -->
@@ -29,9 +26,9 @@
         {% for r in requirements %}
             {% set _ = by_status.update({r.status: (by_status.get(r.status, 0) + 1)}) %}
         {% endfor %}
-        {% for label, color in [('Draft','bg-muted text-muted-foreground'), ('Refined','bg-primary/10 text-primary'), ('Approved','bg-success/10 text-success-emphasis'), ('Implemented','bg-primary/10 text-primary')] %}
+        {% for label, variant in [('Draft','neutral'), ('Refined','info'), ('Approved','success'), ('Implemented','info')] %}
         <div data-slot="card" class="rounded-lg border border-border bg-card p-5 flex items-center gap-4">
-            <span class="flex h-10 w-10 items-center justify-center rounded-full {{ color }} text-lg font-bold shrink-0">
+            <span class="flex h-10 w-10 items-center justify-center rounded-full {% if variant == 'neutral' %}bg-muted text-muted-foreground{% elif variant == 'info' %}bg-primary/10 text-primary{% elif variant == 'success' %}bg-success/10 text-success-emphasis{% endif %} text-lg font-bold shrink-0">
                 {{ by_status.get(label, 0) }}
             </span>
             <div>
@@ -43,124 +40,117 @@
     </div>
 
     <!-- Traceability table -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="px-5 py-4 border-b flex items-center justify-between">
-            <h2 class="font-semibold">Traceability Matrix</h2>
-            <span class="text-sm text-muted-foreground">{{ total }} requirements</span>
-        </div>
+    {% call section_card(title='Traceability Matrix') %}
         {% if requirements %}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b bg-muted/50 text-muted-foreground">
-                        <th class="px-4 py-3 text-left font-medium text-xs">Driver</th>
-                        <th class="px-4 py-3 text-left font-medium text-xs">Goal</th>
-                        <th class="px-4 py-3 text-left font-medium text-xs">Capability</th>
-                        <th class="px-4 py-3 text-left font-medium">Requirement</th>
-                        <th class="px-4 py-3 text-left font-medium">ADM Phase</th>
-                        <th class="px-4 py-3 text-left font-medium">MoSCoW</th>
-                        <th class="px-4 py-3 text-left font-medium">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for req in requirements %}
-                    <tr class="border-b hover:bg-muted/30 transition-colors"
-                        data-req-id="{{ req.id }}"
-                        data-cap-id="{{ req.capability_id or '' }}">
-                        <td class="px-4 py-3 text-xs">
-                            {% if req.driver_id and driver_map.get(req.driver_id) %}
-                                <span class="inline-flex items-center rounded-full bg-destructive/10 text-destructive-emphasis px-2 py-0.5 text-2xs font-medium" title="{{ driver_map[req.driver_id] }}">{{ driver_map[req.driver_id]|truncate(30) }}</span>
-                            {% else %}
-                                <span class="text-muted-foreground italic text-2xs">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-xs">
-                            {% if req.goal_id and goal_map.get(req.goal_id) %}
-                                <span class="inline-flex items-center rounded-full bg-success/10 text-success-emphasis px-2 py-0.5 text-2xs font-medium" title="{{ goal_map[req.goal_id] }}">{{ goal_map[req.goal_id]|truncate(30) }}</span>
-                            {% else %}
-                                <span class="text-muted-foreground italic text-2xs">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-xs" data-cell="capability">
-                            {% if req.capability_id and cap_map.get(req.capability_id) %}
-                                <div class="flex items-center gap-1 group">
-                                    <a href="/enterprise/capabilities/{{ req.capability_id }}"
-                                       class="text-primary hover:underline"
-                                       title="View capability">{{ cap_map[req.capability_id]|truncate(35) }}</a>
-                                    <button type="button"
-                                            title="Change capability link"
-                                            class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-opacity"
-                                            @click="openLinkCapModal({{ req.id }}, {{ req.capability_id }}, null)">
-                                        <i data-lucide="pencil" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
-                                    </button>
-                                </div>
-                            {% else %}
+        {% call table() %}
+            {% call table_header() %}
+                <tr>
+                    {% call table_head() %}Driver{% endcall %}
+                    {% call table_head() %}Goal{% endcall %}
+                    {% call table_head() %}Capability{% endcall %}
+                    {% call table_head() %}Requirement{% endcall %}
+                    {% call table_head() %}ADM Phase{% endcall %}
+                    {% call table_head() %}MoSCoW{% endcall %}
+                    {% call table_head() %}Status{% endcall %}
+                </tr>
+            {% endcall %}
+            {% call table_body() %}
+                {% for req in requirements %}
+                <tr data-req-id="{{ req.id }}" data-cap-id="{{ req.capability_id or '' }}">
+                    {% call table_cell() %}
+                        {% if req.driver_id and driver_map.get(req.driver_id) %}
+                            {% call badge('destructive') %}{{ driver_map[req.driver_id]|truncate(30) }}{% endcall %}
+                        {% else %}
+                            <span class="text-muted-foreground italic text-xs">—</span>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if req.goal_id and goal_map.get(req.goal_id) %}
+                            {% call badge('success') %}{{ goal_map[req.goal_id]|truncate(30) }}{% endcall %}
+                        {% else %}
+                            <span class="text-muted-foreground italic text-xs">—</span>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if req.capability_id and cap_map.get(req.capability_id) %}
+                            <div class="flex items-center gap-1 group">
+                                <a href="/enterprise/capabilities/{{ req.capability_id }}"
+                                   class="text-primary hover:underline"
+                                   title="View capability">{{ cap_map[req.capability_id]|truncate(35) }}</a>
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 text-muted-foreground hover:text-primary italic text-2xs transition-colors group"
-                                        title="Link to a capability"
-                                        @click="openLinkCapModal({{ req.id }}, null, null)">
-                                    <i data-lucide="link" class="h-3 w-3 opacity-50 group-hover:opacity-100" aria-hidden="true"></i>
-                                    Link capability
+                                        title="Change capability link"
+                                        class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-opacity"
+                                        @click="openLinkCapModal({{ req.id }}, {{ req.capability_id }}, null)">
+                                    <i data-lucide="pencil" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
                                 </button>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-1.5">
-                                <span class="inline-flex items-center rounded bg-muted border border-border px-1.5 py-0.5 font-mono text-xs font-semibold text-muted-foreground tracking-wide shrink-0">REQ-{{ '%04d' % req.id }}</span>
-                                {% if req.ai_generated %}
-                                <span class="inline-flex items-center rounded-sm bg-violet-100 text-violet-700 px-1.5 py-0.5 text-xs font-semibold shrink-0" title="AI-generated">AI</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour #}
-                                {% endif %}
-                                <a href="/enterprise/requirements-backlog"
-                                   class="font-medium hover:text-primary hover:underline"
-                                   title="{{ req.description }}">{{ req.name|truncate(80) }}</a>
                             </div>
-                        </td>
-                        <td class="px-4 py-3 text-xs">
-                            {% if req.togaf_phase %}
-                            <span class="inline-flex items-center rounded-full bg-primary/10 text-info-emphasis px-2 py-0.5 text-2xs font-medium">Phase {{ req.togaf_phase }}</span>
-                            {% else %}
+                        {% else %}
+                            <button type="button"
+                                    class="inline-flex items-center gap-1 text-muted-foreground hover:text-primary italic text-xs transition-colors group"
+                                    title="Link to a capability"
+                                    @click="openLinkCapModal({{ req.id }}, null, null)">
+                                <i data-lucide="link" class="h-3 w-3 opacity-50 group-hover:opacity-100" aria-hidden="true"></i>
+                                Link capability
+                            </button>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        <div class="flex items-center gap-1.5">
+                            <span class="inline-flex items-center rounded bg-muted border border-border px-1.5 py-0.5 font-mono text-xs font-semibold text-muted-foreground tracking-wide shrink-0">REQ-{{ '%04d' % req.id }}</span>
+                            {% if req.ai_generated %}
+                            <span class="inline-flex items-center rounded-sm bg-violet-100 text-violet-700 px-1.5 py-0.5 text-xs font-semibold shrink-0" title="AI-generated">AI</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour #}
+                            {% endif %}
+                            <a href="/enterprise/requirements-backlog"
+                               class="font-medium hover:text-primary hover:underline"
+                               title="{{ req.description }}">{{ req.name|truncate(80) }}</a>
+                        </div>
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if req.togaf_phase %}
+                            {% call badge('info') %}Phase {{ req.togaf_phase }}{% endcall %}
+                        {% else %}
                             <span class="text-muted-foreground">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3">
-                            {% if req.moscow_priority %}
-                            <span class="px-2 py-0.5 text-xs rounded-full font-medium
-                                {% if req.moscow_priority == 'MUST' %}bg-destructive/15 text-destructive-emphasis
-                                {% elif req.moscow_priority == 'SHOULD' %}bg-warning/15 text-warning-emphasis
-                                {% elif req.moscow_priority == 'COULD' %}bg-primary/10 text-primary
-                                {% else %}bg-muted text-muted-foreground{% endif %}">
-                                {{ req.moscow_priority }}
-                            </span>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if req.moscow_priority %}
+                            {% if req.moscow_priority == 'MUST' %}
+                                {% call badge('destructive') %}{{ req.moscow_priority }}{% endcall %}
+                            {% elif req.moscow_priority == 'SHOULD' %}
+                                {% call badge('warning') %}{{ req.moscow_priority }}{% endcall %}
+                            {% elif req.moscow_priority == 'COULD' %}
+                                {% call badge('info') %}{{ req.moscow_priority }}{% endcall %}
                             {% else %}
-                            <span class="text-muted-foreground text-xs">—</span>
+                                {% call badge('neutral') %}{{ req.moscow_priority }}{% endcall %}
                             {% endif %}
-                        </td>
-                        <td class="px-4 py-3">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium
-                                {% if req.status == 'Implemented' %}bg-success/10 text-success-emphasis
-                                {% elif req.status == 'Approved' %}bg-primary/10 text-primary
-                                {% elif req.status == 'Refined' %}bg-primary/10 text-primary
-                                {% else %}bg-muted text-muted-foreground{% endif %}">
-                                {{ req.status }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                        {% else %}
+                            <span class="text-muted-foreground text-xs">—</span>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if req.status == 'Implemented' %}
+                            {% call badge('success') %}{{ req.status }}{% endcall %}
+                        {% elif req.status == 'Approved' %}
+                            {% call badge('info') %}{{ req.status }}{% endcall %}
+                        {% elif req.status == 'Refined' %}
+                            {% call badge('info') %}{{ req.status }}{% endcall %}
+                        {% else %}
+                            {% call badge('neutral') %}{{ req.status }}{% endcall %}
+                        {% endif %}
+                    {% endcall %}
+                </tr>
+                {% endfor %}
+            {% endcall %}
+        {% endcall %}
         {% else %}
-        <div class="p-12 text-center text-muted-foreground">
-            <i data-lucide="git-branch" class="h-12 w-12 mx-auto mb-4 opacity-40" aria-hidden="true"></i>
-            <p class="mb-3">No requirements with traceability data yet.</p>
-            <a href="/enterprise/capabilities"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-                Generate from Capability Map
-            </a>
-        </div>
+        {{ empty_state(
+            icon='git-branch',
+            headline='No requirements with traceability data yet.',
+            cta_label='Generate from Capability Map',
+            cta_href='/enterprise/capabilities'
+        ) }}
         {% endif %}
-    </div>
+    {% endcall %}
 
     <!-- Architecture context -->
     <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
@@ -169,13 +159,13 @@
             Traceability Chain (TOGAF 9.2 / ArchiMate 3.2)
         </h3>
         <div class="flex flex-wrap gap-2 items-center text-sm text-muted-foreground">
-            <span class="rounded-full bg-primary/10 text-info-emphasis px-3 py-1 font-medium">Business Capability</span>
+            {% call badge('info') %}Business Capability{% endcall %}
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-            <span class="rounded-full bg-violet-100 text-violet-700 px-3 py-1 font-medium">Requirement (Motivation)</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour, matching the AI badge this legend describes below #}
+            <span class="inline-flex items-center rounded-full bg-violet-100 text-violet-700 px-3 py-1 font-medium">Requirement (Motivation)</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour, matching the AI badge this legend describes below #}
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-            <span class="rounded-full bg-primary/10 text-info-emphasis px-3 py-1 font-medium">Solution Architecture</span>
+            {% call badge('info') %}Solution Architecture{% endcall %}
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-            <span class="rounded-full bg-success/10 text-success-emphasis px-3 py-1 font-medium">ADM Kanban Card</span>
+            {% call badge('success') %}ADM Kanban Card{% endcall %}
         </div>
         <p class="mt-3 text-xs text-muted-foreground">
             Each row traces a requirement from its originating capability through solution design to ADM Phase A–H implementation cards.
@@ -183,70 +173,47 @@
         </p>
     </div>
 
-    <!-- ── Link-to-capability modal (AP-9: data-modal-close, hidden) ────────────────────────────────────── -->
-    <div id="requirements-link-capability-modal"
-         hidden
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
-         aria-modal="true" role="dialog" aria-labelledby="trc-modal-title">
-        <div class="bg-card rounded-lg border border-border w-full max-w-md"
-             @click.stop>
-            <div class="flex items-center justify-between px-5 py-4 border-b">
-                <h2 id="trc-modal-title" class="text-base font-semibold text-foreground text-foreground">Link Capability</h2>
-                <button type="button" data-modal-close="requirements-link-capability-modal"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label="Close">
-                    <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-                </button>
+    <!-- Link-to-capability dialog -->
+    {% call dialog(trigger_text='Link Capability', title='Link Capability', description='Select a capability to link to the requirement.', start_hidden=true, open_expr='modalOpen', close_expr='modalOpen = false') %}
+        <div class="space-y-4">
+            <p class="text-sm text-muted-foreground">
+                Select a capability to link to <strong x-text="'REQ-' + String(activeReqId).padStart(4,'0')"></strong>.
+            </p>
+            <!-- Search filter -->
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
+                <input type="text" x-model="capSearch" placeholder="Filter capabilities…"
+                       class="w-full pl-9 pr-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                       @keydown.escape.stop="capSearch = ''" aria-label="Filter capabilities…">
             </div>
-            <div class="px-5 py-4 space-y-4">
-                <p class="text-sm text-muted-foreground">
-                    Select a capability to link to <strong x-text="'REQ-' + String(activeReqId).padStart(4,'0')"></strong>.
-                </p>
-                <!-- Search filter -->
-                <div class="relative">
-                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
-                    <input type="text" x-model="capSearch" placeholder="Filter capabilities…"
-                           class="w-full pl-9 pr-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                           @keydown.escape.stop="capSearch = ''" aria-label="Filter capabilities…">
-                </div>
-                <!-- Capability list -->
-                <div class="border rounded-md overflow-y-auto max-h-60 divide-y">
-                    <!-- Unlink option -->
+            <!-- Capability list -->
+            <div class="border rounded-md overflow-y-auto max-h-60 divide-y">
+                <!-- Unlink option -->
+                <button type="button"
+                        class="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 text-muted-foreground"
+                        :class="activeCapId === null ? 'bg-primary/10 text-primary font-medium' : ''"
+                        @click="activeCapId = null">
+                    <i data-lucide="unlink" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i>
+                    <span class="italic">Remove link</span>
+                </button>
+                <template x-for="cap in filteredCaps" :key="cap.id">
                     <button type="button"
-                            class="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 text-muted-foreground"
-                            :class="activeCapId === null ? 'bg-primary/10 text-primary font-medium' : ''"
-                            @click="activeCapId = null">
-                        <i data-lucide="unlink" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i>
-                        <span class="italic">Remove link</span>
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            :class="activeCapId === cap.id ? 'bg-primary/10 text-primary font-medium' : ''"
+                            @click="activeCapId = cap.id"
+                            x-text="cap.name">
                     </button>
-                    <template x-for="cap in filteredCaps" :key="cap.id">
-                        <button type="button"
-                                class="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-                                :class="activeCapId === cap.id ? 'bg-primary/10 text-primary font-medium' : ''"
-                                @click="activeCapId = cap.id"
-                                x-text="cap.name">
-                        </button>
-                    </template>
-                    <div x-show="filteredCaps.length === 0" x-cloak class="px-3 py-4 text-center text-sm text-muted-foreground italic">
-                        No capabilities match your filter.
-                    </div>
+                </template>
+                <div x-show="filteredCaps.length === 0" x-cloak class="px-3 py-4 text-center text-sm text-muted-foreground italic">
+                    No capabilities match your filter.
                 </div>
-            </div>
-            <div class="flex justify-end gap-2 px-5 py-4 border-t">
-                <button type="button" data-modal-close="requirements-link-capability-modal"
-                        class="px-4 py-2 rounded-md text-sm font-medium border hover:bg-muted transition-colors">
-                    Cancel
-                </button>
-                <button type="button" @click="saveLink()"
-                        :disabled="saving"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="save" class="h-4 w-4" x-show="!saving" x-cloak aria-hidden="true"></i>
-                    <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="saving" x-cloak aria-hidden="true"></i>
-                    <span x-text="saving ? 'Saving…' : 'Save link'"></span>
-                </button>
             </div>
         </div>
-    </div>
+        <div class="flex justify-end gap-2 mt-4 pt-4 border-t">
+            {{ button(text='Cancel', variant='outline', on_click='modalOpen = false') }}
+            {{ button(text='Save link', variant='default', on_click='saveLink()', disabled='saving', icon='save') }}
+        </div>
+    {% endcall %}
 
 </div>
 
@@ -264,7 +231,6 @@
             saving: false,
 
             init: function () {
-                // re-render lucide icons after Alpine stamps the modal
                 this.$nextTick(function () {
                     if (window.lucide) lucide.createIcons();
                 });
@@ -283,9 +249,7 @@
                 this.activeCapId = capId || null;
                 this.capSearch = '';
                 this.saving = false;
-                if (window.Platform && window.Platform.modal) {
-                    window.Platform.modal.open('requirements-link-capability-modal');
-                }
+                this.modalOpen = true;
                 this.$nextTick(function () {
                     if (window.lucide) lucide.createIcons();
                 });
@@ -295,7 +259,6 @@
                 let self = this;
                 if (self.saving) return;
                 self.saving = true;
-                // Use Platform.fetch.patch which automatically injects CSRF token and serializes JSON
                 Platform.fetch.patch('/api/enterprise/requirements/' + self.activeReqId + '/enrich', 
                     { capability_id: self.activeCapId },
                     { silent: true }
@@ -303,17 +266,12 @@
                 .then(function (data) {
                     if (data.success) {
                         self._updateRow(self.activeReqId, self.activeCapId);
-                        if (window.Platform && window.Platform.modal) {
-                            window.Platform.modal.close('requirements-link-capability-modal');
-                        }
+                        self.modalOpen = false;
                     } else {
                         Platform.toast.error('Error: ' + (data.error || 'Unknown error'));
                     }
                 })
                 .catch(function (e) {
-                    // Platform.fetch throws a PlatformError on network or HTTP errors
-                    // We passed silent:true, so no automatic toast was shown.
-                    // Extract a user-friendly message from the error.
                     let message = 'Network error';
                     if (e.type === 'HttpError' && e.data && e.data.error) {
                         message = e.data.error;
@@ -325,12 +283,6 @@
                 .finally(function () { self.saving = false; });
             },
 
-            _csrf: function () {
-                let m = document.cookie.match(/csrftoken=([^;]+)/);
-                let meta = document.querySelector('meta[name=csrf-token]');
-                return m ? m[1] : (meta ? meta.getAttribute('content') : '');
-            },
-
             _updateRow: function (reqId, capId) {
                 let self = this;
                 let row = document.querySelector('tr[data-req-id="' + reqId + '"]');
@@ -339,9 +291,8 @@
                 let cell = row.querySelector('[data-cell="capability"]');
                 if (!cell) return;
                 if (!capId) {
-                    cell.innerHTML = '<button type="button" class="inline-flex items-center gap-1 text-muted-foreground hover:text-primary italic text-2xs transition-colors group" title="Link to a capability" @click="openLinkCapModal(' + reqId + ', null, null)"><i data-lucide="link" class="h-3 w-3 opacity-50 group-hover:opacity-100" aria-hidden="true"></i> Link capability</button>';
+                    cell.innerHTML = '<button type="button" class="inline-flex items-center gap-1 text-muted-foreground hover:text-primary italic text-xs transition-colors group" title="Link to a capability" @click="openLinkCapModal(' + reqId + ', null, null)"><i data-lucide="link" class="h-3 w-3 opacity-50 group-hover:opacity-100" aria-hidden="true"></i> Link capability</button>';
                     if (window.lucide) lucide.createIcons();
-                    // re-attach Alpine click (fallback: use onclick)
                     let btn = cell.querySelector('button');
                     if (btn) btn.onclick = function () { self.openLinkCapModal(reqId, null, null); };
                     return;
@@ -370,4 +321,3 @@
 })();
 </script>
 {% endblock %}
-

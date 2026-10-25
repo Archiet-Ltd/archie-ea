@@ -210,6 +210,7 @@ def require_org_membership():
 
             user_org = getattr(current_user, "organization_id", None)
             if user_org != request_org:
+                g.audit_cross_organisation = True
                 logger.warning(
                     "RBAC: user %s (org=%s) denied cross-org access to org %s",
                     current_user.id,

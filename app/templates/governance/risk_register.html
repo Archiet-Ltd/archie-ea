@@ -1,10 +1,16 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/data_table.html' import data_table, data_table_script with context %}
+{% from 'components/input.html' import input, textarea, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'macros/page_shell.html' import page_shell %}
 
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% block title %}Risk Register{% endblock %}
 
 {% block breadcrumb %}
@@ -30,10 +36,7 @@
 #}
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
     {% macro _ps_actions() %}
-        <button type="button" @click="openCreate()"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Risk
-        </button>
+        {{ button(text='Add Risk', icon='plus', on_click='openCreate()') }}
     {% endmacro %}
     {{ page_shell(title='Risk Register', subtitle='Enterprise architecture risk tracking and mitigation', actions_caller=_ps_actions) }}
 
@@ -97,7 +100,7 @@
                     </p>
                     {% elif r.worked_out %}
                     <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
-                        <button type="button" @click="openMap({{ r.risk_id }})" class="text-primary hover:underline">Link it</button>
+                        {{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}
                     </p>
                     {% else %}
                     <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
@@ -193,16 +196,10 @@
                     {# DEF-002, Capgemini dry-run: naive "k + 's'" pluralised
                        'dependency' to "dependencys". Real plurals. #}
                     <template x-for="k in kinds" :key="k">
-                        <button type="button" @click="kindFilter = (kindFilter === k ? '' : k)"
-                                :class="kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-                                class="px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors"
-                                x-text="k === 'dependency' ? 'Dependencies' : (k + 's')"></button>
+                        {{ button(text='', size='xs', variant='bare', class='capitalize', on_click="kindFilter = (kindFilter === k ? '' : k)", attrs_dict={':class': "kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'", 'x-text': "k === 'dependency' ? 'Dependencies' : (k + 's')"}) }}
                     </template>
                 </div>
-                <button type="button" @click="openCreate()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="plus" class="h-3.5 w-3.5" aria-hidden="true"></i> Add item
-                </button>
+                {{ button(text='Add item', icon='plus', on_click='openCreate()', size='sm') }}
             </div>
         </div>
         {% if raid_items %}
@@ -244,12 +241,7 @@
                                time (closed it early) — single-quote the
                                attribute instead, per this codebase's
                                established fix for that exact class of bug. #}
-                            <button type="button"
-                                    @click='setStatus({{ item.id }}, {{ ("resolved" if item.status.value == "open" else "closed")|tojson }})'
-                                    :disabled="updatingId === {{ item.id }}"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                                {{ 'Resolve' if item.status.value == 'open' else 'Close' }}
-                            </button>
+                            {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', disabled_when="updatingId === {{ item.id }}", on_click='setStatus({{ item.id }}, ' + ('"resolved"' if item.status.value == 'open' else '"closed"') + ')') }}
                             {% else %}
                             <span class="text-xs text-muted-foreground">Closed</span>
                             {% endif %}
@@ -273,53 +265,43 @@
     {% call modal(id='create-raid-modal', title='Add RAID Item', description='Record an assumption, issue or dependency.', size='lg') %}
     <div class="space-y-4">
         {% call form_group(id='raid-kind', label='Kind', required=true) %}
-            <select id="raid-kind" x-model="raidForm.kind"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm capitalize">
+            {% call native_select(id='raid-kind', size='sm', class='capitalize', attrs_dict={'x-model': 'raidForm.kind'}) %}
                 <template x-for="k in kinds" :key="k">
                     <option :value="k" x-text="k" class="capitalize"></option>
                 </template>
-            </select>
+            {% endcall %}
         {% endcall %}
         {% call form_group(id='raid-title', label='Title', required=true) %}
-            <input id="raid-title" type="text" x-model="raidForm.title"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {{ input(id='raid-title', type='text', size='sm', attrs_dict={'x-model': 'raidForm.title'}) }}
         {% endcall %}
         {% call form_group(id='raid-description', label='Description') %}
-            <textarea id="raid-description" x-model="raidForm.description" rows="3"
-                      class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
+            {{ textarea(id='raid-description', rows=3, attrs_dict={'x-model': 'raidForm.description'}) }}
         {% endcall %}
         <div class="grid grid-cols-2 gap-3">
             {% call form_group(id='raid-owner', label='Owner') %}
-                <input id="raid-owner" type="text" x-model="raidForm.owner"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {{ input(id='raid-owner', type='text', size='sm', attrs_dict={'x-model': 'raidForm.owner'}) }}
             {% endcall %}
             {% call form_group(id='raid-target-date', label='Target date') %}
-                <input id="raid-target-date" type="date" x-model="raidForm.target_date"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {{ input(id='raid-target-date', type='date', size='sm', attrs_dict={'x-model': 'raidForm.target_date'}) }}
             {% endcall %}
         </div>
         <div>
-            <label for="raid-programme" class="block text-sm font-medium mb-1">Programme</label>
-            <select id="raid-programme" x-model="raidForm.strategic_initiative_id"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+            {% call label(for='raid-programme') %}Programme{% endcall %}
+            {% call native_select(id='raid-programme', size='sm', attrs_dict={'x-model': 'raidForm.strategic_initiative_id'}) %}
                 <option value="">— Not linked to a programme —</option>
                 {% for p in programmes %}
                 <option value="{{ p.id }}">{{ p.name }}</option>
                 {% endfor %}
-            </select>
+            {% endcall %}
         </div>
         <p x-show="raidError" x-cloak class="text-sm text-destructive-emphasis" x-text="raidError"></p>
     </div>
     <div class="flex justify-end gap-2 mt-4">
-        <button type="button" data-modal-close="create-raid-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            Cancel
-        </button>
-        <button type="button" @click="submitRaid()" :disabled="raidSaving"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-raid-modal'}) }}
+        {% call button(text='', type='button', on_click='submitRaid()', attrs_dict={':disabled': 'raidSaving'}) %}
             <span x-show="raidSaving" x-cloak class="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
             Save
-        </button>
+        {% endcall %}
     </div>
     {% endcall %}
     </div>
@@ -328,58 +310,34 @@
     <div class="space-y-4">
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
         {% call form_group(id='risk-title', label='Title', required=true) %}
-            <input id="risk-title" type="text" x-model="form.title"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                   placeholder="What could go wrong?">
+            {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
         {% endcall %}
         {% call form_group(id='risk-description', label='Description') %}
-            <textarea id="risk-description" rows="2" x-model="form.description"
-                      class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      placeholder="Context and consequence"></textarea>
+            {{ textarea(id='risk-description', rows=2, placeholder='Context and consequence', attrs_dict={'x-model': 'form.description'}) }}
         {% endcall %}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {% call form_group(id='risk-likelihood', label='Likelihood (1-5)', required=true) %}
-                <select id="risk-likelihood" x-model="form.likelihood"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                </select>
+                {% call native_select(id='risk-likelihood', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.likelihood'}) %}{% endcall %}
             {% endcall %}
             {% call form_group(id='risk-impact', label='Impact (1-5)', required=true) %}
-                <select id="risk-impact" x-model="form.impact"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                </select>
+                {% call native_select(id='risk-impact', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.impact'}) %}{% endcall %}
             {% endcall %}
         </div>
         {% call form_group(id='risk-owner', label='Owner') %}
-            <input id="risk-owner" type="text" x-model="form.owner"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                   placeholder="Who carries this risk?">
+            {{ input(id='risk-owner', type='text', size='sm', placeholder='Who carries this risk?', attrs_dict={'x-model': 'form.owner'}) }}
         {% endcall %}
         {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
-            <textarea id="risk-mitigation" rows="2" x-model="form.mitigation_plan"
-                      class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      placeholder="What reduces it?"></textarea>
+            {{ textarea(id='risk-mitigation', rows=2, placeholder='What reduces it?', attrs_dict={'x-model': 'form.mitigation_plan'}) }}
         {% endcall %}
         <div x-show="error" x-cloak role="alert"
              class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
              x-text="error"></div>
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-        <button type="button" data-modal-close="create-risk-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-        <button type="button" @click="submit()" :disabled="saving"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-risk-modal'}) }}
+        {% call button(text='', type='button', on_click='submit()', attrs_dict={':disabled': 'saving'}) %}
             <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
-        </button>
+        {% endcall %}
     </div>
     {% endcall %}
 
@@ -400,7 +358,7 @@
              @click.self="panelOpen = false"
              class="fixed inset-0 z-40 bg-overlay/50"></div>
 
-        <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
+        <div x-show="panelOpen" x-cloak :role="'dialog'" aria-modal="true" aria-label="Risk detail"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
@@ -409,9 +367,7 @@
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+                {{ button(text='', variant='ghost', size='icon-sm', aria_label='Close risk detail', on_click='panelOpen = false', icon='x', attrs_dict={'class': 'h-8 w-8'}) }}
             </div>
 
             <div class="flex-1 overflow-y-auto p-4 space-y-5" x-show="selectedRisk">
@@ -434,7 +390,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapped to</h3>
-                        <button type="button" @click="showMapPicker = !showMapPicker" class="text-xs text-primary hover:underline">Map to…</button>
+                        {{ button(text='Map to…', variant='link', size='bare', on_click='showMapPicker = !showMapPicker', class='text-xs') }}
                     </div>
                     <template x-if="selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length">
                         <ul class="space-y-1.5">
@@ -445,7 +401,7 @@
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                         <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
-                                    <button type="button" x-show="link.id" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
+                                    {{ button(text='Unmap', variant='bare', size='bare', aria_label='Unmap', class='text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0', attrs_dict={'x-show': 'link.id', '@click': 'removeLink(link.id)'}) }}
                                 </li>
                             </template>
                         </ul>
@@ -454,19 +410,12 @@
 
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
                         <div class="flex gap-2">
-                            <select x-model="linkType" aria-label="Entity type to link" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
-                                <option value="application">Application</option>
-                                <option value="solution">Solution</option>
-                                <option value="programme">Programme</option>
-                            </select>
-                            <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
-                                   aria-label="Search entities to link"
-                                   class="flex-1 h-8 rounded-md border border-input bg-background px-2 text-xs"
-                                   :placeholder="'Search ' + linkType + 's…'">
+                            {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
+                            {{ input(type='text', size='xs', aria_label='Search entities to link', attrs_dict={'x-model': 'linkSearch', '@input.debounce.300ms': 'searchLinkEntities()', ':placeholder': "'Search ' + linkType + 's…'"}) }}
                         </div>
                         <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
                             <template x-for="entity in linkResults" :key="entity.id">
-                                <button type="button" @click="addLink(entity)" class="w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent transition-colors" x-text="entity.name"></button>
+                                {% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-2.5 py-1.5 text-xs', attrs_dict={'@click': 'addLink(entity)', 'x-text': 'entity.name'}) %}{% endcall %}
                             </template>
                         </div>
                     </div>
@@ -474,12 +423,8 @@
             </div>
 
             <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
-                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i> Edit
-                </button>
-                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
-                </button>
+                {{ button(text='Edit', icon='pencil', variant='outline', on_click='openEdit(selectedRisk)') }}
+                {{ button(text='Delete', icon='trash-2', variant='outline', on_click='confirmDelete(selectedRisk)') }}
             </div>
         </div>
     </div>

@@ -47,7 +47,6 @@ def _compute_capability_mapping_counts():
         return None
 
     from sqlalchemy import func
-
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
     from app.models.unified_capability import UnifiedCapability
 
