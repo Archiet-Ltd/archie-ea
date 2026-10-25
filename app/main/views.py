@@ -1446,6 +1446,9 @@ def save_system_settings():
                 {"key": str(key), "value": json.dumps(value)},
             )
         db.session.commit()
+        from app.services import activity_record
+
+        activity_record.clear_setting_cache()
         return jsonify({"status": "saved", "count": len(settings_data)})
     except Exception as e:
         db.session.rollback()

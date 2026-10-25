@@ -10,7 +10,7 @@
 {% block content %}
 <meta name="shadcn-nearest" content="empty">
 <div class="p-6 space-y-6" data-testid="generic-error" data-status="{{ status_code or '' }}">
-    {{ page_shell(title='Error ' ~ (status_code or ''), icon='x-circle') }}
+    {{ page_shell(title='Error ' ~ (status_code or ''), icon='x-circle', breadcrumb=[('Home', url_for('main.index')), ('Error ' ~ (status_code or ''), none)]) }}
 
     <div class="max-w-2xl mx-auto mt-8 space-y-4">
         {{ empty_state(
