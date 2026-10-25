@@ -72,6 +72,26 @@ def test_sample_company_cited_answer_appears(page, live_server):
     assert href.startswith("/"), "record link is not an app page: %s" % href
     assert "empty" not in href.lower(), "record link points to empty: %s" % href
 
+    # Open the cited record and assert the page has the record's name and no
+    # empty state (Section 22: every link lands on a page with content).
+    record_link.click()
+    page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+    # The detail page should show the element/application name in a heading.
+    heading = page.locator("h1, h2, [data-element-name], [data-application-name]").first
+    expect(heading).to_be_visible(timeout=PAGE_TIMEOUT)
+    heading_text = heading.inner_text().strip()
+    assert heading_text, "detail page heading is empty"
+    # The page must not show an empty-state macro or "no data" message.
+    page_text = page.locator("body").inner_text().lower()
+    assert "no data" not in page_text, "detail page shows empty state: %s" % page_text[:200]
+    assert "nothing recorded" not in page_text, "detail page shows nothing recorded: %s" % page_text[:200]
+
+    # The answer text must not contain "nothing recorded matches" — superlative
+    # phrases name no system, so the reason line must not say nothing matches.
+    answer_text = page.locator("#messages-container").inner_text().lower()
+    assert "nothing recorded matches" not in answer_text, \
+        "answer incorrectly says nothing matches: %s" % answer_text[:200]
+
 
 def test_no_sample_company_gets_honest_empty_answer(page, live_server):
     """A person who signs up, skips the sample company, and asks a question
