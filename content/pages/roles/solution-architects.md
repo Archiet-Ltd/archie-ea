@@ -41,7 +41,7 @@ diagram and a decision log kept in two places that quietly drift apart.
 
 ## The screens you will use
 
-- **Ask**, first, for a quick question about one element, and the impact analysis it opens into to
+- **The AI chat**, first, for a quick question about one element, and the impact analysis to
   trace what a design touches — see [Digital twin of your organisation](/modules/digital-twin).
 - **Architecture Journey and Solutions**, where a design is built: its ArchiMate elements, the APQC
   processes it affects, and the owner, sponsor and technical lead recorded against it.
@@ -111,8 +111,8 @@ and motivation layers.
 
 ### Can I submit a design to the review board from it?
 
-Yes. A design in Solutions goes to the review board as a change proposal with its impact evidence
-attached, is discussed in a recorded session, and comes back with a decision — approved, approved
+Yes. A design in Solutions goes to the review board as a change proposal with its evidence pinned
+to the decision, is discussed in a recorded session, and comes back with a decision — approved, approved
 with conditions, rejected or deferred — recorded against that same design rather than a separate
 document.
 
@@ -133,7 +133,7 @@ redrawn by hand.
 
 Anyone editing a design — moving it across ADM Kanban, submitting it to the review board, or
 recording an interface — needs an editor seat on the Team plan, priced at $29 per editor a month.
-People who only ask questions on Ask are free, on every plan, and Community covers a whole
+People who only ask questions in the AI chat are free, on every plan, and Community covers a whole
 organisation of up to three people at no cost at all.
 
 ## Start free

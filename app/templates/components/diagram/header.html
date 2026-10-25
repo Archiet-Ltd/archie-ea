@@ -1,0 +1,16 @@
+{# Diagram header: the view's name and one line saying what it is for and who it is for.
+   Reads composerApp: viewTitle and activeViewpoint. Its height never changes after load, so the canvas below it does not resize.
+
+   Usage: {% from 'components/diagram/header.html' import diagram_header with context %}
+          {{ diagram_header(purposes={'layered': 'How the business, applications and technology fit together'}) }} #}
+
+{% macro diagram_header(purposes={}) %}
+<header class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-testid="diagram-header">
+  <div class="flex min-w-0 flex-col">
+    <p class="truncate text-sm font-semibold text-foreground" data-testid="diagram-title"
+       x-text="viewTitle"></p>
+    <p class="truncate text-xs text-muted-foreground" data-testid="diagram-purpose"
+       x-text="({{ purposes|tojson|forceescape }})[activeViewpoint] || 'A free canvas. Add an element from the list on the left, then connect it to another.'"></p>
+  </div>
+</header>
+{% endmacro %}

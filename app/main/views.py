@@ -825,6 +825,8 @@ def public_roles_index():
     """The /roles hub: every live role page, grouped, from the feed."""
     from app.services.public_pages import ROLE_HUB_EXTRA_ENTRIES
 
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard.overview"))
     return _render_family_hub("role", "/roles", "Roles", ROLE_HUB_EXTRA_ENTRIES)
 
 
@@ -1444,6 +1446,9 @@ def save_system_settings():
                 {"key": str(key), "value": json.dumps(value)},
             )
         db.session.commit()
+        from app.services import activity_record
+
+        activity_record.clear_setting_cache()
         return jsonify({"status": "saved", "count": len(settings_data)})
     except Exception as e:
         db.session.rollback()

@@ -2,7 +2,7 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% from 'components/input.html' import input %}
-{% from 'components/drawer.html' import drawer %}
+{% from 'components/drawer.html' import drawer with context %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/skeleton.html' import skeleton_card %}
@@ -731,15 +731,13 @@ function capabilityMap() {
             this.loading = true;
             this.error = null;
             try {
-                const response = await fetch('/capability-map/api/capabilities/hierarchy', {
-                    headers: { 'Accept': 'application/json' }
+                const data = await Platform.fetch('/capability-map/api/capabilities/hierarchy', {
+                    headers: { 'Accept': 'application/json' },
+                    silent: true, // the page shows the error inline
                 });
-                if (!response.ok) throw new Error('Failed to load capabilities');
-                const data = await response.json();
                 this.domains = data.domains || [];
             } catch (e) {
-                this.error = e.message;
-                console.error('Failed to load capabilities:', e);
+                this.error = e.status ? `Failed to load capabilities (HTTP ${e.status})` : 'Failed to load capabilities';
             } finally {
                 this.loading = false;
                 this.$nextTick(() => lucide.createIcons());

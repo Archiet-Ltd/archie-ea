@@ -1,3 +1,4 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell, section_card, empty_state %}
 
@@ -9,21 +10,22 @@
 <div class="p-6 space-y-6">
     {{ page_shell(
         title='Element properties',
-        subtitle='Typed properties your organisation requires on each kind of element, and which elements are still missing them.',
+        subtitle='Typed properties your organisation requires on each kind of record, how many records use each, and which are still missing a value.',
         breadcrumb=[('Home', home_url), ('Element properties', none)]
     ) }}
 
     {% call section_card(title='Your properties') %}
         {% if rows %}
         <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm" data-testid="metamodel-definitions">
+            <table class="dense-table w-full min-w-max text-sm" data-testid="metamodel-definitions">
                 <thead>
                     <tr class="border-b border-border text-left text-muted-foreground">
                         <th scope="col" class="py-2 pr-4 font-medium">Property</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Element type</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Record type</th>
                         <th scope="col" class="py-2 pr-4 font-medium">Value</th>
                         <th scope="col" class="py-2 pr-4 font-medium">Required</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Elements missing a value</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Records using it</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Records missing a value</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,11 +36,14 @@
                             <a href="{{ url_for('metamodel_properties.detail', definition_id=d.id) }}"
                                class="font-medium text-primary hover:underline">{{ d.display_name }}</a>
                         </td>
-                        <td class="py-2 pr-4 text-foreground">{{ d.archimate_type }}</td>
+                        <td class="py-2 pr-4 text-foreground">{{ row.type_name }}</td>
                         <td class="py-2 pr-4 text-foreground">
                             {{ type_labels.get(d.property_type, d.property_type) }}{% if d.enum_options %}: {{ d.enum_options | join(', ') }}{% endif %}
                         </td>
                         <td class="py-2 pr-4 text-foreground">{{ 'Yes' if d.is_mandatory else 'No' }}</td>
+                        <td class="py-2 pr-4 tabular-nums text-foreground" data-testid="usage-count">
+                            {{ row.usage_count }}
+                        </td>
                         <td class="py-2 pr-4 tabular-nums text-foreground">
                             {% if row.missing_count is none %}
                             <span title="Only required properties are counted">—</span>
@@ -50,13 +55,16 @@
             </table>
         </div>
         {% else %}
-        {{ empty_state('sliders-horizontal', 'No properties defined yet',
-                       'Add a property below to require a typed value on every element of one type.' if can_define
-                       else 'An enterprise architect adds the properties your organisation requires.') }}
+        {{ empty_state('sliders-horizontal', 'No custom properties yet',
+                       'A custom property is an extra fact your organisation wants recorded on one kind of record, such as a recovery time on every application. Define one and it appears on each record of that kind.' if can_define
+                       else 'A custom property is an extra fact your organisation wants recorded on one kind of record, such as a recovery time on every application. An enterprise architect defines them.',
+                       cta_label='Define a property' if can_define else none,
+                       cta_href='#mm-define' if can_define else none) }}
         {% endif %}
     {% endcall %}
 
     {% if can_define %}
+    <div id="mm-define">
     {% call section_card(title='Add a property') %}
         <form method="post" action="{{ url_for('metamodel_properties.define') }}" class="space-y-4" data-testid="metamodel-define-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -65,11 +73,15 @@
             {% endif %}
             <div class="grid gap-4 grid-cols-1">
                 <div class="space-y-1">
-                    <label for="mm-type" class="block text-sm font-medium text-muted-foreground mb-1">Element type</label>
+                    <label for="mm-type" class="block text-sm font-medium text-muted-foreground mb-1">Record type</label>
                     <select id="mm-type" name="archimate_type" required class="{{ field_classes }}">
                         <option value="">Choose a type</option>
-                        {% for t in element_types %}
-                        <option value="{{ t }}" {% if form.get('archimate_type') == t %}selected{% endif %}>{{ t }}</option>
+                        {% for layer_name, types in element_type_groups %}
+                        <optgroup label="{{ layer_name }}">
+                            {% for key, label in types %}
+                            <option value="{{ key }}" {% if form.get('archimate_type') == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </optgroup>
                         {% endfor %}
                     </select>
                 </div>
@@ -99,7 +111,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <input type="checkbox" id="mm-mandatory" name="mandatory" {% if form.get('mandatory') %}checked{% endif %} class="rounded border-input">
-                <label for="mm-mandatory" class="block text-sm font-medium text-muted-foreground mb-1">Every element of this type must have a value</label>
+                <label for="mm-mandatory" class="block text-sm font-medium text-muted-foreground mb-1">Every record of this type must have a value</label>
             </div>
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
@@ -107,6 +119,7 @@
             </button>
         </form>
     {% endcall %}
+    </div>
     {% endif %}
 </div>
 {% endblock %}

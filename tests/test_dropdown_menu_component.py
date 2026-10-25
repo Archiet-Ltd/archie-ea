@@ -75,3 +75,18 @@ def test_data_action_item_has_no_aria_label_at_all(app):
         "visible text 'Export CSV' provides the accessible name"
     )
     assert "Export CSV" in html
+
+_MENU = """
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{{ dropdown_menu(id='m', trigger_text='More', items=[{'text': 'Do it', 'onclick': 'go()'}]__EXTRA__) }}
+"""
+
+
+def test_menu_scales_and_fades_unless_asked_to_only_fade(app):
+    """Every existing caller keeps the scale-and-fade; a toolbar asks for opacity only."""
+    default = _render(app, _MENU.replace("__EXTRA__", ""))
+    assert "scale-95" in default and "x-transition:enter=" in default
+
+    fade_only = _render(app, _MENU.replace("__EXTRA__", ", transition='opacity'"))
+    assert "x-transition.opacity" in fade_only
+    assert "scale-95" not in fade_only and "x-transition:enter=" not in fade_only
