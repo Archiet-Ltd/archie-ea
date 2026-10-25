@@ -121,10 +121,10 @@
     {# Industry and frameworks: chosen at sign-up, changed here. #}
     {% if company %}
     <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-testid="company-choices-card">
-        {% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
+        {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
         {% call card() %}
             {% call card_header() %}
-                {% call card_title() %}Industry and frameworks{% endcall %}
+                {% call card_title() %}Company, industry and frameworks{% endcall %}
                 {% call card_description() %}Your industry picks the starter capability model. The frameworks are the ones your company already works with.{% endcall %}
             {% endcall %}
             {% call card_content(class='space-y-6') %}

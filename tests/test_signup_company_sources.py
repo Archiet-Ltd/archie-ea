@@ -45,8 +45,22 @@ def test_industry_and_frameworks_are_kept_on_the_organisation_that_chose_them(cl
     assert reply.status_code == 200, reply.get_data(as_text=True)
     from app.modules.account.services import onboarding_service as onboarding
 
-    assert onboarding.choices(two["one"]) == {"industry": "banking", "frameworks": ["iso27001", "soc2"]}
-    assert onboarding.choices(two["two"]) == {"industry": None, "frameworks": []}
+    assert onboarding.choices(two["one"]) == {"kind": None, "industry": "banking", "frameworks": ["iso27001", "soc2"]}
+    assert onboarding.choices(two["two"]) == {"kind": None, "industry": None, "frameworks": []}
+
+
+def test_the_company_kind_is_kept_for_the_choosing_organisation_only_and_unknown_kinds_are_refused(client, login_as, two):
+    ok = _post(client, login_as, two["one_owner"], "choices", {"kind": "enterprise", "industry": "", "frameworks": []})
+    assert ok.status_code == 200, ok.get_data(as_text=True)
+    bad = _post(client, login_as, two["one_owner"], "choices", {"kind": "giant", "industry": "", "frameworks": []})
+    assert bad.status_code == 400
+    from app.modules.account.services import onboarding_service as onboarding
+
+    assert onboarding.choices(two["one"])["kind"] == "enterprise"
+    assert onboarding.choices(two["two"])["kind"] is None
+    # Saving again without a kind leaves the answer as it was.
+    _post(client, login_as, two["one_owner"], "choices", {"industry": "banking", "frameworks": []})
+    assert onboarding.choices(two["one"])["kind"] == "enterprise"
 
 
 def test_a_choice_not_on_the_list_is_refused_and_nothing_is_kept(client, login_as, two):
@@ -55,7 +69,7 @@ def test_a_choice_not_on_the_list_is_refused_and_nothing_is_kept(client, login_a
     assert bad_industry.status_code == 400 and bad_framework.status_code == 400
     from app.modules.account.services import onboarding_service as onboarding
 
-    assert onboarding.choices(two["one"]) == {"industry": None, "frameworks": []}
+    assert onboarding.choices(two["one"]) == {"kind": None, "industry": None, "frameworks": []}
 
 
 def test_skipping_both_choices_clears_them(client, login_as, two):
@@ -64,7 +78,7 @@ def test_skipping_both_choices_clears_them(client, login_as, two):
     assert reply.status_code == 200
     from app.modules.account.services import onboarding_service as onboarding
 
-    assert onboarding.choices(two["one"]) == {"industry": None, "frameworks": []}
+    assert onboarding.choices(two["one"]) == {"kind": None, "industry": None, "frameworks": []}
 
 
 def test_the_website_needs_consent_and_is_kept_for_this_organisation_only(client, login_as, two):
