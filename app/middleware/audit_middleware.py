@@ -83,6 +83,11 @@ def _json_safe(value):
     """Coerce a value into something the JSON audit columns can store."""
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
+    # Structured values stay structured, so a recorded change can be applied again.
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
     return str(value)
 
 

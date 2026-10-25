@@ -110,6 +110,17 @@ def test_an_update_that_changes_nothing_a_person_made_is_not_recorded(app, db_se
     assert [r.action for r in _rows(db_session, org.id, "archimate_elements", element.id)] == ["create"]
 
 
+def test_structured_values_are_recorded_as_structure(app, db_session, make_org):
+    org = make_org("a")
+    element = _element(db_session, org.id, "Props")
+    element.custom_properties = {"classification": "restricted"}
+    db_session.flush()
+
+    update = _rows(db_session, org.id, "archimate_elements", element.id)[-1]
+    assert update.action == "update"
+    assert update.new_value["custom_properties"] == {"classification": "restricted"}
+
+
 def test_relationship_create_is_recorded(app, db_session, make_org):
     from app.models.archimate_core import ArchiMateRelationship
 
