@@ -1,8 +1,5 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/checkbox.html' import checkbox %}
-{% from 'components/input.html' import input %}
-{% from 'components/select.html' import native_select %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/metrics_card.html' import metrics_card %}
@@ -74,9 +71,17 @@
             <div class="flex items-center gap-2 flex-1">
                 <div class="relative flex-1 max-w-sm">
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
-                    {{ input(type="search", placeholder=("Search jobs…"), aria_label=("Search batch import jobs"), class="w-full", attrs_dict={"@input.debounce.300ms": ("setSearch($event.target.value)")}) }}
+                    <input
+                        type="search"
+                        placeholder="Search jobs…"
+                        class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label="Search batch import jobs"
+                        @input.debounce.300ms="setSearch($event.target.value)"
+                    >
                 </div>
-                {% call native_select(aria_label=("Filter by status"), attrs_dict={"x-model": ("filterStatus")}) %}
+                <select class="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        x-model="filterStatus"
+                        aria-label="Filter by status">
                     <option value="">All statuses</option>
                     <option value="pending">Pending</option>
                     <option value="processing">Processing</option>
@@ -84,16 +89,18 @@
                     <option value="completed">Completed</option>
                     <option value="failed">Failed</option>
                     <option value="cancelled">Cancelled</option>
-                {% endcall %}
+                </select>
             </div>
             <div class="flex items-center gap-2 shrink-0">
                 <label class="text-sm text-muted-foreground sr-only" for="bj-per-page">Per page</label>
-                {% call native_select(id=("bj-per-page"), attrs_dict={"@change": ("setPerPage($event.target.value)")}) %}
+                <select id="bj-per-page"
+                        class="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        @change="setPerPage($event.target.value)">
                     <option value="10">10 / page</option>
                     <option value="20" selected>20 / page</option>
                     <option value="50">50 / page</option>
                     <option value="100">100 / page</option>
-                {% endcall %}
+                </select>
             </div>
         </div>
 
@@ -108,23 +115,33 @@
              aria-live="polite">
             <span class="font-medium" x-text="selectionCount()"></span>
             <div class="h-4 w-px bg-border"></div>
-            {% call button.button(aria_label=("Delete selected jobs"), variant='bare', size='bare', class="inline-flex items-center gap-1.5 text-destructive-emphasis hover:text-destructive-emphasis/80 font-medium transition-colors", attrs_dict={"@click": ("confirmBulkDelete()")}) %}
+            <button type="button"
+                    @click="confirmBulkDelete()"
+                    class="inline-flex items-center gap-1.5 text-destructive-emphasis hover:text-destructive-emphasis/80 font-medium transition-colors"
+                    aria-label="Delete selected jobs">
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
                 Delete selected
-            {% endcall %}
-            {% call button.button(aria_label=("Clear selection"), variant='bare', size='bare', class="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors", attrs_dict={"@click": ("clearSelection()")}) %}
+            </button>
+            <button type="button"
+                    @click="clearSelection()"
+                    class="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Clear selection">
                 <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                 Clear
-            {% endcall %}
+            </button>
         </div>
 
         {# Table #}
         <div class="overflow-x-auto" aria-live="polite" aria-atomic="false">
-            {% call table.table(class="dense-table w-full caption-bottom text-sm", attrs_dict={"role": ("grid"), "aria-label": ("Batch import jobs table")}) %}
+            <table class="dense-table w-full caption-bottom text-sm" role="grid" aria-label="Batch import jobs table">
                 <thead class="border-b bg-muted/40">
                     <tr>
                         <th class="w-10 h-12 px-3 align-middle" scope="col">
-                            {{ checkbox(class="w-4", attrs_dict={":checked": ("items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"), "@change": ("toggleSelectAll()"), "aria-label": ("Select all on this page")}) }}
+                            <input type="checkbox"
+                                   class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
+                                   :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
+                                   @change="toggleSelectAll()"
+                                   aria-label="Select all on this page">
                         </th>
                         <th class="w-12 px-3 h-12 text-right align-middle font-medium text-muted-foreground tabular-nums" scope="col">#</th>
                         <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Job Name / File</th>
@@ -164,7 +181,11 @@
                         <tr class="border-b transition-colors hover:bg-muted/50"
                             :class="_selectedIds.indexOf(item.id) !== -1 ? 'bg-primary/5' : ''">
                             <td class="w-10 px-3 align-middle" @click.stop>
-                                {{ checkbox(class="w-4", attrs_dict={":checked": ("_selectedIds.indexOf(item.id) !== -1"), "@change": ("handleRowCheckboxClick($event, $index)"), ":aria-label": ("'Select job ' + (item.name || item.file_name)")}) }}
+                                <input type="checkbox"
+                                       class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
+                                       :checked="_selectedIds.indexOf(item.id) !== -1"
+                                       @change="handleRowCheckboxClick($event, $index)"
+                                       :aria-label="'Select job ' + (item.name || item.file_name)">
                             </td>
                             <td class="px-3 py-3 text-right tabular-nums text-muted-foreground text-sm" x-text="item.row_number"></td>
                             <td class="px-4 py-3 align-middle">
@@ -184,7 +205,10 @@
                                     <div class="flex items-center gap-1.5 mb-1">
                                         <span class="text-xs font-medium tabular-nums" x-text="(item.progress || 0) + '%'"></span>
                                     </div>
-                                    {{ progress.progress_bound('item.progress || 0', class='h-1.5') }}
+                                    <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                        <div class="h-full bg-primary transition-all"
+                                             :style="'width: ' + (item.progress || 0) + '%'"></div>
+                                    </div>
                                 </div>
                             </td>
                             <td class="px-4 py-3 align-middle text-sm text-muted-foreground" x-text="item.started_at || '—'"></td>
@@ -199,7 +223,7 @@
                         </tr>
                     </template>
                 </tbody>
-            {% endcall %}
+            </table>
         </div>
 
         {# Pagination #}
@@ -210,18 +234,23 @@
             </p>
             {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is page_header() above. #}
             <nav class="flex items-center gap-1" aria-label="Pagination">
-                {% call button.button(aria_label=("Previous page"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={":disabled": ("!hasPrev"), "@click": ("prevPage()")}) %}
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
                     <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
-                {% endcall %}
+                </button>
                 <template x-for="(pg, idx) in getVisiblePages()" :key="'pg-' + idx">
                     <span>
-                        {% call button.button(variant="ghost", size="sm", class="min-w-[2rem]", attrs_dict={"x-show": ("pg !== '...'"), "x-cloak": "", ":class": ("pg === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"), "@click": ("goToPage(pg)"), "x-text": ("pg")}) %}{% endcall %}
+                        <button type="button" x-show="pg !== '...'" x-cloak
+                                class="min-w-[2rem] h-8 rounded-md text-sm font-medium transition-colors"
+                                :class="pg === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"
+                                @click="goToPage(pg)" x-text="pg"></button>
                         <span x-show="pg === '...'" x-cloak class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
                     </span>
                 </template>
-                {% call button.button(aria_label=("Next page"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={":disabled": ("!hasNext"), "@click": ("nextPage()")}) %}
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
                     <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
-                {% endcall %}
+                </button>
             </nav>
         </div>
 
@@ -231,15 +260,25 @@
                 This will permanently delete the selected import jobs and cannot be undone.
                 Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
             </p>
-            {{ input(type="text", placeholder=("DELETE"), aria_label=("Type DELETE to confirm"), class="w-full mb-4", attrs_dict={"x-model": ("deleteConfirmText"), "@keydown.enter": ("executeBulkDelete()")}) }}
+            <input type="text"
+                   x-model="deleteConfirmText"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
+                   placeholder="DELETE"
+                   @keydown.enter="executeBulkDelete()"
+                   aria-label="Type DELETE to confirm">
             <div class="flex justify-end gap-3">
-                {% call button.button(variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"data-modal-close": ("bulk-delete-confirm-modal")}) %}
+                <button type="button"
+                        data-modal-close="bulk-delete-confirm-modal"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Cancel
-                {% endcall %}
-                {% call button.button(variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("executeBulkDelete()"), ":disabled": ("deleteConfirmText !== 'DELETE' || deleteInProgress")}) %}
+                </button>
+                <button type="button"
+                        @click="executeBulkDelete()"
+                        :disabled="deleteConfirmText !== 'DELETE' || deleteInProgress"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak aria-hidden="true"></i>
                     <span x-text="deleteInProgress ? 'Deleting…' : 'Delete'"></span>
-                {% endcall %}
+                </button>
             </div>
         {% endcall %}
 
@@ -252,12 +291,18 @@
             Any unprocessed batches will be discarded.
         </p>
         <div class="flex justify-end gap-2">
-            {% call button.button(aria_label=("Keep import job"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("Platform.modal.close('cancel-import-job')")}) %}
+            <button type="button"
+                @click="Platform.modal.close('cancel-import-job')"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                aria-label="Keep import job">
                 Keep Job
-            {% endcall %}
-            {% call button.button(aria_label=("Confirm cancel import job"), variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("cancelJob(cancelJobData?.id)")}) %}
+            </button>
+            <button type="button"
+                @click="cancelJob(cancelJobData?.id)"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                aria-label="Confirm cancel import job">
                 Cancel Job
-            {% endcall %}
+            </button>
         </div>
     {% endcall %}
 </div>

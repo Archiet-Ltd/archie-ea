@@ -1,8 +1,5 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/dialog.html' import dialog %}
-{% from 'components/button.html' import button %}
-{% from 'components/table.html' import table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'components/card.html' as card %}
 {% import 'components/badge.html' as badge %}
@@ -56,34 +53,53 @@
 
                 <!-- Action Buttons -->
                 <div class="flex items-center gap-2">
-                    {% call button(aria_label=("Refresh"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("refreshJob()")}) %}
+                    <button type="button"
+                        @click="refreshJob()"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                     aria-label="Refresh">
                         <i data-lucide="refresh-cw" class="mr-2 h-4 w-4" :class="{ 'animate-spin': refreshing }"></i>
                         Refresh
-                    {% endcall %}
+                    </button>
 
                     <!-- Start Button -->
-                    {% call button(aria_label=("Start processing import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors", attrs_dict={"x-show": ("_normStatus(job?.status) === 'pending'"), "@click": ("startJob()")}) %}
+                    <button type="button"
+                        x-show="_normStatus(job?.status) === 'pending'"
+                        @click="startJob()"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors"
+                     aria-label="Start processing import job">
                         <i data-lucide="play" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Start Processing
-                    {% endcall %}
+                    </button>
 
                     <!-- Pause Button -->
-                    {% call button(aria_label=("Pause import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-10 px-4 py-2 transition-colors", attrs_dict={"x-show": ("_normStatus(job?.status) === 'processing'"), "@click": ("pauseJob()")}) %}
+                    <button type="button"
+                        x-show="_normStatus(job?.status) === 'processing'"
+                        @click="pauseJob()"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-10 px-4 py-2 transition-colors"
+                     aria-label="Pause import job">
                         <i data-lucide="pause" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Pause
-                    {% endcall %}
+                    </button>
 
                     <!-- Resume Button -->
-                    {% call button(aria_label=("Resume import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors", attrs_dict={"x-show": ("_normStatus(job?.status) === 'paused'"), "@click": ("resumeJob()")}) %}
+                    <button type="button"
+                        x-show="_normStatus(job?.status) === 'paused'"
+                        @click="resumeJob()"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors"
+                     aria-label="Resume import job">
                         <i data-lucide="play" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Resume
-                    {% endcall %}
+                    </button>
 
                     <!-- Cancel Button -->
-                    {% call button(aria_label=("Cancel"), variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"x-show": ("['pending', 'processing', 'paused'].includes(_normStatus(job?.status))"), "@click": ("showCancelModal = true")}) %}
+                    <button type="button"
+                        x-show="['pending', 'processing', 'paused'].includes(_normStatus(job?.status))"
+                        @click="showCancelModal = true"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                     aria-label="Cancel">
                         <i data-lucide="x-circle" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Cancel
-                    {% endcall %}
+                    </button>
                 </div>
             </div>
         </div>
@@ -165,10 +181,13 @@
                             </p>
                         </div>
                     </div>
-                    {% call button(aria_label=("Pause import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-9 px-4 transition-colors", attrs_dict={"@click": ("pauseJob()")}) %}
+                    <button type="button"
+                        @click="pauseJob()"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-9 px-4 transition-colors"
+                     aria-label="Pause import job">
                         <i data-lucide="pause" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Pause
-                    {% endcall %}
+                    </button>
                 </div>
 
                 <!-- Current batch progress bar -->
@@ -177,7 +196,9 @@
                         <span>Batch Progress</span>
                         <span x-text="batchProgress + '%'"></span>
                     </div>
-                    {{ progress.progress_bound('batchProgress') }}
+                    <div class="w-full bg-secondary rounded-full h-2">
+                        <div class="bg-primary h-2 rounded-full transition-all duration-300" :style="'width: ' + batchProgress + '%'"></div>
+                    </div>
                 </div>
 
                 <!-- Stream messages log -->
@@ -215,7 +236,12 @@
                             <span class="text-sm font-medium">Overall Progress</span>
                             <span class="text-sm font-bold" x-text="job?.progress + '%'"></span>
                         </div>
-                        {{ progress.progress_bound('job?.progress || 0', class='h-4') }}
+                        <div class="h-4 w-full overflow-hidden rounded-full bg-secondary">
+                            <div
+                                class="h-full bg-primary transition-all duration-500"
+                                :style="'width: ' + (job?.progress || 0) + '%'"
+                            ></div>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-3 gap-4 pt-4 border-t">
@@ -305,7 +331,7 @@
             </div>
 
             <div class="overflow-x-auto rounded-md border">
-                {% call table(class="dense-table w-full caption-bottom text-sm") %}
+                <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Batch #</th>
@@ -389,7 +415,7 @@
                             </tr>
                         </template>
                     </tbody>
-                {% endcall %}
+                </table>
             </div>
         </div>
     {% endcall %}
@@ -415,21 +441,47 @@
     </template>
 
     <!-- Cancel Confirmation Modal -->
-    {% call dialog(title='Cancel Import Job', description='This action cannot be undone', open_expr='showCancelModal', close_expr='showCancelModal = false', start_hidden=false) %}
+    <div
+        x-show="showCancelModal" x-cloak
+        @keydown.escape.window="showCancelModal = false"
+        x-transition
+        class="modal-root fixed inset-0 z-50 flex items-center justify-center"
+        x-cloak
+     role="dialog">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCancelModal = false"></div>
+        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
+            <button type="button" @click="showCancelModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Cancel">
+                <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
+            </button>
+            <div class="flex items-center gap-4 mb-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                    <i data-lucide="alert-triangle" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold">Cancel Import Job</h2>
+                    <p class="text-sm text-muted-foreground">This action cannot be undone</p>
+                </div>
+            </div>
             <p class="text-sm text-muted-foreground mb-4">
                 Are you sure you want to cancel this job? Any unprocessed batches will be discarded,
                 but already processed elements can still be reviewed and committed.
             </p>
             <div class="flex justify-end gap-2">
-                {% call button(aria_label=("Cancel"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("showCancelModal = false")}) %}
+                <button type="button"
+                    @click="showCancelModal = false"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                 aria-label="Cancel">
                     Keep Job
-                {% endcall %}
-                {% call button(aria_label=("Cancel"), variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("cancelJob()")}) %}
+                </button>
+                <button type="button"
+                    @click="cancelJob()"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                 aria-label="Cancel">
                     Cancel Job
-                {% endcall %}
+                </button>
             </div>
-        
-{% endcall %}
+        </div>
+    </div>
 </div>
 
 <script>
