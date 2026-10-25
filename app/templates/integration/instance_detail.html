@@ -6,7 +6,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/dialog.html' import dialog %}
+{% from 'components/modal.html' import modal %}
 {% from 'components/alert.html' import alert %}
 {% from 'components/progress.html' import progress %}
 {% from 'components/input.html' import input, textarea %}
@@ -70,14 +70,14 @@
         </span>
         <span class="text-sm text-muted-foreground">{{ instance.progress_percent|dash }}% complete</span>
         {% if instance.status == 'waiting_approval' %}
-        <div class="ml-auto flex flex-wrap items-center gap-2" x-data="{ approveOpen: false }">
-            {{ button(text='Approve Step', icon='check', on_click='approveOpen = true') }}
-            {% call dialog(title='Approve Workflow Step', description='This step is waiting for your confirmation. Add a note for the record, then approve to resume the workflow.', open_expr='approveOpen', close_expr='approveOpen = false') %}
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+            {{ button(text='Approve Step', icon='check', attrs_dict={'data-modal-open': 'approve-step-modal'}) }}
+            {% call modal(id='approve-step-modal', title='Approve Workflow Step', description='This step is waiting for your confirmation. Add a note for the record, then approve to resume the workflow.') %}
                 <form method="post" action="{{ url_for('integration.approve_workflow_step', instance_id=instance.id) }}" class="space-y-4">
                     {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                     {% call textarea(id='comments', name='comments', placeholder='Approval comments (optional).', aria_label='Approval comments') %}{% endcall %}
                     <div class="flex justify-end gap-2">
-                        {{ button(text='Cancel', variant='ghost', on_click='approveOpen = false') }}
+                        {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'approve-step-modal'}) }}
                         {{ button(text='Approve & Resume', type='submit') }}
                     </div>
                 </form>

@@ -139,13 +139,13 @@ def test_platform_admin_starts_and_approves_a_workflow(browser, live_server):
         expect(page.locator("text=Begin review")).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.locator("text=Confirm findings")).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # ---- Approve the gate through the real dialog ----
+        # ---- Approve the gate through the real modal ----
         page.get_by_role("button", name="Approve Step").click()
-        dialog = page.locator('[role="dialog"]')
-        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
-        dialog.locator("textarea").fill("Findings look correct, approve.")
+        modal = page.locator("#approve-step-modal")
+        expect(modal).to_be_visible(timeout=PAGE_TIMEOUT)
+        modal.locator("textarea").fill("Findings look correct, approve.")
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
-            dialog.get_by_role("button", name="Approve & Resume").click()
+            modal.get_by_role("button", name="Approve & Resume").click()
 
         # The run completes after the approval
         status_badge = page.get_by_test_id("instance-status-badge")
@@ -186,7 +186,12 @@ def test_platform_admin_starts_and_approves_a_workflow(browser, live_server):
         sign_in(other_page, live_server, other["emails"]["platform_admin"])
         other_page.goto(live_server + "/integration/instances",
                         wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        assert instance_code not in other_page.content(), (
+        # Check the instances table specifically, not the filter dropdown
+        # (workflow definitions are global reference data so they appear in
+        # every org's catalog filter).
+        table = other_page.locator("table[aria-label='Workflow instances']")
+        table_text = table.inner_text(timeout=PAGE_TIMEOUT) if table.count() > 0 else ""
+        assert instance_code not in table_text, (
             "the first organisation's instance leaked into the second"
         )
         expect(other_page.locator("text=No workflow instances yet")).to_be_visible(

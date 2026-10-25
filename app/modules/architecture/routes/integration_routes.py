@@ -337,9 +337,9 @@ def approve_workflow_step(instance_id):
             "comments": request.form.get("comments", ""),
         }
 
-        if not instance.context_data:
-            instance.context_data = {}
-        instance.context_data["last_approval"] = approval_data
+        if not instance.context:
+            instance.context = {}
+        instance.context["last_approval"] = approval_data
         db.session.commit()
 
         # Resume the workflow
