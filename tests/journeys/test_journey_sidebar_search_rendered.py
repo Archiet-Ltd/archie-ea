@@ -166,21 +166,21 @@ def _serve_app_in_browser(pg, client, document, path):
 
 
 def test_typing_in_the_real_sidebar_shows_a_link_level_result_with_zone(app, client, browser):
-    # A CTO's sidebar carries no Traceability entry, so a hit can only have come from the search.
+    # A CTO's sidebar carries no Stakeholder map entry, so a hit can only have come from the search.
     login(client, _persona(app, "cto"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
-    assert 'href="/architecture/traceability"' not in document
+    assert 'href="/stakeholders/map"' not in document
 
     pg = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
         _serve_app_in_browser(pg, client, document, page_path)
         pg.goto("http://app.test" + page_path)
-        pg.fill("#sidebar-search", "traceability")
-        hit = pg.locator('[data-testid="sidebar-search-results"] a[href="/architecture/traceability"]')
+        pg.fill("#sidebar-search", "stakeholder map")
+        hit = pg.locator('[data-testid="sidebar-search-results"] a[href="/stakeholders/map"]')
         hit.wait_for(state="visible", timeout=10000)
         name, section = [part.strip() for part in hit.inner_text().strip().split("\n") if part.strip()]
-        assert (name, section) == ("Traceability", "Impact")
+        assert (name, section) == ("Stakeholder map", "Systems")
     finally:
         pg.close()
 
