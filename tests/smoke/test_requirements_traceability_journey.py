@@ -39,7 +39,7 @@ def test_requirements_traceability_shows_matrix(browser, live_server):
         expect(page.get_by_text("Implemented")).to_be_visible()
 
         # Assert the traceability chain legend renders
-        expect(page.get_by_text("Traceability Chain")).to_be_visible()
+        expect(page.get_by_role("heading", name="Traceability Chain (TOGAF 9.2 / ArchiMate 3.2)")).to_be_visible()
     finally:
         context.close()
 

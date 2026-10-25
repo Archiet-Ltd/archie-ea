@@ -26,11 +26,11 @@ def test_impact_analysis_shows_results_and_links_land(browser, live_server):
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
 
         # Navigate to impact analysis
-        page.goto(live_server + "/enterprise/impact-analysis",
+        page.goto(live_server + "/enterprise/analysis/impact-analysis",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # Assert the page shell renders
-        expect(page.get_by_role("heading", name="Impact Analysis")).to_be_visible()
+        expect(page.get_by_role("heading", name="Impact Analysis", exact=True)).to_be_visible()
 
         # Assert the filter form renders
         expect(page.get_by_label("Element Type")).to_be_visible()
@@ -52,7 +52,7 @@ def test_impact_analysis_empty_state(browser, live_server):
     page = context.new_page()
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
-        page.goto(live_server + "/enterprise/impact-analysis",
+        page.goto(live_server + "/enterprise/analysis/impact-analysis",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", name="No Impact Analyses Found")).to_be_visible()
     finally:
