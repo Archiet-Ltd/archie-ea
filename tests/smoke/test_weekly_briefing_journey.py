@@ -127,10 +127,16 @@ def week_records(app, seeded):
     yield made
     with app.app_context():
         db.session.remove()
+        mirrored = [r[0] for r in db.session.execute(
+            db.text("SELECT archimate_element_id FROM risks WHERE id = ANY(:ids) AND archimate_element_id IS NOT NULL"),
+            {"ids": [r[0] for r in made["risks"]]})]
         db.session.execute(db.text("DELETE FROM risk_score_history WHERE risk_id = ANY(:ids)"),
                            {"ids": [r[0] for r in made["risks"]]})
         db.session.execute(db.text("DELETE FROM risks WHERE id = ANY(:ids)"),
                            {"ids": [r[0] for r in made["risks"]]})
+        for element_id in mirrored:
+            db.session.execute(db.text("DELETE FROM entity_history WHERE record_id = :id AND table_name = 'archimate_elements'"), {"id": element_id})
+            db.session.execute(db.text("DELETE FROM archimate_elements WHERE id = :id"), {"id": element_id})
         db.session.execute(db.text("DELETE FROM arb_review_items WHERE id = ANY(:ids)"),
                            {"ids": [r[0] for r in made["reviews"]]})
         db.session.execute(db.text("DELETE FROM solution_archimate_elements WHERE solution_id = :id"),
