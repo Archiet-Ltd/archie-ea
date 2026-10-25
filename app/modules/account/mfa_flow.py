@@ -32,7 +32,7 @@ def run_mfa_challenge(user, complete):
     * Enrolled: a six-digit code, or (``use_recovery``) one unused recovery
       code, which stops working as soon as it is accepted.
     """
-    from app.services import mfa_service
+    from app.services import activity_record, mfa_service
 
     if request.method == "POST" and user.mfa_enabled and request.form.get("step") == "codes":
         # The codes are stored hashed and cannot be shown again, so this only
@@ -73,9 +73,14 @@ def run_mfa_challenge(user, complete):
         code = request.form.get("code", "")
         if request.form.get("use_recovery"):
             if mfa_service.use_recovery_code(user, code):
+                activity_record.record_security_event("recovery_code_used", user)
                 return complete(user)
         elif mfa_service.verify_login_code(user, code):
+            activity_record.record_security_event("two_factor_passed", user)
             return complete(user)
+        activity_record.record_security_event(
+            "two_factor_failed", user, method="recovery code" if request.form.get("use_recovery") else "authenticator code"
+        )
         error = "That code was not accepted. Try again."
 
     return render_template(

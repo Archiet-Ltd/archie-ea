@@ -121,10 +121,16 @@ def test_layer_spine_names_every_layer_and_exposes_selection():
 
 
 def test_actions_and_data_surface_follow_the_applications_hierarchy():
-    """The repository gets one primary action and a wrapping, neutral data surface."""
+    """The repository gets one primary action and a wrapping, neutral data surface.
+
+    The action buttons now render through the button() macro, which turns its
+    ``testid`` argument into ``data-testid`` at render time — so the source-level
+    declaration is ``testid='...'``, and the guaranteed rendered testid follows
+    from the macro contract. Each action is still declared exactly once.
+    """
     template = _template()
 
-    assert template.count('data-testid="btn-create-element"') == 1
+    assert template.count("testid='btn-create-element'") == 1
     for test_id in (
         "btn-import-oef",
         "btn-export-oef",
@@ -133,7 +139,7 @@ def test_actions_and_data_surface_follow_the_applications_hierarchy():
         "btn-vendor-templates",
         "btn-ai-generate-element",
     ):
-        assert f'data-testid="{test_id}"' in template
+        assert f"testid='{test_id}'" in template
     assert 'data-testid="architecture-data-card"' in template
     assert 'data-testid="architecture-filter-bar"' in template
     assert 'data-testid="filter-search"' in template

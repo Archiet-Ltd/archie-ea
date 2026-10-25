@@ -2015,6 +2015,20 @@ def application_kind_types() -> Tuple[str, ...]:
 
 
 # The element property that names a specialisation in an exchange file (ADR-0014 Decision 5).
+# The standard types that are systems: what the Systems list shows and what a
+# dependency can bring down. Business processes and functions are not systems.
+_OTHER_SYSTEM_TYPES = ("ApplicationService", "DataObject", "Node", "SystemSoftware")
+
+
+def system_kind_types() -> Tuple[str, ...]:
+    """Every stored type that counts as a system, for SQL ``IN`` filters.
+
+    Applications (through ``application_kind_types``) plus application services,
+    data objects, nodes and system software.
+    """
+    return tuple(sorted(set(application_kind_types()) | set(_OTHER_SYSTEM_TYPES)))
+
+
 SPECIALIZATION_PROPERTY = "entelim:specialization"
 
 

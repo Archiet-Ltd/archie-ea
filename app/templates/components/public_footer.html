@@ -1,8 +1,7 @@
 {# Shared public footer: a complete map of the site, read from the same registry as the
    navbar (site_registry(), content/site/registry.yml), so it cannot list a page the
-   navbar lacks or use a different label. Row one is the Product menu, group for group,
-   then Coming soon; row two mirrors Solutions, Roles, Compare, Resources, Pricing and
-   Legal. Do not write a link into this file; add it to the registry.
+   navbar lacks or use a different label. The footer is one set of columns: Product, Solutions, Roles, Compare, Resources, Company and Legal,
+   then one labelled Coming soon group. Do not write a link into this file; add it to the registry.
    Included by main/index.html, public/page.html, public/hub_index.html, public/pricing.html
    and public/vs_hub.html.
    smoke-coverage-ok: covered by tests/test_public_nav_journey.py and tests/test_public_site_registry.py.
@@ -18,7 +17,7 @@
       </a>
     </div>
 
-    <nav aria-label="Site map" class="space-y-10">
+    <nav aria-label="Site map">
       {% for row in reg.footer.rows %}
       <div class="grid grid-cols-2 gap-8 md:grid-cols-4" data-footer-row="{{ row.id }}">
         {% for column in row.columns %}
@@ -46,7 +45,9 @@
     <div class="mt-10 flex flex-col gap-4 border-t border-border pt-8 md:flex-row md:items-center md:justify-between">
       <p class="text-sm text-muted-foreground">Entelim is licensed under AGPL-3.0. Made by Archiet Ltd.</p>
       <ul class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-        {% if not current_user.is_authenticated %}
+        {% if current_user.is_authenticated %}
+        <li><a href="{{ url_for('dashboard.overview') }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open Entelim</a></li>
+        {% else %}
         {% for action in reg.actions if action.id in ('sign-in', 'start-free') %}
         <li><a href="{{ action.href }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{{ action.label }}</a></li>
         {% endfor %}

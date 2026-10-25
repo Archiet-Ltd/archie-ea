@@ -7,6 +7,7 @@ missing, the flow by the other end's name, and never the sensitive fields. It sh
 picker with the other questions, so the impact question must keep its own answer separate.
 """
 
+import os
 import uuid
 
 import pytest
@@ -84,9 +85,15 @@ def test_an_element_with_no_data_object_says_so_and_the_questions_stay_separate(
 ):
     sign_in_as(page, live_server, seeded, "solution_architect")
     card = ask(page, live_server, _question("%s Warehouse" % data_graph["noun"]))
-    expect(card.get_by_text("No data objects are recorded for this element.")).to_be_visible()
+    expect(card.get_by_text("This element has no linked data objects yet. Link one in the model to list it here.")).to_be_visible()
     assert card.locator("[data-lens-row]").count() == 0
     expect(card.locator("[data-lens-flow]")).to_contain_text("Comes from")
+    for phrase in ("Nothing here yet", "No data", "N/A"):
+        assert phrase not in card.inner_text(), phrase
+    shots = os.environ.get("SMOKE_SHOT_DIR")
+    if shots:
+        os.makedirs(shots, exist_ok=True)
+        card.screenshot(path=os.path.join(shots, "chat-data-answer.png"))
 
     impact = ask(page, live_server, "What breaks if %s Service fails" % data_graph["noun"], fresh=False)
     assert impact.locator("[data-answer-row]").count() >= 1

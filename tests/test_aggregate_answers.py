@@ -177,6 +177,97 @@ class TestNLInterpreterEvaluationSet:
         assert result["method"] == "none"
 
 
+class TestNLInterpreterSuperlativePhrases:
+    """Superlative/descriptive phrases name no specific system; the
+    interpreter must treat them as "no service named" so the answer falls
+    through to single points of failure without a "nothing recorded matches"
+    reason line.
+    """
+
+    def test_most_connected_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our most connected application fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+    def test_most_depended_on_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our most depended-on system fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+    def test_most_critical_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our most critical service fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+    def test_biggest_single_point_of_failure_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our biggest single point of failure fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+
+class TestChatKeepsSuperlativeQuestions:
+    def test_most_connected_question_is_answered_from_the_records_not_the_model(self):
+        from app.modules.ai_chat.services.catalogue_answer import _keep
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        question = "What breaks if our most connected application fails?"
+        assert _keep(question, interpret(question)) is True
+
+    def test_unrelated_what_breaks_chat_still_goes_to_the_model(self):
+        from app.modules.ai_chat.services.catalogue_answer import _keep
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        question = "What do I do if the meeting is cancelled?"
+        assert _keep(question, interpret(question)) is False
+
+
+class TestNLInterpreterRealSystemNames:
+    def test_core_banking_is_a_name_not_a_superlative(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if Core banking fails?")
+        assert result["params"].get("service") == "Core banking"
+
+    def test_main_website_is_a_name_not_a_superlative(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our main website fails?")
+        assert result["params"].get("service") == "main website"
+
+    def test_main_system_is_still_a_superlative(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our main system fails?")
+        assert "service" not in result["params"]
+
+    """A genuinely named system that does not match keeps the fallback, with
+    a plain line that names it. The interpreter must extract the service
+    name so the catalogue entry can attempt to resolve it.
+    """
+
+    def test_payments_api_extracted_as_service(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if Payments API fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert result["params"].get("service") == "Payments API"
+
+    def test_billing_platform_extracted_as_service(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if the billing platform fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert result["params"].get("service") == "billing platform"
+
+
 class TestAskRouteTwoOrgIsolation:
     def test_ask_route_requires_login(self, client):
         resp = client.post("/api/v1/intelligence/ask", json={"question": "which applications have no owner?"})
@@ -668,16 +759,16 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         assert f"/api/v1/elements/{head.id}" in targets
         assert f"/api/v1/elements/{tail.id}" in targets
 
-    def test_unresolved_service_returns_plain_reason_not_a_guess(self, app, db_session, make_org):
+    def test_unresolved_service_falls_back_to_single_points_of_failure(self, app, db_session, make_org):
         from app.modules.intelligence.services.query_catalogue import run_entry
 
         org = make_org("breaks-unknown")
         self._seed_chain(org.id)
 
         result = run_entry("what_breaks_if_fails", org.id, service="A Service That Does Not Exist")
-        assert result["total"] == 0
-        assert result["citations"] == []
-        assert "did not match" in result["reason"]
+        # An unmatched service name falls back to the most depended-on systems
+        # rather than returning an empty "name the service" reason.
+        assert "nothing recorded matches" in result["reason"]
 
     def test_no_service_named_returns_single_points_of_failure_with_citations(
         self, app, db_session, make_org
@@ -712,6 +803,59 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         assert hub_row["depends_on_count"] == 2
         targets = {c["target"] for c in result["citations"]}
         assert f"/api/v1/elements/{hub.id}" in targets
+
+    def test_processes_are_left_out_and_dependents_order_the_rows(self, app, db_session, make_org):
+        """Only systems are listed; a process with more dependents than any
+        system is not. Rows run from most to fewest dependents, each with its
+        count and a source line that is never blank."""
+        from datetime import datetime
+
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("breaks-systems-only")
+        other = make_org("breaks-systems-only-b")
+
+        def element(name, kind, org_id, **extra):
+            e = ArchiMateElement(name=name, type=kind, layer="application", organization_id=org_id, **extra)
+            db.session.add(e)
+            db.session.flush()
+            return e
+
+        process = element("Handle customer checkout", "BusinessProcess", org.id)
+        small = element("Order Service", "ApplicationService", org.id, recorded_at=datetime(2026, 10, 24, 8, 0))
+        big = element(
+            "Customer Database", "DataObject", org.id,
+            source_label="Application portfolio", source_recorded_at=datetime(2026, 10, 25, 9, 0),
+        )
+        callers = [element("Caller %d" % i, "ApplicationComponent", org.id) for i in range(5)]
+        links = [(c, process) for c in callers] + [(c, big) for c in callers[:4]] + [(c, small) for c in callers[:2]]
+        for caller, target in links:
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=target.id, organization_id=org.id,
+            ))
+        foreign = element("Foreign Hub", "ApplicationComponent", other.id)
+        foreign_callers = [element("Foreign %d" % i, "ApplicationComponent", other.id) for i in range(3)]
+        for caller in foreign_callers:
+            db.session.add(ArchiMateRelationship(
+                type="Serving", source_id=caller.id, target_id=foreign.id, organization_id=other.id,
+            ))
+        db.session.flush()
+        db.session.expire_all()
+
+        result = run_entry("what_breaks_if_fails", org.id)
+        names = [r["name"] for r in result["rows"]]
+        assert names == ["Customer Database", "Order Service"]
+        assert [r["depends_on_count"] for r in result["rows"]] == [4, 2]
+        assert result["rows"][0]["source_line"] == "from Application portfolio, as of 25 Oct 2026"
+        assert result["rows"][1]["source_line"] == "added by hand on 24 Oct 2026"
+        from types import SimpleNamespace
+
+        from app.modules.intelligence.services.query_catalogue import _source_line
+
+        undated = SimpleNamespace(source_label=None, source_recorded_at=None, recorded_at=None)
+        assert _source_line(undated) == "added by hand"
 
     def test_org_a_service_name_never_resolves_to_org_b_element(self, app, db_session, make_org):
         from app.modules.intelligence.services.query_catalogue import run_entry

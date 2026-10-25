@@ -160,6 +160,20 @@ def may_open_procurement(user):
     )
 
 
+def may_open_spend(user):
+    """True when ``user`` may open the spend page: the people
+    ``requires_procurement_or_finance`` admits, and platform authority."""
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(is_platform_admin(user)) or get_user_role(user) in (
+        "procurement",
+        "portfolio_manager",
+        "finance",
+    )
+
+
 def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.

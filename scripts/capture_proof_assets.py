@@ -46,6 +46,7 @@ DEMO_EMAIL = "demo@lantern-quay.example.com"
 IMG = REPO / "app" / "static" / "img"
 DPR = 2
 SUBJECT = "Calibration Ledger"
+CHAT_SUBJECT = "Payments service"
 
 # Role page slug -> the enterprise role whose workspace it shows (tests/smoke/conftest.py ARCHETYPES).
 ROLE_PAGES = (
@@ -179,36 +180,49 @@ def capture_arb(browser, base, password, wide: bool) -> tuple[int, int]:
     return size
 
 
-def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
-    """The cited answer card: the sentence, what depends on the system and who owns each.
-
-    The first screen of the public home shows this crop, so it is kept short: the
-    question sentence, the asked-about row and the first dependents (four on desktop, two on a
-    phone), which puts the whole image above the fold at 1440 by 900 and 375 by 812.
+def capture_home_chat(browser, base, password, wide: bool) -> tuple[int, int]:
+    """The AI chat answering "what breaks if ... fails": the question, then a card per connection
+    with where it was read from. The first screen of the public home shows this crop, so it is kept
+    to the question and the first cards (two on desktop, one on a phone).
     """
-    vw, vh = (1180, 1100) if wide else (440, 1400)
-    rows_shown = 4 if wide else 2
+    vw, vh = (1180, 1400) if wide else (390, 1400)
+    cards_shown = 2 if wide else 1
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
     try:
-        _login(page, base, DEMO_EMAIL, password)
+        _login(page, base, role_email("startup_cto_chat"), password)
         page.goto(base + "/dashboard/overview", wait_until="networkidle")
         _dismiss_onboarding(page)
-        page.wait_for_selector('[data-testid="overview-cascade"] [data-depth]', state="visible", timeout=30000)
-        page.wait_for_timeout(1500)
+        if page.get_by_test_id("first-action-sample").count():
+            page.get_by_test_id("first-action-sample").click()
+        page.wait_for_selector('[data-testid="sample-company-indicator"]', timeout=90000)
+        page.goto(base + "/ai-chat", wait_until="networkidle")
+        _dismiss_onboarding(page)
+        page.locator("#user-input").fill("What breaks if %s fails" % CHAT_SUBJECT)
+        page.locator("#user-input").press("Enter")
+        try:
+            page.wait_for_selector('[data-testid="estate-answer"] [data-answer-row]', timeout=30000)
+        except Exception:
+            raise SystemExit("the chat gave no cited answer: run seed-demo-company first")
+        page.wait_for_timeout(1000)
         _tidy(page)
-        page.evaluate("window.scrollTo(0, 0)")
-        card = _box(page, "#overview-answer-cascade")
-        rows = page.locator('[data-testid="overview-cascade"] [data-depth]')
-        if rows.count() < rows_shown + 1:
-            raise SystemExit("the answer card has too few rows to photograph: run seed-demo-company first")
-        last = rows.nth(rows_shown).bounding_box()
-        clip = {
-            "x": card["x"], "y": card["y"], "width": card["width"],
-            "height": last["y"] + last["height"] + 4 - card["y"],
-        }
-        name = "impact-answer.webp" if wide else "impact-answer-mobile.webp"
-        return _webp(_shoot(page, clip), IMG / "home" / name)
+        rows = page.locator('[data-testid="estate-answer"] [data-answer-row]')
+        if rows.count() < cards_shown:
+            raise SystemExit("the chat answer has too few cards to photograph: run seed-demo-company first")
+        for i in range(cards_shown):
+            source = rows.nth(i).locator("xpath=ancestor::*[@data-slot='card'][1]").locator("[data-citation]").inner_text()
+            if not source.strip() or "not recorded" in source:
+                raise SystemExit("a card in the chat answer has no recorded source: refusing to photograph it")
+        page.evaluate("document.getElementById('messages-container').scrollTop = 0")
+        page.wait_for_timeout(300)
+        pane = _box(page, "#messages-container")
+        last = rows.nth(cards_shown - 1).locator("xpath=ancestor::*[@data-slot='card'][1]").bounding_box()
+        clip = {"x": pane["x"], "y": pane["y"], "width": pane["width"], "height": last["y"] + last["height"] + 12 - pane["y"]}
+        if clip["height"] <= 0 or clip["y"] + clip["height"] > vh:
+            raise SystemExit("the chat crop does not fit the viewport: %s" % clip)
+        name = "chat-answer.webp" if wide else "chat-answer-mobile.webp"
+        png = page.screenshot(clip=clip)
+        return _webp(png, IMG / "home" / name)
     finally:
         ctx.close()
 
@@ -334,6 +348,37 @@ def seed_import_user(password: str) -> str:
                 password_hash=generate_password_hash(password),
             ))
             db.session.commit()
+        return email
+
+
+def seed_chat_user(password: str) -> str:
+    """A startup CTO in a fresh, empty organisation who loads the sample company, as a visitor would (idempotent)."""
+    import uuid
+
+    from werkzeug.security import generate_password_hash
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+    from app.services.billing_plans import set_contract_plan
+
+    app = create_app()
+    with app.app_context():
+        email = role_email("startup_cto_chat")
+        if User.query.filter_by(email=email).first():
+            return email
+        Role.insert_roles()
+        suffix = uuid.uuid4().hex[:8]
+        org = Organization(name="Startup %s" % suffix, slug="startup-%s" % suffix)
+        db.session.add(org)
+        db.session.flush()
+        set_contract_plan(org, "enterprise", None)
+        db.session.add(User(
+            email=email, first_name="Startup", last_name="CTO", organization_id=org.id,
+            enterprise_role="enterprise_architect", confirmed=True, role=Role.query.filter_by(name="Architect").first(),
+            password_hash=generate_password_hash(password),
+        ))
+        db.session.commit()
         return email
 
 
@@ -510,6 +555,8 @@ def main() -> int:
                         help="capture only the four role-page workspaces (seeds their users first)")
     parser.add_argument("--import-dialog", action="store_true",
                         help="capture only the Import Applications dialog for the scale-up CTO page")
+    parser.add_argument("--home-chat", action="store_true",
+                        help="capture only the AI chat answer shown in the home hero")
     parser.add_argument("--chromium", default=os.environ.get("PROOF_CHROMIUM"))
     args = parser.parse_args()
     password = os.environ.get("DEMO_USER_PASSWORD")
@@ -520,6 +567,8 @@ def main() -> int:
 
     if args.roles:
         seed_role_users(password)
+    if args.home_chat:
+        seed_chat_user(password)
     if args.import_dialog:
         seed_import_user(password)
 
@@ -527,6 +576,11 @@ def main() -> int:
         launch = {"executable_path": args.chromium, "args": ["--no-sandbox"]} if args.chromium else {}
         browser = pw.chromium.launch(**launch)
         try:
+            if args.home_chat:
+                for wide in (True, False):
+                    w, h = capture_home_chat(browser, args.base, password, wide)
+                    print(f"home chat answer     {'desktop' if wide else 'mobile ':8s} {w}x{h} css px")
+                return 0
             if args.import_dialog:
                 for wide in (True, False):
                     ok, reason = capture_import_dialog(browser, args.base, password, wide)
@@ -539,7 +593,7 @@ def main() -> int:
                         print(f"{slug:24s} {'desktop' if wide else 'mobile '} {'CAPTURED' if ok else 'REFUSED '} {reason}")
                 return 0
             for label, fn in (
-                ("home impact answer", capture_home_impact),
+                ("home chat answer", capture_home_chat),
                 ("home product window", capture_home_product),
                 ("applications", capture_applications),
                 ("arb", capture_arb),

@@ -412,7 +412,7 @@ def api_application_details(id):
 # =============================================================================
 
 
-@application_api_bp.route("/<string:id>/architecture/elements", methods=["GET", "POST"])
+@application_api_bp.route("/<int:id>/architecture/elements", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
 @audit_log("arch_element_create")
@@ -637,7 +637,7 @@ def api_arch_element_ops(id, element_id):
         return api_error("Failed to process element", "INTERNAL_ERROR", 500)
 
 
-@application_api_bp.route("/<string:id>/architecture/export-csv", methods=["GET"])
+@application_api_bp.route("/<int:id>/architecture/export-csv", methods=["GET"])
 @login_required
 def api_arch_export(id):
     """

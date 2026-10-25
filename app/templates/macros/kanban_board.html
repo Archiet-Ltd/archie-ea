@@ -55,8 +55,8 @@
 
 {% macro kanban_board(states=None, labels=None, empty_hints=None, can_write=False,
                       stage_group=None, show_wip=True, show_move=True,
-                      card_width='w-64', region_label='Kanban board, scrolls horizontally',
-                      columns='server', inner_class='flex gap-4 min-w-max lg:min-w-0',
+                      card_width='w-72', region_label='Kanban board, scrolls horizontally',
+                      columns='server', inner_class='flex gap-4 min-w-max',
                       plain_headers=False, unit='item', lane=False) %}
 {#
   Two column-rendering modes share one shell:
@@ -92,7 +92,7 @@
             {% for state in states %}
             {% set label = (labels.get(state) if labels else None) or state %}
             {% set group = (stage_group.get(state) if stage_group else None) %}
-            <div class="kanban-column {{ card_width }} shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]{% if lane %} rounded-lg border border-border bg-muted/40 p-1{% endif %}"
+            <div class="kanban-column {{ card_width }} min-w-72 shrink-0{% if lane %} rounded-lg border border-border bg-muted/40 p-1{% endif %}"
                  data-state="{{ state }}"
                  {% if group %}data-stage-group="{{ group }}"{% endif %}
                  {% if can_write %}@dragover.prevent="onDragOver($event, '{{ state }}')"
@@ -112,7 +112,7 @@
                                     {% endif %}"
                                     aria-hidden="true"></span>
                                 {% endif %}
-                                <h2 class="min-w-0 break-words text-sm font-medium text-foreground">{{ label }}</h2>
+                                <h2 class="min-w-0 text-sm font-medium text-foreground">{{ label }}</h2>
                                 {% call badge('neutral') %}<span x-text="columnCount('{{ state }}')"></span><span class="sr-only"> {{ unit }}s</span>{% endcall %}
                             </div>
                             {% if show_wip %}
@@ -228,7 +228,7 @@
             {% if can_write %}
             <i data-lucide="grip-vertical" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" data-drag-handle data-kanban-grip aria-hidden="true"></i>
             {% endif %}
-            <h3 class="min-w-0 flex-1 break-words line-clamp-2 text-sm font-medium leading-snug text-foreground" :title="{{ title }}" x-text="{{ title }}"></h3>
+            <h3 class="min-w-0 flex-1 line-clamp-2 text-sm font-medium leading-snug text-foreground" :title="{{ title }}" x-text="{{ title }}"></h3>
             {{ kanban_move_menu(states, labels, title, can_write) }}
         </div>
         {{ body() }}

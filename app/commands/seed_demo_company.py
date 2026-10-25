@@ -762,6 +762,10 @@ _ARB_REVIEWS = [
      "standards_exception", "medium", "submitted", 5, None, None),
     ("LQ-ARB-2026-009", "Introduce a vendor risk score into supplier selection",
      "architecture_change", "low", "submitted", 2, None, None),
+    ("LQ-ARB-2026-010", "Adopt a single customer identifier across the estate",
+     "architecture_change", "high", "under_review", 18, None, None),
+    ("LQ-ARB-2026-011", "Exception to the approved database standard for Field Service",
+     "standards_exception", "medium", "submitted", 26, None, None),
 ]
 
 # ── application owners ─────────────────────────────────────────────────────
@@ -855,6 +859,39 @@ _APP_INFRASTRUCTURE_MONTHLY = 2500
 # created with it and an earlier seed's blanket figure is brought back to it.
 _APP_TOTAL_COST = _APP_LICENSE_ANNUAL + 12 * _APP_INFRASTRUCTURE_MONTHLY
 
+# Each application's own annual licence (None where Lantern Quay builds it) and monthly infrastructure
+# cost, so the estate's costs differ from one application to the next, and the business area it serves.
+# (application) -> (licence per year, infrastructure per month, business area)
+_APP_COSTS = {
+    "Event Relay": (84000, 3200, "IT Operations"),
+    "Calibration Ledger": (None, 2100, "Quality and Compliance"),
+    "Dispatch Planner": (96000, 2600, "Operations"),
+    "Inventory Manager": (132000, 3400, "Operations"),
+    "Field Service Scheduler": (78000, 1200, "Field Services"),
+    "Compliance Reporter": (54000, 700, "Quality and Compliance"),
+    "Supplier Portal": (66000, 900, "Shared Services"),
+    "Workforce Planner": (90000, 1100, "Shared Services"),
+    "Quality Monitor": (None, 1500, "Quality and Compliance"),
+    "Sensor Data Hub": (48000, 4800, "Field Services"),
+    "Firmware Distribution Service": (None, 1900, "Field Services"),
+    "Customer Portal": (72000, 1300, "Operations"),
+    "Finance System": (168000, 4200, "Shared Services"),
+    "Document Management": (36000, 600, "Shared Services"),
+    "Identity Provider": (30000, 200, "IT Operations"),
+    "Monitoring Dashboard": (42000, 800, "IT Operations"),
+    "Alert Manager": (18000, 100, "IT Operations"),
+    "Reporting Engine": (24000, 700, "Shared Services"),
+    "Integration Bus": (102000, 2400, "IT Operations"),
+    "Data Warehouse": (120000, 6100, "IT Operations"),
+}
+
+
+def _app_figures(app_name):
+    """(licence, infrastructure per month, total per year, area) for an application."""
+    licence, infra, area = _APP_COSTS.get(app_name, (_APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY, None))
+    return licence, infra, (licence or 0) + 12 * infra, area
+
+
 # Organisation units that own the applications (one per owner role).
 _OWNER_UNITS = [
     # (code, name)
@@ -942,7 +979,42 @@ _CAPABILITIES = [
     ("Security Operations", "LQ-CAP-SECURITY", 3, 4, 3),
 ]
 
+# The judgment for each demo capability: strategic differentiates the company,
+# operational runs it day to day, supporting is what every company needs.
+_CAPABILITY_TYPES = {
+    "LQ-CAP-CALIBRATION": "strategic",
+    "LQ-CAP-WATER-QUALITY": "strategic",
+    "LQ-CAP-FIELD-SERVICE": "strategic",
+    "LQ-CAP-DEMAND": "strategic",
+    "LQ-CAP-ANALYTICS": "strategic",
+    "LQ-CAP-EVENT-PROCESSING": "strategic",
+    "LQ-CAP-INVENTORY": "operational",
+    "LQ-CAP-FULFILMENT": "operational",
+    "LQ-CAP-SUPPLIER": "operational",
+    "LQ-CAP-ASSET-LIFECYCLE": "operational",
+    "LQ-CAP-INCIDENT": "operational",
+    "LQ-CAP-QUALITY": "operational",
+    "LQ-CAP-INTEGRATION": "operational",
+    "LQ-CAP-MONITORING": "operational",
+    "LQ-CAP-DEVICE-MGMT": "operational",
+    "LQ-CAP-FIRMWARE": "operational",
+    "LQ-CAP-NETWORK": "operational",
+    "LQ-CAP-COMPLIANCE": "supporting",
+    "LQ-CAP-WORKFORCE": "supporting",
+    "LQ-CAP-IDENTITY": "supporting",
+    "LQ-CAP-DOCUMENT": "supporting",
+    "LQ-CAP-BACKUP": "supporting",
+    "LQ-CAP-CAPACITY": "supporting",
+    "LQ-CAP-SECURITY": "supporting",
+}
+
 # ── risks ──────────────────────────────────────────────────────────────────
+
+# (risk title, earlier residual (likelihood, impact), residual now)
+_RISING_RISKS = [
+    ("Event Relay single point of failure", (3, 4), (4, 5)),
+    ("Calibration Ledger data corruption", (2, 4), (4, 4)),
+]
 
 _RISKS = [
     # (title, likelihood, impact, status, owner, mitigation, archimate_element_name)
@@ -1082,17 +1154,65 @@ _CANVAS_DESCRIPTION = (
     "How Lantern Quay Systems makes, calibrates, ships and recovers water-quality sensors."
 )
 _CANVAS_OPERATING_MODEL = "coordination"
-_CANVAS_BLOCKS = {
-    "customer_segments": "Municipal water utilities\nIndustrial process-water operators\nEnvironmental survey firms",
-    "value_propositions": "Calibrated sensors with a certificate for every batch\nRecovered assemblies recertified instead of scrapped\nRemote diagnostics that cut site visits",
-    "channels": "Direct account managers\nCustomer portal for orders and returns\nField service engineers",
-    "customer_relationships": "Named service engineer per account\nScheduled preventive maintenance visits\nQuarterly drift and compliance reports",
-    "revenue_streams": "Sensor sales\nAnnual calibration and maintenance contracts\nRecertified assembly resale",
-    "key_activities": "Assemble and calibrate sensor modules\nField calibration runs\nRecover and recertify returned assemblies",
-    "key_resources": "Calibration rigs and the calibration ledger\nField service engineers\nComponent stock and supplier panel",
-    "key_partners": "Component suppliers\nCourier and logistics partners\nRegional testing laboratories",
-    "cost_structure": "Components and assembly labour\nField service travel\nCloud hosting and data platform",
+# Each box of the canvas lists elements of the model: (name, type, layer). An
+# entry that already exists in the seeded model (a process, a resource pool,
+# a capability) is found by name and reused, never created twice.
+_CANVAS_VISION = ("Recover every sensor assembly for reuse", "Goal", "motivation")
+_CANVAS_ENTRIES = {
+    "customer_segments": [
+        ("Municipal water utilities", "BusinessActor", "business"),
+        ("Industrial process-water operators", "BusinessActor", "business"),
+        ("Environmental survey firms", "BusinessActor", "business"),
+    ],
+    "value_propositions": [
+        ("Calibrated sensors with a certificate for every batch", "BusinessService", "business"),
+        ("Recovered assemblies recertified instead of scrapped", "BusinessService", "business"),
+        ("Remote diagnostics that cut site visits", "BusinessService", "business"),
+        ("Operators know their readings can be trusted", "Value", "motivation"),
+    ],
+    "channels": [
+        ("Direct account managers", "BusinessInterface", "business"),
+        ("Customer portal for orders and returns", "BusinessInterface", "business"),
+        ("Field service engineers on site", "BusinessInterface", "business"),
+    ],
+    "customer_relationships": [
+        ("Named service engineer per account", "BusinessService", "business"),
+        ("Scheduled preventive maintenance visits", "BusinessService", "business"),
+        ("Quarterly drift and compliance reports", "BusinessService", "business"),
+    ],
+    "key_activities": [
+        ("Assemble sensor module", "BusinessProcess", "business"),
+        ("Test sensor calibration", "BusinessProcess", "business"),
+        ("Recertify recovered assembly", "BusinessProcess", "business"),
+    ],
+    "key_resources": [
+        ("Calibration Rig Pool", "Resource", "strategy"),
+        ("Field Engineer Pool", "Resource", "strategy"),
+        ("Component stock and supplier panel", "Resource", "strategy"),
+    ],
+    "key_partners": [
+        ("Component suppliers", "BusinessActor", "business"),
+        ("Courier and logistics partners", "BusinessActor", "business"),
+        ("Regional testing laboratories", "BusinessActor", "business"),
+    ],
 }
+# (service it prices, plan name, price, currency, billing period, mechanism)
+_CANVAS_PRICES = [
+    ("Calibrated sensors with a certificate for every batch", "Sensor sale", "1850.00", "GBP", "use", "sale"),
+    ("Remote diagnostics that cut site visits", "Annual calibration and maintenance", "24000.00", "GBP", "year", "subscription"),
+    ("Recovered assemblies recertified instead of scrapped", "Recertified assembly resale", "980.00", "GBP", "use", "sale"),
+]
+# (source, target, relationship type): what serves, realises or is assigned to what.
+_CANVAS_LINKS = [
+    ("Assemble sensor module", "Sensor Calibration", "Realization"),
+    ("Test sensor calibration", "Sensor Calibration", "Realization"),
+    ("Recertify recovered assembly", "Asset Lifecycle Management", "Realization"),
+    ("Calibration Rig Pool", "Sensor Calibration", "Assignment"),
+    ("Field Engineer Pool", "Field Service Management", "Assignment"),
+    ("Calibrated sensors with a certificate for every batch", "Municipal water utilities", "Serving"),
+    ("Remote diagnostics that cut site visits", "Industrial process-water operators", "Serving"),
+    ("Recovered assemblies recertified instead of scrapped", "Environmental survey firms", "Serving"),
+]
 
 # ── work packages ──────────────────────────────────────────────────────────
 
@@ -1219,6 +1339,72 @@ _GAP_PLACEMENT = {
 # ═════════════════════════════════════════════════════════════════════════════
 #  seed function
 # ═════════════════════════════════════════════════════════════════════════════
+
+def _seed_canvas_model(org_id, canvas):
+    """Fill the canvas from the organisation's model: elements per box, links
+    to the seeded capabilities, price plans, and the vision as a Goal.
+    Idempotent: every element is found by name and type before one is made."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models.price_plan import PricePlan
+    from app.modules.business_model_canvas import model_service
+    from app.services.archimate_backbone import create_backbone_element
+
+    created = 0
+    by_key = {
+        (e.name, e.type): e
+        for e in db.session.query(ArchiMateElement).filter(ArchiMateElement.organization_id == org_id)
+    }
+    by_name = {}
+    for (name, _type), e in by_key.items():
+        by_name.setdefault(name, e)
+
+    def element(name, type_, layer):
+        nonlocal created
+        el = by_key.get((name, type_))
+        if el is None:
+            el = create_backbone_element(
+                element_type=type_, layer=layer, name=name, organization_id=org_id,
+                provenance={"created_from": "demo company seed"},
+            )
+            by_key[(name, type_)] = el
+            by_name.setdefault(name, el)
+            created += 1
+        return el
+
+    model_service.ensure_view(canvas)
+    for box, entries in _CANVAS_ENTRIES.items():
+        for name, type_, layer in entries:
+            el = element(name, type_, layer)
+            model_service.place(canvas, box, el)
+    vision = element(*_CANVAS_VISION)
+    canvas.vision_element_id = vision.id
+    db.session.flush()
+
+    for source, target, rel_type in _CANVAS_LINKS:
+        src, tgt = by_name.get(source), by_name.get(target)
+        if src is None or tgt is None:
+            continue
+        if not db.session.query(ArchiMateRelationship.id).filter_by(
+            source_id=src.id, target_id=tgt.id, type=rel_type, organization_id=org_id
+        ).first():
+            db.session.add(ArchiMateRelationship(
+                source_id=src.id, target_id=tgt.id, type=rel_type, organization_id=org_id,
+            ))
+            created += 1
+    for service_name, plan_name, price, currency, period, mechanism in _CANVAS_PRICES:
+        service = by_key.get((service_name, "BusinessService"))
+        if service is None or db.session.query(PricePlan.id).filter_by(
+            organization_id=org_id, element_id=service.id, name=plan_name
+        ).first():
+            continue
+        db.session.add(PricePlan(
+            organization_id=org_id, element_id=service.id, name=plan_name, price=price,
+            currency=currency, billing_period=period, pricing_mechanism=mechanism,
+        ))
+        created += 1
+    db.session.flush()
+    return created
+
 
 def _resolve_elements(org_id):
     """Return {name: ArchiMateElement} for all elements in this org; where a work package's own
@@ -1442,6 +1628,99 @@ def _seed_business_case(org_id, user_id) -> dict:
                                       entity_type="work_package", entity_id=wp.id))
     db.session.flush()
     return {"business_cases_created": 1}
+
+# Three data domains with the entities, attributes and relationships a data
+# architect would draw for a fabrication and fulfilment business. Each entity is
+# a DataEntity (and so its ArchiMate data object); nothing here is a second store.
+_DATA_MODEL = {
+    "Customer": {
+        "entities": {
+            "Customer": ["customer_id:uuid:pk", "legal_name:varchar", "segment:varchar?", "created_on:date"],
+            "Contact": ["contact_id:uuid:pk", "customer_id:uuid:fk", "full_name:varchar", "email:varchar?"],
+            "Delivery Address": ["address_id:uuid:pk", "customer_id:uuid:fk", "street:varchar", "postcode:varchar", "country:varchar"],
+            "Consent": ["consent_id:uuid:pk", "contact_id:uuid:fk", "purpose:varchar", "given_on:timestamp", "withdrawn_on:timestamp?"],
+        },
+        "relationships": [
+            ("Customer", "Contact", "one-to-many", "has"),
+            ("Customer", "Delivery Address", "one-to-many", "ships to"),
+            ("Contact", "Consent", "one-to-many", "gives"),
+        ],
+    },
+    "Orders and Fulfilment": {
+        "entities": {
+            "Sales Order": ["order_id:uuid:pk", "customer_id:uuid:fk", "placed_on:timestamp", "status:varchar"],
+            "Order Line": ["line_id:uuid:pk", "order_id:uuid:fk", "product_id:uuid:fk", "quantity:integer", "unit_price:decimal"],
+            "Product": ["product_id:uuid:pk", "sku:varchar", "name:varchar", "weight_kg:decimal?"],
+            "Shipment": ["shipment_id:uuid:pk", "order_id:uuid:fk", "carrier:varchar", "shipped_on:date?"],
+            "Return": ["return_id:uuid:pk", "line_id:uuid:fk", "reason:text", "received_on:date?"],
+        },
+        "relationships": [
+            ("Sales Order", "Order Line", "one-to-many", "contains"),
+            ("Product", "Order Line", "one-to-many", "is sold on"),
+            ("Sales Order", "Shipment", "one-to-many", "is sent in"),
+            ("Order Line", "Return", "one-to-many", "may be returned as"),
+        ],
+    },
+    "Finance": {
+        "entities": {
+            "Invoice": ["invoice_id:uuid:pk", "order_id:uuid:fk", "issued_on:date", "total:decimal"],
+            "Payment": ["payment_id:uuid:pk", "invoice_id:uuid:fk", "paid_on:date", "amount:decimal"],
+            "Cost Centre": ["cost_centre_id:varchar:pk", "name:varchar", "owner:varchar?"],
+            "Ledger Entry": ["entry_id:bigint:pk", "cost_centre_id:varchar:fk", "invoice_id:uuid:fk?", "posted_on:date", "amount:decimal"],
+        },
+        "relationships": [
+            ("Invoice", "Payment", "one-to-many", "is settled by"),
+            ("Cost Centre", "Ledger Entry", "one-to-many", "is charged by"),
+            ("Invoice", "Ledger Entry", "one-to-many", "is posted as"),
+        ],
+    },
+}
+
+
+def _seed_data_model(org_id) -> dict:
+    """Fill the demonstration organisation's data domains so each opens with a
+    drawn entity relationship diagram. Idempotent: a domain or entity that
+    exists by name is left as it is."""
+    from app.models.process_data import DataDomain, DataEntity, DataEntityRelationship
+    from app.modules.architecture.services import data_erd_service as erd
+
+    stats = {"data_domains_created": 0, "data_entities_created": 0, "data_relationships_created": 0}
+    for domain_name, spec in _DATA_MODEL.items():
+        domain = DataDomain.query.filter_by(organization_id=org_id, name=domain_name).first()
+        if domain is None:
+            domain = DataDomain(name=domain_name, organization_id=org_id,
+                                description=f"The {domain_name.lower()} data of Lantern Quay Systems")
+            db.session.add(domain)
+            db.session.flush()
+            stats["data_domains_created"] += 1
+        by_name = {}
+        for entity_name, columns in spec["entities"].items():
+            entity = DataEntity.query.filter_by(
+                organization_id=org_id, domain_id=domain.id, name=entity_name).first()
+            if entity is None:
+                attributes = []
+                for column in columns:
+                    parts = column.split(":")
+                    nullable = parts[-1].endswith("?")
+                    parts[-1] = parts[-1].rstrip("?")
+                    flags = parts[2:]
+                    attributes.append({
+                        "name": parts[0], "data_type": parts[1],
+                        "is_primary_key": "pk" in flags, "is_foreign_key": "fk" in flags,
+                        "is_nullable": nullable,
+                    })
+                entity = erd.create_entity(domain, entity_name, attributes)
+                stats["data_entities_created"] += 1
+            by_name[entity_name] = entity
+        for source, target, preset, label in spec["relationships"]:
+            exists = DataEntityRelationship.query.filter_by(
+                organization_id=org_id, source_entity_id=by_name[source].id,
+                target_entity_id=by_name[target].id).first()
+            if exists is None:
+                erd.relate(by_name[source], by_name[target], preset=preset, label=label)
+                stats["data_relationships_created"] += 1
+    db.session.flush()
+    return stats
 
 
 def _seed_boards(org_id, demo_user_id) -> dict:
@@ -2288,6 +2567,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
+            licence, infra, total, area = _app_figures(app_name)
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -2299,9 +2579,10 @@ def seed_demo_company() -> dict:
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
                 implementation_date=_dt.date(2022, 3, 15),
                 go_live_date=_dt.date(2022, 6, 1),
-                total_cost_of_ownership=_APP_TOTAL_COST,
-                license_cost_annual=_APP_LICENSE_ANNUAL,
-                infrastructure_cost_monthly=_APP_INFRASTRUCTURE_MONTHLY,
+                total_cost_of_ownership=total,
+                license_cost_annual=licence,
+                infrastructure_cost_monthly=infra,
+                business_domain=area,
                 business_criticality="high",
                 strategic_importance="high",
             )
@@ -2419,7 +2700,7 @@ def seed_demo_company() -> dict:
         from app.models.enterprise_intelligence import (
             ApplicationOwnership, OrganizationUnit,
         )
-        from app.services.application_cost_accessor import sync_cost_fact
+        from app.services.application_cost_accessor import state_contract, sync_cost_fact
 
         units = {
             u.code: u
@@ -2470,19 +2751,25 @@ def seed_demo_company() -> dict:
                 ))
                 held.add((app.id, unit.id, "Business Owner"))
                 changed = True
-            # The total is the sum of its components, whatever an earlier
-            # seed wrote.
-            if (app.license_cost_annual == _APP_LICENSE_ANNUAL
-                    and app.infrastructure_cost_monthly == _APP_INFRASTRUCTURE_MONTHLY
-                    and app.total_cost_of_ownership != _APP_TOTAL_COST):
-                app.total_cost_of_ownership = _APP_TOTAL_COST
+            # The figures are the application's own, whatever an earlier seed wrote.
+            licence, infra, total, area = _app_figures(app_name)
+            if (app.license_cost_annual, app.infrastructure_cost_monthly, app.total_cost_of_ownership,
+                    app.business_domain) != (licence, infra, total, area):
+                app.license_cost_annual, app.infrastructure_cost_monthly = licence, infra
+                app.total_cost_of_ownership, app.business_domain = total, area
                 changed = True
             agreed += changed
         db.session.flush()
         for app in _resolve_apps(org_id).values():
             for column in ("total_cost_of_ownership", "license_cost_annual",
                            "infrastructure_cost_monthly"):
-                sync_cost_fact(app, column, "USD")
+                sync_cost_fact(app, column)
+            # The Spend page reads contracts, so a vendor-supplied application states its cost there
+            # too: the run cost on the Overview, the Spend page and the canvas's cost box then agree.
+            profile = _APP_PROFILE.get(app.name)
+            if (profile and "in-house" not in profile[2].lower() and not profile[0].startswith("5.")
+                    and app.total_cost_of_ownership):
+                state_contract(app, profile[2], app.total_cost_of_ownership, months_ago=3 + app.id % 8)
         db.session.flush()
         stats["application_figures_agreed"] = agreed
 
@@ -2539,6 +2826,20 @@ def seed_demo_company() -> dict:
             for cap in db.session.query(model).filter(model.organization_id == org_id):
                 if not cap.business_owner and cap.code in _CAPABILITY_OWNERS:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
+        db.session.flush()
+
+        # The judgment replaces the starting value, but only while the capability still
+        # carries the starting value: a type an editor has changed is theirs.
+        from app.services.capability_type import default_capability_type
+
+        for cap in db.session.query(UnifiedCapability).filter(
+            UnifiedCapability.organization_id == org_id
+        ):
+            chosen = _CAPABILITY_TYPES.get(cap.code)
+            if chosen and cap.capability_type in (
+                None, default_capability_type(cap.category, cap.level),
+            ):
+                cap.capability_type = chosen
         db.session.flush()
 
         # ── 7b. application-to-capability mappings ──────────────────────
@@ -2640,6 +2941,34 @@ def seed_demo_company() -> dict:
         if risks_created:
             db.session.flush()
         stats["risks_created"] = risks_created
+
+        # Two risks whose score has risen in the last week, so the weekly
+        # briefing has movement to report. Skipped once a risk has history.
+        from app.models.risk_score_history import RiskScoreHistory
+
+        rising_created = 0
+        for title, was, now_score in _RISING_RISKS:
+            risk = (
+                db.session.query(Risk)
+                .filter(Risk.organization_id == org_id, Risk.title == title)
+                .first()
+            )
+            if risk is None or db.session.query(RiskScoreHistory).filter(
+                RiskScoreHistory.risk_id == risk.id
+            ).first():
+                continue
+            risk.residual_likelihood, risk.residual_impact = now_score
+            for (likelihood, impact), days_ago in ((was, 21), (now_score, 2)):
+                db.session.add(RiskScoreHistory(
+                    risk_id=risk.id, score_kind="residual",
+                    likelihood=likelihood, impact=impact,
+                    recorded_at=_dt.datetime.utcnow() - _dt.timedelta(days=days_ago),
+                    organization_id=org_id,
+                ))
+            rising_created += 1
+        if rising_created:
+            db.session.flush()
+        stats["rising_risks_created"] = rising_created
 
         # ── 9. programmes ───────────────────────────────────────────────
         existing_progs = {
@@ -2827,15 +3156,23 @@ def seed_demo_company() -> dict:
             .first()
         )
         if canvas_exists is None:
-            db.session.add(BusinessModelCanvas(
+            canvas = BusinessModelCanvas(
                 organization_id=org_id,
                 name=_CANVAS_NAME,
                 description=_CANVAS_DESCRIPTION,
                 operating_model_type=_CANVAS_OPERATING_MODEL,
-                **_CANVAS_BLOCKS,
-            ))
+            )
+            db.session.add(canvas)
             db.session.flush()
+        else:
+            canvas = BusinessModelCanvas.query.filter_by(
+                id=canvas_exists[0], organization_id=org_id
+            ).first()
+        stats["canvas_entries_created"] = _seed_canvas_model(org_id, canvas)
         stats["business_model_canvases_created"] = 0 if canvas_exists else 1
+        from app.commands import seed_framework_canvases
+
+        stats["framework_canvases_created"], stats["framework_canvas_rows_created"] = seed_framework_canvases.seed(org_id)
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {
@@ -2923,7 +3260,12 @@ def seed_demo_company() -> dict:
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_business_case(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_data_model(org_id))
 
+        db.session.commit()
+        from app.services.history_spread import HAND_LABEL, spread_history
+
+        stats["history_dated"] = spread_history(org_id, rest=("manual", HAND_LABEL))
         db.session.commit()
 
     return stats

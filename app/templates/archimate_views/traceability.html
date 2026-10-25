@@ -12,6 +12,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% import 'components/card.html' as card %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
    Traceability" while the page's own H1 (page_header below) and
@@ -31,7 +32,39 @@
 {% endblock %}
 {% block page_title %}Cross-Layer Traceability Matrix{% endblock %}
 
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/traceability.js') }}"></script>
+{% endblock %}
+
 {% block content %}
+{# One direction of one element's check: the chains found and where each stops. #}
+{% macro chain_block(block, key, heading, target_words) %}
+<section class="space-y-3" data-testid="trace-{{ key }}" data-complete="{{ 'true' if block.complete else 'false' }}">
+    <div class="flex items-center justify-between gap-4">
+        <h3 class="text-base font-semibold text-foreground">{{ heading }}</h3>
+        {% if block.complete %}
+        {% call badge('success') %}Reaches {{ target_words }}{% endcall %}
+        {% else %}
+        {% call badge('warning') %}Does not reach {{ target_words }}{% endcall %}
+        {% endif %}
+    </div>
+    <ul class="space-y-2 text-sm">
+        {% for chain in block.chains %}
+        <li class="rounded-lg border border-border px-3 py-2" data-chain-complete="{{ 'true' if chain.complete else 'false' }}">
+            <span class="text-foreground">
+                {% for element in chain.elements %}{% if not loop.first %} <span class="text-muted-foreground" aria-hidden="true">→</span> {% endif %}{% if element.id and not loop.first %}<a class="font-medium text-primary hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=element.id) }}">{{ element.name or '—' }}</a>{% else %}<span class="font-medium">{{ element.name or '—' }}</span>{% endif %} <span class="text-muted-foreground">({{ element.type or '—' }})</span>{% endfor %}
+            </span>
+            {% if not chain.complete %}
+            <p class="mt-1 text-muted-foreground">Stops at {{ chain.stops_at.name or '—' }}: nothing recorded leads from it toward {{ target_words }}.</p>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endmacro %}
+
 {% set rel_abbrev = {
     'RealizationRelationship': 'Rlz',
     'ServingRelationship': 'Srv',
@@ -88,6 +121,104 @@
         title="Cross-Layer Traceability Matrix",
         description="Shows how ApplicationComponent elements trace upward to Strategy/Business and downward to Technology layers"
     ) }}
+
+    <div class="space-y-6" x-data="traceabilitySurface()" data-page-url="{{ trace_url }}" data-testid="trace-focus">
+        {% call card.card(class='p-4') %}
+        <div class="mx-auto max-w-xl space-y-1">
+            <p class="text-sm font-medium text-foreground">Check one element</p>
+            {{ entity_picker('trace') }}
+        </div>
+        {% endcall %}
+
+        {% if element_id is not none %}
+            {% if element_check is none or element_check.state != 'checked' %}
+            {{ empty_state(icon='search-x', title='That element was not found', description='It does not exist in your organisation. Pick another one above, or clear the filter to see the broken chains.',
+                           cta_text='Show broken chains', cta_href=trace_url, cta_icon='x', padding='py-8') }}
+            {% else %}
+            {% call card.card(class='p-4 space-y-4') %}
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold text-foreground">{{ element_check.element.name }}</h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        {{ button('Open record', variant='outline', size='sm', icon='arrow-up-right', href=url_for('architect_ui.element_traceability', element_id=element_check.element.id)) }}
+                        {{ button('Show broken chains', variant='outline', size='sm', icon='x', href=trace_url) }}
+                    </div>
+                </div>
+                <p class="text-sm text-muted-foreground" data-testid="trace-element" data-element-id="{{ element_check.element.id }}">
+                    {{ element_check.element.type or '—' }} · chains followed up to {{ element_check.depth }} steps through realisation, serving, assignment, composition and aggregation.
+                </p>
+                <div class="space-y-6">
+                    {{ chain_block(element_check.up, 'up', 'Up to capability', 'a capability') }}
+                    {{ chain_block(element_check.down, 'down', 'Down to technology', 'technology') }}
+                </div>
+            {% endcall %}
+
+            {% call card.card(class='p-4 space-y-3') %}
+                <h2 class="text-base font-semibold text-foreground">Suggested relationships</h2>
+                <p role="alert" x-show="addError" x-cloak x-text="addError"
+                   class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"></p>
+                {% if element_check.candidates %}
+                <ul class="space-y-2 text-sm" data-testid="trace-candidates">
+                    {% for candidate in element_check.candidates %}
+                    {% set key = candidate.direction ~ '-' ~ candidate.source.id ~ '-' ~ candidate.target.id %}
+                    <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2" data-candidate="{{ key }}">
+                        <span class="text-foreground">
+                            <span class="font-medium">{{ candidate.source.name }}</span>
+                            <span class="text-muted-foreground">{{ candidate.relationship_type }}</span>
+                            <span class="font-medium">{{ candidate.target.name }}</span>
+                            <span class="block text-xs text-muted-foreground">Already recorded in the {{ candidate.held_in }}, but not as a relationship.</span>
+                        </span>
+                        <button type="button"
+                                data-candidate-key="{{ key }}"
+                                data-source-id="{{ candidate.source.id }}"
+                                data-target-id="{{ candidate.target.id }}"
+                                data-relationship-type="{{ candidate.relationship_type }}"
+                                :disabled="adding !== null"
+                                @click="addCandidate($event)"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+                            Add this relationship
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% elif element_check.up.complete and element_check.down.complete %}
+                <p class="text-sm text-muted-foreground">Both directions are complete; nothing to suggest.</p>
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="trace-no-candidates">
+                    No mapping elsewhere names what is missing, so there is nothing to suggest. Add the relationship where the chain stops.
+                </p>
+                {% endif %}
+            {% endcall %}
+            {% endif %}
+        {% else %}
+            {% call card.card(class='p-4 space-y-3') %}
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base font-semibold text-foreground">Broken chains</h2>
+                {% call badge('warning' if broken.rows else 'success') %}<span data-testid="broken-count">{{ broken.rows | length }}</span>{% endcall %}
+            </div>
+            {% if broken.rows %}
+            <p class="text-sm text-muted-foreground">Of {{ broken.checked }} components and capabilities checked, {{ broken.rows | length }} stop short: components with no capability above them, and capabilities with no technology below.</p>
+            <ul class="divide-y divide-border rounded-lg border border-border text-sm" data-testid="broken-chains">
+                {% for row in broken.rows %}
+                <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2" data-broken-id="{{ row.id }}">
+                    <span>
+                        <a class="font-medium text-primary hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}">{{ row.name }}</a>
+                        <span class="text-muted-foreground">({{ row.type | plain_name(current_user) }})</span>
+                        <span class="block text-xs text-muted-foreground">
+                            {% if row.break == 'no_capability' %}No capability above it{% else %}No technology below it{% endif %}{% if row.stops_at %}; the chain stops at {{ row.stops_at.name or '—' }}{% endif %}.
+                        </span>
+                    </span>
+                    {{ button('Trace', variant='outline', size='sm', icon='route', href=url_for('architect_ui.traceability_matrix', element=row.id)) }}
+                </li>
+                {% endfor %}
+            </ul>
+            {% elif broken.checked %}
+            <p class="text-sm text-muted-foreground" data-testid="broken-none">Every chain is complete: all {{ broken.checked }} components and capabilities checked reach a capability above and technology below.</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="broken-none">There are no components or capabilities in the model to check yet. Add them in the model composer and their chains appear here.</p>
+            {% endif %}
+            {% endcall %}
+        {% endif %}
+    </div>
 
     <div x-data="{ gapOpen: false }" class="space-y-6">
 

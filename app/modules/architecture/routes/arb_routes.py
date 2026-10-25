@@ -761,37 +761,9 @@ def dashboard():
         standards_summary = arb_analytics.get_standard_compliance_summary()
 
         # Overdue items: submitted/under_review older than priority thresholds
-        now = datetime.utcnow()
-        overdue_thresholds = {"critical": 7, "high": 14, "medium": 21, "low": 30}
-        overdue_items = []
-        for priority_val, days_threshold in overdue_thresholds.items():
-            cutoff = now - timedelta(days=days_threshold)
-            items = (
-                ARBReviewItem.query.filter(
-                    ARBReviewItem.status.in_(["submitted", "under_review"]),
-                    ARBReviewItem.priority == priority_val,
-                    ARBReviewItem.submitted_at.isnot(None),
-                    ARBReviewItem.submitted_at <= cutoff,
-                )
-                .order_by(ARBReviewItem.submitted_at.asc())
-                .all()
-            )
-            for item in items:
-                overdue_items.append(
-                    {
-                        "review": item,
-                        "days_overdue": (now - item.submitted_at).days,
-                        "threshold": days_threshold,
-                    }
-                )
-        overdue_items.sort(
-            key=lambda x: (
-                {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(
-                    x["review"].priority, 4
-                ),
-                -x["days_overdue"],
-            )
-        )
+        from app.modules.architecture.services.arb_overdue import overdue_reviews
+
+        overdue_items = overdue_reviews()
 
         # Capability impact summary
         from sqlalchemy import func as sa_func
@@ -968,7 +940,9 @@ def dashboard():
         pending_status = "all"
 
     # ARB-101: compute per-row SLA badge data for decisions table
-    _SLA_THRESHOLDS = {"critical": 7, "high": 14, "medium": 21, "low": 30}
+    from app.modules.architecture.services.arb_overdue import (
+        OVERDUE_LIMIT_DAYS as _SLA_THRESHOLDS,
+    )
     sla_data_by_review = {}
     _now = datetime.utcnow()
     for _rev in decisions:
@@ -1571,7 +1545,9 @@ def review_detail(id):
             logger.exception("ARB impact enrichment failed for app_id=%s", app_ids[0])
 
     # ARB-101: compute SLA banner info for review detail
-    _SLA_THRESHOLDS = {"critical": 7, "high": 14, "medium": 21, "low": 30}
+    from app.modules.architecture.services.arb_overdue import (
+        OVERDUE_LIMIT_DAYS as _SLA_THRESHOLDS,
+    )
     sla_info = None
     if review.submitted_at and review.status in ("submitted", "under_review", "pending_info"):
         _sla_days = _SLA_THRESHOLDS.get(review.priority or "low", 30)
@@ -2159,7 +2135,15 @@ def change_request_detail(cr_id):
     # The template refers to this as `cr` throughout; passing it as
     # `change_request` raised UndefinedError, so every row of the change-request
     # list at arb/change_requests.html:106 linked to a 500.
-    return render_template("arb/change_request_detail.html", cr=change_request)
+    valid_dispositions = ["accept", "reject", "defer", "escalate"]
+    return render_template(
+        "arb/change_request_detail.html",
+        cr=change_request,
+        valid_dispositions=valid_dispositions,
+        disposition_options=[('', 'Select disposition\u2026')] + [(d, d.replace('_', ' ').title()) for d in valid_dispositions],
+        impacts=[],
+        notices=[],
+    )
 
 
 @arb_bp.route("/change-requests/new", methods=["GET", "POST"])
@@ -2191,6 +2175,7 @@ def change_request_new():
         "arb/change_request_form.html",
         change_request=None,
         valid_trigger_types=VALID_TRIGGER_TYPES,
+        trigger_options=[('', 'Select trigger type\u2026')] + [(tt, tt.replace('_', ' ').title()) for tt in VALID_TRIGGER_TYPES],
     )
 
 
