@@ -509,3 +509,74 @@ def require_roles(*allowed_roles):
         return decorated_function
 
     return decorator
+
+
+def gate_admits(gate) -> bool:
+    """Whether the signed-in person would get past *gate*, asked without running a view.
+
+    The page and the route it posts to must agree on who may change what: a control shown
+    to someone the route then refuses is a dead button, and one hidden from someone the
+    route admits is a missing feature. Asking the route's own gate (a decorator such as
+    ``require_roles("admin", "architect")``) answers both from one place.
+    """
+    from werkzeug.exceptions import HTTPException
+
+    try:
+        return gate(lambda: True)() is True
+    except HTTPException:
+        return False
+
+
+def architect_may_read(gate):
+    """Open a route's own role gate to the enterprise architect for reading.
+
+    The architect's job is to read these pages, whichever platform role they hold, so the
+    persona passes here (by the same ``role_required`` check every persona page uses) and
+    everybody else is decided by *gate* unchanged. Writes behind the same page keep their
+    own gate, and ``read_only_unless`` tells a reader who is turned away why.
+    """
+    from app.models.user import ROLE_ENTERPRISE_ARCHITECT
+
+    persona = role_required(ROLE_ENTERPRISE_ARCHITECT)
+
+    def decorator(f):
+        gated = gate(f)
+
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if current_user.is_authenticated and gate_admits(persona):
+                return f(*args, **kwargs)
+            return gated(*args, **kwargs)
+
+        marker = getattr(gated, "_active_org_rbac_gate", None)
+        if marker:
+            decorated_function._active_org_rbac_gate = marker
+        return decorated_function
+
+    return decorator
+
+
+def read_only_unless(gate):
+    """Guard a change with *gate*; a person it turns away is told, in one plain sentence,
+    that they can view this but not change it.
+
+    Use it on the write routes of a page a reader may open. Anyone not signed in still gets
+    the sign-in answer from the gate itself.
+    """
+    from app.utils.plain_errors import refuse_read_only
+
+    def decorator(f):
+        gated = gate(f)
+
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if current_user.is_authenticated and not gate_admits(gate):
+                return refuse_read_only()
+            return gated(*args, **kwargs)
+
+        marker = getattr(gated, "_active_org_rbac_gate", None)
+        if marker:
+            decorated_function._active_org_rbac_gate = marker
+        return decorated_function
+
+    return decorator

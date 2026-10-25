@@ -7,9 +7,9 @@ from __future__ import annotations
 from flask import g, jsonify, render_template, request
 from flask_login import login_required
 
-from app.decorators import audit_log, role_required
+from app.decorators import audit_log, gate_admits, permission_required, read_only_unless, role_required
 from app.models.application_owner import ApplicationOwner
-from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
+from app.models.user import OWNERSHIP_READER_ROLES, Permission
 from app.services.capability_ownership_service import (
     get_tenant_capability,
     list_capabilities_with_no_owner,
@@ -19,21 +19,27 @@ from app.services.capability_ownership_service import (
 
 from . import capability_map
 
+# Changing who owns a capability needs the general write permission: a Viewer reads the
+# lists and the owners, and is told plainly why a change is refused.
+_CHANGE_OWNERS = permission_required(Permission.GENERAL)
+
 
 @capability_map.route("/capabilities/no-owner")
 @login_required
-@role_required(ROLE_CTO, ROLE_PORTFOLIO_MANAGER)
+@role_required(*OWNERSHIP_READER_ROLES)
 @audit_log("capabilities_no_owner_view")
 def capabilities_no_owner():
     """Capabilities with no owner in the caller's organisation.
 
-    Accessible by cto and portfolio_manager personas from their sidebar.
+    Read by the cto, portfolio_manager and enterprise_architect personas. Only a
+    person who may change ownership sees the controls to assign an owner.
     """
     org_id = g.current_org_id
     capabilities = list_capabilities_with_no_owner(org_id)
     return render_template(
         "capabilities/no_owner.html",
         capabilities=capabilities,
+        can_change=gate_admits(_CHANGE_OWNERS),
     )
 
 
@@ -49,6 +55,7 @@ def api_capability_owners(capability_id):
 
 @capability_map.route("/api/capabilities/<int:capability_id>/owners", methods=["POST"])
 @login_required
+@read_only_unless(_CHANGE_OWNERS)
 def api_set_capability_owner(capability_id):
     org_id = g.current_org_id
     data = request.get_json(silent=True) or {}
@@ -72,6 +79,7 @@ def api_set_capability_owner(capability_id):
 
 @capability_map.route("/api/capabilities/<int:capability_id>/owners/<int:owner_id>", methods=["DELETE"])
 @login_required
+@read_only_unless(_CHANGE_OWNERS)
 def api_delete_capability_owner(capability_id, owner_id):
     org_id = g.current_org_id
     removed = remove_capability_owner(owner_record_id=owner_id, organization_id=org_id)

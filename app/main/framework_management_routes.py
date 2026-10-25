@@ -12,7 +12,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, render_template, request
 
 from app import db
-from app.decorators import audit_log
+from app.decorators import architect_may_read, audit_log, gate_admits, read_only_unless
 from app.jobs.tenant_safe_job import platform_scope
 from app.models.framework_configuration import (
     CapabilityFrameworkConfiguration,
@@ -28,18 +28,18 @@ framework_management_bp = Blueprint(
 
 
 @framework_management_bp.route("/")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def dashboard():
     """Framework Management Dashboard"""
-    has_manufacturing = db.session.query(FrameworkInstance).count() > 0
-    return render_template("framework_management/dashboard.html", has_manufacturing=has_manufacturing)
+    has_instances = db.session.query(FrameworkInstance).count() > 0
+    return render_template("framework_management/dashboard.html", has_instances=has_instances)
 
 
 MATURITY_LABELS = {1: "Initial", 2: "Developing", 3: "Defined", 4: "Managed", 5: "Optimizing"}
 
 
 @framework_management_bp.route("/manufacturing/dashboard")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def framework_dashboard():
     """Manufacturing Excellence Framework Dashboard — real data only, no fabricated values."""
     instance_count = db.session.query(FrameworkInstance).count()
@@ -64,23 +64,30 @@ def framework_dashboard():
                 maturity_level = f"{maturity_level} ({MATURITY_LABELS[level]})"
 
     stats = {
-        "capability_coverage": f"{avg_coverage}%" if avg_coverage is not None else "\u2014",
-        "maturity_level": maturity_level or "\u2014",
-        "active_processes": str(instance_count) if instance_count > 0 else "\u2014",
-        "performance_score": str(active_extensions) if active_extensions > 0 else "\u2014",
+        "capability_coverage": f"{avg_coverage}%" if avg_coverage is not None else "Not measured yet",
+        "maturity_level": maturity_level or "Not assessed yet",
+        "active_processes": str(instance_count),
+        "active_extensions": str(active_extensions),
     }
     return render_template("framework_management/manufacturing_dashboard.html", stats=stats)
 
 
 @framework_management_bp.route("/manufacturing/table")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def framework_table():
-    """Manufacturing Excellence Framework Data Table"""
-    return render_template("framework_management/manufacturing_table.html")
+    """Framework instances of the active organisation, with how far each is implemented."""
+    instances = (
+        FrameworkInstance.query.order_by(FrameworkInstance.instance_name).all()
+    )
+    return render_template(
+        "framework_management/manufacturing_table.html",
+        instances=instances,
+        maturity_labels=MATURITY_LABELS,
+    )
 
 
 @framework_management_bp.route("/api/manufacturing/instances")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def get_manufacturing_instances():
     """Return framework instances for manufacturing table — real data only."""
     instances = FrameworkInstance.query.order_by(FrameworkInstance.instance_name).all()
@@ -120,9 +127,12 @@ def _extension_json_list(raw):
 
 
 @framework_management_bp.route("/extensions/<extension_name>")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def extension_dashboard(extension_name):
-    """Framework Extension Dashboard — renders the registered FrameworkExtension record, if any."""
+    """Framework Extension Dashboard — renders the registered FrameworkExtension record, if any.
+
+    Activating or configuring the extension is a platform administrator's change; anyone
+    else who may open the page reads it."""
     slug = _extension_slug(extension_name)
     extension = next(
         (
@@ -143,20 +153,23 @@ def extension_dashboard(extension_name):
         features=features,
         compatible_versions=compatible_versions,
         dependencies_display=dependencies_display,
+        can_change=gate_admits(platform_admin_required),
     )
 
 
 @framework_management_bp.route("/templates/<template_name>")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def template_dashboard(template_name):
     """Framework Template Dashboard"""
     return render_template(
-        "framework_management/template_dashboard.html", template_name=template_name
+        "framework_management/template_dashboard.html",
+        template_name=template_name,
+        can_change=gate_admits(platform_admin_required),
     )
 
 
 @framework_management_bp.route("/api/available-frameworks")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def get_available_frameworks():
     """Get available frameworks, extensions, and templates"""
 
@@ -234,7 +247,7 @@ def get_available_frameworks():
 
 
 @framework_management_bp.route("/api/deploy-configuration", methods=["POST"])
-@platform_admin_required
+@read_only_unless(platform_admin_required)
 @audit_log("deploy_configuration")
 def deploy_configuration():
     """Deploy a framework configuration"""
@@ -276,7 +289,7 @@ def deploy_configuration():
 
 @framework_management_bp.route("/api/activate-extension", methods=["POST"])
 @framework_management_bp.route("/api/activate-extension/<int:extension_id>", methods=["POST"])
-@platform_admin_required
+@read_only_unless(platform_admin_required)
 @audit_log("activate_extension")
 def activate_extension(extension_id=None):
     """Activate a framework extension by ID (URL param) or name (JSON body)."""
@@ -316,7 +329,7 @@ def activate_extension(extension_id=None):
 
 
 @framework_management_bp.route("/api/apply-template", methods=["POST"])
-@platform_admin_required
+@read_only_unless(platform_admin_required)
 @audit_log("apply_template")
 def apply_template():
     """Apply a framework template"""
@@ -375,7 +388,7 @@ def apply_template():
 
 
 @framework_management_bp.route("/api/statistics")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def get_statistics():
     """Get framework management statistics"""
 
@@ -431,7 +444,7 @@ def get_statistics():
 
 
 @framework_management_bp.route("/api/active-framework")
-@platform_admin_required
+@architect_may_read(platform_admin_required)
 def get_active_framework():
     """Get the currently active framework configuration"""
     active_config = CapabilityFrameworkConfiguration.query.filter_by(status="active").first()

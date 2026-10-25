@@ -76,6 +76,10 @@ ROLE_RISK = "risk"
 ROLE_OPERATIONS = "operations"
 ROLE_NON_TECHNICAL_OWNER = "non_technical_owner"
 
+# Who reads the ownership pages (ownership coverage, capabilities with no owner):
+# the accountable executives, and the enterprise architect whose job is to read them.
+OWNERSHIP_READER_ROLES = (ROLE_CTO, ROLE_PORTFOLIO_MANAGER, ROLE_ENTERPRISE_ARCHITECT)
+
 VALID_ROLES = [
     ROLE_SOLUTION_ARCHITECT,
     ROLE_ENTERPRISE_ARCHITECT,

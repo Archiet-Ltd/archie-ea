@@ -1,6 +1,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/alert.html' import alert %}
 
 {% block title %}{{ template_name|title }} Template - Dashboard{% endblock %}
 
@@ -12,8 +13,12 @@
         actions=[
             {'text': 'Apply Template', 'icon': 'play', 'onclick': 'applyTemplate()', 'variant': 'default'},
             {'text': 'Customize', 'icon': 'pencil', 'onclick': 'customizeTemplate()', 'variant': 'outline'}
-        ]
+        ] if can_change else []
     ) }}
+
+    {% if not can_change %}
+    {{ alert('neutral', text=read_only_sentence, testid='read-only-line') }}
+    {% endif %}
 
     <!-- Template Info -->
     <div class="bg-card rounded-lg p-6 border border-border mb-6">

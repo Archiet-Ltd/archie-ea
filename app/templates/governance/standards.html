@@ -6,6 +6,7 @@
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/card.html' import card, card_header, card_content %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/alert.html' import alert %}
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% block title %}Technology Standards{% endblock %}
 {% block content %}
@@ -26,6 +27,9 @@
       </div>
 
       <div class="px-4 lg:px-6">
+        {% if not can_change %}
+        {{ alert('neutral', text=read_only_sentence, testid='read-only-line') }}
+        {% else %}
         {% call card() %}
           {% call card_header() %}
             <h2 id="standard-form-title" class="text-base font-semibold">Publish a standard</h2>
@@ -102,6 +106,7 @@
             </form>
           {% endcall %}
         {% endcall %}
+        {% endif %}
       </div>
 
       {% if not grouped %}

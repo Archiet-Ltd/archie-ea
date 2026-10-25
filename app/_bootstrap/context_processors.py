@@ -698,6 +698,9 @@ def init_context_processors(app):
     app.jinja_env.globals["can_modify_solution"] = _template_can_modify_solution
     app.jinja_env.globals["can_open_code_workbench"] = _template_can_open_code_workbench
     app.jinja_env.globals["can_change_model"] = _template_can_change_model
+    from app.utils.plain_errors import READ_ONLY_SENTENCE
+
+    app.jinja_env.globals["read_only_sentence"] = READ_ONLY_SENTENCE
     app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["home_url"] = _template_home_url

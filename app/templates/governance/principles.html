@@ -1,10 +1,14 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/skeleton.html' import skeleton_card %}
+{% from 'components/alert.html' import alert %}
 {% block title %}Architecture Principles{% endblock %}
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   {{ page_header(title='Architecture Principles', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Architecture Principles'}], description='Guiding principles that steer architecture decisions') }}
+  {% if not can_change %}
+  <div class="mt-4">{{ alert('neutral', text=read_only_sentence, testid='read-only-line') }}</div>
+  {% endif %}
   <div id="gov-list" class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
     {{ skeleton_card() }}
     {{ skeleton_card() }}

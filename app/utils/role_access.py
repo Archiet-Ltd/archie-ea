@@ -14,6 +14,7 @@ from app.models.user import (
     ROLE_APPLICATION_MANAGER,
     ROLE_ARB_MEMBER,
     ROLE_BUSINESS_ARCHITECT,
+    OWNERSHIP_READER_ROLES,
     ROLE_CTO,
     ROLE_ENTERPRISE_ARCHITECT,
     ROLE_DATA_ARCHITECT,
@@ -856,10 +857,10 @@ _MY_WORK_LINKS = {
         # Finding a page by grepping the source is not finding it.
         _link("Tech Radar", "tech_radar.index", "radar"),
         # Ownership coverage by business unit — CTO accountability.
-        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="cto_or_portfolio_manager"),
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="ownership_readers"),
         # R1-B03 PR 2: the one ownership record now also covers capabilities.
         # Ample headroom in this zone (10 links against SIDEBAR_LINK_BUDGET 32).
-        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
+        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="ownership_readers"),
         # R1-B85: supported-estate share, open exceptions, the store-
         # agreement disagreement finder.
         _link("CTO Scorecard", "cto_scorecard.index", "clipboard-list"),
@@ -962,10 +963,10 @@ _MY_WORK_LINKS = {
         # Rationalization above, from which this page is reached in context.
         _link("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
         # Ownership coverage by business unit — portfolio manager accountability.
-        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="cto_or_portfolio_manager"),
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="ownership_readers"),
         # R1-B03 PR 2: the one ownership record now also covers capabilities.
         # Ample headroom in this zone (9 links against SIDEBAR_LINK_BUDGET 32).
-        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
+        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="ownership_readers"),
     ],
     ROLE_PROCUREMENT: [
         # Fix round: Overview, Licences and Compliance were reachable from
@@ -1292,19 +1293,18 @@ def link_requires_satisfied(user, requires):
             return bool(is_active_org_admin(user))
         except Exception:  # anonymous / unexpected user object
             return False
-    if requires == "cto_or_portfolio_manager":
+    if requires == "ownership_readers":
         # Matches the route guard on Ownership Coverage and Capabilities
-        # With No Owner (@role_required(ROLE_CTO, ROLE_PORTFOLIO_MANAGER),
-        # which also falls back to is_admin()) -- these are enterprise_role
-        # checks, not a Permission bit, so neither "admin" nor "general"
-        # above covers them. R1-B03 PR 2: found both links already leaking
-        # into every persona's /modules/ directory as dead 403 rows, since
-        # no requires= guard existed for an enterprise_role predicate before
-        # this one.
+        # With No Owner (@role_required(*OWNERSHIP_READER_ROLES), which also
+        # falls back to is_admin()) -- these are enterprise_role checks, not a
+        # Permission bit, so neither "admin" nor "general" above covers them.
+        # Both links were found leaking into every persona's /modules/
+        # directory as dead 403 rows before a requires= guard existed for an
+        # enterprise_role predicate.
         try:
             if hasattr(user, "is_admin") and user.is_admin():
                 return True
-            return getattr(user, "enterprise_role", None) in (ROLE_CTO, ROLE_PORTFOLIO_MANAGER)
+            return getattr(user, "enterprise_role", None) in OWNERSHIP_READER_ROLES
         except Exception:  # anonymous / unexpected user object
             return False
     return False

@@ -10,7 +10,8 @@ from flask_login import login_required
 
 from app import db
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
-from app.decorators import require_roles
+from app.decorators import architect_may_read, gate_admits, require_roles
+from app.utils.plain_errors import refuse_read_only
 
 logger = logging.getLogger(__name__)
 
@@ -208,12 +209,19 @@ def risk_register():
     return redirect(url_for("risk.risk_register"))
 
 
+# Who may change what these pages hold. Everyone who may open them may read; this decides
+# who also sees the controls, and the route enforces the same decision.
+_CHANGE_GOVERNANCE = require_roles("admin", "architect")
+
+
 @governance_bp.route("/principles")
 @login_required
-@require_roles("admin", "architect")
+@architect_may_read(_CHANGE_GOVERNANCE)
 def principles():
-    """Architecture Principles management page."""
-    return render_template("governance/principles.html")
+    """Architecture Principles page, read-only for an architect without edit rights."""
+    return render_template(
+        "governance/principles.html", can_change=gate_admits(_CHANGE_GOVERNANCE)
+    )
 
 
 TECHNOLOGY_STANDARD_STATUSES = (
@@ -308,7 +316,7 @@ def _create_standard(form, user_id):
 
 @governance_bp.route("/standards", methods=["GET", "POST"])
 @login_required
-@require_roles("admin", "architect")
+@architect_may_read(_CHANGE_GOVERNANCE)
 def standards():
     """Technology Standards: the register per domain, and the form that
     publishes a new standard into it."""
@@ -317,7 +325,10 @@ def standards():
 
     from app.models.tech_radar import RADAR_RING_LABELS, RADAR_RINGS
 
+    can_change = gate_admits(_CHANGE_GOVERNANCE)
     if request.method == "POST":
+        if not can_change:
+            return refuse_read_only()
         try:
             standard, error = _create_standard(request.form, current_user.id)
         except Exception:  # noqa: BLE001
@@ -333,6 +344,7 @@ def standards():
                 rings=RADAR_RINGS,
                 ring_labels=RADAR_RING_LABELS,
                 form=request.form,
+                can_change=can_change,
             ), 400
         flash("%s published as a %s standard." % (
             standard.technology_name, standard.status.replace("_", " ")), "success")
@@ -345,6 +357,7 @@ def standards():
         rings=RADAR_RINGS,
         ring_labels=RADAR_RING_LABELS,
         form={},
+        can_change=can_change,
     )
 
 

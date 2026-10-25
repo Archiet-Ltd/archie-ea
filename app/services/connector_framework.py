@@ -695,6 +695,50 @@ CONNECTOR_TYPE_LABELS = {
     "lucidchart": "Lucidchart",
 }
 
+# What each kind of connector brings into the model, in words a reader understands.
+CONNECTOR_FEEDS = {
+    "servicenow": "Applications and other configuration items from the ServiceNow CMDB",
+    "jira": "Work packages from Jira issues",
+    "m365": "Microsoft Teams notifications and meeting records",
+    "ea_tool": "Applications and capabilities from the architecture tool",
+    "github": "Facts about applications and their owners from code repositories",
+    "devops": "Code pushed from GitHub or Azure DevOps",
+    "lucidchart": "Diagrams imported from Lucidchart",
+}
+
+
+def connector_reader_view(view: dict) -> dict:
+    """One connector as a person who may only read sees it: what it is, what it feeds, and
+    in plain words whether it is working and when it last synchronised.
+
+    Built from the full view but carrying none of its settings, credential state or
+    references, so nothing a reader must not see can reach the page.
+    """
+    health = view.get("health")
+    failed = view.get("last_sync_status") == "error" or health == "error"
+    if view.get("is_proposal") or health == "pending_review":
+        state = "Waiting for approval"
+    elif failed:
+        state = "Not working: the last synchronisation failed"
+    elif health == "active":
+        state = "Connected"
+    elif health == "maintenance":
+        state = "Paused for maintenance"
+    else:
+        state = "Switched off"
+    return {
+        "id": view.get("id"),
+        "name": view.get("name"),
+        "connector_type_label": view.get("connector_type_label"),
+        "feeds": CONNECTOR_FEEDS.get(
+            view.get("connector_type"), "Records from %s" % view.get("connector_type_label")
+        ),
+        "state": state,
+        "failed": failed,
+        "last_sync": None if view.get("is_proposal") else view.get("last_sync"),
+    }
+
+
 # Concrete connector implementations available for sync (outside credential
 # storage, which lives in the per-organisation vault).
 _CONNECTOR_CLASSES: dict = {}

@@ -38,8 +38,9 @@ from functools import wraps
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
-from app.decorators import admin_required
+from app.decorators import admin_required, gate_admits
 from app.models.connector_config import _is_sensitive_key
+from app.models.user import Permission
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,34 @@ def connections_access(f):
     """Who may open and change connectors: administrators of the active
     organisation (what ``admin_required`` asks) and the architects who bring a
     source in, answered by ``may_use_connections`` -- the same predicate the
-    sidebar's Connections link uses, so the link and the page cannot disagree."""
+    sidebar's Connections link uses, so the link and the page cannot disagree.
+
+    An architect holding the Viewer role reads the connectors list (see
+    ``connections_read_access``) but changes nothing: every change, and every
+    settings form, is refused with the plain view-only sentence."""
+    admin_gated = admin_required(f)
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        from flask_login import current_user
+
+        from app.utils.plain_errors import refuse_read_only
+        from app.utils.role_access import may_use_connections
+
+        if current_user.is_authenticated and may_use_connections(current_user):
+            if current_user.can(Permission.GENERAL) or gate_admits(admin_required):
+                return f(*args, **kwargs)
+            return refuse_read_only()
+        return admin_gated(*args, **kwargs)
+
+    return decorated
+
+
+def connections_read_access(f):
+    """Who may read the connectors list: the same people as ``connections_access``,
+    whatever platform role they hold. The list shows what each connector is, what it
+    feeds and whether it works; settings and credentials stay behind
+    ``connections_access``."""
     admin_gated = admin_required(f)
 
     @wraps(f)
@@ -98,12 +126,16 @@ def _permit_connector_type(connector_type: str):
 
 @m365_connector_bp.route("", methods=["GET"])
 @login_required
-@connections_access
+@connections_read_access
 def connectors_index():
     """The one connectors page: every connector of the signed-in
     organisation with health, last synchronisation, the masked credential
     state, and how many connector changes are pending in the organisation's
-    approval queue."""
+    approval queue.
+
+    A person who may only read it (an architect with the Viewer role) is given
+    each connector's name, what it feeds, whether it works and when it last
+    synchronised -- no settings, credential state, forms or change controls."""
     org_id = _require_active_org()
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
     from app.services.connector_framework import (
@@ -114,6 +146,11 @@ def connectors_index():
     )
 
     connectors = list_org_connectors(org_id)
+    can_change = gate_admits(connections_access)
+    if not can_change:
+        from app.services.connector_framework import connector_reader_view
+
+        connectors = [connector_reader_view(view) for view in connectors]
     pending_count = AIChatCRUDApproval.query.filter_by(
         organization_id=org_id,
         entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
@@ -123,6 +160,7 @@ def connectors_index():
     return render_template(
         "admin/connectors/index.html",
         connectors=connectors,
+        can_change=can_change,
         pending_count=pending_count,
         connector_type_labels=CONNECTOR_TYPE_LABELS,
         delegated_actions={

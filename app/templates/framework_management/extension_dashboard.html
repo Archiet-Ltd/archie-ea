@@ -1,6 +1,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/alert.html' import alert %}
 
 {% block title %}{{ extension_name|title }} Extension - Dashboard{% endblock %}
 
@@ -12,7 +13,7 @@
         actions=[
             {'text': 'Activate Extension', 'icon': 'power', 'onclick': 'activateExtension()', 'variant': 'default'},
             {'text': 'Configure', 'icon': 'settings', 'onclick': 'configureExtension()', 'variant': 'secondary'}
-        ] if extension else []
+        ] if extension and can_change else []
     ) }}
 
     {% if not extension %}
@@ -24,6 +25,9 @@
         </div>
     </div>
     {% else %}
+    {% if not can_change %}
+    {{ alert('neutral', text=read_only_sentence, testid='read-only-line') }}
+    {% endif %}
     <!-- Extension Info -->
     <div class="bg-card rounded-lg p-6 border border-border mb-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -135,6 +139,7 @@
         {% endif %}
     </div>
 
+    {% if can_change %}
     <!-- Configuration Panel -->
     <div class="bg-card rounded-lg p-6 border border-border mb-6">
         <h3 class="text-lg font-semibold text-foreground mb-4">Configuration</h3>
@@ -176,6 +181,8 @@
             </div>
         </div>
     </div>
+
+    {% endif %}
 
     <!-- Activity Log -->
     <div class="bg-card rounded-lg p-6 border border-border">

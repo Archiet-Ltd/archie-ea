@@ -1,15 +1,39 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% block title %}Manufacturing Table{% endblock %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% block title %}Framework Instances{% endblock %}
 {% block content %}
 <div class="p-6 space-y-6">
-  {{ page_shell(title='Manufacturing Table', breadcrumb=[('Home', '/'), ('Manufacturing Table', none)]) }}
-  <div class="max-w-2xl mx-auto py-12 text-center">
-  <p class="text-muted-foreground mb-6">This feature is being built. Check back soon.</p>
-  <a href="{{ url_for('dashboard.overview') }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-    Return to Dashboard
-  </a>
+  {{ page_shell(title='Framework Instances', subtitle='Every framework instance in this organisation and how far it is implemented.', breadcrumb=[('Home', '/'), ('Framework Management', url_for('main.framework_management.dashboard')), ('Framework Instances', none)]) }}
+  <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
+    {% call table() %}
+      {% call table_header() %}
+        <tr>
+          {% call table_head() %}Instance{% endcall %}
+          {% call table_head() %}Business unit{% endcall %}
+          {% call table_head() %}Maturity{% endcall %}
+          {% call table_head() %}Implemented{% endcall %}
+          {% call table_head() %}Status{% endcall %}
+          {% call table_head() %}Owner{% endcall %}
+        </tr>
+      {% endcall %}
+      {% call table_body() %}
+        {% for inst in instances %}
+        {% call table_row(attrs_dict={'data-testid': 'framework-instance-row'}) %}
+          {% call table_cell() %}<span class="font-medium text-foreground">{{ inst.instance_name }}</span>{% endcall %}
+          {% call table_cell() %}{{ inst.organization_unit or 'Not set' }}{% endcall %}
+          {% call table_cell() %}
+            {% if inst.current_maturity_level %}Level {{ inst.current_maturity_level }}{% if maturity_labels.get(inst.current_maturity_level) %} ({{ maturity_labels[inst.current_maturity_level] }}){% endif %}{% else %}Not assessed yet{% endif %}
+          {% endcall %}
+          {% call table_cell() %}{% if inst.implementation_percentage is not none %}{{ inst.implementation_percentage | round(1) }}%{% else %}Not measured yet{% endif %}{% endcall %}
+          {% call table_cell() %}{{ (inst.status or 'unknown') | replace('_', ' ') | capitalize }}{% endcall %}
+          {% call table_cell() %}{{ inst.instance_owner or 'No owner recorded' }}{% endcall %}
+        {% endcall %}
+        {% else %}
+        {{ table_empty_state(message='No framework instances in this organisation yet.') }}
+        {% endfor %}
+      {% endcall %}
+    {% endcall %}
   </div>
 </div>
 {% endblock %}

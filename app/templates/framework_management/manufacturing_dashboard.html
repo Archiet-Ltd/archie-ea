@@ -1,15 +1,15 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/metrics_card.html' import metrics_card %}
 {% block title %}Manufacturing Dashboard{% endblock %}
 {% block content %}
 <div class="p-6 space-y-6">
-  {{ page_shell(title='Manufacturing Dashboard', breadcrumb=[('Home', '/'), ('Manufacturing Dashboard', none)]) }}
-  <div class="max-w-2xl mx-auto py-12 text-center">
-  <p class="text-muted-foreground mb-6">This feature is being built. Check back soon.</p>
-  <a href="{{ url_for('dashboard.overview') }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-    Return to Dashboard
-  </a>
+  {{ page_shell(title='Manufacturing Dashboard', subtitle='How far the manufacturing framework is implemented in this organisation.', breadcrumb=[('Home', '/'), ('Framework Management', url_for('main.framework_management.dashboard')), ('Manufacturing Dashboard', none)]) }}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="manufacturing-stats">
+    {{ metrics_card(title='Capability coverage', value=stats.capability_coverage, description='Average implementation across instances') }}
+    {{ metrics_card(title='Maturity level', value=stats.maturity_level, description='Average across instances') }}
+    {{ metrics_card(title='Framework instances', value=stats.active_processes, description='In this organisation', href=url_for('main.framework_management.framework_table')) }}
+    {{ metrics_card(title='Active extensions', value=stats.active_extensions, description='Extensions switched on') }}
   </div>
 </div>
 {% endblock %}

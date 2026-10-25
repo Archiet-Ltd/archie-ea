@@ -39,7 +39,7 @@
         {%- elif overall_pct >= 80 %} text-success
         {%- elif overall_pct >= 50 %} text-warning
         {%- else %} text-destructive{% endif %}">
-        {% if overall_pct is none %}&mdash;{% else %}{{ overall_pct }}%{% endif %}</p>
+        {% if overall_pct is none %}<span class="text-base font-normal">No applications yet</span>{% else %}{{ overall_pct }}%{% endif %}</p>
     </div>
   </div>
 
@@ -60,10 +60,10 @@
           <tr class="hover:bg-muted/30">
             <td class="px-6 py-3 font-medium text-foreground">{{ row.unit_name }}</td>
             <td class="px-6 py-3 text-right text-foreground">
-              {% if row.total_apps > 0 %}{{ row.total_apps }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+              {{ row.total_apps }}
             </td>
             <td class="px-6 py-3 text-right text-foreground">
-              {% if row.total_apps > 0 %}{{ row.owned }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+              {{ row.owned }}
             </td>
             <td class="px-6 py-3 text-right">
               {% if row.coverage_pct is not none %}
@@ -74,7 +74,7 @@
                   {{ row.coverage_pct }}%
                 </span>
               {% else %}
-                <span class="text-muted-foreground">&mdash;</span>
+                <span class="text-xs text-muted-foreground">No applications in this unit yet</span>
               {% endif %}
             </td>
           </tr>

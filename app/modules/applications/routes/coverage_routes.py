@@ -15,7 +15,7 @@ from sqlalchemy import func
 from app.decorators import audit_log, role_required
 from app.modules.my_applications.services import has_assigned_owner
 from app.models.application_portfolio import ApplicationComponent
-from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
+from app.models.user import OWNERSHIP_READER_ROLES
 
 from . import unified_applications_bp
 
@@ -30,14 +30,15 @@ def _domain_matches_unit(unit_name: str):
 
 @unified_applications_bp.route("/ownership-coverage")
 @login_required
-@role_required(ROLE_CTO, ROLE_PORTFOLIO_MANAGER)
+@role_required(*OWNERSHIP_READER_ROLES)
 @audit_log("ownership_coverage_view")
 def ownership_coverage():
     """Ownership coverage by business unit.
 
-    Accessible by cto and portfolio_manager personas from their sidebar.
-    Shows every business unit with applications in the caller's organisation.
-    A unit with no applications shows ``—`` as its coverage figures.
+    Read by the cto, portfolio_manager and enterprise_architect personas, whatever
+    platform role they hold: the page changes nothing.
+    Shows every business unit in the caller's organisation; a unit with no
+    applications says so in words rather than showing a figure.
     """
 
     org_id = g.current_org_id
