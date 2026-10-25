@@ -29,7 +29,7 @@
                   action="{{ url_for('arch_decisions.edit_decision', decision_id=decision.id) if decision else url_for('arch_decisions.create_decision') }}"
                   class="space-y-6"
                   x-data="elementPicker()">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
 
                 <!-- Title -->
                 <div class="bg-card border border-border rounded-lg p-6 space-y-5">
