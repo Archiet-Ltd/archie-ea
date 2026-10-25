@@ -193,11 +193,17 @@ def vendor_detail(vendor_id):
         with db.session.no_autoflush:
             # Get all ArchiMate elements linked to this vendor's products
             try:
-                archimate_elements = (
-                    ArchiMateElement.query.join(ArchiMateElement.vendor_products)
+                # Distinct ids first: DISTINCT over whole elements fails on their JSON columns.
+                element_ids = [r[0] for r in (
+                    db.session.query(ArchiMateElement.id)
+                    .join(ArchiMateElement.vendor_products)
                     .filter(VendorProduct.vendor_organization_id == vendor_id)
                     .distinct()
                     .all()
+                )]
+                archimate_elements = (
+                    ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
+                    if element_ids else []
                 )
             except Exception as e:
                 current_app.logger.warning("Could not load ArchiMate elements: %s", e, exc_info=True)
@@ -323,6 +329,18 @@ def vendor_detail(vendor_id):
             {"id": c.id, "name": c.name} for c in all_business_capabilities
         ]
 
+        # The systems and contracts this organisation attaches to the vendor: the
+        # register's answer, so this page agrees with the Vendors list.
+        from app.services import vendor_register
+
+        supplied_systems = vendor_register.systems_of(vendor_id)
+        vendor_contracts = vendor_register.contracts_of(vendor_id)
+        known = {a.id for a in deployed_applications}
+        deployed_applications = list(deployed_applications) + [
+            a for a in supplied_systems if a.id not in known]
+        supplied_cost = vendor_register.annual_cost(supplied_systems)
+        next_renewal = vendor_register.next_renewal(vendor_contracts)
+
         from datetime import datetime, timedelta
         _stale_cutoff = datetime.utcnow() - timedelta(days=90)
         stale_product_ids = {
@@ -338,6 +356,10 @@ def vendor_detail(vendor_id):
             vendor_capabilities=vendor_capabilities,
             vendor_apqc_mappings=vendor_apqc_mappings,
             deployed_applications=deployed_applications,
+            supplied_systems=supplied_systems,
+            vendor_contracts=vendor_contracts,
+            supplied_cost=supplied_cost,
+            next_renewal=next_renewal,
             all_business_capabilities=all_business_capabilities,
             products_json=products_json,
             capabilities_json=capabilities_json,

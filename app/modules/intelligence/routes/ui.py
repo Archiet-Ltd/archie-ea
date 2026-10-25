@@ -171,34 +171,15 @@ def value_streams_at_risk():
 @intelligence_ui.route("/traceability", methods=["GET"])
 @login_required
 def traceability():
-    """Check one element's chains up to a capability and down to technology.
+    """The old traceability address: the one matrix page is the home now.
 
-    ``element`` (optional) is the id of the element to check. The answer is
-    rendered on the server from ``TraceabilityCheckService.check``, which
-    reads the same tenant-fenced walk as the impact answer; an id outside the
-    caller's organisation renders the same "not found" state as a missing one.
-    Candidate relationships are added through the existing relationship
-    writer from the browser, then the page reloads and checks again.
+    ``element`` (optional) is carried across so a saved link still opens on
+    that element.
     """
     element_id = request.args.get("element", type=int)
-    result = None
-    if element_id is not None:
-        from app.modules.intelligence.services.traceability_check_service import (
-            TraceabilityCheckService,
-        )
-
-        org_id = getattr(g, "current_org_id", None)
-        if org_id is None:
-            from flask_login import current_user
-
-            org_id = getattr(current_user, "organization_id", None)
-        result = TraceabilityCheckService.check(element_id, org_id)
-    return render_template(
-        "intelligence/traceability.html",
-        element_id=element_id,
-        result=result,
-        workspace_counts_available=_workspace_counts_available(),
-    )
+    if element_id is None:
+        return redirect(url_for("architect_ui.traceability_matrix"), code=302)
+    return redirect(url_for("architect_ui.traceability_matrix", element=element_id), code=302)
 
 
 __all__ = ["intelligence_ui"]

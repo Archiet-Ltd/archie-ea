@@ -7,7 +7,7 @@ no diagram. Imports nothing from ``app``.
 Idempotent: the column is added or dropped only when its presence says so.
 
 Revision ID: 20261025_bpmn_flow
-Revises: 20261025_data_erd_tables
+Revises: 20261025_vendor_naming
 Create Date: 2026-10-25
 """
 import sqlalchemy as sa
@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261025_bpmn_flow"
-down_revision = "20261025_data_erd_tables"
+down_revision = "20261025_vendor_naming"
 branch_labels = None
 depends_on = None
 

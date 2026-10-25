@@ -859,6 +859,39 @@ _APP_INFRASTRUCTURE_MONTHLY = 2500
 # created with it and an earlier seed's blanket figure is brought back to it.
 _APP_TOTAL_COST = _APP_LICENSE_ANNUAL + 12 * _APP_INFRASTRUCTURE_MONTHLY
 
+# Each application's own annual licence (None where Lantern Quay builds it) and monthly infrastructure
+# cost, so the estate's costs differ from one application to the next, and the business area it serves.
+# (application) -> (licence per year, infrastructure per month, business area)
+_APP_COSTS = {
+    "Event Relay": (84000, 3200, "IT Operations"),
+    "Calibration Ledger": (None, 2100, "Quality and Compliance"),
+    "Dispatch Planner": (96000, 2600, "Operations"),
+    "Inventory Manager": (132000, 3400, "Operations"),
+    "Field Service Scheduler": (78000, 1200, "Field Services"),
+    "Compliance Reporter": (54000, 700, "Quality and Compliance"),
+    "Supplier Portal": (66000, 900, "Shared Services"),
+    "Workforce Planner": (90000, 1100, "Shared Services"),
+    "Quality Monitor": (None, 1500, "Quality and Compliance"),
+    "Sensor Data Hub": (48000, 4800, "Field Services"),
+    "Firmware Distribution Service": (None, 1900, "Field Services"),
+    "Customer Portal": (72000, 1300, "Operations"),
+    "Finance System": (168000, 4200, "Shared Services"),
+    "Document Management": (36000, 600, "Shared Services"),
+    "Identity Provider": (30000, 200, "IT Operations"),
+    "Monitoring Dashboard": (42000, 800, "IT Operations"),
+    "Alert Manager": (18000, 100, "IT Operations"),
+    "Reporting Engine": (24000, 700, "Shared Services"),
+    "Integration Bus": (102000, 2400, "IT Operations"),
+    "Data Warehouse": (120000, 6100, "IT Operations"),
+}
+
+
+def _app_figures(app_name):
+    """(licence, infrastructure per month, total per year, area) for an application."""
+    licence, infra, area = _APP_COSTS.get(app_name, (_APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY, None))
+    return licence, infra, (licence or 0) + 12 * infra, area
+
+
 # Organisation units that own the applications (one per owner role).
 _OWNER_UNITS = [
     # (code, name)
@@ -2419,8 +2452,6 @@ def spread_history(org_id, days_ago=_HISTORY_DAYS_AGO, now=None):
         flag_modified(row, "snapshot")
     db.session.flush()
     return len(first)
-
-
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
@@ -2545,6 +2576,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
+            licence, infra, total, area = _app_figures(app_name)
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -2556,9 +2588,10 @@ def seed_demo_company() -> dict:
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
                 implementation_date=_dt.date(2022, 3, 15),
                 go_live_date=_dt.date(2022, 6, 1),
-                total_cost_of_ownership=_APP_TOTAL_COST,
-                license_cost_annual=_APP_LICENSE_ANNUAL,
-                infrastructure_cost_monthly=_APP_INFRASTRUCTURE_MONTHLY,
+                total_cost_of_ownership=total,
+                license_cost_annual=licence,
+                infrastructure_cost_monthly=infra,
+                business_domain=area,
                 business_criticality="high",
                 strategic_importance="high",
             )
@@ -2676,7 +2709,7 @@ def seed_demo_company() -> dict:
         from app.models.enterprise_intelligence import (
             ApplicationOwnership, OrganizationUnit,
         )
-        from app.services.application_cost_accessor import sync_cost_fact
+        from app.services.application_cost_accessor import state_contract, sync_cost_fact
 
         units = {
             u.code: u
@@ -2727,19 +2760,25 @@ def seed_demo_company() -> dict:
                 ))
                 held.add((app.id, unit.id, "Business Owner"))
                 changed = True
-            # The total is the sum of its components, whatever an earlier
-            # seed wrote.
-            if (app.license_cost_annual == _APP_LICENSE_ANNUAL
-                    and app.infrastructure_cost_monthly == _APP_INFRASTRUCTURE_MONTHLY
-                    and app.total_cost_of_ownership != _APP_TOTAL_COST):
-                app.total_cost_of_ownership = _APP_TOTAL_COST
+            # The figures are the application's own, whatever an earlier seed wrote.
+            licence, infra, total, area = _app_figures(app_name)
+            if (app.license_cost_annual, app.infrastructure_cost_monthly, app.total_cost_of_ownership,
+                    app.business_domain) != (licence, infra, total, area):
+                app.license_cost_annual, app.infrastructure_cost_monthly = licence, infra
+                app.total_cost_of_ownership, app.business_domain = total, area
                 changed = True
             agreed += changed
         db.session.flush()
         for app in _resolve_apps(org_id).values():
             for column in ("total_cost_of_ownership", "license_cost_annual",
                            "infrastructure_cost_monthly"):
-                sync_cost_fact(app, column, "USD")
+                sync_cost_fact(app, column)
+            # The Spend page reads contracts, so a vendor-supplied application states its cost there
+            # too: the run cost on the Overview, the Spend page and the canvas's cost box then agree.
+            profile = _APP_PROFILE.get(app.name)
+            if (profile and "in-house" not in profile[2].lower() and not profile[0].startswith("5.")
+                    and app.total_cost_of_ownership):
+                state_contract(app, profile[2], app.total_cost_of_ownership, months_ago=3 + app.id % 8)
         db.session.flush()
         stats["application_figures_agreed"] = agreed
 
@@ -3233,7 +3272,9 @@ def seed_demo_company() -> dict:
         stats.update(_seed_data_model(org_id))
 
         db.session.commit()
-        stats["history_dated"] = spread_history(org_id)
+        from app.services.history_spread import HAND_LABEL, spread_history
+
+        stats["history_dated"] = spread_history(org_id, rest=("manual", HAND_LABEL))
         db.session.commit()
 
     return stats

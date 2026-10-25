@@ -22,6 +22,7 @@ from app.decorators import audit_log, require_roles  # dead-code-ok
 from app.extensions import db
 from app.models.vendor_organization import VendorOrganization
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_sql import current_org_id
 from app.middleware.tenant_decorators import platform_admin_required
 
 # Allowlist for vendor updates (security: prevent mass assignment)
@@ -106,6 +107,7 @@ def create_vendor():
         headquarters_location=data.get("country"),  # model column is headquarters_location
         description=data.get("description"),
         website=data.get("website"),
+        named_by_organization_id=current_org_id(),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -411,6 +413,7 @@ def api_create_vendor():
         headquarters_location=data.get("country"),  # model column is headquarters_location
         description=data.get("description"),
         website=data.get("website"),
+        named_by_organization_id=current_org_id(),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )

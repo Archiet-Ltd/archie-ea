@@ -144,14 +144,18 @@ MAIN: tuple = (
        children=_SPEND_CHILDREN,
        owns=("procurement.", "consolidation_list.", "formula_register.",
              "dashboard_pages.rationalization_scorecard", "enterprise.investment_matrix")),
-    _l("compliance", "Compliance", "risk.risk_register", "shield-check", job="5",
+_l("compliance", "Compliance", "risk.risk_register", "shield-check", job="5",
        aliases=("Risks", "Risk register", "Controls", "Decisions", "Evidence", "Audit", "Policies",
-                "Governance", "Standards"),
+                 "Governance", "Standards"),
        owns=("risk.", "arch_decisions.", "policy_monitoring.", "gdpr_bp.", "admin.audit_log_viewer",
-             "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page",
-             "intelligence_ui.history_changes_page"),
+              "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page",
+              "intelligence_ui.history_changes_page"),
+       children=(
+           _l("data_subject_requests", "Data Subject Requests", "gdpr_bp.dsr_index", job="5",
+              requires="data_subject_requests", aliases=("DSR", "GDPR requests")),
+       ),
        note="Lands on the risk register, the canonical page for this job today; the compliance "
-            "dashboard is held back until its views carry data."),
+             "dashboard is held back until its views carry data."),
 )
 
 # ── Architecture: one extra group for the architecture roles ────────────────────────────
