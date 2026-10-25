@@ -50,6 +50,10 @@ def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
 
 
 def _page_for(citation: Dict[str, Any]) -> Optional[str]:
+    if citation.get("type") == "page":
+        # A page of the company's own website the fact was read from: it opens where it lives.
+        target = citation.get("target") or ""
+        return target if target.startswith(("http://", "https://")) else None
     ident = citation.get("id")
     if not isinstance(ident, int):
         return None
@@ -84,15 +88,21 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
             record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")
         if row.get("source_line"):
             record["source_line"] = row["source_line"]
+        elif citation.get("source_line"):
+            record["source_line"] = citation["source_line"]
+        if citation["type"] == "page":
+            record["external"] = True
         records.append(record)
     return {
         "entry_id": entry_id,
-        "title": CATALOGUE[entry_id].title,
+        "title": result.get("title") or CATALOGUE[entry_id].title,
         "summary": result.get("answer"),
         "total": result.get("total"),
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.
         "complete": bool(result.get("complete")),
-        "next_step": NEXT_STEPS.get(entry_id) if not records and not result.get("complete") else None,
+        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not result.get("complete") else None,
+        "next_url": result.get("next_url") if not records else None,
+        "next_label": result.get("next_label") if not records else None,
         "records": records,
     }

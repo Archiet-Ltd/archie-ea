@@ -286,12 +286,15 @@ def confirm(org, user, decisions: List[Dict[str, Any]]) -> Dict[str, int]:
 
 
 def profile_entries(org) -> List[Dict[str, Any]]:
-    """What was confirmed, in profile order, for Settings: label, line, and where each came from."""
+    """What was confirmed, in profile order, for Settings and the chat: the field, its label, the line, where
+    each came from (the page and when it was read), and who confirmed or corrected it."""
     held = (org.settings or {}).get(PROFILE_KEY) or {}
     out = []
     for field, label in PROFILE_FIELDS.items():
         raw = held.get(field)
         for entry in (raw if isinstance(raw, list) else [raw] if raw else []):
-            out.append({"label": label, "text": display(entry.get("value")), "source": entry.get("source"),
-                        "source_url": entry.get("source_url"), "confirmed_by_name": entry.get("confirmed_by_name")})
+            out.append({"field": field, "label": label, "text": display(entry.get("value")),
+                        "source": entry.get("source"), "source_url": entry.get("source_url"),
+                        "fetched_at": entry.get("fetched_at"), "corrected": bool(entry.get("corrected")),
+                        "confirmed_by_name": entry.get("confirmed_by_name")})
     return out

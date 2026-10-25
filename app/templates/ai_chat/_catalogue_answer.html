@@ -22,7 +22,7 @@
         <ul class="space-y-2" aria-label="Records this answer rests on">
             {% for record in answer.records %}
             <li data-catalogue-record>
-                {{ button(text=record.name, variant='link', size='sm', href=record.url, icon='external-link', testid='catalogue-open') }}
+                {{ button(text=record.name, variant='link', size='sm', href=record.url, icon='external-link', testid='catalogue-open', attrs_dict=({'target': '_blank', 'rel': 'noopener noreferrer'} if record.external else {})) }}
                 {% if record.dependents or record.source_line %}
                 <p class="mt-1 text-xs text-muted-foreground">
                     {% if record.dependents %}<span class="font-medium text-foreground" data-catalogue-count>{{ record.dependents }}</span>{% endif %}
@@ -35,6 +35,6 @@
         </ul>
     {% endcall %}
     {% else %}
-        {{ empty_state(icon='circle-help', title=(sentence if sentence else 'Nothing in your records answers this yet'), description=answer.next_step or '', padding='py-6') }}
+        {{ empty_state(icon='circle-help', title=(sentence if sentence else 'Nothing in your records answers this yet'), description=answer.next_step or '', cta_text=(answer.next_label if answer.next_url else none), cta_href=(answer.next_url or none), padding='py-6') }}
     {% endif %}
 </div>
