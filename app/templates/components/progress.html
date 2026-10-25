@@ -48,3 +48,15 @@
     {% endif %}
 </div>
 {% endmacro %}
+
+{# A bar whose fill follows a value the surrounding Alpine scope already holds (the progress of a
+   job, the confidence of an element), where progress_dynamic keeps its own value. value_expr is an
+   Alpine expression for a number 0 to 100; bar_class_expr, when given, is an Alpine expression for
+   the colour classes of the fill. class is added to the track (use it for the width of the track). #}
+{% macro progress_bound(value_expr, bar_class_expr="", bar_class="bg-primary", class="") %}
+<div class="relative h-2 w-full overflow-hidden rounded-full bg-secondary {{ class }}"
+     role="progressbar" :aria-valuenow="{{ value_expr }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="h-full transition-all {{ bar_class }}"{% if bar_class_expr %} :class="{{ bar_class_expr }}"{% endif %}
+         :style="'width: ' + Math.min(100, Math.max(0, Number({{ value_expr }}) || 0)) + '%'"></div>
+</div>
+{% endmacro %}
