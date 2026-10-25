@@ -1,4 +1,4 @@
-"""A new owner finds their way round Entelim from the sidebar alone (navigation v3).
+"""A new owner finds their way round Entelim from the sidebar alone (navigation 3.1).
 
 The person: a startup CTO who has just signed up. Their goals, each asserted as the
 outcome they need, not as an element on a page:
@@ -8,9 +8,11 @@ outcome they need, not as an element on a page:
 - they can ask a question in one action from the sidebar (the AI chat entry) and in one
   action from the search box (type the question, press Enter), and the question is
   waiting in the chat;
-- every job is one click away, and each click lands on a page with content for that job
-  and marks that entry as the current one;
-- a page that has no entry of its own is found by its old name from the same box;
+- every job opens onto its pages: Changes reaches the Roadmap and Solutions in one click each,
+  Model then Strategy reaches Value stream, Model then Frameworks opens the gallery, and
+  Connections opens the connectors page; each click lands on a page with content and marks that
+  entry as the current one;
+- a page is found by its old name from the same box (plateaus finds the Roadmap);
 - the old Ask address still opens the chat.
 
 Played at 1440 wide in the light theme and at 390 wide in the dark theme (where the
@@ -30,18 +32,24 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 PASSWORD = "NavThree!Journey2026"
 QUESTION = "What breaks if Postgres fails?"
 
-# Entry -> (address it opens, words its page must carry). Same names and order for every role.
+# Entry -> (item that holds it or None, name, address it opens, words its page must carry).
+# Same names and order for every role.
 JOBS = [
-    ("Home", r"/dashboard/overview", None),
-    ("AI chat", r"/ai-chat", None),
-    ("Systems", r"/applications/?$", None),
-    ("Impact", r"/enterprise/analysis/impact-analysis", None),
-    ("Changes", r"/enterprise/implementation/gap-analysis", None),
-    ("Spend", r"/applications/rationalization", None),
-    ("Compliance", r"/risks/?$", None),
-    ("Integrations", r"/admin/connectors", "GitHub"),
-    ("Reports", r"/solutions/briefings", None),
-    ("Help", r"/docs", None),
+    (None, "Home", r"/dashboard/overview", None),
+    (None, "AI chat", r"/ai-chat", None),
+    ("systems", "Applications", r"/applications/?$", None),
+    ("impact", "Impact analysis", r"/enterprise/analysis/impact-analysis", None),
+    ("changes", "Gaps", r"/enterprise/implementation/gap-analysis", None),
+    ("changes", "Roadmap", r"/genome/roadmap", None),
+    ("changes", "Solutions", r"/solutions", None),
+    ("changes", "Business cases", r"/business-case/?$", None),
+    ("spend", "Costs", r"/procurement", None),
+    ("compliance", "Risks", r"/risks/?$", None),
+    ("layer_strategy", "Value stream", r"/value-streams", None),
+    (None, "Frameworks", r"/frameworks/?$", "Industry process frameworks"),
+    (None, "Connections", r"/admin/connectors", "GitHub"),
+    (None, "Reports", r"/solutions/briefings", None),
+    (None, "Help", r"/docs", None),
 ]
 
 
@@ -114,8 +122,8 @@ def test_01_a_new_owner_signs_up(walk):
     page.fill("#password", PASSWORD)
     page.fill("#password2", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
-    page.wait_for_timeout(1000)
+    page.wait_for_url(re.compile(r".*/(dashboard|account/welcome).*"), timeout=60000)
+    page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
     assert "/dashboard" in page.url
 
@@ -168,32 +176,42 @@ def test_05_ctrl_k_reaches_the_search_box_from_any_page(walk):
     assert page.evaluate("() => document.activeElement && document.activeElement.id") == "sidebar-search"
 
 
-@pytest.mark.parametrize("entry,address,words", JOBS, ids=[j[0] for j in JOBS])
-def test_06_each_job_is_one_click_away(walk, entry, address, words):
+@pytest.mark.parametrize("parent,entry,address,words", JOBS, ids=[j[1] for j in JOBS])
+def test_06_each_job_is_one_click_away(walk, parent, entry, address, words):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
-    walk.sidebar().locator('a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry))).click()
+    side = walk.sidebar()
+    if parent:
+        toggle = side.locator('[data-nav-toggle="%s"]' % parent)
+        if toggle.get_attribute("aria-expanded") != "true":
+            toggle.click()
+        expect(toggle).to_have_attribute("aria-expanded", "true")
+        target = side.locator('a[data-slot="sidebar-menu-sub-button"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry)))
+    else:
+        target = side.locator('a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry)))
+    target.click()
     page.wait_for_url(re.compile(r".*%s.*" % address))
     main = page.locator("main").first
     expect(main).not_to_be_empty()
     assert page.locator("h1").first.inner_text().strip(), "%s opened a page with no title" % entry
+    assert len(main.inner_text().strip()) > 40, "%s opened an empty page" % entry
     if words:
         expect(main).to_contain_text(words)
     assert "Internal Server Error" not in page.content()
     if entry != "Help":  # the documentation page is a public page, outside the signed-in shell
-        current = walk.sidebar().locator('a[data-slot="sidebar-menu-button"][aria-current="page"]')
-        expect(current).to_have_count(1)
-        expect(current).to_contain_text(entry)
+        side = walk.sidebar()
+        current = side.locator('[aria-current="page"]')
+        expect(current.first).to_contain_text(entry)
     walk.shot("job-%s" % entry.lower().replace(" ", "-"))
 
 
-def test_07_a_page_with_no_entry_is_found_by_its_old_name(walk):
+def test_07_a_page_is_found_by_its_old_name(walk):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
     walk.sidebar()
-    page.locator("#sidebar-search").fill("roadmap")
+    page.locator("#sidebar-search").fill("plateaus")
     hit = page.get_by_test_id("sidebar-search-page").filter(has_text="Roadmap").first
     expect(hit).to_contain_text("Changes")
     hit.click()
