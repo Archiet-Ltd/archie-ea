@@ -1,27 +1,21 @@
+<meta name="shadcn-nearest" content="dashboard-01">
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/modal.html' import modal %}
-{% from 'components/dense_table.html' import dense_table %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/skeleton.html' import skeleton_list, skeleton_table %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/input.html' import input, label, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Enterprise Capability Roadmap{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business Layer', 'href': url_for('archimate_crud.dashboard') + '#business'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Capability Roadmap', 'current': true}
-]) }}
-{% endblock %}
 
 {% block extra_css %}
 <style>
 /* ── Work Package Timeline Gantt ── */
-/* token-migration-ok: chart colours are intentional, not in token map */
 .rdm-gantt-wrap{margin:1.5rem 0;border:1px solid var(--border);border-radius:.5rem;overflow:hidden;background:var(--card)}
 .rdm-gantt-hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:.875rem 1.25rem}
 .rdm-gantt-hdr-title{font-size:.9375rem;font-weight:600;color:var(--foreground)}
@@ -52,6 +46,18 @@
 </style>
 {% endblock %}
 
+{% block breadcrumb %}
+{% call breadcrumb() %}
+  {% call breadcrumb_item(href=url_for('main.index')) %}Home{% endcall %}
+  {{ breadcrumb_separator() }}
+  {% call breadcrumb_item(href=url_for('archimate_crud.dashboard') + '#business') %}Business Layer{% endcall %}
+  {{ breadcrumb_separator() }}
+  {% call breadcrumb_item(href=url_for('capability_map.index')) %}Capabilities{% endcall %}
+  {{ breadcrumb_separator() }}
+  {% call breadcrumb_item(active=true) %}Capability Roadmap{% endcall %}
+{% endcall %}
+{% endblock %}
+
 {% block content %}
 <div id="capability-roadmap-app"
      x-data="enterpriseCapabilityRoadmap()"
@@ -62,228 +68,210 @@
 
   {# ── Page Header ── #}
   <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-    {{ page_header(
-      title='Enterprise Capability Roadmap',
-      description='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages'
-    ) }}
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Enterprise Capability Roadmap</h1>
+      <p class="mt-1 text-sm text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration — Plateaus, Gaps, and Work Packages</p>
+    </div>
     <div class="flex flex-wrap items-center gap-2">
-      <button type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-        @click="detectGaps()"
-        :disabled="isDetecting">
-        <i data-lucide="scan-search" class="h-4 w-4"></i>
-        <span x-show="!isDetecting" x-cloak>Detect Gaps</span>
-        <span x-show="isDetecting" x-cloak>Detecting…</span>
-      </button>
-      <button type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-        @click="openCreatePlateauModal()">
-        <i data-lucide="layers" class="h-4 w-4"></i>
-        Add Plateau
-      </button>
-      <button type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-        @click="openCreateGapModal()">
-        <i data-lucide="plus" class="h-4 w-4"></i>
-        Add Gap
-      </button>
+      {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
+      {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
+      {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
+      {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
     </div>
   </div>
 
   {# ── Metrics Row ── #}
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capability Gaps Detected</p>
-      <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_gaps"></p>
-      <p class="mt-1 text-xs text-muted-foreground">Coverage, quality &amp; modernization signals across capabilities</p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plateaus</p>
-      <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_plateaus"></p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Work Packages</p>
-      <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_wps"></p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI Generated</p>
-      <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.ai_generated"></p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capabilities</p>
-      <p class="mt-2 text-2xl font-semibold text-foreground">{{ capability_count }}</p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Domains</p>
-      <p class="mt-2 text-2xl font-semibold text-foreground">{{ domain_count }}</p>
-    </div>
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_description() %}Capability Gaps Detected{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_gaps"></span>{% endcall %}
+      {% endcall %}
+      {% call card_footer(direction='col') %}
+        <div class="line-clamp-1 flex gap-2 font-medium">Coverage, quality &amp; modernization signals across capabilities</div>
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_description() %}Plateaus{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_plateaus"></span>{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_description() %}Work Packages{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_wps"></span>{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_description() %}AI Generated{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.ai_generated"></span>{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_description() %}Capabilities{% endcall %}
+        {% call card_title(class='tabular-nums') %}{{ capability_count }}{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_description() %}Domains{% endcall %}
+        {% call card_title(class='tabular-nums') %}{{ domain_count }}{% endcall %}
+      {% endcall %}
+    {% endcall %}
   </div>
 
   {# ── Plateau Timeline ── #}
-  <div data-slot="card" class="rounded-lg border border-border bg-card">
-    <div class="flex items-center justify-between border-b px-6 py-4">
-      <h2 class="text-base font-semibold text-foreground">Plateaus — Implementation Timeline</h2>
-      <span class="text-xs text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration Layer</span>
-    </div>
-    <div class="p-6">
+  {% call card() %}
+    {% call card_header() %}
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold text-foreground">Plateaus — Implementation Timeline</h2>
+        <span class="text-xs text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration Layer</span>
+      </div>
+    {% endcall %}
+    {% call card_content() %}
       <template x-if="loading">
         <div>{{ skeleton_list(rows=3) }}</div>
       </template>
       <template x-if="!loading && errorMessage">
-        <div class="flex flex-col items-center justify-center py-10 text-center">
-          <i data-lucide="alert-triangle" class="mb-3 h-10 w-10 text-destructive"></i>
-          <p class="text-sm font-medium text-destructive-emphasis" x-text="errorMessage"></p>
-          <p class="mt-1 text-xs text-muted-foreground">The roadmap could not be read — this is not an empty roadmap.</p>
-        </div>
+        {{ empty_state(
+          icon='alert-triangle',
+          title='Error loading plateaus',
+          description='The roadmap could not be read — this is not an empty roadmap.',
+          class='py-10'
+        ) }}
       </template>
       <template x-if="!loading && !errorMessage && plateaus.length === 0">
-        <div class="flex flex-col items-center justify-center py-10 text-center">
-          <i data-lucide="layers" class="mb-3 h-10 w-10 text-muted-foreground/40"></i>
-          <p class="text-sm font-medium text-foreground">No plateaus defined</p>
-          <p class="mt-1 text-xs text-muted-foreground">Add a plateau to define your implementation timeline phases.</p>
-          <button type="button"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center"
-            @click="openCreatePlateauModal()">
-            <i data-lucide="plus" class="h-4 w-4"></i>
-            Add First Plateau
-          </button>
-        </div>
+        {{ empty_state(
+          icon='layers',
+          title='No plateaus defined',
+          description='Add a plateau to define your implementation timeline phases.',
+          cta_text='Add First Plateau',
+          cta_onclick='openCreatePlateauModal()',
+          cta_icon='plus',
+          class='py-10'
+        ) }}
       </template>
       <template x-if="!loading && plateaus.length > 0">
         <div class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-2' : 'grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
-            <div class="rounded-lg border border-border bg-muted/30 p-4">
-              <div class="flex items-start justify-between">
+            {% call card(class='bg-muted/30') %}
+              <div class="flex items-start justify-between p-4">
                 <div>
                   <p class="text-sm font-semibold text-foreground" x-text="plateau.name"></p>
                   <p class="mt-0.5 text-xs text-muted-foreground" x-text="plateau.description || 'No description'"></p>
                 </div>
-                <span class="inline-flex rounded-full border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground"
-                  x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>
+                {% call badge(variant='outline') %}<span x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>{% endcall %}
               </div>
-              <div class="mt-3 border-t border-border pt-3">
+              <div class="mt-3 border-t border-border pt-3 px-4 pb-4">
                 <p class="text-xs text-muted-foreground">
                   <span x-text="gapsForPlateau(plateau.id).length"></span> gap(s) assigned
                 </p>
               </div>
-            </div>
+            {% endcall %}
           </template>
         </div>
       </template>
-    </div>
-  </div>
+    {% endcall %}
+  {% endcall %}
 
-  {# ── Work Package Timeline (Gantt) ── #}
-  <div id="rdm-gantt-chart"></div>
+  {# ── Work Package Timeline (Gantt) — Tier C3 form region ── #}
+  <div id="rdm-gantt-chart" data-entelim-form="timeline"></div>
 
   {# ── Work Packages Table ── #}
-  <div data-slot="card" class="rounded-lg border border-border bg-card">
-    <div class="flex items-center justify-between border-b px-6 py-4">
-      <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
-      <div class="flex items-center gap-3">
-        <template x-if="selectedGapIds.length > 0">
-          <button type="button"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-            @click="openAiGenerateModal()">
-            <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
-            AI Generate (<span x-text="selectedGapIds.length"></span> gaps)
-          </button>
-        </template>
-        <button type="button"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-          @click="openCreateWorkPackageModal(null)">
-          <i data-lucide="plus" class="h-3.5 w-3.5"></i>
-          Add Work Package
-        </button>
+  {% call card() %}
+    {% call card_header() %}
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
+        <div class="flex items-center gap-3">
+          <template x-if="selectedGapIds.length > 0">
+            {% call button(text='AI Generate', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span x-text="selectedGapIds.length"></span> gaps{% endcall %}
+          </template>
+          {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
+        </div>
       </div>
-    </div>
-{% set _dt_header_12698 %}
-            <th scope="col" class="h-10 px-2 align-middle text-left w-8">
-              <input type="checkbox" class="rounded border-input"
-                @change="toggleAllGaps($event)"
-                :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0"
-                aria-label="Select all work packages">
-            </th>
-            <th scope="col" class="h-10 px-2 align-middle text-left">Work Package</th>
-            <th scope="col" class="h-10 px-2 align-middle text-left">Status</th>
-            <th scope="col" class="h-10 px-2 align-middle text-left">Priority</th>
-            <th scope="col" class="h-10 px-2 align-middle text-left">Timeline</th>
-            <th scope="col" class="h-10 px-2 align-middle text-left">Gap</th>
-            <th scope="col" class="h-10 px-2 align-middle text-right">Actions</th>
-          
-{% endset %}
-{% call dense_table(header=_dt_header_12698, flush=true) %}
+    {% endcall %}
+    {% call card_content() %}
+      {% call table() %}
+        {% call table_header() %}
+          <tr>
+            {% call table_head(attrs_dict={'class': 'w-8'}) %}<input type="checkbox" class="rounded border-input" @change="toggleAllGaps($event)" :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0" aria-label="Select all work packages">{% endcall %}
+            {% call table_head() %}Work Package{% endcall %}
+            {% call table_head() %}Status{% endcall %}
+            {% call table_head() %}Priority{% endcall %}
+            {% call table_head() %}Timeline{% endcall %}
+            {% call table_head() %}Gap{% endcall %}
+            {% call table_head(attrs_dict={'class': 'text-right'}) %}Actions{% endcall %}
+          </tr>
+        {% endcall %}
+        {% call table_body() %}
           <template x-if="loading">
             <tr>
-              <td colspan="7" class="px-2 dense-empty">{{ skeleton_table(rows=3, columns=7) }}</td>
+              <td colspan="7" class="p-4 text-center">{{ skeleton_table(rows=3, columns=7) }}</td>
             </tr>
           </template>
           <template x-if="!loading && errorMessage">
             <tr>
-              <td colspan="7" class="px-2 dense-empty text-center text-sm text-destructive-emphasis">
+              <td colspan="7" class="p-4 text-center text-sm text-destructive-emphasis">
                 Work packages could not be read — this is not "none yet".
               </td>
             </tr>
           </template>
           <template x-if="!loading && !errorMessage && workPackages.length === 0">
             <tr>
-              <td colspan="7" class="px-2 dense-empty text-center text-sm text-muted-foreground">
+              <td colspan="7" class="p-4 text-center text-sm text-muted-foreground">
                 No work packages yet. Add a gap first, then create work packages to resolve it.
               </td>
             </tr>
           </template>
           <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
-            <tr class="hover:bg-muted/30">
-              <td class="px-2">
+            {% call table_row(attrs_dict={'class': 'hover:bg-muted/30'}) %}
+              {% call table_cell() %}
                 <input type="checkbox" class="rounded border-input"
                   :value="wp.gap_id"
                   x-model="selectedGapIds"
                   :aria-label="'Select ' + (wp.name || 'work package')">
-              </td>
-              <td class="px-2 align-top">
+              {% endcall %}
+              {% call table_cell() %}
                 <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
-              </td>
-              <td class="px-2 align-top">
+              {% endcall %}
+              {% call table_cell() %}
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
                   :class="statusClass(wp.status)"
                   x-text="(wp.status || 'planned').replaceAll('_', ' ')"></span>
-              </td>
-              <td class="px-2 align-top">
+              {% endcall %}
+              {% call table_cell() %}
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
                   :class="priorityClass(wp.priority)"
                   x-text="wp.priority || 'medium'"></span>
-              </td>
-              <td class="px-2 align-top text-xs text-muted-foreground">
+              {% endcall %}
+              {% call table_cell(attrs_dict={'class': 'text-xs text-muted-foreground'}) %}
                 <span x-text="formatDate(wp.start_date)"></span>
                 <span class="mx-1 text-muted-foreground/50">→</span>
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
-              </td>
-              <td class="px-2 align-top text-xs text-muted-foreground" data-testid="roadmap-wp-gaps">
+              {% endcall %}
+              {% call table_cell(attrs_dict={'class': 'text-xs text-muted-foreground', 'data-testid': 'roadmap-wp-gaps'}) %}
                 <template x-if="!wp.gaps || wp.gaps.length === 0"><span>—</span></template>
                 <template x-for="g in (wp.gaps || [])" :key="g.id">
                   <div x-text="g.name"></div>
                 </template>
-              </td>
-              <td class="px-2 align-top text-right">
+              {% endcall %}
+              {% call table_cell(attrs_dict={'class': 'text-right'}) %}
                 <div class="inline-flex items-center gap-2">
-                  <button type="button"
-                    class="rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-muted"
-                    @click="openEditWorkPackageModal(wp)">
-                    Edit
-                  </button>
-                  <button type="button"
-                    class="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs text-destructive-emphasis hover:bg-destructive/10"
-                    @click="deleteWorkPackage(wp)">
-                    Delete
-                  </button>
+                  {% call button(text='Edit', variant='outline', size='xs', on_click='openEditWorkPackageModal(wp)') %}{% endcall %}
+                  {% call button(text='Delete', variant='destructive', size='xs', on_click='deleteWorkPackage(wp)') %}{% endcall %}
                 </div>
-              </td>
-            </tr>
+              {% endcall %}
+            {% endcall %}
           </template>
         {% endcall %}
-  </div>
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
 
   {# ── Error Banner ── #}
   <template x-if="errorMessage">
@@ -294,262 +282,260 @@
 </div>
 
 {# ════════════════════════════════════════════════════════════
-   MODALS — all use Platform.modal + hidden attribute (AP-11 compliant)
+   DIALOGS — using Platform.modal for visibility control
    ════════════════════════════════════════════════════════════ #}
 
-{# Create / Edit Gap Modal #}
-{% call modal(id='rdm-create-gap-modal', labelledby='rdm-gap-modal-title') %}
-<div x-data="rdmGapModalForm()" x-init="initFromGlobal()">
-<h3 id="rdm-gap-modal-title" x-text="isEditing ? 'Edit Gap' : 'Create Gap'" class="text-base font-semibold text-foreground mb-4"></h3>
-    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitGapForm()">
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Gap Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" x-model="form.name" required
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Gap Name">
-      </div>
-      <div class="grid gap-4 grid-cols-1">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
-          <select x-model="form.gap_type"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Gap Type">
-            <option value="coverage">Coverage</option>
-            <option value="quality">Quality</option>
-            <option value="retirement">Retirement</option>
-            <option value="modernization">Modernization</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
-          <select x-model="form.priority"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Priority">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-        <textarea x-model="form.description" rows="3"
-          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Description"></textarea>
-      </div>
-      <div class="flex items-center justify-end gap-2 border-t pt-4">
-        <button type="button"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
-          data-modal-close="rdm-create-gap-modal">Cancel</button>
-        <button type="submit"
-          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          :disabled="isSubmitting">
-          <span x-show="!isSubmitting" x-cloak x-text="isEditing ? 'Save Changes' : 'Create Gap'"></span>
-          <span x-show="isSubmitting" x-cloak>Saving…</span>
+{# Create / Edit Gap Dialog #}
+<div id="rdm-create-gap-modal" data-modal="rdm-create-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-gap-modal-title">
+  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+    <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between p-6 border-b shrink-0">
+        <h2 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground" x-text="gapModalTitle"></h2>
+        <button type="button" data-modal-close="rdm-create-gap-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
       </div>
-    </form>
-  
-</div>
-{% endcall %}
-
-{# Create Plateau Modal #}
-{% call modal(id='rdm-create-plateau-modal', title='Add Plateau') %}
-<div x-data="rdmPlateauModalForm()" x-init="initFromGlobal()">
-    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitPlateauForm()">
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Plateau Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" x-model="form.name" required
-          placeholder="e.g. Plateau 1 — Foundation"
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Plateau Name">
-      </div>
-      <div class="grid gap-4 grid-cols-1">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Sequence Order <span class="text-destructive-emphasis">*</span></label>
-          <input type="number" min="1" x-model.number="form.sequence_order" required
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Sequence Order">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
-          <input type="date" x-model="form.target_date"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Date">
-        </div>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-        <textarea x-model="form.description" rows="2"
-          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
-      </div>
-      <div class="flex items-center justify-end gap-2 border-t pt-4">
-        <button type="button"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
-          data-modal-close="rdm-create-plateau-modal">Cancel</button>
-        <button type="submit"
-          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          :disabled="isSubmitting">
-          <span x-show="!isSubmitting" x-cloak>Create Plateau</span>
-          <span x-show="isSubmitting" x-cloak>Saving…</span>
-        </button>
-      </div>
-    </form>
-  
-</div>
-{% endcall %}
-
-{# Create / Edit Work Package Modal #}
-{% call modal(id='rdm-create-wp-modal', size='lg', labelledby='rdm-wp-modal-title') %}
-<div x-data="rdmWpModalForm()" x-init="initFromGlobal()">
-<h3 id="rdm-wp-modal-title" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'" class="text-base font-semibold text-foreground mb-4"></h3>
-    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitWpForm()">
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" x-model="form.name" required
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Name">
-      </div>
-      <div class="grid gap-4 grid-cols-1">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-          <select x-model="form.status"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Status">
-            <option value="planned">Planned</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="on_hold">On Hold</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
-          <select x-model="form.priority"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Priority">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Start Date <span class="text-destructive-emphasis">*</span></label>
-          <input type="date" x-model="form.start_date" required
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Start Date">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Target Date <span class="text-destructive-emphasis">*</span></label>
-          <input type="date" x-model="form.target_date" required
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Date">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Linked Gap</label>
-          <div class="relative">
-            <input type="search" autocomplete="off" x-model="gapQuery" @input.debounce.300ms="searchGaps()"
-              placeholder="Search gaps by name"
-              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Linked Gap" data-testid="wp-modal-gap-input">
-            <p class="mt-1 text-xs text-muted-foreground">
-              <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
-              <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
-            </p>
-            <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background">
-              <template x-for="g in gapResults" :key="g.id">
-                <li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                  @click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []" x-text="g.name"></button></li>
-              </template>
-            </ul>
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1">Target Plateau</label>
-          <select x-model.number="form.plateau_id"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Plateau">
-            <option :value="null">— None —</option>
-            <template x-for="p in $store.rdm.plateaus" :key="p.id">
-              <option :value="p.id" x-text="p.name"></option>
-            </template>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-        <textarea x-model="form.description" rows="3"
-          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
-      </div>
-      <div class="flex items-center justify-end gap-2 border-t pt-4">
-        <button type="button"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
-          data-modal-close="rdm-create-wp-modal">Cancel</button>
-        <button type="submit"
-          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          :disabled="isSubmitting">
-          <span x-show="!isSubmitting" x-cloak x-text="isEditing ? 'Save Changes' : 'Create Work Package'"></span>
-          <span x-show="isSubmitting" x-cloak>Saving…</span>
-        </button>
-      </div>
-    </form>
-  
-</div>
-{% endcall %}
-
-{# AI Generate Preview Modal #}
-{% call modal(id='rdm-ai-generate-modal', title='AI Roadmap Generation Preview', description='Review suggested work packages before confirming. No changes are saved until you click Confirm.', size='lg') %}
-<div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
-    <div class="flex-1 min-h-0 overflow-y-auto">
-      <template x-if="isLoading">
-        <div class="flex items-center justify-center py-10">
-          <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-          <span class="ml-3 text-sm text-muted-foreground">Generating preview…</span>
-        </div>
-      </template>
-      <template x-if="!isLoading && preview.length === 0">
-        <p class="text-center text-sm text-muted-foreground py-6">No preview available. Select gaps and try again.</p>
-      </template>
-      <template x-if="!isLoading && preview.length > 0">
-        <div class="space-y-3">
-          <template x-for="item in preview" :key="item.gap_id">
-            <div class="rounded-lg border border-border bg-muted/30 p-4">
-              <div class="flex items-start justify-between">
-                <div>
-                  <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gap</p>
-                  <p class="text-sm font-semibold text-foreground" x-text="item.gap_name"></p>
-                </div>
-                <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
-                  :class="priorityClass(item.gap_priority)"
-                  x-text="item.gap_priority"></span>
+      <div class="p-6 overflow-y-auto flex-1">
+        <div x-data="rdmGapModalForm()" x-init="initFromGlobal()">
+          <form class="space-y-4" @submit.prevent="submitGapForm()">
+            <div>
+              {% call label(for='rdm-gap-name', required=true) %}Gap Name{% endcall %}
+              {% call input(id='rdm-gap-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Gap Name'}) %}{% endcall %}
+            </div>
+            <div class="grid gap-4 grid-cols-1">
+              <div>
+                {% call label(for='rdm-gap-type') %}Gap Type{% endcall %}
+                {% call native_select(id='rdm-gap-type', aria_label='Gap Type', attrs_dict={'x-model': 'form.gap_type'}) %}
+                  <option value="coverage">Coverage</option>
+                  <option value="quality">Quality</option>
+                  <option value="retirement">Retirement</option>
+                  <option value="modernization">Modernization</option>
+                  <option value="custom">Custom</option>
+                {% endcall %}
               </div>
-              <div class="mt-3 border-t border-border pt-3 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <p class="font-medium text-muted-foreground">Suggested Work Package</p>
-                  <p class="text-foreground" x-text="item.suggested_work_package.name"></p>
-                </div>
-                <div>
-                  <p class="font-medium text-muted-foreground">Target Plateau</p>
-                  <p class="text-foreground" x-text="item.suggested_plateau"></p>
-                </div>
-                <div>
-                  <p class="font-medium text-muted-foreground">Start Date</p>
-                  <p class="text-foreground" x-text="formatDate(item.suggested_work_package.estimated_start_date)"></p>
-                </div>
-                <div>
-                  <p class="font-medium text-muted-foreground">Target Date</p>
-                  <p class="text-foreground" x-text="formatDate(item.suggested_work_package.target_resolution_date)"></p>
-                </div>
+              <div>
+                {% call label(for='rdm-gap-priority') %}Priority{% endcall %}
+                {% call native_select(id='rdm-gap-priority', aria_label='Priority', attrs_dict={'x-model': 'form.priority'}) %}
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                {% endcall %}
               </div>
             </div>
-          </template>
+            <div>
+              {% call label(for='rdm-gap-description') %}Description{% endcall %}
+              {% call textarea(id='rdm-gap-description', rows=3, attrs_dict={'x-model': 'form.description', 'aria-label': 'Description'}) %}{% endcall %}
+            </div>
+            <div class="flex items-center justify-end gap-2 border-t pt-4">
+              {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-gap-modal')") %}{% endcall %}
+              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
+            </div>
+          </form>
         </div>
-      </template>
+      </div>
     </div>
-    <div class="flex items-center justify-end gap-2 border-t py-4 pt-4 mt-4">
-      <button type="button"
-        class="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
-        data-modal-close="rdm-ai-generate-modal">Discard</button>
-      <button type="button"
-        class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        :disabled="isConfirming || preview.length === 0"
-        @click="confirmAiGeneration()">
-        <span x-show="!isConfirming" x-cloak>Confirm &amp; Create Work Packages</span>
-        <span x-show="isConfirming" x-cloak>Creating…</span>
-      </button>
-    </div>
-  
+  </div>
 </div>
-{% endcall %}
+
+{# Create Plateau Dialog #}
+<div id="rdm-create-plateau-modal" data-modal="rdm-create-plateau-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-plateau-modal-title">
+  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+    <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between p-6 border-b shrink-0">
+        <h2 id="rdm-plateau-modal-title" class="text-base font-semibold text-foreground">Add Plateau</h2>
+        <button type="button" data-modal-close="rdm-create-plateau-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <div x-data="rdmPlateauModalForm()" x-init="initFromGlobal()">
+          <form class="space-y-4" @submit.prevent="submitPlateauForm()">
+            <div>
+              {% call label(for='rdm-plateau-name', required=true) %}Plateau Name{% endcall %}
+              {% call input(id='rdm-plateau-name', placeholder='e.g. Plateau 1 — Foundation', attrs_dict={'x-model': 'form.name', 'aria-label': 'Plateau Name'}) %}{% endcall %}
+            </div>
+            <div class="grid gap-4 grid-cols-1">
+              <div>
+                {% call label(for='rdm-plateau-order', required=true) %}Sequence Order{% endcall %}
+                {% call input(id='rdm-plateau-order', type='number', attrs_dict={'min': '1', 'x-model.number': 'form.sequence_order', 'aria-label': 'Sequence Order'}) %}{% endcall %}
+              </div>
+              <div>
+                {% call label(for='rdm-plateau-date') %}Target Date{% endcall %}
+                {% call input(id='rdm-plateau-date', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) %}{% endcall %}
+              </div>
+            </div>
+            <div>
+              {% call label(for='rdm-plateau-description') %}Description{% endcall %}
+              {% call textarea(id='rdm-plateau-description', rows=2, attrs_dict={'x-model': 'form.description', 'aria-label': 'Description'}) %}{% endcall %}
+            </div>
+            <div class="flex items-center justify-end gap-2 border-t pt-4">
+              {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-plateau-modal')") %}{% endcall %}
+              {% call button(text='Create Plateau', variant='default', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Create / Edit Work Package Dialog #}
+<div id="rdm-create-wp-modal" data-modal="rdm-create-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-wp-modal-title">
+  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+    <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between p-6 border-b shrink-0">
+        <h2 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground" x-text="wpModalTitle"></h2>
+        <button type="button" data-modal-close="rdm-create-wp-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <div x-data="rdmWpModalForm()" x-init="initFromGlobal()">
+          <form class="space-y-4" @submit.prevent="submitWpForm()">
+            <div>
+              {% call label(for='rdm-wp-name', required=true) %}Name{% endcall %}
+              {% call input(id='rdm-wp-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Name'}) %}{% endcall %}
+            </div>
+            <div class="grid gap-4 grid-cols-1">
+              <div>
+                {% call label(for='rdm-wp-status') %}Status{% endcall %}
+                {% call native_select(id='rdm-wp-status', aria_label='Status', attrs_dict={'x-model': 'form.status'}) %}
+                  <option value="planned">Planned</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="cancelled">Cancelled</option>
+                {% endcall %}
+              </div>
+              <div>
+                {% call label(for='rdm-wp-priority') %}Priority{% endcall %}
+                {% call native_select(id='rdm-wp-priority', aria_label='Priority', attrs_dict={'x-model': 'form.priority'}) %}
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                {% endcall %}
+              </div>
+              <div>
+                {% call label(for='rdm-wp-start', required=true) %}Start Date{% endcall %}
+                {% call input(id='rdm-wp-start', type='date', attrs_dict={'x-model': 'form.start_date', 'aria-label': 'Start Date'}) %}{% endcall %}
+              </div>
+              <div>
+                {% call label(for='rdm-wp-target', required=true) %}Target Date{% endcall %}
+                {% call input(id='rdm-wp-target', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) %}{% endcall %}
+              </div>
+              <div>
+                {% call label(for='rdm-wp-gap') %}Linked Gap{% endcall %}
+                <div class="relative">
+                  {% call input(id='rdm-wp-gap', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'gapQuery', '@input.debounce.300ms': 'searchGaps()', 'data-testid': 'wp-modal-gap-input'}) %}{% endcall %}
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
+                    <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
+                  </p>
+                  <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background">
+                    <template x-for="g in gapResults" :key="g.id">
+                      <li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                        @click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []" x-text="g.name"></button></li>
+                    </template>
+                  </ul>
+                </div>
+              </div>
+              <div>
+                {% call label(for='rdm-wp-plateau') %}Target Plateau{% endcall %}
+                {% call native_select(id='rdm-wp-plateau', aria_label='Target Plateau', attrs_dict={'x-model.number': 'form.plateau_id'}) %}
+                  <option :value="null">— None —</option>
+                  <template x-for="p in $store.rdm.plateaus" :key="p.id">
+                    <option :value="p.id" x-text="p.name"></option>
+                  </template>
+                {% endcall %}
+              </div>
+            </div>
+            <div>
+              {% call label(for='rdm-wp-description') %}Description{% endcall %}
+              {% call textarea(id='rdm-wp-description', rows=3, attrs_dict={'x-model': 'form.description', 'aria-label': 'Description'}) %}{% endcall %}
+            </div>
+            <div class="flex items-center justify-end gap-2 border-t pt-4">
+              {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-wp-modal')") %}{% endcall %}
+              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Work Package'"}) %}{% endcall %}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# AI Generate Preview Dialog #}
+<div id="rdm-ai-generate-modal" data-modal="rdm-ai-generate-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title">
+  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+    <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between p-6 border-b shrink-0">
+        <h2 id="rdm-ai-modal-title" class="text-base font-semibold text-foreground">AI Roadmap Generation Preview</h2>
+        <p class="text-sm text-muted-foreground">Review suggested work packages before confirming. No changes are saved until you click Confirm.</p>
+        <button type="button" data-modal-close="rdm-ai-generate-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
+          <template x-if="isLoading">
+            <div class="flex items-center justify-center py-10">
+              <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+              <span class="ml-3 text-sm text-muted-foreground">Generating preview…</span>
+            </div>
+          </template>
+          <template x-if="!isLoading && preview.length === 0">
+            <p class="text-center text-sm text-muted-foreground py-6">No preview available. Select gaps and try again.</p>
+          </template>
+          <template x-if="!isLoading && preview.length > 0">
+            <div class="space-y-3">
+              <template x-for="item in preview" :key="item.gap_id">
+                {% call card(class='bg-muted/30') %}
+                  <div class="flex items-start justify-between p-4">
+                    <div>
+                      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gap</p>
+                      <p class="text-sm font-semibold text-foreground" x-text="item.gap_name"></p>
+                    </div>
+                    <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
+                      :class="priorityClass(item.gap_priority)"
+                      x-text="item.gap_priority"></span>
+                  </div>
+                  <div class="mt-3 border-t border-border pt-3 grid grid-cols-2 gap-3 text-xs px-4 pb-4">
+                    <div>
+                      <p class="font-medium text-muted-foreground">Suggested Work Package</p>
+                      <p class="text-foreground" x-text="item.suggested_work_package.name"></p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-muted-foreground">Target Plateau</p>
+                      <p class="text-foreground" x-text="item.suggested_plateau"></p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-muted-foreground">Start Date</p>
+                      <p class="text-foreground" x-text="formatDate(item.suggested_work_package.estimated_start_date)"></p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-muted-foreground">Target Date</p>
+                      <p class="text-foreground" x-text="formatDate(item.suggested_work_package.target_resolution_date)"></p>
+                    </div>
+                  </div>
+                {% endcall %}
+              </template>
+            </div>
+          </template>
+          <div class="flex items-center justify-end gap-2 border-t py-4 pt-4 mt-4">
+            {% call button(text='Discard', variant='outline', on_click="Platform.modal.close('rdm-ai-generate-modal')") %}{% endcall %}
+            {% call button(text='Confirm & Create', variant='default', attrs_dict={':disabled': 'isConfirming || preview.length === 0', '@click': 'confirmAiGeneration()'}) %}{% endcall %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -583,6 +569,16 @@
       isDetecting: false,
       errorMessage: '',
       loading: true,
+
+      get gapModalTitle() {
+        const editing = Alpine.store('rdm').editingGap;
+        return editing ? 'Edit Gap' : 'Create Gap';
+      },
+
+      get wpModalTitle() {
+        const editing = Alpine.store('rdm').editingWp;
+        return editing ? 'Edit Work Package' : 'Create Work Package';
+      },
 
       get filteredGaps() {
         return this.gaps.filter(g => {
@@ -770,8 +766,6 @@
           default: return 'border-secondary/30 bg-secondary/10 text-secondary-foreground';
         }
       },
-
-      // ── Gantt helpers removed — standalone rdmGantt() handles rendering ──
     };
   };
 
@@ -1044,7 +1038,6 @@
   const MONTH_WIDTH = 120; // px per month
 
   /* --- colour map by status --- */
-  /* token-migration-ok: chart-specific colours not in token map */
   const STATUS_COLOUR = {
     completed:   '#15803D',
     in_progress: '#2563EB',
@@ -1055,7 +1048,7 @@
     return STATUS_COLOUR[(status || '').toLowerCase()] || '#64748B';
   }
 
-  /* --- timeline helpers (identical logic to docs/layout.html reference) --- */
+  /* --- timeline helpers --- */
   function getTimelineRange(tasks) {
     const dates = tasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
     const minDate = new Date(Math.min(...dates));
@@ -1123,12 +1116,12 @@
         return `
           <div class="rdm-gantt-row">
             <div class="rdm-gantt-name-cell">
-              <span class="rdm-gantt-dot" style="background:${colour}"></span> <!-- inline-style-ok ratchet-ok -->
+              <span class="rdm-gantt-dot" style="background:${colour}"></span>
               <span class="rdm-gantt-name" title="${task.name}">${task.name}</span>
             </div>
             <div class="rdm-gantt-dur-cell">${getDuration(task.startDate, task.endDate)}</div>
             <div class="rdm-gantt-timeline-cell">
-              <div class="rdm-gantt-track" style="min-width:${totalWidth}px"> <!-- inline-style-ok ratchet-ok -->
+              <div class="rdm-gantt-track" style="min-width:${totalWidth}px">
                 ${timelineCells}
                 <div class="rdm-gantt-bar"
                      style="background:${colour};left:${left}px;width:${width}px"
@@ -1161,7 +1154,7 @@
           <div>Work Package</div>
           <div class="rdm-gantt-dur-hdr">Duration</div>
           <div class="rdm-gantt-months-hdr">
-            <div class="rdm-gantt-months-row" style="min-width:${totalWidth}px">${monthHeaderCells}</div> <!-- inline-style-ok ratchet-ok -->
+            <div class="rdm-gantt-months-row" style="min-width:${totalWidth}px">${monthHeaderCells}</div>
           </div>
         </div>
         ${sections}
@@ -1171,8 +1164,6 @@
   /* --- data loading --- */
   async function loadAndRender() {
     try {
-      // silent: the catch below already paints an inline "could not load the
-      // timeline" card, so three toasts on top of it would be noise.
       const [wpData, gapData, plateauData] = await Promise.all([
         Platform.fetch('/capability-map/api/roadmap/work-packages', { silent: true }),
         Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true }),
@@ -1257,4 +1248,3 @@
 }());
 </script>
 {% endblock %}
-{# design-block: dashboard #}

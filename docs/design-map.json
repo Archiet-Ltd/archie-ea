@@ -19551,6 +19551,7 @@
         "components/filter_bar.html",
         "components/gantt_timeline.html",
         "components/inline_hint.html",
+        "components/input.html",
         "components/loading_state.html",
         "components/metrics_card.html",
         "components/modal.html",
@@ -19559,9 +19560,11 @@
         "components/progress.html",
         "components/provenance.html",
         "components/review_queue_panel.html",
+        "components/select.html",
         "components/skeleton.html",
         "components/status_badge.html",
         "components/status_indicator.html",
+        "components/table.html",
         "components/tabs.html",
         "macros/page_shell.html"
       ],
@@ -19585,12 +19588,18 @@
       "confidence": "high",
       "controls": {
         "button": 18,
-        "form": 3,
+        "form": 4,
         "link": 1,
         "modal": 4,
         "table": 1,
         "testid": 2
       },
+      "extra_macros": [
+        "components/empty_state.html",
+        "components/input.html",
+        "components/select.html",
+        "components/table.html"
+      ],
       "extends": [
         "layouts/admin_base.html"
       ],
@@ -19603,12 +19612,14 @@
       ],
       "macros": [
         "components/badge.html",
-        "components/breadcrumb_nav.html",
+        "components/breadcrumb.html",
+        "components/button.html",
         "components/card.html",
-        "components/dense_table.html",
-        "components/modal.html",
-        "components/page_header.html",
-        "components/skeleton.html"
+        "components/empty_state.html",
+        "components/input.html",
+        "components/select.html",
+        "components/skeleton.html",
+        "components/table.html"
       ],
       "original": "gap:G-4",
       "page_type": "timeline",
