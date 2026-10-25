@@ -107,7 +107,12 @@ def choices(org) -> Dict[str, Any]:
 
 def settings_card(org) -> Dict[str, Any]:
     """What Settings shows so the two choices can be changed after sign-up."""
-    return {"kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org)}
+    from app.modules.organization.website_crawl import confirm
+
+    return {
+        "kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org),
+        "profile": confirm.profile_entries(org),
+    }
 
 
 def save_choices(

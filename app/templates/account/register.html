@@ -7,6 +7,8 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, label %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/badge.html' import badge %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/alert.html' import alert %}
@@ -18,7 +20,7 @@
    landmark. Wrapping the page in a second one gave the document two main
    landmarks and two elements with the same id, so the "Skip to main content"
    link and screen-reader landmark navigation both resolved ambiguously. #}
-<div class="mx-auto w-full max-w-2xl px-4 py-6 space-y-6" x-data="{ step: {{ step }}, done: {{ range(1, step) | list | tojson }}, locked: [] }">
+<div class="mx-auto w-full {{ 'max-w-4xl' if step == 3 else 'max-w-2xl' }} px-4 py-6 space-y-6" x-data="{ step: {{ step }}, done: {{ range(1, step) | list | tojson }}, locked: [] }">
     {{ stepper(sign_up_steps, current_step_expr='step', completed_expr='done', locked_steps_expr='locked') }}
     {% if step == 1 %}
     <div class="flex justify-center">

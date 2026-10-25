@@ -207,7 +207,7 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         expect(page.get_by_text("Tick the box to let us read this site.")).to_be_visible()
         page.get_by_label("You may read this website").check()
         page.get_by_role("button", name="Save website").click()
-        expect(page.get_by_test_id("signup-status-website")).to_contain_text("https://acme.com will be read soon")
+        expect(page.get_by_test_id("signup-status-website")).to_contain_text("Company website is connected")
 
         # GitHub starts at once and the person carries on.
         page.get_by_label("GitHub organisation").fill("acme")
@@ -240,7 +240,7 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         # The dashboard shows each source's progress; no sample company is offered.
         sources = page.get_by_test_id("signup-sources")
         expect(sources).to_contain_text("GitHub.")
-        expect(sources).to_contain_text("https://acme.com will be read soon")
+        expect(sources).to_contain_text("Company website")
         expect(page.get_by_test_id("first-action-sample")).to_have_count(0)
         deadline = time.monotonic() + 240
         while time.monotonic() < deadline:

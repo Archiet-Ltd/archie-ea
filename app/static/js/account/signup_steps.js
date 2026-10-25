@@ -14,6 +14,7 @@
         jira: root.getAttribute('data-url-jira'),
         website: root.getAttribute('data-url-website'),
         choices: root.getAttribute('data-url-choices'),
+        profile: root.getAttribute('data-url-profile'),
         status: root.getAttribute('data-url-status'),
         test: root.getAttribute('data-url-ai-test')
     };
@@ -58,6 +59,10 @@
         timer = window.setInterval(function () {
             window.Platform.fetch.get(URLS.status, null, { silent: true }).then(function (body) {
                 paint(body.sources);
+                var site = (body.sources || []).filter(function (row) { return row.key === 'website'; })[0];
+                if (site && site.state === 'done' && root.hasAttribute('data-reload-when-read')) {
+                    saveEverything().then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
+                }
                 var open = (body.sources || []).some(function (row) { return row.state === 'waiting' || row.state === 'reading'; });
                 if (!open) { window.clearInterval(timer); timer = null; }
             }).catch(function () { /* swallow-ok: a missed poll is retried on the next tick; the last line stays on screen */ });
@@ -82,6 +87,37 @@
         return { kind: value('welcome-kind'), industry: value('welcome-industry'), frameworks: picked };
     }
 
+    function answers(withFacts) {
+        var body = { size_band: value('welcome-size'), role: value('welcome-role'), goal: value('welcome-goal'), facts: [] };
+        if (withFacts) {
+            root.querySelectorAll('[data-fact]').forEach(function (row) {
+                var keep = row.querySelector('[data-fact-keep]');
+                var edit = row.querySelector('[data-fact-value]');
+                body.facts.push({ id: row.getAttribute('data-fact'), accept: !!(keep && keep.checked), value: edit ? edit.value : '' });
+            });
+        }
+        return body;
+    }
+
+    function saveEverything() {
+        return post(URLS.choices, chosen()).then(function () { return post(URLS.profile, answers(true)); });
+    }
+
+    // Offer the frameworks that suit the goal and the company kind; ones already ticked stay.
+    function suggest() {
+        var group = root.querySelector('[data-suggest]');
+        if (!group) return;
+        var map = JSON.parse(group.getAttribute('data-suggest'));
+        var wanted = (map.goal[value('welcome-goal')] || []).concat(map.kind[value('welcome-kind')] || []);
+        group.querySelectorAll('[data-framework]').forEach(function (box) {
+            var holder = box.closest('div');
+            holder.classList.toggle('hidden', !(box.checked || wanted.indexOf(box.value) !== -1));
+        });
+    }
+    root.addEventListener('change', function (event) {
+        if (event.target.id === 'welcome-goal' || event.target.id === 'welcome-kind') suggest();
+    });
+
     root.addEventListener('click', function (event) {
         var button = event.target.closest('[data-action]');
         if (!button) return;
@@ -97,7 +133,7 @@
             give('website', URLS.website, { url: value('welcome-website'), consent: !!(consent && consent.checked) }, button);
         } else if (action === 'continue') {
             busy(button, true);
-            post(URLS.choices, chosen()).then(function () {
+            saveEverything().then(function () {
                 window.location.assign(button.getAttribute('data-next'));
             }).catch(function (error) {
                 busy(button, false);
@@ -127,6 +163,7 @@
         }
     });
 
+    if (root.hasAttribute('data-reload-when-read')) poll();
     var reading = root.querySelector('[data-state="waiting"], [data-state="reading"]');
     if (reading) poll();
 }());

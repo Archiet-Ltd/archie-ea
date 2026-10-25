@@ -18,11 +18,11 @@
         {% endcall %}
     </div>
 </div>
-<fieldset class="space-y-2" data-testid="signup-frameworks">
-    <legend class="text-sm font-medium">Frameworks you already work with</legend>
-    <div class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+<fieldset class="space-y-2" data-testid="signup-frameworks"{% if suggested is defined %} data-suggest="{{ {'goal': goal_frameworks, 'kind': kind_frameworks} | tojson | forceescape }}"{% endif %}>
+    <legend class="text-sm font-medium">{% if suggested is defined %}Frameworks that suit your goal{% else %}Frameworks you already work with{% endif %}</legend>
+    <div class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
         {% for key, name, note in frameworks %}
-        {{ checkbox(id='welcome-framework-' ~ key, value=key, label=name, checked=(key in chosen.frameworks), attrs_dict={'data-framework': '', 'title': note}) }}
+        {{ checkbox(id='welcome-framework-' ~ key, value=key, label=name, checked=(key in chosen.frameworks), class=('hidden' if suggested is defined and key not in suggested and key not in chosen.frameworks else ''), attrs_dict={'data-framework': '', 'title': note}) }}
         {% endfor %}
     </div>
 </fieldset>
