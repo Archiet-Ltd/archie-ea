@@ -1,8 +1,12 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
 {% import 'components/card.html' as card %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, label, textarea %}
+{% from 'components/select.html' import native_select %}
 
 {% block title %}Business Model Canvas{% endblock %}
 
@@ -66,36 +70,25 @@
 
 {% call modal(id='bmc-create-modal', title='New Business Model Canvas', description='Give it a name — you can fill in the 9 blocks next.', size='default') %}
 <form method="POST" action="{{ url_for('business_model.create') }}" class="space-y-4" data-testid="bmc-create-form">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div>
-    <label for="bmc-name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
-    <input id="bmc-name" name="name" type="text" required maxlength="256" placeholder="e.g. Core Retail Business"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='bmc-name', required=true) %}Name{% endcall %}
+    {{ input(id='bmc-name', name='name', required=true, placeholder='e.g. Core Retail Business', attrs_dict={'maxlength': '256'}) }}
   </div>
-  <div>
-    <label for="bmc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-    <textarea id="bmc-description" name="description" rows="2" maxlength="2000" placeholder="Optional context for this canvas"
-      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='bmc-description') %}Description{% endcall %}
+    {{ textarea(id='bmc-description', name='description', placeholder='Optional context for this canvas', rows=2, attrs_dict={'maxlength': '2000'}) }}
   </div>
-  <div>
-    <label for="bmc-operating-model" class="block text-sm font-medium text-muted-foreground mb-1">Operating Model Archetype</label>
-    <select id="bmc-operating-model" name="operating_model_type"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='bmc-operating-model') %}Operating Model Archetype{% endcall %}
+    {% call native_select(id='bmc-operating-model', name='operating_model_type') %}
       <option value="">Not set</option>
-      {% for t in operating_model_types %}
-      <option value="{{ t }}">{{ t | capitalize }}</option>
-      {% endfor %}
-    </select>
+      {% for t in operating_model_types %}<option value="{{ t }}">{{ t | capitalize }}</option>{% endfor %}
+    {% endcall %}
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
-    <button type="button" data-modal-close="bmc-create-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-      Cancel
-    </button>
-    <button type="submit" data-testid="bmc-create-submit"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-      Create Canvas
-    </button>
+    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'bmc-create-modal'}) }}
+    {{ button(text='Create Canvas', type='submit', testid='bmc-create-submit') }}
   </div>
 </form>
 {% endcall %}

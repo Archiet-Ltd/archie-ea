@@ -2354,8 +2354,9 @@ def api_list_stakeholders(analysis_id):
         from app.models.vendor_analysis import OptionsAnalysis
 
         analysis = db.session.get(OptionsAnalysis, analysis_id)
-        if not analysis:
-            return jsonify({"error": "Analysis not found"}), 404
+        denied = _check_analysis_access(analysis)
+        if denied:
+            return denied
 
         stakeholders = [_serialize_stakeholder(si) for si in analysis.stakeholder_inputs]
         return jsonify({"success": True, "stakeholders": stakeholders})
@@ -2376,8 +2377,9 @@ def api_invite_stakeholder(analysis_id):
         from app.models.vendor_analysis import OptionsAnalysis, StakeholderInput
 
         analysis = db.session.get(OptionsAnalysis, analysis_id)
-        if not analysis:
-            return jsonify({"error": "Analysis not found"}), 404
+        denied = _check_analysis_access(analysis)
+        if denied:
+            return denied
 
         data = request.get_json()
         stakeholder_id = data.get("stakeholder_id")
@@ -2480,8 +2482,9 @@ def api_get_stakeholder_consensus(analysis_id):
         from app.models.vendor_analysis import OptionsAnalysis
 
         analysis = db.session.get(OptionsAnalysis, analysis_id)
-        if not analysis:
-            return jsonify({"error": "Analysis not found"}), 404
+        denied = _check_analysis_access(analysis)
+        if denied:
+            return denied
 
         completed = [si for si in analysis.stakeholder_inputs if si.is_complete]
         total_invited = len(analysis.stakeholder_inputs)

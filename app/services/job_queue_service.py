@@ -224,6 +224,10 @@ class JobQueueService:
             return self._execute_model_health_scan(payload, job_id)
         elif task == "github_first_sync":
             return self._execute_github_first_sync(payload, job_id)
+        elif task == "website_profile_crawl":
+            from app.modules.organization.website_crawl import run_website_crawl_job
+
+            return run_website_crawl_job(payload)
         elif task in ("onboarding_github_import", "onboarding_jira_import"):
             return self._execute_onboarding_import(task, payload)
         else:
