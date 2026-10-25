@@ -79,6 +79,10 @@ def proposals(org_id: int):
     for row in facts:
         row["text"] = display(row["value"])
         row["percent"] = int(round(float(row.get("confidence") or 0) * 100))
+        try:
+            row["read_on"] = datetime.fromisoformat(str(row.get("fetched_at"))).strftime("%d %b %Y")
+        except ValueError:
+            row["read_on"] = None
     return facts, completeness
 
 

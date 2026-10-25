@@ -78,10 +78,12 @@ def register_view():
                 "error",
             )
             return redirect(url_for("account.unconfirmed"))
+        # On the way into the welcome steps the notice is a line on the page, so it never covers the step
+        # heading on a phone; on the other routes it stays a toast.
         flash(
             "Account created. Welcome to {}! Your account is ready to use, "
             "with no confirmation message to wait for.".format(current_app.config['APP_NAME']),
-            "info",
+            "signup-notice" if chosen is None and "account.welcome" in current_app.view_functions else "info",
         )
         if chosen is not None:
             # Usable at once: sign in and go straight to that plan's checkout.

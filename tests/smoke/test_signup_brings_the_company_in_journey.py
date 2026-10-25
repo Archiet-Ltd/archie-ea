@@ -685,6 +685,19 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
     page.set_viewport_size({"width": width, "height": 900 if width > 500 else 844})
     try:
         email, _started = sign_up(page, str(server), people)
+        # The welcome notice is a line on the page: it covers neither the progress steps nor the step heading.
+        expect(page.get_by_test_id("signup-notice")).to_contain_text("Account created")
+        assert page.locator("#platform-toast-container [role=alert]").count() == 0
+        if SHOTS:
+            os.makedirs(SHOTS, exist_ok=True)
+            page.screenshot(path=os.path.join(SHOTS, "step2-as-it-opens-%d.png" % width))
+        heading = page.get_by_role("heading", name="Bring in your company")
+        assert page.evaluate(
+            "([h]) => { const e = document.elementFromPoint(h.x + 4, h.y + h.height / 2); return e && e.textContent.includes('Bring in your company'); }",
+            [heading.bounding_box()]), "something sits over the step heading"
+        labels = [b for b in (page.get_by_role("navigation", name="Progress steps").locator("div.text-xs").nth(i).bounding_box() for i in range(4))]
+        for left, right in zip(labels, labels[1:]):
+            assert left["x"] + left["width"] <= right["x"] + 1, ("progress labels run together", left, right)
         with app.app_context():
             from app.models.user import User
 
@@ -699,6 +712,13 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=3")
         expect(page.get_by_test_id("signup-facts")).to_be_visible(timeout=120000)
+        shoot(page, "step3-facts")
+        page.set_viewport_size({"width": width, "height": 900 if width > 500 else 844})
+        for fact in page.locator("[data-fact]").all():  # every fact says which page, how sure, and when it was read
+            expect(fact.get_by_test_id("fact-source")).to_have_attribute("href", re.compile("^http"))
+            line = fact.get_by_test_id("fact-confidence")
+            assert re.fullmatch(r"· \d+% sure · read \d{2} \w{3} \d{4}", line.inner_text().strip()), fact.inner_text()
+            assert line.evaluate("e => e.getBoundingClientRect().right <= e.parentElement.getBoundingClientRect().right + 1"), "the date is cut off"
 
         # Before the company is confirmed nothing is searched: the daily read finds no name to search for.
         with app.app_context():
@@ -763,7 +783,8 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
             landing.wait_for_load_state("domcontentloaded")
             expect(landing.locator("body")).to_contain_text(expected)
             landing.close()
-        shoot(page, "signals-card-%d" % width)
+        if SHOTS:
+            card.screenshot(path=os.path.join(SHOTS, "signals-card-only-%d.png" % width))
 
         # The other company's card holds its own items and none of ours.
         other_context, other_page = new_page(browser, width)
