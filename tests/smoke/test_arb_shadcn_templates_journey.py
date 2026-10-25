@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 # Walk directory for screenshots
 WALK_DIR = os.environ.get(
     "SMOKE_SCREENSHOT_DIR",
-    "/home/ubuntu/verify/seats/mg3arbb030e/walk",
+    "/home/ubuntu/verify/seats/mg3arbb030f/walk",
 )
 
 
@@ -184,11 +184,16 @@ def test_arb_member_sees_change_requests(browser, live_server, seeded, arb_chang
         assert len(stat_cards) >= 4, f"Expected at least 4 stat cards, got {len(stat_cards)}"
 
         # Assert the Raised By column shows the raiser's name for seeded requests
-        page_text = page.text_content("body")
-        assert "Smoke arb_member" in page_text, (
-            "Expected seeded change request to show raiser name 'Smoke arb_member' "
-            "in the Raised By column"
-        )
+        # Read the Raised By cell of each seeded row, not the whole body: the
+        # signed-in user's name also appears in the page chrome.
+        headers = [h.strip() for h in page.locator("table thead th").all_text_contents()]
+        col = headers.index("Raised By")
+        for title in ("Upgrade firewall infrastructure", "Migrate legacy CRM to cloud"):
+            row = page.locator("table tbody tr", has_text=title).first
+            cell = row.locator("td").nth(col).inner_text().strip()
+            assert cell == "Smoke arb_member", (
+                f"Expected Raised By cell for {title!r} to read 'Smoke arb_member', got {cell!r}"
+            )
 
         # Light mode screenshot at 1440
         page.wait_for_timeout(600)
