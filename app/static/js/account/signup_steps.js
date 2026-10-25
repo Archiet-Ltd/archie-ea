@@ -79,7 +79,7 @@
         var boxes = root.querySelectorAll('[data-framework]');
         var picked = [];
         boxes.forEach(function (box) { if (box.checked) picked.push(box.value); });
-        return { industry: value('welcome-industry'), frameworks: picked };
+        return { kind: value('welcome-kind'), industry: value('welcome-industry'), frameworks: picked };
     }
 
     root.addEventListener('click', function (event) {

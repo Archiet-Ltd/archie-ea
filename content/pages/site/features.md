@@ -210,7 +210,7 @@ Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurem
 <picture>
 <img src="/static/img/modules/vendors.webp" alt="Screenshot of the Vendors module's list of your vendors." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
 </picture>
-<figcaption class="mt-2 text-sm text-muted-foreground">Your vendors, with the systems they supply and their contract status.</figcaption>
+<figcaption class="mt-2 text-sm text-muted-foreground">Your vendors, with each vendor's type, products and contract status.</figcaption>
 </figure>
 
 <h3 id="ai-management">AI Management</h3>

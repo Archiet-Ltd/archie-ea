@@ -37,7 +37,7 @@ question directly, not a diagram redrawn and re-checked by hand each time.
 - [What breaks if this service or platform fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)
 - [Which value streams are at risk because the capabilities under them are immature?](/use-cases/value-streams-at-risk)
 - [Is the programme on time and on budget, and what does each project touch?](/use-cases/programme-tracking)
-- [How do I take this change through the review board with the impact evidence attached?](/use-cases/architecture-review-board)
+- [How do I take this change through the review board with its evidence pinned to the decision?](/use-cases/architecture-review-board)
 
 ## The screens you will use
 
@@ -52,7 +52,7 @@ question directly, not a diagram redrawn and re-checked by hand each time.
   canvas, and the saved diagram library behind it — see [Diagrams & Composer](/modules/diagrams).
 - **Tech radar**, classifying the technology already in your model as adopt, trial, assess or hold.
 - **The review board**, where a change proposal, its sessions and its decision are held against the
-  impact evidence that was run before the meeting — see [Architecture Review Board](/modules/arb).
+  evidence pinned when the proposal was submitted, with impact analysis beside it — see [Architecture Review Board](/modules/arb).
 - **The architecture model**, the element browser every imported model lands in, across the business,
   application and technology layers — see [Architecture Model](/modules/architecture-model).
 
@@ -70,8 +70,8 @@ on [CTOs and CIOs](/roles/cto-and-cio).
    [transformation programme](/modules/portfolio) it belongs to, with cost shown as genuinely missing
    where nobody has entered it, never a silent zero.
 4. Open Composer to see the change in the enterprise-wide diagram, and save the view.
-5. Take the proposal to the [review board](/modules/arb) with the impact evidence already attached,
-   and record the decision — approved, approved with conditions, rejected or deferred.
+5. Take the proposal to the [review board](/modules/arb) with its evidence pinned,
+   run impact analysis beside it, and record the decision — approved, approved with conditions, rejected or deferred.
 
 ## What you hand over
 
