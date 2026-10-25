@@ -8,7 +8,6 @@ import logging
 from html import escape
 
 from app import db
-from app.utils.tenant_sql import org_scope
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +97,10 @@ def generate_sad(solution_id: int) -> dict:
         problem_id=prob_def.id
     ).limit(50).all() if prob_def else [], default=[])
 
+    # Motivation modelled on the design itself (the common path: no analysis
+    # session) is read from the solution's linked elements.
+    motivation = _safe(lambda: _linked_motivation(solution_id), default={}) or {}
+
     reqs = _safe(lambda: SolutionRequirement.query.filter_by(
         solution_id=solution_id, deleted_at=None
     ).order_by(SolutionRequirement.priority).limit(100).all(), default=[])
@@ -113,7 +116,7 @@ def generate_sad(solution_id: int) -> dict:
                 "impact": d.impact_level,
             }
             for d in (drivers or [])
-        ],
+        ] + motivation.get("drivers", []),
         "goals": [
             {
                 "name": g.name,
@@ -121,7 +124,7 @@ def generate_sad(solution_id: int) -> dict:
                 "priority": g.priority,
             }
             for g in (goals or [])
-        ],
+        ] + motivation.get("goals", []),
         "requirements": [
             {
                 "name": r.name,
@@ -131,7 +134,7 @@ def generate_sad(solution_id: int) -> dict:
                 "mandatory": r.is_mandatory,
             }
             for r in (reqs or [])
-        ],
+        ] + motivation.get("requirements", []),
         "problem_description": prob_def.problem_description if prob_def else "",
         "business_context_text": prob_def.business_context if prob_def else "",
     }
@@ -233,12 +236,15 @@ def generate_sad(solution_id: int) -> dict:
         "risks": risks or [],
     }
 
+    from app.services.solution_design_score_service import compute as design_score
+
     return {
         "solution": {
             "id": solution.id,
             "name": solution.name,
             "status": solution.status,
         },
+        "design_score": design_score(solution).to_dict(),
         "sections": [
             exec_summary,
             business_context,
@@ -274,63 +280,68 @@ def get_sad_html(solution_id: int) -> str:
 # ---------------------------------------------------------------------------
 
 def _query_archimate_by_layer(solution_id: int, layer: str) -> list:
-    """Return ArchiMate elements for a solution scoped to a layer."""
-    from sqlalchemy import text
-    # solution_elements has no organization_id, so the join proves nothing about
-    # ownership. archimate_elements does (populated on every row) — scope there.
-    _org_clause, _org_params = org_scope(prefix="ae.")
-    rows = db.session.execute(text(
-        "SELECT ae.id, ae.name, ae.type, ae.layer, ae.description "
-        "FROM archimate_elements ae "
-        "JOIN solution_elements se ON se.archimate_element_id = ae.id "
-        "WHERE se.solution_id = :sid AND LOWER(ae.layer) = LOWER(:layer)"
-        + _org_clause +
-        " ORDER BY ae.name LIMIT 200"
-    ), {"sid": solution_id, "layer": layer, **_org_params}).fetchall()
-    return [
-        {"id": r[0], "name": r[1], "type": r[2] or "", "layer": r[3] or "", "description": r[4] or ""}
-        for r in rows
-    ]
+    """The solution's linked design elements in one layer.
+
+    Reads solution_archimate_elements, the link every writer uses, through the
+    design score service. It used to read solution_elements, which nothing
+    writes, so every architecture section of the document was empty.
+    """
+    from app.services.solution_design_score_service import linked_elements
+
+    wanted = layer.lower()
+    return sorted(
+        (
+            {"id": e.element_id, "name": e.name, "type": e.type, "layer": e.layer, "description": ""}
+            for e in linked_elements(solution_id) if e.layer == wanted
+        ),
+        key=lambda d: d["name"].lower(),
+    )
+
+
+def _linked_motivation(solution_id: int) -> dict:
+    """Drivers, goals and requirements linked to the solution's design."""
+    from app.services.solution_design_score_service import linked_elements
+
+    out = {"drivers": [], "goals": [], "requirements": []}
+    for e in linked_elements(solution_id):
+        if e.type == "Driver":
+            out["drivers"].append({"name": e.name, "description": "", "type": "", "impact": ""})
+        elif e.type in ("Goal", "Outcome"):
+            out["goals"].append({"name": e.name, "description": "", "priority": ""})
+        elif e.type in ("Requirement", "Constraint"):
+            out["requirements"].append({"name": e.name, "description": "", "type": e.type,
+                                        "priority": "", "mandatory": e.type == "Constraint"})
+    return out
+
+
+_ROADMAP_TYPES = ("WorkPackage", "Plateau", "Deliverable", "ImplementationEvent")
 
 
 def _query_roadmap(solution_id: int) -> list:
-    """Return work packages / kanban cards linked to the solution."""
-    from sqlalchemy import text
-    # kanban_cards has an organization_id column but it is NULL on every row
-    # (added nullable by reconcile-schema, never backfilled), so a predicate
-    # there would return nothing. Scope through solutions, which is populated.
-    _org_clause, _org_params = org_scope(prefix="s.")
-    rows = _safe(lambda: db.session.execute(text(
-        "SELECT kc.id, kc.title, kc.status, kc.priority "
-        "FROM kanban_cards kc "
-        "JOIN solutions s ON s.id = kc.solution_id "
-        "WHERE kc.solution_id = :sid" + _org_clause +
-        " ORDER BY kc.priority, kc.id LIMIT 100"
-    ), {"sid": solution_id, **_org_params}).fetchall(), default=[])
+    """The work packages, plateaus and events linked to the solution's design.
+
+    Read from the design's links, not from kanban cards: the roadmap of a
+    solution is its implementation and migration elements.
+    """
+    from app.services.solution_design_score_service import linked_elements
+
+    rows = [e for e in linked_elements(solution_id) if e.type in _ROADMAP_TYPES]
     return [
-        {"id": r[0], "title": r[1], "status": r[2] or "", "priority": r[3] or ""}
-        for r in (rows or [])
+        {"id": e.element_id, "title": e.name, "status": e.type, "priority": ""}
+        for e in sorted(rows, key=lambda e: (_ROADMAP_TYPES.index(e.type), e.name.lower()))
     ]
 
 
 def _query_risks(solution_id: int) -> list:
-    """Return risk snapshots linked to the solution."""
-    from sqlalchemy import text
-    rows = _safe(lambda: db.session.execute(text(  # tenant-filtered: scoped via parent FK (solution_id)
-        # Column names checked against the live table, not guessed: this query
-        # asked for risk_description/likelihood/status, none of which exist here
-        # (they are notes/probability/mitigation_status). All three raised
-        # UndefinedColumn, _safe swallowed it, and every narrative rendered an
-        # empty risk register.
-        "SELECT id, risk_name, notes, probability, impact, mitigation_status "
-        "FROM solution_risk_snapshots WHERE solution_id = :sid ORDER BY id LIMIT 100"
-    ), {"sid": solution_id}).fetchall(), default=[])
+    """The solution's risks from the risk register (and any not yet merged)."""
+    from app.services.solution_design_score_service import solution_risks
+
     return [
         {
-            "id": r[0], "name": r[1], "description": r[2] or "",
-            "likelihood": r[3] or "", "impact": r[4] or "", "status": r[5] or "",
+            "id": r["id"], "name": r["title"], "description": r["owner"] and ("Owner: " + r["owner"]) or "",
+            "likelihood": r["likelihood"] or "", "impact": r["impact"] or "", "status": r["status"] or "",
         }
-        for r in (rows or [])
+        for r in solution_risks(solution_id)
     ]
 
 

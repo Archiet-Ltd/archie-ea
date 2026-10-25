@@ -5,6 +5,7 @@
    catalogue — so it cannot drift from the ring, the caption or the gap advisor
    (S-02), and it includes Architecture Decisions (S-03). #}
 {% set sections = completeness.sections %}
+{% from 'components/completeness_ring.html' import completeness_ring %}
 
 {# ── Collect 0%-score sections for quick-add strip ── #}
 {% set _qa_ns = namespace(zero=[]) %}
@@ -55,24 +56,14 @@
         document.querySelectorAll('[data-bp-section]').forEach(el => observer.observe(el));
      "
      class="xl:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border -mx-6 px-6 py-2 mb-6">
+    <a href="#design-score" class="mb-2 flex items-center gap-2">
+        {{ completeness_ring(design_score.passed, size='small', total=design_score.total, label='Design score ' ~ design_score.label) }}
+        <span class="text-sm font-medium text-foreground">Design score <span class="tabular-nums">{{ design_score.label }}</span></span>
+    </a>
     <div class="flex items-center gap-1 overflow-x-auto scrollbar-thin">
         {% for _sec in sections %}
         {% set section_id = _sec.id %}
         {% set label = _sec.short %}
-        {% set score = scores.get(section_id, {}) if scores else {} %}
-        {% set pct = _sec.percent %}
-        {% set elem_pct = score.get('element', 0) if score else 0 %}
-        {% set rel_pct = score.get('relationship', 0) if score else 0 %}
-        {% set trace_pct = score.get('traceability', 0) if score else 0 %}
-        {% if section_id == 'executive_summary' %}
-            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nWord count score — need 100 words to reach 100%.' ~ ('\nCurrently ' ~ (pct | string) ~ '% complete.' if pct < 100 else '\nComplete!') %}
-        {% elif section_id in ['application_cooperation', 'data_information', 'deployment_view'] %}
-            {% set spec_pct = score.get('spec_completeness', 0) if score else 0 %}
-            {% set sq_pct = score.get('spec_quality', 0) if score else 0 %}
-            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nElements: ' ~ elem_pct ~ '%  ·  Relationships: ' ~ rel_pct ~ '%  ·  Traceability: ' ~ trace_pct ~ '%' ~ '\nSpec completeness: ' ~ spec_pct ~ '%  ·  Spec quality: ' ~ sq_pct ~ '%' %}
-        {% else %}
-            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nElements: ' ~ elem_pct ~ '%  ·  Relationships: ' ~ rel_pct ~ '%  ·  Traceability: ' ~ trace_pct ~ '%' %}
-        {% endif %}
         <button type="button"
                 @click="
                     const el = document.getElementById('{{ section_id }}');
@@ -82,28 +73,10 @@
                     }
                 "
                 :class="activeSection === '{{ section_id }}' ? 'ring-1 ring-primary bg-primary/5' : ''"
-                class="flex flex-col items-center min-w-[72px] px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer shrink-0 group"
-                title="{{ _tip }}">
+                class="flex flex-col items-center min-w-[72px] px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer shrink-0 group">
             {# Label #}
             <span class="text-xs font-medium truncate max-w-[68px] leading-tight"
                   :class="activeSection === '{{ section_id }}' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'">{{ label }}</span>
-            {# Progress bar #}
-            <div class="mt-1 w-full h-1 bg-muted rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all duration-300
-                    {% if pct >= 80 %}bg-success
-                    {% elif pct >= 40 %}bg-warning
-                    {% elif pct >= 1 %}bg-destructive
-                    {% else %}bg-muted-foreground/20
-                    {% endif %}"
-                     style="width: {{ pct }}%"></div>
-            </div>
-            {# Percentage #}
-            <span class="text-2xs font-medium mt-0.5
-                {% if pct >= 80 %}text-success
-                {% elif pct >= 40 %}text-warning
-                {% elif pct >= 1 %}text-destructive
-                {% else %}text-muted-foreground
-                {% endif %}">{{ pct }}%</span>
         </button>
         {% endfor %}
     </div>

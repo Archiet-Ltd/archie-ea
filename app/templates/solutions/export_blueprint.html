@@ -176,10 +176,9 @@
         <h1>{{ solution.name }}</h1>
         <div class="subtitle">Solution Architecture Blueprint</div>
 
-        {% set overall = scores.values()|map(attribute='overall', default=0)|list if scores else [] %}
-        {% set avg_score = (overall|sum / overall|length)|round|int if overall else 0 %}
-        <span class="maturity-badge {{ 'maturity-high' if avg_score >= 70 else ('maturity-medium' if avg_score >= 40 else 'maturity-low') }}">
-            Completeness: {{ avg_score }}%
+        <span class="maturity-badge {{ 'maturity-high' if design_score.passed >= 8 else ('maturity-medium' if design_score.passed >= 4 else 'maturity-low') }}"
+              data-design-score="{{ design_score.label }}">
+            Design score {{ design_score.label }}
         </span>
 
         <div class="meta-grid" style="margin-top:24px;"><!-- inline-style-ok -->
@@ -209,16 +208,14 @@
             </div>
         </div>
 
-        {# Completeness strip #}
+        {# The ten design checks #}
         <div style="margin-top:32px;"><!-- inline-style-ok -->
-            <div class="meta-label" style="margin-bottom:8px;"><!-- inline-style-ok -->Section Completeness</div>
-            <div class="completeness-strip">
-                {% for sec_id, sec_def in section_definitions.items() %}
-                    {% set s = scores.get(sec_id, {}).get('overall', 0) if scores else 0 %}
-                    <div class="completeness-dot {{ 'high' if s >= 70 else ('medium' if s >= 40 else ('low' if s > 0 else 'empty')) }}"
-                         title="{{ sec_id }}: {{ s }}%">{{ s }}</div>
+            <div class="meta-label" style="margin-bottom:8px;"><!-- inline-style-ok -->Design checks</div>
+            <ol>
+                {% for check in design_score.checks %}
+                <li>{{ 'Done' if check.passed else 'Open' }}: {{ check.label }}. {{ check.detail }}</li>
                 {% endfor %}
-            </div>
+            </ol>
         </div>
     </div>
 
@@ -246,10 +243,7 @@
                 'requirements_traceability': 'Requirements Traceability'
             } %}
             {% for sec_id in section_definitions %}
-                {% set s = scores.get(sec_id, {}).get('overall', 0) if scores else 0 %}
-                <li>{{ section_names.get(sec_id, sec_id) }}
-                    <span class="badge {{ 'badge-green' if s >= 70 else ('badge-amber' if s >= 40 else 'badge-red') }}">{{ s }}%</span>
-                </li>
+                <li>{{ section_names.get(sec_id, sec_id) }}</li>
             {% endfor %}
         </ol>
     </div>
@@ -266,7 +260,6 @@
         <h2 class="section-title">{{ loop.index }}. {{ sec_name }}</h2>
         <div class="section-meta">
             {% if sec_def.get('viewpoint') %}<span>Viewpoint: {{ sec_def.viewpoint }}</span>{% endif %}
-            <span class="score {{ 'score-high' if sec_score >= 70 else ('score-medium' if sec_score >= 40 else 'score-low') }}">{{ sec_score }}%</span>
         </div>
 
         {# Narrative #}

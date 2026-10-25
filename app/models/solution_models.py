@@ -447,22 +447,18 @@ class Solution(TenantMixin, db.Model, OptimisticLockMixin):
                 import logging
                 logging.getLogger(__name__).debug("Could not check analysis data for readiness")
 
-            try:
-                from app.models.solution_models import SolutionCapabilityMapping
-                session_obj = self.analysis_session
-                if session_obj and session_obj.problem_definition:
-                    problem_id = session_obj.problem_definition.id
-                    has_capabilities = SolutionCapabilityMapping.query.filter_by(
-                        problem_id=problem_id
-                    ).count() > 0
-                # Also check direct solution_id path
-                if not has_capabilities:
-                    has_capabilities = SolutionCapabilityMapping.query.filter_by(
-                        solution_id=self.id
-                    ).count() > 0
-            except Exception:  # fabricated-ok: on error the readiness flag stays False, rendering the check as not-passed; invents no value
-                import logging
-                logging.getLogger(__name__).debug("Could not check capabilities for readiness")
+
+        # Capabilities are counted the way the phase gate counts them (direct
+        # mapping first, then the analysis session), so the checklist and the
+        # gate cannot disagree about the same check.
+        try:
+            from app.modules.solutions_strategic.v2.services.solution_phase_gate_service import (
+                _count_capabilities,
+            )
+            has_capabilities = _count_capabilities(self) > 0
+        except Exception:  # fabricated-ok: on error the readiness flag stays False, rendering the check as not-passed; invents no value
+            import logging
+            logging.getLogger(__name__).debug("Could not check capabilities for readiness")
 
         try:
             from app.services import risk_service
@@ -649,92 +645,23 @@ class Solution(TenantMixin, db.Model, OptimisticLockMixin):
 
     @property
     def architecture_completeness_score(self):
-        """PLT-001: Compute architecture completeness across 14 junction tables.
+        """The design score, in the shape older readers expect.
 
-        Each junction with >0 rows scores 1 point. Score = filled/14 * 100.
-        Returns dict with score (int 0-100), filled (list), missing (list).
+        Repointed to the one design score service: ``score`` is the share of
+        the ten checks passed, ``filled``/``missing`` name the checks. It used
+        to count fourteen junction tables, a sixth way of scoring a solution.
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        from app.models.solution_archimate_element import SolutionArchiMateElement as SAE
-        from app.models.solution_architect_models import (
-            SolutionConstraint,
-            SolutionDriver,
-            SolutionGoal,
-            SolutionRecommendation,
-            SolutionRequirement,
-        )
-        from app.models.solution_lifecycle_models import (
-            SolutionMetric,
-            SolutionPlateau,
-            SolutionRisk,
-            SolutionTCOItem,
-        )
-        from app.models.solution_sad_models import SolutionAPQCProcess
+        from app.services.solution_design_score_service import compute
 
-        junction_checks = [
-            ("drivers", SolutionDriver, "problem_id"),
-            ("goals", SolutionGoal, "problem_id"),
-            ("constraints", SolutionConstraint, "problem_id"),
-            ("requirements", SolutionRequirement, "problem_id"),
-            ("applications", None, "solution_applications"),
-            ("archimate_elements", SAE, "solution_id"),
-            ("vendor_products", None, "solution_vendor_products"),
-            ("recommendations", SolutionRecommendation, "session_id"),
-            ("risks", SolutionRisk, "solution_id"),
-            ("tco_items", SolutionTCOItem, "solution_id"),
-            ("metrics", SolutionMetric, "solution_id"),
-            ("plateaus", SolutionPlateau, "solution_id"),
-            ("apqc_processes", SolutionAPQCProcess, "solution_id"),
-            ("capability_mappings", SolutionCapabilityMapping, "solution_id"),
-        ]
-
-        filled = []
-        missing = []
-
-        # Get problem_id and session_id for analysis-linked junctions
-        problem_id = None
-        session_id = self.analysis_session_id
-        if session_id:
-            try:
-                sess = self.analysis_session
-                if sess and sess.problem_definition:
-                    problem_id = sess.problem_definition.id
-            except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value
-                logger.debug("Could not resolve analysis session for completeness score")
-
-        for name, model, fk_field in junction_checks:
-            has_rows = False
-            try:
-                if name == "applications":
-                    has_rows = self.applications.count() > 0
-                elif name == "vendor_products":
-                    has_rows = self.vendor_products.count() > 0
-                elif fk_field == "problem_id":
-                    if problem_id and model:
-                        has_rows = model.query.filter_by(problem_id=problem_id).count() > 0
-                elif fk_field == "session_id":
-                    if session_id and model:
-                        has_rows = model.query.filter_by(session_id=session_id).count() > 0
-                elif model:
-                    has_rows = model.query.filter_by(solution_id=self.id).count() > 0
-            except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value
-                logger.debug("Could not check junction %s for completeness", name)
-
-            if has_rows:
-                filled.append(name)
-            else:
-                missing.append(name)
-
-        total = len(junction_checks)
-        score = round(len(filled) / total * 100) if total > 0 else 0
-
+        design = compute(self)
         return {
-            "score": score,
-            "filled": filled,
-            "missing": missing,
-            "filled_count": len(filled),
-            "total": total,
+            "score": design.passed * 10,
+            "passed": design.passed,
+            "label": design.label,
+            "filled": [c["label"] for c in design.checks if c["passed"]],
+            "missing": [c["label"] for c in design.missing],
+            "filled_count": design.passed,
+            "total": design.total,
         }
 
     def __repr__(self):

@@ -1,5 +1,7 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from 'solutions/partials/_design_score.html' import design_score_panel %}
 
 {% block title %}Review Packet — {{ solution.name }}{% endblock %}
 
@@ -7,7 +9,7 @@
 <div class="p-6 space-y-6 mx-auto max-w-4xl">
     {{ page_header(
         title='Architecture Review Packet',
-        description='The Chief Architect assembles the board view: conformance verdict, the recommended decision, and a readiness checklist — one page for the ARB.',
+        description='The board view: the design score, conformance findings and the recommended decision, on one page.',
         breadcrumbs=[
             {'label': 'Dashboard', 'href': url_for('main.index')},
             {'label': 'Solutions', 'href': url_for('solution_design.list_solutions')},
@@ -53,11 +55,9 @@
             {% if packet.conformance.unavailable_checks %}
             <p class="text-xs text-muted-foreground mt-1">Unavailable checks: {{ packet.conformance.unavailable_checks|join(', ') }}</p>
             {% endif %}
-            {% elif packet.conformance.score is not none %}
-            <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold {% if packet.conformance.score >= 80 %}text-success{% elif packet.conformance.score >= 50 %}text-warning{% else %}text-destructive{% endif %}">{{ packet.conformance.score }}</span>
-                <span class="text-xs text-muted-foreground">/ 100 · {{ packet.conformance.flagged }} flagged</span>
-            </div>
+            {% elif not packet.conformance.unassessed %}
+            <p class="text-sm text-foreground"><span class="text-2xl font-semibold tabular-nums">{{ packet.conformance.flagged }}</span>
+                finding{{ 's' if packet.conformance.flagged != 1 }} needing attention</p>
             <ul class="mt-3 space-y-1.5">
                 {% for f in packet.conformance.findings[:4] %}
                 <li class="text-xs flex items-start gap-1.5">
@@ -89,17 +89,9 @@
         </div>
     </div>
 
-    {# Readiness checklist #}
+    {# Board readiness is the design score: the same ten checks as everywhere else. #}
     <div class="border border-border rounded-lg bg-card p-5">
-        <h3 class="text-sm font-semibold text-foreground mb-3">Board-readiness checklist</h3>
-        <ul class="space-y-2">
-            {% for item in packet.readiness %}
-            <li class="flex items-center gap-2 text-sm">
-                <i data-lucide="{{ 'check-circle' if item.ok else 'circle' }}" class="h-4 w-4 {{ 'text-success' if item.ok else 'text-muted-foreground' }}"></i>
-                <span class="{{ 'text-foreground' if item.ok else 'text-muted-foreground' }}">{{ item.label }}</span>
-            </li>
-            {% endfor %}
-        </ul>
+        {{ design_score_panel(packet.design_score) }}
     </div>
     {% endif %}
 </div>

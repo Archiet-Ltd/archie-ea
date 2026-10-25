@@ -97,9 +97,6 @@
                     <span class="w-4 text-right text-xs tabular-nums shrink-0
  {% if o_score >= 80 %}text-success-emphasis{% elif o_score >= 40 %}text-warning-emphasis{% elif o_score >= 1 %}text-destructive-emphasis{% else %}text-muted-foreground/60{% endif %}">{{ onum }}</span>
                     <span class="truncate flex-1">{{ olabel }}</span>
-                    {% if o_score %}<span class="text-xs tabular-nums shrink-0
- {% if o_score >= 80 %}text-success-emphasis{% elif o_score >= 40 %}text-warning-emphasis{% else %}text-destructive-emphasis{% endif %}">{{ o_score }}%</span>
-                    {% else %}<span class="w-1.5 h-1.5 rounded-full shrink-0 bg-muted-foreground/30" title="Empty"></span>{% endif %}
                 </a>
             </li>
             {% endfor %}
@@ -579,7 +576,7 @@ function archieShowBanner(msg, type) {
  {% if sec_score >= 80 %}bg-success{% elif sec_score >= 40 %}bg-warning{% elif sec_score >= 1 %}bg-destructive{% else %}bg-muted-foreground/30{% endif %}"></span>
                         <h2 class="text-sm font-semibold text-foreground truncate">{{ num }}. {{ title }}</h2>
                         {% if has_content %}
-                        <span class="text-xs text-muted-foreground shrink-0">{{ sec_score }}% complete</span>
+                        <span class="text-xs text-muted-foreground shrink-0">Written</span>
                         {% else %}
                         <span class="text-xs text-muted-foreground shrink-0">Empty &mdash; nothing here yet</span>
                         {% endif %}

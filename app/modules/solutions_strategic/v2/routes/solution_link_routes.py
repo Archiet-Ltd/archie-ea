@@ -49,8 +49,8 @@ def _check_completeness_threshold(solution, old_score):
                 user_id=solution.created_by_id,
                 notification_type="solution_update",
                 message=(
-                    f"Solution '{solution.name}' completeness reached "
-                    f"{new_score}% (crossed {threshold}% threshold)."
+                    f"Solution '{solution.name}' design score reached "
+                    f"{result.get('label', '')}."
                 ),
                 solution_id=solution.id,
             )

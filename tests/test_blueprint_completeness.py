@@ -197,10 +197,13 @@ def test_all_four_surfaces_agree(blueprint_client, default_pct):
 
     got = _surfaces(html)
 
-    # (a) completeness ring
-    assert got["ring"] == expected["percent"]
-    # (b) "N of M sections complete" caption
-    assert got["caption"] == (expected["sections_complete"], expected["total_sections"])
+    # (a, b) the page's figure is the design score, the same one service as
+    # the list, the review packet and the document; no section percentage.
+    from app.services.solution_design_score_service import compute
+
+    assert 'data-design-score="%s"' % compute(solution).label in html
+    assert got["ring"] is None and got["caption"] is None
+    assert "% complete" not in html
     # (d) gap badges — only rendered when the advisor is (i.e. work outstanding)
     if expected["sections_needing_work"]:
         # (c) "N of M sections need work"

@@ -51,10 +51,11 @@ class ChiefArchitectService:
         latest_adr = SolutionOptionsAdvisor.latest(solution_id)
         adr = SolutionOptionsAdvisor.to_dict(latest_adr) if latest_adr else None
 
+        from app.services.solution_design_score_service import compute as design_score
+
         review_succeeded = bool(conformance.get("success"))
         controls_available = review_succeeded and conformance.get("controls_available", True)
         unassessed = bool(conformance.get("unassessed"))
-        score = conformance.get("score") if review_succeeded else None
         flagged = conformance.get("flagged", 0) if review_succeeded else 0
         has_decision = adr is not None
         decision_accepted = bool(adr and adr.get("status") == "accepted")
@@ -64,7 +65,7 @@ class ChiefArchitectService:
             verdict, tone = "Conformance review unavailable", "warn"
         elif not controls_available:
             verdict, tone = "Conformance controls unavailable", "warn"
-        elif unassessed or score is None:
+        elif unassessed:
             verdict, tone = "Not yet reviewable", "info"
         elif flagged == 0 and decision_accepted:
             verdict, tone = "Ready for the board", "good"
@@ -77,7 +78,9 @@ class ChiefArchitectService:
         else:
             verdict, tone = f"{_n(flagged, 'conformance issue')} — not board-ready", "warn"
 
-        readiness = cls._readiness(solution, conformance, adr)
+        # The board-readiness checklist is the design score: the same ten
+        # checks, and the same "n of 10", as the list, the page and the document.
+        score = design_score(solution).to_dict()
 
         return {
             "success": True,
@@ -86,8 +89,8 @@ class ChiefArchitectService:
                          "governance_status": getattr(solution, "governance_status", "draft")},
             "verdict": verdict,
             "tone": tone,
+            "design_score": score,
             "conformance": {
-                "score": score,
                 "flagged": flagged,
                 "findings": conformance.get("findings", []) if review_succeeded else [],
                 "summary": conformance.get("summary") if review_succeeded else conformance.get("error"),
@@ -96,68 +99,8 @@ class ChiefArchitectService:
                 "unavailable_checks": conformance.get("unavailable_checks", []) if review_succeeded else [],
             },
             "decision": adr,
-            "readiness": readiness,
+            "readiness": [{"label": c["label"], "ok": c["passed"], "key": c["key"]} for c in score["checks"]],
         }
-
-    @staticmethod
-    def _readiness(solution, conformance, adr) -> List[Dict[str, Any]]:
-        """The board-readiness checklist — what's in place, what's missing.
-
-        Covers two different questions. The first four rows are process: is
-        there an owner, a technical lead, a recommended decision, an accepted
-        one. The domain rows are architecture *content*: TOGAF treats Business
-        (Phase B), Data (Phase C) and Technology (Phase D) as peers of the
-        application architecture, so a board asked to approve a design is
-        entitled to see which of them the design has not addressed. Previously
-        every row was process-only, and a solution naming no business process,
-        no data object and no platform could still read as board-ready.
-        """
-        items = [
-            {"label": "Owner assigned", "ok": bool(getattr(solution, "solution_owner", None))},
-            {"label": "Technical lead assigned", "ok": bool(getattr(solution, "technical_lead", None))},
-            {"label": "Recommended decision (ADR)", "ok": adr is not None},
-            {"label": "Decision accepted", "ok": bool(adr and adr.get("status") == "accepted")},
-            {
-                "label": "Required conformance controls available",
-                "ok": bool(conformance.get("success")) and conformance.get("controls_available", True),
-            },
-            {
-                "label": "No high/critical conformance issues",
-                "ok": (
-                    bool(conformance.get("success"))
-                    and conformance.get("controls_available", True)
-                    and not conformance.get("unassessed")
-                    and conformance.get("flagged", 1) == 0
-                ),
-            },
-        ]
-        items += ChiefArchitectService._domain_readiness(solution)
-        return items
-
-    @staticmethod
-    def _domain_readiness(solution) -> List[Dict[str, Any]]:
-        """One row per architecture domain, read from what the solution models.
-
-        Derived from the linked elements rather than from conformance findings:
-        a design with nothing modelled at all raises no findings, and must not
-        therefore be reported as having addressed every domain.
-        """
-        from app.modules.solutions_strategic.v2.services.conformance_reviewer import (
-            _DATA_TABLES,
-            ConformanceReviewer,
-        )
-
-        try:
-            _total, layers, tables = ConformanceReviewer._element_counts(solution.id)
-        except Exception:  # noqa: BLE001 — the checklist must still render
-            logger.debug("domain readiness unavailable for solution %s", solution.id)
-            return []
-
-        return [
-            {"label": "Business architecture addressed", "ok": "business" in layers},
-            {"label": "Data architecture addressed", "ok": bool(tables & _DATA_TABLES)},
-            {"label": "Technology architecture addressed", "ok": "technology" in layers},
-        ]
 
     @staticmethod
     def _summarise_domain_evidence(
@@ -609,7 +552,7 @@ class ChiefArchitectService:
             # Empty solutions carry no signal about conformance — an average
             # computed over them would reward emptiness (M-01). Exclude them
             # from the denominator and report the exclusion explicitly.
-            if r.get("unassessed") or r.get("score") is None:
+            if r.get("unassessed"):
                 unassessed += 1
                 attention.append({
                     "id": s.id,
@@ -628,7 +571,7 @@ class ChiefArchitectService:
                     "action_url": f"/solutions/{s.id}/review-packet",
                 })
                 continue
-            scored.append(r["score"])
+            scored.append(s.id)
             flagged_total += r.get("flagged", 0)
             if r.get("flagged"):
                 attention.append({
@@ -641,13 +584,14 @@ class ChiefArchitectService:
                     "severity": "high",
                     "age_days": None,
                     "reason": f"{_n(r['flagged'], 'conformance issue')} need attention.",
-                    "score": r["score"],
+                    "score": None,
                     "flagged": r["flagged"],
                     "evidence_url": f"/solutions/{s.id}/review-packet",
                     "next_action": "Resolve the findings and resubmit the review packet",
                     "action_url": f"/solutions/{s.id}/review-packet",
                 })
-        avg = round(sum(scored) / len(scored)) if scored and not unavailable else None
+        # No conformance average: the review counts findings, it does not score.
+        avg = None
 
         architecture = cls._architecture_posture(solutions)
         strategic = cls._strategic_posture(solutions)

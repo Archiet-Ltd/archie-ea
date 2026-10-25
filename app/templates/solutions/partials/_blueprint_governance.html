@@ -4,7 +4,7 @@
 {# Completeness comes from `completeness` (compute_blueprint_completeness) —
    the single server-side computation shared with the header strip and the gap
    advisor. Do not re-derive it here: the four surfaces disagreeing was S-02. #}
-{% set overall_pct = completeness.percent %}
+{% from 'solutions/partials/_design_score.html' import design_score_panel %}
 
 <div class="space-y-3">
 
@@ -109,45 +109,14 @@
     </script>
 
     {# ════════════════════════════════════════════════════════════════════ #}
-    {# 1. Blueprint Completeness Ring                                      #}
+    {# 1. Design score: the ten plain checks, the same figure as the list,  #}
+    {#    the review packet, the export and the document.                  #}
     {# ════════════════════════════════════════════════════════════════════ #}
     <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Completeness</h3>
-
-        <div class="flex flex-col items-center">
-            {# Circular score ring #}
-            <div class="relative w-16 h-16 mb-2">
-                <svg class="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                    {# Background ring #}
-                    <circle cx="32" cy="32" r="28" fill="none"
-                            stroke="currentColor" stroke-width="4"
-                            class="text-muted/60" />
-                    {# Progress ring — circumference = 2*pi*28 ≈ 175.93 #}
-                    <circle cx="32" cy="32" r="28" fill="none"
-                            stroke-width="4" stroke-linecap="round"
-                            stroke-dasharray="175.93"
-                            stroke-dashoffset="{{ 175.93 - (175.93 * overall_pct / 100) }}"
-                            class="{% if overall_pct >= 80 %}text-success
-                                   {% elif overall_pct >= 40 %}text-warning
-                                   {% else %}text-destructive
-                                   {% endif %}" />
-                </svg>
-                <div class="absolute inset-0 flex items-center justify-center">
-                    <span class="text-sm font-bold {% if overall_pct >= 80 %}text-success-emphasis
-                        {% elif overall_pct >= 40 %}text-warning-emphasis
-                        {% else %}text-destructive
-                        {% endif %}">{{ overall_pct }}%</span>
-                </div>
-            </div>
-
-            {# Version badge + section count #}
-            <div class="flex items-center gap-2 mt-1">
-                {% if solution.blueprint_version is defined and solution.blueprint_version %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">v{{ solution.blueprint_version }}</span>
-                {% endif %}
-                <span class="text-xs text-muted-foreground">{{ completeness.sections_complete }} of {{ completeness.total_sections }} sections complete</span>
-            </div>
-        </div>
+        {{ design_score_panel(design_score) }}
+        {% if solution.blueprint_version is defined and solution.blueprint_version %}
+        <p class="mt-3 text-xs text-muted-foreground">Blueprint version {{ solution.blueprint_version }}</p>
+        {% endif %}
     </div>
 
     {# ════════════════════════════════════════════════════════════════════ #}
@@ -182,41 +151,6 @@
     {% endif %}
 
     {# ════════════════════════════════════════════════════════════════════ #}
-    {# 3. Next Actions                                                     #}
-    {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Next Actions</h3>
-
-        {% if next_actions %}
-        <div class="space-y-2">
-            {% for action in next_actions[:3] %}
-            <a href="#{{ action.section_id }}"
-               data-section-scroll="{{ action.section_id }}"
-               class="block rounded-lg border border-border p-2.5 hover:bg-muted/50 transition-colors cursor-pointer group">
-                <div class="flex items-center gap-1.5 mb-0.5">
-                    <span class="w-1.5 h-1.5 rounded-full shrink-0
-                        {% if action.score is defined and action.score == 0 %}bg-destructive
-                        {% else %}bg-warning
-                        {% endif %}"></span>
-                    <span class="text-xs font-medium
-                        {% if action.score is defined and action.score == 0 %}text-destructive-emphasis
-                        {% else %}text-warning-emphasis
-                        {% endif %} group-hover:underline">{{ action.title }}</span>
-                </div>
-                {% if action.description %}
-                <p class="text-xs text-muted-foreground leading-snug pl-3">{{ action.description }}</p>
-                {% endif %}
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="rounded-md border border-dashed border-success/40 bg-success/10 px-3 py-2 text-center">
-            <span class="text-xs text-success-emphasis font-medium">All sections at 80%+ — ready for governance review.</span>
-        </div>
-        {% endif %}
-    </div>
-
-    {# ════════════════════════════════════════════════════════════════════ #}
     {# 4. Governance Status                                                #}
     {# ════════════════════════════════════════════════════════════════════ #}
     <div class="rounded-lg border border-border bg-card p-4"
@@ -239,55 +173,12 @@
             {% endif %}
         </div>
 
-        {# Compliance score #}
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-xs text-muted-foreground">Compliance</span>
-            <span class="text-xs font-semibold
-                {% if overall_pct >= 80 %}text-success-emphasis
-                {% elif overall_pct >= 40 %}text-warning-emphasis
-                {% else %}text-destructive
-                {% endif %}">{{ overall_pct }}%</span>
-        </div>
-
         {# ARB Readiness Checklist — fetched async to avoid blocking page render #}
         <div class="mb-3 space-y-3"
              data-testid="arb-evidence-dossier">
             <div x-show="loading" x-cloak class="rounded-md border border-border bg-muted/30 p-3" role="status">
                 <p class="text-xs text-muted-foreground">Checking governed evidence…</p>
             </div>
-            <template x-if="checks.length > 0">
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">ARB Readiness</span>
-                        <span class="text-xs font-semibold"
-                              :class="{'text-success-emphasis': pct >= 80, 'text-warning-emphasis': pct >= 50 && pct < 80, 'text-destructive-emphasis': pct < 50}"
-                              x-text="pct + '%'"></span>
-                    </div>
-                    <div class="w-full h-1 rounded-full bg-muted/60 mb-2">
-                        <div class="h-1 rounded-full transition-all duration-500"
-                             :class="{'bg-success': pct >= 80, 'bg-warning': pct >= 50 && pct < 80, 'bg-destructive': pct < 50}"
-                             :style="'width:' + pct + '%'"></div>
-                    </div>
-                    <div class="space-y-1">
-                        <template x-for="c in checks" :key="c.label">
-                            <div class="flex items-start gap-1.5">
-                                <span class="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                                      :class="c.passed ? 'bg-success/20' : (c.required ? 'border border-destructive/50' : 'border border-border')">
-                                    <span class="text-2xs leading-none"
-                                          :class="c.passed ? 'text-success-emphasis' : (c.required ? 'text-destructive-emphasis/60' : 'text-muted-foreground/50')"
-                                          x-text="c.passed ? '\u2713' : '\u25CB'"></span>
-                                </span>
-                                <div class="leading-tight">
-                                    <span class="text-xs"
-                                          :class="c.passed ? 'text-muted-foreground line-through' : (c.required ? 'text-foreground' : 'text-muted-foreground')"
-                                          x-text="c.label"></span>
-                                    <span x-show="!c.required" class="text-2xs text-muted-foreground/60 ml-1">(optional)</span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </template>
             <div x-show="loadError" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2" role="alert">
                 <p class="text-xs font-medium text-destructive-emphasis">Readiness is unavailable</p>
                 <p class="mt-1 text-xs text-muted-foreground">No submission decision has been made. Try the check again.</p>
@@ -447,7 +338,7 @@
             </button>
             {% else %}
             <button type="button" disabled
-                    title="Complete all ADM phases and reach 80%+ to submit"
+                    title="Close the open design checks before submitting"
                     class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-60">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 Submit to ARB

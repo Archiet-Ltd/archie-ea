@@ -410,8 +410,10 @@ def test_review_packet_renders_unavailable_conformance_controls(
     assert response.status_code == 200
     text = _visible_text(response)
     assert "Conformance controls unavailable" in text
-    assert "Required conformance controls available" in text
+    assert "Required conformance controls unavailable" in text
     assert "business" in text
+    # Board readiness is the design score, shown as "n of 10".
+    assert "of 10" in text
     assert "Ready for the board" not in text
 
 

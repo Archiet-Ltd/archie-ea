@@ -1720,9 +1720,12 @@ class ToolExecutor:
 
     def _tool_get_solution_summary(self, args: dict) -> dict:
         from app.models.solution_models import Solution
-        sol = Solution.query.get(args["solution_id"])
+        from app.services.solution_design_score_service import compute
+
+        sol = Solution.query.filter(Solution.id == args["solution_id"]).first()
         if not sol:
             return {"success": False, "error": f"Solution {args['solution_id']} not found."}
+        score = compute(sol)
         return {
             "success": True,
             "result": {
@@ -1730,13 +1733,14 @@ class ToolExecutor:
                 "name": sol.name,
                 "governance_status": sol.governance_status,
                 "adm_phase": sol.adm_phase,
-                "maturity_level": sol.maturity_current,
-                "applications_count": _safe_count(sol.applications),
-                "risks_count": _safe_count(sol.risks) if hasattr(sol, "risks") else None,
+                "design_score": score.label,
+                "open_checks": [c["label"] for c in score.missing],
+                "applications_count": score.counts["applications"],
+                "risks_count": score.counts["risks"],
             },
             "message": (
-                f"Solution '{sol.name}': phase={sol.adm_phase}, "
-                f"CMM maturity={sol.maturity_current or 0}/5, governance={sol.governance_status}."
+                f"Solution '{sol.name}': design score {score.label}, phase={sol.adm_phase}, "
+                f"governance={sol.governance_status}."
             ),
         }
 
@@ -1745,25 +1749,21 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_get_completeness_score(self, args: dict) -> dict:
-        try:
-            from app.modules.solutions_strategic.v2.services.blueprint_completeness_service import (
-                BlueprintCompletenessService,
-            )
-            svc = BlueprintCompletenessService()
-            scores = svc.score_all(args["solution_id"])
-            # Summarise: overall = mean of section overalls
-            section_scores = {k: v.get("overall", 0) for k, v in scores.items()}
-            overall = round(sum(section_scores.values()) / max(len(section_scores), 1))
-            return {
-                "success": True,
-                "result": {"overall_pct": overall, "sections": section_scores},
-                "message": f"Overall completeness: {overall}%. Lowest sections: "
-                           + ", ".join(
-                               f"{k}={v}%" for k, v in sorted(section_scores.items(), key=lambda x: x[1])[:3]
-                           ),
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        """The design score: ten plain checks, the figure every screen shows."""
+        from app.models.solution_models import Solution
+        from app.services.solution_design_score_service import compute
+
+        sol = Solution.query.filter(Solution.id == args["solution_id"]).first()
+        if not sol:
+            return {"success": False, "error": f"Solution {args['solution_id']} not found."}
+        score = compute(sol)
+        open_checks = [c["label"] for c in score.missing]
+        return {
+            "success": True,
+            "result": score.to_dict(),
+            "message": f"Design score: {score.label}."
+                       + (" Open: " + "; ".join(open_checks) + "." if open_checks else ""),
+        }
 
     # ------------------------------------------------------------------ #
     # Tool: update_solution_fields                                        #

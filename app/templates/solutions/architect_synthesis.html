@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "macros/page_shell.html" import page_shell %}
 {% from "components/empty_state.html" import empty_state %}
@@ -104,8 +105,8 @@
             description=synthesis.arb.dated_open|string ~ ' dated open reviews · ' ~ synthesis.arb.sla_days|string ~ '-day SLA'
         ) }}
         {{ metrics_card(
-            title='Solution conformance',
-            value=(synthesis.avg_conformance|string ~ '/100') if synthesis.avg_conformance is not none else '—',
+            title='Conformance findings',
+            value=synthesis.flagged_total if synthesis.flagged_total is not none else 0,
             icon='shield-check',
             description=synthesis.coverage.evaluated|string ~ ' of ' ~ synthesis.coverage.in_scope|string ~ ' in-scope solutions evaluated'
         ) }}
@@ -394,8 +395,7 @@
                 <div><h2 class="text-base font-semibold text-foreground">Solution conformance</h2><p class="mt-1 text-xs text-muted-foreground">Deterministic controls over the latest eligible solution scope.</p></div>
                 <i data-lucide="shield-check" class="h-5 w-5 text-muted-foreground" aria-hidden="true"></i>
             </div>
-            <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <div><p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Average</p><p class="mt-2 text-2xl font-bold text-foreground">{% if synthesis.avg_conformance is not none %}{{ synthesis.avg_conformance }}/100{% else %}—{% endif %}</p><p class="mt-1 text-xs text-muted-foreground">Withheld when a required control is unavailable.</p></div>
+            <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div><p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Evaluation coverage</p><p class="mt-2 text-2xl font-bold text-foreground">{{ synthesis.coverage.evaluated }}/{{ synthesis.coverage.in_scope }}</p><p class="mt-1 text-xs text-muted-foreground">{{ synthesis.coverage.unassessed }} unassessed · {{ synthesis.coverage.unavailable }} unavailable</p></div>
                 <div><p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flagged findings</p><p class="mt-2 text-2xl font-bold text-foreground">{% if synthesis.flagged_total is not none %}{{ synthesis.flagged_total }}{% else %}—{% endif %}</p><p class="mt-1 text-xs text-muted-foreground">Across {{ synthesis.flagged_evaluated }} evaluated review{{ '' if synthesis.flagged_evaluated == 1 else 's' }}.</p></div>
             </div>

@@ -94,10 +94,11 @@ def test_portfolio_average_excludes_unassessed_solutions(db_session, org_ctx):
     # and the exclusion is reported, not silently dropped.
     assert synthesis["solutions_reviewed"] == 1
     assert synthesis["solutions_unassessed"] == 4
-    # The one scored solution is missing business/data/technology content,
-    # so it must be well below 100 — never near the old fabricated 93.
-    assert synthesis["avg_conformance"] is not None
-    assert synthesis["avg_conformance"] < 100
+    # The review counts findings and calculates no score, so no average of
+    # scores is published: the fabricated 93 cannot come back. The one real
+    # solution's missing business/data/technology content shows as findings.
+    assert synthesis["avg_conformance"] is None
+    assert synthesis["flagged_total"] >= 1
 
 
 # --------------------------------------------------------------------- #

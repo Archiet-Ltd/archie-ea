@@ -9,6 +9,7 @@
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/button.html' import button %}
+{% from 'components/completeness_ring.html' import completeness_ring %}
 
 
 {% block title %}All Solutions{% endblock %}
@@ -216,9 +217,8 @@
                         <th class="px-5 py-3.5 w-10"><input type="checkbox" data-select-all="solution-table" class="h-4 w-4 rounded border-input" aria-label="Select all solutions"></th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Solution</th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Phase &amp; Status</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Design Maturity</th>
+                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Design score</th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Architecture Scope</th>
-                        <th class="px-5 py-3.5 text-center text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Arch. Score</th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Next Action</th>
                         <th class="px-5 py-3.5 text-right text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                     </tr>
@@ -251,9 +251,6 @@
                                         <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.application_count or 0 }} apps</span>
                                         <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.archimate_count or 0 }} ArchiMate</span>
                                         <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.risk_count or 0 }} risks</span>
-                                        {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
-                                        {% set _score = _cs.get('score', 0) %}
-                                        <span class="px-2 py-0.5 rounded bg-muted/50 font-medium">Score: {{ _score }}%</span>
                                     </div>
                                 </div>
                             </td>
@@ -278,22 +275,12 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ _gov_cls }}">{{ _gov_label }}</span>
                                 </div>
                             </td>
-                            <td class="px-5 py-4 whitespace-nowrap hidden xl:table-cell">
-                                <div class="space-y-2">
-                                    <div class="flex items-baseline gap-2">
-                                        <span class="text-2xl font-bold tracking-tight
- {% if (ws.readiness_pct or 0) >= 80 %}text-success
- {% elif (ws.readiness_pct or 0) >= 40 %}text-warning
- {% else %}text-foreground{% endif %}">{{ ws.readiness_pct or 0 }}%</span>
-                                    </div>
-                                    <div class="h-1.5 w-32 rounded-full bg-muted/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all
- {% if (ws.readiness_pct or 0) >= 80 %}bg-success
- {% elif (ws.readiness_pct or 0) >= 40 %}bg-warning
- {% else %}bg-primary{% endif %}"
-                                             style="width: {{ ws.readiness_pct or 0 }}%"></div>
-                                    </div>
-                                    <p class="text-xs text-muted-foreground">{{ ws.readiness_passed or 0 }}/{{ ws.readiness_total or 0 }} TOGAF maturity checks</p>
+                            <td class="px-5 py-4 whitespace-nowrap">
+                                <div class="flex items-center gap-2">
+                                    {{ completeness_ring(ws.design_score_passed or 0, size='small', total=ws.design_score_total or 10,
+                                                         label='Design score ' ~ (ws.design_score_label or '0 of 10'),
+                                                         href=url_for('solution_design.view_solution', solution_id=solution.id) ~ '#design-score') }}
+                                    <span class="text-sm font-medium tabular-nums text-foreground">{{ ws.design_score_label or '0 of 10' }}</span>
                                 </div>
                             </td>
                             <td class="px-5 py-4 hidden 2xl:table-cell">
@@ -303,23 +290,6 @@
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} elements</span>
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.risk_count or 0 }} risks</span>
                                 </div>
-                            </td>
-                            {# PLT-002: Architecture completeness score ring #}
-                            {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
-                            {% set _score = _cs.get('score', 0) %}
-                            <td class="px-5 py-4 whitespace-nowrap hidden 2xl:table-cell">
-                              <div class="flex flex-col items-center gap-1">
-                                <div class="relative flex items-center justify-center w-11 h-11">
-                                  <svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3" class="text-muted/40"/>
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3"
-                                            stroke-dasharray="{{ _score }}, 100"
-                                            class="{{ 'text-success-emphasis' if _score >= 80 else ('text-warning' if _score >= 40 else 'text-destructive') }}"/>
-                                  </svg>
-                                  <span class="absolute text-2xs font-bold leading-none">{{ _score }}%</span>
-                                </div>
-                                <span class="text-xs text-muted-foreground">{{ _cs.get('filled_count', 0) }}/{{ _cs.get('total', 14) }}</span>
-                              </div>
                             </td>
                             {% set _disconnected = (ws.capability_count or 0) == 0 and (ws.application_count or 0) == 0 and (ws.archimate_count or 0) == 0 %}
                             <td class="px-5 py-4">
@@ -758,7 +728,7 @@
     if (ids.length < 2) { Platform.toast.error('Select at least 2 solutions to compare'); return; }
     let rows = document.querySelectorAll('tbody tr');
     let headers = ['Attribute'];
-    let bodyRows = {domain: ['Domain'], status: ['Status'], type: ['Type'], readiness: ['Readiness'], capabilities: ['Capabilities'], created: ['Created']};
+    let bodyRows = {domain: ['Domain'], status: ['Status'], type: ['Type'], readiness: ['Design score'], capabilities: ['Capabilities'], created: ['Created']};
     rows.forEach(function(tr) {
       let cb = tr.querySelector('[data-select-row="solution-table"]');
       if (!cb || ids.indexOf(Number(cb.value)) === -1) return;
@@ -767,7 +737,7 @@
       bodyRows.domain.push(tr.dataset.domain || '—');
       bodyRows.status.push(tr.dataset.status || '—');
       bodyRows.type.push(tr.dataset.type || '—');
-      bodyRows.readiness.push((cells[3] && cells[3].querySelector('.text-2xl')?.textContent?.trim()) || '—');
+      bodyRows.readiness.push((cells[3] && cells[3].querySelector('[data-design-score]')?.dataset.designScore) || '—');
       bodyRows.capabilities.push((cells[4] && cells[4].textContent?.trim()) || '—');
       bodyRows.created.push((cells[5] && cells[5].querySelector('.text-xs')?.textContent?.trim()) || '—');
     });

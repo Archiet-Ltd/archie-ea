@@ -31466,95 +31466,6 @@
    "tier": "C5",
    "type_changed": true
   },
-  "app/templates/solutions/completeness.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "tabs",
-    "progress",
-    "item",
-    "separator"
-   ],
-   "controls": {
-    "button": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "macros": [
-    "components/page_header.html"
-   ],
-   "persona": "solution_architect",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "charts": [
-    "chart-radial-text"
-   ],
-   "confidence": "high",
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-header:Replace"
-   ],
-   "original": "gap:G-4",
-   "page_type": "document",
-   "reason": "Completeness review named a document in the corrections: score ring, section scores and top recommendations, with one radial chart.",
-   "tier": "C5",
-   "type_changed": true
-  },
   "app/templates/solutions/conformance_review.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -31639,7 +31550,10 @@
    "page_type": "document",
    "reason": "Conformance review report with findings and an escalate action.",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "extra_macros": [
+    "components/arb_escalate_button.html"
+   ]
   },
   "app/templates/solutions/data_stewardship.html": {
    "allowed_macros": [
@@ -32095,7 +32009,8 @@
    "status": "mapped",
    "extra_macros": [
     "components/disabled_action.html",
-    "components/sol_confirm_modal.html"
+    "components/sol_confirm_modal.html",
+    "components/completeness_ring.html"
    ],
    "charts": [],
    "confidence": "high",

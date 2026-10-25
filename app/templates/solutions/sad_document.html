@@ -1,5 +1,7 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'solutions/partials/_design_score.html' import design_score_panel %}
 <!-- modal-a11y-ok -->
 
 {% block title %}Solution Architecture Document — {{ sad.solution.name }}{% endblock %}
@@ -85,6 +87,12 @@
       <li><a href="#sad-s10">10. Risks and Constraints</a></li>
     </ol>
   </nav>
+
+  {% if sad.design_score %}
+  <div class="sad-section">
+    {{ design_score_panel(sad.design_score, links=not standalone) }}
+  </div>
+  {% endif %}
 
   {# ── §1 Executive Summary ────────────────────────────────────────────── #}
   {% set s = sad.sections[0] %}

@@ -53,9 +53,9 @@ class ProactiveAnalysisService:
         Every caller must skip the check when it is None.
         """
         try:
-            from app.models.solution_models import SolutionArchiMateElement
-            count = SolutionArchiMateElement.query.filter_by(solution_id=solution_id).count()
-            return min(100, count * 5)
+            from app.services.solution_design_score_service import design_score
+            score = design_score(solution_id)
+            return None if score is None else score.passed * 10
         except Exception:
             logger.exception("_get_completeness_pct(%s) failed", solution_id)
             return None
@@ -66,7 +66,7 @@ class ProactiveAnalysisService:
         if age_days < COMPLETENESS_GAP_THRESHOLD_DAYS:
             return []
         pct = self._get_completeness_pct(sol.id)
-        if pct is None or pct > 5:
+        if pct is None or pct > 10:
             # Unknown completeness is not near-zero completeness: raise nothing.
             return []
         return [CopilotInsight(

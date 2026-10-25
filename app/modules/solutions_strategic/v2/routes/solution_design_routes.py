@@ -306,7 +306,12 @@ def _get_solution_capabilities_payload(solution: Solution) -> list[dict]:
 
 
 def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[int, dict], dict[str, int]]:
-    """Return architect-facing worklist summaries for the provided solutions."""
+    """Return architect-facing worklist summaries for the provided solutions.
+
+    The design score, the application count and the risk count come from the
+    one design score service, so the row shows what the solution page, the
+    review packet and the document show.
+    """
     if not solutions:
         return {}, {
             "needs_setup": 0,
@@ -316,20 +321,14 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
         }
 
     from app.models.solution_architect_models import (
-        SolutionConstraint,
-        SolutionDriver,
-        SolutionGoal,
         SolutionProblemDefinition,
         SolutionRecommendation,
-        SolutionRequirement,
     )
-    from app.models.solution_lifecycle_models import SolutionMetric, SolutionPlateau, SolutionRisk
     from app.models.solution_models import (
-        SolutionArchiMateElement,
         SolutionCapabilityMapping,
-        solution_applications,
         solution_vendor_products,
     )
+    from app.services.solution_design_score_service import design_scores
 
     solution_ids = [solution.id for solution in solutions]
     analysis_session_ids = [solution.analysis_session_id for solution in solutions if solution.analysis_session_id]
@@ -341,14 +340,6 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
         }
 
     counts = {
-        "apps": _count_rows(
-            db.session.query(
-                solution_applications.c.solution_id,
-                func.count(solution_applications.c.application_component_id),
-            )
-            .filter(solution_applications.c.solution_id.in_(solution_ids))
-            .group_by(solution_applications.c.solution_id)
-        ),
         "vendors": _count_rows(
             db.session.query(
                 solution_vendor_products.c.solution_id,
@@ -356,19 +347,6 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
             )
             .filter(solution_vendor_products.c.solution_id.in_(solution_ids))
             .group_by(solution_vendor_products.c.solution_id)
-        ),
-        "archimate": _count_rows(
-            db.session.query(
-                SolutionArchiMateElement.solution_id,
-                func.count(SolutionArchiMateElement.id),
-            )
-            .filter(SolutionArchiMateElement.solution_id.in_(solution_ids))
-            .group_by(SolutionArchiMateElement.solution_id)
-        ),
-        "risks": _count_rows(
-            db.session.query(SolutionRisk.solution_id, func.count(SolutionRisk.id))
-            .filter(SolutionRisk.solution_id.in_(solution_ids))
-            .group_by(SolutionRisk.solution_id)
         ),
         "adrs": _count_rows(
             db.session.query(SolutionADRDirect.solution_id, func.count(SolutionADRDirect.id))
@@ -407,9 +385,6 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
 
     problem_ids = list(problem_ids_by_solution_id.values())
     capabilities_by_problem: dict[int, int] = {}
-    drivers_by_problem: dict[int, int] = {}
-    goals_by_problem: dict[int, int] = {}
-
     if problem_ids:
         capabilities_by_problem = _count_rows(
             db.session.query(SolutionCapabilityMapping.problem_id, func.count(SolutionCapabilityMapping.id))
@@ -419,128 +394,16 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
             )
             .group_by(SolutionCapabilityMapping.problem_id)
         )
-        drivers_by_problem = _count_rows(
-            db.session.query(SolutionDriver.problem_id, func.count(SolutionDriver.id))
-            .filter(SolutionDriver.problem_id.in_(problem_ids))
-            .group_by(SolutionDriver.problem_id)
-        )
-        goals_by_problem = _count_rows(
-            db.session.query(SolutionGoal.problem_id, func.count(SolutionGoal.id))
-            .filter(SolutionGoal.problem_id.in_(problem_ids))
-            .group_by(SolutionGoal.problem_id)
-        )
 
     recommendations_by_session: dict[int, int] = {}
-    selected_rec_by_session: dict[int, bool] = {}
     if analysis_session_ids:
         recommendations_by_session = _count_rows(
             db.session.query(SolutionRecommendation.session_id, func.count(SolutionRecommendation.id))
             .filter(SolutionRecommendation.session_id.in_(analysis_session_ids))
             .group_by(SolutionRecommendation.session_id)
         )
-        # Check which sessions have a selected/recommended option (rank=1 or is_recommended)
-        selected_sessions = (
-            db.session.query(SolutionRecommendation.session_id)
-            .filter(
-                SolutionRecommendation.session_id.in_(analysis_session_ids),
-                db.or_(
-                    SolutionRecommendation.is_recommended == True,  # noqa: E712
-                    SolutionRecommendation.rank == 1,
-                ),
-            )
-            .distinct()
-            .all()
-        )
-        selected_rec_by_session = {row[0]: True for row in selected_sessions}
 
-    # SD-005: Additional entity counts for weighted maturity score (same formula as detail page)
-    constraints_by_problem: dict[int, int] = {}
-    if problem_ids:
-        constraints_by_problem = _count_rows(
-            db.session.query(SolutionConstraint.problem_id, func.count(SolutionConstraint.id))
-            .filter(SolutionConstraint.problem_id.in_(problem_ids))
-            .group_by(SolutionConstraint.problem_id)
-        )
-
-    # Requirements can be linked via problem_id OR solution_id
-    requirements_by_problem: dict[int, int] = {}
-    requirements_by_solution: dict[int, int] = {}
-    if problem_ids:
-        requirements_by_problem = _count_rows(
-            db.session.query(SolutionRequirement.problem_id, func.count(SolutionRequirement.id))
-            .filter(SolutionRequirement.problem_id.in_(problem_ids))
-            .group_by(SolutionRequirement.problem_id)
-        )
-    if solution_ids:
-        requirements_by_solution = _count_rows(
-            db.session.query(SolutionRequirement.solution_id, func.count(SolutionRequirement.id))
-            .filter(
-                SolutionRequirement.solution_id.in_(solution_ids),
-                SolutionRequirement.solution_id.isnot(None),
-            )
-            .group_by(SolutionRequirement.solution_id)
-        )
-
-    plateaus_by_solution: dict[int, int] = _count_rows(
-        db.session.query(SolutionPlateau.solution_id, func.count(SolutionPlateau.id))
-        .filter(SolutionPlateau.solution_id.in_(solution_ids))
-        .group_by(SolutionPlateau.solution_id)
-    ) if solution_ids else {}
-
-    metrics_by_solution: dict[int, int] = _count_rows(
-        db.session.query(SolutionMetric.solution_id, func.count(SolutionMetric.id))
-        .filter(SolutionMetric.solution_id.in_(solution_ids))
-        .group_by(SolutionMetric.solution_id)
-    ) if solution_ids else {}
-
-    # SD-005: Batch cross-layer ArchiMate relationship count per solution
-    # Mirrors the ARCH_relationships check from the detail page (ENT-101)
-    cross_layer_by_solution: dict[int, int] = {}
-    try:
-        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-        from app.models.solution_element import SolutionElement
-        # Build {solution_id: set(element_ids)} mapping
-        sol_elem_rows = (
-            db.session.query(SolutionElement.solution_id, SolutionElement.archimate_element_id)
-            .filter(SolutionElement.solution_id.in_(solution_ids))
-            .all()
-        )
-        sol_elem_map: dict[int, set[int]] = {}
-        all_elem_ids: set[int] = set()
-        for sol_id, elem_id in sol_elem_rows:
-            sol_elem_map.setdefault(sol_id, set()).add(elem_id)
-            all_elem_ids.add(elem_id)
-
-        if all_elem_ids:
-            # Fetch layers for all relevant elements in one query
-            elem_layers = {
-                row[0]: (row[1] or "").lower()
-                for row in db.session.query(ArchiMateElement.id, ArchiMateElement.layer)
-                .filter(ArchiMateElement.id.in_(all_elem_ids))
-                .all()
-            }
-            # Fetch relationships where both ends are in our element set
-            rels = (
-                db.session.query(
-                    ArchiMateRelationship.source_id,
-                    ArchiMateRelationship.target_id,
-                )
-                .filter(
-                    ArchiMateRelationship.source_id.in_(all_elem_ids),
-                    ArchiMateRelationship.target_id.in_(all_elem_ids),
-                )
-                .all()
-            )
-            # Count cross-layer relationships per solution
-            for sol_id, elem_ids in sol_elem_map.items():
-                cross_count = 0
-                for src_id, tgt_id in rels:
-                    if src_id in elem_ids and tgt_id in elem_ids:
-                        if elem_layers.get(src_id, "") != elem_layers.get(tgt_id, ""):
-                            cross_count += 1
-                cross_layer_by_solution[sol_id] = cross_count
-    except Exception as e:
-        logger.debug("SD-005: Cross-layer relationship batch query failed: %s", e)
+    scores = design_scores(solutions)
 
     summaries: dict[int, dict] = {}
     architect_stats = {
@@ -551,55 +414,25 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
     }
 
     for solution in solutions:
+        score = scores[solution.id]
         problem_id = problem_ids_by_solution_id.get(solution.id)
         capability_count = (
             counts["capabilities_direct"].get(solution.id, 0)
             + capabilities_by_problem.get(problem_id, 0)
         )
-        driver_count = drivers_by_problem.get(problem_id, 0)
-        goal_count = goals_by_problem.get(problem_id, 0)
-        constraint_count = constraints_by_problem.get(problem_id, 0)
-        requirement_count = (
-            requirements_by_problem.get(problem_id, 0)
-            + requirements_by_solution.get(solution.id, 0)
+        recommendation_count = (
+            recommendations_by_session.get(solution.analysis_session_id, 0)
+            if solution.analysis_session_id else 0
         )
-        recommendation_count = recommendations_by_session.get(solution.analysis_session_id, 0) if solution.analysis_session_id else 0
-        has_selected_rec = selected_rec_by_session.get(solution.analysis_session_id, False) if solution.analysis_session_id else False
-        app_count = counts["apps"].get(solution.id, 0)
-        vendor_count = counts["vendors"].get(solution.id, 0)
-        archimate_count = counts["archimate"].get(solution.id, 0)
-        risk_count = counts["risks"].get(solution.id, 0)
-        adr_count = counts["adrs"].get(solution.id, 0)
-        apqc_count = counts["apqc"].get(solution.id, 0)
-        plateau_count = plateaus_by_solution.get(solution.id, 0)
-        metric_count = metrics_by_solution.get(solution.id, 0)
-
-        # SD-005: Weighted maturity score — same formula as detail page (_build_solution_detail_context)
-        # Weights mirror the detail page's maturity_checks dict (SDX-017)
-        maturity_weights = {
-            "A_drivers":          (8,  driver_count > 0),
-            "A_goals":            (7,  goal_count > 0),
-            "A_constraints":      (5,  constraint_count > 0),
-            "BCD_requirements":   (10, requirement_count > 0),
-            "BCD_capabilities":   (8,  archimate_count > 0),
-            "CD_risks":           (7,  risk_count > 0),
-            "E_options":          (10, recommendation_count > 0),
-            "E_recommendation":   (8,  has_selected_rec),
-            "F_plateaus":         (5,  plateau_count > 0),
-            "G_arb":              (7,  solution.governance_status not in (None, "draft")),
-            "H_metrics":          (5,  metric_count > 0),
-            "ARCH_relationships": (7,  cross_layer_by_solution.get(solution.id, 0) >= 5),
-        }
-        maturity_total_weight = sum(w for w, _ in maturity_weights.values())
-        maturity_earned_weight = sum(w for w, passed in maturity_weights.values() if passed)
-        readiness_pct = round((maturity_earned_weight / maturity_total_weight) * 100) if maturity_total_weight else 0
-        readiness_passed = sum(1 for _, passed in maturity_weights.values() if passed)
-        readiness_total = len(maturity_weights)
+        app_count = score.counts["applications"]
+        archimate_count = score.counts["elements"]
+        risk_count = score.counts["risks"]
+        adr_count = counts["adrs"].get(solution.id, 0) + score.counts["decisions"]
 
         if not solution.description or capability_count == 0:
             next_action = "Map the business problem and capabilities"
             work_bucket = "needs_setup"
-        elif recommendation_count == 0:
+        elif recommendation_count == 0 and score.counts["options"] == 0:
             next_action = "Define the preferred solution option"
             work_bucket = "in_design"
         elif archimate_count == 0 or app_count == 0:
@@ -621,16 +454,16 @@ def _build_solution_worklist_summaries(solutions: list[Solution]) -> tuple[dict[
             "phase_label": solution.adm_phase_label or f"Phase {solution.adm_phase or 'A'}",
             "governance_status": solution.governance_status or "draft",
             "owner_display": solution.technical_lead or solution.solution_owner or "Unassigned",
-            "readiness_passed": readiness_passed,
-            "readiness_total": readiness_total,
-            "readiness_pct": readiness_pct,
+            "design_score_passed": score.passed,
+            "design_score_total": score.total,
+            "design_score_label": score.label,
             "capability_count": capability_count,
             "application_count": app_count,
-            "vendor_count": vendor_count,
+            "vendor_count": counts["vendors"].get(solution.id, 0),
             "archimate_count": archimate_count,
             "risk_count": risk_count,
             "adr_count": adr_count,
-            "apqc_count": apqc_count,
+            "apqc_count": counts["apqc"].get(solution.id, 0),
             "recommendation_count": recommendation_count,
             "next_action": next_action,
             "work_bucket": work_bucket,
@@ -1272,16 +1105,6 @@ def list_solutions():
 
         # ENT-100: workspace_summaries/workspace_stats computed above (ws_filter branch or normal branch)
 
-        # PLT-002: Derive completeness scores from already-fetched workspace_summaries (zero extra queries)
-        completeness_scores = {
-            _sol.id: {
-                "score": workspace_summaries.get(_sol.id, {}).get("readiness_pct", 0),
-                "filled_count": workspace_summaries.get(_sol.id, {}).get("readiness_passed", 0),
-                "total": workspace_summaries.get(_sol.id, {}).get("readiness_total", 12),
-            }
-            for _sol in pagination.items
-        }
-
         # ── Unified hidden-solutions disclosure (round 4) ───────────────────
         # Rounds 1-3 each added a separate, conditionally-gated disclosure
         # block for ONE filter type (ownership, then BU, then search/status),
@@ -1439,7 +1262,6 @@ def list_solutions():
             bu_filter_active=bu_filter_active,
             bu_name=bu_name,
             show_all_override=show_all_override,
-            completeness_scores=completeness_scores,
             selected_workspace=ws_filter,
             all_filtered_ids=all_filtered_ids,
         )
@@ -3004,10 +2826,16 @@ def _build_blueprint_context(solution):
     except Exception as exc:
         logger.debug("suppressed error in _build_blueprint_context (app/modules/solutions_strategic/v2/routes/solution_design_routes.py): %s", exc)
 
+    from app.services.solution_design_score_service import compute as _design_score
+
     return {
         "solution": solution,
         "scores": scores,
-        # S-02/S-03: the single completeness computation. Every surface on the
+        # The one design score: ten plain checks, shown as "n of 10" here, on
+        # the list, in the review packet, the export and the document.
+        "design_score": _design_score(solution).to_dict(),
+        # S-02/S-03: the section catalogue. Section percentages are no longer
+        # shown; the design score is the one figure. Every surface on the
         # blueprint page (ring, "N of M sections", gap advisor, header strip)
         # reads from this — none of them may re-derive it.
         "completeness": compute_blueprint_completeness(scores),

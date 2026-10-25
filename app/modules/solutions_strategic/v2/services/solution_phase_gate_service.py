@@ -138,10 +138,11 @@ def _count_work_packages(solution):
 
 
 def _count_risks(solution):
-    """Count risks for this solution."""
-    from app.models.solution_lifecycle_models import SolutionRisk
+    """Count the solution's risks: the risk register, plus any older solution
+    risk the merge has not yet retired (the same read as the design score)."""
+    from app.services.solution_design_score_service import solution_risks
 
-    return SolutionRisk.query.filter_by(solution_id=solution.id).count()
+    return len(solution_risks(solution.id))
 
 
 def _count_metrics(solution):

@@ -40,7 +40,7 @@ def solution(db_session, make_org, tenant_ctx):
         yield s
 
 
-def _add_element(db_session, solution_id, layer_type, element_table, name):
+def _add_element(db_session, solution_id, layer_type, element_table, name, etype="TestElement"):
     """Attach one ArchiMate element to a solution.
 
     A real ArchiMateElement row is created first: `solution_archimate_elements`
@@ -50,7 +50,7 @@ def _add_element(db_session, solution_id, layer_type, element_table, name):
     from app.models.models import ArchiMateElement
     from app.models.solution_models import SolutionArchiMateElement
 
-    element = ArchiMateElement(name=name, type="TestElement", layer=layer_type)
+    element = ArchiMateElement(name=name, type=etype, layer=layer_type)
     db_session.add(element)
     db_session.flush()
 
@@ -143,10 +143,11 @@ def _readiness_labels(solution_id):
     return {row["label"]: row["ok"] for row in packet["readiness"]}
 
 
+# The board-readiness checklist is the design score's ten checks; these are
+# the rows that answer "has the design addressed data and technology".
 DOMAIN_ROWS = (
-    "Business architecture addressed",
-    "Data architecture addressed",
-    "Technology architecture addressed",
+    "Data named",
+    "Where it runs named",
 )
 
 
@@ -170,6 +171,8 @@ def test_domain_rows_turn_green_when_the_domains_are_modelled(db_session, soluti
     _add_element(db_session, solution.id, "business", "business_processes", "Capture Order")
     _add_element(db_session, solution.id, "application", "application_data_objects", "Sales Order")
     _add_element(db_session, solution.id, "technology", "technology_nodes", "SAP HANA node")
+    _add_element(db_session, solution.id, "technology", "archimate_elements", "SAP HANA", etype="Node")
+    _add_element(db_session, solution.id, "application", "archimate_elements", "Order", etype="DataObject")
 
     labels = _readiness_labels(solution.id)
     for row in DOMAIN_ROWS:

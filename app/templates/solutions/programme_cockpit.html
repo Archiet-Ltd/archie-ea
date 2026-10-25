@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 
@@ -92,9 +93,8 @@
                     {% endif %}
                 </div>
                 {% if import_review.conformance %}
-                <p class="text-3xl font-bold mt-1 {% if import_review.conformance.score >= 80 %}text-success{% elif import_review.conformance.score >= 50 %}text-warning-emphasis{% else %}text-destructive{% endif %}">
-                    {{ import_review.conformance.score }}<span class="text-sm text-muted-foreground">/100</span></p>
-                <p class="text-xs text-muted-foreground">{{ import_review.conformance.flagged }} flagged finding{{ '' if import_review.conformance.flagged == 1 else 's' }}</p>
+                <p class="text-3xl font-bold mt-1 tabular-nums text-foreground">{{ import_review.conformance.flagged }}</p>
+                <p class="text-xs text-muted-foreground">flagged finding{{ '' if import_review.conformance.flagged == 1 else 's' }}</p>
                 <ul class="mt-3 space-y-1.5">
                     {% for f in import_review.conformance.findings %}
                     <li class="flex items-start gap-2 text-xs">

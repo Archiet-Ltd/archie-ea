@@ -3,8 +3,8 @@
 The demonstration organisation is seeded by the product's own seed. The person who signs in is the demo Enterprise
 Architect (persona enterprise_architect, platform role Viewer, not an administrator):
 
-* opens "Field Calibration Platform" and finds its fifteen blueprint sections written, a completeness figure above
-  zero that equals what the sections score, governance and compliance that follow from those scores;
+* opens "Field Calibration Platform" and finds its fifteen blueprint sections written and its design score,
+  the same "n of 10" the design score service computes;
 * opens the solution's risk heat map and finds probability rising to the right, impact rising upward, each cell
   coloured from its own probability times impact, and every risk of the solution plotted in its cell, the same
   figures as the solution's risk list; opens a cell, follows a risk to its own page, edits a risk and sees it move.
@@ -118,24 +118,18 @@ def test_the_architect_opens_the_solution_and_reads_its_story(browser, live_serv
         decisions = page.locator("textarea[aria-label='Decision narrative']").input_value()
         assert "calibration ledger" in decisions.lower() and "rejected" in decisions.lower(), decisions[:80]
 
-        if width >= 1024:
-            body = page.inner_text("body")
-            shown = re.search(r"(\d+) of (\d+) sections complete", body)
-            assert shown, "the completeness caption is missing"
-            assert int(shown.group(2)) == 15
-            # The caption counts exactly the sections the blueprint scoring rates complete.
-            assert int(shown.group(1)) == written, (shown.group(0), written)
-            ring = re.search(r"Completeness\s+(\d+)%", body, re.I)
-            assert ring and int(ring.group(1)) == mean, (ring and ring.group(1), mean)
-            # Compliance is the same figure, and governance follows from every section being ready.
-            compliance = re.search(r"Compliance\s+(\d+)%", body, re.I)
-            assert compliance and int(compliance.group(1)) == mean
-            assert re.search(r"Governance status\s+Proposed", body, re.I), body[:400]
-        else:
-            # Below the desktop width the rail is folded away: the section strip carries the figures.
-            chips = page.locator("div.sticky button[title*='%']")
-            shown = [chips.nth(i).text_content().split()[-1] for i in range(chips.count())]
-            assert shown[:15] == ["%d%%" % v for v in overall], (shown, overall)
+        # The page's one figure is the design score, the same as every other surface.
+        from app import create_app as _ca
+        from app.models.solution_models import Solution as _S
+        from app.services.solution_design_score_service import compute as _compute
+        _app = _ca("testing")
+        with _app.app_context():
+            from app import db as _db
+            label = _compute(_db.session.get(_S, facts["solution_id"])).label
+            _db.session.remove()
+        shown = page.locator("[data-design-score]").first.get_attribute("data-design-score")
+        assert shown == label, (shown, label)
+        assert "% complete" not in page.inner_text("body")
         _shot(page, "solution-overview", width)
         assert not errors, errors
     finally:

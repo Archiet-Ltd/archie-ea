@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/arb_escalate_button.html" import arb_escalate %}
@@ -30,10 +31,9 @@
     {# ── Score + summary ───────────────────────────────────────────── #}
     <div class="border border-border rounded-lg bg-card p-6 mb-6 flex items-start gap-5">
         <div class="shrink-0 text-center">
-            {% if review.score is not none %}
-            <div class="text-4xl font-bold leading-none
-                {% if review.score >= 80 %}text-success{% elif review.score >= 50 %}text-warning{% else %}text-destructive{% endif %}">{{ review.score }}</div>
-            <div class="text-xs uppercase tracking-wider text-muted-foreground mt-1">Conformance</div>
+            {% if review.controls_available and not review.unassessed %}
+            <div class="text-4xl font-bold leading-none tabular-nums text-foreground">{{ review.flagged }}</div>
+            <div class="text-xs uppercase tracking-wider text-muted-foreground mt-1">Findings to resolve</div>
             {% else %}
             <div class="text-lg font-semibold leading-none text-muted-foreground">Unavailable</div>
             <div class="text-xs uppercase tracking-wider text-muted-foreground mt-1">Conformance</div>
@@ -75,7 +75,7 @@
     <div class="border border-warning/30 bg-warning/5 rounded-xl p-8 text-center">
         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-warning/10 text-warning-emphasis mb-3"><i data-lucide="alert-circle" class="h-6 w-6"></i></span>
         <p class="text-sm font-medium text-foreground">{% if review.unassessed %}No architecture content is modelled yet{% else %}One or more required conformance controls are unavailable{% endif %}</p>
-        <p class="text-xs text-muted-foreground mt-1">No conformance score has been calculated.</p>
+        <p class="text-xs text-muted-foreground mt-1">{% if review.unassessed %}Link the design elements on the solution page, then run the review again.{% else %}Restore the unavailable control, then run the review again.{% endif %}</p>
     </div>
     {% else %}
     <div class="border border-success/30 bg-success/5 rounded-xl p-8 text-center">

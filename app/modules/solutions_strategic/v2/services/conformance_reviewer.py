@@ -11,8 +11,11 @@ Deterministic and sourced (Rule 11): the checks are rules over live data,
 not generation — so a review is fast, free, and always reflects the
 current state. Each section is fault-tolerant. Findings never fabricate.
 
-Severity: 'critical' | 'high' | 'info'. A conformance score starts at 100
-and is debited per finding by severity, floored at 0.
+Severity: 'critical' | 'high' | 'info'. The review returns findings and the
+count needing attention; it calculates no score. A score that started at 100
+and only subtracted findings rewarded absence (a near-empty design scored 88).
+The one figure for a design is its design score
+(app/services/solution_design_score_service.py).
 """
 
 import logging
@@ -30,7 +33,6 @@ def _n(count, singular, plural=None):
     return f"{count} {word}"
 
 
-_DEBIT = {"critical": 25, "high": 12, "info": 0}
 # clean-core eroding fit types (custom build / heavy customization)
 _EROSION_FITS = {"custom", "customization", "custom_development"}
 
@@ -107,19 +109,13 @@ class ConformanceReviewer:
 
         unavailable_checks = [check["check"] for check in checks_run if not check["available"]]
         controls_available = not unavailable_checks
-        score = None
-        if controls_available:
-            score = 100
-            for f in findings:
-                score -= _DEBIT.get(f.get("severity", "info"), 0)
-            score = max(0, score)
         flagged = sum(1 for f in findings if f.get("severity") in ("critical", "high"))
 
         if not controls_available:
             summary = (
                 "Conformance controls unavailable: "
                 + ", ".join(unavailable_checks)
-                + ". No score has been calculated."
+                + ". The review is incomplete."
             )
         elif not findings:
             summary = "No technical-conformance issues found. The design aligns with platform policy."
@@ -135,7 +131,7 @@ class ConformanceReviewer:
             "success": True,
             "solution_id": solution_id,
             "solution_name": solution.name,
-            "score": score,
+            "score": None,
             "unassessed": False,
             "controls_available": controls_available,
             "unavailable_checks": unavailable_checks,
@@ -278,10 +274,15 @@ class ConformanceReviewer:
     @staticmethod
     def _data_findings(sid: int) -> List[Dict]:
         """TOGAF Phase C (Data): a design must name the data it creates and consumes."""
+        from app.services.solution_design_score_service import DATA_TYPES, linked_elements
+
         total, _, tables = ConformanceReviewer._element_counts(sid)
         if total == 0:
             return []
         if tables & _DATA_TABLES:
+            return []
+        # Most links name archimate_elements, not a data table: read the type.
+        if any(e.type in DATA_TYPES | {"BusinessObject", "Representation"} for e in linked_elements(sid)):
             return []
         return [{
             "category": "data",
