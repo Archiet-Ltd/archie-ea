@@ -20,12 +20,6 @@
         breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Billing'}]
     ) }}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-            {{ alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }} {# ui-contract-ok: the alert macro, not a native dialog #}
-        {% endfor %}
-    {% endwith %}
-
     {% if error %}
         {{ alert('danger', text=error) }} {# ui-contract-ok: the alert macro, not a native dialog #}
     {% endif %}
@@ -59,11 +53,15 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Status</p>
                 <p class="text-sm font-semibold
-                    {% if status_val == 'active' %}text-success-emphasis
-                    {% elif status_val == 'past_due' %}text-warning-emphasis
-                    {% elif status_val == 'cancelled' %}text-destructive-emphasis
-                    {% else %}text-foreground{% endif %}">
-                    {% if status_val == 'past_due' %}Payment overdue{% elif status_val == 'trialing' %}Trial{% else %}{{ status_val | title }}{% endif %}
+                    {%- if plan.key == 'free' %}text-foreground
+                    {%- elif status_val == 'active' %}text-success-emphasis
+                    {%- elif status_val == 'past_due' %}text-warning-emphasis
+                    {%- elif status_val == 'cancelled' %}text-destructive-emphasis
+                    {%- else %}text-foreground{% endif %}">
+                    {%- if plan.key == 'free' %}Free plan
+                    {%- elif status_val == 'past_due' %}Payment overdue
+                    {%- elif status_val == 'trialing' %}Trial
+                    {%- else %}{{ status_val | title }}{% endif %}
                 </p>
                 {% if status_val == 'past_due' %}
                 <p class="text-xs text-muted-foreground mt-1">The last payment failed. Update the card in Manage billing.</p>
