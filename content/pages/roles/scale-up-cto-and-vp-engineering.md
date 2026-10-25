@@ -54,7 +54,8 @@ to read it from the tools that already hold it.
   against it.
 - **The AI chat**, where you ask in plain words what breaks if a system fails. It lists what is recorded as
   connected to it and cites the record behind each line. Where nothing is recorded it says so plainly instead of
-  guessing. The same answer opens on the twin map — see
+  guessing, and *Work them out now* extends the answer to indirect connections. Any element opens in the
+  Composer — see
   [Digital twin of your organisation](/modules/digital-twin).
 - **The health scorecard**, which reads the elements, open risks and review pipeline recorded so far and
   marks anything not yet measured as not measured.

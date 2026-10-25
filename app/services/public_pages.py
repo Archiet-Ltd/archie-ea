@@ -1048,8 +1048,8 @@ def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, An
 # lands in a final "More" group.
 
 ROLE_GROUPS: tuple[tuple[str, str], ...] = (
-    ("architecture", "Architecture"),
     ("technology-leadership", "Technology leadership"),
+    ("architecture", "Architecture"),
     ("portfolio-procurement-finance", "Portfolio, procurement and finance"),
     ("security-risk-compliance", "Security, risk and compliance"),
     ("owners", "Owners"),

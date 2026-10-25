@@ -323,3 +323,27 @@ class IndustryProcessRecommendation(TenantMixin, db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+def _load_frameworks_for_new_organisation(mapper, connection, organisation):
+    """A new organisation finds the industry frameworks already there.
+
+    The frameworks are one shared copy, loaded by a data migration for the
+    organisations that exist. This covers an installation or database that
+    has none yet; it adds only what is missing, so it costs one query once
+    the frameworks are present.
+    """
+    from app.modules.industry_apqc.framework_data import load_default_frameworks
+
+    load_default_frameworks(connection)
+
+
+def _register_framework_loader():
+    from sqlalchemy import event
+
+    from app.models.organization import Organization
+
+    event.listen(Organization, "after_insert", _load_frameworks_for_new_organisation)
+
+
+_register_framework_loader()
