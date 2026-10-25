@@ -5,6 +5,19 @@ Service initialization — job queue, audit, prometheus, LLM validation.
 import os
 
 
+def job_worker_wanted(config_name, environ) -> bool:
+    """Whether this process runs the background job worker.
+
+    Every configuration but testing does, unless DISABLE_JOB_QUEUE_WORKER is set. A preview is served
+    under the testing configuration so it never reaches real services, which leaves a saved website
+    waiting for a worker that never starts; RUN_JOB_WORKER=1, set by the preview's serve script,
+    starts it there. Nothing sets it in production, and the test suite does not.
+    """
+    if environ.get("DISABLE_JOB_QUEUE_WORKER"):
+        return False
+    return config_name != "testing" or environ.get("RUN_JOB_WORKER") == "1"
+
+
 def init_services(app, config_name):
     """Initialize background services and integrations."""
 
@@ -162,7 +175,7 @@ def _check_session_configuration(app, config_name):
         app.logger.warning(f"[DEV] Vendor Catalog bootstrap failed: {e}")
 
     # Job queue worker
-    if config_name != "testing" and not os.environ.get("DISABLE_JOB_QUEUE_WORKER"):
+    if job_worker_wanted(config_name, os.environ):
         try:
             from app.services.job_queue_service import get_job_queue_service
             import atexit
