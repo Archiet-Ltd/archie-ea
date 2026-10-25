@@ -199,9 +199,11 @@
                                 {% endif %}
                             </div>
                             <div class="flex flex-col items-end gap-1">
+                                {% if mapping.mapping_strength is not none %}
                                 <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
                                     {{ mapping.mapping_strength }}/5
                                 </span>
+                                {% endif %}
                                 {% if mapping.strategic_importance %}
                                 <span class="px-2 py-1 bg-{{ 'red' if mapping.strategic_importance == 'critical' else 'orange' if mapping.strategic_importance == 'high' else 'green' }}-100 text-{{ 'red' if mapping.strategic_importance == 'critical' else 'orange' if mapping.strategic_importance == 'high' else 'green' }}-800 text-xs rounded-full">
                                     {{ mapping.strategic_importance }}
@@ -243,12 +245,16 @@
                                 {% endif %}
                             </div>
                             <div class="flex flex-col items-end gap-1">
+                                {% if mapping.mapping_strength is not none %}
                                 <span class="px-2 py-1 bg-success/10 text-success-emphasis text-xs rounded-full">
                                     {{ mapping.mapping_strength }}/5
                                 </span>
+                                {% endif %}
+                                {% if mapping.business_value is not none %}
                                 <span class="px-2 py-1 bg-accent text-primary text-xs rounded-full">
                                     ${{ mapping.business_value }}/10
                                 </span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

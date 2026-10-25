@@ -8,11 +8,13 @@ Error handlers: 404, 500, 401, 403.
 
 import logging
 
-from flask import current_app, jsonify, redirect, url_for
+from flask import current_app, jsonify, redirect, request, url_for
 from flask_login import login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import _wants_json
 from app.services.feature_flag_service import FeatureFlagService
+from app.utils.plain_errors import render_plain_error
 from . import unified_ai_chat_bp
 from .chat_core import send_message
 from .workflow_routes import update_capability, update_application_metadata, suggest_entities
@@ -46,8 +48,16 @@ def unauthorized(error):
 
 @unified_ai_chat_bp.errorhandler(403)
 def forbidden(error):
-    """Handle 403 errors."""
-    return jsonify({"error": "Access forbidden"}), 403
+    """Handle 403 errors — plain refusal page for browsers, JSON for API/AJAX callers.
+
+    A blueprint-level handler beats the app-level handler in errors.py, so a
+    browser loading /ai-chat/admin/analytics was receiving raw JSON instead of
+    the product's plain refusal page.  Use the same JSON-or-HTML switch the
+    app-level handler uses (tenant_decorators._wants_json) and the same
+    render_plain_error helper for the HTML path."""
+    if _wants_json():
+        return jsonify({"error": "Access forbidden"}), 403
+    return render_plain_error(403, "errors/403.html")
 
 
 

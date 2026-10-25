@@ -6,7 +6,9 @@
 
 {% block title %}Gap Analysis{% endblock %}
 
-{% macro _gap_actions() %}
+{% macro status_label(status) %}
+    {{ (status|default('identified', true))|replace('_', ' ')|title }}
+{% endmacro %}
 {{ button(text='Identify Gap', variant='default', icon='plus') }}
 {% endmacro %}
 
@@ -25,7 +27,7 @@
     {% endif %}
 {% endmacro %}
 {% macro gap_type_cell(gap) %}
-    {% if gap.gap_type %}{{ gap.gap_type }}{% else %}
+    {% if gap.gap_type %}{{ gap.gap_type|replace('_', ' ')|title }}{% else %}
     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
        class="text-sm text-muted-foreground hover:underline" data-testid="gap-type-unset">Not set: open the gap to classify it</a>
     {% endif %}
@@ -90,11 +92,11 @@
                     {% call table_cell() %}{{ severity_badge(gap) }}{% endcall %}
                     {% call table_cell() %}
                         {% if gap.resolution_status == 'resolved' %}
-                            {% call badge('success') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
+                            {% call badge('success') %}{{ status_label(gap.resolution_status) }}{% endcall %}
                         {% elif gap.resolution_status == 'in_progress' %}
-                            {% call badge('info') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
+                            {% call badge('info') %}{{ status_label(gap.resolution_status) }}{% endcall %}
                         {% else %}
-                            {% call badge('neutral') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
+                            {% call badge('neutral') %}{{ status_label(gap.resolution_status) }}{% endcall %}
                         {% endif %}
                     {% endcall %}
                     {% call table_cell() %}<span class="text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</span>{% endcall %}
@@ -156,11 +158,11 @@
                     {% call table_cell() %}{{ severity_badge(gap) }}{% endcall %}
                     {% call table_cell() %}
                         {% if gap.resolution_status == 'resolved' %}
-                            {% call badge('success') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
+                            {% call badge('success') %}{{ status_label(gap.resolution_status) }}{% endcall %}
                         {% elif gap.resolution_status == 'in_progress' %}
-                            {% call badge('info') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
+                            {% call badge('info') %}{{ status_label(gap.resolution_status) }}{% endcall %}
                         {% else %}
-                            {% call badge('neutral') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
+                            {% call badge('neutral') %}{{ status_label(gap.resolution_status) }}{% endcall %}
                         {% endif %}
                     {% endcall %}
                     {% call table_cell() %}

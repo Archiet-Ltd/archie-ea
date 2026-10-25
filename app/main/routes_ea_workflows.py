@@ -10,7 +10,7 @@ Features:
 - Approval handling for manual intervention steps
 """
 
-from flask import current_app, jsonify, render_template, request
+from flask import current_app, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -439,7 +439,7 @@ def register_ea_workflow_routes(main_blueprint):
             engine = EAWorkflowEngine()
             definition = engine.get_workflow_definition(workflow_code)
             if not definition or workflow_code != "ADM_PHASE_A_VISION":
-                return render_template("errors/404.html"), 404
+                return redirect(url_for("main.ea_workflows_dashboard"))
 
             selected_application = None
             if application_id:
