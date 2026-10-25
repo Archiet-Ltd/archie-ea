@@ -2,6 +2,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
@@ -67,18 +68,13 @@
   <input type="hidden" id="rdm-csrf-token" value="{{ csrf_token() }}">
 
   {# ── Page Header ── #}
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-    <div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Enterprise Capability Roadmap</h1>
-      <p class="mt-1 text-sm text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration — Plateaus, Gaps, and Work Packages</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
-      {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
-      {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
-      {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
-    </div>
-  </div>
+  {% macro _roadmap_actions() %}
+    {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
+    {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
+    {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
+    {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
+  {% endmacro %}
+  {{ page_shell(title='Enterprise Capability Roadmap', subtitle='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages', actions_caller=_roadmap_actions) }}
 
   {# ── Metrics Row ── #}
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
