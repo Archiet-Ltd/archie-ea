@@ -39,6 +39,6 @@ def test_marked_line_is_excluded(tmp_path, monkeypatch):
 
 def test_tree_count_matches_recorded_baseline():
     import json
-    baseline = json.loads((ROOT / "verification_baseline.json").read_text())["content_placeholders"]
+    baseline = json.loads((ROOT / "verification_baseline.json").read_text())["ratchets"]["content_placeholders"]
     os.chdir(ROOT)
     assert len(_load().occurrences()) <= baseline
