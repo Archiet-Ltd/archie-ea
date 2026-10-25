@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/table.html' import table %}
 {% block title %}Registered Users{% endblock %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/filter_bar.html" import filter_bar %}
@@ -37,7 +38,7 @@
     {% call card() %}
         {% call card_content(class='p-0') %}
             <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm border-collapse">
+                {% call table(class="dense-table w-full text-sm border-collapse") %}
                     <thead>
                         <tr class="bg-muted/50 border-b">
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">First name</th>
@@ -84,7 +85,7 @@
                         </tr>
                     {% endfor %}
                     </tbody>
-                </table>
+                {% endcall %}
             </div>
         {% endcall %}
     {% endcall %}
