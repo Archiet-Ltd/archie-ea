@@ -11,19 +11,11 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {% if is_reviews_view %}
     {{ page_header(
-        title='ARB Reviews',
-        description='Architecture review items submitted for governance assessment',
-        breadcrumbs=[{'label': 'Home', 'href': url_for('main.index')}, {'label': 'Governance'}, {'label': 'ARB Reviews'}]
+        title='ARB Reviews' if is_reviews_view else 'ARB Sessions',
+        description='Architecture review items submitted for governance assessment' if is_reviews_view else 'Scheduled Architecture Review Board meetings',
+        breadcrumbs=[{'label': 'Home', 'href': url_for('main.index')}, {'label': 'Governance'}, {'label': 'ARB Reviews' if is_reviews_view else 'ARB Sessions'}]
     ) }}
-    {% else %}
-    {{ page_header(
-        title='ARB Sessions',
-        description='Scheduled Architecture Review Board meetings',
-        breadcrumbs=[{'label': 'Home', 'href': url_for('main.index')}, {'label': 'Governance'}, {'label': 'ARB Sessions'}]
-    ) }}
-    {% endif %}
 
     <!-- Filters -->
     <div class="bg-card border border-border rounded-lg p-4 mb-6" x-data>
