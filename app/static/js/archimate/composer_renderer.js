@@ -870,11 +870,14 @@ let ComposerRenderer = (function() {
         /* UX-CMP-001: Override port colors with layer accent.
          * Ports are pre-declared in CARD_PORTS.items; here we just restyle them. */
         const _ac = c.accent || '#1a1a1a';
-        node.getPorts().forEach(function(p, i) {
+        /* One write for all ports: a write per port per node fires a change
+         * event each time, which is most of the cost of opening a large model. */
+        node.prop('ports/items', node.getPorts().map(function(p, i) {
             let fill = (p.group === 'right' && i % 3 === 0) ? _ac : '#fff';
-            node.portProp(p.id, 'attrs/circle/fill', fill);
-            node.portProp(p.id, 'attrs/circle/stroke', _ac);
-        });
+            let attrs = Object.assign({}, p.attrs);
+            attrs.circle = Object.assign({}, attrs.circle, { fill: fill, stroke: _ac });
+            return Object.assign({}, p, { attrs: attrs });
+        }));
 
         node.set('elementId', elementId);
         node.set('elType', elType);
