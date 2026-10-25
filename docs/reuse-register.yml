@@ -97,6 +97,24 @@ entries:
         reason: authenticated page's local pill macro, predates the register; repointing it is outside the
           public-page scope
 
+  - id: element-table
+    concept: A list of ArchiMate elements on a record page (a solution's design or requirements, a programme's
+      elements, an element's related elements) as dense rows, the name a link to the element's own record,
+      paged by 25
+    status: active
+    canonical:
+      path: app/templates/solutions/partials/_element_table.html
+      symbols: [element_table]
+    reuse: >
+      import `element_table` from solutions/partials/_element_table.html and render the other cells in its
+      call block (design-system lead ruling R30, 25 Oct 2026); do not define another element or elements
+      table macro, and do not hand-roll a table whose first column is an element name linking to its record
+    must_not_create:
+      - id: element-table-macro
+        regex: '{%-?\s*macro\s+(\w*element_table\w*|\w*elements_table\w*|\w*element_list_table\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
   - id: capability-visibility
     concept: A capability looked up by id and caller's organisation
     status: active
