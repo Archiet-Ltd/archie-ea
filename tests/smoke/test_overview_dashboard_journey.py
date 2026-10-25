@@ -447,3 +447,70 @@ def test_the_welcome_card_stays_dark_in_the_dark_theme(browser, live_server, org
         assert _contrast(page, selector)["ratio"] >= 4.5
     finally:
         context.close()
+
+
+# ---- every figure, legend and label reads in both themes ----
+
+READABILITY_PROBE = """
+() => {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
+  const rgba = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+  const over = (top, under) => { const a = top[3]; return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)).concat([1]); };
+  const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const backdrop = el => { const stack = []; for (let n = el; n; n = n.parentElement) stack.push(n);
+    let colour = rgba(getComputedStyle(document.documentElement).backgroundColor); if (colour[3] === 0) colour = [255, 255, 255, 1];
+    for (const n of stack.reverse()) { const s = getComputedStyle(n); const bg = rgba(s.backgroundColor);
+      if (bg[3] > 0) colour = over(bg, colour); } return colour; };
+  const opacity = el => { let o = 1; for (let n = el; n; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity); return o; };
+  const out = [];
+  const root = document.querySelector('main') || document.body;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const seen = new Set();
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent.trim(); const el = node.parentElement;
+    if (!text || seen.has(el) || /^(SCRIPT|STYLE)$/i.test(el.tagName)) continue;
+    seen.add(el);
+    const s = getComputedStyle(el); const box = el.getBoundingClientRect();
+    if (s.visibility === 'hidden' || s.display === 'none' || (box.width === 0 && box.height === 0)) continue;
+    if (el.closest('[x-cloak], [hidden]') || el.closest('[style*="display: none"]')) continue;
+    const svg = el instanceof SVGElement;
+    const fg = rgba(svg ? s.fill : s.color); const bg = backdrop(el);
+    const o = opacity(el); const fgOver = over([fg[0], fg[1], fg[2], fg[3] * o], bg);
+    const hi = Math.max(lum(fgOver), lum(bg)), lo = Math.min(lum(fgOver), lum(bg));
+    const ratio = (hi + 0.05) / (lo + 0.05);
+    const px = parseFloat(s.fontSize); const bold = parseInt(s.fontWeight, 10) >= 700;
+    const need = (px >= 24 || (px >= 18.66 && bold)) ? 3 : 4.5;
+    if (ratio < need) out.push({text: text.slice(0, 40), ratio: Math.round(ratio * 100) / 100, need: need, fg: fgOver.slice(0, 3).map(Math.round).join(','), bg: bg.slice(0, 3).map(Math.round).join(','), tag: el.tagName, cls: String(el.getAttribute('class') || '').slice(0, 60)});
+  }
+  return out;
+}
+"""
+
+
+def _unreadable(page):
+    return page.evaluate(READABILITY_PROBE)
+
+
+@pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_every_figure_legend_and_label_reads_in_both_themes(browser, live_server, orgs, theme, viewport):
+    """The architect can read the records total, the legend under the bars and the layer names, light or dark."""
+    context, page = _page(browser, viewport)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        page.select_option('[data-testid="activity-range"]', "90d")
+        page.wait_for_timeout(1500)
+        page.evaluate("document.getAnimations().forEach(a => a.finish())")  # colours are measured once they have settled
+        _shot(page, "overview-contrast", viewport["width"], theme)
+        failures = _unreadable(page)
+        assert failures == [], "\n".join("%s | %s | fg %s on %s | %s %s" % (f["text"], f["ratio"], f["fg"], f["bg"], f["tag"], f["cls"]) for f in failures)
+        total = page.locator('[data-testid="activity-total-90d"]')
+        legend = page.locator('[data-testid="activity-range-90d"]').get_by_text("Connected sources")
+        layer = page.locator('[data-testid="sourced-layer"]').first
+        for found in (total, legend, layer):
+            expect(found).to_be_visible()
+    finally:
+        context.close()
