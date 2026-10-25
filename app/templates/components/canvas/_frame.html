@@ -174,9 +174,12 @@
     <div class="flex flex-col gap-2">
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs font-medium text-foreground/70">{{ s.title }}</span>
-        {{ ui.badge(text=(boxes.get(s.key) or [])|length, variant='secondary') }}
+        <span class="flex shrink-0 items-center gap-1">
+          {{ ui.badge(text=(boxes.get(s.key) or [])|length, variant='secondary') }}
+          {% if add %}{{ add_button(s.key, s.title) }}{% endif %}
+        </span>
       </div>
-      {{ notes(canvas_id, s.key, boxes.get(s.key) or [], s.title, sm.element, canvas_name, s.empty or s.question) }}
+      {{ notes(canvas_id, s.key, boxes.get(s.key) or [], s.title, sm.element, canvas_name, s.empty or s.question, add) }}
     </div>
     {% endfor %}
   {% endcall %}

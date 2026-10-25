@@ -1300,7 +1300,6 @@ def _seed_canvas_model(org_id, canvas):
         return el
 
     model_service.ensure_view(canvas)
-    zones = model_service.zones()
     for box, entries in _CANVAS_ENTRIES.items():
         for name, type_, layer in entries:
             el = element(name, type_, layer)
