@@ -547,3 +547,127 @@ def test_other_organisation_never_sees_target(app, client, browser):
         assert records == 0, f"Org B should not see ZZ Warehouse, got {records} records"
     finally:
         pg.close()
+
+
+# ---- fragment-heavy large organisation: shared word parts, exact name guarantee ---------------
+
+
+def _persona_with_fragment_org(app, enterprise_role):
+    """Two organisations: org A with ~500 applications sharing fragments (ion, ent, ser etc.)
+    plus a target that sorts alphabetically last, org B empty."""
+    from datetime import datetime
+
+    from app import db
+    from app.models.user import User
+    from app.models.application_portfolio import ApplicationComponent
+
+    with app.app_context():
+        org_a_id = make_org(db, "SearchFragmentOrgA")
+        user_a_id = make_user(db, org_a_id, "u", enterprise_role, role_name="Architect")
+        User.query.filter_by(id=user_a_id).update({"onboarding_completed_at": datetime.utcnow()})
+
+        # Names with shared fragments: ion, ent, ser, cal, ate, tio, men, res, ver, cer
+        fragments = ["ion", "ent", "ser", "cal", "ate", "tio", "men", "res", "ver", "cer"]
+        for i in range(490):
+            a = fragments[i % len(fragments)]
+            b = fragments[(i + 1) % len(fragments)]
+            c = fragments[(i + 2) % len(fragments)]
+            if a in ("ion", "ent"):
+                name_parts = f"{a.title()} {c.title()} Manager"
+            elif a == "ser":
+                name_parts = f"{a.title()}vice {c.title()} System"
+            elif a == "cal":
+                name_parts = f"{a.title()}ibration {c.title()}"
+            elif a == "cer":
+                name_parts = f"{a.title()}tificate {c.title()}"
+            else:
+                name_parts = f"{a.title()}{b.title()} {c.title()} Hub"
+            db.session.add(ApplicationComponent(
+                name=f"{name_parts} {i:03d}",
+                component_type="Application",
+                organization_id=org_a_id,
+            ))
+
+        # Names specifically matching the brief's examples
+        db.session.add(ApplicationComponent(
+            name="Inventory Reservation", component_type="Application", organization_id=org_a_id))
+        db.session.add(ApplicationComponent(
+            name="Calibration certificate", component_type="Application", organization_id=org_a_id))
+        db.session.add(ApplicationComponent(
+            name="MuleSoft agreement for Integration Bus", component_type="Application",
+            organization_id=org_a_id))
+
+        # Target that sorts alphabetically last
+        db.session.add(ApplicationComponent(
+            name="ZZZebra Inventory Hub",
+            component_type="Application",
+            organization_id=org_a_id,
+        ))
+
+        # A second organisation that must never see org A's target
+        org_b_id = make_org(db, "SearchFragmentOrgB")
+        user_b_id = make_user(db, org_b_id, "u", enterprise_role, role_name="Architect")
+        User.query.filter_by(id=user_b_id).update({"onboarding_completed_at": datetime.utcnow()})
+
+        db.session.commit()
+        return {"org_a_id": org_a_id, "user_a_id": user_a_id,
+                "org_b_id": org_b_id, "user_b_id": user_b_id}
+
+
+def test_fragment_org_exact_and_typo_find_last_sorting_target(app, client, browser):
+    """~500 elements sharing fragments: exact name and a one-letter typo of the last sort find it."""
+    data = _persona_with_fragment_org(app, "solution_architect")
+
+    from .conftest import login
+    login(client, data["user_a_id"])
+
+    page_path = "/dashboard/overview"
+    document = client.get(page_path).get_data(as_text=True)
+
+    pg = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _serve_app_in_browser(pg, client, document, page_path)
+        pg.goto("http://app.test" + page_path)
+
+        # Exact name search must find the target
+        pg.fill("#sidebar-search", "ZZZebra Inventory Hub")
+        pg.wait_for_selector('[data-testid="sidebar-search-record"]', timeout=10000)
+        records = pg.locator('[data-testid="sidebar-search-record"]').all()
+        texts = [r.inner_text() for r in records]
+        assert any("ZZZebra Inventory Hub" in t for t in texts), \
+            f"Exact match not found in: {texts}"
+
+        # One-letter typo must also find it
+        pg.fill("#sidebar-search", "ZZZebra Inventry Hub")
+        pg.wait_for_selector('[data-testid="sidebar-search-record"]', timeout=10000)
+        records = pg.locator('[data-testid="sidebar-search-record"]').all()
+        texts = [r.inner_text() for r in records]
+        assert any("ZZZebra Inventory Hub" in t for t in texts), \
+            f"Typo match not found in: {texts}"
+    finally:
+        pg.close()
+
+
+def test_fragment_org_other_org_sees_none(app, client, browser):
+    """The target from org A is not visible when signed in as org B."""
+    data = _persona_with_fragment_org(app, "solution_architect")
+
+    from .conftest import login
+    login(client, data["user_b_id"])
+
+    page_path = "/dashboard/overview"
+    document = client.get(page_path).get_data(as_text=True)
+
+    pg = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _serve_app_in_browser(pg, client, document, page_path)
+        pg.goto("http://app.test" + page_path)
+
+        pg.fill("#sidebar-search", "ZZZebra Inventory Hub")
+        pg.wait_for_selector('[data-testid="sidebar-search-results"]', timeout=10000)
+        pg.wait_for_timeout(500)
+        records = pg.locator('[data-testid="sidebar-search-record"]').count()
+        assert records == 0, \
+            f"Org B should not see ZZZebra Inventory Hub, got {records} records"
+    finally:
+        pg.close()
