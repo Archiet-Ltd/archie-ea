@@ -25,11 +25,6 @@ class JobQueueService:
     def __init__(self):
         self._shutdown_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
-        self._slow_worker_thread: Optional[threading.Thread] = None
-
-    # Reading a whole website takes minutes; it has its own worker so the import a person is waiting
-    # for (GitHub, Jira) never queues behind it.
-    SLOW_TASKS = ("website_profile_crawl", "company_signals_refresh")
 
     def create_job(
         self,
@@ -136,10 +131,8 @@ class JobQueueService:
             return
 
         self._shutdown_event.clear()
-        self._worker_thread = threading.Thread(target=self._worker_loop, kwargs={"skip": self.SLOW_TASKS}, daemon=True)
+        self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._worker_thread.start()
-        self._slow_worker_thread = threading.Thread(target=self._worker_loop, kwargs={"only": self.SLOW_TASKS}, daemon=True)
-        self._slow_worker_thread.start()
         logger.info("Job queue worker started")
 
     def stop_worker(self):
@@ -147,8 +140,6 @@ class JobQueueService:
         if self._worker_thread:
             self._shutdown_event.set()
             self._worker_thread.join(timeout=5)
-            if self._slow_worker_thread:
-                self._slow_worker_thread.join(timeout=5)
             logger.info("Job queue worker stopped")
 
     def _reset_session(self, rollback: bool = False):
@@ -160,8 +151,8 @@ class JobQueueService:
                 db.session.rollback()
             db.session.remove()
 
-    def _worker_loop(self, only=None, skip=()):
-        """Worker loop that processes pending jobs: only the given tasks, or every task but the skipped ones."""
+    def _worker_loop(self):
+        """Worker loop that processes pending jobs."""
         logger.info("Job queue worker loop started")
 
         while not self._shutdown_event.is_set():
@@ -170,10 +161,6 @@ class JobQueueService:
                 with self.app.app_context():
                     # Get next pending job
                     pending = Job.query.filter_by(status=JobStatus.PENDING.value)
-                    if only:
-                        pending = pending.filter(Job.task.in_(only))
-                    elif skip:
-                        pending = pending.filter(Job.task.notin_(skip))
                     job = pending.first()
 
                     if job:
