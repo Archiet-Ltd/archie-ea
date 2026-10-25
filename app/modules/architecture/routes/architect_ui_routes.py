@@ -873,7 +873,19 @@ def update_lifecycle(element_id):
 @architect_ui_bp.route("/architecture/traceability")
 @login_required
 def traceability_matrix():
-    """Cross-layer traceability matrix across Strategy/Business/Application/Technology."""
+    """Cross-layer traceability matrix across Strategy/Business/Application/Technology.
+
+    Slice S3 (D5): ?solution=<id> filters the matrix to the applications that
+    solution carries. The matrix pivots on ArchiMateElement rows; a solution's
+    applications are recorded against ApplicationComponent rows (the
+    solution_applications junction, as app.services.archimate_traceability_service's
+    own TRC-025 solution scoping already reads) -- a different id space, with
+    no direct bridge column between the two tables. This filters by name
+    correspondence between the two (the mirroring convention this codebase's
+    ArchiMate backbone already relies on elsewhere), proven by the journey
+    test rather than assumed; a direct bridge column would be a cleaner fix
+    if that correspondence is ever found to drift.
+    """
     from app.services.archimate_traceability_service import ArchiMateTraceabilityService, get_archimate_gap_analysis
 
     service = ArchiMateTraceabilityService()
@@ -882,6 +894,8 @@ def traceability_matrix():
     plateau = request.args.get('plateau') or None
     search = request.args.get('search', '').strip() or None
     scope = request.args.get('scope', '').strip() or None
+    solution_filter = request.args.get('solution', type=int)
+    filtered_solution = None
     page_size = 50
     try:
         page = max(1, safe_int_arg('page', 1, minimum=1))
@@ -911,9 +925,26 @@ def traceability_matrix():
         fallback_matrix = _build_solution_traceability_fallback_matrix(limit=50)
         if fallback_matrix:
             matrix = fallback_matrix
+    if solution_filter is not None:
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.solution_models import Solution, solution_applications
+        from app import db as _db
+
+        filtered_solution = Solution.query.get(solution_filter)
+        solution_app_names = {
+            row[0] for row in
+            _db.session.query(ApplicationComponent.name).join(
+                solution_applications,
+                solution_applications.c.application_component_id == ApplicationComponent.id,
+            ).filter(solution_applications.c.solution_id == solution_filter).all()
+        }
+        matrix = [row for row in matrix if row.get('application', {}).get('name') in solution_app_names]
+        total_count = len(matrix)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
     return render_template(
         "archimate_views/traceability.html",
         matrix=matrix,
+        filtered_solution=filtered_solution,
         gap_analysis=gap_analysis,
         store_counts=_traceability_store_counts(),
         goals=_traceability_goals(),
