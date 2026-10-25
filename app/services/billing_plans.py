@@ -131,32 +131,35 @@ def get_plan(key: Optional[str]) -> Plan:
     return _BY_KEY.get(key, _BY_KEY["free"])
 
 
-def _money(amount: int) -> str:
-    return "${:,}".format(amount)
+def _money(amount: int, currency: str = "USD") -> str:
+    return "%s %s" % (currency, "{:,}".format(amount))
 
 
 def price_lines(plan: Plan) -> Tuple[str, ...]:
     """The plan's price as people read it, from the same display figures the
-    pricing page is pinned to: ``("$490 a year", "$49 a month")`` for Startup,
-    ``("Free",)`` for Community, ``("From $24,000 a year",)`` for Enterprise.
+    pricing page is pinned to: ``("USD 490 a year", "USD 49 a month")`` for Startup,
+    ``("Free",)`` for Community, ``("From USD 24,000 a year",)`` for Enterprise.
     Empty when the plan has no figure to show."""
+    currency = plan.display_currency
     if plan.display_price_floor_annual is not None:
-        return ("From %s a year" % _money(plan.display_price_floor_annual),)
+        return ("From %s a year" % _money(plan.display_price_floor_annual, currency),)
     if plan.display_price_monthly == 0 and plan.display_price_annual is None:
         return ("Free",)
     unit = " per %s" % plan.display_price_unit if plan.display_price_per_unit else ""
     lines = []
     if plan.display_price_annual is not None:
-        lines.append("%s%s a year" % (_money(plan.display_price_annual), unit))
+        lines.append("%s%s a year" % (_money(plan.display_price_annual, currency), unit))
     if plan.display_price_monthly is not None:
-        lines.append("%s%s a month" % (_money(plan.display_price_monthly), unit))
+        lines.append("%s%s a month" % (_money(plan.display_price_monthly, currency), unit))
     return tuple(lines)
 
 
 def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
     """What the "next renewal" tile says. ``label`` names the date (renews, ends,
     trial ends); ``value`` is the date with the amount when it is known, or
-    "No renewal yet" when nothing is bought, never a bare dash."""
+    "Nothing to renew" when the plan is free, never a bare dash."""
+    if plan.key == "free":
+        return {"label": "Next renewal", "value": "Nothing to renew", "note": None}
     if not live or sub is None or sub.current_period_end is None:
         return {"label": "Next renewal", "value": "No renewal yet", "note": None}
     when = sub.current_period_end.strftime("%d %b %Y")

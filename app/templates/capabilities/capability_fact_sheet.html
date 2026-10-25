@@ -1,3 +1,4 @@
+{# shadcn-reference: preview@e55b60b #}
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
@@ -39,7 +40,9 @@
         {'label': 'Capabilities', 'href': '/capability-map/'},
         {'label': cap.name},
         {'label': 'Fact sheet'}
-      ]
+      ],
+      actions=[{'text': 'Trace', 'icon': 'route', 'variant': 'outline',
+                'href': url_for('architect_ui.traceability_matrix', element=archimate_element_id)}] if archimate_element_id else []
   ) }}
 
   {# ── Top band ────────────────────────────────────────────────────────── #}
@@ -48,7 +51,7 @@
     {# Completeness ring #}
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
-      <div class="relative shrink-0" style="width:76px;height:76px"> {# inline-style-ok: fixed ring geometry #}
+      <div class="relative shrink-0" style="width:76px;height:76px">
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="3"></circle>
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring }}" stroke-width="3"
@@ -73,9 +76,9 @@
       </p>
       {% if maturity.current_pct is not none %}
       <div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden relative">
-        <div class="h-full bg-primary rounded-full" style="width:{{ maturity.current_pct }}%"></div> {# inline-style-ok: data-driven progress #}
+        <div class="h-full bg-primary rounded-full" style="width:{{ maturity.current_pct }}%"></div>
         {% if maturity.target_pct is not none %}
-        <span class="absolute top-0 h-full w-0.5 bg-foreground/70" style="left:{{ maturity.target_pct }}%"></span> {# inline-style-ok: target marker #}
+        <span class="absolute top-0 h-full w-0.5 bg-foreground/70" style="left:{{ maturity.target_pct }}%"></span>
         {% endif %}
       </div>
       {% endif %}
@@ -105,7 +108,7 @@
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
       <div class="flex flex-wrap gap-2 mt-2">
         {% for m in completeness.missing %}
-        <span class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5">{{ m }}</span>
+        {% call badge(variant='warning') %}{{ m }}{% endcall %}
         {% endfor %}
       </div>
     </div>
@@ -187,11 +190,12 @@
   {# ── Impact graph link ───────────────────────────────────────────────── #}
   {% if archimate_element_id %}
   <div class="mt-4">
-    <a href="{{ url_for('archimate.element_impact_graph_page', element_id=archimate_element_id) }}"
-       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-      <i data-lucide="git-fork" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-      View impact graph — what depends on this capability
-    </a>
+    {{ button(
+        text='View impact graph — what depends on this capability',
+        variant='outline',
+        icon='git-fork',
+        href=url_for('archimate.element_impact_graph_page', element_id=archimate_element_id)
+    ) }}
   </div>
   {% endif %}
 

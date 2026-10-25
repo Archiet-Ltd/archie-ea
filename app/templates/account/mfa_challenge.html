@@ -5,7 +5,6 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, label %}
-
 {% block content %}
 {{ live_region('mfa-status') }}
 <main id="main-content" class="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4 py-12">
@@ -42,8 +41,7 @@
       {{ button(text='Use my authenticator app instead', variant='link', href=url_for('account.mfa_challenge')) }}
       {% else %}
       {{ button(text='Lost your device? Use a recovery code', variant='link', href=url_for('account.mfa_challenge', recovery=1)) }}
-      {% endif %}
-    {% endcall %}
+      {% endif %}    {% endcall %}
   {% endcall %}
 </main>
 {% endblock %}

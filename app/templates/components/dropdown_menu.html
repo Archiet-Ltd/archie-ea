@@ -91,6 +91,8 @@
     panel_class=none
 ) %}
 {% set unique_id = id or 'dropdown-' ~ range(1000, 9999) | random %}
+{# A caller-supplied trigger id (trigger_attrs_dict) replaces the default one: two id attributes on one tag leave the second ignored. #}
+{% set trigger_id = trigger_attrs_dict.get('id') or unique_id ~ '-trigger' %}
 
 {% set trigger_variants = {
     'default': 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
@@ -118,7 +120,7 @@
     {# Trigger Button #}
     <button
         type="button"
-        id="{{ unique_id }}-trigger"
+        {% if 'id' not in trigger_attrs_dict %}id="{{ trigger_id }}"{% endif %}
         data-menu-trigger
         @click="menuOpen = !menuOpen"
         :aria-expanded="menuOpen"
@@ -160,7 +162,7 @@
         x-cloak
         class="absolute {{ panel_class or (positions.get(position, 'right-0') ~ ' mt-2') }} {{ menu_width }} rounded-lg border border-border bg-card z-50"
         role="menu"
-        aria-labelledby="{{ unique_id }}-trigger"
+        aria-labelledby="{{ trigger_id }}"
         aria-orientation="vertical"
     >
         <div class="py-1" role="none">

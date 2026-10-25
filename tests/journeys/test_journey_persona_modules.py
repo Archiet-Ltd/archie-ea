@@ -134,7 +134,10 @@ def test_the_wrong_archetype_is_refused(app, client):
 
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     proc = io.open(os.path.join(root, "app/modules/procurement/routes.py"), encoding="utf-8").read()
-    assert proc.count("@requires_procurement") >= 5, "procurement routes lost their role gate"
+    # The cost pages are read by whoever may see costs; the rest stay with the procurement roles.
+    gates = sum(proc.count(gate) for gate in ("@requires_procurement", "@requires_contract_visibility",
+                                               "@requires_spend_visibility"))
+    assert gates >= 5, "procurement routes lost their role gate"
 
     with app.app_context():
         from app.models.application_owner import ApplicationOwner

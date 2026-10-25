@@ -30,7 +30,7 @@ def brand_browser():
 
 @pytest.fixture(params=["solution_architect", "platform_admin"])
 def brand_shell(request):
-    """Navigation v3: the sidebar renders the navigation registry. The harness registers a
+    """Navigation 3.1: the sidebar renders the navigation registry. The harness registers a
     fixture destination for every registry endpoint and hands the sidebar the same
     ``navigation()`` the application does."""
     from app.navigation import registry
@@ -50,8 +50,8 @@ def brand_shell(request):
         ("<h1>Command Center</h1>", 200) if administrator else ("Forbidden", 403)))
     shell.add_url_rule("/account/logout", "account.logout", lambda: "Signed out")
     shell.add_url_rule("/account/switch-organization", "account.switch_organization", lambda: "", methods=["POST"])
-    links = list(registry.ALL_ENTRIES) + [c for link in registry.MAIN for c in link.children]
-    links += [link.fallback for link in registry.ALL_ENTRIES if link.fallback is not None]
+    links = list(registry.ALL_ENTRIES) + [c for link in registry.ALL_ENTRIES for c in link.children]
+    links += [link.fallback for link in links if link.fallback is not None]
     for link in links:
         if link.endpoint not in shell.view_functions:
             rule = "/fixture/" + link.endpoint + "".join("/<%s>" % k for k, _ in link.url_values)

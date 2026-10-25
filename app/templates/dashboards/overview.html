@@ -14,7 +14,6 @@
 {% block content %}
 {# Flask-Basecoat's Overview dashboard (examples/dashboards/overview.html, feat/shadcn-100-compliance b327186c2)
    filled with the organisation's own figures. One dashboard for every role. #}
-{# Tone classes are chosen by number below; listed so the stylesheet build includes them: bg-chart-1/10 bg-chart-2/10 bg-chart-3/10 bg-chart-1 bg-chart-2 bg-chart-3 #}
 {% set o = overview %}
 {% set links = o.links %}
 {% set apps = o.applications %}
@@ -24,13 +23,12 @@
 {% set sourced = o.sourced %}
 {% set chart_1 = o.chart_colours[0] %}
 {% set chart_2 = o.chart_colours[1] %}
-{% set chart_3 = o.chart_colours[2] %}
 
 {#- One of the three icon cards: a figure with its change, and the sentence that says what it means. -#}
-{% macro stat_card(testid, icon, tone, label, value, badge, good, sentence, href, exact=none) %}
+{% macro stat_card(testid, icon, label, value, badge, good, sentence, href, exact=none) %}
 {%- set inner -%}
-  {% call ui.card(class='h-full bg-chart-' ~ tone ~ '/10') %}
-    {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-background [&_svg]:size-4">{{ lucide(icon) }}</span>{% endcall %}
+  {% call ui.card(class='h-full') %}
+    {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide(icon) }}</span>{% endcall %}
     {% call ui.card_content(class='mt-auto flex flex-col gap-1') %}
       {% if value %}
       <span class="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums"><span data-testid="{{ testid }}-value"{% if exact %} title="{{ exact }}"{% endif %}>{{ value }}</span>{% if badge %}<span data-testid="{{ testid }}-change">{{ d.delta(badge, good) }}</span>{% endif %}</span>
@@ -57,9 +55,9 @@
       {% call ui.card_header() %}
         {{ ui.card_title(text='Welcome back' ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
         {% if o.empty %}
-        {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-surface-foreground/70') }}
+        {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-surface-foreground/90') }}
         {% else %}
-        {{ ui.card_description(text='Here is how your model is doing.', class='text-primary-surface-foreground/70') }}
+        {{ ui.card_description(text='Here is how your model is doing.', class='text-primary-surface-foreground/90') }}
         {% endif %}
       {% endcall %}
       {% call ui.card_content(class='flex flex-col items-start gap-4') %}
@@ -67,12 +65,12 @@
         {% if links.connect %}{{ ui.button(text='Connect GitHub', href=links.connect, variant='secondary', class='text-secondary-foreground', attrs={'data-testid': 'overview-connect'}) }}{% endif %}
         {% else %}
         <div class="inline-flex divide-x divide-primary-surface-foreground/20 rounded-lg bg-primary-surface-foreground/10" data-testid="welcome-figures">
-          <a href="{{ links.applications }}" class="flex flex-col items-center px-5 py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-primary-surface-foreground/50" data-testid="welcome-applications"><span class="text-lg font-semibold tabular-nums">{{ apps.total }}</span><span class="text-xs text-primary-surface-foreground/70">Applications</span></a>
+          <a href="{{ links.applications }}" class="flex flex-col items-center px-5 py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-primary-surface-foreground/50" data-testid="welcome-applications"><span class="text-lg font-semibold tabular-nums">{{ apps.total }}</span><span class="text-xs">Applications</span></a>
           {% if sourced %}
-          <span class="flex flex-col items-center px-5 py-2" data-testid="welcome-sourced"><span class="text-lg font-semibold tabular-nums">{{ sourced.percent }}%</span><span class="text-xs text-primary-surface-foreground/70">Facts with a source</span></span>
+          <span class="flex flex-col items-center px-5 py-2" data-testid="welcome-sourced"><span class="text-lg font-semibold tabular-nums">{{ sourced.percent }}%</span><span class="text-xs">Facts with a source</span></span>
           {% endif %}
         </div>
-        {% if not sourced %}<p class="text-sm text-primary-surface-foreground/70" data-testid="welcome-sourced-why">The share of facts with a source appears once the model holds elements.</p>{% endif %}
+        {% if not sourced %}<p class="text-sm text-primary-surface-foreground/90" data-testid="welcome-sourced-why">The share of facts with a source appears once the model holds elements.</p>{% endif %}
         {% endif %}
       {% endcall %}
       <div aria-hidden="true" class="pointer-events-none absolute -right-4 -bottom-6 hidden sm:block">{{ lucide('layout-dashboard', 'size-36 -rotate-12 text-primary-surface-foreground/15') }}</div>
@@ -83,18 +81,18 @@
             {% set cost_sentence = (cost.basis | capitalize ~ '. ' ~ cost.top.name ~ ' is ' ~ cost.top.percent ~ '% of it.') if cost.top else (cost.basis | capitalize ~ '.') %}
       {% if cost.difference %}{% set cost_sentence = cost_sentence ~ ' ' ~ cost.difference %}{% endif %}
       {% set cost_badge = (('%+d%%' % cost.change) if cost.change else 'No change') if cost.change is not none else none %}
-      {{ stat_card('card-run-cost', 'circle-dollar-sign', 1, 'Annual run cost', cost.total_short, cost_badge, (cost.change <= 0) if cost.change else none, cost_sentence, links.spend, exact=cost.total_exact) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change <= 0) if cost.change else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
-      {{ stat_card('card-run-cost', 'circle-dollar-sign', 1, 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
     {% endif %}
 
     {# Relationships #}
     {% if rel.total %}
       {% set rel_sentence = (rel.top.name ~ ' is the most connected, with ' ~ rel.top.count ~ ' relationships.') if rel.top else 'Between the elements of the model.' %}
       {% set rel_badge = ('+' ~ rel.added_30d) if rel.added_30d else 'No change' %}
-      {{ stat_card('card-relationships', 'share-2', 2, 'Relationships', rel.total, rel_badge, none if not rel.added_30d else true, rel_sentence ~ (' ' ~ rel.added_30d ~ ' added in the last 30 days.' if rel.added_30d else ' None were added in the last 30 days.'), links.model) }}
+      {{ stat_card('card-relationships', 'share-2', 'Relationships', rel.total, rel_badge, none if not rel.added_30d else true, rel_sentence ~ (' ' ~ rel.added_30d ~ ' added in the last 30 days.' if rel.added_30d else ' None were added in the last 30 days.'), links.model) }}
     {% else %}
-      {{ stat_card('card-relationships', 'share-2', 2, 'Relationships', none, none, none, 'Appear here once a source is connected and the model links its systems.', links.model) }}
+      {{ stat_card('card-relationships', 'share-2', 'Relationships', none, none, none, 'Appear here once a source is connected and the model links its systems.', links.model) }}
     {% endif %}
 
     {# Applications with no owner #}
@@ -103,12 +101,12 @@
       {% if n %}
         {% set owner_sentence = apps.unowned[0][1] ~ (' has no owner.' if n == 1 else ' and ' ~ (n - 1) ~ (' other have' if n == 2 else ' others have') ~ ' no owner.') %}
         {% set owner_badge = ('+' ~ apps.unowned_added_30d) if apps.unowned_added_30d else 'No change' %}
-        {{ stat_card('card-no-owner', 'user-round-x', 3, 'Applications with no owner', n, owner_badge, false if apps.unowned_added_30d else none, owner_sentence ~ (' ' ~ apps.unowned_added_30d ~ ' arrived in the last 30 days.' if apps.unowned_added_30d else ''), links.no_owner) }}
+        {{ stat_card('card-no-owner', 'user-round-x', 'Applications with no owner', n, owner_badge, false if apps.unowned_added_30d else none, owner_sentence ~ (' ' ~ apps.unowned_added_30d ~ ' arrived in the last 30 days.' if apps.unowned_added_30d else ''), links.no_owner) }}
       {% else %}
-        {{ stat_card('card-no-owner', 'user-check', 3, 'Every application has an owner', none, none, none, 'All ' ~ apps.total ~ ' applications name someone accountable.', links.applications) }}
+        {{ stat_card('card-no-owner', 'user-check', 'Every application has an owner', none, none, none, 'All ' ~ apps.total ~ ' applications name someone accountable.', links.applications) }}
       {% endif %}
     {% else %}
-      {{ stat_card('card-no-owner', 'user-round-x', 3, 'Applications with no owner', none, none, none, 'Appear here once applications are in the model.', links.applications) }}
+      {{ stat_card('card-no-owner', 'user-round-x', 'Applications with no owner', none, none, none, 'Appear here once applications are in the model.', links.applications) }}
     {% endif %}
   </div>
 
@@ -127,7 +125,7 @@
           <div>
             {% for key, label, days in o.ranges %}
             <div x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-range-{{ key }}">
-              {{ d.chart('stacked-bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_3}], x='day', class='aspect-auto h-[360px] w-full', label='Model records added per ' ~ act.ranges[key].per ~ ', ' ~ label | lower, legend=true) }}
+              {{ d.chart('stacked-bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_2}], x='day', class='aspect-auto h-[360px] w-full', label='Model records added per ' ~ act.ranges[key].per ~ ', ' ~ label | lower, legend=true) }}
             </div>
             {% endfor %}
           </div>
@@ -136,10 +134,10 @@
             <div class="flex flex-col gap-6" x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-summary-{{ key }}">
               <div class="flex items-center gap-3">{{ d.icon_tile('layout-grid') }}<div class="grid"><span class="text-2xl font-semibold tabular-nums" data-testid="activity-total-{{ key }}">{{ act.ranges[key].total }}</span><span class="text-sm text-muted-foreground">Records added, {{ label | lower }}</span></div></div>
               <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-1"></span>From connected sources</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].connected }}</span></div>
-              <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-3"></span>By hand</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].manual }}</span></div>
+              <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-tint"></span>By hand</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].manual }}</span></div>
             </div>
             {% endfor %}
-            {% if links.changes %}{{ ui.button(text='See every change', href=links.changes, class='mt-auto w-full') }}{% endif %}
+            {% if links.changes %}{{ ui.button(text='See every change', href=links.changes, class='mt-auto w-full text-primary-foreground') }}{% endif %}
           </div>
           {% else %}
           <p class="py-8 text-sm text-muted-foreground lg:col-span-2" data-testid="activity-empty">{% if act is none %}The change history could not be read, so the daily records cannot be drawn. Reload the page to try again.{% else %}Nothing was added in the last 3 months. Records appear here, day by day, as a connected source or a person adds them.{% endif %}</p>
@@ -166,13 +164,13 @@
           {% if act and act.last_year and act.this_year %}
           <div class="flex flex-col gap-2">
             <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
-            <span class="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">{% if act.year_change is not none %}{{ d.delta('%+d%%' % act.year_change, none) }} last year{% endif %}</span>
+            <span class="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">{% if act.year_change is not none %}{{ d.delta('%+d%%' % act.year_change, none) }} on last year{% endif %}</span>
             <div class="mt-2 grid gap-1 text-sm text-muted-foreground">
-              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-1"></span>Last year <span class="font-medium tabular-nums text-foreground" data-testid="year-last">{{ act.last_year }}</span></span>
-              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-2"></span>This year <span class="font-medium tabular-nums text-foreground" data-testid="year-this">{{ act.this_year }}</span></span>
+              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-tint"></span>Last year <span class="font-medium tabular-nums text-foreground" data-testid="year-last">{{ act.last_year }}</span></span>
+              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-1"></span>This year <span class="font-medium tabular-nums text-foreground" data-testid="year-this">{{ act.this_year }}</span></span>
             </div>
           </div>
-          {{ d.chart('stacked-bar', act.year_rows, [{'key': 'last', 'label': 'Last year', 'color': chart_1}, {'key': 'this', 'label': 'This year', 'color': chart_2}], x='year', grid=false, class='aspect-auto h-[120px] w-[140px]', label='Records added, this year against last year') }}
+          {{ d.chart('stacked-bar', act.year_rows, [{'key': 'last', 'label': 'Last year', 'color': chart_2}, {'key': 'this', 'label': 'This year', 'color': chart_1}], x='year', grid=false, class='aspect-auto h-[120px] w-[140px]', label='Records added, this year against last year') }}
           {% elif act and act.this_year %}
           <div class="flex flex-col gap-2">
             <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
@@ -207,7 +205,7 @@
       {{ d.card_head('Applications by area', 'The business area each application serves') }}
       {% call ui.card_content(class='flex flex-col gap-4') %}
         {% if o.areas %}
-        {{ d.chart('bar', o.areas, [{'key': 'applications', 'label': 'Applications', 'color': chart_1}], x='area', class='aspect-auto h-[280px] w-full', label='Applications by business area') }}
+        {{ d.bar_rows(o.areas, 'area', 'applications', 'Applications', chart_1, label='Applications by business area', testid='areas-chart') }}
         {% else %}
         <p class="text-sm text-muted-foreground" data-testid="areas-empty">Appears once applications are in the model.</p>
         {% endif %}
@@ -219,16 +217,18 @@
       {{ d.card_head('Recent changes', 'The latest changes to the model') }}
       {% call ui.card_content() %}
         {% if act and act.recent %}
+        <div data-testid="recent-changes">
         {% call ui.item_group(class='gap-1') %}
           {% for change in act.recent %}
           {% call ui.item(size='sm', class='px-0') %}{% call ui.item_media() %}{{ d.icon_tile('share-2' if change.kind == 'relationship' else 'box') }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=change.name) }}{{ ui.item_description(text=change.action ~ (' by ' ~ change.by if change.by else '') ~ ', ' ~ change.when.strftime('%d %b %Y')) }}{% endcall %}{% endcall %}
           {% endfor %}
         {% endcall %}
+        </div>
         {% else %}
         <p class="text-sm text-muted-foreground" data-testid="recent-empty">{% if act is none %}The change history could not be read. Reload the page to try again.{% else %}No change has been recorded yet. The latest changes appear here.{% endif %}</p>
         {% endif %}
       {% endcall %}
-      {% if links.changes %}{% call ui.card_footer() %}{{ ui.button(text='See every change', href=links.changes, class='w-full', attrs={'data-testid': 'recent-changes-link'}) }}{% endcall %}{% endif %}
+      {% if links.changes %}{% call ui.card_footer() %}{{ ui.button(text='See every change', href=links.changes, class='w-full text-primary-foreground', attrs={'data-testid': 'recent-changes-link'}) }}{% endcall %}{% endif %}
     {% endcall %}
 
     {# Applications #}
@@ -239,15 +239,14 @@
           {% if o.table.rows %}
           {% call ui.table_container() %}{% call ui.table() %}
             {% call ui.table_header() %}{% call ui.table_row() %}
-              {{ ui.table_head(text='Application', class='pl-6') }}{{ ui.table_head(text='Type') }}{{ ui.table_head(text='Status') }}{{ ui.table_head(text='Owner') }}{{ ui.table_head(text='Annual cost', class='pr-6 text-right') }}
+              {{ ui.table_head(text='Application', class='pl-6') }}{{ ui.table_head(text='Status') }}{{ ui.table_head(text='Owner') }}{{ ui.table_head(text='Annual cost', class='pr-6 text-right') }}
             {% endcall %}{% endcall %}
             {% call ui.table_body() %}
             {% for row in o.table.rows %}
               {% call ui.table_row(attrs={'data-testid': 'applications-row'}) %}
-                {% call ui.table_cell(class='pl-6') %}<a href="{{ url_for('unified_applications.application_detail', id=row.id) }}" class="font-medium hover:underline">{{ row.name }}</a>{% endcall %}
-                {{ ui.table_cell(text=row.type or 'Not recorded') }}
+                {% call ui.table_cell(class='pl-6') %}<a href="{{ url_for('unified_applications.application_detail', id=row.id) }}" class="font-medium hover:underline">{{ row.name }}</a><span class="block text-sm text-muted-foreground" data-testid="applications-row-type">{{ row.type or 'Type not recorded' }}</span>{% endcall %}
                 {% call ui.table_cell() %}{{ ui.badge(text=row.status or 'Not recorded', variant='outline') }}{% endcall %}
-                {% call ui.table_cell() %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
+                {% call ui.table_cell(class='max-w-36 truncate', attrs={'title': row.owner} if row.owner else {}) %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
                 {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost_label }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
               {% endcall %}
             {% endfor %}
@@ -257,7 +256,7 @@
           <p class="px-6 text-sm text-muted-foreground" data-testid="table-empty">Applications appear here once a source is connected or you add one.</p>
           {% endif %}
         {% endcall %}
-        {% if o.table.total and links.applications %}{% call ui.card_footer(class='justify-between text-sm text-muted-foreground') %}<span>Showing {{ o.table.rows | length }} of {{ o.table.total }}</span>{{ ui.button(text='See every application', href=links.applications, variant='outline', size='sm', attrs={'data-testid': 'applications-table-link'}) }}{% endcall %}{% endif %}
+        {% if o.table.total and links.applications %}{% call ui.card_footer(class='justify-between text-sm text-muted-foreground') %}<span>Showing {{ o.table.rows | length }} of {{ o.table.total }}</span>{{ ui.button(text='See every application', href=links.applications, variant='outline', size='sm', class='text-foreground', attrs={'data-testid': 'applications-table-link'}) }}{% endcall %}{% endif %}
       {% endcall %}
     </div>
 

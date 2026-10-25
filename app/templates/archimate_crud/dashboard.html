@@ -1,105 +1,92 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 
 {% block title %}{{ selected_layer.title }}{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="archDashboard()">
-    {# The page header lives here rather than in _repository_workspace.html so
-       the page owns its own header, as every other screen does. The single
-       domain-colour rail is the layer orientation signature; all surfaces and
-       actions stay neutral. -mb-6 cancels page_shell's own bottom margin so the
-       rail section keeps the parent's space-y-6 rhythm rather than doubling it. #}
-    <section class="border-l-4 pl-4 -mb-6" style="border-left-color: hsl(var({{ selected_layer.color_token }}));" data-testid="architecture-page-header">
-    {% macro _ps_sub() %}<span class="block max-w-3xl">{{ selected_layer.description }}
-                <span aria-hidden="true">&mdash;</span>
-                <span x-text="layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable'">repository total unavailable</span></span>{% endmacro %}
-    {# display:contents keeps page_shell's own flex row as the layout parent, so
-       this wrapper only carries the data-testid the smoke harness looks for. #}
-    {% macro _ps_actions() %}<div class="contents" data-testid="architecture-page-actions">
-<button type="button" data-testid="btn-create-element" @click="openCreateModal()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    aria-label="Create element">
-                <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-                Create element
-            </button>
-            <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
-            {% if can_change_model() %}
-            <a href="{{ url_for('architect_ui.import_oef') }}" data-testid="btn-import-oef"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-               aria-label="Import model file">
-                <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import model file
-            </a>
-            {% else %}
-            {{ disabled_action('Import model file', 'Only an architect can import model files. Ask an administrator in Team settings.', 'import-oef-reason', icon='upload') }}
-            {% endif %}
-            <a href="{{ url_for('architect_ui.export_oef') }}" data-testid="btn-export-oef"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-               aria-label="Export architecture as Open Exchange Format">
-                <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export
-            </a>
-            <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
-            <button type="button" data-testid="btn-run-validation" @click="runValidation()" :disabled="validating"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    aria-label="Validate ArchiMate repository">
-                <i data-lucide="shield-check" class="h-4 w-4" aria-hidden="true"></i>
-                <span x-text="validating ? 'Validating…' : 'Validate'">Validate</span>
-            </button>
-            <a href="{{ url_for('archimate_crud.repository_health') }}" data-testid="btn-repository-health"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-               aria-label="Open repository health">
-                <i data-lucide="activity" class="h-4 w-4" aria-hidden="true"></i>Health
-            </a>
-            <a href="{{ url_for('architecture.vendor_templates') }}" data-testid="btn-vendor-templates"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-               aria-label="Open vendor architecture templates">
-                <i data-lucide="building-2" class="h-4 w-4" aria-hidden="true"></i>Templates
-            </a>
-            <button type="button" data-testid="btn-ai-generate-element" @click="openAiGenerateModal()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    aria-label="Generate architecture element with AI">
-                <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true"></i>Generate with AI
-            </button>
-        </div>{% endmacro %}
-    {{ page_shell(
-        title=selected_layer.title,
-        breadcrumb=[
-            ('Home', url_for('main.index')),
-            ('Architecture', url_for('archimate_crud.dashboard')),
-            (selected_layer.short_name, None)
-        ],
-        subtitle_caller=_ps_sub,
-        actions_caller=_ps_actions
-    ) }}
-    </section>
+<div class="flex flex-1 flex-col" x-data="archDashboard()">
+        <div class="flex flex-1 flex-col gap-2">
+        <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            <div class="px-4 lg:px-6">
+                <section class="border-l-4 pl-4 border-{{ selected_layer.color_token[2:] }}" data-testid="architecture-page-header">
+                {% macro _ps_sub() %}<span class="block max-w-3xl">{{ selected_layer.description }}
+                    <span aria-hidden="true">&mdash;</span>
+                    <span x-text="layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable'">repository total unavailable</span></span>{% endmacro %}
+                {% macro _ps_actions() %}
+                    {{ button(text='Create element', variant='default', icon='plus', attrs_dict={'@click': 'openCreateModal()'}, testid='btn-create-element', aria_label='Create element') }}
+                    {% if can_change_model() %}
+                        {{ button(text='Import', variant='outline', icon='upload', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.import_oef') + "'"}, testid='btn-import-oef', aria_label='Import model file') }}
+                    {% endif %}
+                    {{ button(text='Export', variant='outline', icon='download', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.export_oef') + "'"}, testid='btn-export-oef', aria_label='Export OEF') }}
+                    {% set _more_items = [] %}
+                    {% if can_change_model() %}
+                        {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'href': url_for('architect_ui.import_oef'), 'testid': 'dropdown-import-oef'}] %}
+                    {% else %}
+                        {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'disabled': True, 'aria_label': 'Import model file (only an architect can import model files)'}] %}
+                    {% endif %}
+                    {% set _more_items = _more_items + [
+                        {'text': 'Export', 'icon': 'download', 'href': url_for('architect_ui.export_oef'), 'testid': 'dropdown-export-oef'},
+                        {'text': 'Validate', 'icon': 'shield-check', 'onclick': 'runValidation()', 'testid': 'dropdown-run-validation'},
+                        {'text': 'Health', 'icon': 'activity', 'href': url_for('archimate_crud.repository_health'), 'testid': 'dropdown-repository-health'},
+                        {'text': 'Templates', 'icon': 'building-2', 'href': url_for('architecture.vendor_templates'), 'testid': 'dropdown-vendor-templates'},
+                        {'text': 'Generate with AI', 'icon': 'sparkles', 'onclick': 'openAiGenerateModal()', 'testid': 'dropdown-ai-generate-element'},
+                    ] %}
+                    {{ dropdown_menu(
+                        trigger_text='More',
+                        trigger_icon='more-horizontal',
+                        trigger_variant='outline',
+                        trigger_size='default',
+                        items=_more_items,
+                        position='right',
+                        trigger_aria_label='More actions'
+                    ) }}
+                {% endmacro %}
+                {{ page_shell(
+                    title=selected_layer.title,
+                    breadcrumb=[
+                        ('Home', url_for('main.index')),
+                        ('Architecture', url_for('archimate_crud.dashboard')),
+                        (selected_layer.short_name, None)
+                    ],
+                    subtitle_caller=_ps_sub,
+                    actions_caller=_ps_actions
+                ) }}
+                </section>
+            </div>
 
-    {% include 'archimate_crud/partials/_repository_workspace.html' %}
+            <div class="px-4 lg:px-6">
+                {% include 'archimate_crud/partials/_repository_workspace.html' %}
+            </div>
+        </div>
+    </div>
 
     <!-- Health panel slide-out -->
     <div x-cloak x-show="showHealthPanel" x-transition
-         class="fixed inset-y-0 right-0 z-40 w-full max-w-lg border-l border-border bg-background overflow-y-auto border"
+         class="fixed inset-y-0 right-0 z-40 w-full max-w-lg border-l border-border bg-background overflow-y-auto"
          @keydown.escape.window="showHealthPanel = false">
         <div class="flex items-center justify-between p-4 border-b">
             <h2 class="text-lg font-semibold">Repository Health</h2>
-            <button type="button" @click="showHealthPanel = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
-                <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
-            </button>
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': 'showHealthPanel = false'}) }}
         </div>
         {% include 'archimate_crud/partials/_health_panel.html' %}
     </div>
     <div x-cloak x-show="showHealthPanel" class="fixed inset-0 z-30 bg-overlay/50" @click="showHealthPanel = false"></div>
 
-    <!-- ARC-006: Element detail slide-out panel -->
+    <!-- Element detail slide-out panel -->
     <div x-cloak x-show="showDetailPanel"
-         class="fixed right-0 h-full top-0 z-40 w-full max-w-xl border-l border-border bg-background overflow-y-auto border"
+         class="fixed right-0 h-full top-0 z-40 w-full max-w-xl border-l border-border bg-background overflow-y-auto"
          @keydown.escape.window="closeDetailPanel()">
         <div class="flex items-center justify-between p-4 border-b">
             <h2 class="text-lg font-semibold" x-text="detailElement ? detailElement.name : 'Element Detail'"></h2>
-            <button type="button" @click="closeDetailPanel()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close detail panel">
-                <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
-            </button>
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close detail panel', attrs_dict={'@click': 'closeDetailPanel()'}) }}
         </div>
         <div class="p-4 space-y-6">
             <!-- Loading -->
@@ -163,83 +150,43 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <button type="button" data-testid="detail-edit-btn" @click="startDetailEdit()"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Edit element">
-                        <i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i> Edit
-                    </button>
-                    {# x-if, not x-show: with x-show the anchor is always in the DOM
-                       and carried href="#" until an element was selected — a link
-                       that went nowhere (browser-audit "dead-link"). #}
+                    {{ button(text='Edit', variant='default', icon='pencil', size='sm', attrs_dict={'@click': 'startDetailEdit()'}, testid='detail-edit-btn', aria_label='Edit element') }}
                     <template x-if="detailElement">
-                        <a :href="detailUrl(detailElement)"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" aria-label="View full detail">
-                            Full Detail &rarr;
-                        </a>
+                        {{ button(text='Full Detail →', variant='ghost', size='sm', attrs_dict={':href': 'detailUrl(detailElement)'}, aria_label='View full detail') }}
                     </template>
                 </div>
             </div>
             <!-- Edit mode -->
             <div x-cloak x-show="!detailLoading && detailEditing" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Name</label>
-                    <input type="text" x-model="detailForm.name"
-                           class="w-full px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                           aria-label="Element name">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Layer</label>
-                    <select data-testid="detail-layer-select" x-model="detailForm.layer" @change="onDetailLayerChange()"
-                            class="w-full px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Layer">
-                        <template x-for="[key, cfg] in Object.entries(layerConfig)" :key="key">
-                            <option :value="key" x-text="cfg.name"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Type</label>
-                    <select data-testid="detail-type-select" x-model="detailForm.element_type"
-                            class="w-full px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Type">
-                        <template x-for="et in detailFormLayerTypes" :key="et">
-                            <option :value="et" x-text="formatTypeName(et)"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Description</label>
-                    <textarea x-model="detailForm.description" rows="3"
-                              class="w-full px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              placeholder="Optional description" aria-label="Description"></textarea>
-                </div>
+                {{ input(aria_label='Element name', attrs_dict={'x-model': 'detailForm.name'}) }}
+                {% call native_select(aria_label='Layer', attrs_dict={'x-model': 'detailForm.layer', '@change': 'onDetailLayerChange()', 'data-testid': 'detail-layer-select'}) %}
+                    <template x-for="[key, cfg] in Object.entries(layerConfig)" :key="key">
+                        <option :value="key" x-text="cfg.name"></option>
+                    </template>
+                {% endcall %}
+                {% call native_select(aria_label='Type', attrs_dict={'x-model': 'detailForm.element_type', 'data-testid': 'detail-type-select'}) %}
+                    <template x-for="et in detailFormLayerTypes" :key="et">
+                        <option :value="et" x-text="formatTypeName(et)"></option>
+                    </template>
+                {% endcall %}
+                {{ textarea(aria_label='Description', placeholder='Optional description', attrs_dict={'x-model': 'detailForm.description'}) }}
                 <div class="flex gap-2">
-                    <button type="button" data-testid="detail-save-btn" @click="saveDetailEdit()" :disabled="detailSaving"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save changes">
-                        <span x-text="detailSaving ? 'Saving...' : 'Save'"></span>
-                    </button>
-                    <button type="button" @click="detailEditing = false"
-                            class="px-3 py-1.5 border rounded-md text-sm hover:bg-accent" aria-label="Cancel edit">Cancel</button>
+                    {{ button(text='Save', variant='default', attrs_dict={'@click': 'saveDetailEdit()', ':disabled': 'detailSaving'}, testid='detail-save-btn', aria_label='Save changes') }}
+                    {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'detailEditing = false'}, aria_label='Cancel edit') }}
                 </div>
             </div>
             <!-- Outgoing Relationships -->
             <div>
                 <h3 class="text-sm font-semibold mb-2">Outgoing Relationships</h3>
-                <div x-cloak x-show="!detailLoading && detailData && detailData.outgoing && detailData.outgoing.length > 0"
-                     class="border rounded-md overflow-hidden">
-                    <table class="dense-table w-full text-sm">
-                        <thead class="bg-muted/50">
-                            <tr>
-                                <th class="p-2 text-left font-medium">Type</th>
-                                <th class="p-2 text-left font-medium">Target</th>
+                <div x-cloak x-show="!detailLoading && detailData && detailData.outgoing && detailData.outgoing.length > 0">
+                    {% call dense_table(columns=[('Type', ''), ('Target', '')], flush=true) %}
+                        <template x-for="rel in (detailData && detailData.outgoing || [])" :key="rel.id">
+                            <tr class="group h-12 transition-colors hover:bg-muted/50">
+                                <td class="px-2 align-middle text-muted-foreground" x-text="rel.type"></td>
+                                <td class="px-2 align-middle" x-text="rel.target_name"></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="rel in (detailData && detailData.outgoing || [])" :key="rel.id">
-                                <tr class="border-t">
-                                    <td class="p-2 text-muted-foreground" x-text="rel.type"></td>
-                                    <td class="p-2" x-text="rel.target_name"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                        </template>
+                    {% endcall %}
                 </div>
                 <p x-cloak x-show="!detailLoading && (!detailData || !detailData.outgoing || detailData.outgoing.length === 0)"
                    class="text-xs text-muted-foreground">No outgoing relationships</p>
@@ -247,24 +194,15 @@
             <!-- Incoming Relationships -->
             <div>
                 <h3 class="text-sm font-semibold mb-2">Incoming Relationships</h3>
-                <div x-cloak x-show="!detailLoading && detailData && detailData.incoming && detailData.incoming.length > 0"
-                     class="border rounded-md overflow-hidden">
-                    <table class="dense-table w-full text-sm">
-                        <thead class="bg-muted/50">
-                            <tr>
-                                <th class="p-2 text-left font-medium">Type</th>
-                                <th class="p-2 text-left font-medium">Source</th>
+                <div x-cloak x-show="!detailLoading && detailData && detailData.incoming && detailData.incoming.length > 0">
+                    {% call dense_table(columns=[('Type', ''), ('Source', '')], flush=true) %}
+                        <template x-for="rel in (detailData && detailData.incoming || [])" :key="rel.id">
+                            <tr class="group h-12 transition-colors hover:bg-muted/50">
+                                <td class="px-2 align-middle text-muted-foreground" x-text="rel.type"></td>
+                                <td class="px-2 align-middle" x-text="rel.source_name"></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="rel in (detailData && detailData.incoming || [])" :key="rel.id">
-                                <tr class="border-t">
-                                    <td class="p-2 text-muted-foreground" x-text="rel.type"></td>
-                                    <td class="p-2" x-text="rel.source_name"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                        </template>
+                    {% endcall %}
                 </div>
                 <p x-cloak x-show="!detailLoading && (!detailData || !detailData.incoming || detailData.incoming.length === 0)"
                    class="text-xs text-muted-foreground">No incoming relationships</p>
@@ -275,14 +213,11 @@
                 <div x-cloak x-show="!detailLoading && detailData && detailData.solutions && detailData.solutions.length > 0"
                      class="space-y-2">
                     <template x-for="sol in (detailData && detailData.solutions || [])" :key="sol.solution_id">
-                        <a :href="'/solutions/' + sol.solution_id"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
-                            <i data-lucide="link" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
-                            <span x-text="sol.solution_name"></span>
-                            <span x-cloak x-show="sol.element_role"
-                                  class="text-xs text-muted-foreground"
-                                  x-text="'(' + sol.element_role + ')'"></span>
-                        </a>
+                        {{ button(text='', variant='ghost', size='sm', icon='link', attrs_dict={':href': "'/solutions/' + sol.solution_id"}) }}
+                        <span x-text="sol.solution_name"></span>
+                        <span x-cloak x-show="sol.element_role"
+                              class="text-xs text-muted-foreground ml-1"
+                              x-text="'(' + sol.element_role + ')'"></span>
                     </template>
                 </div>
                 <p x-cloak x-show="!detailLoading && (!detailData || !detailData.solutions || detailData.solutions.length === 0)"
@@ -293,184 +228,107 @@
     <div x-cloak x-show="showDetailPanel" class="fixed inset-0 z-30 bg-overlay/50" @click="closeDetailPanel()"></div>
 
     <!-- Create/Edit Modal -->
-    <div id="archimate-form-modal"
-         hidden
-         @keydown.escape.window="Platform.modal.close('archimate-form-modal')"
-         role="dialog" aria-modal="true"
-         class="modal-root hidden items-center justify-center fixed inset-0 z-50 bg-overlay/50" >
-        {# F-18, Capgemini dry-run: typed-field forms (many optional fields per
-           element type) overflowed the viewport with no way to reach Save on
-           a laptop screen. #}
-        <div class="bg-background border rounded-lg w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto border-border" @click.stop tabindex="-1">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-                <button type="button" @click="Platform.modal.close('archimate-form-modal')" aria-label="Close" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
-                </button>
+    {% call modal(id='archimate-form-modal', title='', labelledby='archimate-form-modal-title', size='lg') %}
+        <div class="flex items-center justify-between mb-4" data-modal-header>
+            <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
+        </div>
+        <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
+        <form @submit.prevent="submitForm()" class="space-y-4">
+            <div x-cloak x-show="!editingElement">
+                {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'formData.element_type', '@change': 'resetTypedFields()'}) %}
+                    <option value="">Select type...</option>
+                    <template x-for="et in currentLayerTypes" :key="et">
+                        <option :value="et" x-text="formatTypeName(et)"></option>
+                    </template>
+                {% endcall %}
             </div>
-            <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
-            <form @submit.prevent="submitForm()" class="space-y-4">
-                <div x-cloak x-show="!editingElement">
-                    <label class="block text-sm font-medium text-muted-foreground mb-1">Element Type <span class="text-destructive-emphasis">*</span></label>
-                    <select x-model="formData.element_type" @change="resetTypedFields()"
-                        class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input" aria-label="Element Type">
-                        <option value="">Select type...</option>
-                        <template x-for="et in currentLayerTypes" :key="et">
-                            <option :value="et" x-text="formatTypeName(et)"></option>
-                        </template>
-                    </select>
-                </div>
-                <div x-cloak x-show="editingElement" class="text-sm text-muted-foreground">
-                    Type: <span class="font-medium text-foreground" x-text="formatTypeName(formData.element_type)"></span>
-                </div>
+            <div x-cloak x-show="editingElement" class="text-sm text-muted-foreground">
+                Type: <span class="font-medium text-foreground" x-text="formatTypeName(formData.element_type)"></span>
+            </div>
+            {{ input(aria_label='Element name', placeholder='Element name', attrs_dict={'x-model': 'formData.name', 'required': ''}) }}
+            {{ textarea(aria_label='Description', placeholder='Optional description', attrs_dict={'x-model': 'formData.description'}) }}
+            <template x-for="fld in currentTypeFields" :key="fld.name">
                 <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                    <input type="text" x-model="formData.name" required
-                        class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input"
-                        placeholder="Element name" aria-label="Element name">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                    <textarea x-model="formData.description" rows="3"
-                        class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        placeholder="Optional description" aria-label="Description"></textarea>
-                </div>
-                <!-- Typed fields for the selected element type, from services/field_configs.py.
-                     Types with no config (currentTypeFields is empty) fall back to name+description only. -->
-                <template x-for="fld in currentTypeFields" :key="fld.name">
-                    <div>
-                        <label class="block text-sm font-medium text-muted-foreground mb-1" x-text="fld.label + (fld.required ? ' *' : '')"></label>
-                        <template x-if="fld.type === 'select'">
-                            <select x-model="formData[fld.name]"
-                                class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input"
-                                :aria-label="fld.label">
-                                <option value="">Select...</option>
-                                <template x-for="opt in fld.options" :key="opt.value">
-                                    <option :value="opt.value" x-text="opt.label"></option>
-                                </template>
-                            </select>
-                        </template>
-                        <template x-if="fld.type === 'textarea'">
-                            <textarea x-model="formData[fld.name]" rows="3"
-                                class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                :placeholder="fld.placeholder" :aria-label="fld.label"></textarea>
-                        </template>
-                        <template x-if="fld.type !== 'select' && fld.type !== 'textarea'">
-                            <input type="text" x-model="formData[fld.name]"
-                                class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input"
-                                :placeholder="fld.placeholder" :aria-label="fld.label">
-                        </template>
-                    </div>
-                </template>
-                <div class="flex gap-2 pt-4 border-t">
-                    <button type="submit" :disabled="saving"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
-                        <span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')"></span>
-                    </button>
-                    <button type="button" @click="Platform.modal.close('archimate-form-modal')"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
-                    {# x-if, not x-show — see the "Full Detail" anchor above. #}
-                    <template x-if="editingElement">
-                        <a :href="editPageUrl(editingElement)"
-                           class="ml-auto text-sm text-primary hover:underline flex items-center gap-1 self-center">
-                            Full Edit Page &rarr;
-                        </a>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" x-text="fld.label + (fld.required ? ' *' : '')"></label>
+                    <template x-if="fld.type === 'select'">
+                        {% call native_select(attrs_dict={'x-model': 'formData[fld.name]'}) %}
+                            <option value="">Select...</option>
+                            <template x-for="opt in fld.options" :key="opt.value">
+                                <option :value="opt.value" x-text="opt.label"></option>
+                            </template>
+                        {% endcall %}
+                    </template>
+                    <template x-if="fld.type === 'textarea'">
+                        {{ textarea(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
+                    </template>
+                    <template x-if="fld.type !== 'select' && fld.type !== 'textarea'">
+                        {{ input(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
                 </div>
-            </form>
+            </template>
+            <div class="flex gap-2 pt-4 border-t">
+                {% call button(variant='default', type='submit', attrs_dict={':disabled': 'saving', ':aria-label': 'Submit'}) %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
+                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
+                <template x-if="editingElement">
+                    {{ button(text='Full Edit Page →', variant='link', attrs_dict={':href': 'editPageUrl(editingElement)'}) }}
+                </template>
+            </div>
+        </form>
+    {% endcall %}
+
+    <!-- Generate with AI Modal -->
+    {% call modal(id='ai-generate-modal', labelledby='ai-generate-modal-title', size='lg', attrs={'data-testid': 'ai-generate-modal'}) %}
+        <div class="flex items-center justify-between mb-4" data-modal-header>
+            <h2 id="ai-generate-modal-title" class="text-base font-semibold text-foreground">Generate Element with AI</h2>
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('ai-generate-modal')"}) }}
         </div>
-    </div>
+        <div x-cloak x-show="aiGenerate.error" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="aiGenerate.error" data-testid="ai-generate-error" role="alert"></div>
 
-    <!-- Generate with AI Modal — wires the previously-unused POST
-         /<layer>/<element_type>/ai-generate endpoint
-         (archimate_crud/services/ai_generation_service.py). It only drafts a
-         name/description/attributes from a prompt; it never writes to the
-         database, so accepting a draft below just pre-fills the existing
-         Create Element form for the user to review and submit normally. -->
-    <div id="ai-generate-modal"
-         hidden
-         @keydown.escape.window="Platform.modal.close('ai-generate-modal')"
-         role="dialog" aria-modal="true" aria-labelledby="ai-generate-modal-title"
-         class="modal-root hidden items-center justify-center fixed inset-0 z-50 bg-overlay/50"
-         data-testid="ai-generate-modal">
-        <div class="bg-background border rounded-lg w-full max-w-lg mx-4 p-6 border-border" @click.stop tabindex="-1">
-            <div class="flex items-center justify-between mb-4">
-                <h2 id="ai-generate-modal-title" class="text-base font-semibold text-foreground text-foreground">Generate Element with AI</h2>
-                <button type="button" @click="Platform.modal.close('ai-generate-modal')" aria-label="Close" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
-                </button>
-            </div>
-            <div x-cloak x-show="aiGenerate.error" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="aiGenerate.error" data-testid="ai-generate-error" role="alert"></div>
-
-            <div x-show="!aiGenerate.result" x-cloak class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-2">Layer <span class="text-destructive-emphasis">*</span></label>
-                    <select x-model="aiGenerate.layer" @change="aiGenerate.elementType = ''"
-                        class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Layer">
-                        <template x-for="(cfg, key) in layerConfig" :key="key">
-                            <option :value="key" x-text="cfg.name"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2">Element Type <span class="text-destructive-emphasis">*</span></label>
-                    <select x-model="aiGenerate.elementType"
-                        class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Element Type" data-testid="ai-generate-element-type">
-                        <option value="">Select type...</option>
-                        <template x-for="et in aiGenerateLayerTypes" :key="et">
-                            <option :value="et" x-text="formatTypeName(et)"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2">Prompt <span class="text-destructive-emphasis">*</span></label>
-                    <textarea x-model="aiGenerate.prompt" rows="4"
-                        class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        placeholder="Describe the element to generate, e.g. 'A driver capturing the need to comply with the new data residency regulation'"
-                        aria-label="Prompt" data-testid="ai-generate-prompt"></textarea>
-                </div>
-            </div>
-
-            <div x-show="aiGenerate.loading" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center" data-testid="ai-generate-loading">
-                <i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i>
-                Generating with AI&hellip;
-            </div>
-
-            <div x-show="aiGenerate.result && !aiGenerate.loading" x-cloak class="space-y-3" data-testid="ai-generate-result">
-                <div class="rounded-md border p-3">
-                    <p class="text-xs text-muted-foreground mb-1">Name</p>
-                    <p class="text-sm font-medium" x-text="aiGenerate.result?.name ?? ''"></p>
-                </div>
-                <div class="rounded-md border p-3">
-                    <p class="text-xs text-muted-foreground mb-1">Description</p>
-                    <p class="text-sm whitespace-pre-wrap" x-text="aiGenerate.result?.description ?? ''"></p>
-                </div>
-                <p class="text-xs text-muted-foreground">Nothing has been saved yet. Use this draft to open the Create Element form, review it, and save.</p>
-            </div>
-
-            <div class="flex gap-2 pt-4 mt-4 border-t">
-                <button type="button" x-show="!aiGenerate.result" x-cloak @click="runAiGenerate()" :disabled="aiGenerate.loading"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                    data-testid="btn-ai-generate-run" aria-label="Generate">
-                    <span x-text="aiGenerate.loading ? 'Generating...' : 'Generate'">Generate</span>
-                </button>
-                <button type="button" x-show="aiGenerate.result" x-cloak @click="useAiGenerateResult()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                    data-testid="btn-ai-generate-use" aria-label="Use this draft">
-                    Use Draft &amp; Review
-                </button>
-                <button type="button" x-show="aiGenerate.result" x-cloak @click="aiGenerate.result = null"
-                    class="px-4 py-2 border rounded-md text-sm hover:bg-accent" aria-label="Generate again">Generate Again</button>
-                <button type="button" @click="Platform.modal.close('ai-generate-modal')"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">Cancel</button>
-            </div>
+        <div x-show="!aiGenerate.result" x-cloak class="space-y-4">
+            {% call native_select(aria_label='Layer', attrs_dict={'x-model': 'aiGenerate.layer', '@change': 'aiGenerate.elementType = ""'}) %}
+                <template x-for="(cfg, key) in layerConfig" :key="key">
+                    <option :value="key" x-text="cfg.name"></option>
+                </template>
+            {% endcall %}
+            {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'aiGenerate.elementType', 'data-testid': 'ai-generate-element-type'}) %}
+                <option value="">Select type...</option>
+                <template x-for="et in aiGenerateLayerTypes" :key="et">
+                    <option :value="et" x-text="formatTypeName(et)"></option>
+                </template>
+            {% endcall %}
+            {{ textarea(aria_label='Prompt', placeholder="Describe the element to generate, e.g. 'A driver capturing the need to comply with the new data residency regulation'", attrs_dict={'x-model': 'aiGenerate.prompt', 'data-testid': 'ai-generate-prompt'}) }}
         </div>
-    </div>
+
+        <div x-show="aiGenerate.loading" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center" data-testid="ai-generate-loading">
+            <i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+            Generating with AI&hellip;
+        </div>
+
+        <div x-show="aiGenerate.result && !aiGenerate.loading" x-cloak class="space-y-3" data-testid="ai-generate-result">
+            <div class="rounded-md border p-3">
+                <p class="text-xs text-muted-foreground mb-1">Name</p>
+                <p class="text-sm font-medium" x-text="aiGenerate.result?.name ?? ''"></p>
+            </div>
+            <div class="rounded-md border p-3">
+                <p class="text-xs text-muted-foreground mb-1">Description</p>
+                <p class="text-sm whitespace-pre-wrap" x-text="aiGenerate.result?.description ?? ''"></p>
+            </div>
+            <p class="text-xs text-muted-foreground">Nothing has been saved yet. Use this draft to open the Create Element form, review it, and save.</p>
+        </div>
+
+        <div class="flex gap-2 pt-4 mt-4 border-t">
+            {{ button(text='Generate', variant='default', attrs_dict={'x-show': '!aiGenerate.result', '@click': 'runAiGenerate()', ':disabled': 'aiGenerate.loading'}, testid='btn-ai-generate-run', aria_label='Generate') }}
+            {{ button(text='Use Draft & Review', variant='default', attrs_dict={'x-show': 'aiGenerate.result', '@click': 'useAiGenerateResult()'}, testid='btn-ai-generate-use', aria_label='Use this draft') }}
+            {{ button(text='Generate Again', variant='outline', attrs_dict={'x-show': 'aiGenerate.result', '@click': 'aiGenerate.result = null'}, aria_label='Generate again') }}
+            {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('ai-generate-modal')"}) }}
+        </div>
+    {% endcall %}
 
     <!-- Delete Confirmation -->
     <div x-show="showDeleteConfirm && deletingElement && deletingElement.name" x-cloak
-         class="modal-root flex items-center justify-center fixed inset-0 z-50 bg-overlay/50" @keydown.escape.window="showDeleteConfirm = false">
-        <div class="bg-background border rounded-lg w-full max-w-md mx-4 p-6 border-border" @click.stop role="dialog" aria-modal="true" tabindex="-1">
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50" @keydown.escape.window="showDeleteConfirm = false">
+        <div class="bg-background border rounded-lg w-full max-w-md mx-4 p-6" @click.stop role="alertdialog" aria-modal="true" tabindex="-1">
             <div class="flex flex-col items-center gap-4 text-center">
                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                     <i data-lucide="alert-triangle" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
@@ -482,29 +340,23 @@
                     This cannot be undone.
                 </p>
                 <div class="flex gap-3 w-full">
-                    <button type="button" @click="showDeleteConfirm = false; deletingElement = null"
-                        class="flex-1 px-4 py-2 border rounded-md text-sm hover:bg-accent" aria-label="Delete">Cancel</button>
-                    <button type="button" @click="executeDelete()" :disabled="deleting"
-                class="flex-1 px-4 py-2 bg-destructive text-primary-foreground rounded-md text-sm hover:bg-destructive/90 disabled:opacity-50" aria-label="Delete">
-                        <span x-text="deleting ? 'Deleting...' : 'Delete'"></span>
-                    </button>
+                    {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'showDeleteConfirm = false; deletingElement = null', 'class': 'flex-1'}, aria_label='Cancel') }}
+                    {{ button(text='Delete', variant='destructive', attrs_dict={'@click': 'executeDelete()', ':disabled': 'deleting', 'class': 'flex-1'}, aria_label='Delete') }}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ARCH-016: Validation Results Panel -->
+    <!-- Validation Results Panel -->
     <div x-show="showValidationPanel" x-cloak
-         class="modal-root flex items-center justify-center fixed inset-0 z-50 bg-overlay/50" @keydown.escape.window="showValidationPanel = false">
-        <div class="bg-background border rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto border-border" @click.stop role="dialog" aria-modal="true" tabindex="-1">
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50" @keydown.escape.window="showValidationPanel = false">
+        <div class="bg-background border rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto" @click.stop role="document" aria-modal="true" tabindex="-1">
             <div class="flex items-center justify-between p-6 border-b">
                 <h3 class="text-lg font-semibold flex items-center gap-2">
                     <i data-lucide="shield-check" class="h-5 w-5" aria-hidden="true"></i>
                     ArchiMate 3.2 Validation Results
                 </h3>
-                <button type="button" @click="showValidationPanel = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
-                    <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
-                </button>
+                {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': 'showValidationPanel = false'}) }}
             </div>
             <div class="p-6 space-y-4">
                 <!-- Summary -->
@@ -576,7 +428,6 @@
             </div>
         </div>
     </div>
-
 </div>
 
 <script>
@@ -590,16 +441,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
   window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
   window.__APP_CONFIG__.layerConfig = {{ layer_config | tojson | safe }};
-  {# Server-validated pre-selection from the By-Layer navigation. Null when the
-     page was reached without a filter, or with one the registry rejected. #}
   window.__APP_CONFIG__.initialLayer = {{ (initial_layer if initial_layer is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.initialElementType = {{ (initial_element_type if initial_element_type is defined else None) | tojson | safe }};
-  {# Typed field configs keyed by element_type (services/field_configs.py) used
-     by the create/edit modal to render type-specific fields beyond name +
-     description. This is static, identical-for-every-request configuration —
-     ARCH-064 moved it out of the inline payload to a fetched endpoint so it
-     stops being re-served on every dashboard load. dashboard.js fetches it in
-     init(); a type with no entry keeps the plain name+description form. #}
   window.__APP_CONFIG__.fieldConfigsUrl = {{ url_for('archimate_crud.api_field_configs') | tojson | safe }};
 </script>
 <script src="{{ url_for('static', filename='js/archimate_crud/dashboard.js') }}"></script>

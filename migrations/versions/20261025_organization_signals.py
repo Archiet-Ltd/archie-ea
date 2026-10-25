@@ -18,7 +18,7 @@ from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261025_organization_signals"
-down_revision = "20261025_canvas_types"
+down_revision = "20261025_vendor_naming"
 branch_labels = None
 depends_on = None
 

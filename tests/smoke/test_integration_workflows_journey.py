@@ -74,7 +74,7 @@ def test_platform_admin_starts_and_approves_a_workflow(browser, live_server):
     org = create_fresh_org("platform_admin")
     other = create_fresh_org("platform_admin")
     suffix = org["suffix"]
-    code = _seed_definition(org["org_id"], org["user_ids"]["platform_admin"], suffix)
+    _seed_definition(org["org_id"], org["user_ids"]["platform_admin"], suffix)
     flow_name = "Pilot approval flow %s" % suffix
     instance_code = "PILOT_%s" % suffix.upper()
 

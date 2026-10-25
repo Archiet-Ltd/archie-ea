@@ -166,21 +166,21 @@ def _serve_app_in_browser(pg, client, document, path):
 
 
 def test_typing_in_the_real_sidebar_shows_a_link_level_result_with_zone(app, client, browser):
-    # A CTO's sidebar carries no Traceability entry, so a hit can only have come from the search.
+    # A CTO's sidebar carries no Stakeholder map entry, so a hit can only have come from the search.
     login(client, _persona(app, "cto"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
-    assert 'href="/architecture/traceability"' not in document
+    assert 'href="/stakeholders/map"' not in document
 
     pg = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
         _serve_app_in_browser(pg, client, document, page_path)
         pg.goto("http://app.test" + page_path)
-        pg.fill("#sidebar-search", "traceability")
-        hit = pg.locator('[data-testid="sidebar-search-results"] a[href="/architecture/traceability"]')
+        pg.fill("#sidebar-search", "stakeholder map")
+        hit = pg.locator('[data-testid="sidebar-search-results"] a[href="/stakeholders/map"]')
         hit.wait_for(state="visible", timeout=10000)
         name, section = [part.strip() for part in hit.inner_text().strip().split("\n") if part.strip()]
-        assert (name, section) == ("Traceability", "Impact")
+        assert (name, section) == ("Stakeholder map", "Systems")
     finally:
         pg.close()
 
@@ -204,7 +204,7 @@ def test_only_matching_pages_show_not_the_whole_sidebar(app, client, browser):
         pg.close()
 
 
-def test_no_match_offers_to_ask_the_ai_chat_and_the_hint_stays_visible(app, client, browser):
+def test_no_match_says_so_without_an_ask_control_and_the_hint_stays_visible(app, client, browser):
     login(client, _persona(app, "solution_architect"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
@@ -216,10 +216,9 @@ def test_no_match_offers_to_ask_the_ai_chat_and_the_hint_stays_visible(app, clie
         pg.wait_for_selector('[data-testid="sidebar-search-results"]', state="visible")
         pg.locator('[data-testid="sidebar-search-results"] p', has_text="Searching").wait_for(state="hidden", timeout=5000)
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        assert "No page matches. Press Enter to ask the AI chat." in results.inner_text()
-        ask = results.locator('[data-testid="sidebar-search-ask"]')
-        assert ask.is_visible() and "zzzznomatch" in ask.inner_text()
-        assert "q=zzzznomatch" in ask.get_attribute("href")
+        assert "Nothing matches. Try another word." in results.inner_text()
+        assert results.locator('[data-testid="sidebar-search-ask"]').count() == 0
+        assert results.locator('a[href*="q=zzzznomatch"]').count() == 0
         assert pg.locator("kbd", has_text="K").first.is_visible()
     finally:
         pg.close()
