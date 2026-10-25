@@ -9,6 +9,8 @@
 {% extends 'layouts/public_base.html' %}
 
 {% from 'components/public_faq.html' import faq_chevron %}
+{% from 'components/table.html' import table %}
+{% from 'components/radio_group.html' import radio_group %}
 {% block title %}{{ page.title }}{% endblock %}
 
 {% block meta_description %}
@@ -42,11 +44,11 @@
 
     <section class="pp-section pp-section--first" aria-labelledby="plans-heading" data-testid="pricing-plans" >
       <h2 id="plans-heading" class="sr-only">Plans</h2>
-      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-year" checked>
-      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-month">
-      <div class="pp-toggle" role="group" aria-label="Billing period" data-testid="pricing-toggle">
-        <label for="pp-bill-year">Annual <span class="pp-save">Two months free</span></label>
-        <label for="pp-bill-month">Monthly</label>
+      <div class="pp-toggle" data-testid="pricing-toggle">
+        {{ radio_group(name='pp-interval', label='Billing period', value='year', inline=true, options=[
+          {'value': 'year', 'label': 'Annual: two months free'},
+          {'value': 'month', 'label': 'Monthly'}
+        ]) }}
       </div>
 
       <div class="pp-plans">
@@ -132,7 +134,7 @@
       <h2 id="compare-heading">Compare plans</h2>
       <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
       <div class="pp-frame rounded-2xl border border-border">
-        <table class="public-table public-table--fit">
+        {% call table(class='public-table public-table--fit') %}
           <caption class="sr-only">What each plan includes</caption>
           <thead>
             <tr>
@@ -183,7 +185,7 @@
             {% endfor %}
             {% endfor %}
           </tbody>
-        </table>
+        {% endcall %}
       </div>
     </section>
   </div>

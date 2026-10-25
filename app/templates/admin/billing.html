@@ -106,7 +106,7 @@
                     {{ button(text='Keep my subscription', type='submit', variant='outline') }}
                 </form>
                 {% else %}
-                {% call dialog(trigger_text='Cancel subscription', trigger_label='Cancel subscription', title='Cancel your subscription?', description='The plan stays in place until the end of the period already paid for, then your organisation moves to Community. Nothing you have recorded is deleted.') %}
+                {% call dialog(trigger_text='Cancel subscription', trigger_label='Cancel subscription', start_hidden=false, title='Cancel your subscription?', description='The plan stays in place until the end of the period already paid for, then your organisation moves to Community. Nothing you have recorded is deleted.') %}
                 <form method="post" action="{{ url_for('billing.billing_cancel') }}" class="flex justify-end">
                     {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                     {{ button(text='Cancel at the end of the period', type='submit', variant='destructive') }}
