@@ -44263,7 +44263,8 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "tier": "B"
   },
   "app/templates/vendors/catalogue_list.html": {
    "allowed_macros": [
@@ -44346,7 +44347,8 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "tier": "B"
   },
   "app/templates/vendors/create_simple.html": {
    "allowed_macros": [
