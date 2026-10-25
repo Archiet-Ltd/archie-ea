@@ -31,6 +31,7 @@
     "canonical_store": 0,
     "composer_url_params": 0,
     "console_reporting": 0,
+    "content_placeholders": 120,
     "crosswalk_writer_gated": 0,
     "design_map_outside_block": 42,
     "design_map_outside_components": 34,

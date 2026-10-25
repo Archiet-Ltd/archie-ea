@@ -825,6 +825,8 @@ def public_roles_index():
     """The /roles hub: every live role page, grouped, from the feed."""
     from app.services.public_pages import ROLE_HUB_EXTRA_ENTRIES
 
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard.overview"))
     return _render_family_hub("role", "/roles", "Roles", ROLE_HUB_EXTRA_ENTRIES)
 
 

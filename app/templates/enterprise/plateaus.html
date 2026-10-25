@@ -1,54 +1,40 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/disabled_action.html' import disabled_action %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card %}
+{% from 'components/badge.html' import badge %}
 
 {% block title %}Implementation Plateaus{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Plateaus', 'current': true}
-]) }}
-{% endblock %}
+{% macro _plateau_actions() %}
+{{ button(text='New Plateau', variant='default', icon='plus', href=url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') if can_change_model() else none, disabled=not can_change_model(), aria_label='New Plateau') }}
+{% endmacro %}
 
 {% block content %}
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        {{ page_header(
+    {{ page_shell(
         title='Implementation Plateaus',
-        description='Define architecture plateaus representing stable states in the transition.'
+        subtitle='Define architecture plateaus representing stable states in the transition.',
+        breadcrumb=[('Home', url_for('main.index')), ('Enterprise Architecture', url_for('enterprise.enterprise_dashboard')), ('Plateaus', None)],
+        actions_caller=_plateau_actions
     ) }}
-        {# The ArchiMate CRUD workflow operates on this same Plateau model
-           (MODEL_REGISTRY['Plateau']), so create and detail are real destinations. #}
-        {% if can_change_model() %}
-        <a href="{{ url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-           data-testid="btn-new-plateau">
-            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> New Plateau
-        </a>
-        {% else %}
-        {{ disabled_action('New Plateau', 'Only an architect can create plateaus. Ask an administrator in Team settings.', 'new-plateau-reason', icon='plus', variant='default') }}
-        {% endif %}
-    </div>
 
     <!-- Plateaus Grid -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {% for plateau in plateaus|default([]) %}
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6 transition-shadow">
+        {% call card() %}
             <div class="flex items-start justify-between mb-4">
                 <div class="p-2 rounded-lg bg-primary/10">
                     <i data-lucide="layers" class="h-5 w-5 text-primary" aria-hidden="true"></i>
                 </div>
-                <span class="px-2 py-1 text-xs rounded-full
-                    {% if plateau.status == 'Active' %}bg-success/20 text-success-emphasis
-                    {% elif plateau.status == 'Planned' %}bg-primary/20 text-primary
-                    {% else %}bg-muted text-muted-foreground{% endif %}">
-                    {{ plateau.status|default('—', true) }}
-                </span>
+                {% if plateau.status == 'Active' %}
+                    {% call badge('success') %}{{ plateau.status }}{% endcall %}
+                {% elif plateau.status == 'Planned' %}
+                    {% call badge('info') %}{{ plateau.status }}{% endcall %}
+                {% else %}
+                    {% call badge('neutral') %}{{ plateau.status|default('—', true) }}{% endcall %}
+                {% endif %}
             </div>
             <h3 class="font-semibold mb-2">
                 <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Plateau', element_id=plateau.id) }}"
@@ -67,12 +53,16 @@
                 <span class="text-muted-foreground">—</span>
                 {% endfor %}
             </div>
-        </div>
+        {% endcall %}
         {% else %}
-        <div data-slot="card" class="col-span-full p-12 text-center text-muted-foreground rounded-lg border border-border bg-card">
-            <i data-lucide="layers" class="h-12 w-12 mx-auto mb-4 opacity-50" aria-hidden="true"></i>
-            <p>No plateaus defined yet</p>
-            <p class="text-sm">Plateaus registered through the roadmap appear here.</p>
+        <div class="col-span-full">
+            {{ empty_state(
+                icon='layers',
+                headline='No plateaus defined yet',
+                body='Plateaus registered through the roadmap appear here.',
+                cta_label='New Plateau',
+                cta_href=url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') if can_change_model() else none
+            ) }}
         </div>
         {% endfor %}
     </div>

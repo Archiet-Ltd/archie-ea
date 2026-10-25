@@ -1,27 +1,40 @@
 ---
 page_family: module
 module_label: "Build your model from your tools"
-state: briefed
-cta: waiting_list
-capture_status: not_applicable_not_yet_built
+endpoint: account.welcome
+state: on_main
+cta: plans
+capture_status: live
 icon: unplug
+description: "Connect GitHub or Jira when you sign up and Entelim starts your model from them, with each fact traced to the repository, commit and file it came from."
 ---
 
 # Build your model from your tools
 
-*Coming soon: start your model from the tools you already use.*
+*Start your model from the tools you already use, without typing everything in first.*
 
-## What Entelim is building
+## What it does
 
-Most teams have no inventory to import. Their systems are already described by the tools they use to build and run them. Entelim is building a way to start your model from those tools, with each fact in it traced back to the record it came from, so you can begin asking questions of your model without typing everything in first.
+Most teams have no inventory to import. Their systems are already described by the tools they use to build and run them. When you sign up, Entelim asks you to connect GitHub or Jira. It proposes your services, owners and dependencies from them, and every fact is traced back to the repository, commit and file it came from. You review what it found before anything joins your model.
 
-## What you can do today
+## Who it is for
 
-Import an ArchiMate file into the [architecture model](/modules/architecture-model), or record your applications by hand in the [application inventory](/modules/applications).
+A startup CTO or a scale-up engineering lead who wants a first cited answer from the [AI chat](/modules/ai-chat) on the first day.
 
-Coming soon. Join the waiting list and we will tell you the day it ships.
+## What you can do
+
+1. Connect GitHub or Jira during sign-up.
+2. Review the services and owners Entelim found, and accept the ones that are right.
+3. Ask the AI chat what breaks if one of them fails.
+
+You can also import an ArchiMate file into the [architecture model](/modules/architecture-model), or record your applications by hand in the [application inventory](/modules/applications).
+
+## Plan
+
+Connecting GitHub or Jira is part of sign-up on every plan. [See Entelim pricing](/pricing).
 
 ## Related
 
+- [AI chat](/modules/ai-chat)
 - [Application inventory](/modules/applications)
 - [Architecture model](/modules/architecture-model)
