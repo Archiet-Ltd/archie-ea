@@ -1,13 +1,14 @@
-"""The Business Model Canvas as a view over the organisation's model.
+"""A framework canvas (Business Model Canvas, Lean Canvas, SWOT and the rest) as a view over the organisation's model.
 
 A canvas holds no entry text. Each box lists elements of the types the box
-accepts (``CANVAS_TEMPLATES["business_model_canvas"]``): an element is on a
-canvas when its Architecture View (a saved diagram) lists it, and in a box when
-its ``profile`` property names that box. Adding an entry looks an existing
-element up first and creates one only when nothing matches. Removing an entry
-takes it off the view and leaves the element in the model. Cost Structure reads
-the cost facts and Revenue Streams the price plans; neither keeps an amount on
-an element.
+accepts (``CANVAS_TEMPLATES[<canvas type>]``): an element is on a canvas when
+its Architecture View (a saved diagram) lists it, and in a box when that view
+row names the box (``SavedDiagramElement.canvas_box``). The box belongs to the
+view, so the same element can sit in a different box of another canvas. Adding
+an entry looks an existing element up first and creates one only when nothing
+matches. Removing an entry takes it off the view and leaves the element in the
+model. Cost Structure reads the cost facts and Revenue Streams the price plans;
+neither keeps an amount on an element.
 """
 
 from decimal import Decimal, InvalidOperation
@@ -25,14 +26,22 @@ TEMPLATE_KEY = "business_model_canvas"
 PRICE_BOX = "revenue_streams"
 COST_BOX = "cost_structure"
 
-# The business layer elements a price plan may price: the value propositions.
-PRICEABLE_BOX = "value_propositions"
+# The box whose elements a price plan may price, for the canvases that have a Revenue Streams box.
+PRICEABLE_BOXES = {"business_model_canvas": "value_propositions", "lean_canvas": "solution"}
+PRICEABLE_BOX = PRICEABLE_BOXES[TEMPLATE_KEY]
 
 _LAYER_BY_TYPE = {
     "BusinessActor": "business", "BusinessService": "business", "BusinessInterface": "business",
     "BusinessInteraction": "business", "BusinessProcess": "business", "BusinessFunction": "business",
-    "ApplicationInterface": "application", "Value": "motivation", "Resource": "strategy",
-    "Capability": "strategy",
+    "BusinessRole": "business", "Product": "business", "Location": "business", "EvidenceRecord": "business",
+    "ApplicationInterface": "application", "ApplicationComponent": "application", "ApplicationService": "application",
+    "DataObject": "application", "TechnologyService": "technology",
+    "Equipment": "physical", "Facility": "physical", "Material": "physical",
+    "Value": "motivation", "Assessment": "motivation", "Driver": "motivation", "Goal": "motivation",
+    "Outcome": "motivation", "Principle": "motivation", "Constraint": "motivation", "Metric": "motivation",
+    "Risk": "motivation", "Stakeholder": "motivation",
+    "Resource": "strategy", "Capability": "strategy", "CourseOfAction": "strategy", "Skill": "strategy",
+    "WorkPackage": "implementation", "Gap": "implementation",
 }
 
 
@@ -40,12 +49,32 @@ class CanvasError(ValueError):
     """A write the canvas refuses; the message is shown to the person."""
 
 
-def zones():
-    return {z["box_key"]: z for z in CANVAS_TEMPLATES[TEMPLATE_KEY]["zones"]}
+def template_key(canvas):
+    """The framework this canvas draws; a canvas with no type is the Business Model Canvas."""
+    key = getattr(canvas, "canvas_type", None) or TEMPLATE_KEY
+    if key not in CANVAS_TEMPLATES:
+        raise CanvasError("This canvas has a type that is not known.")
+    return key
 
 
-def element_boxes():
-    return [k for k, z in zones().items() if z["membership"] != "attribute"]
+def canvas_types():
+    """The framework canvases a person can create: key and name, in the order they are offered."""
+    return [(k, t["name"]) for k, t in CANVAS_TEMPLATES.items() if t["record"] == TEMPLATE_KEY]
+
+
+def zones(canvas=None):
+    """The boxes of a canvas by box key; the Business Model Canvas's when no canvas is given."""
+    key = template_key(canvas) if canvas is not None else TEMPLATE_KEY
+    return {z["box_key"]: z for z in CANVAS_TEMPLATES[key]["zones"]}
+
+
+def element_boxes(canvas=None):
+    return [k for k, z in zones(canvas).items() if z["membership"] != "attribute"]
+
+
+def priceable_box(canvas):
+    """The box whose elements this canvas can price, or None when it has no Revenue Streams box."""
+    return PRICEABLE_BOXES.get(template_key(canvas))
 
 
 def element_href(el):
@@ -70,8 +99,8 @@ def ensure_view(canvas):
         diagram = SavedDiagram.query.filter(SavedDiagram.id == canvas.saved_diagram_id).first()
     if diagram is None:
         diagram = SavedDiagram(
-            name=canvas.name or "Business Model Canvas",
-            viewpoint_type=TEMPLATE_KEY,
+            name=canvas.name or CANVAS_TEMPLATES[template_key(canvas)]["name"],
+            viewpoint_type=template_key(canvas),
             organization_id=canvas.organization_id,
         )
         db.session.add(diagram)
@@ -80,59 +109,82 @@ def ensure_view(canvas):
     return diagram
 
 
-def _view_elements(canvas):
-    """Elements on the canvas's view, as ArchiMateElement rows."""
+def _view_rows(canvas):
+    """``(view row, element)`` for every element on the canvas's view, oldest first."""
     if not canvas.saved_diagram_id:
         return []
-    ids = [
-        r.element_id
-        for r in SavedDiagramElement.query.filter(SavedDiagramElement.diagram_id == canvas.saved_diagram_id).all()
-    ]
-    if not ids:
-        return []
-    return ArchiMateElement.query.filter(
-        ArchiMateElement.id.in_(ids), ArchiMateElement.organization_id == canvas.organization_id
-    ).order_by(ArchiMateElement.id).all()
+    rows = SavedDiagramElement.query.filter(SavedDiagramElement.diagram_id == canvas.saved_diagram_id).all()
+    by_id = {
+        el.id: el for el in ArchiMateElement.query.filter(
+            ArchiMateElement.id.in_({r.element_id for r in rows} or {0}),
+            ArchiMateElement.organization_id == canvas.organization_id,
+        ).all()
+    }
+    return sorted(((r, by_id[r.element_id]) for r in rows if r.element_id in by_id), key=lambda pair: pair[1].id)
+
+
+def _view_elements(canvas):
+    """Elements on the canvas's view, as ArchiMateElement rows."""
+    return [el for _row, el in _view_rows(canvas)]
 
 
 def _profile(el):
-    """The box profile the element carries, however the property writer stored it."""
+    """The box profile an older canvas wrote on the element, however the property writer stored it."""
     value = (el.acm_properties or {}).get("profile")
     return value.get("value") if isinstance(value, dict) else value
 
 
-def set_profile(el, profile):
-    """Place an element in a box by writing its ``profile`` property through the one property writer."""
-    from app.modules.architecture_assistant.property_service import PropertyService
+def _box_of(canvas, row, el, by_profile):
+    """The box an element sits in on this canvas: the view row's own box, else the box an older
+    canvas recorded as the element's profile."""
+    if row.canvas_box:
+        return row.canvas_box
+    return by_profile.get(_profile(el))
 
-    PropertyService().set_element_property(el, "profile", profile, source="user")
+
+def _boxes_by_profile(canvas):
+    return {z["profile"]: k for k, z in zones(canvas).items() if z["profile"]}
 
 
 def entries(canvas, box_key):
     """Elements in one box of one canvas."""
-    zone = zones()[box_key]
+    zone = zones(canvas)[box_key]
+    by_profile = _boxes_by_profile(canvas)
     return [
-        el for el in _view_elements(canvas)
-        if _profile(el) == zone["profile"] and el.type in zone["element_types"]
+        el for row, el in _view_rows(canvas)
+        if _box_of(canvas, row, el, by_profile) == box_key and el.type in zone["element_types"]
     ]
 
 
 def candidates(canvas, box_key):
     """Existing elements of the box's types that this canvas does not show yet.
-    An element already placed in another box is not offered: it has one box."""
-    zone = zones()[box_key]
+    An element has one box on a canvas."""
+    zone = zones(canvas)[box_key]
     shown = {el.id for el in _view_elements(canvas)}
     rows = ArchiMateElement.query.filter(
         ArchiMateElement.organization_id == canvas.organization_id,
         ArchiMateElement.type.in_(zone["element_types"]),
     ).order_by(ArchiMateElement.name).limit(400).all()
-    return [el for el in rows if el.id not in shown and _profile(el) in (None, "", zone["profile"])]
+    return [el for el in rows if el.id not in shown]
+
+
+def place(canvas, box_key, el):
+    """Put an element in a box of this canvas's view. An element that is already on the view
+    stays in the box it has."""
+    diagram = ensure_view(canvas)
+    row = SavedDiagramElement.query.filter_by(diagram_id=diagram.id, element_id=el.id).first()
+    if row is None:
+        db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id, canvas_box=box_key))
+        return True
+    if row.canvas_box is None:
+        row.canvas_box = _box_of(canvas, row, el, _boxes_by_profile(canvas)) or box_key
+    return row.canvas_box == box_key
 
 
 def add_entry(canvas, box_key, element_id=None, name=None):
     """Put an element in a box: the chosen existing one, else one found by
     name among the box's types, else a new one."""
-    zone = zones().get(box_key)
+    zone = zones(canvas).get(box_key)
     if zone is None or zone["membership"] == "attribute":
         raise CanvasError("This box takes its entries from the cost and price records, not from elements.")
     org_id = canvas.organization_id
@@ -151,7 +203,7 @@ def add_entry(canvas, box_key, element_id=None, name=None):
         for row in ArchiMateElement.query.filter(
             ArchiMateElement.organization_id == org_id,
             ArchiMateElement.type.in_(zone["element_types"]),
-        ).all():
+        ).order_by(ArchiMateElement.id).all():
             if normalise(row.name) == wanted:
                 el = row
                 break
@@ -159,15 +211,10 @@ def add_entry(canvas, box_key, element_id=None, name=None):
             el_type = zone["element_types"][0]
             el = create_backbone_element(
                 element_type=el_type, layer=_LAYER_BY_TYPE.get(el_type, "business"), name=name,
-                organization_id=org_id, provenance={"created_from": "business_model_canvas"},
+                organization_id=org_id, provenance={"created_from": template_key(canvas)},
             )
-    if _profile(el) not in (None, "", zone["profile"]):
-        raise CanvasError("That element is already in another box.")
-    set_profile(el, zone["profile"])
-    diagram = ensure_view(canvas)
-    exists = SavedDiagramElement.query.filter_by(diagram_id=diagram.id, element_id=el.id).first()
-    if exists is None:
-        db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id))
+    if not place(canvas, box_key, el):
+        raise CanvasError("That element is already in another box on this canvas.")
     db.session.commit()
     return el
 
@@ -207,7 +254,10 @@ def price_plans(canvas):
 
 
 def add_price_plan(canvas, element_id, name, price, currency, billing_period, mechanism=None):
-    el = _entry_or_error(canvas, PRICEABLE_BOX, element_id)
+    box = priceable_box(canvas)
+    if box is None:
+        raise CanvasError("This canvas has no prices.")
+    el = _entry_or_error(canvas, box, element_id)
     name = " ".join((name or "").split()) or "Price"
     try:
         amount = Decimal(str(price).strip())

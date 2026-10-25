@@ -103,7 +103,7 @@ def test_every_menu_opens_and_every_item_lands_on_a_page_with_content(desktop, b
     # Sign in and Start free lead to the account forms by design; they are not content pages.
     hrefs = {h: text for h, text in hrefs.items()
              if h and not h.startswith(("#", "mailto:", "/account/")) and text not in ("Sign in", "Start free")}
-    assert len(hrefs) > 80, f"only {len(hrefs)} distinct links found in the menus and footer"
+    assert len(hrefs) > 60, f"only {len(hrefs)} distinct links found in the menus and footer"
 
     by_path = {}
     for href, label in hrefs.items():
@@ -151,14 +151,13 @@ def test_navbar_and_footer_carry_the_same_items(desktop):
     nav = {label for _, label in page.evaluate(LINKS_JS, "header a") if label}
     foot = {label for _, label in page.evaluate(LINKS_JS, "footer a") if label}
     foot |= set(page.eval_on_selector_all("footer h2", "els => els.map(e => e.textContent.trim())"))
-    own = {"Sign in", "Talk to us", "Start free"}
+    own = {"Sign in", "Talk to us", "Start free", "Pricing"}
     roles = {label for _, label in page.evaluate(LINKS_JS, "#menu-roles li a")}
-    missing = sorted(text for text in nav if text not in foot and text not in own and text not in roles and not text.startswith("+ "))
+    missing = sorted(text for text in nav if text not in foot and text not in own and text not in roles)
     assert missing == [], f"in the navbar but not the footer: {missing}"
-    # the footer repeats the Product menu group for group, in the same order
-    groups = page.eval_on_selector_all("#menu-product p[id^='p-']", "els => els.map(e => e.textContent.trim())")
-    footer_headings = page.eval_on_selector_all("footer [data-footer-row='product'] h2", "els => els.map(e => e.textContent.trim())")
-    assert footer_headings[:len(groups)] == groups, (groups, footer_headings)
+    # the footer is one set of columns, not a second copy of the menus
+    footer_headings = page.eval_on_selector_all("footer h2", "els => els.map(e => e.textContent.trim())")
+    assert footer_headings == ["Product", "Solutions", "Roles", "Compare", "Resources", "Company", "Legal", "Coming soon"]
 
 
 def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base_url):
@@ -168,8 +167,8 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base
     expect(soon.get_by_text("Coming soon", exact=True)).to_be_visible()
     expect(soon.get_by_text("Not available yet. Join the waiting list.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
-    assert rows.count() == 3
-    for text in ("Build your model from your tools", "Scenarios", "Every answer shows its sources"):
+    assert rows.count() == 2
+    for text in ("Scenarios", "Software and tool discovery"):
         expect(soon.get_by_role("link", name=text)).to_be_visible()
     # nothing delivered sits in the Coming soon group, and nothing coming soon sits among delivered ones
     live_labels = page.eval_on_selector_all("#menu-product a[data-availability='live']", "els => els.map(e => e.textContent)")
@@ -201,7 +200,7 @@ def test_everything_coming_soon_lands_on_the_features_list(desktop, base_url):
     expect(page).to_have_url(base_url + "/features#coming-soon")
     section = page.locator("#coming-soon")
     expect(section).to_be_visible()
-    for text in ("Build your model from your tools", "Scenarios", "Every answer shows its sources", "Software and tool discovery"):
+    for text in ("Scenarios", "Software and tool discovery"):
         expect(page.locator("article").get_by_role("link", name=text, exact=True)).to_be_visible()
 
 

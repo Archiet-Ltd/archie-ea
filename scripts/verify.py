@@ -1545,6 +1545,23 @@ def gate_js_syntax() -> Result:
     return Result("js-syntax", FAIL, output.strip()[-800:])
 
 
+def gate_content_placeholders(baseline: int) -> Result:
+    """Ratchet on the banned placeholder phrases ("Nothing here yet", "No data",
+    "N/A") in shipped templates and scripts. Each one is an empty region that
+    does not say what is missing or what to do next; the count can only fall.
+    """
+    proc = _run([sys.executable, "scripts/check_content_placeholders.py", "--count"])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode != 0:
+        return Result("content-placeholders", FAIL, output[-400:])
+    try:
+        count = int(output.splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("content-placeholders", FAIL, f"unparseable count: {output[-200:]}")
+    detail = "" if count <= baseline else "run scripts/check_content_placeholders.py to list them"
+    return Result("content-placeholders", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_console_reporting(baseline: int) -> Result:
     """Ratchet on console.* calls in shipped JS and templates.
 
@@ -2358,6 +2375,10 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("console-reporting", "console.* calls in shipped JS and templates", "ratchet",
              lambda: gate_console_reporting(baseline["console_reporting"]),
              remediation="surface the failure via Platform.toast or an inline error state, or delete the diagnostic",
+             tags=["static", "ui"]),
+        Gate("content-placeholders", "no 'Nothing here yet', 'No data' or 'N/A' placeholder text", "ratchet",
+             lambda: gate_content_placeholders(baseline["content_placeholders"]),
+             remediation="say what is missing and offer the next action with the empty_state macro (components/empty_state.html), as the help-and-overlays standard requires",
              tags=["static", "ui"]),
         Gate("js-syntax", "every shipped JS file parses in a real engine", "command",
              gate_js_syntax,

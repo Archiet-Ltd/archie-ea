@@ -946,6 +946,35 @@ _CAPABILITIES = [
     ("Security Operations", "LQ-CAP-SECURITY", 3, 4, 3),
 ]
 
+# The judgment for each demo capability: strategic differentiates the company,
+# operational runs it day to day, supporting is what every company needs.
+_CAPABILITY_TYPES = {
+    "LQ-CAP-CALIBRATION": "strategic",
+    "LQ-CAP-WATER-QUALITY": "strategic",
+    "LQ-CAP-FIELD-SERVICE": "strategic",
+    "LQ-CAP-DEMAND": "strategic",
+    "LQ-CAP-ANALYTICS": "strategic",
+    "LQ-CAP-EVENT-PROCESSING": "strategic",
+    "LQ-CAP-INVENTORY": "operational",
+    "LQ-CAP-FULFILMENT": "operational",
+    "LQ-CAP-SUPPLIER": "operational",
+    "LQ-CAP-ASSET-LIFECYCLE": "operational",
+    "LQ-CAP-INCIDENT": "operational",
+    "LQ-CAP-QUALITY": "operational",
+    "LQ-CAP-INTEGRATION": "operational",
+    "LQ-CAP-MONITORING": "operational",
+    "LQ-CAP-DEVICE-MGMT": "operational",
+    "LQ-CAP-FIRMWARE": "operational",
+    "LQ-CAP-NETWORK": "operational",
+    "LQ-CAP-COMPLIANCE": "supporting",
+    "LQ-CAP-WORKFORCE": "supporting",
+    "LQ-CAP-IDENTITY": "supporting",
+    "LQ-CAP-DOCUMENT": "supporting",
+    "LQ-CAP-BACKUP": "supporting",
+    "LQ-CAP-CAPACITY": "supporting",
+    "LQ-CAP-SECURITY": "supporting",
+}
+
 # ── risks ──────────────────────────────────────────────────────────────────
 
 # (risk title, earlier residual (likelihood, impact), residual now)
@@ -1283,7 +1312,6 @@ def _seed_canvas_model(org_id, canvas):
     to the seeded capabilities, price plans, and the vision as a Goal.
     Idempotent: every element is found by name and type before one is made."""
     from app.models import ArchiMateElement, ArchiMateRelationship
-    from app.models.archimate_core import SavedDiagramElement
     from app.models.price_plan import PricePlan
     from app.modules.business_model_canvas import model_service
     from app.services.archimate_backbone import create_backbone_element
@@ -1310,16 +1338,11 @@ def _seed_canvas_model(org_id, canvas):
             created += 1
         return el
 
-    diagram = model_service.ensure_view(canvas)
-    zones = model_service.zones()
+    model_service.ensure_view(canvas)
     for box, entries in _CANVAS_ENTRIES.items():
         for name, type_, layer in entries:
             el = element(name, type_, layer)
-            model_service.set_profile(el, zones[box]["profile"])
-            if not db.session.query(SavedDiagramElement.id).filter_by(
-                diagram_id=diagram.id, element_id=el.id
-            ).first():
-                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id))
+            model_service.place(canvas, box, el)
     vision = element(*_CANVAS_VISION)
     canvas.vision_element_id = vision.id
     db.session.flush()
@@ -2652,6 +2675,20 @@ def seed_demo_company() -> dict:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
         db.session.flush()
 
+        # The judgment replaces the starting value, but only while the capability still
+        # carries the starting value: a type an editor has changed is theirs.
+        from app.services.capability_type import default_capability_type
+
+        for cap in db.session.query(UnifiedCapability).filter(
+            UnifiedCapability.organization_id == org_id
+        ):
+            chosen = _CAPABILITY_TYPES.get(cap.code)
+            if chosen and cap.capability_type in (
+                None, default_capability_type(cap.category, cap.level),
+            ):
+                cap.capability_type = chosen
+        db.session.flush()
+
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
 
@@ -2980,6 +3017,9 @@ def seed_demo_company() -> dict:
             ).first()
         stats["canvas_entries_created"] = _seed_canvas_model(org_id, canvas)
         stats["business_model_canvases_created"] = 0 if canvas_exists else 1
+        from app.commands import seed_framework_canvases
+
+        stats["framework_canvases_created"], stats["framework_canvas_rows_created"] = seed_framework_canvases.seed(org_id)
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {

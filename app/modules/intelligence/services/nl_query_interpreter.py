@@ -122,6 +122,40 @@ _SERVICE_PATTERNS = [
     re.compile(r"\bbreaks? for .*? if (?:the |our )?(.+?) (?:is down|fails|goes down)\b", re.I),
 ]
 
+# Superlative/descriptive phrases that name no specific system. When the
+# captured service phrase matches one of these, we treat it as "no service
+# named" so the answer falls through to single points of failure without a
+# "nothing recorded matches" reason line.
+_SUPERLATIVE_PHRASES = [
+    re.compile(
+        r"^(?:(?:our|the) )?"
+        r"(?:most connected|most depended[- ]?on|most critical|biggest|main|core)"
+        r"(?: (?:application|app|system|service|platform|database|single point of failure))?$",
+        re.I,
+    ),
+]
+
+
+def _is_superlative_phrase(service: str) -> bool:
+    """True only when the whole phrase is a superlative or descriptive word,
+    optionally followed by a generic noun ("most connected application",
+    "main system"). A real name such as "core banking" or "main website" is
+    not superlative.
+    """
+    s = " ".join(service.strip().lower().split())
+    return any(pattern.match(s) for pattern in _SUPERLATIVE_PHRASES)
+
+
+def asks_for_superlative(question: str) -> bool:
+    """True when the question's service phrase is a superlative ("our most
+    connected application"): it asks for the single points of failure."""
+    text = (question or "").strip()
+    for pattern in _SERVICE_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            return _is_superlative_phrase(found.group(1).strip().rstrip("?.! "))
+    return False
+
 
 def _extract_service(question: str) -> Optional[str]:
     """The service a 'what breaks' question names, or None.
@@ -130,14 +164,21 @@ def _extract_service(question: str) -> Optional[str]:
     one); the catalogue entry resolves that phrase to an element through the
     one entity matcher, and an unmatched phrase is answered honestly rather
     than with an invented blast radius.
+
+    Superlative/descriptive phrases ("most connected", "most depended-on",
+    "most critical", "biggest", "our main", "the core") are treated as no
+    service named, so the answer falls through to single points of failure
+    without a "nothing recorded matches" reason line.
     """
     text = (question or "").strip()
     for pattern in _SERVICE_PATTERNS:
         found = pattern.search(text)
         if found:
             service = found.group(1).strip().rstrip("?.! ")
-            if service:
+            if service and not _is_superlative_phrase(service):
                 return service
+            # Superlative phrase matched — treat as no service named.
+            return None
     return None
 
 
