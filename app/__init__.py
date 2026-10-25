@@ -129,6 +129,8 @@ def create_app(config=None):
 
     # 5. Asset pipeline (Flask-Assets)
     init_assets(app)
+    from app.basecoat_kit import init_basecoat
+    init_basecoat(app)
 
     # 6. Services (SSL, LLM validation, error handlers, template filters,
     #              job queue, audit, prometheus, LLM health check)

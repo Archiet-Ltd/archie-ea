@@ -10,6 +10,8 @@ module.exports = {
     // `focus:ring-2 focus:ring-ring` and `-translate-y-1/2` were unbuilt.
     './app/modules/**/templates/**/*.html',
     './app/static/js/**/*.js',
+    // The class lists of the vendored component macros (the Overview dashboard).
+    './app/basecoat_kit/data/recipes.json',
   ],
   theme: {
     container: {

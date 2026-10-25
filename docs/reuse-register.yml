@@ -489,6 +489,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/archimate_composer.css
         reason: authenticated-app composer toolbar and search buttons, moved unchanged out of the composer page where the baseline already recorded them; not a public-site button
       - path: app/static/css/vendor/
@@ -518,6 +520,8 @@ entries:
         scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/accessibility.css
         reason: authenticated-app skip-link and focus styles, not the public inline link
       - path: app/static/css/app.css
@@ -556,6 +560,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -588,6 +594,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
