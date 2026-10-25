@@ -1,0 +1,11 @@
+{
+ "web": {
+  "results": [
+   {
+    "title": "Northwind Freight - company profile",
+    "url": "https://profiles.example/northwind",
+    "description": "<strong>Northwind</strong> Freight is a logistics company."
+   }
+  ]
+ }
+}

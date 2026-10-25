@@ -1,0 +1,370 @@
+"""Add cited public signals to an organisation's company profile, and keep them fresh.
+
+For an organisation that agreed at sign-up to have its public footprint read (the website consent), this
+reads the sources in ``sources.REGISTRY`` for the company's name, stores each item once as an
+``OrganizationSignal`` (source, link, published date, when it was read), has a model score the public
+mentions with OperateIQ's sentiment prompt, and tags each signal with the PESTLE factor and SWOT
+quadrant it informs. The profile card, and the PESTLE, SWOT and competitor readers below, read that one
+store. ``refresh_all`` is the scheduled entry; it visits each consenting organisation in its own scope.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional
+
+from app import db
+from app.models.organization_signal import OrganizationSignal
+
+from ..website_crawl import prompts
+from ..website_crawl.rendering import parse_json
+from . import sources as src
+
+logger = logging.getLogger(__name__)
+
+SETTINGS_KEY = "public_signals"
+REFRESH_EVERY = timedelta(hours=23)  # a daily schedule always finds the last run old enough
+MAX_PER_SOURCE = 20
+MAX_FOR_SENTIMENT = 40
+KEEP_DAYS = 365
+
+COMPANY_ONLY = ("sec_edgar", "uspto", "yahoo_finance", "alpha_vantage")  # the company's own records, not a competitor's
+
+PESTLE = ("political", "economic", "social", "technological", "legal", "environmental")
+SWOT = ("strength", "weakness", "opportunity", "threat")
+
+# Which PESTLE factor a signal informs. A filing is a legal and regulatory record, a market figure is an
+# economic one, a patent or a paper is technological. News and public mentions are read for the words
+# they use; where none of these words appears the signal carries no factor, and is not forced into one.
+_KIND_FACTOR = {"filing": "legal", "financial": "economic", "patent": "technological", "research": "technological"}
+_WORDS = (
+    ("legal", ("lawsuit", "court", "regulat", "compliance", "fine ", "fined", "antitrust", "privacy", "gdpr", "sued", "settlement")),
+    ("political", ("government", "election", "tariff", "sanction", "policy", "minister", "congress", "parliament", "treaty")),
+    ("environmental", ("climate", "emission", "carbon", "sustainab", "net zero", "renewable")),
+    ("economic", ("revenue", "profit", "earnings", "inflation", "funding", "investment", "acquisition", "acquires", "layoff", "stock", "ipo", "valuation")),
+    ("technological", ("launch", "ai ", "artificial intelligence", "cloud", "platform", "software", "patent", "breach", "outage", "cyber")),
+    ("social", ("customers", "workforce", "hiring", "culture", "community", "diversity", "protest", "boycott")),
+)
+
+
+class SignalsRefused(ValueError):
+    """Nothing was read; the message says why in words a person can act on."""
+
+
+# ----------------------------------------------------------------------------- who and what to read
+
+def consenting(org) -> bool:
+    site = ((org.settings or {}).get("onboarding") or {}).get("website") or {}
+    return bool(site.get("consent_at"))
+
+
+def _company_name(org) -> str:
+    from ..website_crawl.confirm import PROFILE_KEY
+
+    held = ((org.settings or {}).get(PROFILE_KEY) or {}).get("company_name")
+    value = (held or {}).get("value") if isinstance(held, dict) else None
+    return str(value or org.name or "").strip()
+
+
+def _context(org) -> Dict[str, Any]:
+    mine = (org.settings or {}).get(SETTINGS_KEY) or {}
+    return {
+        "ticker": mine.get("ticker") or ((org.settings or {}).get("company_context") or {}).get("ticker"),
+        "rss_feeds": [f for f in mine.get("rss_feeds") or [] if isinstance(f, str) and f.startswith("http")],
+        "competitors": [c for c in mine.get("competitors") or [] if isinstance(c, str) and c.strip()],
+    }
+
+
+def pestle_factor(kind: str, title: str, summary: str) -> Optional[str]:
+    if kind in _KIND_FACTOR:
+        return _KIND_FACTOR[kind]
+    text = (" %s %s " % (title or "", summary or "")).lower()
+    for factor, words in _WORDS:
+        if any(w in text for w in words):
+            return factor
+    return None
+
+
+def swot_quadrant(subject_is_company: bool, score: Optional[float]) -> Optional[str]:
+    """Only a scored mention carries a quadrant: well spoken of is a strength and badly spoken of a weakness
+    for the company itself; for a competitor it is the other way about (a threat, an opportunity)."""
+    if score is None or -0.2 <= score <= 0.2:
+        return None
+    if subject_is_company:
+        return "strength" if score > 0 else "weakness"
+    return "threat" if score > 0 else "opportunity"
+
+
+def _date(text: Optional[str]) -> Optional[datetime]:
+    if not text:
+        return None
+    text = str(text).strip().replace("Z", "+00:00")
+    for parse in (datetime.fromisoformat, lambda t: datetime.strptime(t[:10], "%Y-%m-%d")):
+        try:
+            value = parse(text)
+            return value.replace(tzinfo=None) if value.tzinfo else value
+        except ValueError:
+            continue
+    return None
+
+
+def _checksum(source: str, url: Optional[str], title: str, subject: str = "") -> str:
+    """Once per organisation, per subject: one article about two companies is a signal for each."""
+    return hashlib.sha256(("|".join([source, subject, url or "", title])).encode("utf8")).hexdigest()
+
+
+# ----------------------------------------------------------------------------- writing
+
+def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item], is_company: bool, now: datetime) -> int:
+    kept = 0
+    for item in items[:MAX_PER_SOURCE]:
+        if not item.title:
+            continue
+        digest = _checksum(source.key, item.url, item.title, subject)
+        row = OrganizationSignal.query.filter_by(organization_id=org_id, checksum=digest).first()
+        if row is None:
+            row = OrganizationSignal(organization_id=org_id, checksum=digest, source=source.key, created_at=now)
+            db.session.add(row)
+        row.kind, row.source_label, row.subject = source.kind, source.label, subject
+        row.title, row.summary, row.url = item.title[:500], (item.summary or "")[:2000], (item.url or None)
+        row.published_at, row.fetched_at, row.details = _date(item.published), now, item.details or None
+        row.pestle_factor = pestle_factor(row.kind, row.title, row.summary)
+        kept += 1
+    return kept
+
+
+def _sentiment(org_id: int, subject: str, mentions: List[OrganizationSignal], model: Callable[[str], str], is_company: bool, now: datetime) -> Optional[Dict[str, Any]]:
+    """OperateIQ's sentiment reading over the public mentions just read; one summary signal, and a score on each mention the model named."""
+    if not mentions:
+        return None
+    sources: Dict[str, List[Dict[str, Any]]] = {}
+    for row in mentions[:MAX_FOR_SENTIMENT]:
+        sources.setdefault("news" if row.kind == "news" else "social", []).append({
+            "title": row.title, "content": (row.summary or "")[:500], "url": row.url or "",
+            "date": row.published_at.date().isoformat() if row.published_at else ""})
+    prompt = prompts.render_text(_prompt_text(), {
+        "company_name": subject, "company_data": {"overview": None, "industry": None},
+        "sources": [{"source_type": kind, "items": items} for kind, items in sources.items()]})
+    result = parse_json(model(prompt))
+    overall = result.get("overall_sentiment") or {}
+    score = overall.get("score")
+    if not isinstance(score, (int, float)):
+        raise ValueError("the sentiment reading gave no score")
+    score = max(-1.0, min(1.0, float(score)))
+    by_url = {m.url: m for m in mentions if m.url}
+    for note in result.get("notable_mentions") or []:
+        row, value = by_url.get(note.get("url")), (note.get("sentiment") or {}).get("score")
+        if row is not None and isinstance(value, (int, float)):
+            row.sentiment_score = max(-1.0, min(1.0, float(value)))
+            row.swot_quadrant = swot_quadrant(is_company, row.sentiment_score)
+    topics = [t.get("topic") for t in result.get("trending_topics") or [] if t.get("topic")][:5]
+    label = overall.get("label") or ("positive" if score > 0.2 else "negative" if score < -0.2 else "neutral")
+    digest = _checksum("sentiment_analysis", None, now.date().isoformat(), subject)
+    row = OrganizationSignal.query.filter_by(organization_id=org_id, checksum=digest).first()
+    if row is None:
+        row = OrganizationSignal(organization_id=org_id, checksum=digest, source="sentiment_analysis", created_at=now)
+        db.session.add(row)
+    row.kind, row.source_label, row.subject = "sentiment", "Public sentiment (from %d public items)" % len(mentions[:MAX_FOR_SENTIMENT]), subject
+    row.title = "Public sentiment about %s: %s" % (subject, str(label).replace("_", " "))
+    row.summary = ("Topics: %s." % ", ".join(topics)) if topics else "Read across the public mentions listed beside it."
+    row.url, row.published_at, row.fetched_at = None, now, now
+    row.sentiment_score, row.swot_quadrant = score, swot_quadrant(is_company, score)
+    row.details = {"label": label, "confidence": overall.get("confidence"), "sample_size": len(mentions[:MAX_FOR_SENTIMENT]),
+                   "analysis_period": result.get("analysis_period")}
+    return {"score": score, "label": label}
+
+
+def _prompt_text() -> str:
+    from pathlib import Path
+
+    return (Path(__file__).parent / "prompts" / "sentiment_analysis.hbs").read_text(encoding="utf-8")
+
+
+def refresh_organization(
+    org_id: int, *, http: Optional[src.Http] = None, llm: Optional[Callable[[str], str]] = None,
+    force: bool = False, now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Read every available source for one organisation and store what came back.
+
+    Raises SignalsRefused when the organisation did not agree to be read, or was read too recently.
+    Returns, per source, how many signals it gave or why it was left out, and the sentiment reading."""
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.organization import Organization
+
+    now = now or datetime.utcnow()
+    org = db.session.get(Organization, org_id)
+    if org is None:
+        raise SignalsRefused("That organisation does not exist.")
+    if not consenting(org):
+        raise SignalsRefused("The organisation has not agreed to its public footprint being read.")
+    mine = dict((org.settings or {}).get(SETTINGS_KEY) or {})
+    last = _date(mine.get("refreshed_at"))
+    if not force and last and now - last < REFRESH_EVERY:
+        raise SignalsRefused("The signals were refreshed %s ago; they are read once a day." % _ago(now - last))
+    name, ctx = _company_name(org), _context(org)
+    if not name:
+        raise SignalsRefused("The organisation has no company name to search for.")
+    http = http or src.Http()
+    if llm is None:
+        from ..website_crawl.service import default_model
+
+        llm = default_model()
+    report: Dict[str, Any] = {"sources": {}, "sentiment": None, "stored": 0}
+    subjects = [(name, True)] + [(c.strip(), False) for c in ctx["competitors"][:5]]
+    with tenant_scope(org_id):
+        mentions: Dict[str, List[OrganizationSignal]] = {}
+        for source in src.REGISTRY:
+            reason = src.skipped_reason(source, ctx)
+            if reason:
+                report["sources"][source.key] = {"label": source.label, "skipped": reason}
+                continue
+            total, failure = 0, None
+            for subject, is_company in subjects:
+                if source.key in COMPANY_ONLY and not is_company:
+                    continue
+                try:
+                    items = source.fetch(http, subject, ctx)
+                except src.SourceFailed as exc:
+                    failure = "%s %s" % (source.label, exc)
+                    break
+                except Exception as exc:  # one source's bug or changed answer never stops the others
+                    logger.info("signal source %s failed for organisation %s", source.key, org_id, exc_info=True)
+                    failure = "%s could not be read (%s)" % (source.label, type(exc).__name__)
+                    break
+                db.session.flush()
+                total += _store(org_id, source, subject, items, is_company, now)
+                if source.social:
+                    db.session.flush()
+                    mentions.setdefault(subject, []).extend(OrganizationSignal.query.filter(
+                        OrganizationSignal.organization_id == org_id, OrganizationSignal.source == source.key,
+                        OrganizationSignal.subject == subject, OrganizationSignal.kind.in_(("news", "mention")),
+                        OrganizationSignal.fetched_at == now).all())
+            report["sources"][source.key] = {"label": source.label, "signals": total, **({"failed": failure} if failure else {})}
+            report["stored"] += total
+        for subject, is_company in subjects:
+            try:
+                reading = _sentiment(org_id, subject, mentions.get(subject, []), llm, is_company, now)
+            except Exception:
+                logger.info("sentiment reading failed for organisation %s", org_id, exc_info=True)
+                reading = None
+                report["sentiment_failed"] = True
+            if is_company:
+                report["sentiment"] = reading
+        cutoff = now - timedelta(days=KEEP_DAYS)
+        OrganizationSignal.query.filter(
+            OrganizationSignal.organization_id == org_id, OrganizationSignal.fetched_at < cutoff).delete(synchronize_session=False)
+        org = db.session.get(Organization, org_id)  # the scope detached the row loaded above
+        fresh = dict((org.settings or {}).get(SETTINGS_KEY) or {})
+        fresh["refreshed_at"] = now.isoformat()
+        fresh["last_report"] = {k: v for k, v in report["sources"].items()}
+        settings = dict(org.settings or {})
+        settings[SETTINGS_KEY] = fresh
+        org.settings = settings
+        from sqlalchemy.orm.attributes import flag_modified
+
+        flag_modified(org, "settings")
+        db.session.commit()
+    return report
+
+
+def _ago(delta: timedelta) -> str:
+    hours = int(delta.total_seconds() // 3600)
+    return "%d hours" % hours if hours >= 1 else "under an hour"
+
+
+def refresh_all(app, *, http=None, llm=None) -> List[Dict[str, Any]]:
+    """The scheduled entry: each consenting organisation, in its own scope. A refusal (read recently) is not an error."""
+    from app.jobs.tenant_safe_job import run_for_each_tenant
+
+    results: List[Dict[str, Any]] = []
+
+    def one(organization_id: int):
+        try:
+            results.append({"organization_id": organization_id, **refresh_organization(organization_id, http=http, llm=llm)})
+        except SignalsRefused as exc:
+            results.append({"organization_id": organization_id, "refused": str(exc)})
+
+    run_for_each_tenant(app, "company-signals-refresh", one)
+    return results
+
+
+SIGNALS_TASK = "company_signals_refresh"
+
+
+def queue_signals_refresh(org_id: int):
+    """Queue the first reading for an organisation that agreed to it; None when it has not."""
+    from app.models.organization import Organization
+    from app.services.job_queue_service import get_job_queue_service
+
+    org = db.session.get(Organization, org_id)
+    if org is None or not consenting(org):
+        return None
+    return get_job_queue_service().create_job("Read the company's public signals", SIGNALS_TASK, {}, organization_id=org_id)
+
+
+def run_signals_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """The job body: one organisation, counts only. A refusal (read within the day) is an answer, not a failure."""
+    org_id = payload.get("organization_id")
+    if org_id is None:
+        raise ValueError("%s job requires organization_id in payload" % SIGNALS_TASK)
+    try:
+        report = refresh_organization(org_id)
+    except SignalsRefused as exc:
+        return {"refused": str(exc)}
+    return {"stored": report["stored"], "sources": {k: v.get("signals", v.get("skipped") or v.get("failed")) for k, v in report["sources"].items()}}
+
+
+# ----------------------------------------------------------------------------- reading
+
+def _row(sig: OrganizationSignal) -> Dict[str, Any]:
+    return {
+        "id": sig.id, "kind": sig.kind, "source": sig.source_label, "source_key": sig.source, "subject": sig.subject,
+        "title": sig.title, "summary": sig.summary, "url": sig.url, "published_at": sig.published_at,
+        "fetched_at": sig.fetched_at, "pestle_factor": sig.pestle_factor, "swot_quadrant": sig.swot_quadrant,
+        "sentiment_score": sig.sentiment_score,
+    }
+
+
+def signals_for_profile(org_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+    """The newest signals about the company itself, each with its source and date."""
+    from app.models.organization import Organization
+
+    org = db.session.get(Organization, org_id)
+    name = _company_name(org) if org is not None else None
+    query = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id)
+    if name:
+        query = query.filter(OrganizationSignal.subject == name)
+    rows = query.order_by(db.func.coalesce(OrganizationSignal.published_at, OrganizationSignal.fetched_at).desc()).limit(limit).all()
+    return [_row(r) for r in rows]
+
+
+def framework_view(org_id: int, framework: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Signals grouped for PESTLE (by factor), SWOT (by quadrant), or competitors (by competitor name)."""
+    query = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id)
+    if framework == "pestle":
+        groups, column = {f: [] for f in PESTLE}, "pestle_factor"
+    elif framework == "swot":
+        groups, column = {q: [] for q in SWOT}, "swot_quadrant"
+    elif framework == "competitors":
+        from app.models.organization import Organization
+
+        org = db.session.get(Organization, org_id)
+        names = _context(org)["competitors"] if org is not None else []
+        groups, column = {n: [] for n in names}, "subject"
+    else:
+        raise ValueError("Unknown framework: %s" % framework)
+    for sig in query.order_by(db.func.coalesce(OrganizationSignal.published_at, OrganizationSignal.fetched_at).desc()).all():
+        key = getattr(sig, column)
+        if key in groups:
+            groups[key].append(_row(sig))
+    return groups
+
+
+def refresh_state(org) -> Dict[str, Any]:
+    """What the profile card says about reading: whether the organisation agreed, when it last ran, what was left out and why."""
+    mine = (org.settings or {}).get(SETTINGS_KEY) or {}
+    skipped = {v["label"]: v["skipped"] for v in (mine.get("last_report") or {}).values() if v.get("skipped")}
+    failed = [v["failed"] for v in (mine.get("last_report") or {}).values() if v.get("failed")]
+    return {"agreed": consenting(org), "refreshed_at": _date(mine.get("refreshed_at")), "skipped": skipped, "failed": failed}
