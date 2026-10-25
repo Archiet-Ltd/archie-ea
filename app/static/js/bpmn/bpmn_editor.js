@@ -203,7 +203,7 @@
                 var message = f.type === 'message';
                 var l = new J.shapes.standard.Link({
                     source: { id: src.id }, target: { id: dst.id }, z: 3, kind: 'flow', flowId: f.id,
-                    router: { name: message ? 'normal' : 'orthogonal' }, connector: { name: 'rounded' },
+                    router: message ? { name: 'normal' } : { name: 'manhattan', args: { padding: 12, step: 10, startDirections: ['right', 'bottom', 'top'], endDirections: ['left', 'top', 'bottom'] } }, connector: { name: 'rounded' },
                     attrs: {
                         line: { class: 'bpmn-flow' + (message ? ' bpmn-flow-message' : ''),
                             targetMarker: message ? { type: 'path', d: 'M 10 -5 0 0 10 5 z', class: 'bpmn-arrow-open' } : { type: 'path', d: 'M 10 -5 0 0 10 5 z', class: 'bpmn-arrow' },
