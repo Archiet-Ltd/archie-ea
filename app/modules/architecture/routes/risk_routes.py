@@ -500,13 +500,42 @@ def serialize_risk_row(risk, ctx=None):
 @risk_bp.route("/risks/")
 @login_required
 def risk_register():
-    """Standalone Risk Register page — shows all risks across the enterprise."""
+    """Standalone Risk Register page — shows all risks across the enterprise.
+
+    Slice S3: ?solution=<id> and ?programme=<id> filter the register to the
+    risks of one solution, or every risk of every solution a programme
+    carries (a Risk has no programme_id of its own, so this resolves through
+    Solution.initiative_id, the same link the Programmes view reads).
+    """
     sort_key = request.args.get("sort", "id")
     direction = request.args.get("dir", "asc")
     column = _RISK_SORT_COLUMNS.get(sort_key, Risk.id)
     order = column.desc() if direction == "desc" else column.asc()
-    risks = Risk.query.order_by(order, Risk.id).all()
-    heat_data = risk_service.get_heat_map_data(solution_id=None)
+
+    solution_filter = request.args.get("solution", type=int)
+    programme_filter = request.args.get("programme", type=int)
+    filtered_solution = None
+    filtered_programme = None
+
+    query = Risk.query
+    if solution_filter is not None:
+        from app.models.solution_models import Solution
+
+        filtered_solution = Solution.query.get(solution_filter)
+        query = query.filter(Risk.solution_id == solution_filter)
+    elif programme_filter is not None:
+        from app.models.solution_models import Solution
+        from app.models.strategic import StrategicInitiative
+
+        filtered_programme = StrategicInitiative.query.get(programme_filter)
+        programme_solution_ids = [
+            row[0] for row in
+            db.session.query(Solution.id).filter(Solution.initiative_id == programme_filter).all()
+        ]
+        query = query.filter(Risk.solution_id.in_(programme_solution_ids)) if programme_solution_ids else query.filter(False)
+
+    risks = query.order_by(order, Risk.id).all()
+    heat_data = risk_service.get_heat_map_data(solution_id=solution_filter)
     # RAID (2 Sep 2026, Capgemini delivery-team dry-run): the register was
     # Risk-only — 1 of the 4 RAID categories. Loaded here so the same page
     # can show Issues/Dependencies without a separate navigation destination.
@@ -530,6 +559,17 @@ def risk_register():
     ctx = _prefetch_risk_context(risks)
     risk_rows = [serialize_risk_row(r, ctx) for r in risks]
     ranked = risk_service.ranked_risks()
+    if solution_filter is not None or programme_filter is not None:
+        # The table itself reads ranked.rows, not risk_rows above -- ranked_risks()
+        # is organisation-wide (it also drives the phase-gate ranking elsewhere, so
+        # it is not changed here); filter its output to the same risk ids already
+        # selected, rather than add a parameter to a shared service function.
+        visible_ids = {r.id for r in risks}
+        ranked = {
+            **ranked,
+            "rows": [row for row in ranked["rows"] if row["risk_id"] in visible_ids],
+            "total": len(visible_ids),
+        }
     return render_template(
         "governance/risk_register.html",
         risks=risks,
@@ -542,6 +582,8 @@ def risk_register():
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
         programmes=[{"id": p.id, "name": p.name} for p in programmes],
+        filtered_solution=filtered_solution,
+        filtered_programme=filtered_programme,
     )
 
 
@@ -562,14 +604,11 @@ def risk_page(risk_id):
     return render_template("governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"])
 
 
-@risk_bp.route("/solutions/<int:solution_id>/risks", methods=["GET"])
-@login_required
-def risk_heat_map_page(solution_id):
-    """Render the risk heat map page for a solution."""
-    data = risk_service.get_heat_map_data(solution_id=solution_id)
-    return render_template(
-        "solutions/risk_heat_map.html",
-        solution_id=solution_id,
-        grid=data["grid"],
-        risks=data["risks"],
-    )
+# Slice S3 (D4): risk_heat_map_page, which rendered solutions/risk_heat_map.html
+# at this exact address, is removed here -- it was registered second behind
+# solution_phase_routes.get_solution_risks (same URL and method) and could
+# never be reached (confirmed: no caller anywhere referenced it either).
+# That live route now redirects a browser here; this duplicate registration,
+# the thing that made the page unreachable in the first place, is deleted
+# rather than left as dead code beside a redirect that only one of the two
+# could ever serve.
