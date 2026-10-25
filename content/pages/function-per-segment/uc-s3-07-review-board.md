@@ -9,14 +9,14 @@ url_slug: /use-cases/architecture-review-board
 icon: users-round
 ---
 
-# Take a change through the review board with the impact evidence attached
+# Take a change through the review board with its evidence pinned to the decision
 
 **For enterprise architecture teams running formal governance.**
 
 In Entelim a solution is submitted to the Architecture Review Board from its own page, once its readiness checks pass.
 The review then sits in the board's queue, pinned to a snapshot of the proposal as submitted. The board records one of
-five outcomes with a written rationale, and that decision stays with the review for good. Impact analysis runs on its
-own screen, and the board can use it alongside the review.
+five outcomes with a written rationale, and that decision stays with the review for good. Impact analysis sits beside
+the review, so the board can see what a change touches before it decides.
 
 ## The question
 
@@ -69,7 +69,7 @@ will stand up to an audit.
 1. Complete the solution's phases and open its governance panel.
 2. Tick the review confirmation, add the three attestations with evidence notes and choose **Submit to ARB**.
 3. Open **Architecture Review Board** and find the review in the queue.
-4. Run **Impact Analysis** for the elements the change touches and share the findings with the board.
+4. Run **Impact Analysis** for the elements the change touches, so the board can read what the change affects beside the review.
 5. The deciding member opens the review, reads the dossier, and records the outcome with a rationale.
 6. Track any conditions in the Conditions section until each is verified or waived.
 
@@ -80,7 +80,7 @@ edited after the meeting or the conditions have to be chased.
 
 ## Limits
 
-- Impact analysis is not attached to a review automatically. You run it on its own screen.
+- Impact analysis is a separate screen that sits beside the review. It is run by a person and is not pinned to the decision.
 - Only people authorised to decide see the decision buttons.
 - A recorded decision cannot be edited or deleted.
 - Submission depends on the solution's readiness. The button stays disabled until the checks are complete.

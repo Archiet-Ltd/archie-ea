@@ -96,10 +96,20 @@ def initiative_shortlist():
         {"initiatives": [{id, name, prioritisation_score, feasibility_score}], "count": int}
     """
     try:
-        from app.models.capability_gap_analysis import GapSolutionOption
+        from app.middleware.tenant_context import current_org_id
+        from app.models.capability_gap_analysis import (
+            CapabilityGapAnalysis,
+            CapabilityGapDetail,
+            GapSolutionOption,
+        )
 
+        # GapSolutionOption has no tenant column; it belongs to an organisation
+        # through its gap detail's analysis.
         rows = (
             GapSolutionOption.query
+            .join(CapabilityGapDetail, GapSolutionOption.gap_detail_id == CapabilityGapDetail.id)
+            .join(CapabilityGapAnalysis, CapabilityGapDetail.analysis_id == CapabilityGapAnalysis.id)
+            .filter(CapabilityGapAnalysis.organization_id == current_org_id())
             .order_by(desc(GapSolutionOption.prioritisation_score))
             .limit(10)
             .all()
