@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import requests
 
@@ -124,10 +124,27 @@ def names_domain(text: str, domain: Optional[str]) -> bool:
     return bool(host) and re.search(r"(?<![a-z0-9-])%s(?![a-z0-9-])" % re.escape(host), (text or "").lower()) is not None
 
 
-def is_about(title: str, summary: str, company: str, domain: Optional[str] = None) -> bool:
-    """A hit is kept only when its title or summary names the company or its web address."""
-    text = "%s %s" % (title or "", summary or "")
-    return any(names_company(text, v) for v in name_variants(company)) or names_domain(text, domain)
+def own_link(url: Optional[str], details: Optional[Dict[str, Any]]) -> Optional[str]:
+    """The page a hit is about: the story's own link where the source only lists it (Hacker News), else its address."""
+    return (details or {}).get("story_url") or url
+
+
+def link_is_on(link: Optional[str], domain: Optional[str]) -> bool:
+    """True when the link's host is the company's web address or a subdomain of it."""
+    host = (domain or "").strip().lower()
+    host = host[4:] if host.startswith("www.") else host
+    if not host or not link:
+        return False
+    found = (urlparse(link if "://" in link else "https://" + link).hostname or "").lower()
+    found = found[4:] if found.startswith("www.") else found
+    return found == host or found.endswith("." + host)
+
+
+def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None, summary: str = "") -> bool:
+    """A hit is kept only when the company's name appears in its title or summary, or its web address appears in its title,
+    or the story's own link is on the company's domain. A link to the company inside someone else's post is not enough."""
+    text = " ".join(filter(None, [title, summary]))
+    return any(names_company(text, v) for v in name_variants(company)) or names_domain(title, domain) or link_is_on(link, domain)
 
 
 def _strip_html(text: str) -> str:
@@ -252,7 +269,8 @@ def hackernews(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
             continue
         items.append(Item(title=title, summary=hit.get("story_text") or "",
                           url="https://news.ycombinator.com/item?id=%s" % ident, published=hit.get("created_at"),
-                          details={"points": hit.get("points"), "comments": hit.get("num_comments")}))
+                          details={"points": hit.get("points"), "comments": hit.get("num_comments"),
+                                   "story_url": hit.get("url") or None}))
     return items
 
 
