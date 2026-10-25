@@ -1,0 +1,24 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ lean-canvas.html. Adapted only to Entelim macro names (components/canvas/_ui.html). #}
+{# Lean Canvas, C4. Ash Maurya, Running Lean (2012), adapted from the Business Model Canvas. Ten-column grid: Problem (Existing alternatives at its foot) | Solution over Key Metrics | Unique Value Proposition (High-level concept) | Unfair Advantage over Channels | Customer Segments (Early adopters); Cost Structure and Revenue Streams are equal halves of the bottom strip. The number on each block is the order Maurya suggests filling them in. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C4', 'name': 'Lean canvas', 'grid': 'grid-cols-10 grid-rows-[auto_auto_auto]',
+  'hint': 'Scroll sideways on a narrow screen to see all nine blocks. The number on each block is the order to fill them in.',
+  'credit': 'Lean Canvas adapted by Ash Maurya from the Business Model Canvas.',
+  'boxes': [
+    {'key': 'problem', 'title': 'Problem', 'number': '2', 'question': 'What are the top three problems?', 'empty': 'No problems yet. Add the assessments that name what customers struggle with.', 'area': 'col-span-2 col-start-1 row-span-2 row-start-1',
+     'subs': [{'key': 'existing-alternatives', 'title': 'Existing alternatives', 'question': 'How do they cope today?', 'empty': 'No alternatives yet. Add the competitors or workarounds customers use today.'}]},
+    {'key': 'solution', 'title': 'Solution', 'number': '4', 'question': 'What is the smallest thing that fixes each problem?', 'empty': 'No solution yet. Add the services that fix the problems.', 'area': 'col-span-2 col-start-3 row-start-1'},
+    {'key': 'key-metrics', 'title': 'Key Metrics', 'number': '8', 'question': 'Which numbers tell you it is working?', 'empty': 'No metrics yet. Add the measures that show it is working.', 'area': 'col-span-2 col-start-3 row-start-2'},
+    {'key': 'unique-value-proposition', 'title': 'Unique Value Proposition', 'number': '3', 'question': 'Why are you different, in one line?', 'empty': 'No value proposition yet. Add the value that sets you apart.', 'area': 'col-span-2 col-start-5 row-span-2 row-start-1',
+     'subs': [{'key': 'high-level-concept', 'title': 'High-level concept', 'question': 'X for Y', 'empty': 'No concept yet. Add the one-line analogy for the proposition.'}]},
+    {'key': 'unfair-advantage', 'title': 'Unfair Advantage', 'number': '9', 'question': 'What cannot be copied or bought?', 'empty': 'No advantage yet. Add the resources or capabilities others cannot copy.', 'area': 'col-span-2 col-start-7 row-start-1'},
+    {'key': 'channels', 'title': 'Channels', 'number': '5', 'question': 'How will you reach them?', 'empty': 'No channels yet. Add how customers find and receive the offer.', 'area': 'col-span-2 col-start-7 row-start-2'},
+    {'key': 'customer-segments', 'title': 'Customer Segments', 'number': '1', 'question': 'Who exactly has this problem?', 'empty': 'No segments yet. Add who you create value for.', 'area': 'col-span-2 col-start-9 row-span-2 row-start-1',
+     'subs': [{'key': 'early-adopters', 'title': 'Early adopters', 'question': 'Who would use it first?', 'empty': 'No early adopters yet. Add the segment you would approach first.'}]},
+    {'key': 'cost-structure', 'readonly': true, 'title': 'Cost Structure', 'number': '7', 'question': 'Customer acquisition, hosting, people', 'empty': 'No application costs recorded yet. Record them on each application.', 'area': 'col-span-5 col-start-1 row-start-3'},
+    {'key': 'revenue-streams', 'title': 'Revenue Streams', 'number': '6', 'question': 'Revenue model and lifetime value', 'empty': 'No prices yet. Add a price to a service in the Solution box.', 'area': 'col-span-5 col-start-6 row-start-3'},
+  ]} %}
+{% macro lean_canvas(data, id='lean-canvas') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

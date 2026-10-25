@@ -13,7 +13,7 @@ source: app/utils/role_access.py (ROLE_SECURITY_ARCHITECT, SIDEBAR_ZONES, _MY_WO
 
 # Security architect tools that show what a risk reaches, not just where it was logged
 
-Security architect tools earn their place by answering three questions a design review or an audit puts to you: which risks matter most right now, what each one actually touches, and whether the record of what happened can be trusted. Entelim answers them from the same architecture model your enterprise architects work in: a risk register ranked by the number of elements each risk reaches, a risk answer in Ask that lists every risk against an application with its score, owner and mitigation, and an audit log that proves it has not been altered. A security architect can start on the free Community plan.
+Security architect tools earn their place by answering three questions a design review or an audit puts to you: which risks matter most right now, what each one actually touches, and whether the record of what happened can be trusted. Entelim answers them from the same architecture model your enterprise architects work in: a risk register ranked by the number of elements each risk reaches, a risk answer in the AI chat that lists every risk against an application with its score, owner and mitigation, and an audit log that proves it has not been altered. A security architect can start on the free Community plan.
 
 **[Start free](/register)** or **[see pricing](/pricing)**.
 
@@ -30,7 +30,7 @@ A security architect decides how a design stays safe: which risks are acceptable
 ## The screens you will use
 
 - **Risk Register**, which lists every recorded risk with its status, likelihood and impact, and ranks the top risks by the number of elements each one reaches, then by recorded score. Each row says how many elements it reaches and names some of them, so a risk logged against one database shows the applications and processes behind it. Totals for all risks, open risks, critical risks and mitigated risks sit across the top. See [Risk Register](/modules/risk-register).
-- **Ask**, where the risk question, "What could hurt this and what does it touch?", takes one application, process or other element and lists each risk against it with likelihood times impact, a severity word, the recorded owner, the mitigation recorded for it and the number of connections it reaches. See [Digital twin of your organisation](/modules/digital-twin).
+- **The AI chat**, where you ask what could hurt a system and what it touches. It takes one application, process or other element and lists each risk against it with likelihood times impact, a severity word, the recorded owner, the mitigation recorded for it and the number of connections it reaches. See [Digital twin of your organisation](/modules/digital-twin).
 - **Audit Log**, a searchable record of your organisation's activity that you can filter by date, user, action and entity type and export as CSV. Each entry is sealed to the one before it, so an entry altered, removed or inserted afterwards is detected, and a button runs the check and records who ran it and when. One filter shows only the AI tool calls the platform refused.
 - **Governance Gates**, the hard gates that stop a solution moving forward until its completeness meets a threshold. The default gate on Architecture Review Board submission asks for 60 per cent completeness. Security architects can read the gates; changing one is an administrator's action.
 - **Data Subject Requests**, where you record an access, erasure, rectification, restriction, portability or objection request, and Entelim lists the systems, and the suppliers recorded against them, that hold the personal data it concerns. Each search is given an owner, and every step is kept in the audit trail.
@@ -42,7 +42,7 @@ Enterprise architects set the direction these designs follow; read how they work
 ## A week with Entelim
 
 1. Open the Risk Register and read the top-ranked risks: which ones reach the most of the estate this week.
-2. Pick the application behind the biggest one in Ask and ask what could hurt it, to see every risk against it with its owner and its mitigation.
+2. Name the application behind the biggest one in the AI chat and ask what could hurt it, to see every risk against it with its owner and its mitigation.
 3. Before a design goes to the review board, check it against the governance gate and against the Tech Radar for anything marked hold.
 4. When a data subject request arrives, record it and send the searches to the owners of the systems it lists.
 5. At audit time, filter the audit log to the period, export it, and run the integrity check so the evidence says it is intact.

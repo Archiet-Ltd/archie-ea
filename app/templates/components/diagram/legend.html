@@ -1,0 +1,20 @@
+{# Relationship legend: names each relationship type the diagram draws, with the line as the engine draws it.
+   Reads composerApp (legendTypes, relGlyph).
+
+   Usage: {% from 'components/diagram/legend.html' import diagram_legend with context %}
+          {{ diagram_legend() }} #}
+{% macro diagram_legend() %}
+<div class="hidden min-h-12 shrink-0 items-center md:flex border-t border-border bg-card px-4 py-2" data-testid="diagram-legend">
+  <ul class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs" aria-label="Relationship key" x-show="legendTypes.length > 0" x-cloak>
+    <template x-for="rel in legendTypes" :key="rel.type">
+      <li class="flex items-center gap-2" :data-testid="'legend-' + rel.type">
+        <span class="flex shrink-0 text-foreground" x-html="relGlyph(rel.type)"></span>
+        <span x-text="rel.label"></span>
+      </li>
+    </template>
+  </ul>
+  <p class="text-xs text-muted-foreground" x-show="legendTypes.length === 0" x-cloak data-testid="legend-empty">
+    No relationships yet. Choose Connect, then click two elements to relate them.
+  </p>
+</div>
+{% endmacro %}

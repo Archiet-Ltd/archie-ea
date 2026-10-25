@@ -6,10 +6,18 @@ Provides web interface routes for managing industry-specific APQC process framew
 Migrated from: app/main/routes_industry_apqc.py
 """
 
-from flask import Blueprint, current_app, jsonify, render_template, request
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
-from app.decorators import audit_log
+from app.decorators import audit_log, require_roles
 from app.jobs.tenant_safe_job import platform_scope
 from app.middleware.tenant_decorators import platform_admin_required
 
@@ -26,94 +34,95 @@ industry_apqc_bp = Blueprint("industry_apqc", __name__, url_prefix="/industry-ap
 @industry_apqc_bp.route("/")
 @login_required
 def industry_apqc_dashboard():
-    """Industry APQC dashboard showing all available industry frameworks."""
+    """Every industry framework, one card each with its process counts."""
     try:
-        service = IndustryAPQCService()
-        frameworks = service.get_all_frameworks()
-
-        # Get statistics for each framework
-        framework_stats = []
-        for fw in frameworks:
-            stats = service.get_industry_statistics(fw.industry_code)
-            framework_stats.append({"framework": fw.to_dict(), "stats": stats})
-
-        return render_template(
-            "industry_apqc/dashboard.html",
-            frameworks=frameworks,
-            framework_stats=framework_stats,
-        )
+        summaries = IndustryAPQCService().framework_summaries()
+        return render_template("industry_apqc/dashboard.html", summaries=summaries)
     except Exception as e:
         from app import db
 
         db.session.rollback()
         current_app.logger.exception("Error loading industry APQC dashboard: %s", e)
-        # frameworks=None, not []: the "0 frameworks / seed some" empty state is
-        # a statement about the tenant's data, not about a failed query.
+        # summaries=None, not []: an empty list says "no frameworks", which is a
+        # statement about the data, not about a failed query.
         return render_template(
             "industry_apqc/dashboard.html",
-            frameworks=None,
-            framework_stats=None,
-            error=str(e),
-            load_error="Industry APQC frameworks could not be read.",
+            summaries=None,
+            load_error="The industry frameworks could not be read.",
         )
 
 
 @industry_apqc_bp.route("/framework/<industry_code>")
 @login_required
 def industry_apqc_framework_detail(industry_code):
-    """Detail view for a specific industry framework."""
-    try:
-        service = IndustryAPQCService()
-        framework = service.get_framework_by_code(industry_code)
+    """A framework as the APQC hierarchy, with Recommendations as a tab."""
+    service = IndustryAPQCService()
+    framework = service.get_framework_by_code(industry_code)
+    if not framework:
+        return render_template("errors/404.html"), 404
 
-        if not framework:
-            return render_template("errors/404.html"), 404
-
-        processes = service.get_industry_processes(industry_code)
-        unique_processes = service.get_industry_unique_processes(industry_code)
-        regulatory_processes = service.get_regulatory_processes(industry_code)
-        stats = service.get_industry_statistics(industry_code)
-
-        return render_template(
-            "industry_apqc/framework_detail.html",
-            framework=framework,
-            processes=processes,
-            unique_processes=unique_processes,
-            regulatory_processes=regulatory_processes,
-            stats=stats,
-        )
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+    tab = "recommendations" if request.args.get("tab") == "recommendations" else "hierarchy"
+    org_id = getattr(current_user, "organization_id", None)
+    summary = next(
+        (x for x in service.framework_summaries() if x["framework"].id == framework.id),
+        None,
+    )
+    return render_template(
+        "industry_apqc/framework_detail.html",
+        framework=framework,
+        summary=summary,
+        tree=service.build_hierarchy(framework.industry_code),
+        recommended=service.recommended_processes(framework.industry_code, org_id),
+        pending=service.get_pending_recommendations(industry_code=framework.industry_code),
+        tab=tab,
+    )
 
 
 @industry_apqc_bp.route("/recommendations")
 @login_required
 def industry_apqc_recommendations():
-    """View pending recommendations across all industries."""
-    try:
-        service = IndustryAPQCService()
-
-        industry_code = request.args.get("industry")
-        quick_wins_only = request.args.get("quick_wins", "false").lower() == "true"
-
-        recommendations = service.get_pending_recommendations(
-            industry_code=industry_code, quick_wins_only=quick_wins_only
-        )
-
+    """Recommendations are a tab of the framework page; this address keeps working."""
+    code = request.args.get("industry")
+    service = IndustryAPQCService()
+    framework = service.get_framework_by_code(code) if code else None
+    if framework is None:
         frameworks = service.get_all_frameworks()
+        if not frameworks:
+            return redirect(url_for("industry_apqc.industry_apqc_dashboard"))
+        framework = frameworks[0]
+    return redirect(
+        url_for(
+            "industry_apqc.industry_apqc_framework_detail",
+            industry_code=framework.industry_code,
+            tab="recommendations",
+        )
+    )
 
-        return render_template(
-            "industry_apqc/recommendations.html",
-            recommendations=recommendations,
-            frameworks=frameworks,
-            selected_industry=industry_code,
-            quick_wins_only=quick_wins_only,
+
+@industry_apqc_bp.route(
+    "/api/frameworks/<industry_code>/processes/<int:process_id>/adopt", methods=["POST"]
+)
+@login_required
+@require_roles("admin", "architect")
+@audit_log("apqc_process_adopt")
+def api_adopt_process(industry_code, process_id):
+    """Add an industry process to the capability model."""
+    try:
+        capability, created = IndustryAPQCService().adopt_process(
+            industry_code, process_id, current_user.organization_id
         )
     except Exception:
-        current_app.logger.error(
-            "industry_apqc_recommendations failed", exc_info=True
-        )
-        return jsonify({"error": "An internal error occurred"}), 500
+        current_app.logger.error("api_adopt_process failed", exc_info=True)
+        return jsonify({"success": False, "error": "The process could not be adopted."}), 500
+    if capability is None:
+        return jsonify({"success": False, "error": "Process not found"}), 404
+    return jsonify(
+        {
+            "success": True,
+            "created": created,
+            "capability": {"id": capability.id, "name": capability.name},
+        }
+    )
 
 
 # =========================================================================
