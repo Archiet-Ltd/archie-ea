@@ -6,7 +6,7 @@ the audit's own script), against a target of at least 730px. The duplicated "Col
 inside the sidebar (the header already carries the same toggle, with the same Ctrl+B hint in its title) and
 the search box living inside the scrolling <nav> both ate into that height for no reason.
 
-Navigation v3: the search box sits above the scrolling list, outside it, and a search with no page match
+Navigation 3.1: the search box sits above the scrolling list, outside it, and a search with no page match
 offers to ask the AI chat instead.
 """
 from pathlib import Path
@@ -92,10 +92,11 @@ def _open(browser, client, document, path, width=1440, height=900, drawer=False)
     return pg
 
 
-def test_the_scrolling_list_holds_every_entry_at_1440(app, client, browser):
-    """Navigation v3: the search box sits above the list (outside it), so the list is a
-    little shorter than before; it must still hold every entry an architect has with no
-    scrolling at 1440x900."""
+def test_the_scrolling_list_holds_every_collapsed_item_and_reaches_the_last_one_at_1440(app, client, browser):
+    """Navigation 3.1: the search box sits above the list (outside it) and every Work item and Model
+    layer starts shut, so the list is taller than the screen by design. It must stay tall enough to
+    read, hold every item, and scroll to the last entry, Help, with the search box and the account
+    menu still on screen."""
     login(client, _persona(app, "solution_architect"))
     path = "/dashboard/overview"
     document = client.get(path).get_data(as_text=True)
@@ -103,8 +104,22 @@ def test_the_scrolling_list_holds_every_entry_at_1440(app, client, browser):
     try:
         height = pg.eval_on_selector("#sidebar-nav", "el => el.clientHeight")
         assert height >= MIN_NAV_HEIGHT, "sidebar-nav is %dpx tall, expected at least %dpx" % (height, MIN_NAV_HEIGHT)
-        overflow = pg.eval_on_selector("#sidebar-nav", "el => el.scrollHeight - el.clientHeight")
-        assert overflow <= 1, "the architect's entries do not fit without scrolling (%dpx over)" % overflow
+        keys = pg.eval_on_selector_all(
+            '#sidebar-nav [data-slot="sidebar-menu-button"]', "els => els.map(e => e.getAttribute('data-nav-key'))"
+        )
+        for key in ("home", "ai_chat", "approvals", "systems", "impact", "changes", "spend", "compliance",
+                    "layer_strategy", "layer_business", "layer_other", "frameworks", "composer", "connections",
+                    "reports", "help"):
+            assert key in keys, (key, keys)
+        pg.eval_on_selector("#sidebar-nav", "el => { el.scrollTop = el.scrollHeight; }")
+        pg.wait_for_timeout(150)
+        reached = pg.eval_on_selector(
+            '#sidebar-nav a[data-nav-key="help"]',
+            "el => { const r = el.getBoundingClientRect(), n = document.querySelector('#sidebar-nav').getBoundingClientRect();"
+            " return r.top >= n.top && r.bottom <= n.bottom + 1; }",
+        )
+        assert reached, "Help cannot be scrolled into view"
+        assert pg.is_visible("#sidebar-search")
     finally:
         pg.close()
 
@@ -249,7 +264,7 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     "platform_admin",
 ])
 def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
-    """Navigation v3: the rendered sidebar entries are exactly what the navigation
+    """Navigation 3.1: the rendered sidebar entries are exactly what the navigation
     registry gives this persona, in its order, for each of the eleven personas."""
     import html as html_module
     import re
@@ -289,9 +304,10 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     with app.test_request_context("/dashboard/overview"):
         expected = registry.sidebar_for(_StubUser(role), "dashboard.overview")
     expected_labels = []
-    for group in ("main", "architecture", "secondary"):
+    for group in ("main", "work", "model", "secondary"):
         for item in expected[group]:
-            expected_labels.append(item.label)
+            if not item.toggle:  # an item that opens is a button, not a link
+                expected_labels.append(item.label)
             expected_labels.extend(child.label for child in item.children)
 
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)
