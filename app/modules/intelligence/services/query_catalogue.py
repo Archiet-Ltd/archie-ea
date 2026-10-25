@@ -627,15 +627,15 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     element = _resolve_service_element(organization_id, service)
     if element is None:
         if service:
-            # A service was named but matched nothing: say so plainly rather
-            # than trace a guessed element.
-            return {
-                "answer": "what breaks if a named service fails",
-                "rows": [],
-                "total": 0,
-                "citations": [],
-                "reason": "name the service you mean — it did not match one system in this organisation",
-            }
+            # A service was named but matched nothing: fall back to the most
+            # depended-on systems (single points of failure) so the answer is
+            # still a cited one from the organisation's own records.
+            result = _single_points_of_failure(organization_id)
+            if result.get("rows"):
+                result["reason"] = "nothing recorded matches '%s' — showing the most depended-on systems instead" % service
+            else:
+                result["reason"] = "nothing recorded matches '%s' and nothing in this organisation has more than one thing depending on it yet" % service
+            return result
         # No single service was named ("the single points of failure in our
         # stack"): the systems the most other things depend on are the single
         # points of failure. Count how many relationships point at each
