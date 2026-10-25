@@ -185,7 +185,7 @@ def test_a_segment_added_on_the_canvas_is_on_the_value_proposition_canvas(db_ses
     page = client.get(f"/business-model/{canvas.id}/value-proposition").get_data(as_text=True)
     el = ArchiMateElement.query.filter_by(name="Grocery chains", organization_id=org.id).one()
     assert "Grocery chains" in page
-    assert f"/architecture/business/BusinessActor/{el.id}" in page
+    assert f"/business-model/{canvas.id}/value-proposition?segment={el.id}" in page
 
 
 def test_the_old_block_text_write_is_gone(db_session, make_org, client, login_as):
