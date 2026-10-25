@@ -1,0 +1,27 @@
+{# shadcn/ui Popover
+   A small task in place: a panel opened from a trigger that keeps the page in view. It is a
+   dialog named by its title, not a menu. The page's script opens and closes it (the panel
+   starts hidden), moves focus inside, closes it on Escape and returns focus to the trigger.
+
+   {% from 'components/popover.html' import popover %}
+   {% call popover(id='notif-dropdown', title='Notifications', title_id='notif-title') %}
+       ...body: rows, empty state...
+   {% endcall %}
+
+   header_action: markup shown to the right of the title (a button).
+   class: replaces the panel's width and position. Wrap the trigger and the popover in a
+   relative element so the panel is placed under the trigger.
+#}
+{% macro popover(id, title, title_id=none, header_action='', class='absolute right-0 mt-2 w-80', body_class='') %}
+{% set heading_id = title_id or id ~ '-title' %}
+<div id="{{ id }}"
+     data-popover
+     class="{{ class }} rounded-md border border-border bg-popover text-popover-foreground z-50 hidden"
+     role="dialog" aria-labelledby="{{ heading_id }}">
+    <div class="p-3 border-b border-border flex items-center justify-between gap-2">
+        <span id="{{ heading_id }}" class="text-sm font-semibold">{{ title }}</span>
+        {{ header_action }}
+    </div>
+    <div class="{{ body_class }}">{{ caller() }}</div>
+</div>
+{% endmacro %}
