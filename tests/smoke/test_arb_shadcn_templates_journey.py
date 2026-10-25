@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 # Walk directory for screenshots
 WALK_DIR = os.environ.get(
     "SMOKE_SCREENSHOT_DIR",
-    "/home/ubuntu/verify/seats/mg3arbb030b/walk",
+    "/home/ubuntu/verify/seats/mg3arbb030e/walk",
 )
 
 
@@ -182,6 +182,13 @@ def test_arb_member_sees_change_requests(browser, live_server, seeded, arb_chang
         # The stat cards show summary counts
         stat_cards = page.locator("[data-slot=card]").all()
         assert len(stat_cards) >= 4, f"Expected at least 4 stat cards, got {len(stat_cards)}"
+
+        # Assert the Raised By column shows the raiser's name for seeded requests
+        page_text = page.text_content("body")
+        assert "Smoke arb_member" in page_text, (
+            "Expected seeded change request to show raiser name 'Smoke arb_member' "
+            "in the Raised By column"
+        )
 
         # Light mode screenshot at 1440
         page.wait_for_timeout(600)
