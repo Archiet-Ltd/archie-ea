@@ -256,6 +256,7 @@ def test_r9_concurrent_creates_one_takes_element(app):
         if org_id is not None:
             with Session(engine) as cleanup:
                 for sql in (
+                    "DELETE FROM soc2_audit_log WHERE organization_id = :o",  # tenancy-ok: test cleanup
                     "DELETE FROM unified_work_packages WHERE organization_id = :o",  # tenancy-ok: test cleanup
                     "DELETE FROM work_packages WHERE organization_id = :o",  # tenancy-ok: test cleanup
                     "DELETE FROM archimate_elements WHERE organization_id = :o",  # tenancy-ok: test cleanup

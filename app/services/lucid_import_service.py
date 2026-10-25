@@ -11,6 +11,7 @@ be created, what would attach to something already in the repository, and what
 would change, before any of it happens. It is also the honest way to answer
 "what will re-importing this diagram do to my estate?".
 """
+from app.services.change_source import records_changes_as
 from datetime import datetime
 
 from app import db
@@ -60,6 +61,7 @@ def _container_map(elements, relationships):
     return mapping
 
 
+@records_changes_as("import")
 def import_payload(payload, org_id, dedupe="name-type", link_applications=True,
                    create_applications=False, preview=False):
     """Persist a transformed payload, or work out what persisting it would do.
