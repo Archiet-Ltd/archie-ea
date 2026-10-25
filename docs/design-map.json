@@ -1754,8 +1754,7 @@
    "controls": {
     "button": 1,
     "link": 1,
-    "testid": 7,
-    "form": 1
+    "testid": 7
    },
    "departures": [
     {
@@ -2229,15 +2228,13 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/loading_state.html",
-    "components/provenance.html",
-    "macros/page_shell.html",
     "components/badge.html",
     "components/button.html",
     "components/card.html",
     "components/empty_state.html",
     "components/input.html",
-    "components/table.html"
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "note": "A filter card above a results card; both use the library card macro.",
    "original": "preview",
@@ -2359,9 +2356,6 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/loading_state.html",
-    "components/provenance.html",
-    "macros/page_shell.html",
     "components/alert.html",
     "components/badge.html",
     "components/button.html",
@@ -2369,7 +2363,8 @@
     "components/empty_state.html",
     "components/input.html",
     "components/select.html",
-    "components/table.html"
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "note": "A filter card above a results card; both use the library card macro.",
    "original": "preview",
@@ -5307,8 +5302,7 @@
    "confidence": "low",
    "controls": {
     "button": 5,
-    "form": 2,
-    "testid": 1
+    "form": 2
    },
    "departures": [
     {
@@ -5659,6 +5653,14 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
     "components/drawer.html",
     "components/dropdown_menu.html",
@@ -5679,15 +5681,7 @@
     "components/tabs.html",
     "macros/adm_cycle.html",
     "macros/kanban_board.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -6941,8 +6935,7 @@
     "components/form_field.html",
     "components/input.html",
     "components/page_header.html",
-    "components/table.html",
-    "macros/page_shell.html"
+    "components/table.html"
    ],
    "original": "preview-02",
    "page_type": "settings",
@@ -16065,7 +16058,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -16082,16 +16084,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -16154,16 +16147,16 @@
     "components/button.html",
     "components/checkbox.html",
     "components/dense_table.html",
-    "components/empty_state.html",
-    "components/input.html",
-    "components/modal.html",
-    "components/select.html",
     "components/diagram/finder.html",
     "components/diagram/legend.html",
     "components/diagram/minimap.html",
     "components/diagram/palette.html",
     "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html"
+    "components/diagram/status_line.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/modal.html",
+    "components/select.html"
    ],
    "original": "gap:G-4",
    "page_type": "diagram-canvas",
@@ -17431,8 +17424,7 @@
     "components/card.html",
     "components/empty_state.html",
     "components/table.html",
-    "macros/page_shell.html",
-    "components/page_header.html"
+    "macros/page_shell.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -17548,8 +17540,7 @@
     "components/empty_state.html",
     "components/table.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/breadcrumb_nav.html"
+    "macros/page_shell.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -18602,7 +18593,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -18619,16 +18619,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -19506,9 +19497,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 3,
-    "form": 1,
-    "link": 1
+    "button": 2,
+    "form": 1
    },
    "departures": [
     {
@@ -19525,7 +19515,11 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/button.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/select.html"
    ],
    "original": "preview",
    "page_type": "form",
@@ -19614,7 +19608,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 9,
+    "link": 8,
     "table": 1
    },
    "departures": [
@@ -19632,7 +19626,13 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/table.html",
+    "components/tabs.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -19743,7 +19743,12 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -21203,6 +21208,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/canvas/index.html",
     "components/canvas_box.html",
     "components/card.html",
     "components/checkbox.html",
@@ -21230,8 +21236,7 @@
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html",
-    "components/canvas/index.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "record-detail",
@@ -21282,7 +21287,6 @@
    "macros": [
     "components/button.html",
     "components/canvas/index.html",
-    "components/canvas_box.html",
     "components/empty_state.html",
     "components/input.html",
     "components/modal.html",
@@ -21332,6 +21336,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
@@ -21357,8 +21362,7 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html",
-    "components/card.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -21405,12 +21409,12 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/card.html",
     "components/empty_state.html",
+    "components/input.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/button.html",
-    "components/input.html",
     "components/select.html"
    ],
    "original": "example:tasks",
@@ -21570,9 +21574,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
+    "button": 2,
     "form": 1,
-    "link": 3,
+    "link": 2,
     "testid": 1
    },
    "departures": [
@@ -21596,12 +21600,12 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/empty_state.html",
-    "components/metrics_card.html",
-    "components/page_header.html",
     "components/badge.html",
     "components/button.html",
+    "components/empty_state.html",
     "components/form_field.html",
+    "components/metrics_card.html",
+    "components/page_header.html",
     "components/select.html"
    ],
    "original": "preview",
@@ -21651,6 +21655,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
@@ -21704,6 +21709,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/card.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -21712,11 +21720,11 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/badge.html",
     "components/card.html",
     "components/empty_state.html",
     "components/page_header.html",
-    "components/table.html",
-    "components/metrics_card.html"
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -21750,10 +21758,7 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false,
-   "extra_macros": [
-    "components/card.html"
-   ]
+   "type_changed": false
   },
   "app/templates/capabilities/no_owner.html": {
    "allowed_macros": [
@@ -21810,7 +21815,7 @@
    "controls": {
     "button": 2,
     "table": 1,
-    "testid": 3
+    "testid": 1
    },
    "departures": [
     {
@@ -21828,8 +21833,11 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/empty_state.html",
-    "components/page_header.html"
+    "components/input.html",
+    "components/page_header.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -21939,7 +21947,10 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/badge.html",
+    "components/button.html",
     "components/empty_state.html",
+    "components/input.html",
     "components/page_header.html"
    ],
    "original": "example:tasks",
@@ -22438,7 +22449,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -22455,16 +22475,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "declared",
    "block": "board",
@@ -22730,7 +22741,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -22749,16 +22769,7 @@
     "components/status_badge.html",
     "components/tabs.html",
     "components/unified_mapping_modal.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "reviewed",
    "block": "board",
@@ -22999,7 +23010,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -23016,16 +23036,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -23114,24 +23125,6 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/tabs.html",
-    "macros/page_shell.html",
     "components/diagram/finder.html",
     "components/diagram/header.html",
     "components/diagram/legend.html",
@@ -23140,8 +23133,26 @@
     "components/diagram/properties_sheet.html",
     "components/diagram/status_line.html",
     "components/diagram/toolbar.html",
+    "components/dialog.html",
     "components/drawer.html",
-    "components/metrics_card.html"
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -23184,12 +23195,12 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
-    "components/empty_state.html",
-    "components/page_header.html",
     "components/badge.html",
+    "components/breadcrumb_nav.html",
     "components/card.html",
-    "components/metrics_card.html"
+    "components/empty_state.html",
+    "components/metrics_card.html",
+    "components/page_header.html"
    ],
    "original": "gap:G-4",
    "page_type": "matrix-map",
@@ -24110,6 +24121,7 @@
     "components/filter_bar.html",
     "components/gantt_timeline.html",
     "components/inline_hint.html",
+    "components/input.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -24118,14 +24130,13 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/input.html",
-    "components/select.html",
-    "components/table.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -24150,8 +24161,7 @@
     "form": 3,
     "link": 1,
     "modal": 4,
-    "table": 1,
-    "testid": 2
+    "table": 1
    },
    "departures": [
     {
@@ -24182,17 +24192,13 @@
    ],
    "macros": [
     "components/badge.html",
-    "components/breadcrumb_nav.html",
-    "components/card.html",
-    "components/dense_table.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/skeleton.html",
     "components/breadcrumb.html",
     "components/button.html",
+    "components/card.html",
     "components/empty_state.html",
     "components/input.html",
     "components/select.html",
+    "components/skeleton.html",
     "components/table.html",
     "macros/page_shell.html"
    ],
@@ -24663,7 +24669,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -24680,16 +24695,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -24819,7 +24825,8 @@
    "controls": {
     "button": 5,
     "form": 5,
-    "testid": 19
+    "link": 2,
+    "testid": 17
    },
    "departures": [
     {
@@ -24841,8 +24848,14 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
     "components/empty_state.html",
-    "components/page_header.html"
+    "components/input.html",
+    "components/select.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -24935,11 +24948,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
+    "button": 2,
     "form": 1,
-    "link": 1,
+    "link": 2,
     "table": 1,
-    "testid": 4
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -24952,8 +24965,14 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/dense_table.html",
     "components/empty_state.html",
-    "components/page_header.html"
+    "components/input.html",
+    "components/select.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -26232,8 +26251,7 @@
     "button": 4,
     "link": 4,
     "table": 1,
-    "testid": 28,
-    "form": 3
+    "testid": 28
    },
    "departures": [
     {
@@ -26261,19 +26279,7 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/button.html",
-    "components/card.html",
-    "components/company_kind.html",
-    "components/dense_table.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/explained_value.html",
-    "components/input.html",
-    "components/priority_actions.html",
-    "components/table.html",
-    "components/tabs.html",
-    "macros/page_shell.html",
-    "components/answer_cascade.html"
+    "macros/page_shell.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -26478,9 +26484,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
+    "button": 4,
     "form": 1,
-    "link": 4,
+    "link": 1,
     "table": 1
    },
    "departures": [
@@ -26499,7 +26505,14 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/badge.html",
     "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
+    "components/table.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -26592,10 +26605,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
+    "button": 5,
     "form": 1,
-    "link": 2,
-    "table": 1
+    "link": 5,
+    "table": 2,
+    "testid": 1
    },
    "departures": [
     {
@@ -26613,7 +26627,11 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/badge.html",
     "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/dense_table.html",
     "macros/page_shell.html"
    ],
    "original": "preview",
@@ -26662,7 +26680,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -26678,6 +26705,7 @@
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
+    "components/table.html",
     "components/tabs.html",
     "macros/page_shell.html"
    ],
@@ -26707,11 +26735,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 80,
-    "link": 1,
-    "modal": 6,
-    "table": 2,
-    "testid": 3
+    "button": 7,
+    "form": 3,
+    "modal": 3,
+    "table": 1,
+    "testid": 6
    },
    "extends": [
     "layouts/admin_base.html"
@@ -26734,12 +26762,20 @@
    "macros": [
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
-    "components/dense_table.html",
+    "components/confirmation_dialog.html",
+    "components/diagram/finder.html",
+    "components/diagram/legend.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/empty_state.html",
+    "components/form_field.html",
     "components/input.html",
     "components/modal.html",
-    "components/select.html"
+    "components/select.html",
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "gap:G-4",
    "page_type": "diagram-canvas",
@@ -27784,8 +27820,7 @@
    "controls": {
     "button": 1,
     "table": 1,
-    "testid": 1,
-    "link": 1
+    "testid": 1
    },
    "departures": [
     {
@@ -27802,7 +27837,6 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/_breadcrumb_root.html",
     "components/badge.html",
     "components/button.html",
     "components/dense_table.html",
@@ -27897,8 +27931,7 @@
    "confidence": "high",
    "controls": {
     "table": 1,
-    "testid": 1,
-    "link": 3
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -27910,7 +27943,6 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/_breadcrumb_root.html",
     "components/dense_table.html",
     "components/empty_state.html",
     "macros/page_shell.html"
@@ -28003,8 +28035,7 @@
    "controls": {
     "button": 1,
     "table": 1,
-    "testid": 1,
-    "link": 1
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -28016,7 +28047,6 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/_breadcrumb_root.html",
     "components/button.html",
     "components/dense_table.html",
     "components/empty_state.html",
@@ -28163,6 +28193,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
@@ -28188,8 +28219,7 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html",
-    "components/card.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -28225,7 +28255,6 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html",
     "components/badge.html",
     "components/button.html",
     "components/card.html",
@@ -28399,11 +28428,11 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html",
-    "components/table.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "record-detail",
@@ -28444,11 +28473,11 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html",
     "components/badge.html",
     "components/button.html",
     "components/card.html",
     "components/checkbox.html",
+    "components/page_header.html",
     "components/table.html",
     "components/tabs.html"
    ],
@@ -29935,7 +29964,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
+    "button": 2,
     "link": 6,
     "table": 2,
     "testid": 4
@@ -29954,11 +29983,10 @@
     "status_badge:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
-    "components/dense_table.html",
-    "components/metrics_card.html",
-    "components/page_header.html",
-    "components/status_badge.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -30048,7 +30076,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
+    "button": 1,
     "form": 1,
     "link": 2,
     "table": 1
@@ -30070,8 +30098,11 @@
    ],
    "macros": [
     "components/badge.html",
-    "components/breadcrumb_nav.html",
-    "components/page_header.html"
+    "components/button.html",
+    "components/card.html",
+    "components/select.html",
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -30275,7 +30306,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 3,
+    "button": 1,
+    "link": 2,
     "testid": 1
    },
    "departures": [],
@@ -30292,9 +30324,10 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
-    "components/disabled_action.html",
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -30628,8 +30661,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 7,
-    "link": 4,
+    "button": 6,
+    "link": 3,
     "modal": 1,
     "table": 1
    },
@@ -30649,8 +30682,12 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/dialog.html",
+    "components/input.html",
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -31171,9 +31208,14 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
-    "components/modal.html",
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/dialog.html",
+    "components/input.html",
+    "components/pagination_controls.html",
+    "components/select.html",
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -31548,8 +31590,7 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "testid": 1,
-    "link": 2
+    "testid": 1
    },
    "departures": [
     {
@@ -31566,10 +31607,10 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html",
     "components/alert.html",
     "components/button.html",
-    "components/empty_state.html"
+    "components/empty_state.html",
+    "macros/page_shell.html"
    ],
    "original": "empty",
    "page_type": "empty-state",
@@ -31721,7 +31762,7 @@
    "controls": {
     "button": 1,
     "form": 1,
-    "testid": 7
+    "testid": 3
    },
    "departures": [
     {
@@ -31738,7 +31779,11 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/button.html",
+    "components/card.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/page_header.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -32227,8 +32272,10 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/metrics_card.html",
-    "components/page_header.html"
+    "components/badge.html",
+    "components/card.html",
+    "components/page_header.html",
+    "components/progress.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -32329,8 +32376,10 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/metrics_card.html",
-    "components/page_header.html"
+    "components/badge.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -33716,11 +33765,15 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/badge.html",
     "components/breadcrumb_nav.html",
+    "components/button.html",
     "components/data_table.html",
     "components/dense_table.html",
     "components/form_field.html",
+    "components/input.html",
     "components/modal.html",
+    "components/select.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -33820,6 +33873,7 @@
    "controls": {
     "button": 2,
     "form": 1,
+    "link": 1,
     "table": 1,
     "testid": 5
    },
@@ -33838,7 +33892,12 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/input.html",
+    "components/select.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -34570,9 +34629,7 @@
    ],
    "confidence": "low",
    "controls": {
-    "link": 1,
-    "button": 1,
-    "table": 1
+    "link": 1
    },
    "departures": [],
    "extends": [
@@ -34586,11 +34643,9 @@
    ],
    "macros": [
     "components/badge.html",
-    "components/button.html",
     "components/card.html",
-    "components/metrics_card.html",
-    "components/page_header.html",
-    "components/empty_state.html"
+    "components/empty_state.html",
+    "components/page_header.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -34683,8 +34738,7 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 1,
-    "table": 1
+    "link": 1
    },
    "departures": [
     {
@@ -34701,10 +34755,10 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html",
     "components/badge.html",
     "components/button.html",
     "components/empty_state.html",
+    "components/page_header.html",
     "components/tabs.html"
    ],
    "original": "preview",
@@ -34897,7 +34951,8 @@
     "button": 4,
     "form": 2,
     "link": 1,
-    "modal": 1
+    "modal": 1,
+    "testid": 1
    },
    "departures": [
     {
@@ -34919,8 +34974,15 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/metrics_card.html",
-    "components/page_header.html"
+    "components/alert.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -35012,9 +35074,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
+    "button": 3,
     "form": 1,
-    "link": 4,
+    "link": 1,
     "table": 1
    },
    "departures": [
@@ -35032,7 +35094,13 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/form_field.html",
+    "components/page_header.html",
+    "components/select.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -35143,7 +35211,12 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/metrics_card.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/dense_table.html",
+    "components/empty_state.html",
+    "components/input.html",
     "components/page_header.html"
    ],
    "original": "preview",
@@ -35232,7 +35305,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 4
+    "button": 3,
+    "form": 1,
+    "link": 1,
+    "table": 1
    },
    "departures": [
     {
@@ -35249,7 +35325,13 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/form_field.html",
+    "components/page_header.html",
+    "components/select.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -36281,7 +36363,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -36298,16 +36389,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -37309,9 +37391,9 @@
     "public-navbar:Compose"
    ],
    "macros": [
+    "components/card.html",
     "components/public_footer.html",
-    "components/public_navbar.html",
-    "components/card.html"
+    "components/public_navbar.html"
    ],
    "original": "gap:G-1",
    "page_type": "public",
@@ -37799,7 +37881,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -37817,16 +37908,7 @@
     "components/status_badge.html",
     "components/tabs.html",
     "macros/kanban_board.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "declared",
    "block": "board",
@@ -37884,9 +37966,7 @@
     "components/input.html",
     "components/modal.html",
     "macros/kanban_board.html",
-    "macros/page_shell.html",
-    "components/dropdown_menu.html",
-    "components/select.html"
+    "macros/page_shell.html"
    ],
    "original": "gap:G-4",
    "page_type": "board",
@@ -37977,9 +38057,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 12,
+    "button": 2,
     "modal": 1,
-    "testid": 30
+    "testid": 2
    },
    "departures": [
     {
@@ -37996,6 +38076,14 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/alert.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/input.html",
+    "components/select.html",
+    "components/switch.html",
+    "components/tabs.html",
     "macros/page_shell.html"
    ],
    "original": "preview-02",
@@ -42064,7 +42152,16 @@
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
+    "components/diagram/finder.html",
+    "components/diagram/header.html",
+    "components/diagram/legend.html",
+    "components/diagram/minimap.html",
+    "components/diagram/palette.html",
+    "components/diagram/properties_sheet.html",
+    "components/diagram/status_line.html",
+    "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -42081,16 +42178,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/diagram/finder.html",
-    "components/diagram/header.html",
-    "components/diagram/legend.html",
-    "components/diagram/minimap.html",
-    "components/diagram/palette.html",
-    "components/diagram/properties_sheet.html",
-    "components/diagram/status_line.html",
-    "components/diagram/toolbar.html",
-    "components/drawer.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "board",
@@ -42840,6 +42928,7 @@
     "components/alert.html",
     "components/answer_cascade.html",
     "components/app_stats_grid.html",
+    "components/arb_submission_modal.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
@@ -42854,7 +42943,9 @@
     "components/error_boundary.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
+    "components/initiative_modal.html",
     "components/inline_hint.html",
+    "components/llm_recommendations.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -42863,16 +42954,13 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/roi_calculator_modal.html",
+    "components/scenario_comparison_modal.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/arb_submission_modal.html",
-    "components/initiative_modal.html",
-    "components/llm_recommendations.html",
-    "components/roi_calculator_modal.html",
-    "components/scenario_comparison_modal.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43207,7 +43295,9 @@
     "components/error_boundary.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
+    "components/initiative_modal.html",
     "components/inline_hint.html",
+    "components/llm_recommendations.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -43216,14 +43306,12 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/risk_detail_modal.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html",
-    "components/initiative_modal.html",
-    "components/llm_recommendations.html",
-    "components/risk_detail_modal.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -44680,974 +44768,6 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false
-  },
-  "app/templates/industry_apqc/recommendations.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_table.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/filter_panel.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/pagination_controls.html",
-    "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/table.html",
-    "components/tabs.html",
-    "components/workbench_table.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "data-table",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "empty",
-    "field",
-    "input",
-    "page-header",
-    "pagination",
-    "select",
-    "table"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 3,
-    "form": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/page_header.html"
-   ],
-   "original": "example:tasks",
-   "page_type": "data-table",
-   "persona": "business_architect",
-   "reason": "Recommendations list.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
-  "app/templates/solutions/architect_synthesis.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "provenance",
-    "tabs",
-    "item",
-    "collapsible",
-    "hover-card",
-    "table"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 1,
-    "link": 5
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "card:Replace",
-    "empty_state:Replace",
-    "metrics_card:Replace",
-    "provenance:Compose",
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "components/card.html",
-    "components/empty_state.html",
-    "components/metrics_card.html",
-    "components/provenance.html",
-    "macros/page_shell.html"
-   ],
-   "original": "dashboard-01",
-   "page_type": "dashboard",
-   "persona": "solution_architect",
-   "reason": "Synthesis overview with about ten sections (posture, attention queue, domains, briefing, coverage, programme, governance, delivery, conformance, risks); must be cut to six regions with the rest in tabs.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": true
-  },
-  "app/templates/solutions/ea_briefing.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "tabs",
-    "table",
-    "separator",
-    "dropdown-menu"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 2,
-    "link": 2,
-    "table": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "arb-escalate-button:Compose",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/arb_escalate_button.html",
-    "components/page_header.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "document",
-   "persona": "enterprise_architect",
-   "reason": "EA briefing; answer-first report with export.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C5",
-   "type_changed": true
-  },
-  "app/templates/adm_kanban/plateau_roadmap.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {
-    "link": 2,
-    "testid": 5
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "macros/page_shell.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "enterprise_architect",
-   "reason": "Plateau roadmap; loops over plateaus and cards today, becomes time axis with plateau bars.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/adm_kanban/roadmap.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "gantt-timeline",
-    "page-header",
-    "page-shell",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {
-    "link": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "gantt-timeline:Keep",
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "components/gantt_timeline.html",
-    "macros/page_shell.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "enterprise_architect",
-   "reason": "ADM roadmap on the single merged timeline component.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/archimate_roadmap/enhanced_roadmap_fixed.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 11,
-    "form": 1,
-    "modal": 2,
-    "table": 2
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "components/breadcrumb_nav.html",
-    "macros/page_shell.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "enterprise_architect",
-   "reason": "ArchiMate roadmap with timeline and milestone markup today; time-axis form.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/enterprise/technology_roadmap.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {},
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/breadcrumb_nav.html",
-    "components/page_header.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "cto",
-   "reason": "Technology roadmap; a work-package list today, rebuilt as the time-axis form.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/governance/roadmap.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {
-    "link": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/page_header.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "enterprise_architect",
-   "reason": "Governance roadmap of plateaus with an empty state; time-axis form.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/strategic/roadmap.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 1,
-    "form": 1,
-    "link": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "empty_state:Replace",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/badge.html",
-    "components/breadcrumb_nav.html",
-    "components/card.html",
-    "components/empty_state.html",
-    "components/page_header.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "cto",
-   "reason": "Strategic roadmap with quarter and timeline markup; time-axis form.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/strategic/technology_roadmap.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "progress",
-    "toggle-group",
-    "sheet",
-    "table"
-   ],
-   "confidence": "high",
-   "controls": {
-    "link": 2,
-    "table": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "metrics_card:Replace",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/breadcrumb_nav.html",
-    "components/metrics_card.html",
-    "components/page_header.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "cto",
-   "reason": "Technology roadmap of phases plus a technology table; phases become the time-axis form.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
-  },
-  "app/templates/strategic_roadmap/enhanced_roadmap_fixed.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "progress",
-    "toggle-group",
-    "sheet"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 9,
-    "form": 1,
-    "table": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "macros/page_shell.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "timeline",
-   "persona": "cto",
-   "reason": "Strategic roadmap with timeline and milestone markup; time-axis form.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C3",
-   "type_changed": true
   }
  }
 }
