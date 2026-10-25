@@ -1,6 +1,8 @@
 {# Sidebar parts: the shadcn/ui sidebar (sidebar-07 block), vendored from the pattern library.
 
-   Source: flask-basecoat commit b327186, templates/basecoat/sidebar.html (macros) with the class
+   Source: flask-basecoat commit b327186, templates/basecoat/sidebar.html (macros), with
+   flask-basecoat b8c1c5af (commit 12eb8bc, slots.py: data-collapsible-mode is written only for
+   collapsible='icon' or 'offcanvas', so the script knows the mode while expanded) and the class
    recipes in data/recipes.json and the parts' behaviour in static/js/src/components/sidebar.js.
    Class strings are the library's, with the Tailwind 4 spellings rewritten for the Tailwind 3
    build this app ships (w-(--x) -> w-[--x], outline-hidden -> outline-none). The rules behind
@@ -41,7 +43,7 @@
 {%- if collapsible == 'none' -%}
 {{ sb_part(tag, 'sidebar', 'flex h-full w-[--sidebar-width] flex-col bg-card text-foreground', none, class, attrs, text, caller() if caller else '', id) }}
 {%- else -%}
-{{ sb_part(tag, 'sidebar', 'group peer hidden text-foreground md:block', none, class, dict({'data-state': state, 'data-collapsible': (collapsible if state == 'collapsed' else ''), 'data-collapsible-mode': collapsible, 'data-variant': variant, 'data-side': side}, **attrs), text, caller() if caller else '', id) }}
+{{ sb_part(tag, 'sidebar', 'group peer hidden text-foreground md:block', none, class, dict({'data-state': state, 'data-collapsible': (collapsible if state == 'collapsed' else ''), 'data-collapsible-mode': (collapsible if collapsible in ('icon', 'offcanvas') else none), 'data-variant': variant, 'data-side': side}, **attrs), text, caller() if caller else '', id) }}
 {%- endif -%}
 {%- endmacro %}
 

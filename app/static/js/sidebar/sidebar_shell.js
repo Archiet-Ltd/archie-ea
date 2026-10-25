@@ -1,7 +1,9 @@
 /* Sidebar shell behaviour: the expanded/collapsed state on the sidebar root, the trigger and rail
    toggles, Ctrl/Cmd+B, the state kept in a cookie, a drawer below 768px, and the icon rail's tooltips.
    Source: flask-basecoat commit b327186, static/js/src/components/sidebar.js, with the library's
-   layer helpers (scroll lock, Escape, focus trap) written out here so the file stands alone.
+   layer helpers (scroll lock, Escape, focus trap) written out here so the file stands alone; the
+   icon-rail tooltip rule from flask-basecoat b8c1c5af (commit 8ebe50c, components/popover.js): a
+   menu button's tooltip opens only while the sidebar is collapsed and the window is 768px or wider.
    Markup: components/ui_sidebar.html. Rules: styles/sidebar-shell.css. */
 (function () {
     'use strict';
@@ -111,7 +113,9 @@
         /* Tooltips: in the icon rail a menu button shows its label beside the icon. */
         var tip = null;
         function showTip(el) {
-            if (!(sidebar.getAttribute('data-collapsible') === 'icon') || drawerOpen) { return; }
+            /* Upstream: hidden={state !== "collapsed" || isMobile} (flask-basecoat 8ebe50c). */
+            if (sidebar.getAttribute('data-state') !== 'collapsed' || sidebar.getAttribute('data-collapsible') !== 'icon'
+                || drawerOpen || isMobile()) { return; }
             var text = el.getAttribute('data-tooltip');
             if (!text) { return; }
             if (!tip) {
