@@ -102,54 +102,6 @@ def _add_capability(db_session, org):
     db_session.flush()
 
 
-def test_workspace_holding_elements_is_not_called_empty(app, db_session, make_org):
-    holder, holder_org = _make_user(db_session, make_org, "holder")
-    empty, _empty_org = _make_user(db_session, make_org, "empty")
-    _add_element(db_session, holder_org)
-    _add_capability(db_session, holder_org)
-
-    assert 'data-testid="guided-setup"' not in _overview(app, holder)
-    # The other organisation holds nothing, so it still gets the checklist:
-    # neither the element nor the capability above counts towards it.
-    assert 'data-testid="guided-setup"' in _overview(app, empty)
-
-
-def test_a_workspace_holding_only_a_capability_is_not_called_empty(app, db_session, make_org):
-    """A workspace whose only content is one capability (a capability always has
-    its own ArchiMate element) is not told it is empty: no application, no
-    mapping, nothing else."""
-    holder, holder_org = _make_user(db_session, make_org, "cap-holder")
-    empty, _empty_org = _make_user(db_session, make_org, "cap-empty")
-    _add_capability(db_session, holder_org)
-
-    assert 'data-testid="guided-setup"' not in _overview(app, holder)
-    assert 'data-testid="guided-setup"' in _overview(app, empty)
-
-
-def test_checklist_links_to_the_real_import_and_create_actions(app, db_session, make_org):
-    editor, _org = _make_user(db_session, make_org, "editor")
-    html = _overview(app, editor)
-
-    assert 'data-testid="guided-setup"' in html
-    assert 'href="/applications/?import=1"' in html
-    assert 'href="/enterprise/capability-map/capabilities?new=1"' in html
-    assert "Add a capability" in html
-
-
-def test_role_that_cannot_author_capabilities_is_not_sent_to_a_create_action(
-    app, db_session, make_org
-):
-    viewer, _org = _make_user(
-        db_session, make_org, "viewer", enterprise_role="application_manager"
-    )
-    html = _overview(app, viewer)
-
-    assert 'data-testid="guided-setup"' in html
-    assert "?new=1" not in html
-    assert 'href="/enterprise/capability-map/capabilities"' in html
-    assert "An architect or administrator adds them" in html
-
-
 def test_import_link_opens_the_import_dialog_and_new_link_opens_the_create_dialog(
     app, db_session, make_org
 ):

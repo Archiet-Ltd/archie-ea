@@ -155,6 +155,9 @@ def signed_in_client(app):
         if row is not None:
             db.session.delete(row)
         db.session.commit()
+        from tests._outbox_cleanup import purge_audit_entries
+
+        purge_audit_entries(db.session, [org_id])
         org_row = db.session.get(Organization, org_id)
         if org_row is not None:
             db.session.delete(org_row)

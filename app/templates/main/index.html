@@ -132,9 +132,9 @@
         Ask a question. Get an answer that shows its working.
       </h2>
       <p class="home-section-lead">
-        Pick any element in your model and ask: what breaks if it fails, which strategy it serves, which
-        programmes touch it, and which risks reach it. Every row shows its source and how it was derived, and you
-        can see the model as it stood on any past date.
+        Ask the AI chat what breaks if a system fails, which strategy it serves, which programmes touch it
+        and which risks reach it. Every answer names the records behind it, and you can see the model as it
+        stood on any past date.
       </p>
     </div>
     <div class="mt-12 grid gap-6 sm:grid-cols-2">
@@ -156,7 +156,7 @@
       </div>
     </div>
     <div class="mt-8">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask your own model</a>
+      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask the AI chat</a>
     </div>
   </div>
 </section>
@@ -249,12 +249,12 @@
       </p>
     </div>
     <ul class="home-emphasis-list mt-12 max-w-3xl">
-      <li><strong>Your administrator decides.</strong> Each assistant is approved for your organisation and access can be revoked at any time.</li>
+      <li><strong>You connect it yourself.</strong> Any member can connect their own AI assistant from their account, and an administrator can disconnect it at any time.</li>
       <li><strong>Read first, change only with approval.</strong> Assistants start with read access; a suggested change arrives in your approval queue, and nothing changes until a person approves it.</li>
       <li><strong>Every call on the record.</strong> Each request is logged with the assistant, the grant and the person it acted for.</li>
     </ul>
     <p class="home-note mt-8 max-w-3xl">
-      Read access for your AI assistants opens in Q1 2027. Today, Entelim's own assistant already works this way:
+      Connecting your own AI assistant is live on every plan. Entelim's own AI chat works the same way:
       every action passes one permission check and every change waits for approval.
     </p>
   </div>
@@ -275,7 +275,7 @@
         <p class="public-stepper__name">Modelled</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q1 2027</p>
+        <p class="home-eyebrow">Next</p>
         <p class="public-stepper__name">Synchronised</p>
       </li>
       <li>
@@ -364,7 +364,7 @@
             <td><strong>$29</strong>/editor/month</td>
             <td>$290/editor/year. Askers free.</td>
             <td>For scale-ups and services companies, 50 to 500 people.</td>
-            <td>Single sign-on, the review-board workflow, and your own model key.</td>
+            <td>Single sign-on and the review-board workflow.</td>
           </tr>
           <tr>
             <td>Enterprise</td>
@@ -475,11 +475,11 @@
         </details>
         <details>
           <summary>What works today?{{ faq_chevron() }}</summary>
-          <p>Import an existing architecture model and get a cited answer to what breaks if a system fails, in minutes. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
+          <p>Connect GitHub or Jira when you sign up, or import an existing architecture model, then ask the AI chat what breaks if a system fails and get a cited answer. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
         </details>
         <details>
           <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
-          <p>Read access for your own AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's own assistant already works through the same permission and approval model.</p>
+          <p>Yes. Connect your own AI assistant from your account, on every plan, through the open Model Context Protocol. It reads your model and cites the records; any change it suggests waits in your approval queue.</p>
         </details>
       </div>
     </div>
@@ -490,7 +490,7 @@
 <section class="home-closing">
   <div class="container px-4">
     <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Import your model. Get a cited answer in minutes.</h2>
+    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
     <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
     <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
       <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>

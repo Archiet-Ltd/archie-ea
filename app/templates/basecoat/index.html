@@ -1,0 +1,44 @@
+{# Barrel of the flask-basecoat component macros the Overview dashboard uses.
+   Vendored from flask-basecoat, branch feat/shadcn-100-compliance, commit b327186c2e2f745310005b18e92a990a9b77f240.
+   Usage: {% import 'basecoat/index.html' as ui %} then {{ ui.button(text="Save") }} #}
+{% import 'basecoat/badge.html' as _badge %}
+{% set badge = _badge.badge %}
+{% import 'basecoat/button.html' as _button %}
+{% set button = _button.button %}
+{% import 'basecoat/card.html' as _card %}
+{% set card = _card.card %}
+{% set card_header = _card.card_header %}
+{% set card_title = _card.card_title %}
+{% set card_description = _card.card_description %}
+{% set card_action = _card.card_action %}
+{% set card_content = _card.card_content %}
+{% set card_footer = _card.card_footer %}
+{% import 'basecoat/chart.html' as _chart %}
+{% set chart = _chart.chart %}
+{% import 'basecoat/item.html' as _item %}
+{% set item_group = _item.item_group %}
+{% set item_separator = _item.item_separator %}
+{% set item = _item.item %}
+{% set item_media = _item.item_media %}
+{% set item_content = _item.item_content %}
+{% set item_title = _item.item_title %}
+{% set item_description = _item.item_description %}
+{% set item_actions = _item.item_actions %}
+{% set item_header = _item.item_header %}
+{% set item_footer = _item.item_footer %}
+{% import 'basecoat/native-select.html' as _native_select %}
+{% set native_select_wrapper = _native_select.native_select_wrapper %}
+{% set native_select = _native_select.native_select %}
+{% set native_select_icon = _native_select.native_select_icon %}
+{% set native_select_option = _native_select.native_select_option %}
+{% set native_select_optgroup = _native_select.native_select_optgroup %}
+{% import 'basecoat/table.html' as _table %}
+{% set table_container = _table.table_container %}
+{% set table = _table.table %}
+{% set table_header = _table.table_header %}
+{% set table_body = _table.table_body %}
+{% set table_footer = _table.table_footer %}
+{% set table_row = _table.table_row %}
+{% set table_head = _table.table_head %}
+{% set table_cell = _table.table_cell %}
+{% set table_caption = _table.table_caption %}
