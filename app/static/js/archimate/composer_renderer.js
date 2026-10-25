@@ -362,7 +362,6 @@ let ComposerRenderer = (function() {
             { tagName: 'rect', selector: 'accentBar' },
             { tagName: 'rect', selector: 'iconBox' },
             { tagName: 'path', selector: 'typeIcon' },
-            { tagName: 'use', selector: 'notationIcon' },
             { tagName: 'rect', selector: 'maturityBadgeBg' },
             { tagName: 'text', selector: 'maturityBadgeLabel' },
             { tagName: 'text', selector: 'nameLabel' },
@@ -428,7 +427,6 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect',     selector: 'accentBar' },
                 { tagName: 'rect',     selector: 'iconBox' },
                 { tagName: 'path',     selector: 'typeIcon' },
-                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'rect',     selector: 'maturityBadgeBg' },
                 { tagName: 'text',     selector: 'maturityBadgeLabel' },
                 { tagName: 'text',     selector: 'nameLabel' },
@@ -469,7 +467,6 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect',    selector: 'accentBar' },
                 { tagName: 'rect',    selector: 'iconBox' },
                 { tagName: 'path',    selector: 'typeIcon' },
-                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'rect',    selector: 'maturityBadgeBg' },
                 { tagName: 'text',    selector: 'maturityBadgeLabel' },
                 { tagName: 'text',    selector: 'nameLabel' },
@@ -508,7 +505,6 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect', selector: 'accentBar' },
                 { tagName: 'rect', selector: 'iconBox' },
                 { tagName: 'path', selector: 'typeIcon' },
-                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'rect', selector: 'maturityBadgeBg' },
                 { tagName: 'text', selector: 'maturityBadgeLabel' },
                 { tagName: 'text', selector: 'nameLabel' },
@@ -579,7 +575,6 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect', selector: 'headerSep' },
                 { tagName: 'rect', selector: 'iconBox' },
                 { tagName: 'path', selector: 'typeIcon' },
-                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'text', selector: 'nameLabel' },
                 { tagName: 'text', selector: 'typeLabel' },
                 { tagName: 'rect', selector: 'resizeHandle' },
@@ -854,6 +849,10 @@ let ComposerRenderer = (function() {
 
     /* Notation mode: the type symbol sits in the top-right corner, as the standard draws
        it, taken from the one sprite; the card's own left-hand icon box is hidden. */
+    function withNotationIcon(markup) {
+        return (markup || []).concat([{ tagName: 'use', selector: 'notationIcon' }]);
+    }
+
     function applyNotationIcon(node, elType, c) {
         if (!NOTATION_ON || !elType) return;
         node.attr('notationIcon', {
@@ -909,11 +908,13 @@ let ComposerRenderer = (function() {
             shapeAttrs.underlay = { fill: c.accent || c.fill, opacity: 0.22 };
         }
 
-        let node = new ShapeClass({
+        let nodeOptions = {
             position: { x: x, y: y },
             size: { width: 200, height: 130 },
             attrs: shapeAttrs,
-        });
+        };
+        if (NOTATION_ON) nodeOptions.markup = withNotationIcon(ShapeClass.prototype.markup);
+        let node = new ShapeClass(nodeOptions);
         applyNotationIcon(node, elType, c);
 
         /* UX-CMP-001: Override port colors with layer accent.
@@ -1098,7 +1099,7 @@ let ComposerRenderer = (function() {
         let iconPath = typeIconPath(elType);
         let typeName = (elType || '').replace(/([A-Z])/g, ' $1').trim();
 
-        let container = new joint.shapes.archimate.Container({
+        let container = new joint.shapes.archimate.Container(Object.assign({
             position: { x: x, y: y },
             size: { width: w || 320, height: h || 220 },
             attrs: {
@@ -1110,7 +1111,7 @@ let ComposerRenderer = (function() {
                 typeIcon:  iconPath ? { d: iconPath, stroke: c.text } : { d: '' },
                 resizeHandle: { stroke: c.accent || c.stroke },
             },
-        });
+        }, NOTATION_ON ? { markup: withNotationIcon(joint.shapes.archimate.Container.prototype.markup) } : {}));
 
         /* UX-CMP-001: Override port colors for containers.
          * Ports pre-declared in CARD_PORTS.items; restyle with layer accent. */
@@ -1310,6 +1311,10 @@ let ComposerRenderer = (function() {
             let view = paper.findViewByModel(link);
             let count = link.labels().length;
             if (!view || !count) return;
+            /* A label's move is a CSS transition by default, and a box measured mid-transition is where the
+               label was, not where it is now, so every try read the same stale place and nothing was ever
+               spread. Moves must be immediate while measuring. */
+            view.el.querySelectorAll('.labels > .label').forEach(function(node) { node.style.transition = 'none'; });
             for (let i = 0; i < count; i++) {
                 let box = null;
                 for (let k = 0; k < tries.length; k++) {
