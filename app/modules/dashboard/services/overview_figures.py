@@ -27,6 +27,38 @@ RANGES = (("90d", "Last 3 months", 90), ("30d", "Last 30 days", 30), ("7d", "Las
 CONNECTED_KINDS = ("import", "connector")
 
 
+def _currency():
+    """The organisation's currency symbol and whether it comes before the amount."""
+    from flask import has_request_context
+
+    from app.middleware.tenant_context import current_org
+    from config import CurrencyConfig
+
+    try:
+        organization = current_org() if has_request_context() else None
+    except Exception:
+        organization = None
+    cfg = CurrencyConfig.get_org_currency_config(organization)
+    return cfg["symbol"], cfg["position"] == "prefix"
+
+
+def _money(amount, compact=False):
+    """An amount in whole pounds, or short ("£250k", "£20.8k") for a card; the table keeps the whole figure."""
+    if amount is None:
+        return None
+    symbol, prefix = _currency()
+    amount = float(amount)
+    if compact and abs(amount) >= 1000:
+        for size, suffix in ((1_000_000, "m"), (1_000, "k")):
+            if abs(amount) >= size:
+                number = ("%.1f" % (amount / size)).rstrip("0").rstrip(".")
+                text = number + suffix
+                break
+    else:
+        text = "{:,.0f}".format(amount)
+    return symbol + text if prefix else text + symbol
+
+
 def _percent_change(now_value, before_value):
     if not before_value:
         return None
@@ -96,10 +128,16 @@ def _sourced_share(org_id):
         ((r[2] / r[1], r[0] or "Unassigned layer", r[1]) for r in rows), key=lambda item: (item[0], item[1])
     )
     weakest = shares[0] if shares and shares[0][0] < 1 else None
+    layers = [
+        {"layer": name, "key": (name or "").lower(), "percent": round(share * 100), "count": count}
+        for share, name, count in shares
+        if share < 1
+    ][:4]
     return {
         "percent": round(sourced / total * 100),
         "total": total,
         "weakest": ({"layer": weakest[1], "percent": round(weakest[0] * 100), "count": weakest[2]} if weakest else None),
+        "layers": layers,
     }
 
 
@@ -174,9 +212,13 @@ def _run_cost(org_id, now):
         share = {"name": top[0], "percent": round(top[1]["annual_cost"] / total * 100)}
     return {
         "total": total,
+        "total_short": _money(total, compact=True),
+        "total_exact": _money(total),
         "contracts": summary["total_contracts"],
         "series": series,
         "this_month": this_month,
+        "this_month_short": _money(this_month, compact=True),
+        "this_month_exact": _money(this_month),
         "change": _percent_change(this_month, last_month),
         "top": share,
     }
@@ -206,6 +248,28 @@ def _is_connected(change):
     return (change.snapshot or {}).get("source_kind") in CONNECTED_KINDS
 
 
+def _bars(inserts, today, days):
+    """Records added, split into connected and by hand: one bar a day, or a week when the range is long."""
+    size = 7 if days > 31 else 1
+    first = today - timedelta(days=days - 1)
+    buckets = []
+    end = today
+    while end >= first:
+        buckets.append([max(end - timedelta(days=size - 1), first), end, 0, 0])
+        end -= timedelta(days=size)
+    for change in inserts:
+        day = change.valid_from.date()
+        if first <= day <= today:
+            for bucket in buckets:
+                if bucket[0] <= day <= bucket[1]:
+                    bucket[2 if _is_connected(change) else 3] += 1
+                    break
+    return [
+        {"day": "%d %s" % (b[0].day, b[0].strftime("%b")), "connected": b[2], "manual": b[3]}
+        for b in reversed(buckets)
+    ]
+
+
 def _activity(changes, now):
     if changes is None:
         return None
@@ -213,23 +277,17 @@ def _activity(changes, now):
     inserts = [c for c in changes if c.action == "insert" and c.valid_from]
     ranges = {}
     for key, label, days in RANGES:
-        first = today - timedelta(days=days - 1)
-        per_day = {first + timedelta(days=i): [0, 0] for i in range(days)}
-        for change in inserts:
-            day = change.valid_from.date()
-            if day in per_day:
-                per_day[day][0 if _is_connected(change) else 1] += 1
-        rows = [
-            {"day": d.strftime("%d/%m"), "connected": v[0], "manual": v[1]}
-            for d, v in per_day.items()
-        ]
+        rows = _bars(inserts, today, days)
         ranges[key] = {
             "label": label,
             "rows": rows,
+            "per": "week" if days > 31 else "day",
             "connected": sum(r["connected"] for r in rows),
             "manual": sum(r["manual"] for r in rows),
         }
         ranges[key]["total"] = ranges[key]["connected"] + ranges[key]["manual"]
+    # the shortest range that holds any record is the one shown first
+    default_range = next((key for key in ("7d", "30d") if ranges[key]["total"]), "90d")
     this_year = sum(1 for c in inserts if c.valid_from.year == now.year)
     last_year = sum(1 for c in inserts if c.valid_from.year == now.year - 1)
     week_start = today - timedelta(days=6)
@@ -244,9 +302,14 @@ def _activity(changes, now):
     recent = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)[:5]
     return {
         "ranges": ranges,
+        "default_range": default_range,
         "this_year": this_year,
         "last_year": last_year,
         "year_change": _percent_change(this_year, last_year),
+        "year_rows": [
+            {"year": "Last year", "last": last_year, "this": 0},
+            {"year": "This year", "last": 0, "this": this_year},
+        ],
         "week": {
             "rows": weekly_rows,
             "total": len(week),
@@ -302,12 +365,31 @@ def _table(org_id):
             "id": app.id,
             "name": app.name,
             "type": (app.component_type or "").strip() or None,
-            "status": (app.lifecycle_status or "").strip() or None,
+            "status": ((app.lifecycle_status or "").strip()[:1].upper() + (app.lifecycle_status or "").strip()[1:]) or None,
             "owner": ", ".join(names) if names else None,
             "cost": get_annual_cost_float(app),
         })
+        rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
-    return {"rows": rows[:10], "total": len(rows)}
+    costed = [r["cost"] for r in rows if r["cost"] is not None]
+    return {"rows": rows[:10], "total": len(rows), "cost_total": sum(costed) if costed else None}
+
+
+def _name_the_basis(run_cost, applications_cost):
+    """Say where the run cost comes from, and why the applications' own costs may add up to another figure."""
+    if run_cost["total"] is None:
+        return
+    count = run_cost["contracts"]
+    run_cost["basis"] = "from %d active %s" % (count, "contract" if count == 1 else "contracts")
+    run_cost["difference"] = None
+    if applications_cost is None:
+        return
+    gap = run_cost["total"] - applications_cost
+    if round(gap) > 0:
+        run_cost["difference"] = "%s of contract cost is not yet tied to an application." % _money(gap, compact=True)
+    elif round(gap) < 0:
+        run_cost["difference"] = "The applications' own costs add up to %s, %s more than the contracts state." % (
+            _money(applications_cost, compact=True), _money(-gap, compact=True))
 
 
 def build_overview(org_id, user, now=None):
@@ -319,6 +401,8 @@ def build_overview(org_id, user, now=None):
     run_cost = _run_cost(org_id, now)
     changes = _history(org_id, now)
     activity = _activity(changes, now)
+    table = _table(org_id)
+    _name_the_basis(run_cost, table["cost_total"])
     empty = not apps["total"] and not relationships["total"] and sourced is None
     return {
         "empty": empty,
@@ -329,7 +413,7 @@ def build_overview(org_id, user, now=None):
         "run_cost": run_cost,
         "activity": activity,
         "areas": _areas(org_id),
-        "table": _table(org_id),
+        "table": table,
         "ranges": RANGES,
     }
 
@@ -338,6 +422,18 @@ def _link(endpoint, **values):
     from flask import current_app, url_for
 
     return url_for(endpoint, **values) if endpoint in current_app.view_functions else None
+
+
+def _has_endpoint(endpoint):
+    from flask import current_app
+
+    return endpoint in current_app.view_functions
+
+
+def _layer_keys():
+    from app.modules.architecture.routes.archimate_crud.routes import LAYER_CONFIG
+
+    return LAYER_CONFIG.keys()
 
 
 def overview_context(user, org_id):
@@ -353,4 +449,7 @@ def overview_context(user, org_id):
         "changes": _link("intelligence_ui.history_changes_page"),
         "connect": _link("m365_connector.github_connect"),
     }
+    if figures["sourced"] and _has_endpoint("archimate_crud.dashboard"):
+        for row in figures["sourced"]["layers"]:
+            row["href"] = _link("archimate_crud.dashboard", layer=row["key"]) if row["key"] in _layer_keys() else None
     return {"overview": figures}

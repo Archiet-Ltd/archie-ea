@@ -36,6 +36,8 @@
     --popover-foreground: 222.2 47.4% 11.2%;
     --primary: 213.2 81.3% 40.7%;  /* the logo's blue, oklch(0.497 0.163 257); white label 5.93:1 */
     --primary-foreground: 0 0% 100%;
+    --primary-surface: 213.2 81.3% 40.7%;  /* a large area of brand colour: the same blue as --primary in light */
+    --primary-surface-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 215.3 25% 26.7%;
     --muted: 210 40% 96.1%;
@@ -110,6 +112,8 @@
     --popover-foreground: 210 40% 98%;
     --primary: 215 86.8% 67.2%;  /* oklch(0.70 0.14 257); navy label 6.68:1 */
     --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-surface: 215 60% 24%;  /* the brand blue held in the dark range, so a large area sits with the cards around it; white label 10:1 */
+    --primary-surface-foreground: 210 40% 98%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;

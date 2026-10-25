@@ -63,6 +63,8 @@ module.exports = {
         primary: {
           DEFAULT: "hsl(var(--primary) / <alpha-value>)",
           foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
+          surface: "hsl(var(--primary-surface) / <alpha-value>)",
+          "surface-foreground": "hsl(var(--primary-surface-foreground) / <alpha-value>)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary) / <alpha-value>)",

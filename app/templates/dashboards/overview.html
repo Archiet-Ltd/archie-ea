@@ -27,13 +27,13 @@
 {% set chart_3 = 'hsl(var(--chart-3))' %}
 
 {#- One of the three icon cards: a figure with its change, and the sentence that says what it means. -#}
-{% macro stat_card(testid, icon, tone, label, value, badge, good, sentence, href) %}
+{% macro stat_card(testid, icon, tone, label, value, badge, good, sentence, href, exact=none) %}
 {%- set inner -%}
   {% call ui.card(class='h-full bg-chart-' ~ tone ~ '/10') %}
     {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-background [&_svg]:size-4">{{ lucide(icon) }}</span>{% endcall %}
     {% call ui.card_content(class='mt-auto flex flex-col gap-1') %}
       {% if value %}
-      <span class="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums"><span data-testid="{{ testid }}-value">{{ value }}</span>{% if badge %}<span data-testid="{{ testid }}-change">{{ d.delta(badge, good) }}</span>{% endif %}</span>
+      <span class="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums"><span data-testid="{{ testid }}-value"{% if exact %} title="{{ exact }}"{% endif %}>{{ value }}</span>{% if badge %}<span data-testid="{{ testid }}-change">{{ d.delta(badge, good) }}</span>{% endif %}</span>
       <span class="text-sm font-medium">{{ label }}</span>
       {% else %}
       <span class="text-lg font-semibold">{{ label }}</span>
@@ -53,36 +53,37 @@
 {{ page_shell(title='Overview', subtitle='Your applications, relationships, run cost and changes at a glance', breadcrumb=[('Home', none), ('Overview', none)]) }}
 <div class="style-vega flex flex-col gap-4 md:gap-6" data-testid="overview-dashboard">
   <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-3 xl:grid-cols-5">
-    {% call ui.card(class='relative overflow-hidden bg-primary text-primary-foreground sm:col-span-3 xl:col-span-2') %}
+    {% call ui.card(class='relative overflow-hidden bg-primary-surface text-primary-surface-foreground sm:col-span-3 xl:col-span-2', attrs={'data-testid': 'overview-welcome'}) %}
       {% call ui.card_header() %}
         {{ ui.card_title(text='Welcome back' ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
         {% if o.empty %}
-        {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-foreground/70') }}
+        {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-surface-foreground/70') }}
         {% else %}
-        {{ ui.card_description(text='Here is how your model is doing.', class='text-primary-foreground/70') }}
+        {{ ui.card_description(text='Here is how your model is doing.', class='text-primary-surface-foreground/70') }}
         {% endif %}
       {% endcall %}
       {% call ui.card_content(class='flex flex-col items-start gap-4') %}
         {% if o.empty %}
         {% if links.connect %}{{ ui.button(text='Connect GitHub', href=links.connect, variant='secondary', class='text-secondary-foreground', attrs={'data-testid': 'overview-connect'}) }}{% endif %}
         {% else %}
-        <div class="inline-flex divide-x divide-primary-foreground/20 rounded-lg bg-primary-foreground/10" data-testid="welcome-figures">
-          <a href="{{ links.applications }}" class="flex flex-col items-center px-5 py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-primary-foreground/50" data-testid="welcome-applications"><span class="text-lg font-semibold tabular-nums">{{ apps.total }}</span><span class="text-xs text-primary-foreground/70">Applications</span></a>
+        <div class="inline-flex divide-x divide-primary-surface-foreground/20 rounded-lg bg-primary-surface-foreground/10" data-testid="welcome-figures">
+          <a href="{{ links.applications }}" class="flex flex-col items-center px-5 py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-primary-surface-foreground/50" data-testid="welcome-applications"><span class="text-lg font-semibold tabular-nums">{{ apps.total }}</span><span class="text-xs text-primary-surface-foreground/70">Applications</span></a>
           {% if sourced %}
-          <span class="flex flex-col items-center px-5 py-2" data-testid="welcome-sourced"><span class="text-lg font-semibold tabular-nums">{{ sourced.percent }}%</span><span class="text-xs text-primary-foreground/70">Facts with a source</span></span>
+          <span class="flex flex-col items-center px-5 py-2" data-testid="welcome-sourced"><span class="text-lg font-semibold tabular-nums">{{ sourced.percent }}%</span><span class="text-xs text-primary-surface-foreground/70">Facts with a source</span></span>
           {% endif %}
         </div>
-        {% if not sourced %}<p class="text-sm text-primary-foreground/70" data-testid="welcome-sourced-why">The share of facts with a source appears once the model holds elements.</p>{% endif %}
+        {% if not sourced %}<p class="text-sm text-primary-surface-foreground/70" data-testid="welcome-sourced-why">The share of facts with a source appears once the model holds elements.</p>{% endif %}
         {% endif %}
       {% endcall %}
-      <div aria-hidden="true" class="pointer-events-none absolute -right-4 -bottom-6 hidden sm:block">{{ lucide('layout-dashboard', 'size-36 -rotate-12 text-primary-foreground/15') }}</div>
+      <div aria-hidden="true" class="pointer-events-none absolute -right-4 -bottom-6 hidden sm:block">{{ lucide('layout-dashboard', 'size-36 -rotate-12 text-primary-surface-foreground/15') }}</div>
     {% endcall %}
 
     {# Annual run cost #}
     {% if cost.total is not none %}
-      {% set cost_sentence = (cost.top.name ~ ' is ' ~ cost.top.percent ~ '% of it, across ' ~ cost.contracts ~ (' contract' if cost.contracts == 1 else ' contracts') ~ '.') if cost.top else ('Across ' ~ cost.contracts ~ (' contract' if cost.contracts == 1 else ' contracts') ~ '.') %}
+            {% set cost_sentence = (cost.basis | capitalize ~ '. ' ~ cost.top.name ~ ' is ' ~ cost.top.percent ~ '% of it.') if cost.top else (cost.basis | capitalize ~ '.') %}
+      {% if cost.difference %}{% set cost_sentence = cost_sentence ~ ' ' ~ cost.difference %}{% endif %}
       {% set cost_badge = (('%+d%%' % cost.change) if cost.change else 'No change') if cost.change is not none else none %}
-      {{ stat_card('card-run-cost', 'circle-dollar-sign', 1, 'Annual run cost', cost.total | format_currency, cost_badge, (cost.change <= 0) if cost.change else none, cost_sentence, links.spend) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 1, 'Annual run cost', cost.total_short, cost_badge, (cost.change <= 0) if cost.change else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
       {{ stat_card('card-run-cost', 'circle-dollar-sign', 1, 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
     {% endif %}
@@ -113,26 +114,26 @@
 
   <div class="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-3">
     {# Records added #}
-    {% call ui.card(class='xl:col-span-2', attrs={'x-data': "{ range: '90d' }", 'data-testid': 'activity-chart'}) %}
+    {% call ui.card(class='xl:col-span-2', attrs={'x-data': "{ range: '" ~ (act.default_range if act else '90d') ~ "' }", 'data-testid': 'activity-chart'}) %}
         {% call ui.card_header() %}
           {{ ui.card_title(text='Model records added') }}
-          {{ ui.card_description(text='Added each day, from connected sources and by hand') }}
+          {{ ui.card_description(text='Added each day (each week over 3 months), from connected sources and by hand') }}
           {% call ui.card_action() %}
-            {% call ui.native_select_wrapper(size='sm') %}{% call ui.native_select(id='activity-range', size='sm', attrs={'aria-label': 'Period', 'x-model': 'range', 'data-testid': 'activity-range'}) %}{% for key, label, days in o.ranges %}{{ ui.native_select_option(text={'90d': '3 months', '30d': '30 days', '7d': '7 days'}[key], value=key) }}{% endfor %}{% endcall %}{{ ui.native_select_icon() }}{% endcall %}
+            {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='activity-range', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Period', 'x-model': 'range', 'data-testid': 'activity-range'}) %}{% for key, label, days in o.ranges %}{{ ui.native_select_option(text={'90d': '3 months', '30d': '30 days', '7d': '7 days'}[key], value=key) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
           {% endcall %}
         {% endcall %}
         {% call ui.card_content(class='grid gap-6 lg:grid-cols-[1fr_14rem]') %}
           {% if act and act.ranges['90d'].total %}
           <div>
             {% for key, label, days in o.ranges %}
-            <div x-show="range === '{{ key }}'" {% if not loop.first %}x-cloak{% endif %} data-testid="activity-range-{{ key }}">
-              {{ d.chart('bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_3}], x='day', class='aspect-auto h-[360px] w-full', label='Model records added per day, ' ~ label | lower, legend=true) }}
+            <div x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-range-{{ key }}">
+              {{ d.chart('stacked-bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_3}], x='day', class='aspect-auto h-[360px] w-full', label='Model records added per ' ~ act.ranges[key].per ~ ', ' ~ label | lower, legend=true) }}
             </div>
             {% endfor %}
           </div>
           <div class="flex flex-col gap-6">
             {% for key, label, days in o.ranges %}
-            <div class="flex flex-col gap-6" x-show="range === '{{ key }}'" {% if not loop.first %}x-cloak{% endif %} data-testid="activity-summary-{{ key }}">
+            <div class="flex flex-col gap-6" x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-summary-{{ key }}">
               <div class="flex items-center gap-3">{{ d.icon_tile('layout-grid') }}<div class="grid"><span class="text-2xl font-semibold tabular-nums" data-testid="activity-total-{{ key }}">{{ act.ranges[key].total }}</span><span class="text-sm text-muted-foreground">Records added, {{ label | lower }}</span></div></div>
               <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-1"></span>From connected sources</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].connected }}</span></div>
               <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-3"></span>By hand</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].manual }}</span></div>
@@ -151,7 +152,7 @@
         {% call ui.card_header() %}{{ ui.card_title(text='Monthly run cost') }}{% call ui.card_action() %}{{ d.icon_tile('circle-dollar-sign') }}{% endcall %}{% endcall %}
         {% call ui.card_content(class='flex flex-col gap-2') %}
           {% if cost.total is not none %}
-          <span class="text-2xl font-semibold tabular-nums" data-testid="monthly-cost-value">{{ cost.this_month | format_currency }}</span>
+          <span class="text-2xl font-semibold tabular-nums" data-testid="monthly-cost-value" title="{{ cost.this_month_exact }}">{{ cost.this_month_short }}</span>
           <span class="flex items-center gap-2 text-sm text-muted-foreground">{% if cost.change %}{{ d.delta('%+d%%' % cost.change, cost.change <= 0) }} than last month{% elif cost.change == 0 %}Same as last month{% else %}Active contracts, per month{% endif %}</span>
           {{ d.chart('area', cost.series, [{'key': 'value', 'label': 'Run cost', 'color': chart_1}], grid=false, class='aspect-auto h-[110px] w-full', label='Run cost by month') }}
           {% else %}
@@ -159,18 +160,26 @@
           {% endif %}
         {% endcall %}
       {% endcall %}
-      {% call ui.card() %}
+      {% call ui.card(attrs={'data-testid': 'year-card'}) %}
         {% call ui.card_header() %}{{ ui.card_title(text='This year against last year') }}{% endcall %}
         {% call ui.card_content(class='flex items-center justify-between gap-4') %}
-          {% if act and (act.this_year or act.last_year) %}
+          {% if act and act.last_year and act.this_year %}
           <div class="flex flex-col gap-2">
             <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
-            <span class="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">{% if act.year_change is not none %}{{ d.delta('%+d%%' % act.year_change, none) }} last year{% else %}records added this year{% endif %}</span>
-            {{ d.legend([('Last year', 1), ('This year', 2)], 'mt-2') }}
+            <span class="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">{% if act.year_change is not none %}{{ d.delta('%+d%%' % act.year_change, none) }} last year{% endif %}</span>
+            <div class="mt-2 grid gap-1 text-sm text-muted-foreground">
+              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-1"></span>Last year <span class="font-medium tabular-nums text-foreground" data-testid="year-last">{{ act.last_year }}</span></span>
+              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-2"></span>This year <span class="font-medium tabular-nums text-foreground" data-testid="year-this">{{ act.this_year }}</span></span>
+            </div>
           </div>
-          {{ d.chart('donut', [{'year': 'Last year', 'value': act.last_year, 'fill': chart_1}, {'year': 'This year', 'value': act.this_year, 'fill': chart_2}], [{'key': 'value', 'label': 'Records'}], x='year', grid=false, class='aspect-square h-[120px]', label='Records added, this year against last year') }}
+          {{ d.chart('stacked-bar', act.year_rows, [{'key': 'last', 'label': 'Last year', 'color': chart_1}, {'key': 'this', 'label': 'This year', 'color': chart_2}], x='year', grid=false, class='aspect-auto h-[120px] w-[140px]', label='Records added, this year against last year') }}
+          {% elif act and act.this_year %}
+          <div class="flex flex-col gap-2">
+            <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
+            <span class="text-sm text-muted-foreground" data-testid="year-empty">No records were added last year, so there is nothing to set this year against.</span>
+          </div>
           {% else %}
-          <p class="text-sm text-muted-foreground" data-testid="year-empty">Appears once records have been added to the model.</p>
+          <p class="text-sm text-muted-foreground" data-testid="year-empty">No records were added last year or this year yet. They appear here once a source is connected or you add one.</p>
           {% endif %}
         {% endcall %}
       {% endcall %}
@@ -225,7 +234,7 @@
     {# Applications #}
     <div class="xl:col-span-2" data-testid="applications-table">
       {% call ui.card(class='gap-4') %}
-        {% call ui.card_header() %}{{ ui.card_title(text='Applications') }}{{ ui.card_description(text='Owner and annual cost of each application') }}{% endcall %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Applications') }}{{ ui.card_description(text='Annual cost recorded for the application') }}{% endcall %}
         {% call ui.card_content(class='px-0') %}
           {% if o.table.rows %}
           {% call ui.table_container() %}{% call ui.table() %}
@@ -239,7 +248,7 @@
                 {{ ui.table_cell(text=row.type or 'Not recorded') }}
                 {% call ui.table_cell() %}{{ ui.badge(text=row.status or 'Not recorded', variant='outline') }}{% endcall %}
                 {% call ui.table_cell() %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
-                {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost | format_currency }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+                {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost_label }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
               {% endcall %}
             {% endfor %}
             {% endcall %}
@@ -253,12 +262,22 @@
     </div>
 
     {# Facts with a source #}
-    {% call ui.card() %}
+    {% call ui.card(attrs={'data-testid': 'sourced-card'}) %}
       {{ d.card_head('Facts with a source', 'Model elements that say where they came from') }}
       {% call ui.card_content(class='flex flex-col gap-2') %}
         {% if sourced %}
         <span class="text-2xl font-semibold tabular-nums" data-testid="sourced-value">{{ sourced.percent }}%</span>
-        <span class="text-sm text-muted-foreground" data-testid="sourced-sentence">{% if sourced.weakest %}Least sourced: the {{ sourced.weakest.layer | lower }} layer, {{ sourced.weakest.percent }}% of its {{ sourced.weakest.count }} elements.{% else %}Every one of the {{ sourced.total }} elements names its source.{% endif %}</span>
+        <span class="text-sm text-muted-foreground" data-testid="sourced-sentence">{% if sourced.layers %}Across {{ sourced.total }} elements. The layers with the fewest sourced facts:{% else %}Every one of the {{ sourced.total }} elements names its source.{% endif %}</span>
+        {% if sourced.layers %}
+        {% call ui.item_group(class='gap-1') %}
+          {% for row in sourced.layers %}
+          {% call ui.item(size='sm', class='px-0', attrs={'data-testid': 'sourced-layer'}) %}
+            {% call ui.item_content() %}{% if row.href %}<a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.layer | capitalize }} layer</a>{% else %}{{ ui.item_title(text=row.layer | capitalize ~ ' layer') }}{% endif %}{{ ui.item_description(text=row.count ~ ' elements') }}{% endcall %}
+            {% call ui.item_actions() %}{{ ui.badge(text=row.percent ~ '%', variant='secondary') }}{% endcall %}
+          {% endcall %}
+          {% endfor %}
+        {% endcall %}
+        {% endif %}
         {% else %}
         <p class="text-sm text-muted-foreground" data-testid="sourced-empty">Appears once the model holds elements that a source can be named for.</p>
         {% endif %}

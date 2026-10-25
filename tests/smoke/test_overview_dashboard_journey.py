@@ -38,7 +38,7 @@ OLD_PAGE = ("Read it another way", "View as", "Priority actions", "Layer tabs", 
 
 @pytest.fixture(scope="module")
 def orgs(live_server):
-    a = seed_overview_org("a", APPS_A, CONTRACTS_A)
+    a = seed_overview_org("a", APPS_A, CONTRACTS_A, last_year=True)
     b = seed_overview_org("b", APPS_B, CONTRACTS_B)
     yield {"a": a, "b": b}
     purge_org(a["org_id"])
@@ -47,7 +47,7 @@ def orgs(live_server):
 
 def _shot(page, name, width, theme="light"):
     if WALK:
-        page.wait_for_timeout(600)  # let the theme colours finish their transition
+        page.wait_for_timeout(1800)  # let the theme colours finish their transition
         size = page.viewport_size
         page.set_viewport_size({"width": width, "height": 2600})
         page.screenshot(path=os.path.join(WALK, "%s-%s-%d.png" % (name, theme, width)))
@@ -113,7 +113,7 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         assert "most connected" in dash.locator('[data-testid="card-relationships-sentence"]').inner_text()
         cost_sentence = dash.locator('[data-testid="card-run-cost-sentence"]').inner_text()
         assert "Northbeam" in cost_sentence and "80%" in cost_sentence, cost_sentence
-        assert "250,000" in dash.locator('[data-testid="card-run-cost-value"]').inner_text()
+        assert dash.locator('[data-testid="card-run-cost-value"]').inner_text().strip() == "£250k"
         for testid in ("card-run-cost", "card-relationships", "card-no-owner"):
             text = dash.locator('[data-testid="%s"]' % testid).inner_text()
             assert not re.search(r"(^|\s)(—|-|0)(\s|$)", text), (testid, text)
@@ -121,6 +121,7 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         # the chart is drawn with the records added, and the period select shows the other ranges
         chart = page.locator('[data-testid="activity-chart"]')
         panel = chart.locator('[data-testid="activity-range-90d"]')
+        page.select_option('[data-testid="activity-range"]', "90d")
         expect(panel.locator("svg").first).to_be_visible()
         assert panel.locator("svg .recharts-bar-rectangle, svg .recharts-rectangle").count() >= 1
         total_90 = _int(chart.locator('[data-testid="activity-total-90d"]').inner_text())
@@ -130,7 +131,7 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         expect(panel7.locator("svg").first).to_be_visible()
         expect(panel).to_be_hidden()
         assert panel7.locator("svg .recharts-bar-rectangle, svg .recharts-rectangle").count() >= 1
-        assert _int(chart.locator('[data-testid="activity-total-7d"]').inner_text()) == total_90
+        assert 0 < _int(chart.locator('[data-testid="activity-total-7d"]').inner_text()) < total_90
         page.select_option('[data-testid="activity-range"]', "90d")
 
         # the applications table: the three active applications, with owner and cost
@@ -190,7 +191,7 @@ def test_figures_agree_with_the_pages_they_summarise(browser, live_server, orgs)
     try:
         _open(page, live_server, info["emails"]["portfolio_manager"])
         welcome = _int(page.locator('[data-testid="welcome-applications"] span').first.inner_text())
-        cost = page.locator('[data-testid="card-run-cost-value"]').inner_text().strip()
+        cost = page.locator('[data-testid="card-run-cost-value"]').get_attribute("title")
         no_owner = _int(page.locator('[data-testid="card-no-owner-value"]').inner_text())
         page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         listed = page.locator("table tbody tr").count()
@@ -241,5 +242,208 @@ def test_a_new_company_sees_the_same_page_saying_what_will_appear(browser, live_
         dash.locator('[data-testid="overview-connect"]').click()
         page.wait_for_url("**/admin/connectors/github**", timeout=PAGE_TIMEOUT)
         assert len(_content(page)) > 50
+    finally:
+        context.close()
+
+
+# ---- the chart, the select, the money, the year card, the facts card and the dark welcome card ----
+
+BARS = "svg .recharts-bar-rectangle"
+LABELS = "svg .recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value"
+
+
+def _boxes(locator):
+    return locator.evaluate_all(
+        "els => els.map(e => { const r = e.getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, t: e.textContent}; })"
+    )
+
+
+def _signed_in_as_the_architect(info):
+    email = info["emails"]["enterprise_architect"]
+    _assert_role(email, "enterprise_architect")
+    return email
+
+
+@pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
+def test_main_chart_has_wide_bars_and_labels_that_do_not_touch(browser, live_server, orgs, viewport):
+    """The architect sees what was added, day by day (week by week over 3 months), readable at a glance."""
+    info = orgs["a"]
+    email = _signed_in_as_the_architect(info)
+    context, page = _page(browser, viewport)
+    try:
+        _open(page, live_server, email)
+        select = page.locator('[data-testid="activity-range"]')
+        assert select.input_value() == "7d", "records exist in the last 7 days, so the shortest range is shown first"
+        for key in ("7d", "30d", "90d"):
+            page.select_option('[data-testid="activity-range"]', key)
+            panel = page.locator('[data-testid="activity-range-%s"]' % key)
+            expect(panel.locator("svg").first).to_be_visible()
+            page.wait_for_function(
+                "sel => [...document.querySelectorAll(sel + ' .recharts-bar-rectangle')].some(e => e.getBoundingClientRect().height > 0)",
+                arg='[data-testid="activity-range-%s"]' % key, timeout=PAGE_TIMEOUT,
+            )
+            page.wait_for_timeout(1200)  # the bars finish growing before they are measured
+            everything = _boxes(panel.locator(BARS))
+            bars = [b for b in everything if b["h"] > 0]
+            wide = [b for b in bars if b["w"] > 4]
+            assert len(wide) >= 2, (key, bars, everything)
+            labels = _boxes(panel.locator(LABELS))
+            assert len(labels) >= 2, (key, labels)
+            for first, second in zip(labels, labels[1:]):
+                assert first["x"] + first["w"] + 2 <= second["x"], (key, first["t"], second["t"])
+            if key == "90d":
+                assert len(bars) <= 14, "grouped by week, not one bar a day"
+    finally:
+        context.close()
+
+
+def test_the_range_select_keeps_its_arrow_clear_of_its_text(browser, live_server, orgs):
+    info = orgs["a"]
+    email = _signed_in_as_the_architect(info)
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, email)
+        for key in ("7d", "30d", "90d"):
+            page.select_option('[data-testid="activity-range"]', key)
+            gap = page.evaluate(
+                """() => {
+                  const select = document.querySelector('[data-testid="activity-range"]');
+                  const style = getComputedStyle(select);
+                  const canvas = document.createElement('canvas').getContext('2d');
+                  canvas.font = style.fontSize + ' ' + style.fontFamily;
+                  const label = select.options[select.selectedIndex].text;
+                  const box = select.getBoundingClientRect();
+                  const textEnd = box.left + parseFloat(style.paddingLeft) + canvas.measureText(label).width;
+                  const icon = select.parentElement.querySelector('svg').getBoundingClientRect();
+                  return icon.left - textEnd;
+                }"""
+            )
+            assert gap >= 4, (key, gap)
+    finally:
+        context.close()
+
+
+def test_money_is_short_on_cards_and_whole_pounds_in_the_table(browser, live_server, orgs):
+    info = orgs["a"]
+    email = _signed_in_as_the_architect(info)
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, email)
+        run = page.locator('[data-testid="card-run-cost-value"]')
+        assert run.inner_text().strip() == "£250k"
+        assert run.get_attribute("title") == "£250,000"
+        month = page.locator('[data-testid="monthly-cost-value"]')
+        assert month.inner_text().strip() == "£20.8k"
+        assert month.get_attribute("title") == "£20,833"
+        table = page.locator('[data-testid="applications-table"]').inner_text()
+        assert "£120,000" in table and "£80,000" in table
+        assert ".00" not in table
+        assert not re.search(r"£[\d,]+\.\d\d\b", page.locator('[data-testid="overview-dashboard"]').inner_text())
+    finally:
+        context.close()
+
+
+def test_status_reads_as_a_word_with_a_capital(browser, live_server, orgs):
+    info = orgs["a"]
+    email = _signed_in_as_the_architect(info)
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, email)
+        table = page.locator('[data-testid="applications-table"]')
+        assert table.get_by_text("Operational", exact=True).count() >= 1
+        assert table.get_by_text("operational", exact=True).count() == 0
+    finally:
+        context.close()
+
+
+def test_year_card_sets_last_year_beside_this_year(browser, live_server, orgs):
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        card = page.locator('[data-testid="year-card"]')
+        last = _int(card.locator('[data-testid="year-last"]').inner_text())
+        this = _int(card.locator('[data-testid="year-this"]').inner_text())
+        assert last == 1 and this >= 8
+        assert _int(card.locator('[data-testid="year-value"]').inner_text()) == this
+        page.wait_for_timeout(700)
+        assert card.locator("svg .recharts-bar-rectangle").count() >= 2
+        context.close()
+        context, page = _page(browser, FOLD)
+        _open(page, live_server, orgs["b"]["emails"]["enterprise_architect"])
+        card = page.locator('[data-testid="year-card"]')
+        assert "No records were added last year" in card.locator('[data-testid="year-empty"]').inner_text()
+        assert card.locator("svg").count() == 0
+    finally:
+        context.close()
+
+
+def test_run_cost_and_the_applications_table_agree_or_say_why(browser, live_server, orgs):
+    """The run cost comes from contracts, the table from per-application cost; the page says how they differ."""
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        card = page.locator('[data-testid="card-run-cost"]').inner_text()
+        assert "From 2 active contracts" in card
+        costs = page.locator('[data-testid="applications-row"] td:last-child').all_inner_texts()
+        listed = sum(int(re.sub(r"[^0-9]", "", c)) for c in costs if re.search(r"\d", c))
+        assert listed == 200000
+        assert "Annual cost recorded for the application" in page.locator('[data-testid="applications-table"]').inner_text()
+        assert "£50k of contract cost is not yet tied to an application" in card
+        assert 250000 - listed == 50000
+        # a company whose applications state no cost has nothing to reconcile and is not told a difference
+        context.close()
+        context, page = _page(browser, FOLD)
+        _open(page, live_server, orgs["b"]["emails"]["enterprise_architect"])
+        text = page.locator('[data-testid="card-run-cost"]').inner_text()
+        assert "From 1 active contract" in text and "not yet tied" not in text
+    finally:
+        context.close()
+
+
+def test_facts_card_lists_the_least_sourced_layers_and_each_opens_the_model(browser, live_server, orgs):
+    context, page = _page(browser, FOLD)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        card = page.locator('[data-testid="sourced-card"]')
+        rows = card.locator('[data-testid="sourced-layer"]')
+        assert 1 <= rows.count() <= 4
+        for index in range(rows.count()):
+            assert re.search(r"\d+%", rows.nth(index).inner_text())
+        rows.first.get_by_role("link").click()
+        page.wait_for_url(lambda url: "/architecture" in url and "layer=" in url, timeout=PAGE_TIMEOUT)
+        assert len(_content(page)) > 50
+    finally:
+        context.close()
+
+
+def _contrast(page, selector):
+    return page.evaluate(
+        """sel => {
+          const el = document.querySelector(sel);
+          const parse = c => c.match(/[\\d.]+/g).slice(0, 3).map(Number);
+          const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+          const bg = parse(getComputedStyle(el).backgroundColor);
+          const fg = parse(getComputedStyle(el.querySelector('[data-slot=card-title]')).color);
+          const [hi, lo] = [lum(bg), lum(fg)].sort((a, b) => b - a);
+          return { ratio: (hi + 0.05) / (lo + 0.05), bg: bg, lightness: lum(bg) };
+        }""",
+        selector,
+    )
+
+
+@pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
+def test_the_welcome_card_stays_dark_in_the_dark_theme(browser, live_server, orgs, viewport):
+    context, page = _page(browser, viewport)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        selector = '[data-testid="overview-welcome"]'
+        page.evaluate("document.documentElement.classList.add('dark')")
+        page.wait_for_timeout(600)
+        dark = _contrast(page, selector)
+        assert dark["ratio"] >= 4.5, dark
+        assert dark["lightness"] < 0.1, dark
+        page.evaluate("document.documentElement.classList.remove('dark')")
+        page.wait_for_timeout(600)
+        assert _contrast(page, selector)["ratio"] >= 4.5
     finally:
         context.close()
