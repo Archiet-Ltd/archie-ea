@@ -111,14 +111,14 @@
                         </span>
                     {% endcall %}
                     {% call table_cell() %}
-                        <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                                @click='convertToWorkPackage({{ gap.id }}, {{ (gap.name|default("this gap"))|tojson }})' 
-                                :disabled="busyId === {{ gap.id }} || convertedIds.includes({{ gap.id }})"
-                                aria-label="Convert this gap to a work package">
-                            <span x-show="busyId !== {{ gap.id }} && !convertedIds.includes({{ gap.id }})">Convert to Work Package</span>
-                            <span x-show="busyId === {{ gap.id }}">Converting…</span>
-                            <span x-show="busyId !== {{ gap.id }} && convertedIds.includes({{ gap.id }})">Converted</span>
-                        </button>
+<button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                                        @click='convertToWorkPackage({{ gap.id }}, {{ (gap.name|default("this gap"))|tojson }})' 
+                                        :disabled="busyId === {{ gap.id }} || convertedIds.indexOf({{ gap.id }}) !== -1"
+                                        aria-label="Convert this gap to a work package">
+                                    <span x-show="busyId !== {{ gap.id }} && convertedIds.indexOf({{ gap.id }}) === -1">Convert to Work Package</span>
+                                    <span x-show="busyId === {{ gap.id }}">Converting…</span>
+                                    <span x-show="busyId !== {{ gap.id }} && convertedIds.indexOf({{ gap.id}}) !== -1">Converted</span>
+                                </button>
                     {% endcall %}
                 </tr>
                 {% else %}
@@ -198,7 +198,7 @@
                 cell.appendChild(row);
             },
             convertToWorkPackage(gapId, gapName) {
-                if (this.busyId !== null || this.convertedIds.includes(gapId)) return;
+                if (this.busyId !== null || this.convertedIds.indexOf(gapId) !== -1) return;
                 this.busyId = gapId;
                 Platform.fetch.post('/capability-map/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
                     .then((data) => {
