@@ -1,7 +1,7 @@
 {% extends "layouts/admin_base.html" %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/list_table.html' import list_table %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/modal.html' import modal %}
@@ -34,20 +34,37 @@
 ]) }}
 {% endif %}
 
-{% call(vs) list_table(rows=streams, columns=[('Value stream', ''), {'label': 'Type', 'class': 'hidden md:table-cell'}, {'label': 'Importance', 'sortable': true}, {'label': 'Stages', 'align': 'right', 'sortable': true}, {'label': 'Capabilities', 'align': 'right', 'sortable': true}],
-                        caption='Value streams', testid='value-streams-table', row_testid='value-stream-row', search_placeholder='Filter value streams...',
-                        empty_message='No value streams yet. Model a flow such as Order to Cash, then map the capabilities that support each stage.') %}
+{% if streams %}
+{%- set any_type = streams|selectattr('value_stream_type')|list|length > 0 -%}
+{%- set any_rated = streams|selectattr('strategic_importance')|list|length > 0 -%}
+{%- set cols = [('Value stream', '')] + ([{'label': 'Type', 'class': 'hidden md:table-cell', 'sortable': true}] if any_type else []) + ([{'label': 'Importance', 'sortable': true}] if any_rated else []) + [{'label': 'Stages', 'align': 'right', 'sortable': true}, {'label': 'Capabilities', 'align': 'right', 'sortable': true}, {'label': '', 'class': 'w-12'}] -%}
+{% call(vs) list_table(rows=streams, columns=cols, caption='Value streams', testid='value-streams-table', row_testid='value-stream-row',
+                       search_placeholder='Filter value streams...', toolbar=true) %}
   {% call table_cell(class='max-w-[500px]') %}
     <a href="{{ url_for('value_stream.detail', value_stream_id=vs.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="value-stream-link">{{ vs.name }}</a>
     {% if vs.description %}<span class="block truncate text-xs text-muted-foreground">{{ vs.description }}</span>{% endif %}
   {% endcall %}
-  {% call table_cell(class='hidden md:table-cell') %}{{ value_or_unset((vs.value_stream_type|replace('_', ' '))|capitalize if vs.value_stream_type else none, 'No type') }}{% endcall %}
-  {% call table_cell(attrs={'data-sort': {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get(vs.strategic_importance, 0)}) %}
-    {% if vs.strategic_importance %}{{ state_badge(vs.strategic_importance) }}{% else %}{{ value_or_unset(none, 'Not rated') }}{% endif %}
-  {% endcall %}
+  {% if any_type %}{% call table_cell(class='hidden md:table-cell whitespace-nowrap') %}{{ (vs.value_stream_type|replace('_', ' '))|capitalize if vs.value_stream_type else '' }}{% endcall %}{% endif %}
+  {% if any_rated %}{% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get(vs.strategic_importance, 0)}) %}{% if vs.strategic_importance %}{{ state_badge(vs.strategic_importance) }}{% endif %}{% endcall %}{% endif %}
   {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': vs.stage_count or 0}) %}{{ vs.stage_count or 0 }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': vs.mapped_capability_count or 0}) %}{{ vs.mapped_capability_count or 0 }}{% endcall %}
+  {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ vs.name) %}
+    {{ row_action('Open', href=url_for('value_stream.detail', value_stream_id=vs.id), testid='value-stream-open') }}
+    {{ row_action('Capability grid', href=url_for('value_stream.grid', value_stream_id=vs.id)) }}
+    {{ row_action('Delete', action=url_for('value_stream.delete', value_stream_id=vs.id), destructive=true, separator_before=true, confirm='Delete the ' ~ vs.name ~ ' value stream and its stages? This cannot be undone.', testid='value-stream-delete') }}
+  {% endcall %}{% endcall %}
 {% endcall %}
+{% else %}
+{% call ui.card() %}
+{% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'value-streams-empty', 'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('waves') }}{% endcall %}
+    {{ ui.empty_title(text='No value streams yet') }}
+    {{ ui.empty_description(text='Model a flow such as Order to Cash with New value stream, then map the capabilities that support each stage.') }}
+  {% endcall %}
+{% endcall %}
+{% endcall %}
+{% endif %}
 </div>
 
 {% call modal(id='vs-create-modal', title='New value stream', description='Define an end-to-end flow of value.', size='default') %}

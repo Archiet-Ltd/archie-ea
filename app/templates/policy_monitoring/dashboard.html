@@ -2,7 +2,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
-{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset, section %}
 {% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}AI policy controls{% endblock %}
@@ -34,34 +34,24 @@
 {% call ui.alert(variant='destructive', attrs={'data-testid': 'policy-alert'}) %}{{ lucide('triangle-alert') }}{{ ui.alert_title(text='A serious policy breach was caught') }}{{ ui.alert_description(text=('AI operations were stopped after a breach. ' if es.get('termination_triggered') else '') ~ 'Review the violations below.') }}{% endcall %}
 {% endif %}
 
-{%- set status_word = (health.get('status') or md.get('health_status') or '')|string|lower -%}
-{%- set enforcement_card = ({'label': 'Enforcement is on', 'value': none, 'icon': 'shield-check', 'sentence': ('Strict mode: an AI operation that breaks a rule is blocked' if md.get('strict_mode') else 'An AI operation that breaks a rule is flagged'), 'testid': 'policy-enforcement'}
-                             if md.get('enforcement_enabled') else
-                             {'label': 'Enforcement is off', 'value': none, 'icon': 'shield', 'sentence': 'AI operations are not checked against the rules', 'testid': 'policy-enforcement'}) -%}
-{%- set health_card = {'label': ('Healthy' if status_word == 'healthy' else (status_word|capitalize if status_word else 'Health not reported')), 'value': none, 'icon': 'activity',
-                       'sentence': ('No critical violations and no warnings' if status_word == 'healthy' else (health.get('critical_violations') or 0)|string ~ ' critical, ' ~ (health.get('warnings') or 0)|string ~ ' warnings'), 'testid': 'policy-health'} -%}
+{%- set enforcement_sentence = ('Enforcement is on, in strict mode: an AI operation that breaks a rule is blocked.' if md.get('strict_mode') else 'Enforcement is on: an AI operation that breaks a rule is flagged.') if md.get('enforcement_enabled') else 'Enforcement is off: AI operations are not checked against the rules.' -%}
+{%- set critical = health.get('critical_violations') or 0 -%}
 
 {% if checked %}
 {{ stat_cards([
-    enforcement_card,
-    {'label': 'Operations checked', 'value': '{:,}'.format(checked), 'icon': 'clipboard-check', 'sentence': 'AI operations checked against the rules', 'testid': 'policy-checked'},
-    ({'label': 'Violations caught', 'value': '{:,}'.format(found), 'icon': 'triangle-alert', 'sentence': ('Compliance rate ' ~ (rate|round|int) ~ '%' if rate is not none else 'Operations that broke a rule'), 'testid': 'policy-violations'} if found else
+    {'label': 'Operations checked', 'value': '{:,}'.format(checked), 'icon': 'clipboard-check', 'sentence': enforcement_sentence, 'testid': 'policy-checked'},
+    ({'label': 'Violations caught', 'value': '{:,}'.format(found), 'icon': 'triangle-alert', 'sentence': 'Operations that broke a rule', 'testid': 'policy-violations'} if found else
      {'label': 'No violations', 'value': none, 'icon': 'circle-check', 'sentence': 'Every operation checked kept to the rules', 'testid': 'policy-violations'}),
-    health_card
+    {'label': 'Kept to the rules', 'value': ((rate|round|int)|string ~ '%') if rate is not none else none, 'icon': 'shield-check', 'sentence': 'Share of checked operations with no violation', 'testid': 'policy-rate'},
+    ({'label': 'Critical violations', 'value': '{:,}'.format(critical), 'icon': 'octagon-x', 'sentence': 'Serious breaches that need a look', 'testid': 'policy-critical'} if critical else
+     {'label': 'No critical violations', 'value': none, 'icon': 'activity', 'sentence': 'Nothing serious has been caught', 'testid': 'policy-critical'})
 ]) }}
-{% else %}
-{{ stat_cards([enforcement_card, health_card]) }}
 {% endif %}
 
-{% call ui.card(attrs={'data-testid': 'policy-recent-violations'}) %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='Recent violations') }}
-    {{ ui.card_description(text='The last five operations that broke a rule, with what to do about each') }}
-  {% endcall %}
-  {% call ui.card_content() %}
+{% call section('Recent violations', (enforcement_sentence if not checked else 'The last five operations that broke a rule, with what to do about each'), testid='policy-recent-violations') %}
+  {% if recent %}
   {% call(v) list_table(rows=recent, columns=[('Rule', ''), ('Severity', ''), {'label': 'Detected', 'sortable': true}, {'label': 'What to do', 'class': 'hidden lg:table-cell'}],
-                        caption='Recent policy violations', testid='policy-violations-table', row_testid='policy-violation-row',
-                        empty_message=('No AI operations have been checked yet. Violations appear here as soon as an operation breaks a rule.' if not checked else 'No violations. Every operation checked kept to the rules.')) %}
+                        caption='Recent policy violations', testid='policy-violations-table', row_testid='policy-violation-row') %}
     {% call table_cell(class='max-w-[360px]') %}
       <span class="block truncate font-medium">{{ v.rule.name }}</span>
       <span class="block truncate text-xs text-muted-foreground">{{ v.file_path or v.context or v.rule.description }}</span>
@@ -70,7 +60,15 @@
     {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': v.detected_at.strftime('%Y%m%d%H%M%S') if v.detected_at else ''}) %}{{ v.detected_at.strftime('%d %b %Y %H:%M') if v.detected_at else value_or_unset(none, 'Unknown') }}{% endcall %}
     {% call table_cell(class='hidden lg:table-cell max-w-[360px] truncate text-muted-foreground') %}{{ value_or_unset(v.suggested_action, 'No suggestion') }}{% endcall %}
   {% endcall %}
+  {% else %}
+  {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'policy-violations-empty', 'role': 'status'}) %}
+    {% call ui.empty_header() %}
+      {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
+      {{ ui.empty_title(text=('No AI operations checked yet' if not checked else 'No violations')) }}
+      {{ ui.empty_description(text=('A violation appears here as soon as an AI operation breaks a rule.' if not checked else 'Every operation checked kept to the rules.')) }}
+    {% endcall %}
   {% endcall %}
+  {% endif %}
 {% endcall %}
 {% endif %}
 </div>

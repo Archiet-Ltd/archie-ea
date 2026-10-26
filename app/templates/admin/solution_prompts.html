@@ -8,30 +8,26 @@
 
 {% block title %}AI prompts{% endblock %}
 
-{% macro _actions() %}
-{% call ui.button(href=request.path, variant='outline', attrs={'data-testid': 'prompts-refresh'}) %}{{ lucide('refresh-cw') }}Refresh{% endcall %}
-{% endmacro %}
-
 {% block content %}
 {% set prompts = prompts|default([]) %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='AI prompts', subtitle='The instructions the Architecture Journey gives the AI for each phase; a customised prompt replaces the default',
-              breadcrumb=[('Admin', url_for('admin.index')), ('AI prompts', none)], actions_caller=_actions) }}
+{%- set custom = prompts|selectattr('has_override')|list|length -%}
+{{ page_shell(title='AI prompts', subtitle=('What the Architecture Journey tells the AI in each phase; ' ~ ('every prompt uses its default text' if not custom else (custom|string ~ ' of ' ~ prompts|length|string ~ ' use your own text, the rest the default'))),
+              breadcrumb=[('Admin', url_for('admin.index')), ('AI prompts', none)]) }}
 
 {% if load_error %}
 {% call ui.alert(variant='destructive', attrs={'role': 'alert'}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=load_error) }}{% endcall %}
 {% endif %}
 {% call ui.alert(variant='destructive', class='hidden', attrs={'role': 'alert', 'data-prompt-error': ''}) %}{{ lucide('circle-alert') }}<div data-slot="alert-description" data-prompt-error-text></div>{% endcall %}
 
-{% call(p) list_table(rows=prompts, columns=[('Prompt', ''), {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': '', 'class': 'w-12'}],
-                      caption='AI prompts', testid='prompts-table', row_testid='prompt-row', search_placeholder='Filter prompts...',
+{% call(p) list_table(rows=prompts, columns=[('Prompt', ''), {'label': 'Phase', 'sortable': true}, {'label': '', 'class': 'w-12'}],
+                      caption='AI prompts', testid='prompts-table', row_testid='prompt-row', search_placeholder='Filter prompts...', toolbar=true,
                       empty_message=('No prompts to show.' if load_error else 'No prompts are configured for the Architecture Journey.')) %}
   {% call table_cell(class='max-w-[560px]') %}
-    <span class="block truncate font-medium">{{ p.name }}</span>
+    <span class="flex items-center gap-2"><span class="truncate font-medium">{{ p.name }}</span>{% if p.has_override %}{{ state_badge('Customised', tone='caution', testid='prompt-status') }}{% endif %}</span>
     {% if p.description %}<span class="block truncate text-xs text-muted-foreground">{{ p.description }}</span>{% endif %}
   {% endcall %}
-  {% call table_cell(class='whitespace-nowrap') %}{{ value_or_unset(p.category, 'Any phase') }}{% endcall %}
-  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge('Customised' if p.has_override else 'Default', tone=('caution' if p.has_override else 'neutral'), testid='prompt-status') }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ p.category or 'Any phase' }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}
     {% call row_actions('Actions for ' ~ p.name) %}
         {{ ui.dropdown_menu_item(text='Edit', attrs={'data-prompt-edit': p.key, 'data-testid': 'prompt-edit'}) }}

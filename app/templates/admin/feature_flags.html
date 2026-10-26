@@ -13,12 +13,9 @@
 {% endmacro %}
 
 {% macro _filters() %}
-<form method="get" action="{{ url_for('admin.feature_flags') }}" class="flex flex-wrap items-center gap-2" data-testid="feature-flag-filters">
-  {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
-  {% call native_select_wrapper() %}{% call native_select(name='type', size='sm', attrs={'aria-label': 'Type', 'data-autosubmit': ''}) %}
-    {{ native_select_option(text='All types', value='') }}
-    {% for ftype in FeatureType %}{{ native_select_option(text=ftype.value.replace('_', ' ')|capitalize, value=ftype.value, selected=(filter_type == ftype.value)) }}{% endfor %}
-  {% endcall %}{% endcall %}
+{%- set keep = {'search': search or none, 'type': filter_type or none, 'state': filter_state or none, 'status': filter_status or none, 'hierarchy': filter_hierarchy or none} -%}
+<form method="get" action="{{ url_for('admin.feature_flags') }}" class="flex items-center gap-2" data-testid="feature-flag-filters">
+  {% for k in ['search', 'type', 'hierarchy'] %}{% if keep[k] %}<input type="hidden" name="{{ k }}" value="{{ keep[k] }}">{% endif %}{% endfor %}
   {% call native_select_wrapper() %}{% call native_select(name='state', size='sm', attrs={'aria-label': 'Stage', 'data-autosubmit': ''}) %}
     {{ native_select_option(text='All stages', value='') }}
     {% for fstate in FeatureState %}{{ native_select_option(text=fstate.value.replace('_', ' ')|capitalize, value=fstate.value, selected=(filter_state == fstate.value)) }}{% endfor %}
@@ -28,26 +25,35 @@
     {{ native_select_option(text='On', value='enabled', selected=(filter_status == 'enabled')) }}
     {{ native_select_option(text='Off', value='disabled', selected=(filter_status == 'disabled')) }}
   {% endcall %}{% endcall %}
-  {% call native_select_wrapper() %}{% call native_select(name='hierarchy', size='sm', attrs={'aria-label': 'Level', 'data-autosubmit': ''}) %}
-    {{ native_select_option(text='All levels', value='') }}
-    {{ native_select_option(text='Sections', value='parent', selected=(filter_hierarchy == 'parent')) }}
-    {{ native_select_option(text='Features', value='child', selected=(filter_hierarchy == 'child')) }}
-    {{ native_select_option(text='Sub-features', value='grandchild', selected=(filter_hierarchy == 'grandchild')) }}
-  {% endcall %}{% endcall %}
   <noscript>{{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}</noscript>
 </form>
+{%- set more_on = (1 if filter_type else 0) + (1 if filter_hierarchy else 0) -%}
+{% call ui.dropdown_menu() %}
+  {% call ui.dropdown_menu_trigger(variant='outline', size='sm', class='h-8 border-dashed', attrs={'data-testid': 'feature-flag-more-filters'}) %}{{ lucide('filter') }}Filters{% if more_on %}<span class="tabular-nums text-muted-foreground">{{ more_on }}</span>{% endif %}{% endcall %}
+  {% call ui.dropdown_menu_content(align='end', class='w-[200px]') %}
+    {{ ui.dropdown_menu_label(text='Type') }}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, type=none))) %}{% if not filter_type %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}All types{% endcall %}
+    {% for ftype in FeatureType %}{% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, type=ftype.value))) %}{% if filter_type == ftype.value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ ftype.value.replace('_', ' ')|capitalize }}{% endcall %}{% endfor %}
+    {{ ui.dropdown_menu_separator() }}
+    {{ ui.dropdown_menu_label(text='Level') }}
+    {% for value, label in [('', 'All levels'), ('parent', 'Sections'), ('child', 'Features'), ('grandchild', 'Sub-features')] %}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, hierarchy=(value or none)))) %}{% if (filter_hierarchy or '') == value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ label }}{% endcall %}
+    {% endfor %}
+  {% endcall %}
+{% endcall %}
 {% endmacro %}
 
 {% macro _clear_filters() %}{{ ui.button(text='Show every flag', href=url_for('admin.feature_flags'), variant='outline', size='sm') }}{% endmacro %}
 
 {% block content %}
 {%- set filtered = search or filter_type or filter_state or filter_status or filter_hierarchy -%}
+{%- set any_routes = (features or [])|selectattr('routes')|list|length > 0 -%}
 {%- set state_tone = {'stable': 'positive', 'deprecated': 'negative', 'alpha': 'caution', 'beta': 'caution', 'labs': 'caution', 'maintenance_mode': 'caution'} -%}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Feature flags', subtitle='Turn features on or off for everyone, and see which stage each one is at',
               breadcrumb=[('Admin', url_for('admin.index')), ('Feature flags', none)], actions_caller=_actions) }}
 
-{% call(feature) list_table(rows=features, columns=[('Feature', ''), {'label': 'Type', 'class': 'hidden md:table-cell'}, {'label': 'Stage', 'sortable': true}, {'label': 'On or off', 'sortable': true}, {'label': 'Pages', 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}],
+{% call(feature) list_table(rows=features, columns=[('Feature', ''), {'label': 'Type', 'class': 'hidden md:table-cell'}, {'label': 'Stage', 'sortable': true}, {'label': 'On or off', 'sortable': true}] + ([{'label': 'Pages', 'class': 'hidden lg:table-cell'}] if any_routes else []) + [{'label': '', 'class': 'w-12'}],
                             caption='Feature flags', testid='feature-flags-table', row_testid='feature-flag-row', search_placeholder='Filter flags...',
                             toolbar=true, toolbar_actions=_filters, page_size=50,
                             empty_message=('No feature flags match these filters.' if filtered else 'No feature flags yet. Create one to control who sees a feature.'),
@@ -61,9 +67,9 @@
   {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': 1 if feature.enabled else 0}) %}
     {{ state_badge('On' if feature.enabled else 'Off', tone=('positive' if feature.enabled else 'neutral'), testid='feature-flag-status') }}
   {% endcall %}
-  {% call table_cell(class='hidden lg:table-cell max-w-[260px] truncate text-xs text-muted-foreground') %}
-    {% if feature.routes %}<code>{{ feature.routes[0] }}</code>{% if feature.routes|length > 1 %} and {{ feature.routes|length - 1 }} more{% endif %}{% else %}Not tied to a page{% endif %}
-  {% endcall %}
+  {% if any_routes %}  {% call table_cell(class='hidden lg:table-cell max-w-[260px] truncate text-xs text-muted-foreground') %}
+    {% if feature.routes %}<code>{{ feature.routes[0] }}</code>{% if feature.routes|length > 1 %} and {{ feature.routes|length - 1 }} more{% endif %}{% endif %}
+  {% endcall %}{% endif %}
   {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ feature.name) %}
     {{ dropdown_menu_item(text=('Turn off' if feature.enabled else 'Turn on'), attrs={'data-ff-toggle': url_for('admin.feature_flag_toggle', id=feature.id), 'data-testid': 'feature-flag-toggle'}) }}
     {{ row_action('Edit', href=url_for('admin.feature_flag_edit', id=feature.id)) }}

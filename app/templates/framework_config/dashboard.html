@@ -12,7 +12,7 @@
 {% macro _actions() %}
 <div class="flex flex-wrap items-center gap-2">
   {% call ui.dropdown_menu() %}
-    {% call ui.dropdown_menu_trigger(variant='outline') %}More{{ lucide('chevron-down') }}{% endcall %}
+    {% call ui.dropdown_menu_trigger(variant='ghost', size='icon', attrs={'aria-label': 'More framework pages'}) %}{{ lucide('ellipsis') }}{% endcall %}
     {% call ui.dropdown_menu_content(align='end', class='w-[200px]') %}
       {{ ui.dropdown_menu_item(text='Templates', href=url_for('framework_config_ui.templates')) }}
       {{ ui.dropdown_menu_item(text='Extensions', href=url_for('framework_config_ui.extensions')) }}

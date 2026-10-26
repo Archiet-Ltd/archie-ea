@@ -4,7 +4,7 @@
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'components/figures.html' import state_badge, section %}
 {% from 'basecoat/table.html' import table_cell %}
-{% from 'basecoat/dropdown-menu.html' import dropdown_menu_item, dropdown_menu_separator %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu_item, dropdown_menu_separator, dropdown_menu_label %}
 
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
@@ -17,10 +17,10 @@
 {{ page_shell(title='Team', subtitle='Who belongs to this organisation, what role each person has, and who is still to accept an invitation',
               breadcrumb=[('Admin', url_for('admin.index')), ('Team', none)]) }}
 
-<nav class="flex items-center gap-1 border-b border-border text-sm" aria-label="Team sections" data-testid="team-tabs">
+<nav class="inline-flex h-9 w-fit items-center rounded-lg bg-muted p-1 text-sm text-muted-foreground" aria-label="Team sections" data-testid="team-tabs">
   {% for key, label, href in [('members', 'Members', url_for('team.team')), ('permissions', 'Permissions', url_for('team.team', tab='permissions'))] %}
   {% set active = (tab == 'permissions') == (key == 'permissions') %}
-  <a href="{{ href }}" data-testid="team-tab-{{ key }}" class="-mb-px inline-flex items-center border-b-2 px-3 py-2 transition-colors {{ 'border-primary font-medium text-foreground' if active else 'border-transparent text-muted-foreground hover:text-foreground' }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+  <a href="{{ href }}" data-testid="team-tab-{{ key }}" class="inline-flex h-full items-center rounded-md px-3 font-medium transition-colors {{ 'bg-background text-foreground' if active else 'hover:text-foreground' }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
   {% endfor %}
 </nav>
 
@@ -28,31 +28,33 @@
 {% include 'admin/_team_permissions.html' %}
 {% else %}
 
-{% call section('Invite a teammate', 'They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.', testid='team-invite') %}
+{% call section('Invite a teammate', ('They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.' if mail_is_available else 'Invite someone who already has an account here; they join the next time they sign in.'), testid='team-invite') %}
   {% if invite_error %}
-  {% call ui.alert(variant='destructive', class='mb-4', attrs={'data-team-invite-error': ''}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=invite_error) }}{% endcall %}
+  {% call ui.alert(variant='destructive', class='mb-6 max-w-2xl', attrs={'data-team-invite-error': ''}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=invite_error) }}{% endcall %}
   {% endif %}
-  {% if not mail_is_available %}
-  {% call ui.alert(class='mb-4', attrs={'data-team-mail-unavailable': ''}) %}{{ lucide('info') }}{{ ui.alert_description(text='E-mail is not available on this server, so invitations cannot be sent to people who do not have an account yet.') }}{% endcall %}
+  {% if not mail_is_available and current_user.is_platform_admin %}
+  {% call ui.alert(class='mb-6 max-w-2xl', attrs={'data-team-mail-unavailable': ''}) %}{{ lucide('info') }}{{ ui.alert_description(text='Invitation e-mails are switched off on this server, so people without an account cannot be invited until e-mail is set up.') }}{% endcall %}
   {% endif %}
-  <form method="POST" action="{{ url_for('team.team_invite') }}" class="flex flex-wrap items-end gap-3">
+  <form method="POST" action="{{ url_for('team.team_invite') }}" class="max-w-2xl space-y-6" data-testid="team-invite-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="grid w-full gap-2 sm:w-64">
-      {{ ui.label(text='Email', attrs={'for': 'email'}) }}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Email', attrs={'for': 'email'}) }}
       {{ ui.input(id='email', name='email', type='email', required=true, autocomplete='off', placeholder='name@company.com') }}
-    </div>
-    <div class="grid gap-2">
-      {{ ui.label(text='Persona', attrs={'for': 'persona'}) }}
-      {% call native_select_wrapper() %}{% call native_select(id='persona', name='persona') %}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Persona', attrs={'for': 'persona'}) }}
+      {% call native_select_wrapper(class='w-full') %}{% call native_select(id='persona', name='persona', class='w-full') %}
         {% for value, label in personas %}{{ native_select_option(label, value=value) }}{% endfor %}
       {% endcall %}{% endcall %}
-    </div>
-    <div class="grid gap-2">
-      {{ ui.label(text='Role', attrs={'for': 'role'}) }}
-      {% call native_select_wrapper() %}{% call native_select(id='role', name='role') %}
+      {{ ui.field_description(text='Sets what they see first when they sign in.') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Role', attrs={'for': 'role'}) }}
+      {% call native_select_wrapper(class='w-full') %}{% call native_select(id='role', name='role', class='w-full') %}
         {% for r in valid_roles %}{{ native_select_option(_role_label(r), value=r, selected=(r == 'viewer')) }}{% endfor %}
       {% endcall %}{% endcall %}
-    </div>
+      {{ ui.field_description(text='What they may change. You can change it later from the member list.') }}
+    {% endcall %}
     {{ ui.button(text='Send invitation', type='submit') }}
   </form>
 {% endcall %}
@@ -90,7 +92,7 @@
 {% endcall %}
 {% endif %}
 
-{% call section('Members', 'Change a role from the list; the change takes effect on the next page the person opens.', testid='team-members') %}
+{% call section('Members', 'Change someone’s role from the menu at the end of their row; it applies on the next page they open.', testid='team-members') %}
 <div data-team-members>
 {% call(member) list_table(rows=members, columns=[('Name', ''), {'label': 'Email', 'class': 'hidden md:table-cell'}, ('Role', ''), {'label': '', 'class': 'w-12'}],
                             caption='Organisation members', testid='members-table', row_testid='member-row', search_placeholder='Filter members...',
@@ -100,30 +102,30 @@
     {% if member.id == current_user.id %}<span class="block text-xs text-muted-foreground">You</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='hidden md:table-cell max-w-[300px] truncate text-muted-foreground') %}{{ member.email }}{% endcall %}
-  {% call table_cell() %}
-    {% set _role_from_map = role_map[member.id] if (role_map is defined and member.id in role_map) else '' %}
-    {% set _raw_role = _role_from_map or (member.role|default('')) %}
-    {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
-    <form method="POST" action="{{ url_for('team.team_change_role') }}" class="flex items-center">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="user_id" value="{{ member.id }}">
-      {% call native_select_wrapper() %}{% call native_select(name='role', size='sm', attrs={'aria-label': 'Role for ' ~ member.email, 'data-autosubmit': ''}) %}
-        {% for r in valid_roles %}{{ native_select_option(_role_label(r), value=r, selected=(current_role == r)) }}{% endfor %}
-      {% endcall %}{% endcall %}
-    </form>
-  {% endcall %}
+  {% set _role_from_map = role_map[member.id] if (role_map is defined and member.id in role_map) else '' %}
+  {% set _raw_role = _role_from_map or (member.role|default('')) %}
+  {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-testid': 'member-role'}) %}{{ _role_label(current_role) }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}
-    {% if member.id != current_user.id or (member.external_id and not member.is_platform_admin) %}
     {% call row_actions('Actions for ' ~ member.email) %}
+      {{ dropdown_menu_label(text='Change role') }}
+      {% for r in valid_roles if r != current_role %}
+      <form method="POST" action="{{ url_for('team.team_change_role') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="user_id" value="{{ member.id }}">
+        <input type="hidden" name="role" value="{{ r }}">
+        {{ dropdown_menu_item(text='Make ' ~ _role_label(r)|lower, tag='button', type='submit', class='w-full', attrs={'data-testid': 'member-role-' ~ r}) }}
+      </form>
+      {% endfor %}
       {% if member.external_id and not member.is_platform_admin %}
+      {{ dropdown_menu_separator() }}
       {{ row_action('Reset single sign-on', action=url_for('team.team_reset_sign_in', user_id=member.id), testid='member-reset-sign-in') }}
       {% endif %}
       {% if member.id != current_user.id %}
-      {% if member.external_id and not member.is_platform_admin %}{{ dropdown_menu_separator() }}{% endif %}
+      {{ dropdown_menu_separator() }}
       {{ dropdown_menu_item(text='Remove from organisation', variant='destructive', attrs={'data-action': 'remove-member', 'data-member-id': member.id, 'data-member-name': member.full_name(), 'data-remove-url': url_for('team.team_remove_member', user_id=member.id), 'data-testid': 'member-remove'}) }}
       {% endif %}
     {% endcall %}
-    {% endif %}
   {% endcall %}
 {% endcall %}
 </div>
