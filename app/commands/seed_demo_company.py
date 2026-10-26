@@ -979,6 +979,16 @@ _CAPABILITIES = [
     ("Security Operations", "LQ-CAP-SECURITY", 3, 4, 3),
 ]
 
+# Each demo capability sits in a business domain, so the capability heat map has
+# rows to compare rather than one "No domain" strip. (code, name) per domain.
+_CAPABILITY_DOMAINS = {
+    "LQ-FIELD": ("Field Operations", ["CALIBRATION", "WATER-QUALITY", "FIELD-SERVICE", "ASSET-LIFECYCLE", "INCIDENT"]),
+    "LQ-SUPPLY": ("Supply and Fulfilment", ["INVENTORY", "FULFILMENT", "SUPPLIER", "DEMAND", "QUALITY"]),
+    "LQ-GOVERN": ("Governance and People", ["COMPLIANCE", "WORKFORCE", "DOCUMENT", "IDENTITY"]),
+    "LQ-DATA": ("Data and Integration", ["EVENT-PROCESSING", "ANALYTICS", "INTEGRATION", "MONITORING"]),
+    "LQ-TECH": ("Technology Operations", ["DEVICE-MGMT", "FIRMWARE", "NETWORK", "BACKUP", "CAPACITY", "SECURITY"]),
+}
+
 # The judgment for each demo capability: strategic differentiates the company,
 # operational runs it day to day, supporting is what every company needs.
 _CAPABILITY_TYPES = {
@@ -2778,6 +2788,28 @@ def _seed_demo_company() -> dict:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
         db.session.flush()
 
+        # Business domains for the heat map (also for a database seeded before
+        # capabilities carried one: a domain an editor has set is left alone).
+        from app.models.unified_capability import BusinessDomain
+
+        domain_of = {}
+        for dcode, (dname, members) in _CAPABILITY_DOMAINS.items():
+            domain = BusinessDomain.query.filter_by(code=dcode).first()
+            if domain is None:
+                domain = BusinessDomain(code=dcode, name=dname,
+                                        description="%s capabilities of Lantern Quay Systems" % dname)
+                db.session.add(domain)
+                db.session.flush()
+            for member in members:
+                domain_of["LQ-CAP-" + member] = (domain.id, dname)
+        for cap in db.session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org_id):
+            if cap.domain_id is None and cap.code in domain_of:
+                cap.domain_id = domain_of[cap.code][0]
+        for cap in db.session.query(BusinessCapability).filter(BusinessCapability.organization_id == org_id):
+            if not cap.business_domain and cap.code in domain_of:
+                cap.business_domain = domain_of[cap.code][1]
+        db.session.flush()
+
         # The judgment replaces the starting value, but only while the capability still
         # carries the starting value: a type an editor has changed is theirs.
         from app.services.capability_type import default_capability_type
@@ -2792,6 +2824,51 @@ def _seed_demo_company() -> dict:
                 cap.capability_type = chosen
         db.session.flush()
 
+        # ── 7a. every capability has its model element and its canonical record ──
+        # The coverage page, the genome slice and the chat read the unified store
+        # with a model element on both ends; a capability without either reads as
+        # unsupported however many systems run it.
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_application_capability_mapping import (
+            UnifiedApplicationCapabilityMapping,
+        )
+        from app.modules.capabilities.services.capability_service import ensure_capability_record
+        from app.services.archimate_backbone import create_backbone_element
+
+        unified_by_code = {u.code: u for u in _resolve_caps(org_id).values()}
+        elements_made = 0
+        for name, code, _cur, _tgt, level in _CAPABILITIES:
+            element = elements.get(name)
+            if element is None or element.type != "Capability":
+                element = create_backbone_element(
+                    element_type="Capability", layer="strategy", name=name,
+                    organization_id=org_id,
+                )
+                elements[name] = element
+                elements_made += 1
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.archimate_element_id is None:
+                bc.archimate_element_id = element.id
+            ucap = unified_by_code.get(code)
+            if ucap is None:
+                ucap, _created = ensure_capability_record(
+                    name=name, code=code, level=level, organization_id=org_id,
+                    archimate_element_id=element.id,
+                    domain_id=(domain_of.get(code) or (None,))[0],
+                )
+                unified_by_code[code] = ucap
+            elif ucap.archimate_element_id is None:
+                ucap.archimate_element_id = element.id
+        for demo_app in db.session.query(ApplicationComponent).filter(
+            ApplicationComponent.organization_id == org_id
+        ):
+            if demo_app.archimate_element_id is None:
+                match = elements.get(demo_app.name)
+                if match is not None and match.type == "ApplicationComponent":
+                    demo_app.archimate_element_id = match.id
+        db.session.flush()
+        stats["capability_elements_created"] = elements_made
+
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
 
@@ -2801,9 +2878,30 @@ def _seed_demo_company() -> dict:
             .filter(ApplicationCapabilityMapping.organization_id == org_id)
             .all()
         }
+        unified_mapped = {
+            (m.application_component_id, m.unified_capability_id)
+            for m in db.session.query(UnifiedApplicationCapabilityMapping)
+            .join(ApplicationComponent,
+                  ApplicationComponent.id == UnifiedApplicationCapabilityMapping.application_component_id)
+            .filter(ApplicationComponent.organization_id == org_id)
+            .all()
+        }
+        unified_created = 0
         mappings_created = 0
         for app_name, app in _resolve_apps(org_id).items():
             profile = _APP_PROFILE.get(app_name)
+            ucap = unified_by_code.get(profile[3]) if profile else None
+            if ucap is not None and (app.id, ucap.id) not in unified_mapped:
+                db.session.add(UnifiedApplicationCapabilityMapping(
+                    unified_capability_id=ucap.id,
+                    application_component_id=app.id,
+                    support_level="full",
+                    coverage_percentage=80,
+                    relationship_type="supports",
+                    is_active=True,
+                ))
+                unified_mapped.add((app.id, ucap.id))
+                unified_created += 1
             bc = existing_bcs.get(profile[3]) if profile else None
             if bc is None or (app.id, bc.id) in mapped:
                 continue
@@ -2817,9 +2915,10 @@ def _seed_demo_company() -> dict:
                 is_active=True,
             ))
             mappings_created += 1
-        if mappings_created:
+        if mappings_created or unified_created:
             db.session.flush()
         stats["capability_mappings_created"] = mappings_created
+        stats["unified_capability_mappings_created"] = unified_created
 
         # ── 7c. architecture review board queue ─────────────────────────
         from app.models.architecture_review_board import ARBReviewItem
