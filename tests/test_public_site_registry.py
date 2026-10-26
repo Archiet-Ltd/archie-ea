@@ -22,7 +22,7 @@ PRODUCT_ITEMS = [
     ("Map your business", "Business capability map", ""),
     ("Map your business", "Value streams", "Draw value streams with their stages and map each stage to capabilities."),
     ("Map your business", "Business model canvas", "Create a business model canvas and export it."),
-    ("Know what you run", "Build your model from your tools", "Connect GitHub or Jira at sign-up and start your model from them."),
+    ("Know what you run", "Build your model from your tools", "Start your model from your company website and a spreadsheet of applications."),
     ("Know what you run", "Application inventory", "Keep a list of your applications and record the details of each."),
     ("Know what you run", "Architecture model", "Import an ArchiMate file and browse the elements and links it brings in."),
     ("Know what you run", "Diagrams", "Draw architecture diagrams from the elements in your model."),
@@ -40,6 +40,7 @@ PRODUCT_SOON = [
     ("Ask in plain language", "Early access: ask your model a question in plain words, get a cited answer."),
     ("Business model canvas and frameworks", "Early access: draw your business model canvas and other known frameworks."),
     ("Connect GitHub or Jira", "Early access: build your model from your code and tickets."),
+    ("An architecture team in your chat", "Early access: ask Entelim as your technical architect or product manager."),
     ("Scenarios", "Early access: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Early access: discover the software and tools you actually pay for and use."),
 ]

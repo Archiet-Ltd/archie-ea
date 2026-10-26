@@ -167,8 +167,9 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base
     expect(soon.get_by_text("Early access", exact=True).first).to_be_visible()
     expect(soon.get_by_text("Not available yet. Join the waiting list.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
-    assert rows.count() == 2
-    for text in ("Scenarios", "Software and tool discovery"):
+    assert rows.count() == 6
+    for text in ("Ask in plain language", "Business model canvas and frameworks", "Connect GitHub or Jira",
+                 "An architecture team in your chat", "Scenarios", "Software and tool discovery"):
         expect(soon.get_by_role("link", name=text)).to_be_visible()
     # nothing delivered sits in the Early access group, and nothing coming soon sits among delivered ones
     live_labels = page.eval_on_selector_all("#menu-product a[data-availability='live']", "els => els.map(e => e.textContent)")

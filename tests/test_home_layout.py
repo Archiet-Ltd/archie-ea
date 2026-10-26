@@ -11,18 +11,14 @@ import re
 import pytest
 
 EXPECTED_H2 = [
-    "Every enterprise runs on knowledge it cannot see in one place.",
-    "Ask a question. Get an answer that shows its working.",
-    "The eighteen capabilities of Enterprise Intelligence Management.",
-    "Give your AI assistants one true source about your company.",
-    "How the company brain grows.",
-    "See it answered for where you are.",
+    "From your website to one list of what you run.",
+    "The jobs it does for you.",
+    "Coming next. Join the waiting list.",
     "Priced per company, never per application.",
     "A startup is an enterprise too.",
     "Licensed under AGPL-3.0.",
-    "How Entelim compares.",
     "Questions.",
-    "Connect your tools. Get a cited answer.",
+    "Start with your website. See your company in one place.",
 ]
 
 
@@ -55,16 +51,15 @@ def test_section_order_follows_the_design(home_html):
 
 def test_eyebrows_label_the_sections(home_html):
     eyebrows = [_text(m) for m in re.findall(r'<p class="home-eyebrow">(.*?)</p>', home_html, flags=re.S)]
-    for label in ("The category", "Cited answers", "Capabilities", "AI assistants", "Roadmap", "Use cases",
-                  "Pricing", "Compare", "Questions"):
+    for label in ("See it in one sitting", "What it does", "Early access", "Pricing", "Questions"):
         assert label in eyebrows
 
 
 def test_every_details_sits_inside_the_faq_column(home_html):
     faq = re.search(r'<div class="public-faq[^"]*">(.*?)</div>\s*</div>\s*</div>\s*</section>', home_html, flags=re.S)
     assert faq, "FAQ column not found"
-    assert home_html.count("<details") == 6
-    assert faq.group(1).count("<details") == 6
+    assert home_html.count("<details") == 5
+    assert faq.group(1).count("<details") == 5
 
 
 def test_pricing_table_has_five_headers_and_four_rows(home_html):
@@ -80,15 +75,16 @@ def test_pricing_table_has_five_headers_and_four_rows(home_html):
     assert all(len(re.findall(r"<td", r)) == 5 for r in rows)
 
 
-def test_hero_figure_is_a_real_answer_and_not_the_stale_list(home_html):
-    assert "img/home/chat-answer.webp" in home_html
-    assert "img/home/chat-answer-mobile.webp" in home_html
+def test_hero_figure_is_the_real_overview_and_not_the_chat_or_the_stale_list(home_html):
+    assert "img/home/overview.webp" in home_html
+    assert "img/home/overview-mobile.webp" in home_html
+    assert "chat-answer" not in home_html
     assert "product-portfolio" not in home_html
 
 
 def test_closing_band_has_the_call_to_action_pair(home_html):
     closing = home_html[home_html.index('class="home-closing"'):]
     closing = closing[: closing.index("</section>")]
-    assert closing.count("public-btn--primary") == 1
-    assert closing.count("public-btn--outline") == 1
+    assert closing.count("bg-primary text-primary-foreground") == 1
+    assert closing.count("border border-input") == 1
     assert 'href="/contact"' in closing

@@ -76,8 +76,7 @@ def test_pill_href_is_escaped(render):
 def test_home_hero_uses_the_pill(client):
     html = client.get("/").get_data(as_text=True)
     assert "home-hero__chip" not in html
-    assert "Open source &middot; Self-host free" in html
-    assert "Open source under AGPL-3.0 &middot; Self-host free, forever" in html
+    assert "Open source, free to start" in html
     pill = re.search(r'<span class="[^"]*rounded-full[^"]*">\s*<span class="sm:hidden">Open source', html)
     assert pill, "hero label is not rendered as the pill span"
     assert "px-4" in pill.group(0) and "py-1.5" in pill.group(0)

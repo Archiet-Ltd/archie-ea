@@ -27,6 +27,7 @@ EARLY_ACCESS_PAGES = {
     "Ask in plain language": "/modules/ask-in-plain-language",
     "Business model canvas and frameworks": "/modules/business-model-canvas-and-frameworks",
     "Connect GitHub or Jira": "/modules/connect-github-or-jira",
+    "An architecture team in your chat": "/modules/an-architecture-team-in-your-chat",
 }
 
 
@@ -139,7 +140,7 @@ def test_a_visitor_joins_the_waiting_list_for_something_not_built_yet(browser, s
 
         with app.app_context():
             row = ProductInquiry.query.filter_by(email=email).first()
-            assert row is not None and row.offer.endswith(path.rsplit("/", 1)[1][:30]), "the waiting-list entry was not stored"
+            assert row is not None and row.offer == ("feature:" + path.rsplit("/", 1)[1])[:50], "the waiting-list entry was not stored"
     finally:
         context.close()
 
@@ -151,7 +152,9 @@ def test_pricing_lists_what_exists_and_paid_plans_join_a_waiting_list(browser, s
     page = context.new_page()
     try:
         page.goto(site_url + "/pricing")
-        body = page.inner_text("body")
+        body = page.locator("main").evaluate(
+            "el => { const c = el.cloneNode(true); c.querySelectorAll('[data-site-footer], script').forEach(n => n.remove()); return c.textContent; }")
+        body = " ".join(body.split())
         for published in ("USD 490", "USD 290", "24,000"):
             assert published in body, published
         for absent in ("SAML", "Single sign-on", "review-board workflow", "Business Model Canvas", "ArchiMate Composer",
@@ -185,15 +188,24 @@ def test_the_main_action_reaches_sign_up_and_the_home_page_shows_what_is_early_a
     page = context.new_page()
     try:
         page.goto(site_url + "/")
-        for item in EARLY_ACCESS_PAGES:
+        for item in list(EARLY_ACCESS_PAGES)[:3]:
             expect(page.get_by_test_id("home-early-access")).to_contain_text(item)
         # The home page claims nothing that arrives later as available.
-        text = page.inner_text("main")
+        text = page.locator("main").evaluate(
+            "el => { const c = el.cloneNode(true); c.querySelectorAll('[data-testid=home-early-access]').forEach(n => n.remove()); return c.textContent; }")
         for later in ("cited answer", "Connect GitHub and", "eighteen capabilities", "live on every plan", "Q2 2027"):
             if later == "cited answer":
                 assert "get a cited answer" not in text
             else:
                 assert later not in text, later
+        team = page.get_by_test_id("home-architecture-team")
+        expect(team).to_contain_text("Coming next: an architecture team in your chat.")
+        expect(team).to_contain_text("You approve every change.")
+        assert team.locator("img").count() == 0, "the role advisers carry no screenshot"
+        team.get_by_test_id("home-architecture-team-join").click()
+        expect(page).to_have_url(re.compile(r"/modules/an-architecture-team-in-your-chat$"))
+        expect(page.get_by_test_id("early-access-page")).to_contain_text("Early access")
+        page.goto(site_url + "/")
         page.get_by_test_id("home-hero-start").click()
         expect(page).to_have_url(re.compile(r"/account/register"))
         assert len(page.locator("form").first.inner_text().strip()) > 20

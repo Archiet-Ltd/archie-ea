@@ -63,13 +63,14 @@ def test_the_hero_shows_the_overview_of_the_first_wave_and_not_the_chat(browser,
     page = context.new_page()
     try:
         page.goto(site_url + "/")
-        expect(page.get_by_test_id("home-hero").locator("h1")).to_contain_text("who owns it")
+        expect(page.get_by_test_id("home-hero").locator("h1")).to_contain_text("The company brain.")
         figure = page.get_by_test_id("home-hero-figure")
         expect(figure).to_be_visible()
         # The frame is the library's card: a hairline border and no shadow.
         frame = page.get_by_test_id("home-hero-frame")
         assert frame.get_attribute("data-slot") == "card"
-        assert frame.evaluate("el => getComputedStyle(el).boxShadow") in ("none", "")
+        shadow = frame.evaluate("el => getComputedStyle(el).boxShadow")
+        assert shadow == "none" or set(re.findall(r"rgba?\([^)]*\)", shadow)) <= {"rgba(0, 0, 0, 0)"}, shadow
         assert frame.evaluate("el => parseFloat(getComputedStyle(el).borderTopWidth)") == 1
         expect(frame).to_contain_text("Overview")
         image = page.get_by_test_id("home-hero-proof")
@@ -138,7 +139,7 @@ def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(brow
         offered = []
         for index in range(links.count()):
             text = " ".join(links.nth(index).inner_text().split())
-            if any(label.lower() in text.lower() for label in held) and "coming soon" not in text.lower():
+            if any(label.lower() in text.lower() for label in held) and "coming soon" not in text.lower() and "early access" not in text.lower():
                 offered.append(text)
         assert offered == [], f"offered as available but coming soon: {offered}"
     finally:

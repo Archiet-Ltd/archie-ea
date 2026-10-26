@@ -59,7 +59,7 @@ def test_other_module_screenshots_keep_their_one_x_size():
 def test_home_hero_declares_the_captured_pixels(app, client):
     html = client.get("/").get_data(as_text=True)
     assert 'data-testid="home-hero-figure"' in html
-    for name, width_attr in (("chat-answer.webp", 908), ("chat-answer-mobile.webp", 374)):
+    for name, width_attr in (("overview.webp", 1280), ("overview-mobile.webp", 390)):
         w, h = _css_size(HOME_IMG / name)
         assert w == width_attr
         tag = re.search(r'(?:width="%d"\s+height="(\d+)"|height="(\d+)"\s+width="%d")' % (w, w), html)

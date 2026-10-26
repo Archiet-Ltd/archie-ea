@@ -67,6 +67,15 @@ MODULE_ICONS = {
     "solutions": "puzzle",
     "value-streams": "workflow",
     "vendors": "truck",
+    "ask-in-plain-language": "message-circle",
+    "business-model-canvas-and-frameworks": "layout-dashboard",
+    "connect-github-or-jira": "git-fork",
+    "an-architecture-team-in-your-chat": "bot",
+    "paid-plans": "credit-card",
+    "what-breaks-if-something-fails": "zap",
+    "what-it-costs": "coins",
+    "what-you-are-changing": "target",
+    "prove-you-are-compliant": "badge-check",
 }
 
 # Every use-case (function-per-segment) content file's own icon, keyed by its
@@ -445,7 +454,7 @@ class _Outline(HTMLParser):
         classes = (attrs.get("class") or "").split()
         if tag == "h1":
             self.h1_count += 1
-        if tag == "a" and "public-btn" in classes and "public-btn--primary" in classes:
+        if tag == "a" and "bg-primary" in classes and "text-primary-foreground" in classes:
             if self._inside(lambda t, a: a.get("data-testid") == "landing-hero"):
                 self.hero_primary += 1
         if tag == "a" and self._inside(lambda t, a: t == "ul" and a.get("role") == "list"):
@@ -480,6 +489,11 @@ def test_every_landing_page_renders_hero_bands_and_closing(app):
             outline = _Outline()
             outline.feed(main.group(0))
             assert outline.h1_count == 1, f"{page.url}: {outline.h1_count} <h1> elements"
+            if page.cta == "waiting_list":
+                # An early-access page is laid out like the library's coming-soon page, not as a landing.
+                assert 'data-testid="early-access-page"' in html, page.url
+                assert 'data-testid="feature-interest-form"' in html, page.url
+                continue
             assert 'data-testid="landing-hero"' in html, page.url
             assert 'data-testid="landing-closing"' in html, page.url
             assert 'class="landing-bands"' in html, page.url
@@ -642,15 +656,15 @@ def test_live_page_hero_offers_start_free(app):
     with app.test_client() as client:
         html = client.get("/modules/arb").data.decode()
     hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
-    assert re.search(r'<a href="/account/register" class="public-btn public-btn--primary">Start free</a>', hero)
-    assert re.search(r'class="public-btn public-btn--outline">See pricing</a>', hero)
+    assert re.search(r'<a href="/account/register" class="[^"]*bg-primary[^"]*"[^>]*>\s*Start free\s*</a>', hero)
+    assert re.search(r'<a href="/pricing" class="[^"]*border-input[^"]*"[^>]*>\s*See pricing\s*</a>', hero)
     nav = hero[hero.index('aria-label="Breadcrumb"'):hero.index("</nav>")]
     assert re.search(r'<a href="/features" class="[^"]*rounded-full[^"]*border-border[^"]*px-4 py-1.5[^"]*">', nav)
     assert hero.index("</nav>") < hero.index("<h1")
     closing = html[html.index('data-testid="landing-closing"'):]
-    assert "Import your model and get a free, cited answer to what breaks if a system fails, in minutes." in closing
+    assert "Start free. Give us your company website and see your company profile, your systems and their owners in about fifteen minutes." in closing
     assert 'href="/contact"' in closing
-    assert re.search(r'class="public-btn public-btn--outline">Get in touch</a>', closing)
+    assert re.search(r'<a href="/contact" class="[^"]*border-input[^"]*"[^>]*>\s*Get in touch\s*</a>', closing)
     assert "text-center" in html[html.index('data-testid="landing-closing"') - 10:][:140]
     assert "bg-primary" not in html[html.index('data-testid="landing-closing"') - 10:][:140]
 
@@ -784,7 +798,7 @@ def test_use_case_answer_figure_still_renders_without_a_figure_band_section(app,
 def test_every_module_page_declares_a_known_icon():
     module_dir = CONTENT_ROOT / "modules"
     files = sorted(module_dir.glob("*.md"))
-    assert len(files) == 31
+    assert len(files) == 40
     known = set(MODULE_ICONS.values())
     for md_file in files:
         front = md_file.read_text(encoding="utf-8").split("---", 2)[1]

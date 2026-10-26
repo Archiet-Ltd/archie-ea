@@ -16,7 +16,7 @@ REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "app"
 PRICING_CSS = APP / "static" / "css" / "public_pricing.css"
 
-SHARED = ("public-faq", "public-card", "public-table", "public-btn--primary")
+SHARED = ("public-faq", "public-card", "public-table")
 RETIRED = tuple(f"{'pp'}-{name}" for name in ("btn", "card", "table", "faq", "grow", "link"))
 
 
@@ -107,11 +107,12 @@ def test_the_wrapping_button_shares_the_callout_declaration_block():
 
 
 def test_every_plan_card_button_wraps_and_band_buttons_do_not():
+    """The plan buttons are the library's button macro; a plan card's wraps, the band's does not."""
     html = PRICING_HTML.read_text(encoding="utf-8")
-    tags = re.findall(r'<a [^>]*?class="(public-btn[^"]*)"[^>]*?data-testid="(buy-[^"]*)"', html, flags=re.S)
-    assert len(tags) == 5 and all("public-btn--wrap" in cls for cls, _ in tags)
-    others = re.findall(r'class="(public-btn[^"]*)"[^>]*?data-testid="selfhost-github"', html)
-    assert others and all("public-btn--wrap" not in cls for cls in others)
+    tags = re.findall(r"button\(([^\n]*?testid='((?:buy|waitlist)-[^']*)'[^\n]*?)\) \}\}", html)
+    assert len(tags) == 3 and all("whitespace-normal" in call for call, _ in tags), tags
+    others = re.findall(r"button\(([^\n]*?testid='selfhost-github'[^\n]*?)\) \}\}", html)
+    assert others and all("whitespace-normal" not in call for call in others)
 
 
 def test_the_comparison_frame_clips_its_corners_without_scrolling():

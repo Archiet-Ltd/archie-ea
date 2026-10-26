@@ -2380,26 +2380,24 @@ def test_use_cases_index_in_robots_and_sitemap(app):
 # ── Home page: curated use-case highlights per segment, plus the /vs hub ──
 
 
-def test_home_page_links_curated_use_cases_and_vs_hub(app):
-    """The home page links at least one use case per persona segment, plus
-    the /vs comparison hub, with real working URLs."""
+def test_home_page_shows_what_works_today_and_links_early_access_waiting_lists(app):
+    """While the first wave is live the home page names what a person can do today and links each early-access
+    capability to its waiting-list page; it no longer teases use cases or comparisons that arrive later."""
     with app.test_client() as client:
-        rv = client.get("/")
-        html = rv.data.decode()
+        html = client.get("/").data.decode()
 
-    assert 'href="/use-cases"' in html
-    assert 'href="/vs"' in html
-
-    # Every curated slug on the home page resolves to a real page.
-    from app.main.views import _HOME_USE_CASE_HIGHLIGHTS
-
-    for slugs in _HOME_USE_CASE_HIGHLIGHTS.values():
-        for slug in slugs:
-            page = load_page("function-per-segment", slug=slug)
-            assert page is not None, f"curated home-page slug {slug!r} does not resolve"
-            assert f'href="{page.url}"' in html, (
-                f"home page missing link to curated use case {page.url}"
-            )
+    assert 'data-testid="home-today"' in html
+    assert 'href="/features#applications-and-owners"' in html
+    for path in ("/modules/what-breaks-if-something-fails", "/modules/what-it-costs", "/modules/what-you-are-changing",
+                 "/modules/prove-you-are-compliant"):
+        assert f'href="{path}"' in html and load_page("module", slug=path.rsplit("/", 1)[1]) is not None, path
+    for path in ("/modules/ask-in-plain-language", "/modules/business-model-canvas-and-frameworks",
+                 "/modules/connect-github-or-jira", "/modules/paid-plans"):
+        assert f'href="{path}"' in html, path
+        page_family, slug = path.strip("/").split("/")
+        assert load_page("module", slug=slug) is not None, path
+    main = html[html.index("<main"):html.index('data-site-footer')]
+    assert 'href="/use-cases"' not in main and 'href="/vs"' not in main
 
 
 # ── Header/footer: every public page links Features, Use cases, Compare, ──
@@ -2413,7 +2411,7 @@ def test_public_footer_links_use_cases_compare_pricing_and_offers(app):
     with app.test_client() as client:
         html = client.get("/").data.decode()
 
-    for href in ["/use-cases", "/vs", "/pricing", "/architecture-health-check", "/team-annual-onboarding"]:
+    for href in ["/vs", "/pricing", "/architecture-health-check", "/team-annual-onboarding"]:
         assert f'href="{href}"' in html, f"public footer missing link to {href}"
 
 
