@@ -1,351 +1,207 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/form_field.html' import form_group, form_footer %}
-{% from "components/page_header.html" import page_header %}
-{% from "components/workbench_table.html" import workbench_table with context %}
-{% from "components/modal.html" import modal %}
-{% from "basecoat/button.html" import button %}
-{% from "basecoat/input.html" import input %}
-{% from "basecoat/native-select.html" import native_select, native_select_option %}
-{% from "basecoat/textarea.html" import textarea %}
-{% from "basecoat/table.html" import table_cell %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/modal.html' import modal %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select, native_select_option %}
 
 {% block title %}Vendors{% endblock %}
 
 {% block extra_head_js %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<script src="{{ url_for('static', filename='js/vendors/list.js') }}" data-vendors-url="{{ url_for('unified_applications.vendors') }}"></script>
 <script>
   window.__VENDOR_CONFIG__ = { createVendorUrl: '{{ url_for("vendor_management.create_vendor") }}' };
 </script>
 <script src="{{ url_for('static', filename='js/vendors/create_modal.js') }}"></script>
-<script src="{{ url_for('static', filename='js/vendors/vendor_list_table.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vendors/mapping.js') }}"></script>
 {% endblock %}
 
+{#- A stored ISO date ("2026-11-03") written the way the Overview writes dates: 3 Nov 2026. -#}
+{% macro _date(iso) -%}
+{%- set p = (iso or '')|string|truncate(10, true, '')|replace('T', '-')|truncate(10, true, '') -%}
+{%- set bits = p.split('-') -%}
+{%- if bits|length == 3 and bits[1]|int >= 1 and bits[1]|int <= 12 -%}
+{{ bits[2]|int }} {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][bits[1]|int - 1] }} {{ bits[0] }}
+{%- else -%}{{ iso }}{%- endif -%}
+{%- endmacro %}
+
+{#- A headline amount the way the Overview writes it: the symbol once, abbreviated, no trailing pence. -#}
+{% macro _money(v) -%}
+{%- set sym = (currency_config.symbol if currency_config is defined and currency_config and currency_config.symbol else '£') -%}
+{%- set a = v|float -%}
+{%- if a|abs >= 1000000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000000))|replace('.0', '') }}m
+{%- elif a|abs >= 1000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000))|replace('.0', '') }}k
+{%- else -%}{{ sym }}{{ '%.0f'|format(a) }}{%- endif -%}
+{%- endmacro %}
+
+{% macro _actions() %}
+<div class="flex flex-wrap items-center gap-2">
+  {% call ui.button(href=url_for('application_mgmt.vendor_analysis_list'), variant='outline') %}{{ lucide('sparkles') }}Compare vendor options{% endcall %}
+  {% call ui.button(type='button', attrs={'data-modal-open': 'create-vendor', 'data-testid': 'add-vendor'}) %}{{ lucide('plus') }}Add vendor{% endcall %}
+</div>
+{% endmacro %}
+
+{% macro _add_first() %}{{ ui.button(text='Add your first vendor', type='button', attrs={'data-modal-open': 'create-vendor'}) }}{% endmacro %}
+
 {% block content %}
-<div class="space-y-6" x-data="vendorListTable()" x-cloak>
+{%- set vp = vendor_page() -%}
+{%- set rows = register_rows if register_rows is defined and register_rows is not none else [] -%}
+{%- set tab = 'mapping' if request.args.get('tab') == 'mapping' else 'vendors' -%}
+{%- set unmapped_n = vp.unmapped_count if vp else 0 -%}
+{%- set has_renewal = (rows|selectattr('next_renewal')|list|length) > 0 -%}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Vendors', subtitle='The vendors your systems and contracts name, what they supply and when they renew',
+              breadcrumb=[('Home', url_for('main.index')), ('Vendors', none)], actions_caller=_actions,
+              tabs=[('Vendors', url_for('unified_applications.vendors'), tab == 'vendors'),
+                    (('Systems without a vendor (' ~ unmapped_n ~ ')') if unmapped_n else 'Systems without a vendor', url_for('unified_applications.vendors', tab='mapping'), tab == 'mapping')]) }}
 
-  {% set vp = vendor_page() %}
-  {{ page_header(
-      title='Vendors',
-      description='The vendors your systems and contracts already name, what they supply and when they renew',
-      breadcrumbs=[
-          {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Vendors'}
-      ],
-      actions=[
-          {'text': 'Add Vendor', 'icon': 'plus', 'onclick': 'Platform.modal.open("create-vendor")', 'variant': 'default'},
-          {'text': 'Vendor Options Analysis', 'icon': 'sparkles', 'href': url_for('application_mgmt.vendor_analysis_list'), 'variant': 'outline'}
-      ]
-  ) }}
+{% if not vp %}
+  {% call ui.card(attrs={'role': 'alert', 'data-testid': 'vendors-load-error'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('triangle-alert') }}</span>
+      <p class="text-base font-semibold">The vendor list could not be read just now</p>
+      <p class="max-w-[60ch] text-sm text-muted-foreground">Reload the page. If it keeps happening, tell your administrator.</p>
+      {{ ui.button(text='Reload', href=url_for('unified_applications.vendors'), variant='outline') }}
+    {% endcall %}
+  {% endcall %}
 
-  {# The answer first: one sentence from the same register the table below lists. #}
-  {% if vp %}
-  <div class="rounded-lg border border-border bg-card p-4" data-testid="vendors-answer" role="status">
-    <p class="text-base font-medium">
-      {% if vp.vendor_count %}
-        {{ vp.vendor_count }} vendor{{ '' if vp.vendor_count == 1 else 's' }} supply
-        {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
-        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}None renew within 90 days.{% endif %}
-      {% elif vp.total_systems %}
-        None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.
-      {% else %}
-        You have no systems yet, so there are no vendors to list.
-      {% endif %}
-    </p>
-    <p class="mt-1 text-sm text-muted-foreground">
-      {% if vp.unmapped_count %}
-        {{ vp.unmapped_count }} of your systems have no vendor recorded.
-        <a href="?tab=mapping" @click.prevent="showTab('mapping')" class="text-primary underline underline-offset-2">Set the vendor</a>.
-      {% elif vp.total_systems %}
-        Every system has a vendor recorded.
-      {% else %}
-        <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline">Add your first system</a> and name its vendor.
-      {% endif %}
-      {% if vp.annual_cost is not none %}
-        Annual cost across vendors: {{ vp.annual_cost|currency }}.
-      {% endif %}
-    </p>
-  </div>
-  {% else %}
-  <div class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-emphasis" role="alert">
-    The vendor list could not be read just now. Reload the page; if it persists, tell your administrator.
-  </div>
+{% elif tab == 'mapping' %}
+<div data-testid="mapping-answer">
+  {# Systems that name no vendor yet: pick or type the vendor for each; it is saved straight away. #}
+  {% call(system) list_table(rows=vp.unmapped, columns=[('System', ''), {'label': 'Lifecycle', 'class': 'hidden md:table-cell'}, {'label': 'Vendor', 'class': 'w-[340px]'}],
+                             caption='Systems with no vendor recorded', testid='mapping-list', row_testid='mapping-row',
+                             search_placeholder='Filter systems...',
+                             empty_message=('Every one of your ' ~ vp.total_systems ~ ' systems has a vendor recorded. New systems that name no vendor are listed here.') if vp.total_systems else 'You have no systems yet. Add a system, then set its vendor here.') %}
+    {% call table_cell() %}<a href="{{ url_for('unified_applications.application_detail', id=system.id) }}" class="font-medium text-foreground hover:underline">{{ system.name }}</a>{% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}
+      {%- set lc = (system.lifecycle_status or '')|replace('_', ' ')|trim -%}
+      {%- if lc[:1] in '0123456789' and ' ' in lc %}{% set lc = lc.split(' ', 1)[1] %}{% endif -%}
+      {{ state_badge(lc) if lc else value_or_unset(none, 'Not recorded') }}
+    {% endcall %}
+    {% call table_cell() %}
+      <div x-data="vendorMapRow({{ system.id }})" class="flex flex-col gap-1">
+        <div class="flex gap-2">
+          {{ ui.input(type='text', autocomplete='off', class='h-8', placeholder='Search or type a vendor',
+                      attrs={'aria-label': 'Vendor for ' ~ system.name, 'list': 'vendor-choices-' ~ system.id, 'x-model': 'query', '@input': 'search', '@keydown.enter.prevent': 'saveTyped'}) }}
+          <datalist id="vendor-choices-{{ system.id }}"><template x-for="vendor in choices" :key="vendor.id"><option :value="vendor.name"></option></template></datalist>
+          {{ ui.button(text='Save', type='button', size='sm', attrs={'@click': 'saveTyped', ':disabled': 'saving', 'aria-label': 'Save the vendor for ' ~ system.name}) }}
+        </div>
+        <p x-show="error" x-cloak class="text-xs text-destructive" x-text="error" role="alert"></p>
+      </div>
+    {% endcall %}
+  {% endcall %}
+  {% if vp.unmapped_count > vp.unmapped|length %}
+  <p class="mt-4 text-sm text-muted-foreground">Showing the first {{ vp.unmapped|length }} of {{ vp.unmapped_count }}. Set these and the rest follow.</p>
+  {% endif %}
+</div>
+
+{% else %}
+  {% if rows %}
+  {%- set cards = [
+      {'label': 'Vendors', 'value': vp.vendor_count, 'icon': 'building-2', 'testid': 'vendors-count',
+       'sentence': 'Named by your systems and contracts'},
+      {'label': 'Systems with a vendor', 'value': vp.supplied_count ~ ' of ' ~ vp.total_systems, 'icon': 'blocks', 'testid': 'vendors-supplied',
+       'sentence': ((vp.unmapped_count ~ ' still need' ~ ('s' if vp.unmapped_count == 1 else '') ~ ' a vendor') if vp.unmapped_count else 'Every system has a vendor recorded'),
+       'href': (url_for('unified_applications.vendors', tab='mapping') if vp.unmapped_count else none)},
+  ] -%}
+  {%- if vp.renewals_due -%}
+    {%- set _ = cards.append({'label': 'Renewing within 90 days', 'value': vp.renewals_due, 'icon': 'calendar', 'testid': 'vendors-renewals',
+        'sentence': 'Vendors with a contract to renew or exit soon', 'href': url_for('procurement.renewals_dashboard')}) -%}
+  {%- else -%}
+    {%- set _ = cards.append({'label': 'No renewals in the next 90 days', 'value': none, 'icon': 'calendar', 'testid': 'vendors-renewals',
+        'sentence': ('No vendor contract ends before then' if has_renewal else 'No vendor contract has an end date yet. Add one on the contract to track renewals.'),
+        'href': url_for('procurement.contracts_list')}) -%}
+  {%- endif -%}
+  {%- if vp.annual_cost is not none -%}
+    {%- set _ = cards.append({'label': 'Annual cost across vendors', 'value': _money(vp.annual_cost), 'icon': 'banknote', 'testid': 'vendors-annual-cost',
+        'sentence': 'What the systems they supply cost each year'}) -%}
+  {%- endif -%}
+  {{ stat_cards(cards, testid='vendors-answer') }}
   {% endif %}
 
-  <div role="tablist" data-slot="tabs-list" aria-label="Vendor views" class="inline-flex h-10 items-center gap-1 rounded-md bg-muted p-1 text-muted-foreground">
-    {% call button(type='button', variant='ghost', size='sm', id='tab-vendors', class='px-3', attrs={'role': 'tab', 'data-slot': 'tabs-trigger', 'aria-controls': 'panel-vendors', ':aria-selected': "tab === 'vendors'", '@click': "showTab('vendors')", ':class': "tab === 'vendors' ? 'bg-background text-foreground font-medium' : ''"}) %}Vendors{% endcall %}
-    {% call button(type='button', variant='ghost', size='sm', id='tab-mapping', class='px-3', attrs={'role': 'tab', 'data-slot': 'tabs-trigger', 'aria-controls': 'panel-mapping', ':aria-selected': "tab === 'mapping'", '@click': "showTab('mapping')", ':class': "tab === 'mapping' ? 'bg-background text-foreground font-medium' : ''"}) %}
-      Mapping{% if vp and vp.unmapped_count %} <span class="ml-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{{ vp.unmapped_count }}</span>{% endif %}
+  {%- set columns = [{'label': 'Vendor', 'sortable': true}, {'label': 'Systems', 'align': 'right', 'sortable': true}] -%}
+  {%- if vp.show_cost -%}{%- set _ = columns.append({'label': 'Annual cost', 'align': 'right', 'sortable': true}) -%}{%- endif -%}
+  {%- if has_renewal %}{% set _ = columns.append({'label': 'Next renewal', 'sortable': true}) %}{% endif -%}
+  {%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
+  <div{% if not rows %} data-testid="vendors-true-empty-state"{% endif %}>
+  {% call(row) list_table(rows=rows, columns=columns, caption='Vendors your systems and contracts name', testid='vendors-table', row_testid='vendor-row',
+                          search_placeholder='Filter vendors...',
+                          empty_message=('None of your ' ~ vp.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if vp.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
+                          empty_action=_add_first) %}
+    {% call table_cell(class='max-w-[360px]') %}
+      <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="vendor-link">{{ row.name }}</a>
+      {% if row.website %}<span class="block truncate text-xs text-muted-foreground">{{ row.website|replace('https://', '')|replace('http://', '') }}</span>{% endif %}
     {% endcall %}
-  </div>
-
-  <div id="panel-mapping" role="tabpanel" data-slot="tabs-content" aria-labelledby="tab-mapping" x-show="tab === 'mapping'" x-cloak>
-    {% if vp and vp.unmapped_count %}
-    <p class="mb-3 text-sm" data-testid="mapping-answer">
-      <strong>{{ vp.unmapped_count }}</strong> of your systems have no vendor recorded. Pick the vendor for each; it is saved straight away.
-    </p>
-    <ul class="divide-y divide-border rounded-lg border border-border bg-card" data-testid="mapping-list">
-      {% for system in vp.unmapped %}
-      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between" x-data="vendorMapRow({{ system.id }})">
-        <div class="min-w-0">
-          <a href="{{ url_for('unified_applications.application_detail', id=system.id) }}" class="font-medium text-primary hover:underline break-words">{{ system.name }}</a>
-          <p class="text-xs text-muted-foreground">{{ system.lifecycle_status|replace('_', ' ')|title if system.lifecycle_status else 'Lifecycle not recorded' }}</p>
-        </div>
-        <div class="relative w-full sm:w-72">
-          <div class="flex gap-2">
-            {{ input(type='text', autocomplete='off', aria_label='Vendor for ' ~ system.name, placeholder='Search or type a vendor', attrs={'x-model': 'query', '@input': 'search()', '@focus': 'search()', '@keydown.enter.prevent': 'saveTyped()', '@keydown.escape': 'open = false', 'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': 'open'}) }}
-            {% call button(type='button', variant='default', aria_label='Save the vendor choice for ' ~ system.name, attrs={'@click': 'saveTyped()', ':disabled': 'saving'}) %}Save{% endcall %}
-          </div>
-          <ul x-show="open && choices.length" x-cloak role="listbox"
-              class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-card">
-            <template x-for="vendor in choices" :key="vendor.id">
-              <li role="option">{% call button(type='button', variant='ghost', size='sm', class='w-full justify-start px-3 py-2 h-auto text-left text-sm', attrs={'@click': 'choose(vendor)', 'x-text': 'vendor.name'}) %}{% endcall %}</li>
-            </template>
-          </ul>
-          <p x-show="error" x-cloak class="mt-1 text-xs text-destructive-emphasis" x-text="error" role="alert"></p>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% if vp.unmapped_count > vp.unmapped|length %}
-    <p class="mt-2 text-xs text-muted-foreground">Showing the first {{ vp.unmapped|length }}; set these and the rest follow.</p>
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
+      {% if row.system_count %}
+      <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }}</a>
+      {% else %}<span class="text-muted-foreground">0</span>{% endif %}
+    {% endcall %}
+    {% if vp.show_cost %}
+    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.annual_cost if row.annual_cost is not none else -1}) %}
+      {{ value_or_unset(_money(row.annual_cost) if row.annual_cost is not none else none, 'Not recorded') }}
+    {% endcall %}
     {% endif %}
-    {% elif vp and vp.total_systems %}
-    <div class="rounded-lg border border-border bg-card p-6 text-sm" data-testid="mapping-answer">
-      <p class="font-medium">Every one of your {{ vp.total_systems }} systems has a vendor recorded.</p>
-      <p class="mt-1 text-muted-foreground">New systems that name no vendor will be listed here.</p>
-    </div>
-    {% elif vp %}
-    <div class="rounded-lg border border-border bg-card p-6 text-sm" data-testid="mapping-answer">
-      <p class="font-medium">You have no systems yet.</p>
-      <p class="mt-1 text-muted-foreground">Add a system, then set its vendor here.</p>
-    </div>
+    {% if has_renewal %}
+    {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': row.next_renewal or '9999'}) %}
+      {% if row.next_renewal %}
+        <span class="inline-flex items-center gap-2">{{ _date(row.next_renewal) }}{% if row.renewal_due %}{{ state_badge('Due soon', tone='caution') }}{% endif %}</span>
+      {% else %}{{ value_or_unset(none, 'No renewal ahead') }}{% endif %}
+    {% endcall %}
     {% endif %}
+    {% call table_cell(class='w-12 text-right') %}
+      {% call row_actions('Actions for ' ~ row.name) %}
+        {{ row_action('Open', href=url_for('unified_applications.vendor_detail', vendor_id=row.id), testid='vendor-open') }}
+        {% if is_platform_administrator() %}
+        {{ row_action('Edit', href=url_for('unified_vendors.edit_vendor', vendor_id=row.id), testid='vendor-edit') }}
+        {{ row_action('Delete', action=url_for('application_mgmt.delete_vendor', vendor_id=row.id), destructive=true, separator_before=true,
+                      confirm='Delete ' ~ row.name ~ '? This cannot be undone.', testid='vendor-delete') }}
+        {% endif %}
+        {% endcall %}
+    {% endcall %}
+  {% endcall %}
   </div>
+{% endif %}
 
-  {# Main layout: table + side panel #}
-  <div id="panel-vendors" role="tabpanel" data-slot="tabs-content" aria-labelledby="tab-vendors" x-show="tab === 'vendors'" class="flex flex-col lg:flex-row gap-6">
-
-    {# LEFT: Table Card — uses workbench_table macro.
-       min-w-0 overrides the flex item's default min-width:auto -- without it, a flex
-       child containing a wide table cannot shrink below the table's intrinsic width,
-       so the browser can't compute a correct scroll boundary for the table's own
-       overflow-x-auto container. The visible symptom (H3) was the sticky "Actions"
-       column's right:0 anchor landing mid-table instead of at the real scrolled edge,
-       overlapping Status/Contract. #}
-    <div class="flex-1 min-w-0">
-      {# Two empty states, chosen by hasActiveFilters (search or a filter is applied): nothing exists yet, or
-         nothing matches what was asked for. The shared table only takes static text, so the message and the
-         action are passed as markup and bound here. #}
-      {# data-testid/role match the house empty-state convention used elsewhere, e.g.
-         archimate_crud/partials/_repository_workspace.html's true/filtered empty states. #}
-      {% set _vendor_empty_title %}
-        <span role="status"
-              :data-testid="hasActiveFilters ? 'vendors-filtered-empty-state' : 'vendors-true-empty-state'"
-              x-text="hasActiveFilters ? 'No vendors match these filters.' : 'No vendors yet.'"></span>
-      {% endset %}
-      {% set _vendor_empty_action %}
-        {# Distinct accessible name from the header's own "Add Vendor" action (page_header's
-           `actions=`, above): both are visible together whenever the table is empty, and
-           identical names made get_by_role('button', name='Add Vendor') ambiguous -- caught by
-           tests/smoke/test_vendor_dialog_controls.py, whose own selector is (rightly) unscoped
-           since it targets the header action specifically. #}
-        <span class="mt-3 block" x-show="!hasActiveFilters">
-          {% call button(type='button', variant='default', aria_label='Add your first vendor', attrs={'@click': "Platform.modal.open('create-vendor')"}) %}Add your first vendor{% endcall %}
-        </span>
-        <span class="mt-3 block" x-show="hasActiveFilters" x-cloak>
-          {% call button(type='button', variant='outline', aria_label='Clear filters', attrs={'@click': 'clearAllFilters()'}) %}Clear filters{% endcall %}
-        </span>
-      {% endset %}
-      {% call workbench_table(
-          columns=[
-              {'key': 'row_number', 'label': '#'},
-              {'key': 'name', 'label': 'Vendor', 'sortable': true},
-              {'key': 'system_count', 'label': 'Systems'},
-              {'key': 'annual_cost', 'label': 'Annual cost'},
-              {'key': 'next_renewal', 'label': 'Next renewal'},
-              {'label': 'Actions', 'align': 'right'},
-          ],
-          filters=[],
-          selectable=true,
-          search_placeholder='Search vendors...',
-          empty_icon='building',
-          empty_message=_vendor_empty_title,
-          empty_description=_vendor_empty_action,
-          per_page_default=25
-      ) %}
-        {# ── Page-specific cell templates (repeated per row by Alpine x-for) ── #}
-        {% call table_cell(class='px-3 align-middle tabular-nums text-muted-foreground text-sm', attrs={'x-text': 'row.row_number'}) %}{% endcall %}
-        {% call table_cell(class='px-4 py-3 align-middle') %}
-          <div>
-            {% call button(type='button', variant='link', size='sm', class='h-auto p-0 font-medium text-left hover:text-primary hover:underline transition-colors', attrs={'@click': 'openEditModal(row)', 'x-text': 'row.name'}) %}{% endcall %}
-            <template x-if="row.website">
-              <a :href="row.website" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block" x-text="row.website"></a>
-            </template>
-          </div>
+  {# Add a vendor #}
+  {% call modal(id='create-vendor', title='New vendor', description='Add a vendor to the catalogue', size='lg') %}
+    <div x-data="vendorCreateModal">
+      <form @submit.prevent="submitCreateVendor" class="space-y-4">
+        {{ ui.input(type="hidden", name="csrf_token", value=csrf_token()) }}
+        {% call form_group(id='cv-name', label='Vendor name', required=true) %}
+          {{ ui.input(type='text', id='cv-name', name='name', required=true, maxlength=200, placeholder='Enter vendor name', attrs={'x-model': 'formData.name'}) }}
         {% endcall %}
-        {% call table_cell(class='px-4 py-3 align-middle text-sm') %}
-          <a :href="'{{ url_for('unified_applications.vendor_detail', vendor_id=0) }}'.replace('/0', '/' + row.id) + '#vendor-systems'"
-             class="text-primary hover:underline"
-             x-text="row.system_count + (row.system_count === 1 ? ' system' : ' systems')"></a>
-          <p class="text-xs text-muted-foreground" x-show="row.system_count === 0">None of your systems name it yet</p>
-        {% endcall %}
-        {% call table_cell(class='px-4 py-3 align-middle text-sm tabular-nums') %}
-          <span x-show="row.annual_cost !== null && row.annual_cost !== undefined" x-text="(row.annual_cost === null || row.annual_cost === undefined) ? '' : (window.currencyManager ? window.currencyManager.format(row.annual_cost) : row.annual_cost)"></span>
-          <span x-show="(row.annual_cost === null || row.annual_cost === undefined)" class="text-xs text-muted-foreground"
-                x-text="row.cost_visible === false ? 'Not shown for your role' : 'No cost recorded'"></span>
-        {% endcall %}
-        {% call table_cell(class='px-4 py-3 align-middle text-sm') %}
-          <span x-show="row.next_renewal" x-text="row.next_renewal"></span>
-          <span x-show="row.renewal_due" class="ml-2 inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis">Due within 90 days</span>
-          <span x-show="!row.next_renewal" class="text-xs text-muted-foreground">No contract renewal ahead</span>
-        {% endcall %}
-        {% call table_cell(class='px-4 py-3 align-middle text-right', attrs={'@click.stop': true}) %}
-          <div class="flex items-center gap-2 justify-end">
-            <a :href="'{{ url_for('application_mgmt.vendor_detail', vendor_id=0) }}'.replace('0', row.id)"
-               aria-label="View vendor details"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-              <i data-lucide="eye" class="h-3 w-3"></i>
-              View
-            </a>
-            {% call button(type='button', variant='default', attrs={'@click.stop': 'openEditModal(row)'}) %}
-              <i data-lucide="pencil" class="h-3 w-3"></i>
-              Edit
-            {% endcall %}
-          </div>
-        {% endcall %}
-      {% endcall %}
-    </div>
-
-    {# RIGHT: Products side panel. showVendorProducts() (js/vendors/list.js) is what reveals it (adds
-       lg:block), but nothing on this page currently calls it — no row carries data-vendor-id, and the
-       vendor-name button opens the edit modal instead. That gap predates this fix and is not addressed
-       here; this change only concerns the wrapper's own default state. The wrapper must NOT carry
-       lg:block itself while hidden, or an empty bordered box reserves 288px from 1024px up and squeezes
-       the table into a scrolled, overlapped state — which is the bug this PR fixes. #}
-    <div id="vendor-products-wrapper" class="hidden w-72 shrink-0">
-      <div id="vendor-products-panel" class="sticky top-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-      </div>
-    </div>
-
-  </div>
-
-  {# Edit Vendor modal #}
-  {% call modal(id='edit-vendor-modal', title='Edit Vendor', size='lg') %}
-    <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">Vendor Name <span class="text-destructive-emphasis">*</span></label>
-        {{ input(type='text', required=true, maxlength=200, placeholder='Vendor name', aria_label='Vendor Name', attrs={'x-model': 'editForm.name'}) }}
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Vendor Type</label>
-          {% call native_select(class='w-full', aria_label='Vendor Type', attrs={'x-model': 'editForm.vendor_type'}) %}
+        {% call form_group(id='cv-type', label='Vendor type') %}
+          {% call native_select(id='cv-type', name='vendor_type', class='w-full', attrs={'x-model': 'formData.vendor_type'}) %}
             {{ native_select_option('Select type...', value='') }}
-            {{ native_select_option('Software Vendor', value='software_vendor') }}
-            {{ native_select_option('SaaS Platform', value='saas_platform') }}
-            {{ native_select_option('Cloud Provider', value='cloud_provider') }}
-            {{ native_select_option('Systems Integrator', value='systems_integrator') }}
-            {{ native_select_option('Consulting Partner', value='consulting_partner') }}
-            {{ native_select_option('Managed Service Provider', value='managed_service_provider') }}
+            {{ native_select_option('Software vendor', value='software_vendor') }}
+            {{ native_select_option('SaaS platform', value='saas_platform') }}
+            {{ native_select_option('Cloud provider', value='cloud_provider') }}
+            {{ native_select_option('Systems integrator', value='systems_integrator') }}
+            {{ native_select_option('Consulting partner', value='consulting_partner') }}
+            {{ native_select_option('Managed service provider', value='managed_service_provider') }}
           {% endcall %}
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Country</label>
-          {{ input(type='text', placeholder='e.g. United Kingdom', aria_label='Country', attrs={'x-model': 'editForm.country'}) }}
-        </div>
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Website</label>
-        {{ input(type='url', placeholder='https://example.com', aria_label='Website', attrs={'x-model': 'editForm.website'}) }}
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Status</label>
-        {% call native_select(class='w-full', aria_label='Status', attrs={'x-model': 'editForm.status'}) %}
-          {{ native_select_option('Active', value='active') }}
-          {{ native_select_option('Inactive', value='inactive') }}
-          {{ native_select_option('Catalog', value='catalog') }}
-          {{ native_select_option('Contracted', value='contracted') }}
-          {{ native_select_option('Deployed', value='deployed') }}
         {% endcall %}
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Description</label>
-        {{ textarea(rows=3, placeholder='Brief description', aria_label='Description', attrs={'x-model': 'editForm.description'}) }}
-      </div>
-      <div x-show="editError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="editError"></div>
-    </div>
-    <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-      {% call button(type='button', variant='outline', attrs={'data-modal-close': 'edit-vendor-modal'}) %}Cancel{% endcall %}
-      {% call button(type='button', variant='default', attrs={'@click': 'saveEdit()', ':disabled': 'editSaving'}) %}
-        <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="editSaving" x-cloak></i>
-        <span x-text="editSaving ? 'Saving...' : 'Save Changes'"></span>
-      {% endcall %}
-    </div>
-  {% endcall %}
-
-  {# Bulk delete confirm modal #}
-  {% call modal(id='bulk-delete-confirm-modal', title='Delete Vendors?', size='sm') %}
-    <p class="text-sm text-muted-foreground mb-4">
-      This will permanently delete the selected vendors and cannot be undone.
-      Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
-    </p>
-    {{ input(type='text', class='font-mono mb-4', placeholder='DELETE', aria_label='DELETE', attrs={'x-model': 'deleteConfirmText', '@keydown.enter': 'executeBulkDelete()'}) }}
-    <div class="flex justify-end gap-3">
-      {% call button(type='button', variant='outline', attrs={'data-modal-close': 'bulk-delete-confirm-modal'}) %}Cancel{% endcall %}
-      {% call button(type='button', variant='destructive', attrs={'@click': 'executeBulkDelete()', ':disabled': "deleteConfirmText !== 'DELETE' || deleteInProgress"}) %}
-        <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak></i>
-        <span x-text="deleteInProgress ? 'Deleting...' : 'Delete'"></span>
-      {% endcall %}
-    </div>
-  {% endcall %}
-
-  {# Create Vendor Modal #}
-  {% call modal(id='create-vendor', title='New Vendor', description='Add a new vendor to the catalogue', size='lg') %}
-    <div x-data="vendorCreateModal()">
-      <form @submit.prevent="submitCreateVendor()" class="space-y-4">
-        {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
-        {% call form_group(id='cv-name', label='Vendor Name', required=true) %}
-          {{ input(type='text', id='cv-name', name='name', required=true, maxlength=200, placeholder='Enter vendor name', attrs={'x-model': 'formData.name'}) }}
+        {% call form_group(id='cv-country', label='Country') %}
+          {{ ui.input(type='text', id='cv-country', name='country', placeholder='e.g. United Kingdom', attrs={'x-model': 'formData.country'}) }}
         {% endcall %}
-        <div class="grid grid-cols-1 gap-4">
-          {% call form_group(id='cv-type', label='Vendor Type') %}
-            {% call native_select(id='cv-type', name='vendor_type', class='w-full', attrs={'x-model': 'formData.vendor_type'}) %}
-              {{ native_select_option('Select type...', value='') }}
-              {{ native_select_option('Software Vendor', value='software_vendor') }}
-              {{ native_select_option('SaaS Platform', value='saas_platform') }}
-              {{ native_select_option('Cloud Provider', value='cloud_provider') }}
-              {{ native_select_option('Systems Integrator', value='systems_integrator') }}
-              {{ native_select_option('Consulting Partner', value='consulting_partner') }}
-              {{ native_select_option('Managed Service Provider', value='managed_service_provider') }}
-            {% endcall %}
-          {% endcall %}
-          {% call form_group(id='cv-country', label='Country') %}
-            {{ input(type='text', id='cv-country', name='country', placeholder='e.g. United Kingdom', attrs={'x-model': 'formData.country'}) }}
-          {% endcall %}
-        </div>
         {% call form_group(id='cv-website', label='Website') %}
-          {{ input(type='url', id='cv-website', name='website', placeholder='https://example.com', attrs={'x-model': 'formData.website'}) }}
+          {{ ui.input(type='url', id='cv-website', name='website', placeholder='https://example.com', attrs={'x-model': 'formData.website'}) }}
         {% endcall %}
         {% call form_group(id='cv-description', label='Description') %}
-          {{ textarea(id='cv-description', name='description', rows=3, placeholder='Brief description of the vendor', attrs={'x-model': 'formData.description'}) }}
+          {{ ui.textarea(id='cv-description', name='description', rows=3, placeholder='Brief description of the vendor', attrs={'x-model': 'formData.description'}) }}
         {% endcall %}
-        <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
-        <div class="flex justify-end gap-3 pt-2 border-t border-border">
-          {% call button(type='button', variant='ghost', attrs={'@click': "Platform.modal.close('create-vendor')"}) %}Cancel{% endcall %}
-          {% call button(type='submit', variant='default', attrs={'x-bind:disabled': 'submitting'}) %}
-            <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
-            <span x-text="submitting ? 'Creating...' : 'Create Vendor'"></span>
-          {% endcall %}
+        <p x-show="errorMsg" x-cloak class="text-sm text-destructive" x-text="errorMsg" role="alert"></p>
+        <div class="flex justify-end gap-2 border-t pt-4">
+          {{ ui.button(text='Cancel', type='button', variant='outline', attrs={'data-modal-close': 'create-vendor'}) }}
+          {{ ui.button(text='Create vendor', type='submit', attrs={':disabled': 'submitting'}) }}
         </div>
       </form>
     </div>
   {% endcall %}
-
-  {% include 'components/unified_mapping_modal.html' %}
-
 </div>
-
 {% endblock %}

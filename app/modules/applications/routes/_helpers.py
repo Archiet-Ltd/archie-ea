@@ -648,9 +648,20 @@ def _vendors_impl(
         {"value": vt, "label": vt} for vt in vendor_type_options
     ]
 
+    # The table lists the organisation's vendor register (the same rows the
+    # register API serves), rendered on the server.
+    from app.services import vendor_register
+
+    try:
+        register_rows = vendor_register.register()
+    except Exception:  # noqa: BLE001 - the page says the list could not be read
+        db.session.rollback()
+        register_rows = []
+
     return render_template(
         "vendors/list.html",
         vendors=vendors,
+        register_rows=register_rows,
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,
