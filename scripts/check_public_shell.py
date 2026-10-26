@@ -141,10 +141,22 @@ def _nav_contract(path: Path, text: str) -> list[tuple[int, str, str]]:
     need('href="#main-content"' in layout and 'id="main-content"' in layout,
          "the public layout lacks a skip link to #main-content")
     need("data-site-nav" in text, "the header is not marked data-site-nav")
-    need(re.search(r'<nav\s+aria-label="[^"]+"', text) is not None, "no <nav aria-label>")
+    # The navigation is drawn with the library's navigation_menu macro, which takes the label as an attribute.
+    need(re.search(r'<nav\s+aria-label="[^"]+"', text) is not None
+         or re.search(r"navigation_menu\([^%]*'aria-label':\s*'[^']+'", text) is not None, "no <nav aria-label>")
     need('role="menu"' not in text, 'role="menu" is banned: use the disclosure pattern')
-    need('aria-label="Menu"' in text, "the Menu button has no accessible name")
-    need('aria-label="Account menu"' in text, "the account button has no accessible name")
+    need('aria-label="Menu"' in text or "aria_label='Menu'" in text, "the Menu button has no accessible name")
+    need('aria-label="Account menu"' in text or "aria_label='Account menu'" in text,
+         "the account button has no accessible name")
+    # The library's trigger macros: each is a type=button disclosure with aria-controls matching a panel id.
+    for macro in re.finditer(r"(?:navigation_menu_trigger|sheet_trigger)\(([^%]*?)\) %\}", text):
+        attrs = macro.group(1)
+        need("type='button'" in attrs, "a disclosure trigger macro is not type=button")
+        controls = re.search(r"aria_controls='([^']+)'", attrs)
+        need(controls is not None, "a disclosure trigger macro has no aria_controls")
+        if controls:
+            target = controls.group(1)
+            need(f"id='{target}'" in text or f"id='{target}' " in text or f"id={target!r}" in text, f"aria_controls {target!r} matches no panel id")
     for button in re.finditer(r"<button\b([^>]*)>", text):
         attrs = button.group(1)
         if "aria-expanded" in attrs:

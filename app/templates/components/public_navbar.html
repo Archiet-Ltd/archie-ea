@@ -32,7 +32,7 @@
       {% else %}
       {{ button(text='Start free', href=url_for('account.register'), variant='primary', attrs_dict={'data-site-cta': ''}) }}
       {% endif %}
-      {% call sheet_trigger(variant='ghost', size='icon', class='h-11 w-11 text-foreground', aria_label='Menu', aria_expanded='false', aria_controls='site-nav-panel', attrs={'data-sheet-trigger': ''}) %}
+      {% call sheet_trigger(type='button', variant='ghost', size='icon', class='h-11 w-11 text-foreground', aria_label='Menu', aria_expanded='false', aria_controls='site-nav-panel', attrs={'data-sheet-trigger': ''}) %}
         <i data-lucide="menu" class="h-5 w-5" aria-hidden="true" data-sheet-icon="closed"></i>
         <i data-lucide="x" class="hidden h-5 w-5" aria-hidden="true" data-sheet-icon="open"></i>
       {% endcall %}
@@ -53,7 +53,7 @@
           {% endcall %}
           {% else %}
           {% call navigation_menu_item(class='w-full lg:static lg:w-auto') %}
-            {% call navigation_menu_trigger(class=trigger_class, aria_expanded='false', aria_controls='menu-' ~ entry.id, attrs={'data-menu-trigger': '', 'data-nav-top': ''}) %}
+            {% call navigation_menu_trigger(type='button', class=trigger_class, aria_expanded='false', aria_controls='menu-' ~ entry.id, attrs={'data-menu-trigger': '', 'data-nav-top': ''}) %}
               {{ entry.label }}<i data-lucide="chevron-down" class="h-4 w-4 transition-transform" aria-hidden="true" data-chevron></i>
             {% endcall %}
             {% call navigation_menu_content(id='menu-' ~ entry.id, class=panel_class, attrs={'hidden': true, 'data-menu-panel': ''}) %}
@@ -126,7 +126,7 @@
         {% if current_user.is_authenticated %}
         <span class="hidden lg:inline-flex">{{ button(text='Open Entelim', href=url_for('dashboard.overview'), variant='primary', attrs_dict={'data-open-entelim': ''}) }}</span>
         <div class="lg:relative">
-          {% call navigation_menu_trigger(class=trigger_class, aria_expanded='false', aria_controls='menu-account', aria_label='Account menu', attrs={'data-menu-trigger': ''}) %}
+          {% call navigation_menu_trigger(type='button', class=trigger_class, aria_expanded='false', aria_controls='menu-account', aria_label='Account menu', attrs={'data-menu-trigger': ''}) %}
             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">{{ current_user.first_name[0] if current_user.first_name else 'U' }}</span>
             <i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true" data-chevron></i>
           {% endcall %}
