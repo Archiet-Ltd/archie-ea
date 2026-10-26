@@ -57,7 +57,8 @@
 <div class="text-center {{ padding }} px-4 {{ class }}" role="status">
     <!-- Icon -->
     {% if not compact %}<div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-        <i data-lucide="{{ icon }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
+        {#- drawn on the server when it knows the icon: the browser set is older and lacks some names -#}
+        {% if has_lucide is defined and has_lucide(icon) %}{{ lucide(icon, 'h-8 w-8 text-muted-foreground') }}{% else %}<i data-lucide="{{ icon }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>{% endif %}
     </div>{% endif %}
 
     <!-- Title -->

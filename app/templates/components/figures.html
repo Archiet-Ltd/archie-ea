@@ -45,7 +45,7 @@
 {%- set inner -%}
   {% call ui.card(class='h-full') %}
     {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide(item.icon or 'chart-no-axes-column') }}</span>{% endcall %}
-    {% call ui.card_content(class='mt-auto flex flex-col gap-1') %}
+    {% call ui.card_content(class='flex flex-col gap-1') %}
       {% if item.value is not none %}
       <span class="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums"><span{% if item.testid %} data-testid="{{ item.testid }}-value"{% endif %}>{{ item.value }}</span>{% if item.change %}<span>{{ d.delta(item.change, item.good) }}</span>{% endif %}</span>
       <span class="text-sm font-medium">{{ item.label }}</span>
@@ -73,12 +73,13 @@
 {#- A section of a page: the Overview's card with a title, a one-line description and an optional action on the
     right, around any content. -#}
 {% macro section(title, description=none, action=none, class='', content_class='', testid=none) -%}
+{%- set body = caller() -%}
 {%- call ui.card(class=class, attrs=({'data-testid': testid} if testid else {})) -%}
   {%- call ui.card_header() -%}
     {{ ui.card_title(text=title) }}
     {% if description %}{{ ui.card_description(text=description) }}{% endif %}
     {% if action %}{% call ui.card_action() %}{{ action() }}{% endcall %}{% endif %}
   {%- endcall -%}
-  {%- call ui.card_content(class=content_class) -%}{{ caller() }}{%- endcall -%}
+  {%- call ui.card_content(class=content_class) -%}{{ body }}{%- endcall -%}
 {%- endcall -%}
 {%- endmacro %}

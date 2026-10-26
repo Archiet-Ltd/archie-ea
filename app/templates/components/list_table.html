@@ -72,7 +72,7 @@
   </div>
   {% endif %}
 
-  <div class="overflow-hidden rounded-md border">
+  <div class="overflow-x-auto rounded-md border">
     {% call table(attrs={'data-testid': testid}) %}
       {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
       {% call table_header() %}
@@ -151,9 +151,11 @@
       {{ row_action('Delete', action=delete_url, destructive=true, confirm='Delete this contract? This cannot be undone.') }}
     {% endcall %}{% endcall %} -#}
 {% macro row_actions(label='Open menu') -%}
+{#- the body is taken first: a nested call block cannot reach this macro's caller -#}
+{%- set body = caller() -%}
 {%- call dropdown_menu() -%}
   {%- call dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">{{ label }}</span>{%- endcall -%}
-  {%- call dropdown_menu_content(align='end', class='w-[160px]') -%}{{ caller() }}{%- endcall -%}
+  {%- call dropdown_menu_content(align='end', class='w-[160px]') -%}{{ body }}{%- endcall -%}
 {%- endcall -%}
 {%- endmacro %}
 

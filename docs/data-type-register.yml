@@ -67,7 +67,7 @@ types:
     data: the three or four numbers that matter at the top of a dashboard or record
     show_with: the section card (card, card_header, card_description, card_title, card_action), at
       most four in a row, each with a label and a comparison or explanation (pattern P24)
-    components: [components/card.html, basecoat/card.html, basecoat/index.html, basecoat/macros.html]
+    components: [components/figures.html, components/card.html, basecoat/card.html, basecoat/index.html, basecoat/macros.html]
     pages: every dashboard
     signals:
       - 'stat-card|kpi-card|metric-card'
@@ -94,7 +94,7 @@ types:
   - id: status
     data: a state, severity, priority or confidence
     show_with: the badge, with the word always present (pattern P23)
-    components: [components/badge.html, basecoat/badge.html, basecoat/index.html, basecoat/macros.html]
+    components: [components/figures.html, components/badge.html, basecoat/badge.html, basecoat/index.html, basecoat/macros.html]
     pages: every cell and header that shows a state
     signals:
       - '\b(?:pill|chip|tag)-(?:success|warning|danger|info|neutral)\b'
