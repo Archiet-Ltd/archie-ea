@@ -53,6 +53,7 @@ class Fetcher:
         self.timeout = timeout
         self._robots: Optional[RobotFileParser] = None
         self._blocked_everything = False
+        self.robots_unanswered = False  # robots.txt could not be fetched: the site did not answer, which is not a refusal
         self.crawl_delay = 0.0
 
     def get(self, url: str, timeout: Optional[float] = None) -> Page:
@@ -83,11 +84,11 @@ class Fetcher:
         try:
             page = self.get(root + "/robots.txt")
         except (FetchRefused, requests.RequestException):
-            self._blocked_everything = True
+            self._blocked_everything = self.robots_unanswered = True
             self._robots = parser
             return
         if page.status >= 500:
-            self._blocked_everything = True
+            self._blocked_everything = self.robots_unanswered = True
         elif page.status == 200:
             parser.parse(page.text.splitlines())
             delay = parser.crawl_delay(USER_AGENT)

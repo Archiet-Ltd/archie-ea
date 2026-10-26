@@ -1,13 +1,23 @@
-{# Sign-up step 3: what kind of company this is, its industry and the frameworks it works with. All optional. #}
+{# Sign-up step 3: the company profile read from its website to confirm, the few questions a website cannot answer, and the frameworks that suit the first goal. All optional. #}
 <div data-signup-steps
      data-url-choices="{{ url_for('account.welcome_choices') }}"
+     data-url-profile="{{ url_for('account.welcome_profile') }}"
+     data-url-status="{{ url_for('account.welcome_status') }}"
+     {% set site_row = sources | selectattr('key', 'equalto', 'website') | first %}
+     {% if website and not facts and site_row.state in ('waiting', 'reading') %}data-reload-when-read="true"{% endif %}
      class="space-y-6" data-testid="signup-company">
     {% call card() %}
         {% call card_header() %}
             {% call card_title(class='text-xl') %}About your company{% endcall %}
-            {% call card_description() %}Optional. Your industry picks the starter capability model. You can change all of this later in Settings.{% endcall %}
+            {% call card_description() %}Optional. Confirm what we read, answer three questions, and change any of it later in Settings.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}
+            {% if facts %}
+            {% include 'account/_company_facts.html' %}
+            {% elif website %}
+            {% include 'account/_website_reading.html' %}
+            {% endif %}
+            {% include 'account/_company_asked.html' %}
             {% include 'account/_company_choices.html' %}
             <p class="text-sm text-destructive-emphasis" role="status" aria-live="polite" data-say="choices"></p>
         {% endcall %}

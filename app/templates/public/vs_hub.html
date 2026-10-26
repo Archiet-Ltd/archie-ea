@@ -10,6 +10,7 @@
    to every other public page; no second loader or renderer.
 #}
 {% extends 'layouts/public_base.html' %}
+{% from 'components/card.html' import card, card_header, card_title, card_description %}
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}Compare Entelim{% endblock %}
 {% block meta_description %}
@@ -31,17 +32,21 @@
       Factual, sourced comparisons against the enterprise architecture tools teams evaluate
       alongside Entelim. Each page ends with the public pages its facts about that product come from, with the date each was read.
     </p>
-    <ul>
-      {% for entry in entries %}
-      <li>
-        <a href="{{ entry.real_url }}">Entelim vs {{ entry.competitor }}</a>
-        {% if entry.same_origin_url %}
-        (also on <a href="{{ entry.same_origin_url }}">entelim.org</a>)
-        {% endif %}
-      </li>
-      {% endfor %}
-    </ul>
   </article>
+  <ul class="mt-8 grid gap-4 sm:grid-cols-2">
+    {% for entry in entries %}
+    <li>
+      {% call card(class='h-full') %}
+        {% call card_header() %}
+          {% call card_title(class='text-lg') %}<a href="{{ entry.real_url }}" class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Entelim vs {{ entry.competitor }}</a>{% endcall %}
+          {% if entry.same_origin_url %}
+          {% call card_description() %}(also on <a href="{{ entry.same_origin_url }}" class="text-primary underline-offset-4 hover:underline">entelim.org</a>){% endcall %}
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+    </li>
+    {% endfor %}
+  </ul>
 </div>
 {% include 'components/public_footer.html' %}
 {% endblock %}

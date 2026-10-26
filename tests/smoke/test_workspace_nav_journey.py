@@ -184,9 +184,9 @@ def test_owner_reads_the_plans_prices_and_a_plain_renewal_line(page, live_server
     for key in ("free", "startup", "team", "enterprise"):
         shown[key] = " ".join(page.get_by_test_id("plan-price-%s" % key).inner_text().split())
         assert shown[key], key
-    assert shown["startup"] == "$490 a year $49 a month"
-    assert shown["team"] == "$290 per editor a year $29 per editor a month"
-    assert shown["enterprise"] == "From $24,000 a year"
+    assert shown["startup"] == "USD 490 a year USD 49 a month"
+    assert shown["team"] == "USD 290 per editor a year USD 29 per editor a month"
+    assert shown["enterprise"] == "From USD 24,000 a year"
     page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     pricing = page.locator("main").inner_text()
     for figure in ("$490", "$49", "$290", "$29", "$24,000"):

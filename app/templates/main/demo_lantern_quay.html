@@ -1,4 +1,5 @@
-{% extends "layouts/public_base.html" %}<!-- smoke-coverage-ok: public informational page with no interactive elements; seeded-org presence verified by test_seed_demo_company.py -->
+{% extends "layouts/public_base.html" %}
+{% from 'components/card.html' import card, card_header, card_title, card_description %}<!-- smoke-coverage-ok: public informational page with no interactive elements; seeded-org presence verified by test_seed_demo_company.py -->
 {% block title %}Lantern Quay Systems{% endblock %}
 
 {% block header %}
@@ -36,22 +37,30 @@
   <section class="mb-12">
     <h2 class="text-2xl font-bold text-foreground mb-4">What we make</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="border border-border rounded-lg p-5">
-        <h3 class="font-semibold text-foreground mb-2">Sensor Modules</h3>
-        <p class="text-muted-foreground text-sm">Multi-parameter probes measuring turbidity, conductivity, dissolved oxygen, pH and temperature in a single submersible housing. Each module is calibrated against reference standards traceable to national metrology institutes.</p>
-      </div>
-      <div class="border border-border rounded-lg p-5">
-        <h3 class="font-semibold text-foreground mb-2">Field Testers</h3>
-        <p class="text-muted-foreground text-sm">Handheld instruments for spot-checking and in-situ calibration verification. Ruggedised for field use with an IP68 rating and a 72-hour offline operating window.</p>
-      </div>
-      <div class="border border-border rounded-lg p-5">
-        <h3 class="font-semibold text-foreground mb-2">Data Gateways</h3>
-        <p class="text-muted-foreground text-sm">Edge devices that aggregate readings from up to 500 concurrent sensor modules and relay them to the central event backbone over cellular or satellite links.</p>
-      </div>
-      <div class="border border-border rounded-lg p-5">
-        <h3 class="font-semibold text-foreground mb-2">Calibration Rigs</h3>
-        <p class="text-muted-foreground text-sm">Automated calibration stations that verify and adjust sensor modules against certified reference standards, producing an immutable calibration record for every batch.</p>
-      </div>
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title(class='text-base') %}Sensor Modules{% endcall %}
+          {% call card_description() %}Multi-parameter probes measuring turbidity, conductivity, dissolved oxygen, pH and temperature in a single submersible housing. Each module is calibrated against reference standards traceable to national metrology institutes.{% endcall %}
+        {% endcall %}
+      {% endcall %}
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title(class='text-base') %}Field Testers{% endcall %}
+          {% call card_description() %}Handheld instruments for spot-checking and in-situ calibration verification. Ruggedised for field use with an IP68 rating and a 72-hour offline operating window.{% endcall %}
+        {% endcall %}
+      {% endcall %}
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title(class='text-base') %}Data Gateways{% endcall %}
+          {% call card_description() %}Edge devices that aggregate readings from up to 500 concurrent sensor modules and relay them to the central event backbone over cellular or satellite links.{% endcall %}
+        {% endcall %}
+      {% endcall %}
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title(class='text-base') %}Calibration Rigs{% endcall %}
+          {% call card_description() %}Automated calibration stations that verify and adjust sensor modules against certified reference standards, producing an immutable calibration record for every batch.{% endcall %}
+        {% endcall %}
+      {% endcall %}
     </div>
   </section>
 

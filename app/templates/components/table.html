@@ -1,6 +1,8 @@
 {# shadcn/ui Table Component #}
-{% macro table(class='', id='', attrs_dict={}) %}
-    <div class="relative w-full overflow-auto" aria-live="polite" aria-atomic="false">
+{# wrapper_class: classes added to the scroll wrapper, for a page whose own header must stay pinned to the
+   window (pass '!overflow-visible' so the wrapper stops being a scroll container). #}
+{% macro table(class='', id='', attrs_dict={}, wrapper_class='') %}
+    <div class="relative w-full overflow-auto {{ wrapper_class }}" aria-live="polite" aria-atomic="false">
         <table {% if id %}id="{{ id }}" {% endif %}class="dense-table w-full caption-bottom text-sm {{ class }}" {{ attrs_dict|xmlattr }}>
             {{ caller() }}
         </table>

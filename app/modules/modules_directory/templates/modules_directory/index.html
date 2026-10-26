@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
 {% block title %}All modules — {{ config.APP_NAME }}{% endblock %}
 
 {% block extra_head_js %}
@@ -23,20 +25,11 @@
             <i data-lucide="search"
                class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
                aria-hidden="true"></i>
-            <input id="modules-directory-search"
-                   type="search"
-                   x-model="q"
-                   autocomplete="off"
-                   placeholder="Filter modules…"
-                   data-testid="modules-directory-search"
-                   class="w-full rounded-md border border-input bg-background pl-9 pr-9 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-            <button type="button"
-                    x-show="q !== ''"
-                    x-on:click="clear()"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+            {{ input(id=("modules-directory-search"), type="search", autocomplete=("off"), placeholder=("Filter modules…"), class="w-full pl-9 pr-9", attrs_dict={"x-model": ("q"), "data-testid": ("modules-directory-search")}) }}
+            {% call button(variant='bare', size='bare', class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring", attrs_dict={"x-show": ("q !== ''"), "x-on:click": ("clear()")}) %}
                 <span class="sr-only">Clear the module filter</span>
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
+            {% endcall %}
         </div>
         <p class="mt-2 text-xs text-muted-foreground" aria-live="polite" data-testid="modules-directory-count">
             <span x-text='shownCount({{ all_labels | tojson }})'>{{ total_count }}</span>

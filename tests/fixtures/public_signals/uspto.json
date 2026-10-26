@@ -1,0 +1,32 @@
+{
+ "recordTotalQuantity": 2,
+ "results": [
+  {
+   "patentNumber": "11999999",
+   "inventionTitle": "Route planning for refrigerated freight",
+   "inventorNameArrayText": [
+    "B. Singh"
+   ],
+   "assigneeEntityNameArrayText": [
+    "Northwind Freight Inc."
+   ],
+   "filingDate": "2024-03-01",
+   "grantDate": "2026-05-12",
+   "abstractText": [
+    "A method of planning routes."
+   ]
+  },
+  {
+   "patentNumber": "11888888",
+   "inventionTitle": "Something else",
+   "assigneeEntityNameArrayText": [
+    "Contoso Ltd"
+   ],
+   "filingDate": "2024-01-01",
+   "grantDate": "2025-01-01",
+   "abstractText": [
+    "x"
+   ]
+  }
+ ]
+}
