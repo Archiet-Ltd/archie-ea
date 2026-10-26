@@ -46,7 +46,7 @@
         {{ metrics_card(title='Total Mappings', value=stats.quality_metrics.total_mappings, description='Across all paths', icon='link') }}
         {{ metrics_card(
             title='Quality Score',
-            value=("%.1f"|format(stats.quality_metrics.quality_score) ~ '/5.0') if stats.quality_metrics.quality_score is not none else '—',
+            value=("%.1f"|format(stats.quality_metrics.quality_score) ~ '/5.0') if (stats.quality_metrics.quality_score is not none and stats.quality_metrics.quality_score > 0) else 'Not rated',
             description=stats.quality_metrics.high_quality_mappings ~ ' high-quality',
             icon='star'
         ) }}
