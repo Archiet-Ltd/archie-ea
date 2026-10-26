@@ -283,11 +283,11 @@
 
 {# Create / Edit Gap Dialog #}
 <div id="rdm-create-gap-modal" data-modal="rdm-create-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-gap-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <h2 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground" x-text="gapModalTitle"></h2>
+        <h2 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground" x-data x-text="$store.rdm.editingGap ? 'Edit Gap' : 'Create Gap'"></h2>
         <button type="button" data-modal-close="rdm-create-gap-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
@@ -337,8 +337,8 @@
 
 {# Create Plateau Dialog #}
 <div id="rdm-create-plateau-modal" data-modal="rdm-create-plateau-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-plateau-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <h2 id="rdm-plateau-modal-title" class="text-base font-semibold text-foreground">Add Plateau</h2>
@@ -380,11 +380,11 @@
 
 {# Create / Edit Work Package Dialog #}
 <div id="rdm-create-wp-modal" data-modal="rdm-create-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-wp-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <h2 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground" x-text="wpModalTitle"></h2>
+        <h2 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground" x-data x-text="$store.rdm.editingWp ? 'Edit Work Package' : 'Create Work Package'"></h2>
         <button type="button" data-modal-close="rdm-create-wp-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
@@ -467,8 +467,8 @@
 
 {# AI Generate Preview Dialog #}
 <div id="rdm-ai-generate-modal" data-modal="rdm-ai-generate-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <h2 id="rdm-ai-modal-title" class="text-base font-semibold text-foreground">AI Roadmap Generation Preview</h2>
