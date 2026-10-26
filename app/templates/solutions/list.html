@@ -12,25 +12,25 @@
 
 {% block title %}Solutions{% endblock %}
 
-{#- Header: one primary action (New solution starts a solution through the page's solutionListCompare component), the
-    rest in one More menu. -#}
+{#- Header: one primary action (New solution starts a solution through the page's solutionListCompare component), and
+    one "Start from" menu for the other ways in. -#}
 {% macro _solutions_page_actions() %}
 <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
   {% call ui.dropdown_menu() %}
-    {% call ui.dropdown_menu_trigger(variant='outline', attrs={'data-testid': 'solutions-more-menu'}) %}{{ lucide('ellipsis') }}More{% endcall %}
+    {% call ui.dropdown_menu_trigger(variant='outline', attrs={'data-testid': 'solutions-more-menu'}) %}Start from{{ lucide('chevron-down') }}{% endcall %}
     {% call ui.dropdown_menu_content(align='end', class='w-[220px]') %}
-      {{ ui.dropdown_menu_item(text='Start architecture journey', href=url_for('architecture_journey.index'), attrs={'data-testid': 'btn-start-journey'}) }}
-      {{ ui.dropdown_menu_item(text='New from template', attrs={'data-action': 'open-template-modal', 'data-testid': 'btn-new-from-template'}) }}
+      {{ ui.dropdown_menu_item(text='The architecture journey', href=url_for('architecture_journey.index'), attrs={'data-testid': 'btn-start-journey'}) }}
+      {{ ui.dropdown_menu_item(text='A template', attrs={'data-action': 'open-template-modal', 'data-testid': 'btn-new-from-template'}) }}
       {% if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions %}
-      {{ ui.dropdown_menu_item(text='Reference catalogue', href=url_for('enterprise_crud.reference_catalog'), attrs={'data-testid': 'btn-reference-catalog'}) }}
+      {{ ui.dropdown_menu_item(text='The reference catalogue', href=url_for('enterprise_crud.reference_catalog'), attrs={'data-testid': 'btn-reference-catalog'}) }}
       {% endif %}
     {% endcall %}
   {% endcall %}
-  {% call ui.button(type='button', attrs={'@click': 'startSolution', ':disabled': 'startingSolution', 'data-testid': 'btn-new-solution', 'aria-label': 'Create a new solution'}) %}{{ lucide('plus') }}New solution{% endcall %}
+  {% call ui.button(type='button', class='bg-primary', attrs={'@click': 'startSolution', ':disabled': 'startingSolution', 'data-testid': 'btn-new-solution', 'aria-label': 'Create a new solution'}) %}{{ lucide('plus') }}New solution{% endcall %}
 </div>
 {% endmacro %}
 
-{% macro _subtitle() %}<span data-testid="programme-solution-relationship">Every solution being designed, what is blocking it and what to do next. A programme groups several solutions; the architecture journey designs one.</span>{% endmacro %}
+{% macro _subtitle() %}<span data-testid="programme-solution-relationship">Every solution in design, what is blocking it and the next step</span>{% endmacro %}
 
 {%- set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In review', 'under_review': 'In review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In progress', 'proposed': 'Submitted'} -%}
 
@@ -113,8 +113,9 @@
 
 {% block content %}
 <div class="p-6 space-y-6" x-data="solutionListCompare">
+{%- set _truly_empty = not solutions and not load_error and ((hidden_by_role_filter or 0) + (hidden_by_filters or 0)) == 0 -%}
 {{ page_shell(title='Solutions', subtitle_caller=_subtitle, breadcrumb=[('Home', url_for('main.index')), ('Solutions', none)],
-              actions_caller=_solutions_page_actions) }}
+              actions_caller=(none if _truly_empty else _solutions_page_actions)) }}
 
 {% if solutions %}
 {%- set ws_stats = workspace_stats or {} -%}
@@ -168,10 +169,23 @@
   </div>
 </div>
 
-{%- set columns = [{'label': _select_all(), 'class': 'w-10'}, {'label': 'Solution', 'sortable': true}, {'label': 'Stage', 'class': 'hidden lg:table-cell'},
-                   {'label': 'Status', 'sortable': true}, {'label': 'Review', 'class': 'hidden xl:table-cell'},
-                   {'label': 'Readiness', 'align': 'right', 'sortable': true}, {'label': 'Next step', 'class': 'hidden md:table-cell'},
-                   {'label': 'Created', 'sortable': true, 'class': 'hidden 2xl:table-cell'}, {'label': '', 'class': 'w-12'}] -%}
+{#- A fact the same on every row (no domain, one type, one lead) is said once above the table, not on each row; a missing domain or type is simply left out of the row. -#}
+{%- set _summaries = workspace_summaries or {} -%}
+{%- set _domains = solutions|map(attribute='business_domain')|map('default', '', true)|unique|list -%}
+{%- set _types = solutions|map(attribute='solution_type')|map('default', '', true)|unique|list -%}
+{%- set _leads = [] -%}
+{%- for sol in solutions %}{% set lead = (_summaries.get(sol.id, {}).owner_display or '') %}{% if lead not in _leads %}{% set _ = _leads.append(lead) %}{% endif %}{% endfor -%}
+{%- set vary = {'domain': _domains|length > 1, 'type': _types|length > 1, 'lead': _leads|length > 1} -%}
+{%- set _shared = [] -%}
+{%- if not vary.domain %}{% set _ = _shared.append(('every solution is in ' ~ _domains[0]) if _domains[0] else 'no solution has a business domain yet') %}{% endif -%}
+{%- if not vary.type %}{% set _ = _shared.append(('every solution is ' ~ _types[0]|replace('_', ' ')|lower) if _types[0] else 'no solution has a type yet') %}{% endif -%}
+{%- if not vary.lead %}{% set _ = _shared.append(('every solution is led by ' ~ _leads[0]) if _leads[0] else 'no solution has a lead yet') %}{% endif -%}
+{% if _shared %}<p class="text-sm text-muted-foreground" data-testid="solutions-shared-facts">{{ (_shared|join('; ') ~ ' on this page.')|capitalize }}</p>{% endif %}
+{#- At 1440 the table shows selection, solution, status, readiness, created and the row menu; stage, review and next step join at 2xl. -#}
+{%- set columns = [{'label': _select_all(), 'class': 'w-10'}, {'label': 'Solution', 'sortable': true}, {'label': 'Stage', 'class': 'hidden 2xl:table-cell'},
+                   {'label': 'Status', 'sortable': true}, {'label': 'Review', 'class': 'hidden 2xl:table-cell'},
+                   {'label': 'Readiness', 'align': 'right', 'sortable': true}, {'label': 'Next step', 'class': 'hidden 2xl:table-cell'},
+                   {'label': 'Created', 'sortable': true, 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}] -%}
 {% call(solution) list_table(rows=solutions, columns=columns, caption='Solutions', testid='solutions-table', row_testid='solution-row', page_size=50,
                              search_placeholder='Filter this page...', toolbar=true, toolbar_actions=_filters,
                              empty_message='No solutions match these filters.') %}
@@ -181,24 +195,27 @@
   {% call table_cell(class='w-10') %}
     <input type="checkbox" value="{{ solution.id }}" class="size-4 accent-primary align-middle" aria-label="Select {{ solution.name }}" data-select-row="solution-table">
   {% endcall %}
-  {% call table_cell(class='max-w-[340px]') %}
+  {%- set _line = [] -%}
+  {%- if vary.domain and solution.business_domain %}{% set _ = _line.append(solution.business_domain) %}{% endif -%}
+  {%- if vary.type and solution.solution_type %}{% set _ = _line.append(solution.solution_type|replace('_', ' ')|capitalize) %}{% endif -%}
+  {%- if vary.lead %}{% set _ = _line.append('Lead: ' ~ (ws.owner_display or 'unassigned')) %}{% endif -%}
+  {% call table_cell(class='max-w-[320px]') %}
     <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="solution-link">{{ solution.name }}</a>
-    <span class="block truncate text-xs text-muted-foreground">{{ solution.business_domain or 'No domain' }} · {{ solution.solution_type|replace('_', ' ')|capitalize if solution.solution_type else 'No type' }} · Lead: {{ ws.owner_display or 'unassigned' }}</span>
+    {% if _line %}<span class="block truncate text-xs text-muted-foreground">{{ _line|join(' · ') }}</span>{% endif %}
     <span hidden data-sol-meta data-id="{{ solution.id }}" data-name="{{ solution.name }}" data-domain="{{ solution.business_domain or '' }}"
           data-status="{{ (solution.status or 'planned')|replace('_', ' ')|capitalize }}" data-type="{{ solution.solution_type|replace('_', ' ')|capitalize if solution.solution_type else '' }}"
           data-readiness="{{ readiness }}%" data-capabilities="{{ ws.capability_count or 0 }}" data-created="{{ solution.created_at|format_date }}"></span>
   {% endcall %}
-  {% call table_cell(class='hidden lg:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(solution.status or 'planned') }}{% endcall %}
-  {% call table_cell(class='hidden xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize) }}{% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness}) %}
     <span class="inline-flex items-center justify-end gap-2" title="{{ ws.readiness_passed or 0 }} of {{ ws.readiness_total or 0 }} maturity checks pass">
-      <progress class="hidden h-1.5 w-16 overflow-hidden rounded-full accent-primary xl:block" max="100" value="{{ readiness }}" aria-hidden="true"></progress>
       <span class="w-10 text-right">{{ readiness }}%</span>
     </span>
   {% endcall %}
-  {% call table_cell(class='hidden md:table-cell max-w-[260px] truncate') %}{{ ws.next_action or 'Continue modelling' }}{% endcall %}
-  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground', attrs={'data-sort': solution.created_at.strftime('%Y%m%d%H%M') if solution.created_at else ''}) %}{{ solution.created_at|format_date }}{% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell max-w-[260px] truncate') %}{{ ws.next_action or 'Continue modelling' }}{% endcall %}
+  {% call table_cell(class='hidden lg:table-cell whitespace-nowrap text-muted-foreground', attrs={'data-sort': solution.created_at.strftime('%Y%m%d%H%M') if solution.created_at else ''}) %}{{ solution.created_at|format_date }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}{{ _row_menu(solution) }}{% endcall %}
 {% endcall %}
 
@@ -272,9 +289,13 @@
       </div>
     </div>
   {% else %}
-    {{ empty_state(icon='puzzle', title='No solutions yet',
-                   description='Start one with New solution, or pick a pattern with New from template under More. Its architecture blueprint builds from there.',
-                   heading_testid='solutions-empty-state-heading') }}
+    {{ empty_state(icon='puzzle', title='No solutions yet', description='Create a solution to start its architecture blueprint.',
+                   heading_testid='solutions-empty-state-heading', padding='pt-12 pb-4') }}
+    <div class="flex flex-wrap items-center justify-center gap-2 pb-12">
+      {% call ui.button(type='button', class='bg-primary', attrs={'@click': 'startSolution', ':disabled': 'startingSolution', 'data-testid': 'btn-new-solution', 'aria-label': 'Create a new solution'}) %}{{ lucide('plus') }}New solution{% endcall %}
+      {{ ui.button(text='From a template', type='button', variant='outline', attrs={'data-action': 'open-template-modal', 'data-testid': 'btn-new-from-template'}) }}
+      {{ ui.button(text='Through the architecture journey', href=url_for('architecture_journey.index'), variant='outline', attrs={'data-testid': 'btn-start-journey'}) }}
+    </div>
   {% endif %}
   {% endcall %}
 {% endcall %}

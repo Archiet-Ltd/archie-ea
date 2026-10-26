@@ -46,7 +46,7 @@
 {%- set show_recommended = rows|selectattr('recommended_vendor')|list|length > 0 -%}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Vendor options analysis', subtitle='Compare vendor products with weighted scores to back a selection decision',
-              breadcrumb=[('Home', url_for('main.index')), ('Vendor options analysis', none)], actions_caller=_actions) }}
+              breadcrumb=[('Home', url_for('main.index')), ('Vendor options analysis', none)], actions_caller=(_actions if (s.total or 0) > 0 else none)) }}
 
 {% if (s.total or 0) > 0 %}
 {{ stat_cards([
@@ -80,7 +80,8 @@
 {% call ui.card(attrs={'data-testid': 'vendor-analysis-empty'}) %}
   {% call ui.card_content() %}
     {{ empty_state(icon='chart-column', title='No vendor analyses yet',
-                   description='Start one with New analysis: pick the vendors you are weighing up, set what matters and how much, and the scores show which fits best.') }}
+                   description='Pick the vendors you are weighing up, set what matters and how much, and the scores show which fits best.',
+                   cta_text='New analysis', cta_icon='plus', cta_href=url_for('application_mgmt.vendor_analysis_new')) }}
   {% endcall %}
 {% endcall %}
 {% endif %}

@@ -16,7 +16,7 @@
 {% block content %}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Business cases', subtitle='The problem, the options, the recommendation and what it costs and returns, in one document per decision',
-              breadcrumb=[('Home', url_for('main.index')), ('Business cases', none)], actions_caller=_actions) }}
+              breadcrumb=[('Home', url_for('main.index')), ('Business cases', none)], actions_caller=(_actions if business_cases else none)) }}
 
 {% if business_cases %}
 {#- A column every row leaves empty is left out rather than repeating "not costed" on each row. -#}
@@ -49,7 +49,8 @@
 {% call ui.card(attrs={'data-testid': 'bc-empty'}) %}
   {% call ui.card_content() %}
     {{ empty_state(icon='file-text', title='No business cases yet',
-                   description='Start one with New business case: give it a title, then fill in the problem, the options, the recommendation and its costs and benefits.') }}
+                   description='Give it a title, then fill in the problem, the options, the recommendation and its costs and benefits.', padding='pt-12 pb-4') }}
+    <div class="flex justify-center pb-12">{{ _actions() }}</div>
   {% endcall %}
 {% endcall %}
 {% endif %}

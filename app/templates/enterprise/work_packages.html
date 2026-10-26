@@ -13,7 +13,7 @@
 {% endmacro %}
 
 {% macro _bulk_delete() %}
-{% call ui.button(type='submit', variant='outline', size='sm', class='h-8', attrs={'form': 'wp-bulk-form', 'data-testid': 'wp-bulk-delete', 'data-bulk-delete': '', 'disabled': true}) %}{{ lucide('trash-2') }}Delete selected{% endcall %}
+{% call ui.button(type='submit', variant='outline', size='sm', class='h-8', attrs={'form': 'wp-bulk-form', 'data-testid': 'wp-bulk-delete', 'data-bulk-delete': '', 'hidden': true}) %}{{ lucide('trash-2') }}Delete selected{% endcall %}
 {% endmacro %}
 
 {#- The row's ellipsis menu, built from the same dropdown parts as row_actions in components/list_table.html
@@ -47,10 +47,19 @@
 {%- set show_gaps = wps|selectattr('id', 'in', gaps_by_wp.keys()|list)|list|length > 0 -%}
 {%- set show_progress = wps|selectattr('progress_percentage', 'ne', none)|list|length > 0 -%}
 {%- set show_due = wps|selectattr('end_date')|list|length > 0 -%}
+{%- set no_due = wps|rejectattr('end_date')|list|length -%}
+{%- set no_gap = wps|rejectattr('id', 'in', gaps_by_wp.keys()|list)|list|length -%}
+{%- set no_progress = wps|selectattr('progress_percentage', 'none')|list|length -%}
+{%- set _missing = [] -%}
+{%- if show_due and no_due %}{% set _ = _missing.append(no_due ~ ' ha' ~ ('s' if no_due == 1 else 've') ~ ' no due date') %}{% endif -%}
+{%- if show_gaps and no_gap %}{% set _ = _missing.append(no_gap ~ ' ha' ~ ('s' if no_gap == 1 else 've') ~ ' no linked gap') %}{% endif -%}
+{%- if show_progress and no_progress %}{% set _ = _missing.append(no_progress ~ ' ha' ~ ('s' if no_progress == 1 else 've') ~ ' no progress recorded') %}{% endif -%}
+{%- if not show_due %}{% set _ = _missing.append('none has a due date yet') %}{% endif -%}
+{%- if not show_gaps %}{% set _ = _missing.append('none is linked to a gap yet') %}{% endif -%}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Work packages', subtitle='The pieces of work that close architecture gaps, with their status, progress and due dates',
               breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Work packages', none)],
-              actions_caller=_actions) }}
+              actions_caller=(_actions if wps else none)) }}
 
 {% if wps %}
 {{ stat_cards([
@@ -59,6 +68,8 @@
     {'label': 'Completed', 'value': counts.completed, 'icon': 'circle-check', 'sentence': ('Delivered and closed' if counts.completed else 'Nothing has been delivered yet'), 'testid': 'wp-stat-completed'},
     {'label': 'Overdue', 'value': counts.overdue, 'icon': 'clock', 'sentence': ('Past their due date and not finished' if counts.overdue else 'Nothing is past its due date'), 'testid': 'wp-stat-overdue'},
 ]) }}
+
+{% if _missing %}<p class="text-sm text-muted-foreground" data-testid="wp-shared-facts">Of these work packages, {{ _missing|join('; ') }}. Those cells are left empty.</p>{% endif %}
 
 <form id="wp-bulk-form" method="post" action="{{ url_for('enterprise.work_packages') }}" data-confirm="Delete the selected work packages? This cannot be undone." data-testid="wp-bulk-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -89,23 +100,18 @@
       {% if wp_gaps %}
         <span class="block truncate">{{ wp_gaps[0].name }}</span>
         {% if wp_gaps|length > 1 %}<span class="block text-xs text-muted-foreground">and {{ wp_gaps|length - 1 }} more</span>{% endif %}
-      {% else %}{{ value_or_unset(none, 'No gap linked') }}{% endif %}
+      {% endif %}
     </span>
   {% endcall %}
   {% endif %}
   {% if show_progress %}
   {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': wp.progress_percentage if wp.progress_percentage is not none else -1}) %}
-    {% if wp.progress_percentage is not none %}
-    <span class="inline-flex items-center justify-end gap-2">
-      <progress class="h-1.5 w-16 overflow-hidden rounded-full accent-primary" max="100" value="{{ wp.progress_percentage }}" aria-hidden="true"></progress>
-      <span class="w-10 text-right">{{ wp.progress_percentage|round|int }}%</span>
-    </span>
-    {% else %}{{ value_or_unset(none, 'Not tracked') }}{% endif %}
+    {% if wp.progress_percentage is not none %}{{ wp.progress_percentage|round|int }}%{% endif %}
   {% endcall %}
   {% endif %}
   {% if show_due %}
   {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': wp.end_date.strftime('%Y%m%d') if wp.end_date else '99999999'}) %}
-    {{ wp.end_date|format_date if wp.end_date else value_or_unset(none, 'No date') }}
+    {{ wp.end_date|format_date if wp.end_date else '' }}
   {% endcall %}
   {% endif %}
   {% call table_cell(class='w-12 text-right') %}
@@ -116,7 +122,8 @@
 {% call ui.card(attrs={'data-testid': 'work-packages-empty'}) %}
   {% call ui.card_content() %}
     {{ empty_state(icon='package', title='No work packages yet',
-                   description='A work package is a piece of work that closes one or more gaps. Add one with New work package, or convert a gap on the gap analysis page.') }}
+                   description='A work package is a piece of work that closes one or more gaps. Add one here, or convert a gap on the gap analysis page.',
+                   cta_text='New work package', cta_icon='plus', cta_href=url_for('implementation_planning.create_work_package')) }}
   {% endcall %}
 {% endcall %}
 {% endif %}
@@ -131,7 +138,7 @@
     var picked = boxes().filter(function (b) { return b.checked; }).length;
     var button = document.querySelector('[data-bulk-delete]');
     if (button) {
-      button.disabled = picked === 0;
+      button.hidden = picked === 0;
       button.lastChild.textContent = picked ? 'Delete ' + picked + ' selected' : 'Delete selected';
     }
   }
