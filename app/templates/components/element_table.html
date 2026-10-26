@@ -21,7 +21,7 @@
 {% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table') %}
   <td class="px-2 !pl-6 align-middle">
     {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
-    {% if row.description %}<span class="block max-w-md text-xs text-muted-foreground line-clamp-1">{{ row.description }}</span>{% endif %}
+    {% if row.description %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
   </td>
   {{ cells(row) }}
 {% endcall %}

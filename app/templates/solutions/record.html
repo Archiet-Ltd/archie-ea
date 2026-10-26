@@ -418,7 +418,7 @@
                   <td class="whitespace-nowrap px-2 align-middle text-foreground">{% if o.months %}{{ o.months }} month{{ 's' if o.months != 1 }}{% else %}Not stated{% endif %}</td>
                   <td class="whitespace-nowrap px-2 align-middle">{% if o.risk %}{% call badge(variant={'Low': 'success', 'Medium': 'warning', 'High': 'danger'}.get(o.risk, 'outline')) %}{{ o.risk }}{% endcall %}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}</td>
                   {% endif %}
-                  <td class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}"><span class="block max-w-md line-clamp-1">{{ o.summary }}</span></td>
+                  <td class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}"><span class="block w-0 min-w-full truncate">{{ o.summary }}</span></td>
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -485,7 +485,7 @@
                     <td class="px-2 !pl-6 align-middle">
                       <a href="{{ r.href }}" class="font-medium text-foreground hover:underline" data-testid="risk-link">{{ r.title }}</a>
                       {% if r.via %}<span class="block text-xs text-muted-foreground">through {{ r.via }}</span>{% endif %}
-                      {% if r.mitigation %}<span class="block max-w-md line-clamp-1 text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
+                      {% if r.mitigation %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
                     </td>
                     <td class="px-2 align-middle">{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}</td>
                     <td class="whitespace-nowrap px-2 align-middle">{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[r.band]) %}{{ r.band_label }} {{ r.score }}{% endcall %}</td>
