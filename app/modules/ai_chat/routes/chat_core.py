@@ -691,6 +691,8 @@ def send_message():
                 "sources": agent_result.get("sources", []),
                 # The provider and model that answered; absent when none did.
                 "answered_by": agent_result.get("answered_by"),
+                # An answer that read the model, checked and drawn on the server.
+                "genome_answer": agent_result.get("genome_answer"),
                 # AgentRunner._fallback() persists a friendly "couldn't be
                 # completed" response AND keeps the raw failure reason on the
                 # same dict; without this field the UI could not tell an

@@ -613,6 +613,7 @@
                        ordinary answer that happens to mention Admin
                        -> API Settings. */
                     answeredBy: data.answered_by || null,
+                    genomeHtml: (data.genome_answer && data.genome_answer.html) || null,
                     error: data.agent_error || null
                 });
 
@@ -725,6 +726,7 @@
                         actions: result.actions || [],
                         pendingApprovals: result.pendingApprovals || [],
                         answeredBy: result.answeredBy || null,
+                        genomeHtml: result.genomeHtml || null,
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
