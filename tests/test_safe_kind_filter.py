@@ -387,7 +387,7 @@ def test_detail_link_opens_the_clicked_work_package_not_a_number_twin(
     c = app.test_client()
     login_as(c, user)
 
-    resp = c.get("/architecture/implementation/WorkPackage/%d" % collision_id)
+    resp = c.get("/architecture/implementation/WorkPackage/%d?ae=1" % collision_id)
     assert resp.status_code == 200, resp.get_data(as_text=True)
     body = resp.get_data(as_text=True)
     assert "Target work package" in body, (
@@ -434,12 +434,12 @@ def test_detail_link_is_isolated_between_organisations(
     c = app.test_client()
 
     login_as(c, user_a)
-    resp = c.get("/architecture/implementation/WorkPackage/%d" % ae.id)
+    resp = c.get("/architecture/implementation/WorkPackage/%d?ae=1" % ae.id)
     assert resp.status_code == 200
     assert "Org A only work package" in resp.get_data(as_text=True)
 
     login_as(c, user_b)
-    resp = c.get("/architecture/implementation/WorkPackage/%d" % ae.id)
+    resp = c.get("/architecture/implementation/WorkPackage/%d?ae=1" % ae.id)
     assert resp.status_code == 404, (
         "org B reached org A's work package through the detail link"
     )
