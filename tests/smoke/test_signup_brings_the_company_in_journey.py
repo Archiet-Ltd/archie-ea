@@ -40,6 +40,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 SHOTS = os.environ.get("SIGNUP_JOURNEY_SHOTS")
 GOOD_KEY = "sk-journey-good-key-0001"
 READER_KEY = "sk-journey-reader-0001"  # the server's own key: it reads the pages of a website
+READER_DELAY = {"seconds": 0.0}  # how long the reader's model takes to answer; a slow free model in one test
 
 
 class _Provider(BaseHTTPRequestHandler):
@@ -53,6 +54,8 @@ class _Provider(BaseHTTPRequestHandler):
         text = "ok"
         if reading:
             from tests.test_website_crawl import fake_model
+
+            time.sleep(READER_DELAY["seconds"])
 
             try:
                 text = fake_model("\n".join(str(m.get("content")) for m in asked.get("messages", [])))
@@ -512,6 +515,48 @@ def company_site():
     yield site
     site.stop()
     other.stop()
+
+
+def test_a_slow_model_does_not_keep_the_founder_from_seeing_their_company_name(browser, server, people, app, company_site):
+    """QA-026: the cal.com sign-up reached step 3 and saw nothing, because each page waited on the model.
+    The company name and the facts a page states are on step 3 within seconds, ticked, while the model is
+    still reading; the page says more are coming, and the model's facts arrive once it answers."""
+    site = company_site
+    READER_DELAY["seconds"] = 45.0
+    context, page = new_page(browser, 1440)
+    try:
+        email, _started = sign_up(page, str(server), people)
+        page.get_by_label("Website address").fill(site.url)
+        page.get_by_label("You may read this website").check()
+        page.get_by_role("button", name="Save website").click()
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        asked_at = time.monotonic()
+
+        # Within the walk, the name is there and ticked, and nothing is waiting on the model.
+        name = _fact(page, "Company name")
+        expect(name.locator("[data-fact-value]")).to_have_value("Acme Robotics Ltd", timeout=30000)
+        assert time.monotonic() - asked_at < 30, "the name took %.0f s" % (time.monotonic() - asked_at)
+        expect(name.get_by_role("checkbox")).to_be_checked()
+        expect(_fact(page, "Contact email").locator("[data-fact-value]")).to_have_value("info@acme-robotics.test")
+        expect(page.get_by_test_id("signup-facts-more")).to_contain_text("More facts are still being worked out")
+        assert _fact(page, "Category").count() == 0, "a model-only fact appeared before the model answered"
+        shoot(page, "slow-model-first-facts")
+
+        # The model's reading arrives; the person asks for it and gets the richer profile.
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline and not _fact(page, "Category").count():
+            page.wait_for_timeout(5000)
+            if page.get_by_test_id("signup-facts-refresh").count():
+                page.get_by_test_id("signup-facts-refresh").click()
+                page.wait_for_url("**/account/welcome?step=3")
+        expect(_fact(page, "Category").locator("[data-fact-value]")).to_have_value("Transportation & Logistics")
+        expect(_fact(page, "Product").first).to_be_visible()
+        expect(_fact(page, "Company name")).to_have_count(1)
+        shoot(page, "slow-model-all-facts")
+    finally:
+        READER_DELAY["seconds"] = 0.0
+        context.close()
 
 
 def _fact(page, label):

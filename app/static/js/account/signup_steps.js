@@ -105,7 +105,7 @@
             window.Platform.fetch.get(URLS.status, null, { silent: true }).then(function (body) {
                 paint(body.sources);
                 var site = (body.sources || []).filter(function (row) { return row.key === 'website'; })[0];
-                if (site && site.state === 'done' && root.hasAttribute('data-reload-when-read')) {
+                if (site && (site.state === 'done' || site.facts_ready) && root.hasAttribute('data-reload-when-read')) {
                     saveEverything().then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
                 }
                 var open = (body.sources || []).some(function (row) { return row.state === 'waiting' || row.state === 'reading'; });
