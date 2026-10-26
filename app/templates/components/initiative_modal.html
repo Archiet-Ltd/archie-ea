@@ -88,6 +88,7 @@
 {% call modal(id='initiative-' ~ id, title=title, size='lg') %}
     <!-- Error Alert -->
     <div x-show="error" x-cloak
+         x-transition
          class="mb-4 px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis text-sm">
         <span x-text="error"></span>
     </div>
@@ -181,7 +182,7 @@
     <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-border">
         <button @click="Platform.modal.close('initiative-{{ id }}')"
                 type="button"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
+                class="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4" aria-label="Cancel">
             Cancel
         </button>
         <button @click="submitInitiativeForm()"

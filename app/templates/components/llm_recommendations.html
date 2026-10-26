@@ -158,13 +158,15 @@ function llmRecommendationsComponent(dashboard) {
             
             <!-- Error Message -->
             <div x-show="error" x-cloak 
-                 class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis">
+                 class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis"
+                 x-transition>
                 <strong>Error:</strong> <span x-text="error"></span>
             </div>
             
             <!-- Recommendations List -->
             <div x-show="recommendations.length > 0" x-cloak 
-                 class="space-y-4 mt-6">
+                 class="space-y-4 mt-6"
+                 x-transition>
                 
                 <template x-for="rec in recommendations" :key="rec.id">
                     <div :class="getPriorityColor(rec.priority)" 
@@ -240,7 +242,8 @@ function llmRecommendationsComponent(dashboard) {
     
     <!-- Rating Modal -->
     <div x-show="ratingRecommendation !== null" x-cloak
-         x-cloak
+         @keydown.escape.window="ratingRecommendation = null; resetRatingForm()"
+         role="dialog" aria-modal="true" aria-label="Rate Recommendation"
          class="modal-root fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
          @click="ratingRecommendation = null; resetRatingForm()">
         
