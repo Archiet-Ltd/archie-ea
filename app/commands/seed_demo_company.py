@@ -2413,7 +2413,7 @@ def _seed_demo_company() -> dict:
     if org is None:
         from app.services.billing_plans import set_contract_plan
 
-        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG)
+        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG, settings={"currency_code": "GBP"}, reporting_currency="GBP")
         db.session.add(org)
         db.session.flush()
         # Enterprise has no people limit, so the demo cast below fits.
@@ -2423,6 +2423,16 @@ def _seed_demo_company() -> dict:
         ensure_charters(org.id)
         stats["organization_created"] = 1
     else:
+        # Ensure the demo organisation has its currency set.
+        changed = False
+        if not (org.settings or {}).get("currency_code"):
+            org.settings = {**(org.settings or {}), "currency_code": "GBP"}
+            changed = True
+        if not org.reporting_currency:
+            org.reporting_currency = "GBP"
+            changed = True
+        if changed:
+            db.session.flush()
         stats["organization_created"] = 0
     org_id = org.id
     # Commit the org row before tenant_scope, which calls db.session.remove()

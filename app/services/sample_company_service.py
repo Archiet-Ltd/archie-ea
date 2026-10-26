@@ -204,6 +204,16 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.commands.seed_agent_charters import ensure_charters
 
     ensure_charters(org_id)
+
+    from app import db
+    from app.models.organization import Organization
+
+    # Ensure the organisation has a reporting currency set (H-04: single currency source)
+    org = db.session.get(Organization, org_id)
+    if org and not org.reporting_currency:
+        org.reporting_currency = "GBP"
+        db.session.flush()
+
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent

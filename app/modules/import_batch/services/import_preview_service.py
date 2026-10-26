@@ -21,7 +21,6 @@ from app.modules.import_batch.v2.services.duplicate_detection_utils_v2 import (
 )
 from app.services.application_cost_accessor import (
     detect_cost_columns,
-    get_reporting_currency,
     map_import_cost_columns,
 )
 
@@ -397,7 +396,9 @@ class ImportPreviewService:
             import_row = row.get("_import_row", 0)
             app_name = row.get("_app_name", "")
 
-            parsed = map_import_cost_columns(row, column_mapping, reporting_currency=get_reporting_currency())
+            from config import CurrencyConfig
+
+            parsed = map_import_cost_columns(row, column_mapping, reporting_currency=CurrencyConfig.get_org_currency_code())
 
             has_cost = bool(parsed["cost_fields"])
             has_errors = bool(parsed["cost_errors"])
