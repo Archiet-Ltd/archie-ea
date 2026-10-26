@@ -231,6 +231,13 @@ def test_the_slice_reads_the_capability_record_not_the_older_store(db_session, m
         name="Only In The Old Table", code=f"OLD-{org.id}", level=1,
         organization_id=org.id, archimate_element_id=old_elem.id,
     ))
+    # A write to the older table is projected into the unified one on a migrated database; this test is about a
+    # capability that exists only in the older table, so the projection is removed.
+    from app.models.unified_capability import UnifiedCapability
+
+    UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="business_capability", name="Only In The Old Table"
+    ).delete(synchronize_session=False)
     keep = _capability(org.id, "Customer Management", f"CAP-{org.id}-1", None)
     gone = _capability(org.id, "Retired Capability", f"CAP-{org.id}-9", gone_elem.id)
     gone.retired_into_id = keep.id
