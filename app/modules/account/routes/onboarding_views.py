@@ -57,6 +57,7 @@ def add_routes(bp, access) -> None:
             size_bands=confirm.SIZE_BANDS,
             goals=confirm.GOALS,
             facts=facts,
+            more_coming=onboarding.more_facts_coming(org) if step == 3 else None,
             completeness=completeness,
             suggested=onboarding.suggested_frameworks(
                 onboarding.choices(org).get("kind"), confirm.asked(org.settings).get("goal")),

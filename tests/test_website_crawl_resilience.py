@@ -60,6 +60,14 @@ def test_a_page_that_times_out_mid_read_keeps_the_pages_already_read(make_org, s
 OPENROUTER = ("google/gemma-4-31b-it:free", "meta-llama/llama-3.3-70b-instruct:free", "qwen/qwen-2.5-72b-instruct:free")
 
 
+@pytest.fixture(autouse=True)
+def _no_live_list(monkeypatch):
+    """The live OpenRouter list is not read from the network here: the curated list stands."""
+    from app.modules.ai_chat.services import model_defaults
+
+    monkeypatch.setattr(model_defaults, "live_free_openrouter_models", lambda: [])
+
+
 @pytest.fixture
 def providers(monkeypatch):
     """Stand-ins for every provider caller. ``calls`` records (provider, model) in the order tried;
@@ -86,6 +94,7 @@ def providers(monkeypatch):
     monkeypatch.setattr(LLMService, "_get_all_api_keys",
                         staticmethod(lambda provider: ["key-for-" + provider] if provider in keyed else []))
     monkeypatch.setattr(LLMService, "_persist_interaction_record", staticmethod(lambda interaction: None))
+    monkeypatch.setattr(LLMService, "_sleep", staticmethod(lambda seconds: None))
     return SimpleNamespaceLike(calls=calls, script=script, keyed=keyed, service=LLMService)
 
 
@@ -99,16 +108,18 @@ def _public(providers_):
 
 
 def test_a_rate_limited_model_then_an_error_then_an_answer_takes_the_third_models_facts(providers):
+    providers.script["nvidia"] = [RuntimeError("down")]
     providers.script["openrouter"] = [RuntimeError("429 rate limit"), RuntimeError("upstream error"), "third model's facts"]
     assert _public(providers) == "third model's facts"
-    assert providers.calls == [("openrouter", m) for m in OPENROUTER], "stops at the first answer"
+    assert [(p, m) for p, m in providers.calls if p == "openrouter"] == [("openrouter", m) for m in OPENROUTER]
+    assert providers.calls[-1] == ("openrouter", OPENROUTER[2]), "stops at the first answer"
 
 
-def test_the_chain_is_openrouter_then_nvidia_then_mistral_cerebras_groq_then_gemini(providers):
+def test_the_chain_is_nvidia_then_openrouter_then_mistral_cerebras_groq_then_gemini(providers):
     from app.modules.ai_chat.services.model_defaults import fallback_models_for
 
     boom = RuntimeError("unavailable")
-    for name in ("openrouter", "nvidia", "mistral", "cerebras"):
+    for name in ("nvidia", "openrouter", "mistral", "cerebras"):
         providers.script[name] = [boom]
     providers.script["groq"] = ["groq answers"]
     assert _public(providers) == "groq answers"
@@ -116,7 +127,7 @@ def test_the_chain_is_openrouter_then_nvidia_then_mistral_cerebras_groq_then_gem
     for name, _model in providers.calls:
         if not order or order[-1] != name:
             order.append(name)
-    assert order == ["openrouter", "nvidia", "mistral", "cerebras", "groq"]
+    assert order == ["nvidia", "openrouter", "mistral", "cerebras", "groq"]
     assert [m for p, m in providers.calls if p == "openrouter"] == fallback_models_for("openrouter", "")
     assert [m for p, m in providers.calls if p == "nvidia"] == fallback_models_for("nvidia", "")
     assert ("gemini", "gemini-2.0-flash") not in providers.calls, "stopped at the first answer"
