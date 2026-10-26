@@ -658,6 +658,35 @@ def _vendors_impl(
         db.session.rollback()
         register_rows = []
 
+    # Each vendor's active contracts and their stated annual cost, read through
+    # the same functions the Costs page totals with, so both pages agree.
+    try:
+        from app.models.application_portfolio import VendorContract
+        from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+        reg_org = vendor_register._org(None)
+        by_vendor = {}
+        if reg_org is not None and register_rows:
+            for c in VendorContract.query.filter(
+                VendorContract.organization_id == reg_org,
+                VendorContract.status == "active",
+                VendorContract.vendor_id.in_([r["id"] for r in register_rows]),
+            ).all():
+                by_vendor.setdefault(c.vendor_id, []).append(get_contract_amounts(c)["annual_cost"])
+        # The contract cost per vendor is the figure the Costs page shows, so it
+        # follows that page's rule for who may read it.
+        from flask_login import current_user as _viewer
+        from app.decorators.requires_role import may_see_spend_pages
+
+        cost_visible = may_see_spend_pages(_viewer)
+        for r in register_rows:
+            costs = by_vendor.get(r["id"], [])
+            r["contract_count"] = len(costs)
+            r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
+    except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor contract figures could not be read")
+
     # System counts use the Overview's definition of an application (not
     # decommissioned), through the Overview's own query, so both pages agree.
     system_counts = None

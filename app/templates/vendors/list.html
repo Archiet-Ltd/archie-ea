@@ -6,6 +6,7 @@
 {% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/empty_state.html' import empty_state %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/native-select.html' import native_select, native_select_option %}
 
@@ -55,30 +56,35 @@
 {%- set sc = system_counts if (system_counts is defined and system_counts) else vp -%}
 {%- set unmapped_n = sc.unmapped_count if sc else 0 -%}
 {%- set any_systems = (rows|selectattr('system_count')|list|length) > 0 -%}
-{%- set cost_col = vp and vp.show_cost and (rows|rejectattr('annual_cost', 'none')|list|length) > 0 -%}
+{%- set any_contracts = (rows|selectattr('contract_count')|list|length) > 0 -%}
+{%- set cost_col = (rows|rejectattr('contract_annual_cost', 'none')|list|length) > 0 -%}
 {%- set has_renewal = (rows|selectattr('next_renewal')|list|length) > 0 -%}
+
+{% macro _set_vendors() %}{% if unmapped_n %}{{ ui.button(text='Set system vendors (' ~ unmapped_n ~ ')', href=url_for('unified_applications.vendors', tab='mapping'), variant='outline', size='sm', attrs={'data-testid': 'vendors-mapping-link'}) }}{% endif %}{% endmacro %}
+
 <div class="p-6 space-y-6">
-{{ page_shell(title='Vendors', subtitle='The vendors your systems and contracts name, what they supply and when they renew',
-              breadcrumb=[('Home', url_for('main.index')), ('Vendors', none)], actions_caller=_actions,
-              tabs=[('Vendors', url_for('unified_applications.vendors'), tab == 'vendors'),
-                    (('Systems without a vendor (' ~ unmapped_n ~ ')') if unmapped_n else 'Systems without a vendor', url_for('unified_applications.vendors', tab='mapping'), tab == 'mapping')]) }}
+{% if tab == 'mapping' %}
+{{ page_shell(title='Systems without a vendor', subtitle='Pick or type the vendor for each system; it is saved straight away',
+              breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Systems without a vendor', none)]) }}
+{% else %}
+{{ page_shell(title='Vendors', subtitle='The vendors your systems and contracts name, what they cost and when they renew',
+              breadcrumb=[('Home', url_for('main.index')), ('Vendors', none)], actions_caller=_actions) }}
+{% endif %}
 
 {% if not vp %}
   {% call ui.card(attrs={'role': 'alert', 'data-testid': 'vendors-load-error'}) %}
-    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
-      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('triangle-alert') }}</span>
-      <p class="text-base font-semibold">The vendor list could not be read just now</p>
-      <p class="max-w-[60ch] text-sm text-muted-foreground">Reload the page. If it keeps happening, tell your administrator.</p>
-      {{ ui.button(text='Reload', href=url_for('unified_applications.vendors'), variant='outline') }}
+    {% call ui.card_content() %}
+      {{ empty_state(icon='triangle-alert', title='The vendor list could not be read just now', description='Reload the page. If it keeps happening, tell your administrator.',
+                     cta_text='Reload', cta_href=url_for('unified_applications.vendors')) }}
     {% endcall %}
   {% endcall %}
 
 {% elif tab == 'mapping' %}
 <div data-testid="mapping-answer">
-  {# Systems that name no vendor yet: pick or type the vendor for each; it is saved straight away. #}
   {% call(system) list_table(rows=sc.unmapped, columns=[('System', ''), {'label': 'Lifecycle', 'class': 'hidden md:table-cell'}, {'label': 'Vendor', 'class': 'w-[340px]'}],
                              caption='Systems with no vendor recorded', testid='mapping-list', row_testid='mapping-row',
                              search_placeholder='Filter systems...',
+                             notice=(('Showing the first ' ~ sc.unmapped|length ~ ' of ' ~ sc.unmapped_count ~ '; set these and the rest follow.') if sc.unmapped_count > sc.unmapped|length else none),
                              empty_message=('Every one of your ' ~ sc.total_systems ~ ' systems has a vendor recorded. New systems that name no vendor are listed here.') if sc.total_systems else 'You have no systems yet. Add a system, then set its vendor here.') %}
     {% call table_cell() %}<a href="{{ url_for('unified_applications.application_detail', id=system.id) }}" class="font-medium text-foreground hover:underline">{{ system.name }}</a>{% endcall %}
     {% call table_cell(class='hidden md:table-cell') %}
@@ -98,54 +104,47 @@
       </div>
     {% endcall %}
   {% endcall %}
-  {% if sc.unmapped_count > sc.unmapped|length %}
-  <p class="mt-4 text-sm text-muted-foreground">Showing the first {{ sc.unmapped|length }} of {{ sc.unmapped_count }}. Set these and the rest follow.</p>
-  {% endif %}
 </div>
 
 {% else %}
-  {% if rows %}
-  {#- The facts every row would otherwise repeat, said once above the table. -#}
-  <p class="text-sm text-muted-foreground" data-testid="vendors-answer">
-    {{ rows|length }} vendor{{ '' if rows|length == 1 else 's' }} named by your systems and contracts.
-    {% if sc.unmapped_count == sc.total_systems and sc.total_systems %}
-      No system names one of them yet, so none supplies a system:
-      <a href="{{ url_for('unified_applications.vendors', tab='mapping') }}" class="font-medium text-foreground underline underline-offset-4">set the vendor on your {{ sc.total_systems }} systems</a>.
-    {% elif sc.unmapped_count %}
-      {{ sc.supplied_count }} of your {{ sc.total_systems }} systems name their vendor;
-      <a href="{{ url_for('unified_applications.vendors', tab='mapping') }}" class="font-medium text-foreground underline underline-offset-4">{{ sc.unmapped_count }} still need one</a>.
-    {% elif sc.total_systems %}
-      Every one of your {{ sc.total_systems }} systems names its vendor.
-    {% endif %}
-    {% if not has_renewal %}No vendor contract has an end date yet, so no renewal is shown.{% elif vp.renewals_due %}<a href="{{ url_for('procurement.renewals_dashboard') }}" class="font-medium text-foreground underline underline-offset-4">{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days</a>.{% endif %}
-    {% if vp.annual_cost is not none %}The systems they supply cost {{ _money(vp.annual_cost) }} a year.{% endif %}
-  </p>
-  {% endif %}
+  {#- The facts every row would otherwise repeat, said once inside the table block. -#}
+  {%- set facts = [] -%}
+  {%- if rows and sc and sc.total_systems -%}
+    {%- if sc.unmapped_count == sc.total_systems -%}{%- set _ = facts.append('none of your ' ~ sc.total_systems ~ ' systems names its vendor yet') -%}
+    {%- elif sc.unmapped_count -%}{%- set _ = facts.append(sc.unmapped_count ~ ' of your ' ~ sc.total_systems ~ ' systems do not name their vendor yet') -%}{%- endif -%}
+  {%- endif -%}
+  {%- if rows and not has_renewal -%}{%- set _ = facts.append('no vendor contract has an end date, so no renewal is shown') -%}{%- endif -%}
+  {%- set joined = facts|join(', and ') -%}
+  {%- set notice = (joined[:1]|upper ~ joined[1:] ~ '.') if facts else none -%}
 
   {%- set columns = [{'label': 'Vendor', 'sortable': true}] -%}
+  {%- if any_contracts %}{% set _ = columns.append({'label': 'Active contracts', 'align': 'right', 'sortable': true}) %}{% endif -%}
+  {%- if cost_col %}{% set _ = columns.append({'label': 'Annual cost', 'align': 'right', 'sortable': true}) %}{% endif -%}
   {%- if any_systems %}{% set _ = columns.append({'label': 'Systems', 'align': 'right', 'sortable': true}) %}{% endif -%}
-  {%- if cost_col -%}{%- set _ = columns.append({'label': 'Annual cost', 'align': 'right', 'sortable': true}) -%}{%- endif -%}
   {%- if has_renewal %}{% set _ = columns.append({'label': 'Next renewal', 'sortable': true}) %}{% endif -%}
   {%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
-  <div{% if not rows %} data-testid="vendors-true-empty-state"{% endif %}>
+  <div data-testid="{{ 'vendors-answer' if rows else 'vendors-true-empty-state' }}">
   {% call(row) list_table(rows=rows, columns=columns, caption='Vendors your systems and contracts name', testid='vendors-table', row_testid='vendor-row',
-                          search_placeholder='Filter vendors...',
+                          search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_set_vendors, notice=notice,
                           empty_message=('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
                           empty_action=_add_first) %}
     {% call table_cell(class='max-w-[360px]') %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="vendor-link">{{ row.name }}</a>
       {% if row.website %}<span class="block truncate text-xs text-muted-foreground">{{ row.website|replace('https://', '')|replace('http://', '') }}</span>{% endif %}
     {% endcall %}
+    {% if any_contracts %}
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{{ row.contract_count or 0 }}{% endcall %}
+    {% endif %}
+    {% if cost_col %}
+    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
+      {% if row.contract_annual_cost is not none %}{{ _money(row.contract_annual_cost) }}{% else %}<span class="text-muted-foreground">{{ 'No contract' if not row.contract_count else 'Not stated' }}</span>{% endif %}
+    {% endcall %}
+    {% endif %}
     {% if any_systems %}
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
       {% if row.system_count %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }}</a>
       {% else %}<span class="text-muted-foreground">0</span>{% endif %}
-    {% endcall %}
-    {% endif %}
-    {% if cost_col %}
-    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.annual_cost if row.annual_cost is not none else -1}) %}
-      {{ value_or_unset(_money(row.annual_cost) if row.annual_cost is not none else none, 'Not recorded') }}
     {% endcall %}
     {% endif %}
     {% if has_renewal %}
@@ -163,7 +162,7 @@
         {{ row_action('Delete', action=url_for('application_mgmt.delete_vendor', vendor_id=row.id), destructive=true, separator_before=true,
                       confirm='Delete ' ~ row.name ~ '? This cannot be undone.', testid='vendor-delete') }}
         {% endif %}
-        {% endcall %}
+      {% endcall %}
     {% endcall %}
   {% endcall %}
   </div>

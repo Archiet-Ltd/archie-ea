@@ -56,13 +56,10 @@
   {%- for ring in rings -%}{%- set _ = cards.append({'label': ring_labels[ring], 'value': state.rings[ring]|length, 'sentence': RING_SENTENCE.get(ring),
         'icon': {'adopt': 'circle-check', 'trial': 'flame', 'assess': 'search', 'hold': 'circle-off'}.get(ring, 'target'), 'testid': 'radar-count-' ~ ring}) -%}{%- endfor -%}
   {{ stat_cards(cards, testid='radar-ring-summary') }}
-  {% else %}
-  {% call ui.alert(attrs={'data-testid': 'radar-unclassified'}) %}
-    {{ lucide('info') }}
-    {{ ui.alert_title(text='Nothing is on the radar yet') }}
-    {{ ui.alert_description(text='Open the menu at the end of a row to place that technology in adopt, trial, assess or hold.') }}
-  {% endcall %}
   {% endif %}
+  {#- The detail columns only exist once something is placed; until then one sentence says how to start. -#}
+  {%- set placed = state.classified_count > 0 -%}
+  {% macro _unplaced_notice() %}<span data-testid="radar-unclassified">Nothing is on the radar yet. Open the menu at the end of a row to place a technology in adopt, trial, assess or hold; its rationale, review date and requester then show here.</span>{% endmacro %}
 
   {#- One list of every technology: placed ones in ring order, then the ones waiting for a ring. -#}
   {%- set all_rows = [] -%}
@@ -70,11 +67,13 @@
   {%- for element in state.unclassified -%}{%- set _ = all_rows.append({'element': element, 'entry': none, 'ring': none}) -%}{%- endfor -%}
 
   {% call(row) list_table(rows=all_rows,
-                          columns=[('Technology', ''), {'label': 'Ring', 'sortable': true}, {'label': 'Rationale', 'class': 'hidden lg:table-cell'},
-                                   {'label': 'Review by', 'sortable': true, 'class': 'hidden md:table-cell'}, {'label': 'Requested by', 'class': 'hidden xl:table-cell'}, ('', 'w-12')],
-                          caption='Technologies on the radar', testid='radar-table', row_testid='radar-row', search_placeholder='Filter technologies...') %}
+                          columns=[{'label': 'Technology', 'sortable': true}, {'label': 'Ring', 'sortable': true}]
+                                  + ([{'label': 'Rationale', 'class': 'hidden lg:table-cell'}, {'label': 'Review by', 'sortable': true, 'class': 'hidden md:table-cell'},
+                                      {'label': 'Requested by', 'class': 'hidden xl:table-cell'}] if placed else []) + [('', 'w-12')],
+                          caption='Technologies on the radar', testid='radar-table', row_testid='radar-row', search_placeholder='Filter technologies...',
+                          notice=(none if placed else _unplaced_notice())) %}
     {%- set el = row.element -%}
-    {% call table_cell(class='max-w-[320px]') %}
+    {% call table_cell(class='max-w-[320px]', attrs={'data-sort': el.name or ''}) %}
       <div class="min-w-0" data-element-name="{{ el.name }}">
         <p class="truncate font-medium">{{ el.name or 'Unnamed element' }}</p>
         <p class="text-sm text-muted-foreground">{{ human_type(el.type) }}</p>
@@ -83,9 +82,11 @@
     {% call table_cell(attrs={'data-sort': (rings.index(row.ring) if row.ring else 9)}) %}
       {% if row.ring %}{{ state_badge(ring_labels[row.ring], tone=RING_TONE.get(row.ring), testid='radar-ring-' ~ el.id) }}{% else %}<span class="text-muted-foreground" data-testid="radar-ring-{{ el.id }}">Not placed</span>{% endif %}
     {% endcall %}
+    {% if placed %}
     {% call table_cell(class='hidden lg:table-cell max-w-[320px] truncate') %}{% if row.entry %}<span data-testid="radar-rationale-{{ el.id }}">{% if row.entry.rationale %}{{ row.entry.rationale }}{% else %}<span class="text-muted-foreground">None recorded</span>{% endif %}</span>{% endif %}{% endcall %}
     {% call table_cell(class='hidden md:table-cell whitespace-nowrap tabular-nums', attrs={'data-sort': row.entry.review_date.isoformat() if row.entry and row.entry.review_date else '9999'}) %}{% if row.entry %}<span data-testid="radar-review-date-{{ el.id }}">{% if row.entry.review_date %}{{ row.entry.review_date|format_date }}{% else %}<span class="text-muted-foreground">Not set</span>{% endif %}</span>{% endif %}{% endcall %}
     {% call table_cell(class='hidden xl:table-cell max-w-[240px] truncate') %}{% if row.entry %}<span data-testid="radar-initiative-{{ el.id }}">{% if row.entry.requesting_initiative %}{{ row.entry.requesting_initiative.name }}{% else %}<span class="text-muted-foreground">Not linked</span>{% endif %}</span>{% endif %}{% endcall %}
+    {% endif %}
     {% call table_cell(class='text-right') %}
       {% call row_actions(label='Actions for ' ~ (el.name or 'this technology')) %}
         {% for r in rings if r != row.ring %}{{ _move_item(el, r, ('Move to ' if row.ring else 'Place in ') ~ ring_labels[r]) }}{% endfor %}

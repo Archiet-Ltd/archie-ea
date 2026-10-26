@@ -131,6 +131,7 @@
 ]) }}
 
 {#- What narrows this list, said once, with the way back. -#}
+{%- set _bucket_labels = {'needs_setup': 'Needs setup', 'in_design': 'In design', 'needs_attention': 'Needs attention', 'ready_for_review': 'Ready for review'} -%}
 {%- set _ws_labels = {'needs_setup': 'need setup', 'in_design': 'are in design', 'needs_attention': 'need attention', 'ready_for_review': 'are ready for review'} -%}
 {% if bu_filter_active and not show_all_override %}
 <p class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-testid="bu-scope-indicator" role="status">
@@ -139,18 +140,6 @@
 </p>
 {% elif show_all_override %}
 <p class="flex items-center gap-2 text-sm text-muted-foreground" data-testid="bu-scope-indicator-all" role="status">{{ lucide('globe') }}Showing every business unit ({{ total_count }} solution{{ 's' if total_count != 1 else '' }}).</p>
-{% endif %}
-{% if selected_workspace or search or created_before or hidden_by_default_filter %}
-<p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-testid="worklist-filter-indicator" role="status">
-  {% if selected_workspace %}<span>Showing solutions that {{ _ws_labels.get(selected_workspace, selected_workspace|replace('_', ' ')) }} ({{ total_count }}).</span>{% endif %}
-  {% if search %}<span>Matching "{{ search }}".</span>{% endif %}
-  {% if created_before %}<span>Created on or before {{ created_before }}.</span>{% endif %}
-  {% if selected_workspace or search or created_before %}<a href="{{ request.path }}" class="font-medium text-foreground underline underline-offset-4" aria-label="Clear filters">Clear filters</a>{% endif %}
-  {% if hidden_by_default_filter %}
-  <span>{{ hidden_by_default_filter }} empty draft{{ 's are' if hidden_by_default_filter != 1 else ' is' }} hidden.</span>
-  <a href="{{ url_for('solution_design.list_solutions', status='draft') }}" class="font-medium text-foreground underline underline-offset-4">Show drafts</a>
-  {% endif %}
-</p>
 {% endif %}
 
 {# Selection bar: shown by Platform.selection once a row is ticked #}
@@ -180,7 +169,37 @@
 {%- if not vary.domain %}{% set _ = _shared.append(('every solution is in ' ~ _domains[0]) if _domains[0] else 'no solution has a business domain yet') %}{% endif -%}
 {%- if not vary.type %}{% set _ = _shared.append(('every solution is ' ~ _types[0]|replace('_', ' ')|lower) if _types[0] else 'no solution has a type yet') %}{% endif -%}
 {%- if not vary.lead %}{% set _ = _shared.append(('every solution is led by ' ~ _leads[0]) if _leads[0] else 'no solution has a lead yet') %}{% endif -%}
-{% if _shared %}<p class="text-sm text-muted-foreground" data-testid="solutions-shared-facts">{{ (_shared|join('; ') ~ ' on this page.')|capitalize }}</p>{% endif %}
+{#- The table's footer: which solutions are shown, and Previous / Next when the server pages them. -#}
+{% macro _pager() -%}
+{%- set _q = {'per_page': per_page if per_page != 20 else none, 'search': search or none, 'status': (selected_workspace or selected_status) or none, 'domain': selected_domain or none,
+              'type': selected_type or none, 'created_after': created_after or none, 'created_before': created_before or none, 'bu': ('all' if show_all_override else none)} -%}
+{%- set _n = pagination.total if pagination else solutions|length -%}
+<div class="flex items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="solutions-pages">
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums">{% if pagination and pagination.pages > 1 %}Solutions {{ (pagination.page - 1) * pagination.per_page + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }}{% else %}{{ _n }} solution{{ 's' if _n != 1 else '' }}{% endif %}</p>
+  {% if pagination and pagination.pages > 1 %}
+  <div class="flex items-center gap-2">
+    {% if pagination.has_prev %}{{ ui.button(text='Previous', href=url_for('solution_design.list_solutions', page=pagination.prev_num, **_q), variant='outline', size='sm') }}{% else %}{{ ui.button(text='Previous', type='button', variant='outline', size='sm', attrs={'disabled': true}) }}{% endif %}
+    {% if pagination.has_next %}{{ ui.button(text='Next', href=url_for('solution_design.list_solutions', page=pagination.next_num, **_q), variant='outline', size='sm') }}{% else %}{{ ui.button(text='Next', type='button', variant='outline', size='sm', attrs={'disabled': true}) }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+{#- One notice above the table: what is filtered or hidden, then what is true of every row. -#}
+{%- set _has_filter = selected_workspace or search or created_before or hidden_by_default_filter -%}
+{% macro _notice() -%}
+{%- if _has_filter %}<span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="worklist-filter-indicator" role="status">
+  {% if selected_workspace %}<span>Showing solutions that {{ _ws_labels.get(selected_workspace, selected_workspace|replace('_', ' ')) }} ({{ total_count }}).</span>{% endif %}
+  {% if search %}<span>Matching "{{ search }}".</span>{% endif %}
+  {% if created_before %}<span>Created on or before {{ created_before }}.</span>{% endif %}
+  {% if selected_workspace or search or created_before %}<a href="{{ request.path }}" class="font-medium text-foreground underline underline-offset-4" aria-label="Clear filters">Clear filters</a>{% endif %}
+  {% if hidden_by_default_filter %}
+  <span>{{ hidden_by_default_filter }} empty draft{{ 's are' if hidden_by_default_filter != 1 else ' is' }} hidden.</span>
+  <a href="{{ url_for('solution_design.list_solutions', status='draft') }}" class="font-medium text-foreground underline underline-offset-4">Show drafts</a>
+  {% endif %}
+</span>{% endif -%}
+{%- if _has_filter and _shared %} {% endif -%}
+{%- if _shared %}<span data-testid="solutions-shared-facts">{{ (_shared|join('; ') ~ ' on this page.')|capitalize }}</span>{% endif -%}
+{%- endmacro %}
 {#- At 1440 the table shows selection, solution, status, readiness, created and the row menu; stage, review and next step join at 2xl. -#}
 {%- set columns = [{'label': _select_all(), 'class': 'w-10'}, {'label': 'Solution', 'sortable': true}, {'label': 'Stage', 'class': 'hidden 2xl:table-cell'},
                    {'label': 'Status', 'sortable': true}, {'label': 'Review', 'class': 'hidden 2xl:table-cell'},
@@ -188,7 +207,8 @@
                    {'label': 'Created', 'sortable': true, 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}] -%}
 {% call(solution) list_table(rows=solutions, columns=columns, caption='Solutions', testid='solutions-table', row_testid='solution-row', page_size=50,
                              search_placeholder='Filter this page...', toolbar=true, toolbar_actions=_filters,
-                             empty_message='No solutions match these filters.', server_pagination=(pagination and pagination.pages > 1)) %}
+                             empty_message='No solutions match these filters.',
+                             notice=(_notice() if (_has_filter or _shared) else none), server_pagination=_pager) %}
   {%- set ws = (workspace_summaries or {}).get(solution.id, {}) -%}
   {%- set readiness = ws.readiness_pct or 0 -%}
   {%- set gov = ws.governance_status or 'draft' -%}
@@ -207,7 +227,8 @@
           data-readiness="{{ readiness }}%" data-capabilities="{{ ws.capability_count or 0 }}" data-created="{{ solution.created_at|format_date }}"></span>
   {% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
-  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(solution.status or 'planned') }}{% endcall %}
+  {%- set bucket = ws.work_bucket or 'in_design' -%}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'needs_setup': 1, 'in_design': 2, 'needs_attention': 3, 'ready_for_review': 4}.get(bucket, 0)}) %}{{ state_badge(_bucket_labels.get(bucket, bucket|replace('_', ' ')|capitalize), tone={'needs_setup': 'neutral', 'in_design': 'caution', 'needs_attention': 'negative', 'ready_for_review': 'positive'}.get(bucket, 'neutral')) }}{% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness}) %}
     <span class="inline-flex items-center justify-end gap-2" title="{{ ws.readiness_passed or 0 }} of {{ ws.readiness_total or 0 }} maturity checks pass">
@@ -218,18 +239,6 @@
   {% call table_cell(class='hidden lg:table-cell whitespace-nowrap text-muted-foreground', attrs={'data-sort': solution.created_at.strftime('%Y%m%d%H%M') if solution.created_at else ''}) %}{{ solution.created_at|format_date }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}{{ _row_menu(solution) }}{% endcall %}
 {% endcall %}
-
-{% if pagination and pagination.pages > 1 %}
-{%- set _q = {'per_page': per_page if per_page != 20 else none, 'search': search or none, 'status': (selected_workspace or selected_status) or none, 'domain': selected_domain or none,
-              'type': selected_type or none, 'created_after': created_after or none, 'created_before': created_before or none, 'bu': ('all' if show_all_override else none)} -%}
-<div class="flex items-center justify-between gap-2" data-testid="solutions-pages">
-  <p class="text-sm text-muted-foreground tabular-nums">Solutions {{ (pagination.page - 1) * pagination.per_page + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }}</p>
-  <div class="flex items-center gap-2">
-    {% if pagination.has_prev %}{{ ui.button(text='Previous', href=url_for('solution_design.list_solutions', page=pagination.prev_num, **_q), variant='outline', size='sm') }}{% endif %}
-    {% if pagination.has_next %}{{ ui.button(text='Next', href=url_for('solution_design.list_solutions', page=pagination.next_num, **_q), variant='outline', size='sm') }}{% endif %}
-  </div>
-</div>
-{% endif %}
 
 {# Comparison of the ticked solutions, filled in by openSolutionCompare() #}
 <div id="solutionComparePanel" class="hidden" data-testid="solution-compare-panel">
