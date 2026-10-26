@@ -97,7 +97,8 @@ def default_model(timeout: float = MODEL_TIMEOUT_SECONDS) -> Callable[[str], str
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     def ask(prompt: str) -> str:
-        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=timeout)
+        # the pages are public text, so free providers may read them
+        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=timeout, public_input=True)
 
     return ask
 
