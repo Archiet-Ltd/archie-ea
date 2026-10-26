@@ -46,10 +46,27 @@
 {% endcall %}
 {%- endmacro %}
 
+{#- The business case export: one place, in the page header, once anything is scored. -#}
+{% macro _export_actions() -%}
+{% if stats and stats.time_scored_count %}
+<div class="flex items-center gap-2">
+  {% call native_select_wrapper() %}
+    {% call native_select(size='sm', attrs={'aria-label': 'Export format', 'x-model': 'exportFormat'}) %}
+      {{ native_select_option(text='Excel workbook', value='excel', selected=true) }}
+      {{ native_select_option(text='CSV data', value='csv') }}
+      {{ native_select_option(text='Executive summary (HTML)', value='pdf') }}
+    {% endcall %}
+  {% endcall %}
+  {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'doExport', ':disabled': 'exportLoading', 'data-testid': 'export-business-case'}) %}{{ lucide('download') }}Export business case{% endcall %}
+</div>
+{% endif %}
+{%- endmacro %}
+
 {% block content %}
 <div class="p-6 space-y-6" x-data="rationalizationDashboard()" x-init="load">
 {{ page_shell(title='Application rationalization', subtitle='Find applications that do the same job, score them and plan what to keep, merge or retire',
-              breadcrumb=[('Home', url_for('main.index')), ('Applications', url_for('unified_applications.application_list')), ('Rationalization', none)]) }}
+              breadcrumb=[('Home', url_for('main.index')), ('Applications', url_for('unified_applications.application_list')), ('Rationalization', none)],
+              actions_caller=_export_actions) }}
 
 {% include 'applications/rationalization/_sub_nav.html' %}
 
@@ -110,6 +127,7 @@
   {% call ui.card_header() %}
     {{ ui.card_title(text='Progress') }}
     {{ ui.card_description(text='How far your portfolio has moved from finding duplicates to a tracked plan') }}
+    {% call ui.card_action() %}{{ _score_button('Score again', 'outline') }}{% endcall %}
   {% endcall %}
   {% call ui.card_content() %}
     <ol class="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -135,21 +153,17 @@
 {# ── Headline figures ── #}
 {%- set resolved = stats.resolved_groups or 0 -%}
 {%- set savings = stats.estimated_savings or 0 -%}
+{%- set decom = stats.decommissioned_applications or 0 -%}
 {%- set cards = [
   {'label': 'Applications', 'value': total, 'icon': 'layers', 'href': url_for('unified_applications.application_list'), 'testid': 'stat-total-apps',
-   'sentence': ((total - resolved) ~ ' still active after merging resolved duplicates') if resolved else 'In your portfolio'},
-  ({'label': 'Possible duplicate groups', 'value': groups_found, 'icon': 'copy', 'href': url_for('unified_duplicate.duplicate_dashboard'), 'testid': 'stat-duplicate-groups',
-    'sentence': ((stats.pending_groups or 0) ~ ' waiting for a decision') if stats.pending_groups else 'Every group has a decision'}
-   if groups_found else
-   {'label': 'No duplicates found', 'value': none, 'icon': 'copy', 'testid': 'stat-duplicate-groups', 'sentence': 'Run detection to look for applications that do the same job.'}),
+   'sentence': ('Plus ' ~ decom ~ ' decommissioned') if decom else 'In use across your portfolio'},
+  {'label': 'Possible duplicate groups', 'value': groups_found, 'icon': 'copy', 'href': url_for('unified_duplicate.duplicate_dashboard'), 'testid': 'stat-duplicate-groups',
+   'sentence': (((stats.pending_groups or 0) ~ ' waiting for a decision') if stats.pending_groups else 'Every group has a decision') if groups_found else 'Run detection to look for them'},
+  {'label': 'Scored', 'value': scored ~ ' of ' ~ total, 'icon': 'chart-bar', 'href': url_for('unified_applications.rationalization_workbench'), 'testid': 'stat-scored',
+   'sentence': ((insuf ~ ' need more evidence before a decision') if insuf else 'Each has enough evidence for a decision') if scored else 'Score the portfolio to see health'},
+  {'label': 'Estimated savings a year', 'value': _money(savings), 'icon': 'piggy-bank', 'testid': 'stat-savings',
+   'sentence': 'From duplicate groups and the consolidation list' if savings > 0 else 'Appears once duplicates carry a cost'},
 ] -%}
-{%- if scored -%}
-{%- set _ = cards.append({'label': 'Scored', 'value': scored ~ ' of ' ~ total, 'icon': 'chart-bar', 'href': url_for('unified_applications.rationalization_workbench'), 'testid': 'stat-scored',
-    'sentence': (insuf ~ ' need more evidence before a decision') if insuf else 'Every scored application has enough evidence for a decision'}) -%}
-{%- endif -%}
-{%- set _ = cards.append({'label': 'Estimated savings a year', 'value': _money(savings), 'icon': 'piggy-bank', 'testid': 'stat-savings',
-    'sentence': 'From duplicate groups and the consolidation list'} if savings > 0 else
-   {'label': 'No savings estimated yet', 'value': none, 'icon': 'piggy-bank', 'testid': 'stat-savings', 'sentence': 'Savings appear once duplicates or consolidations carry a cost.'}) -%}
 {{ stat_cards(cards) }}
 
 {# ── Health, disposition and the TIME quadrant, once anything is scored ── #}
@@ -212,7 +226,8 @@
     <div class="flex items-center gap-3 text-sm">
       <span class="w-28 shrink-0 text-muted-foreground">{{ label }}</span>
       {% if pct is not none %}
-      <progress class="h-2 flex-1 overflow-hidden rounded-full accent-primary" max="100" value="{{ pct }}" aria-label="{{ label }} coverage"></progress>
+      {%- set p = [[pct|round|int, 0]|max, 100]|min -%}
+      {% call ui.progress(value=p, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': label ~ ' coverage', 'role': 'progressbar', 'aria-valuemin': '0'}) %}{{ ui.progress_indicator(value=p) }}{% endcall %}
       <span class="w-24 text-right font-medium tabular-nums">{{ pct|round|int }}%</span>
       {% else %}
       <span class="flex-1 text-muted-foreground">Not measured yet</span>
@@ -234,9 +249,9 @@
     {% call ui.card_header() %}
       {{ ui.card_title(text='Detection') }}
       {{ ui.card_description(text='The latest search for applications that do the same job') }}
-      {% call ui.card_action() %}{{ ui.button(text='View results', href=url_for('unified_duplicate.duplicate_dashboard'), variant='ghost', size='sm') }}{% endcall %}
+      {% call ui.card_action() %}{{ ui.button(text='Review groups', href=url_for('unified_duplicate.duplicate_dashboard'), variant='outline', size='sm') }}{% endcall %}
     {% endcall %}
-    {% call ui.card_content() %}
+    {% call ui.card_content(class='space-y-4') %}
       {% if latest_run %}
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
         <dt class="text-muted-foreground">Last run</dt><dd class="whitespace-nowrap">{{ latest_run.created_at.strftime('%d %b %Y, %H:%M') if latest_run.created_at else 'Date not recorded' }}</dd>
@@ -244,15 +259,45 @@
         <dt class="text-muted-foreground">Groups found</dt><dd class="tabular-nums">{{ latest_run.total_duplicates_found or stats.total_groups or 0 }}</dd>
       </dl>
       {% else %}
-      <p class="text-sm text-muted-foreground">Detection has not been run yet. Run it from Actions below to find possible duplicates.</p>
+      <p class="text-sm text-muted-foreground">Detection has not been run yet.</p>
       {% endif %}
+      <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" class="grid gap-4 border-t pt-4 sm:grid-cols-2" data-testid="run-detection-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="from_dashboard" value="1">
+        {% call ui.field() %}
+          {{ ui.field_label(text='How to compare', attrs={'for': 'detection-strategy'}) }}
+          {% call native_select_wrapper(class='w-full') %}
+            {% call native_select(name='strategy', id='detection-strategy', size='sm', class='w-full') %}
+              {{ native_select_option(text='Hybrid (recommended)', value='hybrid', selected=true) }}
+              {{ native_select_option(text='Fast: names and acronyms', value='fast') }}
+              {{ native_select_option(text='Enhanced: adds business context', value='enhanced') }}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.field() %}
+          {{ ui.field_label(text='How alike they must be', attrs={'for': 'detection-threshold'}) }}
+          {% call native_select_wrapper(class='w-full') %}
+            {% call native_select(name='similarity_threshold', id='detection-threshold', size='sm', class='w-full') %}
+              {% for pct in range(30, 101, 5) %}
+              {{ native_select_option(text=pct ~ '%' ~ (' (more results)' if pct == 30 else ' (exact matches only)' if pct == 100 else ''), value='%.2f'|format(pct / 100), selected=(pct == 55)) }}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+          {% call ui.button(type='submit', size='sm') %}{{ lucide('search') }}Run detection{% endcall %}
+          {% if groups_found %}
+          {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'autoResolveExact', ':disabled': 'autoResolveLoading'}) %}{{ lucide('check') }}Resolve exact matches{% endcall %}
+          {% endif %}
+        </div>
+      </form>
     {% endcall %}
   {% endcall %}
   {% call ui.card() %}
     {% call ui.card_header() %}
       {{ ui.card_title(text='Consolidation') }}
       {{ ui.card_description(text='Applications planned to be merged or retired') }}
-      {% call ui.card_action() %}{{ ui.button(text='Open list', href='/consolidation-list', variant='ghost', size='sm') }}{% endcall %}
+      {% call ui.card_action() %}{{ ui.button(text='Open list', href='/consolidation-list', variant='outline', size='sm') }}{% endcall %}
     {% endcall %}
     {% call ui.card_content() %}
       {% if stats.consolidation_count %}
@@ -266,80 +311,6 @@
     {% endcall %}
   {% endcall %}
 </div>
-
-{# ── Actions ── #}
-{% call ui.card(attrs={'data-testid': 'rationalization-actions'}) %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='Actions') }}
-    {{ ui.card_description(text='Run the next step on your portfolio') }}
-  {% endcall %}
-  {% call ui.card_content() %}
-    <ul class="divide-y">
-      {% if scored %}
-      <li class="flex flex-col gap-3 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
-        <div><p class="text-sm font-medium">Score again</p><p class="text-sm text-muted-foreground">Rescore every application so the figures reflect recent changes.</p></div>
-        {{ _score_button('Score portfolio', 'outline') }}
-      </li>
-      {% endif %}
-      <li class="py-4 first:pt-0">
-        <details>
-          <summary class="flex cursor-pointer list-none flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span><span class="block text-sm font-medium">Run detection</span><span class="block text-sm text-muted-foreground">Find applications that may do the same job.</span></span>
-            <span class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent">{{ lucide('search') }}Run detection</span>
-          </summary>
-          <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" class="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end" data-testid="run-detection-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="from_dashboard" value="1">
-            {% call ui.field() %}
-              {{ ui.field_label(text='How to compare', attrs={'for': 'detection-strategy'}) }}
-              {% call native_select_wrapper(class='w-full') %}
-                {% call native_select(name='strategy', id='detection-strategy', size='sm', class='w-full') %}
-                  {{ native_select_option(text='Hybrid: balanced speed and accuracy (recommended)', value='hybrid', selected=true) }}
-                  {{ native_select_option(text='Fast: names and acronyms, for large portfolios', value='fast') }}
-                  {{ native_select_option(text='Enhanced: adds business context, most accurate', value='enhanced') }}
-                {% endcall %}
-              {% endcall %}
-            {% endcall %}
-            {% call ui.field() %}
-              {{ ui.field_label(text='How alike they must be', attrs={'for': 'detection-threshold'}) }}
-              {% call native_select_wrapper(class='w-full') %}
-                {% call native_select(name='similarity_threshold', id='detection-threshold', size='sm', class='w-full') %}
-                  {% for pct in range(30, 101, 5) %}
-                  {{ native_select_option(text=pct ~ '%' ~ (' (more results)' if pct == 30 else ' (exact matches only)' if pct == 100 else ''), value='%.2f'|format(pct / 100), selected=(pct == 55)) }}
-                  {% endfor %}
-                {% endcall %}
-              {% endcall %}
-            {% endcall %}
-            {{ ui.button(text='Run detection', type='submit', size='sm') }}
-          </form>
-        </details>
-      </li>
-      <li class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><p class="text-sm font-medium">Resolve exact matches</p><p class="text-sm text-muted-foreground">Mark every group of identical applications as resolved, keeping the first one.</p></div>
-        {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'autoResolveExact', ':disabled': 'autoResolveLoading'}) %}{{ lucide('check') }}Resolve exact matches{% endcall %}
-      </li>
-      <li class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><p class="text-sm font-medium">Review duplicate groups</p><p class="text-sm text-muted-foreground">Decide what to do with each group of possible duplicates.</p></div>
-        {{ ui.button(text='Review groups', href=url_for('unified_duplicate.duplicate_dashboard'), variant='outline', size='sm') }}
-      </li>
-      {% if scored %}
-      <li class="flex flex-col gap-3 py-4 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-        <div><p class="text-sm font-medium">Export the business case</p><p class="text-sm text-muted-foreground">Download the scores and savings for leadership.</p></div>
-        <div class="flex items-center gap-2">
-          {% call native_select_wrapper() %}
-            {% call native_select(size='sm', attrs={'aria-label': 'Export format', 'x-model': 'exportFormat'}) %}
-              {{ native_select_option(text='Excel workbook', value='excel', selected=true) }}
-              {{ native_select_option(text='CSV data', value='csv') }}
-              {{ native_select_option(text='Executive summary (HTML)', value='pdf') }}
-            {% endcall %}
-          {% endcall %}
-          {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'doExport', ':disabled': 'exportLoading', 'data-testid': 'export-business-case'}) %}{{ lucide('download') }}Download{% endcall %}
-        </div>
-      </li>
-      {% endif %}
-    </ul>
-  {% endcall %}
-{% endcall %}
 
 {# ── AI gap analysis: one section at a time, read when the person opens it ── #}
 {%- set gap_tabs = [('summary', 'Summary'), ('critical-gaps', 'Critical gaps'), ('rationalization', 'Rationalization opportunities'), ('vendor-lifecycle', 'Vendor lifecycle risks')] -%}

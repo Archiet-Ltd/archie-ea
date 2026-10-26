@@ -193,6 +193,25 @@ def rationalization_dashboard():
         # Pipeline counts for workflow stepper
         from sqlalchemy import func, or_
 
+        # The application count is the Overview's: not decommissioned, not a
+        # merged-away duplicate. One query, imported, so the two pages agree.
+        from flask import g
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        org_id = getattr(g, "current_org_id", None)
+        active_q = _active_applications()
+        if org_id:
+            active_q = active_q.where(ApplicationComponent.organization_id == org_id)
+        total_apps = db.session.execute(
+            db.select(func.count()).select_from(active_q.with_only_columns(ApplicationComponent.id).subquery())
+        ).scalar_one()
+        decommissioned_q = ApplicationComponent.query.filter(
+            func.lower(ApplicationComponent.lifecycle_status) == "5. decommissioned"
+        )
+        if org_id:
+            decommissioned_q = decommissioned_q.filter(ApplicationComponent.organization_id == org_id)
+        decommissioned_count = decommissioned_q.count()
+
         from app.models.consolidation_list import ConsolidationListEntry
         from app.models.application_rationalization import ApplicationRationalizationScore
 
@@ -213,6 +232,7 @@ def rationalization_dashboard():
 
         stats = {
             "total_applications": total_apps,
+            "decommissioned_applications": decommissioned_count,
             "duplicate_groups": total_groups,
             "total_groups": total_groups,
             "pending_groups": pending_groups,

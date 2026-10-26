@@ -4,7 +4,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/figures.html' import section %}
-{% from 'components/list_table.html' import list_table %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 
@@ -156,17 +156,22 @@
             {% endcall %}
             {% call ui.card_content() %}
             {% if broken.rows %}
-            {% call(row) list_table(rows=broken.rows, columns=[('Element', ''), ('Type', ''), {'label': 'Where the chain stops', 'class': 'hidden md:table-cell'}, ('', 'w-24 text-right')],
+            {%- set broken_names = broken.rows|map(attribute='name')|list -%}
+            {% call(row) list_table(rows=broken.rows, columns=[{'label': 'Element', 'sortable': true}, {'label': 'Type', 'sortable': true}, {'label': 'Where the chain stops', 'class': 'hidden md:table-cell'}, ('', 'w-12')],
                                     caption='Broken chains', testid='broken-chains', row_testid='broken-chain-row', search_placeholder='Filter elements...') %}
                 {% call table_cell(class='max-w-[360px] truncate font-medium') %}
                     <a class="hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" data-broken-id="{{ row.id }}">{{ row.name }}</a>
+                    {% if broken_names.count(row.name) > 1 %}<span class="block text-sm font-normal text-muted-foreground">Element {{ row.id }}</span>{% endif %}
                 {% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}{{ kind(row.type) }}{% endcall %}
                 {% call table_cell(class='hidden md:table-cell max-w-[420px] truncate text-muted-foreground') %}
                     {% if row.break == 'no_capability' %}No capability above it{% else %}No technology below it{% endif %}{% if row.stops_at and row.stops_at.name %}; stops at {{ row.stops_at.name }}{% endif %}
                 {% endcall %}
                 {% call table_cell(class='text-right') %}
-                    {% call ui.button(href=url_for('architect_ui.traceability_matrix', element=row.id), variant='ghost', size='sm') %}{{ lucide('git-branch') }}Trace{% endcall %}
+                    {% call row_actions(label='Actions for ' ~ row.name) %}
+                        {{ row_action('Open its chain', href=url_for('architect_ui.element_traceability', element_id=row.id)) }}
+                        {{ row_action('Trace', href=url_for('architect_ui.traceability_matrix', element=row.id), testid='broken-trace-' ~ row.id) }}
+                    {% endcall %}
                 {% endcall %}
             {% endcall %}
             {% elif broken.checked %}
@@ -262,21 +267,29 @@
             {% endcall %}
         {% endcall %}
         {% endif %}
-        {% call(row) list_table(rows=matrix, columns=[('Technology element' if direction == 'inverse' else kind(current_pivot_type), ''), ('Goals', ''), ('Strategy', ''), ('Business', ''), ('Impact' if direction == 'inverse' else 'Technology', ''), ('Data', '')],
-                                caption='Traceability matrix', testid='traceability-matrix', row_testid='traceability-row', page_size=50, search_placeholder='Filter this page...') %}
+        {%- set matrix_names = matrix|map(attribute='application.name')|list -%}
+        {%- set mcols = [{'label': ('Technology element' if direction == 'inverse' else kind(current_pivot_type)), 'sortable': true}, ('Goals', ''), ('Strategy', ''), ('Business', '')] -%}
+        {%- if direction != 'inverse' %}{% set _ = mcols.append(('Technology', '')) %}{% endif -%}
+        {%- set _ = mcols.append(('Data', '')) -%}{%- set _ = mcols.append(('', 'w-12')) -%}
+        {% call(row) list_table(rows=matrix, columns=mcols, toolbar=false,
+                                caption='Traceability matrix', testid='traceability-matrix', row_testid='traceability-row', page_size=50) %}
             {% call table_cell(class='align-top whitespace-normal font-medium') %}
                 <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}" class="hover:underline">{{ row.application.name }}</a>
-                {% if row.application.type %}<span class="block text-sm font-normal text-muted-foreground">{{ kind(row.application.type) }}</span>{% endif %}
+                {%- set other_kind = row.application.type and (direction == 'inverse' or row.application.type != current_pivot_type) -%}
+                {%- set twin = matrix_names.count(row.application.name) > 1 -%}
+                {% if other_kind or twin %}<span class="block text-sm font-normal text-muted-foreground">{% if other_kind %}{{ kind(row.application.type) }}{% endif %}{% if other_kind and twin %}, {% endif %}{% if twin %}element {{ row.application.id }}{% endif %}</span>{% endif %}
             {% endcall %}
             {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.motivation | default([], true)) }}{% endcall %}
             {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.strategy) }}{% endcall %}
             {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.business) }}{% endcall %}
-            {% call table_cell(class='align-top whitespace-normal') %}
-                {% if direction == 'inverse' %}
-                {% call ui.button(href=url_for('architect_ui.impact_analysis', element_id=row.application.id), variant='ghost', size='sm') %}{{ lucide('activity') }}Assess impact{% endcall %}
-                {% else %}{{ layer_cell(row.technology) }}{% endif %}
-            {% endcall %}
+            {% if direction != 'inverse' %}{% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.technology) }}{% endcall %}{% endif %}
             {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.data | default([], true)) }}{% endcall %}
+            {% call table_cell(class='align-top text-right') %}
+                {% call row_actions(label='Actions for ' ~ row.application.name) %}
+                    {{ row_action('Open its chain', href=url_for('architect_ui.element_traceability', element_id=row.application.id)) }}
+                    {{ row_action('Assess impact', href=url_for('architect_ui.impact_analysis', element_id=row.application.id)) }}
+                {% endcall %}
+            {% endcall %}
         {% endcall %}
         {% else %}
         {% call ui.empty(class='rounded-md border p-6 md:p-10') %}
@@ -290,16 +303,23 @@
         {% endif %}
         {# TRC-016: server pages of 50 #}
         {% if total_pages is defined and total_pages > 1 %}
-        <div class="mt-4 flex items-center justify-between gap-2">
-            <p class="text-sm text-muted-foreground tabular-nums">{{ (current_page - 1) * page_size + 1 }} to {{ [current_page * page_size, total_count] | min }} of {{ total_count }} elements</p>
-            <div class="flex items-center gap-2">
-                <span class="text-sm font-medium tabular-nums">Page {{ current_page }} of {{ total_pages }}</span>
-                {% if current_page > 1 %}
-                {% call ui.button(href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, search=current_search or none, scope=current_scope or none, page=current_page - 1), variant='outline', size='icon', class='size-8') %}<span class="sr-only">Previous page</span>{{ lucide('chevron-left') }}{% endcall %}
-                {% endif %}
-                {% if current_page < total_pages %}
-                {% call ui.button(href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, search=current_search or none, scope=current_scope or none, page=current_page + 1), variant='outline', size='icon', class='size-8') %}<span class="sr-only">Next page</span>{{ lucide('chevron-right') }}{% endcall %}
-                {% endif %}
+        {%- set pg = {'pivot_type': current_pivot_type, 'plateau': current_plateau or '', 'direction': direction, 'search': current_search or none, 'scope': current_scope or none} -%}
+        <div class="mt-4 flex items-center justify-between px-2" data-testid="traceability-server-pager">
+            <p class="flex-1 text-sm text-muted-foreground tabular-nums">{{ (current_page - 1) * page_size + 1 }} to {{ [current_page * page_size, total_count] | min }} of {{ total_count }} elements</p>
+            <div class="flex items-center space-x-6 lg:space-x-8">
+                <div class="flex w-[100px] items-center justify-center text-sm font-medium tabular-nums">Page {{ current_page }} of {{ total_pages }}</div>
+                <div class="flex items-center space-x-2">
+                    {% for label, icon, target, cls, enabled in [('Go to first page', 'chevrons-left', 1, 'hidden size-8 lg:flex', current_page > 1),
+                                                                ('Go to previous page', 'chevron-left', current_page - 1, 'size-8', current_page > 1),
+                                                                ('Go to next page', 'chevron-right', current_page + 1, 'size-8', current_page < total_pages),
+                                                                ('Go to last page', 'chevrons-right', total_pages, 'hidden size-8 lg:flex', current_page < total_pages)] %}
+                    {% if enabled %}
+                    {% call ui.button(href=url_for('architect_ui.traceability_matrix', page=target, **pg), variant='outline', size='icon', class=cls) %}<span class="sr-only">{{ label }}</span>{{ lucide(icon) }}{% endcall %}
+                    {% else %}
+                    {% call ui.button(type='button', variant='outline', size='icon', class=cls, disabled=true) %}<span class="sr-only">{{ label }}</span>{{ lucide(icon) }}{% endcall %}
+                    {% endif %}
+                    {% endfor %}
+                </div>
             </div>
         </div>
         {% endif %}

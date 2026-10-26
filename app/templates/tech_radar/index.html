@@ -2,12 +2,11 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/figures.html' import stat_cards %}
-{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import stat_cards, state_badge %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'basecoat/table.html' import table_cell %}
-{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
-{% block title %}Tech radar{% endblock %}
+{% block title %}Technology radar{% endblock %}
 
 {#- An ArchiMate type as a person reads it: "SystemSoftware" becomes "System software". -#}
 {% macro human_type(t, fallback='Technology') -%}
@@ -18,45 +17,26 @@
 {%- endif -%}
 {%- endmacro %}
 
-{#- "Same purpose" as far as the model records it: other technology elements of the same ArchiMate type, with the ring
-    each has. Collapsed, and capped, so a large estate does not repeat the whole model on every row. -#}
-{% macro same_type_list(element, peers) %}
-<details class="text-sm" data-testid="radar-same-type-{{ element.id }}">
-  <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-    {% if peers %}{{ peers|length }} other {{ human_type(element.type)|lower }} {{ 'element' if peers|length == 1 else 'elements' }}{% else %}No other {{ human_type(element.type)|lower }} elements{% endif %}
-  </summary>
-  <p class="sr-only">Other {{ human_type(element.type)|lower }} elements in the model</p>
-  {% if peers %}
-  <ul class="mt-2 flex flex-wrap gap-1">
-    {% for peer in peers[:10] %}
-    <li class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs">
-      <span>{{ peer.name or 'Unnamed element' }}</span>
-      <span class="text-muted-foreground">{{ ring_labels[peer.ring] if peer.ring else 'not classified' }}</span>
-    </li>
-    {% endfor %}
-    {% if peers|length > 10 %}<li class="px-1.5 py-0.5 text-xs text-muted-foreground">and {{ peers|length - 10 }} more</li>{% endif %}
-  </ul>
-  {% endif %}
-</details>
-{% endmacro %}
-
-{% macro _technology_cell(element, peers) %}
-<div class="min-w-0 space-y-1" data-element-name="{{ element.name }}">
-  <p class="truncate font-medium">{{ element.name or 'Unnamed element' }}</p>
-  <p class="text-sm text-muted-foreground">{{ human_type(element.type) }}</p>
-  {{ same_type_list(element, peers) }}
-</div>
-{% endmacro %}
-
 {% macro _add_technology() %}{% call ui.button(href='/architecture/dashboard?layer=technology') %}{{ lucide('plus') }}Add technology{% endcall %}{% endmacro %}
+
+{#- A ring move as a row-menu item: a form post with the element and the ring, the same shape row_action uses. -#}
+{% macro _move_item(element, ring, text) -%}
+<form method="post" action="{{ url_for('tech_radar.classify') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="archimate_element_id" value="{{ element.id }}">
+  <input type="hidden" name="ring" value="{{ ring }}">
+  {{ ui.dropdown_menu_item(text=text, tag='button', type='submit', class='w-full', attrs={'data-testid': 'radar-move-' ~ element.id ~ '-' ~ ring}) }}
+</form>
+{%- endmacro %}
 
 {%- set RING_SENTENCE = {'adopt': 'Use it by default', 'trial': 'Use it where the risk is acceptable',
                          'assess': 'Worth exploring before committing', 'hold': 'Start nothing new with it'} -%}
+{%- set RING_TONE = {'adopt': 'positive', 'trial': 'caution', 'assess': 'neutral', 'hold': 'negative'} -%}
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Tech radar', subtitle='Adopt, trial, assess or hold for each technology in your model',
-              breadcrumb=[('Home', url_for('main.index')), ('Tech radar', none)]) }}
+{{ page_shell(title='Technology radar', subtitle='Adopt, trial, assess or hold for each technology in your model',
+              breadcrumb=[('Home', url_for('main.index')), ('Technology radar', none)]) }}
 
 {% if state.total_candidates == 0 %}
   {% call ui.card() %}
@@ -64,7 +44,7 @@
       {% call ui.empty_header() %}
         {% call ui.empty_icon(variant='icon') %}{{ lucide('server') }}{% endcall %}
         {{ ui.empty_title(text='No technology in your model yet') }}
-        {{ ui.empty_description(text='The radar classifies the servers, devices, system software and technology services in your model. Add them directly, or through an application\'s technology stack, and each one appears here to place on the radar.') }}
+        {{ ui.empty_description(text='Add servers, devices, system software or technology services to your model and each one appears here to place on the radar.') }}
       {% endcall %}
       {% call ui.empty_content() %}{{ _add_technology() }}{% endcall %}
     {% endcall %}
@@ -76,137 +56,44 @@
   {%- for ring in rings -%}{%- set _ = cards.append({'label': ring_labels[ring], 'value': state.rings[ring]|length, 'sentence': RING_SENTENCE.get(ring),
         'icon': {'adopt': 'circle-check', 'trial': 'flame', 'assess': 'search', 'hold': 'circle-off'}.get(ring, 'target'), 'testid': 'radar-count-' ~ ring}) -%}{%- endfor -%}
   {{ stat_cards(cards, testid='radar-ring-summary') }}
-
-  {% for ring in rings if state.rings[ring] %}
-  {% call ui.card(attrs={'data-testid': 'radar-section-' ~ ring}) %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text=ring_labels[ring]) }}
-      {{ ui.card_description(text=RING_SENTENCE.get(ring, '') ~ '. ' ~ (state.rings[ring]|length) ~ (' technology' if state.rings[ring]|length == 1 else ' technologies') ~ '.') }}
-    {% endcall %}
-    {% call ui.card_content() %}
-      {% call(row) list_table(rows=state.rings[ring], columns=[('Technology', ''), {'label': 'Rationale', 'class': 'hidden lg:table-cell'}, {'label': 'Review by', 'sortable': true},
-                                                              {'label': 'Requested by', 'class': 'hidden md:table-cell'}, ('Ring', 'w-56')],
-                              caption=ring_labels[ring] ~ ' technologies', testid='radar-table-' ~ ring, row_testid='radar-row', search_placeholder='Filter technologies...') %}
-        {% call table_cell(class='max-w-[320px] whitespace-normal align-top') %}{{ _technology_cell(row.element, row.same_type) }}{% endcall %}
-        {% call table_cell(class='hidden lg:table-cell max-w-[320px] whitespace-normal align-top') %}<span data-testid="radar-rationale-{{ row.element.id }}">{% if row.entry.rationale %}{{ row.entry.rationale }}{% else %}<span class="text-muted-foreground">No rationale recorded</span>{% endif %}</span>{% endcall %}
-        {% call table_cell(class='whitespace-nowrap align-top tabular-nums', attrs={'data-sort': row.entry.review_date.isoformat() if row.entry.review_date else '9999'}) %}<span data-testid="radar-review-date-{{ row.element.id }}">{% if row.entry.review_date %}{{ row.entry.review_date|format_date }}{% else %}<span class="text-muted-foreground">No review date</span>{% endif %}</span>{% endcall %}
-        {% call table_cell(class='hidden md:table-cell align-top') %}<span data-testid="radar-initiative-{{ row.element.id }}">{% if row.entry.requesting_initiative %}{{ row.entry.requesting_initiative.name }}{% else %}<span class="text-muted-foreground">No initiative</span>{% endif %}</span>{% endcall %}
-        {% call table_cell(class='align-top') %}
-          {# A submit button, not an onchange handler: the CSP refuses inline handlers, and this works with scripting off. #}
-          <form method="POST" action="{{ url_for('tech_radar.classify') }}" class="flex items-center gap-2">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="archimate_element_id" value="{{ row.element.id }}">
-            {% call native_select_wrapper() %}
-              {% call native_select(name='ring', size='sm', attrs={'aria-label': 'Move ' ~ row.element.name ~ ' to another ring'}) %}
-                {% for r in rings %}{{ native_select_option(text=ring_labels[r], value=r, selected=(r == ring)) }}{% endfor %}
-              {% endcall %}
-            {% endcall %}
-            {{ ui.button(text='Move', type='submit', variant='outline', size='sm', attrs={'data-testid': 'radar-reclassify-' ~ row.element.id}) }}
-          </form>
-        {% endcall %}
-      {% endcall %}
-    {% endcall %}
+  {% else %}
+  {% call ui.alert(attrs={'data-testid': 'radar-unclassified'}) %}
+    {{ lucide('info') }}
+    {{ ui.alert_title(text='Nothing is on the radar yet') }}
+    {{ ui.alert_description(text='Open the menu at the end of a row to place that technology in adopt, trial, assess or hold.') }}
   {% endcall %}
-  {% endfor %}
   {% endif %}
 
-  {% call ui.card(attrs={'data-testid': 'radar-unclassified'}) %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text='Not yet on the radar') }}
-      {% if not state.classified_count %}
-      {{ ui.card_description(text='Nothing is on the radar yet. Pick a ring for each technology below: adopt, trial, assess or hold. ' ~ (state.unclassified|length) ~ ' technologies are waiting.') }}
-      {% else %}
-      {{ ui.card_description(text=(state.unclassified|length) ~ (' technology has' if state.unclassified|length == 1 else ' technologies have') ~ ' no ring yet.') }}
-      {% endif %}
+  {#- One list of every technology: placed ones in ring order, then the ones waiting for a ring. -#}
+  {%- set all_rows = [] -%}
+  {%- for ring in rings -%}{%- for row in state.rings[ring] -%}{%- set _ = all_rows.append({'element': row.element, 'entry': row.entry, 'ring': ring}) -%}{%- endfor -%}{%- endfor -%}
+  {%- for element in state.unclassified -%}{%- set _ = all_rows.append({'element': element, 'entry': none, 'ring': none}) -%}{%- endfor -%}
+
+  {% call(row) list_table(rows=all_rows,
+                          columns=[('Technology', ''), {'label': 'Ring', 'sortable': true}, {'label': 'Rationale', 'class': 'hidden lg:table-cell'},
+                                   {'label': 'Review by', 'sortable': true, 'class': 'hidden md:table-cell'}, {'label': 'Requested by', 'class': 'hidden xl:table-cell'}, ('', 'w-12')],
+                          caption='Technologies on the radar', testid='radar-table', row_testid='radar-row', search_placeholder='Filter technologies...') %}
+    {%- set el = row.element -%}
+    {% call table_cell(class='max-w-[320px]') %}
+      <div class="min-w-0" data-element-name="{{ el.name }}">
+        <p class="truncate font-medium">{{ el.name or 'Unnamed element' }}</p>
+        <p class="text-sm text-muted-foreground">{{ human_type(el.type) }}</p>
+      </div>
     {% endcall %}
-    {% call ui.card_content() %}
-      {% if state.unclassified %}
-      {% call(element) list_table(rows=state.unclassified, columns=[('Technology', ''), ('Place on the radar', 'w-[26rem]')],
-                                  caption='Technology not yet on the radar', testid='radar-unclassified-table', row_testid='radar-unclassified-row',
-                                  search_placeholder='Filter technologies...') %}
-        {% call table_cell(class='max-w-[420px] whitespace-normal align-top') %}{{ _technology_cell(element, state.unclassified_peers.get(element.id, [])) }}{% endcall %}
-        {% call table_cell(class='whitespace-normal align-top') %}
-          <form method="POST" action="{{ url_for('tech_radar.classify') }}" class="space-y-2" data-testid="radar-classify-form-{{ element.id }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="archimate_element_id" value="{{ element.id }}">
-            <div class="flex items-center gap-2">
-              {% call native_select_wrapper(class='flex-1') %}
-                {% call native_select(name='ring', size='sm', class='w-full', required=true, attrs={'aria-label': 'Ring for ' ~ element.name}) %}
-                  {{ native_select_option(text='Choose a ring', value='', selected=true, disabled=true) }}
-                  {% for r in rings %}{{ native_select_option(text=ring_labels[r], value=r) }}{% endfor %}
-                {% endcall %}
-              {% endcall %}
-              {{ ui.button(text='Set', type='submit', size='sm', attrs={'data-testid': 'radar-classify-' ~ element.id}) }}
-            </div>
-            <details class="text-sm">
-              <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">Add a rationale, review date or initiative</summary>
-              <div class="mt-3 space-y-3">
-                <div class="space-y-1">
-                  {{ ui.label(text='Rationale', attrs={'for': 'radar-rationale-input-' ~ element.id}) }}
-                  {{ ui.textarea(id='radar-rationale-input-' ~ element.id, name='rationale', rows=2, maxlength=2000, class='w-full') }}
-                </div>
-                <div class="space-y-1">
-                  {{ ui.label(text='Review by', attrs={'for': 'radar-review-input-' ~ element.id}) }}
-                  {{ ui.input(id='radar-review-input-' ~ element.id, type='date', name='review_date', class='h-8') }}
-                </div>
-                <div x-data="radarInitiativePicker" class="relative space-y-1">
-                  {{ ui.label(text='Requesting initiative', attrs={'for': 'radar-initiative-' ~ element.id}) }}
-                  <input type="hidden" name="requesting_initiative_id" :value="picked ? picked.id : ''">
-                  {{ ui.input(id='radar-initiative-' ~ element.id, type='text', autocomplete='off', placeholder='Search initiatives and programmes', class='h-8',
-                              attrs={'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': "results.length > 0 ? 'true' : 'false'",
-                                     'aria-controls': 'radar-initiative-results-' ~ element.id, 'x-model': 'query', '@input.debounce.300ms': 'search'}) }}
-                  <ul id="radar-initiative-results-{{ element.id }}" role="listbox" x-show="results.length" x-cloak
-                      class="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover">
-                    <template x-for="item in results" :key="item.id">
-                      <li role="option" aria-selected="false">
-                        {{ ui.button(type='button', variant='ghost', size='sm', class='h-auto w-full justify-start px-2 py-1.5 text-left', attrs={'@click': 'choose', ':data-id': 'item.id', ':data-name': 'item.name', 'x-text': 'item.name'}) }}
-                      </li>
-                    </template>
-                  </ul>
-                  <p class="text-muted-foreground" x-show="picked" x-cloak>Selected: <span class="font-medium text-foreground" x-text="picked ? picked.name : ''"></span></p>
-                  <p class="text-muted-foreground" x-show="error" x-cloak x-text="error" role="alert"></p>
-                </div>
-              </div>
-            </details>
-          </form>
-        {% endcall %}
+    {% call table_cell(attrs={'data-sort': (rings.index(row.ring) if row.ring else 9)}) %}
+      {% if row.ring %}{{ state_badge(ring_labels[row.ring], tone=RING_TONE.get(row.ring), testid='radar-ring-' ~ el.id) }}{% else %}<span class="text-muted-foreground" data-testid="radar-ring-{{ el.id }}">Not placed</span>{% endif %}
+    {% endcall %}
+    {% call table_cell(class='hidden lg:table-cell max-w-[320px] truncate') %}{% if row.entry %}<span data-testid="radar-rationale-{{ el.id }}">{% if row.entry.rationale %}{{ row.entry.rationale }}{% else %}<span class="text-muted-foreground">None recorded</span>{% endif %}</span>{% endif %}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell whitespace-nowrap tabular-nums', attrs={'data-sort': row.entry.review_date.isoformat() if row.entry and row.entry.review_date else '9999'}) %}{% if row.entry %}<span data-testid="radar-review-date-{{ el.id }}">{% if row.entry.review_date %}{{ row.entry.review_date|format_date }}{% else %}<span class="text-muted-foreground">Not set</span>{% endif %}</span>{% endif %}{% endcall %}
+    {% call table_cell(class='hidden xl:table-cell max-w-[240px] truncate') %}{% if row.entry %}<span data-testid="radar-initiative-{{ el.id }}">{% if row.entry.requesting_initiative %}{{ row.entry.requesting_initiative.name }}{% else %}<span class="text-muted-foreground">Not linked</span>{% endif %}</span>{% endif %}{% endcall %}
+    {% call table_cell(class='text-right') %}
+      {% call row_actions(label='Actions for ' ~ (el.name or 'this technology')) %}
+        {% for r in rings if r != row.ring %}{{ _move_item(el, r, ('Move to ' if row.ring else 'Place in ') ~ ring_labels[r]) }}{% endfor %}
+        {{ row_action(('Edit rationale and review date' if row.entry else 'Place with a rationale'), href=url_for('tech_radar.classify_form', element_id=el.id), separator_before=true, testid='radar-place-' ~ el.id) }}
       {% endcall %}
-      {% else %}
-      <p class="text-sm text-muted-foreground">Every technology in your model has a ring.</p>
-      {% endif %}
     {% endcall %}
   {% endcall %}
 
 {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script nonce="{{ csp_nonce }}">
-  // Live-search picker over the organisation's initiatives and programmes.
-  window.radarInitiativePicker = function () {
-    return {
-      query: '',
-      results: [],
-      picked: null,
-      error: '',
-      search() {
-        const q = this.query.trim();
-        this.error = '';
-        if (this.picked && q !== this.picked.name) this.picked = null;
-        if (q.length < 2) { this.results = []; return; }
-        Platform.fetch.get('/api/programmes/search?q=' + encodeURIComponent(q), null, { silent: true })
-          .then((rows) => { this.results = Array.isArray(rows) ? rows : []; })
-          .catch(() => { this.results = []; this.error = 'Initiatives could not be searched.'; });
-      },
-      // The option button carries its initiative in data attributes, so the handler needs no inline arguments.
-      choose(event) {
-        const el = event.currentTarget;
-        this.picked = { id: el.dataset.id, name: el.dataset.name };
-        this.query = el.dataset.name;
-        this.results = [];
-      },
-    };
-  };
-</script>
 {% endblock %}

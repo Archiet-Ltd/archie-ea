@@ -119,6 +119,13 @@
   {% endcall %}
   {% endfor %}
 </div>
+{% elif not decisions and not decided_error %}
+{#- Nothing waiting and nothing decided: one empty state for the whole page. -#}
+{% call ui.card() %}
+  {{ _empty('inbox', 'No approvals yet',
+            'When someone asks the AI chat to change your architecture, the proposal waits here for a second person to approve or reject it. Decisions are kept here too.',
+            'approval-inbox-empty', _open_chat) }}
+{% endcall %}
 {% else %}
 {% call ui.card() %}
   {{ _empty('inbox', 'No pending approvals waiting for your review',
@@ -126,6 +133,8 @@
             'approval-inbox-empty', _open_chat) }}
 {% endcall %}
 {% endif %}
+
+{% if approvals or queue_error or decisions or decided_error %}
 
 {% call section('Recently decided', 'The latest approved and rejected proposals, with the reason given for each rejection', testid='approval-decided') %}
   {% if decided_error %}
@@ -144,8 +153,9 @@
       {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': d.proposed.isoformat() if d.proposed else ''}) %}{{ d.proposed|format_date if d.proposed else 'Date not recorded' }}{% endcall %}
     {% endcall %}
   {% else %}
-    {{ _empty('history', 'Nothing decided yet', 'Every approval and rejection is listed here, with the reason given.', 'approval-decided-empty') }}
+    <p class="text-sm text-muted-foreground" data-testid="approval-decided-empty">Nothing decided yet.</p>
   {% endif %}
 {% endcall %}
+{% endif %}
 </div>
 {% endblock %}
