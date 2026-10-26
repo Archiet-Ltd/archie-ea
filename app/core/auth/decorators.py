@@ -204,6 +204,9 @@ def require_permission(action, object_type):
 
             return f(*args, **kwargs)
 
+        # A blueprint-wide write floor reads this to let a matrix grant through (it cannot
+        # refuse what the route's own matrix check admits); the check above still runs.
+        decorated_function.matrix_guard = (action, object_type)
         return decorated_function
 
     return decorator
