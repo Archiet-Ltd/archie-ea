@@ -38,6 +38,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/shadcn-components.css') }}">
     <!-- Card pattern normalization (bg-background legacy, .card, alerts, list-groups) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/shadcn-cards.css') }}">
+    <!-- flask-basecoat component styles (every library component, scoped to .style-vega) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
     
     <!-- Alpine.js x-cloak prevention for modal epidemic -->
     <style nonce="{{ csp_nonce }}">
@@ -78,11 +80,13 @@
     <!-- NOTE: api-fetch.js removed — Platform.fetch (03-fetch.js) already provides window.apiFetch -->
     <script src="{{ url_for('static', filename='js/shared/debounce.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alpine-architecture.js') }}"></script>
+    {# flask-basecoat behaviour for library menus, selects, tabs and dialogs (data-slot elements only) #}
+    <script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-ui.js') }}" defer></script>
 
     <!-- Page-specific Alpine registrations (after Platform, before Alpine defer fires) -->
     {% block extra_head_js %}{% endblock %}
 </head>
-<body class="h-full bg-background text-foreground antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
+<body class="style-vega h-full bg-background text-foreground antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
     {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
     <!-- Skip navigation links for keyboard users -->
     <a href="#main-content"
