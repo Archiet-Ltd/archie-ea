@@ -122,7 +122,7 @@
           {{ ui.card_title(text='Model records added') }}
           {{ ui.card_description(text='Added each day (each week over 3 months), from connected sources and by hand') }}
           {% call ui.card_action() %}
-            {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='activity-range', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Period', 'x-model': 'range', 'data-testid': 'activity-range'}) %}{% for key, label, days in o.ranges %}{{ ui.native_select_option(text={'90d': '3 months', '30d': '30 days', '7d': '7 days'}[key], value=key) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+            {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='activity-range', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Period', 'x-model': 'range', 'data-testid': 'activity-range'}) %}{% for key, label, days in o.ranges %}{{ ui.native_select_option(text={'90d': '3 months', '30d': '30 days', '7d': '7 days'}[key], value=key) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground') }}{% endcall %}
           {% endcall %}
         {% endcall %}
         {% call ui.card_content(class='grid gap-6 lg:grid-cols-[1fr_14rem]') %}

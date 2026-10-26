@@ -70,10 +70,12 @@
     <p class="text-xs text-muted-foreground" x-show="applied" x-cloak data-testid="bc-seed-applied">The title and description below were drafted for you. Check them before you create the business case.</p>
     <p class="text-xs text-destructive" x-show="error" x-cloak x-text="error" data-testid="bc-seed-error"></p>
   </div>
-  {% call ui.field(label='Title', for_id='bc-title') %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Title', attrs={'for': 'bc-title'}) }}
     {{ ui.input(id='bc-title', name='title', type='text', attrs={'required': true, 'maxlength': 256, 'placeholder': 'For example: consolidate regional CRM instances', 'x-ref': 'bcTitle'}) }}
   {% endcall %}
-  {% call ui.field(label='Description', for_id='bc-description') %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Description', attrs={'for': 'bc-description'}) }}
     {{ ui.textarea(id='bc-description', name='description', attrs={'rows': 2, 'maxlength': 2000, 'placeholder': 'Optional context for this business case', 'x-ref': 'bcDescription'}) }}
   {% endcall %}
   <div class="flex justify-end gap-2 border-t pt-4">

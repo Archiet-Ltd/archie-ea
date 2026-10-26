@@ -106,7 +106,7 @@
         {% else %}
         {% call ui.card() %}
             {% call ui.card_header() %}
-                {{ ui.card_title(text=element_check.element.name) }}
+                {{ ui.card_title(text=element_check.element.name, tag='h2') }}
                 {% call ui.card_description(attrs={'data-testid': 'trace-element', 'data-element-id': element_check.element.id}) %}{{ kind(element_check.element.type) }}. Chains followed up to {{ element_check.depth }} steps through realisation, serving, assignment, composition and aggregation.{% endcall %}
                 {% call ui.card_action() %}
                 <div class="flex flex-wrap items-center gap-2">
