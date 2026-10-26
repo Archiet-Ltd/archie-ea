@@ -19,9 +19,10 @@
 {%- set _POSITIVE = ['active', 'approved', 'done', 'complete', 'completed', 'live', 'healthy', 'compliant', 'renewed',
                      'signed', 'accepted', 'resolved', 'passed', 'pass', 'enabled', 'on', 'ok', 'low', 'success',
                      'implemented', 'operational', 'closed', 'mitigated', 'invest', 'adopt', 'connected'] -%}
-{%- set _CAUTION = ['pending', 'in_progress', 'in progress', 'review', 'in_review', 'under_review', 'draft', 'expiring',
-                    'at_risk', 'at risk', 'proposed', 'planned', 'planning', 'medium', 'warning', 'assess', 'trial',
-                    'partial', 'partially_compliant', 'open', 'submitted', 'renewal_due', 'tolerate', 'migrate'] -%}
+{#- Not started (planned, proposed, draft, open, identified) is neutral grey; amber is work under way or waiting on someone. -#}
+{%- set _CAUTION = ['pending', 'in_progress', 'in progress', 'review', 'in_review', 'in review', 'under_review', 'expiring',
+                    'at_risk', 'at risk', 'medium', 'warning', 'assess', 'trial', 'partial', 'partially_compliant',
+                    'submitted', 'renewal_due', 'tolerate', 'migrate'] -%}
 {%- set _NEGATIVE = ['expired', 'rejected', 'failed', 'fail', 'critical', 'high', 'overdue', 'non_compliant',
                      'non-compliant', 'cancelled', 'canceled', 'blocked', 'error', 'disabled', 'off', 'breached',
                      'violation', 'terminated', 'hold', 'eliminate', 'retire', 'disconnected'] -%}

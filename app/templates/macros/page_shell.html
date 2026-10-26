@@ -54,6 +54,8 @@
   {%- set _own = breadcrumb[1:] if breadcrumb and breadcrumb[0][0] == 'Home' else breadcrumb -%}
   {%- if _last[1] and _last[1].split('?')[0] == _where.path -%}
     {#- the entry's own page; a record chosen on it (?initiative=) stays as the last crumb -#}
+    {#- one name per page: the heading of a sidebar entry's own page is the name the sidebar gives it -#}
+    {%- set title = _last[0] -%}
     {%- if _own|length > 1 and (_own[-1][0]|lower) not in (title|lower) -%}
       {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [(_own[-1][0], none)] -%}
     {%- else -%}
@@ -168,8 +170,9 @@
 
 {% macro empty_state(icon, headline, body, cta_label=None, cta_href=None) %}
 <div class="text-center py-12 px-4" role="status">
-    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-        <i data-lucide="{{ icon }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
+    {#- the Overview's icon tile, as in components/empty_state.html -#}
+    <div class="mx-auto mb-4 flex size-10 items-center justify-center rounded-lg bg-muted text-primary">
+        {% if has_lucide is defined and has_lucide(icon) %}{{ lucide(icon, 'size-4') }}{% else %}<i data-lucide="{{ icon }}" class="size-4" aria-hidden="true"></i>{% endif %}
     </div>
 
     <h3 class="text-base font-semibold text-foreground">{{ headline }}</h3>
