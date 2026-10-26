@@ -404,7 +404,17 @@ def website_state(org) -> Dict[str, Any]:
         limit = int(progress.get("limit") or 30)
         read = int(progress.get("pages_read") or 0)
         percent = min(100, int(round(100.0 * read / limit))) if limit else 0
-        if progress.get("stage") == "working_out":
+        if progress.get("stage") == "facts_ready":
+            facts, _completeness = confirm.proposals(org.id)
+            if facts:
+                return {
+                    "state": "reading", "facts_ready": True,
+                    "text": "Read %d of up to %d pages. %d %s ready for you to confirm in the next step; "
+                            "more are still being worked out." % (read, limit, len(facts), "fact is" if len(facts) == 1 else "facts are"),
+                    "next": {"label": "Confirm what we read", "url": url_for("account.welcome", step=3)},
+                    "progress": {"read": read, "limit": limit, "percent": percent},
+                }
+        if progress.get("stage") in ("working_out", "facts_ready"):
             text = "Read %d of up to %d pages. Working out what they say; this takes a minute." % (read, limit)
         elif read == 0:
             text = "Opening %s. Up to %d pages will be read." % (_address(progress.get("current")) or host, limit)

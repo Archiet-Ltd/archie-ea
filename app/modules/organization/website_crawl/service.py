@@ -623,7 +623,6 @@ def crawl_organization_website(
     except Exception:
         logger.info("website reading by the model failed for organisation %s", org_id, exc_info=True)
         read["model_errors"] += 1
-    _tell(progress, stage="working_out", pages_read=len(read["pages"]), limit=max_pages, current=None)
     facts = _facts_from(read["pages"])
     _from_inference(facts, first["url"], first["fetched_at"], inferred)
     added = [row for row in facts.ordered()

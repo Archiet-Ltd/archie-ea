@@ -733,4 +733,5 @@ def test_the_progress_says_when_the_first_facts_are_ready(make_org, site):
     stages = []
     _crawl(org, progress=lambda state: stages.append(state["stage"]))
     assert "facts_ready" in stages
-    assert stages.index("facts_ready") < stages.index("working_out")
+    assert "reading" not in stages[stages.index("facts_ready"):], "reading went back after the first facts were ready"
+    assert stages[-1] == "facts_ready"
