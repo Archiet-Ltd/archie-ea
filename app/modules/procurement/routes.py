@@ -70,6 +70,9 @@ def contracts_list():
     org_id = current_user.organization_id
 
     contracts = VendorContract.query.filter_by(organization_id=org_id).all()
+    # The page's status filter: the stats below still count every contract.
+    status = (request.args.get("status") or "").strip().lower()
+    listed = [c for c in contracts if (c.status or "").lower() == status] if status else contracts
 
     # Summary stats
     active_count = sum(1 for c in contracts if c.status == "active")
@@ -110,11 +113,15 @@ def contracts_list():
 
     return render_template(
         "procurement/contracts_list.html",
-        contracts=[_wrap(c) for c in contracts],
+        contracts=[_wrap(c) for c in listed],
+        status=status,
+        search=None,
+        # The renewal column shows only when some contract has a date; otherwise the page says so once.
+        any_renewal=any(c.end_date for c in contracts),
         # The pagination footer reads both. It is guarded by `total > 20`, so on a
         # small portfolio the block never renders and their absence went unnoticed
         # until a real dataset existed.
-        total=len(contracts),
+        total=len(listed),
         page=1,
         active_count=active_count,
         expiring_soon=expiring_soon,

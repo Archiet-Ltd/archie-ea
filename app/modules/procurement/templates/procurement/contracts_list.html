@@ -37,7 +37,11 @@
 {{ page_shell(title='Contracts and licences', subtitle='Every vendor agreement, what it costs a year and when it comes up for renewal',
               breadcrumb=[('Home', url_for('main.index')), ('Contracts and licences', none)], actions_caller=_actions) }}
 
-{% call(item) list_table(rows=contracts, columns=[('Contract', ''), ('Vendor', ''), {'label': 'Annual cost', 'align': 'right', 'sortable': true}, ('Status', ''), {'label': 'Renewal', 'sortable': true}],
+{% set _cols = [('Contract', ''), ('Vendor', ''), {'label': 'Annual cost', 'align': 'right', 'sortable': true}, ('Status', '')] + ([{'label': 'Renewal', 'sortable': true}] if any_renewal else []) %}
+{% if contracts and not any_renewal %}
+<p class="text-sm text-muted-foreground" data-testid="contracts-no-renewals">None of these contracts has a renewal date yet. Add one on a contract and its renewal shows here and on Renewals.</p>
+{% endif %}
+{% call(item) list_table(rows=contracts, columns=_cols,
                           caption='Vendor contracts', testid='contracts-table', row_testid='contract-row', search_placeholder='Filter contracts...',
                           toolbar=true, toolbar_actions=_status_filter,
                           empty_message=('No contracts match these filters.' if (search or status) else 'No vendor contracts yet. Add the first one and its cost and renewal date show here.'),
@@ -51,6 +55,7 @@
     {{ value_or_unset(item.annual_cost|format_currency if item.annual_cost is not none else none) }}
   {% endcall %}
   {% call table_cell() %}{{ state_badge(item.contract.status) }}{% endcall %}
+  {% if any_renewal %}
   {% call table_cell(attrs={'data-sort': item.days_until_renewal if item.days_until_renewal is not none else 99999}) %}
     {% if item.urgency == 'expired' %}
       {{ state_badge('Expired', tone='negative') }}
@@ -61,6 +66,7 @@
       {{ value_or_unset(none, 'No renewal date') }}
     {% endif %}
   {% endcall %}
+  {% endif %}
 {% endcall %}
 
 {% if total > 20 %}
