@@ -244,6 +244,7 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
     context.add_init_script(SKIP_WELCOME)
     context.set_default_timeout(PAGE_TIMEOUT)
     page = context.new_page()
+    second = None
     try:
         sign_in(page, base, mine["email"])
         unsupported = _coverage_page_unsupported(page, base)
@@ -293,21 +294,41 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
         expect(page.get_by_text(re.compile(r"^2 lookups"))).to_be_visible()
         _shoot(page, "genome-answer")
 
-        # Every name is a link to a page of that record, with content.
+        # Every name is a link to a page of that record, and the page says what the answer said about it.
         hrefs = [(links.nth(i).inner_text().strip(), links.nth(i).get_attribute("href")) for i in range(links.count())]
         assert len(hrefs) == 3, hrefs
+        planned = world["seed_one"]["names"]["wp"]
         for name, href in hrefs:
             assert href and href.startswith("/"), (name, href)
             landing = context.new_page()
             landing.goto(base + href, wait_until="domcontentloaded")
             body = landing.locator("main").inner_text()
-            assert name in body and len(body.strip()) > len(name) + 20, (name, href, body[:200])
-            assert name in landing.title() or landing.locator("h1").filter(has_text=name).count(), (name, landing.title())
+            assert name.lower() in body.lower() and len(body.strip()) > len(name) + 20, (name, href, body[:200])
+            if name in unsupported:
+                # the capability's row: its support (no application) and what is planned for it
+                row = landing.locator("tr").filter(has=landing.locator("th[data-capability-id]", has_text=name))
+                expect(row).to_have_count(1)
+                assert not row.locator(".genome-cov-cell").count(), "an unsupported capability shows support"
+                cell = row.locator("td[data-planned-work-for]").inner_text()
+                if name == "Fraud Screening":
+                    assert planned in cell, cell
+                    assert row.locator("td[data-planned-work-for] a").first.get_attribute("href").endswith(
+                        "/work-packages/%d" % world["seed_one"]["wp_id"])
+                else:
+                    assert "None planned" in cell, cell
+            else:
+                # the work package's own page names the capability it changes
+                assert landing.get_by_test_id("wp-capability").inner_text().strip() == "Fraud Screening", body[:300]
+                assert planned in landing.locator("h1").inner_text() or planned in body
             _shoot(landing, "genome-link-" + re.sub(r"\W+", "-", name.lower()))
             landing.close()
 
         # The other organisation's person sees only their own names through the same question.
         model_peer.sent.clear()
+        second = browser.new_context(viewport={"width": 1440, "height": 900})
+        second.add_init_script(SKIP_WELCOME)
+        second.set_default_timeout(PAGE_TIMEOUT * 2)
+        page = second.new_page()
         sign_in(page, base, other["email"])
         page.goto(base + "/ai-chat", wait_until="domcontentloaded")
         page.locator("#user-input").fill(QUESTION)
@@ -322,3 +343,5 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
         assert not re.search(first_org_wp, " ".join(model_peer.sent))
     finally:
         context.close()
+        if second is not None:
+            second.close()

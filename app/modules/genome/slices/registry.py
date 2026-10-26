@@ -75,6 +75,17 @@ def _link(provenance: dict, fallback_endpoint: str) -> Optional[str]:
     return element_page(element_id) or _path(fallback_endpoint)
 
 
+def capability_page(capability_id) -> Optional[str]:
+    """Where a capability's support and planned work are shown: its row on the Capability Coverage page."""
+    base = _path("genome_coverage.generate")
+    return "%s#capability-%s" % (base, capability_id) if base else None
+
+
+def work_package_page(work_package_id) -> Optional[str]:
+    """The work package's own page, which names the capability it changes."""
+    return _path("implementation_planning.work_package_detail", work_package_id=work_package_id)
+
+
 def node_id(domain: str, kind: str, store_id) -> str:
     return "%s:%s:%s" % (domain, kind, store_id)
 
@@ -122,7 +133,7 @@ def _business_nodes(raw: dict) -> tuple:
             "supported_by": apps,
             "supported": bool(apps),
             "provenance": prov,
-            "link": _link(prov, "genome_coverage.index"),
+            "link": capability_page(cap["id"]) or _link(prov, "genome_coverage.index"),
         })
     for app in raw.get("applications", []):
         prov = _structural(app.get("archimate_element_id"), "ApplicationComponent")
@@ -147,7 +158,7 @@ def _implementation_nodes(raw: dict) -> tuple:
             "sequence_order": plateau.get("sequence_order"),
             "target_date": plateau.get("target_date"),
             "provenance": prov,
-            "link": _link(prov, "genome_roadmap.index"),
+            "link": _path("genome_roadmap.index") or _link(prov, "genome_roadmap.index"),
         })
     for wp in raw.get("work_packages", []):
         prov = wp["provenance"]
@@ -168,7 +179,7 @@ def _implementation_nodes(raw: dict) -> tuple:
             "closed_gap_ids": wp.get("closed_gap_ids", []),
             "togaf_phase": wp.get("togaf_phase"),
             "provenance": prov,
-            "link": _link(prov, "genome_roadmap.index"),
+            "link": work_package_page(wp["id"]) or _link(prov, "genome_roadmap.index"),
         })
         if plateau:
             edges.append({"source": wid, "target": plateau, "type": "realises"})

@@ -282,7 +282,7 @@ def test_the_rendered_answer_links_each_cited_record_with_the_notice_and_as_of(t
     with tenant_ctx(two_orgs["a"].id):
         built = genome_answer.build("Nothing supports [ref:%s]." % own, grounding, "openai")
     html = built["html"]
-    assert ('href="/archimate/elements/%d/impact"' % a["cap_element_ids"]["unplanned"]) in html
+    assert ('href="/genome/coverage/generate#capability-%d"' % a["cap_ids"]["unplanned"]) in html
     assert ">Partner Payouts</a>" in html
     assert "Answer written by AI from your model · OpenAI" in html
     assert "Model as of " in html

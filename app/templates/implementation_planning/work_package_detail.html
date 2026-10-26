@@ -22,6 +22,16 @@
         {% call card_content() %}
         <dl class="grid grid-cols-1 gap-4 sm:grid-cols-4 text-sm">
             <div>
+                <dt class="text-muted-foreground">Changes capability</dt>
+                <dd class="font-medium" data-testid="wp-capability">
+                    {% if capability %}
+                        <a href="{{ url_for('genome_coverage.generate') }}#capability-{{ capability.id }}" class="text-primary hover:underline">{{ capability.name }}</a>
+                    {% else %}
+                        <span class="text-muted-foreground">No capability linked</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
                 <dt class="text-muted-foreground">Status</dt>
                 <dd class="font-medium" data-testid="wp-status">{{ (work_package.status or '—')|replace('_', ' ')|capitalize if work_package.status else '—' }}</dd>
             </div>
