@@ -783,6 +783,34 @@ def trail(user, endpoint: str | None) -> list:
     return [{"label": entry.label, "href": href(chosen) if chosen is not None else None}]
 
 
+
+def _holds(link: NavLink, endpoint: str) -> bool:
+    # an entry that is a filtered view of a shared page (a layer of the model) does not own that page
+    if endpoint == link.endpoint and not link.url_values or (link.fallback is not None and endpoint == link.fallback.endpoint):
+        return True
+    return endpoint in link.owns or any(o.endswith((".", "_")) and endpoint.startswith(o) for o in link.owns)
+
+
+def page_trail(user, endpoint: str | None) -> list:
+    """[(label, href)] for where a page sits in the sidebar: its section, then its entry.
+
+    The page header puts Home in front and the page itself (or the record it shows) at the end,
+    so every breadcrumb reads the way the sidebar is laid out. A section such as Spend has no
+    page of its own, so it carries no link. Empty for Home and for pages the sidebar does not hold.
+    """
+    entry = entry_for_endpoint(endpoint)
+    if entry is None or entry.key == "home":
+        return []
+    if not entry.toggle:
+        chosen = resolve(user, entry)
+        return [(sentence_case(entry.label), href(chosen) if chosen is not None else None)]
+    crumbs = [(sentence_case(entry.label), None)]
+    child = next((c for c in entry.children if _holds(c, endpoint)), None)
+    if child is not None:
+        chosen = resolve(user, child)
+        crumbs.append((sentence_case(child.label), href(chosen) if chosen is not None else None))
+    return crumbs
+
 # ── Stage awareness ──────────────────────────────────────────────────────────────────────
 def has_connected_source(org_id) -> bool | None:
     """True once the organisation has connected a source; None when that cannot be told."""
