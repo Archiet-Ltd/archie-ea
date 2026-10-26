@@ -275,3 +275,34 @@ def test_step_three_shows_the_sentence_to_a_signed_in_person(app, client, login_
     html = page.get_data(as_text=True)
     assert "More facts will be added when our reading service is less busy." in html
     assert 'data-testid="more-facts-coming"' in html, "shown beside the facts to confirm"
+
+
+def test_a_retry_never_proposes_again_a_fact_the_person_has_confirmed_or_left_out(make_org, site, monkeypatch):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+    from app.modules.organization import website_crawl
+    from app.modules.organization.website_crawl import confirm
+
+    org = _org(make_org, site.url)
+    _crawl(org, llm=_busy)
+    proposed = _by_field(org.id)
+    assert "company_name" in proposed and "tagline" in proposed
+    Role.insert_roles()
+    user = User(email="decider@example.com", first_name="Dee", last_name="Cider", organization_id=org.id,
+                confirmed=True, enterprise_role="enterprise_architect")
+    user.role = Role.query.filter_by(name="Architect").one()
+    user.password = "password"
+    db.session.add(user)
+    db.session.commit()
+    decisions = [{"id": proposed["company_name"][0]["id"], "accept": True},
+                 {"id": proposed["tagline"][0]["id"], "accept": False}]
+    confirm.confirm(db.session.get(Organization, org.id), db.session.get(User, user.id), decisions)
+    assert "company_name" not in _by_field(org.id) and "tagline" not in _by_field(org.id), "decided: no longer pending"
+
+    monkeypatch.setattr(website_crawl, "default_model", lambda *a, **k: fake_model)
+    website_crawl.run_website_retry_job({"organization_id": org.id, "retry_attempt": 1})
+    after = _by_field(org.id)
+    assert "company_name" not in after, "a confirmed fact is not proposed again"
+    assert "tagline" not in after, "a fact the person left out is not proposed again"
+    assert after["category"][0]["value"] == "Transportation & Logistics", "what is new is still added"

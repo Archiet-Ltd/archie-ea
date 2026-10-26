@@ -549,6 +549,21 @@ def _facts_from(pages: List[Dict[str, Any]]) -> _Facts:
     return facts
 
 
+def _decided_or_pending_proposals(org_id: int) -> List[Dict[str, Any]]:
+    """Every fact read from the website that is waiting or that a person has confirmed or left out.
+    A retry of the model pass proposes none of them again."""
+    import json
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    rows = AIChatCRUDApproval.query.filter(
+        AIChatCRUDApproval.organization_id == org_id, AIChatCRUDApproval.source_table == PROPOSAL_SOURCE,
+        AIChatCRUDApproval.operation_type == OP_PROFILE_FACT,
+        AIChatCRUDApproval.status.in_([ApprovalStatus.PENDING, ApprovalStatus.APPROVED, ApprovalStatus.REJECTED]),
+    ).all()
+    return [json.loads(row.operation_payload or "{}") for row in rows]
+
+
 def pending_website_proposals(org_id: int) -> List[Dict[str, Any]]:
     """The profile facts read from the organisation's website that wait for a person, in profile order."""
     import json
@@ -611,7 +626,7 @@ def crawl_organization_website(
     if more_only:
         # a retry of the model pass: what is already proposed stays, and only what is new is added
         with tenant_scope(org_id):
-            existing = pending_website_proposals(org_id)
+            existing = _decided_or_pending_proposals(org_id)
         held = {(row["field"], _row_key(row)) for row in existing}
         held_scalars = {row["field"] for row in existing if row["field"] not in _MANY}
     else:
