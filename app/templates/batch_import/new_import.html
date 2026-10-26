@@ -740,7 +740,9 @@ function newImportForm() {
 
                 if (data.success) {
                     const jobId = data.job_id || (data.data && data.data.id) || (data.job && data.job.id);
-                    this.showToast('Import job created successfully', 'success');
+                    const source = this.form.source_type === 'file' && this.form.file ? this.form.file.name
+                        : (this.form.name || 'your data');
+                    this.showToast('Importing ' + source + '; it appears in the list below.', 'success');
                     if (jobId) {
                         window.location.href = `/batch-import/jobs/${jobId}`;
                     }
