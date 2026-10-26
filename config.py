@@ -829,7 +829,7 @@ class CurrencyConfig:
         "EUR": {
             "symbol": "€",
             "code": "EUR",
-            "position": "suffix",
+            "position": "prefix",
             "decimal_places": 2,
             "thousands_separator": ".",
             "name": "Euro",
@@ -874,23 +874,39 @@ class CurrencyConfig:
         return config
 
     @classmethod
-    def get_org_currency_code(cls, organization=None):
+    def get_org_currency_code(cls, organization=None, organization_id=None):
         """H-04: single source of truth for "which currency does this org use".
 
-        Reads ``organization.reporting_currency`` (the one stored currency
-        column) and falls back to DEFAULT_CURRENCY. Every server-rendered
+        Delegates to ``application_cost_accessor.get_reporting_currency`` which
+        reads the ``Organization.reporting_currency`` column (the one stored
+        currency value) and falls back to DEFAULT_CURRENCY. Every server-rendered
         money figure AND the client currencyManager default both come from
         this, not from a hardcoded '$' or '£' baked into a template.
+
+        Accepts either an ``organization`` object (with an ``id`` attribute) or
+        an explicit ``organization_id``. If neither is given, the current
+        organisation from the request context is used.
         """
-        code = None
-        try:
-            if organization is not None:
-                code = getattr(organization, "reporting_currency", None)
-        except Exception:
-            code = None
-        if not code or not cls.is_supported(code):
-            code = cls.DEFAULT_CURRENCY
-        return code
+        from flask import has_app_context
+
+        # Resolve the organisation id from the given arguments.
+        org_id = None
+        if organization is not None:
+            org_id = getattr(organization, "id", None)
+        elif organization_id is not None:
+            org_id = organization_id
+
+        # Call get_reporting_currency inside an application context (request or CLI).
+        # Outside any context, fall back to DEFAULT_CURRENCY.
+        if has_app_context():
+            try:
+                from app.services.application_cost_accessor import get_reporting_currency
+
+                return get_reporting_currency(org_id)
+            except Exception:
+                pass
+
+        return cls.DEFAULT_CURRENCY
 
     @classmethod
     def get_org_currency_config(cls, organization=None):
