@@ -5,8 +5,12 @@
 
 Entelim's app/static/css/basecoat_components.css holds the .cn-* rules the Overview dashboard needed (62 of the
 library's class names). Every other library component (input, dropdown menu, select, tabs, dialog, pagination and
-the rest) rendered unstyled, and nothing gave the menus behaviour. This script appends, in a second cascade layer,
-every library rule whose selector names at least one .cn-* class that the existing file does not already style.
+the rest) rendered unstyled, and nothing gave the menus behaviour. This script appends every library rule whose
+selector names at least one .cn-* class that the existing file does not already style. Those rules sit outside any
+cascade layer, because this product's Tailwind 3 output does too and its reset (no borders, transparent buttons)
+would beat any layered rule; the scope is written :where(.style-vega) so a rule weighs the same as one utility class,
+which beats the reset, and the stylesheet loads before Tailwind so a utility on the same element still wins, as in
+the library.
 Rules that only name classes the existing file styles are left alone, so nothing the Overview renders can change.
 Colour tokens become hsl(var(--token)) because this product stores colours as hue, saturation and lightness
 triples. The Tailwind 4 variables the rules compose from are renamed --cn-tw-* and registered with the library's
@@ -102,7 +106,7 @@ def main():
         if any(w.startswith("@layer properties") for w in wrappers):
             continue
         outer = [w for w in wrappers if not w.startswith("@layer")]
-        text = f"{sel}{{{colourise(body)}}}"
+        text = f"{sel.replace('.style-vega ', ':where(.style-vega) ')}{{{colourise(body)}}}"
         for w in reversed(outer):
             text = f"{w}{{{text}}}"
         rules.append(text)
@@ -110,9 +114,10 @@ def main():
         used_frames |= set(re.findall(r"animation(?:-name)?:\s*([\w-]+)", body))
 
     # tokens the rules read that this product does not define anywhere
-    defined = set()
+    defined = set(re.findall(r"(--[a-z0-9-]+)\s*:", current))
     for f in (ROOT / "app/static/css").glob("*.css"):
-        defined |= set(re.findall(r"(--[a-z0-9-]+)\s*:", f.read_text(encoding="utf-8", errors="ignore")))
+        if f != CSS_OUT:
+            defined |= set(re.findall(r"(--[a-z0-9-]+)\s*:", f.read_text(encoding="utf-8", errors="ignore")))
     theme = {}
     for wrappers, sel, body in walk(lib):
         if sel.startswith(":root") and any(w.startswith("@layer theme") for w in wrappers):
@@ -139,9 +144,8 @@ def main():
            ":root{" + ";".join(f"{t}:{theme[t]}" for t in missing) + ("" if not missing else ";") + "--color-black:black}",
            *map(rename, registered),
            *map(rename, frame_text),
-           "@layer basecoat-ui {",
            *map(rename, rules),
-           "}", ""]
+           ""]
     CSS_OUT.write_text("\n".join(out), encoding="utf-8")
 
     js = [f"/* flask-basecoat {a.ref}: runtime core and the menu, popover, select, tabs, dialog, disclosure and toggle "
