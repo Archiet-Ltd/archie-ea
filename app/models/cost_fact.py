@@ -20,7 +20,8 @@ __all__ = ["CostFact", "ExchangeRate"]
 # at a call site.
 ELEMENT_APPLICATION = "application"
 ELEMENT_CAPABILITY = "capability"
-ELEMENT_TYPES = frozenset({ELEMENT_APPLICATION, ELEMENT_CAPABILITY})
+ELEMENT_TECHNOLOGY = "technology"
+ELEMENT_TYPES = frozenset({ELEMENT_APPLICATION, ELEMENT_CAPABILITY, ELEMENT_TECHNOLOGY})
 
 KIND_ACTUAL = "actual"
 KIND_BUDGET = "budget"
