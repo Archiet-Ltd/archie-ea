@@ -28,6 +28,10 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/list_table.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/answer_cascade.html",
@@ -92,6 +96,10 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/list_table.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/badge.html",
@@ -158,6 +166,10 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/list_table.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/avatar.html",
@@ -713,6 +725,30 @@
   "value_streams": "business_architect"
  },
  "components": {
+  "element-table": {
+   "source": "app",
+   "macros": [
+    "components/element_table.html"
+   ]
+  },
+  "fact-list": {
+   "source": "app",
+   "macros": [
+    "components/fact_list.html"
+   ]
+  },
+  "list-table": {
+   "source": "app",
+   "macros": [
+    "components/list_table.html"
+   ]
+  },
+  "risk-matrix": {
+   "source": "app",
+   "macros": [
+    "components/risk_matrix.html"
+   ]
+  },
   "accessibility-helpers": {
    "source": "app",
    "macros": [
@@ -38500,6 +38536,33 @@
    "type_changed": true
   },
   "app/templates/solutions/record.html": {
+   "data_types": [
+    {
+     "type": "archimate-elements",
+     "testid": "requirement-row",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "record-list",
+     "testid": "option-row",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "risks",
+     "testid": "risk-row",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "record-facts",
+     "testid": "record-properties",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "status",
+     "testid": "record-stage",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    }
+   ],
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -38543,6 +38606,10 @@
    "block": "record-detail",
    "charts": [],
    "components": [
+    "element-table",
+    "fact-list",
+    "list-table",
+    "risk-matrix",
     "alert",
     "avatar",
     "badge",

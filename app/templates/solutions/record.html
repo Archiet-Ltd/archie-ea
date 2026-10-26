@@ -9,13 +9,15 @@
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/alert.html' import alert %}
-{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'components/risk_matrix.html' import risk_matrix %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/avatar.html' import avatar %}
 {% from 'solutions/partials/_design_score.html' import design_score_panel, design_score_ring %}
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/progress.html' import progress %}
-{% from 'solutions/partials/_element_table.html' import element_table %}
 
 {% block title %}{{ solution.name }} - Solution{% endblock %}
 
@@ -23,7 +25,6 @@
 {% set base = '/solutions/' ~ sid %}
 {% set stage_variant = {'Approved': 'success', 'Approved with conditions': 'success', 'In review': 'info', 'Rejected': 'danger', 'Proposed': 'info'}.get(stage, 'neutral') %}
 {% set change_variant = {'Added': 'success', 'Changed': 'info', 'Retired': 'warning'} %}
-{% set band_cell = {'low': 'bg-success/10 border-success/30', 'medium': 'bg-warning/10 border-warning/30', 'high': 'bg-warning/30 border-warning/50', 'critical': 'bg-destructive/20 border-destructive/50'} %}
 
 {% macro initials(name) -%}
 {%- set parts = (name or '').split() -%}
@@ -398,13 +399,11 @@
             {% endcall %}
             {% call card_content(class='p-0') %}
               {% if opt.source == 'options' %}
-                {% set opt_columns = [('Option', '!pl-6'), ('Fit', 'whitespace-nowrap'), ('Coverage', 'whitespace-nowrap'), ('Risk', 'whitespace-nowrap'), ('Summary', 'hidden md:table-cell')] %}
+                {% set opt_columns = [('Option', ''), ('Fit', ''), ('Coverage', ''), ('Risk', ''), ('Summary', 'hidden md:table-cell')] %}
               {% else %}
-                {% set opt_columns = [('Option', '!pl-6'), ('Approach', 'whitespace-nowrap'), ('Cost', 'whitespace-nowrap'), ('Time', 'whitespace-nowrap'), ('Risk', 'whitespace-nowrap'), ('Summary', 'hidden lg:table-cell')] %}
+                {% set opt_columns = [('Option', ''), ('Approach', ''), ('Cost', ''), ('Time', ''), ('Risk', ''), ('Summary', 'hidden lg:table-cell')] %}
               {% endif %}
-              {% call dense_table(columns=opt_columns, rows=opt.options|length, caption='Options compared', testid='options-table', flush=true) %}
-                {% for o in opt.options %}
-                <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="option-row">
+              {% call(o) list_table(rows=opt.options, columns=opt_columns, caption='Options compared', testid='options-table', row_testid='option-row') %}
                   <td class="px-2 !pl-6 align-middle">
                     <span class="font-medium text-foreground">{{ o.name }}</span>
                     {% if o.recommended %} {% call badge(variant='success') %}Leader{% endcall %}{% endif %}
@@ -420,8 +419,6 @@
                   <td class="whitespace-nowrap px-2 align-middle">{% if o.risk %}{% call badge(variant={'Low': 'success', 'Medium': 'warning', 'High': 'danger'}.get(o.risk, 'outline')) %}{{ o.risk }}{% endcall %}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}</td>
                   {% endif %}
                   <td class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}"><span class="block max-w-md line-clamp-1">{{ o.summary }}</span></td>
-                </tr>
-                {% endfor %}
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -475,26 +472,7 @@
                 {% call card_description() %}Probability across, impact upward. Each cell counts the risks in it.{% endcall %}
               {% endcall %}
               {% call card_content() %}
-                <div class="flex gap-2">
-                  <div class="grid shrink-0 content-start gap-1 text-right text-xs leading-tight text-muted-foreground" aria-hidden="true">
-                    {% for n in [5, 4, 3, 2, 1] %}<span class="flex h-9 items-center justify-end">{{ n }}</span>{% endfor %}
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <div class="grid grid-cols-5 gap-1" role="grid" aria-label="Risk heat map, probability across and impact upward" data-testid="risks-grid">
-                      {% for row in rk.grid %}
-                      <div role="row" class="contents">
-                      {% for cell in row %}
-                        <div role="gridcell" class="flex h-9 items-center justify-center rounded border text-sm font-medium tabular-nums {{ band_cell[cell.band] }}" data-testid="risk-cell" data-count="{{ cell.count }}" aria-label="Probability {{ cell.likelihood }}, impact {{ cell.impact }}: {{ cell.count }} risk{{ 's' if cell.count != 1 }}"{% if cell.titles %} title="{{ cell.titles|join('; ') }}"{% endif %}>{% if cell.count %}{{ cell.count }}{% endif %}</div>
-                      {% endfor %}
-                      </div>
-                      {% endfor %}
-                    </div>
-                    <div class="mt-1 grid grid-cols-5 gap-1 text-center text-xs text-muted-foreground" aria-hidden="true">
-                      {% for n in [1, 2, 3, 4, 5] %}<span>{{ n }}</span>{% endfor %}
-                    </div>
-                  </div>
-                </div>
-                <p class="mt-2 text-xs text-muted-foreground">Impact rises upward, probability to the right.</p>
+                {{ risk_matrix(rk.grid) }}
               {% endcall %}
             {% endcall %}
             {% call card(class='overflow-hidden lg:col-span-2') %}
@@ -503,9 +481,7 @@
                 {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
               {% endcall %}
               {% call card_content(class='p-0') %}
-                {% call dense_table(columns=[('Risk', '!pl-6'), ('Owner', 'whitespace-nowrap'), ('Score', 'whitespace-nowrap'), ('Status', 'hidden md:table-cell whitespace-nowrap')], rows=rk.rows|length, caption='Risks', testid='risks-table', flush=true) %}
-                  {% for r in rk.rows %}
-                  <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="risk-row">
+                {% call(r) list_table(rows=rk.rows, columns=[('Risk', ''), ('Owner', ''), ('Score', ''), ('Status', 'hidden md:table-cell')], caption='Risks', testid='risks-table', row_testid='risk-row') %}
                     <td class="px-2 !pl-6 align-middle">
                       <a href="{{ r.href }}" class="font-medium text-foreground hover:underline" data-testid="risk-link">{{ r.title }}</a>
                       {% if r.via %}<span class="block text-xs text-muted-foreground">through {{ r.via }}</span>{% endif %}
@@ -514,8 +490,6 @@
                     <td class="px-2 align-middle">{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}</td>
                     <td class="whitespace-nowrap px-2 align-middle">{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[r.band]) %}{{ r.band_label }} {{ r.score }}{% endcall %}</td>
                     <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ r.status }}</td>
-                  </tr>
-                  {% endfor %}
                 {% endcall %}
               {% endcall %}
             {% endcall %}
@@ -540,9 +514,7 @@
               {% call card_description() %}The delivery work of this solution, in order, with what each depends on and what needs it.{% endcall %}
             {% endcall %}
             {% call card_content(class='p-0') %}
-              {% call dense_table(columns=[('Work package', '!pl-6 whitespace-nowrap'), ('Status', 'whitespace-nowrap'), ('Progress', 'whitespace-nowrap'), ('Dates', 'hidden lg:table-cell whitespace-nowrap'), ('Owner', 'hidden md:table-cell whitespace-nowrap'), ('Depends on', 'hidden md:table-cell whitespace-nowrap'), ('Needed by', 'hidden md:table-cell whitespace-nowrap')], rows=dl.packages|length, caption='Work packages', testid='delivery-table', flush=true) %}
-                {% for p in dl.packages %}
-                <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="work-package-row">
+              {% call(p) list_table(rows=dl.packages, columns=[('Work package', 'whitespace-nowrap'), ('Status', ''), ('Progress', ''), ('Dates', 'hidden lg:table-cell'), ('Owner', 'hidden md:table-cell'), ('Depends on', 'hidden md:table-cell'), ('Needed by', 'hidden md:table-cell')], caption='Work packages', testid='delivery-table', row_testid='work-package-row') %}
                   <td class="px-2 !pl-6 align-middle">
                     {% if p.href %}<a href="{{ p.href }}" class="font-medium text-foreground hover:underline" data-testid="work-package-link">{{ p.name }}</a>{% else %}<span class="font-medium text-foreground">{{ p.name }}</span>{% endif %}
                     {% if p.plateau %}<span class="block text-xs text-muted-foreground">Plateau {{ p.plateau }}</span>{% endif %}
@@ -558,8 +530,6 @@
                   <td class="hidden px-2 align-middle md:table-cell">{% if p.owner %}<span class="text-foreground">{{ p.owner }}</span>{% else %}<span class="text-muted-foreground">No owner yet</span>{% endif %}</td>
                   <td class="hidden px-2 align-middle text-muted-foreground md:table-cell" data-testid="work-package-depends">{{ p.depends_on|join(', ') if p.depends_on else 'Nothing' }}</td>
                   <td class="hidden px-2 align-middle text-muted-foreground md:table-cell" data-testid="work-package-needed">{{ p.needed_by|join(', ') if p.needed_by else 'Nothing' }}</td>
-                </tr>
-                {% endfor %}
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -576,18 +546,11 @@
           {% call card_title(class='text-base') %}Properties{% endcall %}
         {% endcall %}
         {% call card_content() %}
-          <dl class="space-y-2 text-sm" data-testid="record-properties">
-            {% for p in properties %}
-            <div class="flex items-start justify-between gap-3">
-              <dt class="shrink-0 text-muted-foreground">{{ p.label }}</dt>
-              <dd class="min-w-0 text-right text-foreground" data-testid="property-{{ p.key }}">
-                {%- if p.value and p.key == 'target_date' %}{{ p.value|format_datetime('d MMM yyyy') }}
-                {%- elif p.value %}{{ p.value }}
-                {%- else %}<a href="{{ base }}/edit" class="text-muted-foreground hover:text-foreground hover:underline">Not set</a>{% endif -%}
-              </dd>
-            </div>
-            {% endfor %}
-          </dl>
+          {% call(p) fact_list(items=properties, testid='record-properties') %}
+            {%- if p.value and p.key == 'target_date' %}{{ p.value|format_datetime('d MMM yyyy') }}
+            {%- elif p.value %}{{ p.value }}
+            {%- else %}<a href="{{ base }}/edit" class="text-muted-foreground hover:text-foreground hover:underline">Not set</a>{% endif -%}
+          {% endcall %}
         {% endcall %}
       {% endcall %}
 

@@ -198,6 +198,12 @@ def test_the_architect_reads_the_record_and_reaches_an_element(browser, live_ser
         added = int(page.get_by_test_id("changes-added").inner_text())
         changed = int(page.get_by_test_id("changes-changed").inner_text())
         assert added + changed >= 1, "the demo solution changes at least one application"
+        # The facts about the record: every property has a label and either a value or a way to set it.
+        facts = page.get_by_test_id("record-properties")
+        assert facts.locator("dt").count() >= 5
+        assert "Chief Operations Officer" in page.get_by_test_id("property-sponsor").inner_text()
+        for value in facts.locator("dd").all_inner_texts():
+            assert value.strip(), "a property shows an empty value"
         # The actions an architect who did not author it may take.
         for testid in ("record-compare", "record-download", "record-ask"):
             assert page.get_by_test_id(testid).is_visible(), testid
