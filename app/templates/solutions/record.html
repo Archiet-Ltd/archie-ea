@@ -125,16 +125,9 @@
           {% endcall %}
         {% endcall %}
 
-        {% call alert(kind='info' if next_step.action != 'Fix this' else 'warning', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step', class='flex-wrap') %}{% endcall %}
+        {% call alert(kind='info', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step', class='flex-wrap') %}{% endcall %}
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {% call card() %}
-            {% call card_content(class='p-6') %}
-              {{ design_score_panel(score) }}
-            {% endcall %}
-          {% endcall %}
-
-          <div class="space-y-6">
+        <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2 [&>*]:h-full">
             {% call card() %}
               {% call card_header() %}
                 {% call card_title(class='text-lg') %}What it changes{% endcall %}
@@ -180,8 +173,17 @@
                 <div class="mt-3">{{ button(text='Record the cost', variant='outline', size='sm', href=base ~ '?edit=1', testid='cost-record-link') }}</div>
               {% endcall %}
             {% endcall %}
-          </div>
         </div>
+
+        {% call card() %}
+          {% call card_header() %}
+            {% call card_title(class='text-lg') %}Design score {{ score.label }}{% endcall %}
+            {% call card_description() %}{% if score.passed == score.total %}Every check passes.{% else %}{{ score.total - score.passed }} check{{ 's' if score.total - score.passed != 1 }} still open.{% endif %}{% endcall %}
+          {% endcall %}
+          {% call card_content() %}
+            {{ design_score_panel(score, ring=false, columns=2, heading=false) }}
+          {% endcall %}
+        {% endcall %}
 
       {% elif tab == 'design' %}
         {% if groups %}

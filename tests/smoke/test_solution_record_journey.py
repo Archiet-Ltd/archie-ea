@@ -85,6 +85,8 @@ def demo(live_server, seeded):
                     user.password = PASSWORD
                     db.session.add(user)
             solution = Solution.query.filter_by(name=SOLUTION, organization_id=org_id).one()
+            if not (solution.solution_owner or "").strip():
+                solution.solution_owner = "Ivo Reed"  # the seed leaves an existing solution's owner alone
             reviewed = Solution.query.filter_by(name=IN_REVIEW, organization_id=org_id).one()
             reviewed.governance_status = "arb_review"
             if reviewed.created_by_id != author.id:
@@ -220,7 +222,7 @@ def test_the_architect_reads_the_record_and_reaches_an_element(browser, live_ser
         # Every element on the Design tab opens its own record, which has content.
         page.get_by_role("link", name="Design", exact=True).click()
         page.wait_for_url(re.compile(r"tab=design"), timeout=PAGE_TIMEOUT)
-        rows = page.locator("[data-testid^=design-table-] tbody tr")
+        rows = page.locator("[data-testid^=design-table-] tbody tr[data-row]")
         summary = page.get_by_test_id("design-summary").inner_text()
         assert str(rows.count()) in summary, (rows.count(), summary)
         assert rows.count() >= 10
