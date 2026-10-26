@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>{{ count }} new sign-up{{ '' if count == 1 else 's' }} in the last day.</p>
+{% if lines %}<ul>{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% else %}<p>Nobody signed up in the last day.</p>{% endif %}
+</body>
+</html>
