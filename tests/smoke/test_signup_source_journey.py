@@ -72,7 +72,8 @@ def test_a_register_link_person_appears_on_the_signups_list_with_their_source_an
             expect(row).to_contain_text(shown)
         expect(row).to_contain_text("Not yet")  # no first answer: said in words, not a dash
 
-        narrow = admin.new_page(viewport={"width": 390, "height": 844})
+        narrow = admin.new_page()
+        narrow.set_viewport_size({"width": 390, "height": 844})
         narrow.goto(live_server + "/admin/signups", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(narrow.get_by_text(address)).to_be_visible()
         assert narrow.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
