@@ -250,6 +250,7 @@ def _link_strategy_archimate(connection, target, element_type, desc_prefix):
     # recorded here: the element then has its create entry in the change history like any other.
     from app.middleware.audit_middleware import record_create
 
+    # reuse-ok: a transient instance, never added to a session, that only describes the row the Core insert above wrote
     record_create(connection, "archimate_elements", ArchiMateElement(id=new_id, **values))
 
     connection.execute(
