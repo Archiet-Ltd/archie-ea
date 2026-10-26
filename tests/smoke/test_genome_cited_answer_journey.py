@@ -276,6 +276,9 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
         expect(notice).to_contain_text("Answer written by AI from your model")
         expect(notice).to_contain_text("OpenAI")
         expect(notice.locator("[data-genome-as-of]")).to_contain_text(re.compile(r"Model as of \d{2} \w{3} \d{4}, \d{2}:\d{2} UTC"))
+        # The strip under the answer tells the truth about what was read.
+        assert page.get_by_text("No lookup ran").count() == 0
+        expect(page.get_by_text(re.compile(r"^2 lookups"))).to_be_visible()
         _shoot(page, "genome-answer")
 
         # Every name is a link to a page of that record, with content.

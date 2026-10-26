@@ -596,13 +596,14 @@
                     sources: data.sources,
                     /* The fallback must show the same footer as the streamed
                        path. It carries no tool_start/tool_result events — there
-                       is no stream to carry them — so the trail is empty and the
-                       evidence strip reports "context only" rather than
-                       inventing lookups it cannot see. actions_taken does come
-                       back on this path, so receipts and next-artifact are the
+                       is no stream to carry them — so the trail is built from
+                       actions_taken, the lookups that did run, and reports "context
+                       only" only when none did. Receipts and next-artifact are the
                        same either way. */
-                    trail: [],
-                    contextUsed: true,
+                    trail: (data.actions_taken || []).map(function (a) {
+                        return { tool: a.tool, args: a.arguments, result: { success: true, result: a.result, message: a.message } };
+                    }),
+                    contextUsed: !(data.actions_taken || []).length,
                     actions: data.actions_taken || [],
                     pendingApprovals: data.pending_approvals || [],
                     /* agent_result.error survives internally even when the
