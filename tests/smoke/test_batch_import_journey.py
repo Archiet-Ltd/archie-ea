@@ -19,6 +19,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .fresh_org import create_fresh_org
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -99,29 +100,52 @@ def test_create_batch_import_job_via_paste_and_reload(browser, live_server, seed
     context.close()
 
 
-def test_a_successful_import_names_the_file_it_is_importing(browser, live_server, seeded, tmp_path):
-    """The toast after submitting says which file is being imported, not a job number."""
-    csv = tmp_path / "applications.csv"
-    csv.write_text("name,description\nSmkApp1,First\nSmkApp2,Second\n", encoding="utf-8")
-    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
-    page = context.new_page()
-    _login(page, live_server, seeded["emails"]["data_architect"])
-    page.add_init_script("window.__toasts = []; window.showToast = function (m) { window.__toasts.push(m); };")
-    # the job is created for real by the server; the answer is held back from the page so that it stays and shows its toast
-    page.route("**/api/batch-import/jobs", lambda route: route.fulfill(
-        status=200, content_type="application/json", body='{"success": true}') if route.request.method == "POST" else route.continue_())
+
+def _upload(page, live_server, csv, name):
     page.goto(live_server + "/batch-import/new", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_selector('[role="tab"]', timeout=PAGE_TIMEOUT)
-    page.locator("#jobName").fill("File toast %s" % uuid.uuid4().hex[:6])
+    page.locator("#jobName").fill(name)
     page.locator("#fileUpload").set_input_files(str(csv))
     page.wait_for_timeout(1500)
     button = page.get_by_role("button", name="Create Import Job")
     expect(button.first).to_be_enabled(timeout=PAGE_TIMEOUT)
     button.first.click()
-    for _ in range(40):
-        if page.evaluate("window.__toasts.length"):
-            break
-        page.wait_for_timeout(250)
-    toasts = page.evaluate("window.__toasts")
-    assert toasts == ["Importing applications.csv; it appears in the list below."], toasts
+
+
+def test_the_page_a_person_lands_on_names_the_file_and_says_the_status_in_words(browser, live_server, tmp_path):
+    """Create Import Job takes the person to the job within a moment; that page, not a toast, says what is happening."""
+    csv = tmp_path / "lantern-apps.csv"
+    csv.write_text("name,description\nLanternApp1,First\nLanternApp2,Second\n", encoding="utf-8")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    _login(page, live_server, create_fresh_org("data_architect")["emails"]["data_architect"])
+    _upload(page, live_server, csv, "From file %s" % uuid.uuid4().hex[:6])
+    page.wait_for_url(lambda url: "/batch-import/jobs/" in url, timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+    expect(page.locator("main")).to_contain_text("From lantern-apps.csv")
+    status = page.get_by_test_id("job-status")
+    expect(status).to_be_visible()
+    words = status.inner_text()
+    assert words.strip() and "_" not in words and words == words.strip(), words
+    assert "awaiting_confirmation" not in page.locator("main").inner_text()
+    context.close()
+
+
+def test_importing_a_file_that_is_already_being_imported_says_so_and_links_to_that_job(browser, live_server, tmp_path):
+    csv = tmp_path / "twice-apps.csv"
+    csv.write_text("name,description\nTwiceApp1,First\nTwiceApp2,Second\n", encoding="utf-8")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    _login(page, live_server, create_fresh_org("data_architect")["emails"]["data_architect"])
+    _upload(page, live_server, csv, "Twice one %s" % uuid.uuid4().hex[:6])
+    page.wait_for_url(lambda url: "/batch-import/jobs/" in url, timeout=PAGE_TIMEOUT)
+    first = page.url
+    _upload(page, live_server, csv, "Twice two %s" % uuid.uuid4().hex[:6])
+    notice = page.get_by_test_id("existing-job")
+    expect(notice).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(notice).to_contain_text("An active import job already exists for this file")
+    assert "Invalid file or parameters" not in page.locator("body").inner_text()
+    notice.get_by_role("link", name="Open the existing import").click()
+    page.wait_for_url(first, timeout=PAGE_TIMEOUT)
+    expect(page.locator("main")).to_contain_text("From twice-apps.csv")
     context.close()
