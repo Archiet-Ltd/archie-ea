@@ -23,10 +23,13 @@
    toolbar_actions  a macro rendering buttons at the right of the toolbar, before View
    empty_message    shown in the table when there are no rows; empty_action is an optional macro for the next step
    notice           one sentence about every row at once ("None of these contracts has a renewal date yet"), shown
-                    once above the table, so no row repeats it
+                    once at the top of the table, above its toolbar, so no row repeats it
    server_pagination  set when the server pages the rows: every row given is shown, the table's own footer is left
                     out, and a macro passed here renders the server's pager in its place
-   A sortable column sorts by each cell's data-sort attribute (table_cell(attrs={'data-sort': value})) or its text.
+   footer_count     a macro for the footer's left side in place of the row count ("0 of 21 row(s) selected")
+   Every named column sorts (by each cell's data-sort attribute, table_cell(attrs={'data-sort': value}), or its
+   text) unless its mapping says 'sortable': false. The footer shows whenever there are rows; with none, the table
+   shows its empty message without a header row.
 
    A list of ArchiMate elements uses components/element_table.html, which is this table with the element's name
    and link in the first column. #}
@@ -40,15 +43,16 @@
 {%- if col is mapping -%}{{ col.get('label', '') }}{%- else -%}{{ col[0] }}{%- endif -%}
 {%- endmacro -%}
 
-{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_action=none, server_pagination=none, notice=none) %}
+{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_action=none, server_pagination=none, notice=none, footer_count=none) %}
 {%- set cells = caller -%}
 {%- set rows = rows or [] -%}
 {%- set total = rows|length -%}
 {%- set show_toolbar = toolbar if toolbar is not none else (total > 8 or toolbar_actions) -%}
-{%- set show_footer = total > 10 and not server_pagination -%}
+{%- set show_footer = total > 0 and not server_pagination -%}
 {%- set page_size = (total or 1) if server_pagination else page_size -%}
 {%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
 <div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
+  {% if notice %}<p class="flex items-start gap-2 text-sm text-muted-foreground" data-slot="data-table-notice">{{ lucide('info', class='mt-0.5 size-4 shrink-0') }}<span>{{ notice }}</span></p>{% endif %}
   {% if show_toolbar %}
   <div class="flex items-center justify-between gap-2" data-slot="data-table-toolbar">
     <div class="flex flex-1 items-center gap-2">
@@ -77,22 +81,23 @@
   </div>
   {% endif %}
 
-  {% if notice %}<p class="text-sm text-muted-foreground" data-slot="data-table-notice">{{ notice }}</p>{% endif %}
-  <div class="overflow-x-auto rounded-md border">
+  <div data-slot="table-container" class="overflow-x-auto rounded-md border">
     {% call table(attrs={'data-testid': testid}) %}
       {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
+      {% if total > 0 %}
       {% call table_header() %}
         {% call table_row() %}
           {% for col in columns %}
             {%- set m = col if col is mapping else {'label': col[0], 'class': (col[1] if col|length > 1 else '')} -%}
             {%- set cls = ((m.get('class') or '') ~ (' text-right' if m.get('align') == 'right' else ''))|trim -%}
             {% call table_head(class=cls, attrs={'scope': 'col', 'data-col': loop.index0}) %}
-              {%- if m.get('sortable') and total > 1 -%}
+              {%- if m.get('sortable', (m.label or '')|trim != '') and total > 1 -%}
+                {%- set right = m.get('align') == 'right' -%}
                 {% call dropdown_menu() %}
-                  {% call dropdown_menu_trigger(variant='ghost', size='sm', class='-ml-3 h-8 data-[state=open]:bg-accent', attrs={'data-table-sort-trigger': loop.index0}) %}
+                  {% call dropdown_menu_trigger(variant='ghost', size='sm', class=('-mr-3 ml-auto' if right else '-ml-3') ~ ' h-8 data-[state=open]:bg-accent', attrs={'data-table-sort-trigger': loop.index0}) %}
                     <span>{{ m.label }}</span><span class="contents" data-sort-icon="none">{{ lucide('chevrons-up-down') }}</span><span class="contents" data-sort-icon="asc" hidden>{{ lucide('arrow-up') }}</span><span class="contents" data-sort-icon="desc" hidden>{{ lucide('arrow-down') }}</span>
                   {% endcall %}
-                  {% call dropdown_menu_content(align='start') %}
+                  {% call dropdown_menu_content(align=('end' if right else 'start')) %}
                     {% call dropdown_menu_item(attrs={'data-table-sort': loop.index0, 'data-dir': 'asc', 'data-table-owner': testid}) %}{{ lucide('arrow-up') }}Ascending{% endcall %}
                     {% call dropdown_menu_item(attrs={'data-table-sort': loop.index0, 'data-dir': 'desc', 'data-table-owner': testid}) %}{{ lucide('arrow-down') }}Descending{% endcall %}
                   {% endcall %}
@@ -104,6 +109,7 @@
           {% endfor %}
         {% endcall %}
       {% endcall %}
+      {% endif %}
       {% call table_body(attrs={'data-table-body': ''}) %}
         {% for row in rows %}
           {%- set attrs = {'data-testid': row_testid, 'data-row': loop.index0} -%}
@@ -129,7 +135,7 @@
   {% if server_pagination is callable %}{{ server_pagination() }}{% endif %}
   {% if show_footer %}
   <div class="flex items-center justify-between px-2" data-slot="data-table-pagination">
-    <div class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{{ total }} rows</div>
+    {% if footer_count %}{{ footer_count() }}{% else %}<div class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{{ total }} rows</div>{% endif %}
     <div class="flex items-center space-x-6 lg:space-x-8">
       <div class="hidden items-center space-x-2 sm:flex">
         <p class="text-sm font-medium">Rows per page</p>

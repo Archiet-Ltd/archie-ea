@@ -30,10 +30,8 @@
 {%- endcall -%}
 {%- endmacro %}
 
-{% macro _selection_footer() -%}
-<div class="flex items-center px-2" data-slot="data-table-pagination">
-  <p class="flex-1 text-sm text-muted-foreground tabular-nums" data-wp-selected-count data-total="{{ work_packages|length }}">0 of {{ work_packages|length }} row(s) selected.</p>
-</div>
+{% macro _selected_count() -%}
+<p class="flex-1 text-sm text-muted-foreground tabular-nums" data-wp-selected-count data-total="{{ work_packages|length }}">0 of {{ work_packages|length }} row(s) selected.</p>
 {%- endmacro %}
 
 {% macro _select_all() -%}
@@ -79,7 +77,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 </form>
 
-{%- set columns = [{'label': _select_all(), 'class': 'w-10'}, {'label': 'Name', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Priority', 'sortable': true, 'class': 'hidden md:table-cell'}] -%}
+{%- set columns = [{'label': _select_all(), 'class': 'w-10', 'sortable': false}, {'label': 'Name', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Priority', 'sortable': true, 'class': 'hidden md:table-cell'}] -%}
 {%- if show_gaps %}{% set _ = columns.append({'label': 'Gaps', 'class': 'hidden lg:table-cell'}) %}{% endif -%}
 {%- if show_progress %}{% set _ = columns.append({'label': 'Progress', 'align': 'right', 'sortable': true}) %}{% endif -%}
 {%- if show_due %}{% set _ = columns.append({'label': 'Due', 'sortable': true}) %}{% endif -%}
@@ -89,7 +87,7 @@
                        search_placeholder='Filter work packages...', toolbar=true, toolbar_actions=_bulk_delete,
                        empty_message='No work packages yet.',
                        notice=(('Of these work packages, ' ~ _missing|join('; ') ~ '. Those cells are left empty.') if _missing else none),
-                       server_pagination=(_selection_footer if wps|length <= 50 else none)) %}
+                       footer_count=_selected_count) %}
   {% call table_cell(class='w-10') %}
     <input type="checkbox" name="ids" value="{{ wp.id }}" form="wp-bulk-form" class="size-4 accent-primary align-middle" aria-label="Select {{ wp.name or 'this work package' }}" data-wp-select>
   {% endcall %}

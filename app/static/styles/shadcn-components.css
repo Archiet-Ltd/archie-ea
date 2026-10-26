@@ -114,8 +114,8 @@
 }
 
 /* Don't double-border containers that already have border classes */
-#main-content .overflow-x-auto.border,
-#main-content .overflow-x-auto[class*="border-"] {
+#main-content .overflow-x-auto.border:not([data-slot=table-container]),
+#main-content .overflow-x-auto[class*="border-"]:not([data-slot=table-container]) {
     border: none;
 }
 
