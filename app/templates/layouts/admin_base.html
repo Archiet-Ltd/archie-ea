@@ -80,6 +80,8 @@
     <script src="{{ url_for('static', filename='js/alpine-architecture.js') }}"></script>
     {# flask-basecoat behaviour for library menus, selects, tabs and dialogs (data-slot elements only) #}
     <script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-ui.js') }}" defer></script>
+    {# the list table's filter, column visibility, sorting and paging (components/list_table.html) #}
+    <script src="{{ url_for('static', filename='js/data-table.js') }}" defer></script>
 
     <!-- Page-specific Alpine registrations (after Platform, before Alpine defer fires) -->
     {% block extra_head_js %}{% endblock %}
