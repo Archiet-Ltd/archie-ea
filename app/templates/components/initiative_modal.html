@@ -88,7 +88,6 @@
 {% call modal(id='initiative-' ~ id, title=title, size='lg') %}
     <!-- Error Alert -->
     <div x-show="error" x-cloak
-         x-transition
          class="mb-4 px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis text-sm">
         <span x-text="error"></span>
     </div>

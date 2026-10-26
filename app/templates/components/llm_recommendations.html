@@ -158,15 +158,13 @@ function llmRecommendationsComponent(dashboard) {
             
             <!-- Error Message -->
             <div x-show="error" x-cloak 
-                 class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis"
-                 x-transition>
+                 class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis">
                 <strong>Error:</strong> <span x-text="error"></span>
             </div>
             
             <!-- Recommendations List -->
             <div x-show="recommendations.length > 0" x-cloak 
-                 class="space-y-4 mt-6"
-                 x-transition>
+                 class="space-y-4 mt-6">
                 
                 <template x-for="rec in recommendations" :key="rec.id">
                     <div :class="getPriorityColor(rec.priority)" 
