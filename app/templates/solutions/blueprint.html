@@ -313,7 +313,7 @@ function archieShowBanner(msg, type) {
         ) }}
 
         {# Design score — the one figure every surface shows: "n of 10" #}
-        <div class="mb-6" id="design-score">
+        <div class="mb-6 lg:hidden" id="design-score">
             {% from 'solutions/partials/_design_score.html' import design_score_panel %}
             {{ design_score_panel(design_score, show_checks=true, links=true) }}
         </div>
