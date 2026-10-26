@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, jsonify, render_template, render_template_string, request
+from flask import current_app, flash, jsonify, redirect, render_template, render_template_string, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -122,6 +122,29 @@ def _auto_create_consolidation_for_app(app_id, score, actor_name):
 # ── Rationalization dashboard & duplicate detection ──────────────────────
 
 
+_AI_GAP_SECTIONS = {
+    "summary": "get_comprehensive_gap_summary",
+    "critical-gaps": "find_critical_gaps",
+    "rationalization": "find_rationalization_opportunities",
+    "vendor-lifecycle": "find_vendor_lifecycle_risks",
+}
+
+
+def _ai_gap_section(key):
+    """One section of the AI gap analysis for the dashboard, or {'error': True} when it cannot be read."""
+    try:
+        from app.modules.ai_chat.services.ai_gap_detection_service import AIGapDetectionService
+
+        return {"data": getattr(AIGapDetectionService(), _AI_GAP_SECTIONS[key])()}
+    except Exception as exc:
+        current_app.logger.warning("AI gap section %s could not be read: %s", key, exc)
+        try:
+            db.session.rollback()
+        except Exception as rollback_exc:
+            logger.debug("suppressed rollback error in _ai_gap_section: %s", rollback_exc)
+        return {"error": True}
+
+
 @unified_applications_bp.route("/rationalization")
 @login_required
 def rationalization_dashboard():
@@ -230,6 +253,10 @@ def rationalization_dashboard():
             ApplicationRationalizationScore.disposition_action == "insufficient_evidence"
         ).count() if time_scored_count > 0 else 0
 
+        gap_tab = request.args.get("gaps", "summary")
+        if gap_tab not in _AI_GAP_SECTIONS:
+            gap_tab = "summary"
+
         return render_template(
             "applications/rationalization/dashboard.html",
             stats=stats,
@@ -240,6 +267,8 @@ def rationalization_dashboard():
             active_tab="dashboard",
             data_quality=data_quality,
             insufficient_count=insufficient_count,
+            gap_tab=gap_tab,
+            ai_gaps=_ai_gap_section(gap_tab),
         )
     except Exception as e:
         current_app.logger.exception("Error loading rationalization dashboard: %s", e)
@@ -385,28 +414,42 @@ def rationalization_run_detection():
         UnifiedDuplicateDetectionService,
     )
 
+    from_page = bool(request.form.get("from_dashboard"))
+
+    def _reply(payload, status=200):
+        if not from_page:
+            return jsonify(payload), status
+        if payload.get("success"):
+            flash("Detection finished. New duplicate groups are listed below.", "success")
+        else:
+            flash(payload.get("error") or "Detection could not be run. Try again.", "error")
+        return redirect(url_for("unified_applications.rationalization_dashboard"))
+
     try:
-        data = request.get_json() or {}
+        data = request.form if from_page else (request.get_json() or {})
         strategy = data.get("strategy", "hybrid")
         threshold = data.get("similarity_threshold", 0.55)
+        if from_page:
+            try:
+                threshold = float(threshold)
+            except (TypeError, ValueError):
+                threshold = -1.0
 
         if strategy not in ["fast", "hybrid", "enhanced"]:
-            return jsonify({"success": False, "error": "Invalid strategy"}), 400
+            return _reply({"success": False, "error": "Invalid strategy"}, 400)
 
         if not (0.0 <= threshold <= 1.0):
-            return jsonify(
-                {"success": False, "error": "Threshold must be between 0 and 1"}
-            ), 400
+            return _reply({"success": False, "error": "Threshold must be between 0 and 1"}, 400)
 
         service = UnifiedDuplicateDetectionService()
         result = service.run_detection(
             similarity_threshold=threshold, strategy=strategy
         )
 
-        return jsonify(result)
+        return _reply(result)
     except Exception as e:
         current_app.logger.error(f"Detection error: {e}")
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+        return _reply({"success": False, "error": "An internal error occurred"}, 500)
 
 
 @unified_applications_bp.route("/rationalization/api/groups")
