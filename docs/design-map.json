@@ -21050,13 +21050,13 @@
     "components/badge.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/dialog.html",
     "components/diagram/header.html",
     "components/diagram/status_line.html",
     "components/diagram/toolbar.html",
-    "components/empty_state.html",
+    "components/dialog.html",
     "components/input.html",
-    "components/select.html"
+    "components/select.html",
+    "macros/page_shell.html"
    ],
    "original": "gap:G-4",
    "page_type": "diagram-canvas",
@@ -21075,7 +21075,31 @@
    "spec": null,
    "status": "mapped",
    "tier": "C1",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P20-inspect-side-panel",
+    "P09-form-in-dialog",
+    "P08-confirm-destructive",
+    "P29-export-share"
+   ],
+   "states": [
+    "empty-first-use",
+    "populated",
+    "confirm-error"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the finder lists every step with its lane, the List view of the process page shows each process as a table, and the canvas carries a summary aria-label."
+    },
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn’s pale border."
+    }
+   ],
+   "grid": "G4",
+   "note": "Shares the Composer shell (toolbar, rail, properties panel, status line) by the design decision of 25 Oct; the port-map fields follow the Composer’s."
   },
   "app/templates/business_architecture/processes.html": {
    "allowed_macros": [
@@ -21147,8 +21171,7 @@
     "components/badge.html",
     "components/button.html",
     "components/card.html",
-    "components/dense_table.html",
-    "components/empty_state.html",
+    "components/table.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
@@ -21169,7 +21192,20 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false,
-   "extra_macros": []
+   "extra_macros": [
+    "components/table.html"
+   ],
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "empty-first-use",
+    "populated"
+   ],
+   "departures": [],
+   "grid": "G1"
   },
   "app/templates/business_capability/overview.html": {
    "allowed_macros": [

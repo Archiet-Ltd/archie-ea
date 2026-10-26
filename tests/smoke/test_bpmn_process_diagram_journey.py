@@ -336,3 +336,67 @@ def test_the_diagram_fits_a_phone_without_hiding_the_job(browser, live_server, s
         assert errors == []
     finally:
         context.close()
+
+
+def _drawing_offset(page):
+    """Where the drawing sits in the canvas: the transform JointJS puts on its layer group."""
+    return page.evaluate("document.querySelector('[data-testid=bpmn-canvas] svg .joint-layers, [data-testid=bpmn-canvas] svg .joint-viewport').getAttribute('transform')")
+
+
+@pytest.mark.smoke
+def test_space_and_drag_pans_the_drawing_as_the_status_line_promises(browser, live_server, seeded, process_ids):
+    """The status line says "Space + drag to pan". Holding Space and dragging the canvas moves the drawing, with the
+    Select tool still active, and letting go of Space returns to selecting: the next click picks a shape."""
+    context, page, errors = _sign_in(browser, live_server, seeded)
+    try:
+        _open_diagram(page, live_server, process_ids["main"])
+        expect(page.get_by_test_id("diagram-status-line")).to_contain_text("Space")
+        page.get_by_test_id("tool-select").click()
+        before = _drawing_offset(page)
+        box = page.get_by_test_id("bpmn-canvas").bounding_box()
+        x, y = box["x"] + box["width"] - 30, box["y"] + box["height"] - 30
+        page.mouse.move(x, y)  # the pointer is over the canvas, as a person holding Space to pan has it
+        page.keyboard.down("Space")
+        page.mouse.down()
+        page.mouse.move(x - 150, y - 80, steps=10)
+        page.mouse.up()
+        page.keyboard.up("Space")
+        assert _drawing_offset(page) != before, "Space + drag did not move the drawing"
+        # Space over the canvas did not press the focused Select button either: the tool is still Select.
+        assert page.evaluate("(sel) => Alpine.$data(document.querySelector(sel)).tool", APP) == "select"
+        # Space released: a plain click selects again, and the canvas did not scroll the page.
+        _click_shape(page, "receive")
+        expect(page.get_by_test_id("status-selection")).to_contain_text("Selected:")
+        assert page.evaluate("window.scrollY") == 0
+        # The shortcuts help says the same thing as the status line.
+        page.get_by_role("button", name="Keyboard Shortcuts").click()
+        expect(page.get_by_role("dialog")).to_contain_text("Space + drag")
+        page.keyboard.press("Escape")
+        assert errors == []
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+def test_the_process_list_is_a_table_whose_every_row_opens_its_diagram(browser, live_server, seeded, process_ids):
+    """The List view is a real table (column headers a screen reader announces), each process names its owner and
+    whether it is drawn, and Open diagram lands on that process's diagram."""
+    context, page, errors = _sign_in(browser, live_server, seeded)
+    try:
+        page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        table = page.get_by_test_id("processes-table")
+        expect(table).to_be_visible()
+        for heading in ("Process", "Part of", "Owner", "Diagram"):
+            expect(table.get_by_role("columnheader", name=heading)).to_be_visible()
+        row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
+        expect(row).to_contain_text("Logistics Planner")
+        expect(row).to_contain_text("steps")
+        undrawn = page.get_by_test_id("process-row").filter(has_text=process_ids["undrawn_name"])
+        expect(undrawn).to_contain_text("Not drawn")
+        expect(undrawn).to_contain_text("No owner recorded")
+        row.get_by_role("link", name="Open diagram").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
+        assert errors == []
+    finally:
+        context.close()

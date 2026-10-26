@@ -57,7 +57,7 @@
         return {
             // state read by the shared header and status line
             viewTitle: cfg.title, activeViewpoint: 'bpmn', shellElementTotal: 0, shellRelTotal: 0, selectedNode: null,
-            statusText: 'Ready', showShortcutsModal: false,
+            statusText: 'Ready', showShortcutsModal: false, spaceHeld: false, overCanvas: false,
             saveIndicator: { tone: 'text-muted-foreground', icon: 'check', text: 'Saved' },
             // state of the editor
             canEdit: cfg.canEdit, flow: cfg.flow, urls: cfg.urls, selected: null, tool: 'select', connectFrom: null,
@@ -88,7 +88,7 @@
                 paper.on('blank:pointerdown', function (evt) { self.blankDown(evt); });
                 paper.on('element:pointerdown', function (view, evt) {
                     var kind = view.model.get('kind');
-                    if (kind === 'band' || self.tool === 'pan') { self.blankDown(evt); }
+                    if (kind === 'band' || self.tool === 'pan' || self.spaceHeld) { self.blankDown(evt); }
                 });
                 var move = function (evt) { if (panning) { var t = paper.translate(); paper.translate(t.tx + evt.clientX - panning.x, t.ty + evt.clientY - panning.y); panning = { x: evt.clientX, y: evt.clientY }; } };
                 var up = function () { panning = null; };
@@ -96,6 +96,13 @@
                 paperEl.addEventListener('dragover', function (e) { if (self.canEdit) { e.preventDefault(); } });
                 paperEl.addEventListener('drop', function (e) { self.dropFromPalette(e); });
                 document.addEventListener('keydown', function (e) { self.key(e); });
+                paperEl.addEventListener('mouseenter', function () { self.overCanvas = true; });
+                paperEl.addEventListener('mouseleave', function () { self.overCanvas = false; });
+                document.addEventListener('keyup', function (e) {
+                    if (e.code !== 'Space' || !self.spaceHeld) { return; }
+                    e.preventDefault(); self.spaceHeld = false; panning = null; paperEl.style.cursor = self.tool === 'pan' ? 'grab' : '';
+                });
+                window.addEventListener('blur', function () { self.spaceHeld = false; panning = null; });
                 window.addEventListener('resize', function () { self.resize(); });
                 window.addEventListener('beforeunload', function () { if (saveTimer) { self.flush(); } });
                 this.$nextTick(function () { self.resize(); self.draw(); self.fit(); });
@@ -267,7 +274,7 @@
             },
             blankDown: function (evt) {
                 var e = evt.originalEvent || evt;
-                if (this.tool === 'pan' || e.button === 1 || e.shiftKey) { panning = { x: e.clientX, y: e.clientY }; return; }
+                if (this.tool === 'pan' || this.spaceHeld || e.button === 1 || e.shiftKey) { panning = { x: e.clientX, y: e.clientY }; return; }
                 if (this.tool === 'connect') { this.connectFrom = null; this.highlight(); return; }
                 this.select(null);
             },
@@ -512,6 +519,13 @@
             key: function (e) {
                 var tag = (e.target && e.target.tagName || '').toLowerCase();
                 var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+                // Over the canvas Space pans whatever has focus; elsewhere a focused button or link keeps Space for itself.
+                if (e.code === 'Space' && !typing && (this.overCanvas || (tag !== 'button' && tag !== 'a'))) {
+                    // Space + drag pans, as the status line says; held down, Space must not scroll the page.
+                    e.preventDefault();
+                    if (!this.spaceHeld) { this.spaceHeld = true; paperEl.style.cursor = 'grab'; }
+                    return;
+                }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !typing) { e.preventDefault(); if (e.shiftKey) { this.redo(); } else { this.undo(); } return; }
                 if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && this.selected) { e.preventDefault(); this.deleteSelected(); }
                 if (e.key === 'Escape' && this.connectFrom) { this.connectFrom = null; this.highlight(); }

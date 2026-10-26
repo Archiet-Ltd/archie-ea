@@ -5,7 +5,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/dialog.html' import dialog %}
-{% from 'components/empty_state.html' import empty_state %}
+{% from 'macros/page_shell.html' import empty_state as shell_empty %}
 {% from 'components/diagram/header.html' import diagram_header with context %}
 {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
 {% from 'components/diagram/toolbar.html' import icon_button, toggle_item with context %}
@@ -131,7 +131,7 @@
       <div x-ref="paper" class="bpmn-paper absolute inset-0 overflow-hidden" role="img" :aria-label="'BPMN diagram of ' + viewTitle + ': ' + flow.nodes.length + ' steps, ' + flow.flows.length + ' flows'"><div x-ref="surface"></div></div>
       <div x-show="flow.nodes.length === 0" x-cloak class="pointer-events-none absolute inset-x-0 top-6 flex justify-center px-4" data-testid="bpmn-empty">
         <div class="pointer-events-auto max-w-sm rounded-lg border border-border bg-card">
-          {{ empty_state(icon='workflow', title='Nothing is drawn for this process yet', description='Add a start event from the shapes list, then the tasks that follow it. Each lane is a business role.', compact=true, padding='py-6') }}
+          {{ shell_empty(icon='workflow', headline='Nothing is drawn for this process yet', body='Add a start event from the shapes list, then the tasks that follow it. Each lane is a business role.') }}
         </div>
       </div>
     </section>
@@ -265,6 +265,7 @@
     <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
       <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Del</kbd></dt><dd>Delete the selected shape, flow or lane</dd>
       <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Ctrl</kbd>+<kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Z</kbd></dt><dd>Undo</dd>
+      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Space</kbd> + drag</dt><dd>Pan the drawing, with any tool</dd>
       <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Shift</kbd> + drag</dt><dd>Pan the drawing</dd>
       <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Esc</kbd></dt><dd>Stop connecting</dd>
     </dl>
