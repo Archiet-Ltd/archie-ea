@@ -98,7 +98,7 @@ def emit_coverage_matrix_html(slice_dict: dict) -> str:
         parts.append('</div>')
         return "".join(parts)
 
-    parts.append('<div class="overflow-x-auto border border-border rounded-lg">')
+    parts.append('<div class="overflow-x-auto border border-border rounded-lg" tabindex="0" role="region" aria-label="Capability coverage matrix">')
     parts.append('<table class="border-collapse text-xs">')
 
     # Header row: application names as columns.

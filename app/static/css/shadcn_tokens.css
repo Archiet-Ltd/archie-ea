@@ -7,7 +7,13 @@
 @layer base {
   /* Native controls (select lists, date pickers, scrollbars) follow the theme. Without this a <select> with no
      background class painted light grey (239,239,239) under near-white text in dark mode. */
-  :root { color-scheme: light; }
+  :root {
+    --heat-1: 0 84% 60%;
+    --heat-2: 25 95% 53%;
+    --heat-3: 45 93% 47%;
+    --heat-4: 84 81% 44%;
+    --heat-5: 142 71% 45%;
+    --heat-foreground: 0 0% 0%;  /* black on every level: 5.6 or better */ color-scheme: light; }
   .dark { color-scheme: dark; }
   /* Every native select, text input and textarea reads the surface and foreground tokens, so a control with no
      background class is the page colour in both themes (it was the browser's pale grey under light text in dark).

@@ -483,7 +483,7 @@
                 <button type="button"
                      class="${cs.bg} border-2 ${cs.border} rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer text-left w-full"
                      data-domain-filter="${escapeAttr(domain.key)}"
-                     aria-label="Filter capabilities to ${escapeHtml(domain.name)}">
+                     title="Filter capabilities to ${escapeHtml(domain.name)}">
                     <div class="flex items-start justify-between mb-3">
                         ${domain.code && domain.code !== 'N/A'
                             ? `<span class="text-xs font-bold ${cs.textBold} ${cs.badge} px-2 py-0.5 rounded">${escapeHtml(domain.code)}</span>`

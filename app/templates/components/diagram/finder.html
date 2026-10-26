@@ -19,7 +19,7 @@
   <ul class="min-h-0 flex-1 overflow-y-auto p-2" data-testid="finder-list">
     <template x-for="row in finderRows" :key="row.id">
       <li>
-        {% call button(variant='ghost', size='sm', class='h-auto w-full justify-start gap-2 px-2 py-1 text-left font-normal', attrs_dict={'@click': 'shellFocus(row.id)', ':data-testid': '\'finder-row-\' + row.id', ':aria-label': '\'Show \' + row.name + \' on the diagram\''}) %}
+        {% call button(variant='ghost', size='sm', class='h-auto w-full justify-start gap-2 px-2 py-1 text-left font-normal', attrs_dict={'@click': 'shellFocus(row.id)', ':data-testid': '\'finder-row-\' + row.id', ':title': '\'Show \' + row.name + \' on the diagram\''}) %}
           <span class="flex w-full min-w-0 items-center gap-2 text-left">
             {{ notation_swatch('row.elType', 'row.layer') }}
             <span class="flex min-w-0 flex-col">
