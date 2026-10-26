@@ -32,8 +32,7 @@
          style="scroll-padding-inline-end: 28px;">
         {% for layer_key, layer_info in layer_config.items() %}
         <a href="{{ url_for('archimate_crud.dashboard', layer=layer_key) }}"
-           aria-label="Open {{ layer_info.title }}"
-           title="{{ layer_info.title }}"
+                      title="{{ layer_info.title }}"
            {% if layer_key == selected_layer.key %}aria-current="page"{% endif %}
            {% if layer_key == selected_layer.key %}style="border-left-color: hsl(var({{ layer_info.color_token }}));"{% endif %}
            class="flex shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border-l-4 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {% if layer_key == selected_layer.key %}border-y border-r border-border bg-muted/50 text-foreground{% else %}border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground{% endif %}">
@@ -136,13 +135,13 @@
                 <button type="button" @click="groupByType = !groupByType; collapsedTypes = {}"
                         :aria-pressed="groupByType.toString()"
                         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                        aria-label="Toggle grouping architecture elements by type">
+                        title="Toggle grouping architecture elements by type">
                     <i data-lucide="rows-3" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     <span x-text="groupByType ? 'Table' : 'Group'">Group</span>
                 </button>
                 <button type="button" x-cloak x-show="hasAltView" @click="toggleViewMode()"
                         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                        :aria-label="currentViewMode === 'table' ? 'Open layer-specific architecture view' : 'Return to architecture table'">
+                        :title="currentViewMode === 'table' ? 'Open layer-specific architecture view' : 'Return to architecture table'">
                     <i :data-lucide="currentViewMode === 'table' ? 'layout-grid' : 'list'" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     <span x-text="currentViewMode === 'table' ? 'Rich view' : 'Table'">Rich view</span>
                 </button>
@@ -296,7 +295,7 @@
                             <td class="px-4 py-3 text-center" data-field="element-wsjf"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.wsjf_score !== undefined && el.wsjf_score !== null ? el.wsjf_score : '—'"></span></td>
                             <td class="px-4 py-3" data-field="element-actions">
                                 <div class="flex items-center justify-end gap-1">
-                                    <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open full detail for ' + el.name">View</a>
+                                    <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'View full detail for ' + el.name">View</a>
                                     <button type="button" @click="openEditModal(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Edit ' + el.name">Edit</button>
                                     <button type="button" @click="confirmDelete(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50" :aria-label="'Delete ' + el.name">Delete</button>
                                 </div>
@@ -324,7 +323,7 @@
                            with names that read as synonyms. Labelled to match what each actually
                            does — the aria-labels already said this; the visible text didn't. #}
                         <button type="button" @click="openDetailPanel(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open details for ' + el.name">Quick View</button>
-                        <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open full detail for ' + el.name">Full Detail</a>
+                        <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'View full detail for ' + el.name">Full Detail</a>
                         <button type="button" @click="openEditModal(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Edit ' + el.name">Edit</button>
                         <button type="button" @click="confirmDelete(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50" :aria-label="'Delete ' + el.name">Delete</button>
                     </div>

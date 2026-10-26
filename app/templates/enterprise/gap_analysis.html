@@ -112,7 +112,7 @@
                         <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                 @click='convertToWorkPackage({{ gap.id }}, {{ (gap.name|default("this gap"))|tojson }})' 
                                 :disabled="busyId === {{ gap.id }} || convertedIds.includes({{ gap.id }})"
-                                aria-label="Convert this gap to a work package">
+                                title="Convert this gap to a work package">
                             <span x-show="busyId !== {{ gap.id }} && !convertedIds.includes({{ gap.id }})">Convert to Work Package</span>
                             <span x-show="busyId === {{ gap.id }}">Converting…</span>
                             <span x-show="busyId !== {{ gap.id }} && convertedIds.includes({{ gap.id }})">Converted</span>
