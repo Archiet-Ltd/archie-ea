@@ -156,8 +156,8 @@ def total_in_reporting_currency(organization_id: int, reporting_currency: Option
     ``amount`` is None (shown as missing) when the facts span currencies with
     no rate on file for their period; a sum is never returned on a guess.
     """
-    from app.services.application_cost_accessor import get_reporting_currency
+    from config import CurrencyConfig
     from app.services.currency_service import convert_total
 
-    reporting = reporting_currency or get_reporting_currency(organization_id)
+    reporting = reporting_currency or CurrencyConfig.get_org_currency_code(organization_id=organization_id)
     return convert_total(list_facts(organization_id, **filters), reporting)
