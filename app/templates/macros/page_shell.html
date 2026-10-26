@@ -55,8 +55,9 @@
   {%- if _last[1] and _last[1].split('?')[0] == _where.path -%}
     {#- the entry's own page; a record chosen on it (?initiative=) stays as the last crumb -#}
     {#- one name per page: the heading of a sidebar entry's own page is the name the sidebar gives it -#}
+    {%- set _given = title or '' -%}
     {%- set title = _last[0] -%}
-    {%- if _own|length > 1 and (_own[-1][0]|lower) not in (title|lower) -%}
+    {%- if _own|length > 1 and (_own[-1][0]|lower) not in (title|lower) and (_own[-1][0]|lower) not in (_given|lower) -%}
       {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [(_own[-1][0], none)] -%}
     {%- else -%}
       {%- set breadcrumb = [('Home', _where.home)] + _where.trail[:-1] + [(_last[0], none)] -%}
