@@ -31,5 +31,11 @@
                   {{ 'border-primary text-primary' if active_tab == 'enrich' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}">
             <i data-lucide="database" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>Enrich
         </a>
+        <a href="{{ url_for('unified_applications.rationalization_gaps') }}"
+           class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors duration-200
+                  {{ 'border-primary text-primary' if active_tab == 'gaps' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}"
+           data-testid="rationalization-gaps-tab">
+            <i data-lucide="search" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>Gap findings
+        </a>
     </div>
 </nav>

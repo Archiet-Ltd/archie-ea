@@ -122,29 +122,6 @@ def _auto_create_consolidation_for_app(app_id, score, actor_name):
 # ── Rationalization dashboard & duplicate detection ──────────────────────
 
 
-_AI_GAP_SECTIONS = {
-    "summary": "get_comprehensive_gap_summary",
-    "critical-gaps": "find_critical_gaps",
-    "rationalization": "find_rationalization_opportunities",
-    "vendor-lifecycle": "find_vendor_lifecycle_risks",
-}
-
-
-def _ai_gap_section(key):
-    """One section of the AI gap analysis for the dashboard, or {'error': True} when it cannot be read."""
-    try:
-        from app.modules.ai_chat.services.ai_gap_detection_service import AIGapDetectionService
-
-        return {"data": getattr(AIGapDetectionService(), _AI_GAP_SECTIONS[key])()}
-    except Exception as exc:
-        current_app.logger.warning("AI gap section %s could not be read: %s", key, exc)
-        try:
-            db.session.rollback()
-        except Exception as rollback_exc:
-            logger.debug("suppressed rollback error in _ai_gap_section: %s", rollback_exc)
-        return {"error": True}
-
-
 @unified_applications_bp.route("/rationalization")
 @login_required
 def rationalization_dashboard():
@@ -273,10 +250,6 @@ def rationalization_dashboard():
             ApplicationRationalizationScore.disposition_action == "insufficient_evidence"
         ).count() if time_scored_count > 0 else 0
 
-        gap_tab = request.args.get("gaps", "summary")
-        if gap_tab not in _AI_GAP_SECTIONS:
-            gap_tab = "summary"
-
         return render_template(
             "applications/rationalization/dashboard.html",
             stats=stats,
@@ -287,8 +260,6 @@ def rationalization_dashboard():
             active_tab="dashboard",
             data_quality=data_quality,
             insufficient_count=insufficient_count,
-            gap_tab=gap_tab,
-            ai_gaps=_ai_gap_section(gap_tab),
         )
     except Exception as e:
         current_app.logger.exception("Error loading rationalization dashboard: %s", e)
@@ -4251,6 +4222,53 @@ def api_check_duplicate_element(app_id):
         return jsonify(
             {"success": False, "error": "Could not check for a duplicate element"}
         ), 500
+
+
+# ── Gap findings: the AI gap analysis, one list at a time ────────────────
+
+_AI_GAP_SECTIONS = {
+    "summary": "get_comprehensive_gap_summary",
+    "critical-gaps": "find_critical_gaps",
+    "uncovered": "find_uncovered_capabilities",
+    "rationalization": "find_rationalization_opportunities",
+    "vendor-lifecycle": "find_vendor_lifecycle_risks",
+}
+_GAP_TABS = [("critical-gaps", "Critical gaps"), ("uncovered", "Capabilities no application covers"),
+             ("rationalization", "Rationalization opportunities"),
+             ("vendor-lifecycle", "Vendor lifecycle risks")]
+
+
+def _ai_gap_section(key):
+    """One section of the AI gap analysis, or {'error': True} when it cannot be read."""
+    try:
+        from app.modules.ai_chat.services.ai_gap_detection_service import AIGapDetectionService
+
+        return {"data": getattr(AIGapDetectionService(), _AI_GAP_SECTIONS[key])()}
+    except Exception as exc:
+        current_app.logger.warning("AI gap section %s could not be read: %s", key, exc)
+        try:
+            db.session.rollback()
+        except Exception as rollback_exc:
+            logger.debug("suppressed rollback error in _ai_gap_section: %s", rollback_exc)
+        return {"error": True}
+
+
+@unified_applications_bp.route("/rationalization/gaps")
+@login_required
+def rationalization_gaps():
+    """Gap findings: the four headline counts, and the list behind the one the person opens."""
+    gap_tab = request.args.get("gaps", "critical-gaps")
+    if gap_tab not in dict(_GAP_TABS):
+        gap_tab = "critical-gaps"
+    return render_template(
+        "applications/rationalization/gaps.html",
+        active_tab="gaps",
+        gap_tabs=_GAP_TABS,
+        gap_tab=gap_tab,
+        gap_label=dict(_GAP_TABS)[gap_tab],
+        summary=_ai_gap_section("summary"),
+        gaps=_ai_gap_section(gap_tab),
+    )
 
 
 # ── RAT-001: Bulk data enrichment page and API ───────────────────────────

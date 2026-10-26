@@ -2,9 +2,7 @@
 {# design-block: dashboard #}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/figures.html' import stat_cards, state_badge %}
-{% from 'components/list_table.html' import list_table %}
-{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/figures.html' import stat_cards, section %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 {% block title %}Application rationalization{% endblock %}
 
@@ -40,16 +38,18 @@
 
 {% macro _to_applications() %}{% call ui.button(href=url_for('unified_applications.application_list')) %}{{ lucide('layers') }}Go to applications{% endcall %}{% endmacro %}
 
+{#- The page's one primary button: scoring the portfolio. -#}
 {% macro _score_button(text='Score portfolio', variant='default') -%}
 {% call ui.button(type='button', variant=variant, size='sm', attrs={'@click': 'scorePortfolio', ':disabled': 'isScoring', 'data-testid': 'score-portfolio'}) %}
   <span x-show="isScoring" x-cloak class="inline-flex animate-spin">{{ lucide('loader-circle') }}</span>{{ text }}
 {% endcall %}
 {%- endmacro %}
 
-{#- The business case export: one place, in the page header, once anything is scored. -#}
-{% macro _export_actions() -%}
-{% if stats and stats.time_scored_count %}
+{#- Header actions: the business-case export once anything is scored, and one menu for everything else. -#}
+{% macro _header_actions() -%}
+{%- set is_scored = stats and stats.time_scored_count -%}
 <div class="flex items-center gap-2">
+  {% if is_scored %}
   {% call native_select_wrapper() %}
     {% call native_select(size='sm', attrs={'aria-label': 'Export format', 'x-model': 'exportFormat'}) %}
       {{ native_select_option(text='Excel workbook', value='excel', selected=true) }}
@@ -58,15 +58,39 @@
     {% endcall %}
   {% endcall %}
   {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'doExport', ':disabled': 'exportLoading', 'data-testid': 'export-business-case'}) %}{{ lucide('download') }}Export business case{% endcall %}
+  {% endif %}
+  {% if stats %}
+  {% call ui.dropdown_menu() %}
+    {% call ui.dropdown_menu_trigger(variant='outline', size='icon', class='size-8', attrs={'data-testid': 'rationalization-more'}) %}{{ lucide('ellipsis') }}<span class="sr-only">More actions</span>{% endcall %}
+    {% call ui.dropdown_menu_content(align='end', class='w-56') %}
+      {% if is_scored %}
+      {{ ui.dropdown_menu_item(text='Score again', tag='button', type='button', class='w-full', attrs={'@click': 'scorePortfolio', ':disabled': 'isScoring'}) }}
+      <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" data-testid="run-detection-menu-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="from_dashboard" value="1">
+        <input type="hidden" name="strategy" value="hybrid">
+        <input type="hidden" name="similarity_threshold" value="0.55">
+        {{ ui.dropdown_menu_item(text='Run detection again', tag='button', type='submit', class='w-full') }}
+      </form>
+      {% endif %}
+      {% if stats.duplicate_groups %}
+      {{ ui.dropdown_menu_item(text='Resolve exact matches', tag='button', type='button', class='w-full', attrs={'@click': 'autoResolveExact', ':disabled': 'autoResolveLoading'}) }}
+      {% endif %}
+      {% if is_scored or stats.duplicate_groups %}{{ ui.dropdown_menu_separator() }}{% endif %}
+      {{ ui.dropdown_menu_item(text='Review duplicate groups', href=url_for('unified_duplicate.duplicate_dashboard')) }}
+      {{ ui.dropdown_menu_item(text='Open the consolidation list', href='/consolidation-list') }}
+      {{ ui.dropdown_menu_item(text='Capability gaps', href=url_for('enterprise.gap_analysis'), attrs={'data-testid': 'rationalization-gaps-link'}) }}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
 </div>
-{% endif %}
 {%- endmacro %}
 
 {% block content %}
 <div class="p-6 space-y-6" x-data="rationalizationDashboard()" x-init="load">
 {{ page_shell(title='Application rationalization', subtitle='Find applications that do the same job, score them and plan what to keep, merge or retire',
               breadcrumb=[('Home', url_for('main.index')), ('Applications', url_for('unified_applications.application_list')), ('Rationalization', none)],
-              actions_caller=_export_actions) }}
+              actions_caller=_header_actions) }}
 
 {% include 'applications/rationalization/_sub_nav.html' %}
 
@@ -87,181 +111,36 @@
 {%- set scored = stats.time_scored_count or 0 -%}
 {%- set groups_found = stats.duplicate_groups or 0 -%}
 {%- set insuf = insufficient_count or 0 -%}
-
-{# ── One card before the figures: getting started, or how far the portfolio has come ── #}
-{% if scored == 0 %}
-{% call ui.card(attrs={'data-testid': 'rationalization-get-started'}) %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='Get started') }}
-    {{ ui.card_description(text='Four steps take your portfolio from a list of applications to a plan for what to keep, merge or retire.') }}
-  {% endcall %}
-  {% call ui.card_content() %}
-    <ol class="divide-y">
-      {% set steps = [
-        ('Score your portfolio', 'Score all ' ~ total ~ ' applications against the TIME framework: tolerate, invest, migrate or eliminate.', 'score', none),
-        ('Review possible duplicates', (groups_found ~ (' group' if groups_found == 1 else ' groups') ~ ' of applications that may do the same job.') if groups_found else 'Run detection to find applications that may do the same job.', 'Open workbench', url_for('unified_applications.rationalization_workbench')),
-        ('Add dependencies', 'Record what depends on each application so retiring one is safe.', 'Add dependencies', url_for('unified_applications.rationalization_tracking') ~ '#dependencies'),
-        ('Plan consolidations', 'Put the applications to merge on the consolidation list and see what that saves.', 'Open consolidation list', '/consolidation-list'),
-      ] %}
-      {% for title, sentence, action, href in steps %}
-      <li class="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-start gap-3">
-          <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">{{ loop.index }}</span>
-          <div>
-            <p class="text-sm font-medium">{{ title }}</p>
-            <p class="text-sm text-muted-foreground">{{ sentence }}</p>
-          </div>
-        </div>
-        <div class="shrink-0 sm:pl-4">
-          {% if action == 'score' %}{{ _score_button() }}
-          {% else %}{{ ui.button(text=action, href=href, variant='outline', size='sm') }}{% endif %}
-        </div>
-      </li>
-      {% endfor %}
-    </ol>
-    <p class="mt-4 text-sm text-muted-foreground" x-show="scoringResult && !scoringResult.success" x-cloak role="alert">Scoring did not finish. Try again in a moment.</p>
-  {% endcall %}
-{% endcall %}
-{% else %}
-{% call ui.card(attrs={'data-testid': 'rationalization-progress'}) %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='Progress') }}
-    {{ ui.card_description(text='How far your portfolio has moved from finding duplicates to a tracked plan') }}
-    {% call ui.card_action() %}{{ _score_button('Score again', 'outline') }}{% endcall %}
-  {% endcall %}
-  {% call ui.card_content() %}
-    <ol class="grid grid-cols-2 gap-4 md:grid-cols-4">
-      {% for label, value, sentence, href in [
-          ('Detect', groups_found ~ (' group' if groups_found == 1 else ' groups'), 'of possible duplicates', url_for('unified_duplicate.duplicate_dashboard')),
-          ('Score', scored ~ ' of ' ~ total, 'applications scored', url_for('unified_applications.rationalization_workbench')),
-          ('Plan', (stats.consolidation_count or 0) ~ ' of ' ~ total, 'applications on the consolidation list', '/consolidation-list'),
-          ('Roadmap', (stats.roadmap_count or 0) ~ ((' item') if stats.roadmap_count == 1 else ' items'), 'on the roadmap, tracked to completion', url_for('unified_applications.rationalization_tracking')),
-        ] %}
-      <li>
-        <a href="{{ href }}" class="block rounded-lg border p-4 hover:bg-accent">
-          <span class="text-sm text-muted-foreground">{{ loop.index }}. {{ label }}</span>
-          <span class="mt-1 block text-lg font-semibold tabular-nums">{{ value }}</span>
-          <span class="block text-sm text-muted-foreground">{{ sentence }}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ol>
-  {% endcall %}
-{% endcall %}
-{% endif %}
-
-{# ── Headline figures ── #}
-{%- set resolved = stats.resolved_groups or 0 -%}
 {%- set savings = stats.estimated_savings or 0 -%}
 {%- set decom = stats.decommissioned_applications or 0 -%}
-{%- set cards = [
-  {'label': 'Applications', 'value': total, 'icon': 'layers', 'href': url_for('unified_applications.application_list'), 'testid': 'stat-total-apps',
-   'sentence': ('Plus ' ~ decom ~ ' decommissioned') if decom else 'In use across your portfolio'},
-  {'label': 'Possible duplicate groups', 'value': groups_found, 'icon': 'copy', 'href': url_for('unified_duplicate.duplicate_dashboard'), 'testid': 'stat-duplicate-groups',
-   'sentence': (((stats.pending_groups or 0) ~ ' waiting for a decision') if stats.pending_groups else 'Every group has a decision') if groups_found else 'Run detection to look for them'},
-  {'label': 'Scored', 'value': scored ~ ' of ' ~ total, 'icon': 'chart-bar', 'href': url_for('unified_applications.rationalization_workbench'), 'testid': 'stat-scored',
-   'sentence': ((insuf ~ ' need more evidence before a decision') if insuf else 'Each has enough evidence for a decision') if scored else 'Score the portfolio to see health'},
-  {'label': 'Estimated savings a year', 'value': _money(savings), 'icon': 'piggy-bank', 'testid': 'stat-savings',
-   'sentence': 'From duplicate groups and the consolidation list' if savings > 0 else 'Appears once duplicates carry a cost'},
-] -%}
-{{ stat_cards(cards) }}
 
-{# ── Health, disposition and the TIME quadrant, once anything is scored ── #}
-{% if scored %}
-<div class="grid gap-4 md:grid-cols-2">
-  {% for title, description, key in [('Health', 'Applications by overall health score', 'health_distribution'), ('Disposition', 'What the scores recommend for each application', 'disposition_breakdown')] %}
-  {% call ui.card() %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text=title) }}
-      {{ ui.card_description(text=description) }}
-    {% endcall %}
-    {% call ui.card_content() %}
-      <div x-show="execSummary.loaded" x-cloak class="space-y-3">
-        <template x-for="(item, idx) in execSummary.{{ key }}" :key="idx">
-          <div class="flex items-center gap-3 text-sm">
-            <span class="w-28 shrink-0 text-muted-foreground" x-text="item.label"></span>
-            <progress class="h-2 flex-1 overflow-hidden rounded-full accent-primary" max="100" :value="item.pct"></progress>
-            <span class="w-8 text-right font-medium tabular-nums" x-text="item.count"></span>
-          </div>
-        </template>
-        {% if loop.first %}
-        <p class="text-sm text-muted-foreground"><span class="font-medium text-foreground tabular-nums" x-text="execSummary.decision_ready_count"></span> ready for a decision</p>
-        {% endif %}
+{# ── Getting started, only while nothing is scored: detection and consolidation live in their steps ── #}
+{% if scored == 0 %}
+{% call section('Get started', 'Four steps take your portfolio from a list of applications to a plan for what to keep, merge or retire.', testid='rationalization-get-started') %}
+  <ol class="divide-y">
+    <li class="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">1</span>
+        <div>
+          <p class="text-sm font-medium">Score your portfolio</p>
+          <p class="text-sm text-muted-foreground">Score all {{ total }} applications against the TIME framework: tolerate, invest, migrate or eliminate.</p>
+          <p class="text-sm text-destructive" x-show="scoringResult && !scoringResult.success" x-cloak role="alert">Scoring did not finish. Try again in a moment.</p>
+        </div>
       </div>
-      <div x-show="!execSummary.loaded && !execSummary.error" class="space-y-3" role="status">
-        {{ ui.skeleton(class='h-4 w-full') }}{{ ui.skeleton(class='h-4 w-4/5') }}{{ ui.skeleton(class='h-4 w-3/5') }}
+      <div class="shrink-0 sm:pl-4">{{ _score_button() }}</div>
+    </li>
+    <li class="space-y-3 py-4">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">2</span>
+        <div>
+          <p class="text-sm font-medium">Find possible duplicates</p>
+          <p class="text-sm text-muted-foreground" data-testid="rationalization-last-run">
+            {% if latest_run %}Last run {{ latest_run.created_at.strftime('%d %b %Y') if latest_run.created_at else 'on a date not recorded' }}: {{ groups_found }} {{ 'group' if groups_found == 1 else 'groups' }} of applications that may do the same job.
+            {% else %}Not run yet. Detection compares names, acronyms and business context to find applications that may do the same job.{% endif %}
+          </p>
+        </div>
       </div>
-      <div x-show="execSummary.error" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground" role="alert">
-        <span>These figures could not be loaded.</span>
-        {{ ui.button(text='Try again', type='button', variant='link', size='sm', class='h-auto p-0', attrs={'@click': 'load'}) }}
-      </div>
-    {% endcall %}
-  {% endcall %}
-  {% endfor %}
-</div>
-
-{% call ui.card() %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='TIME quadrant') }}
-    {{ ui.card_description(text='Each application by business value and technical health: tolerate, invest, migrate or eliminate') }}
-  {% endcall %}
-  {% call ui.card_content() %}
-    <template x-if="hasScores">
-      <div class="relative h-[400px]"><canvas id="timeQuadrantChart" aria-label="TIME quadrant chart"></canvas></div>
-    </template>
-  {% endcall %}
-{% endcall %}
-{% endif %}
-
-{# ── Data quality ── #}
-{% set fc = (data_quality or {}).get('field_coverage', {}) or {} %}
-{% call ui.card(attrs={'data-testid': 'data-quality'}) %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='Data quality') }}
-    {{ ui.card_description(text='How much of your portfolio has each field filled in') }}
-  {% endcall %}
-  {% call ui.card_content(class='space-y-3') %}
-    {% for label, key in [('Cost', 'cost'), ('Owner', 'owner'), ('Vendor', 'vendor'), ('Risk', 'risk'), ('Lifecycle', 'lifecycle')] %}
-    {%- set pct = fc.get(key) if key == 'vendor' else (fc.get(key) or 0) -%}
-    <div class="flex items-center gap-3 text-sm">
-      <span class="w-28 shrink-0 text-muted-foreground">{{ label }}</span>
-      {% if pct is not none %}
-      {%- set p = [[pct|round|int, 0]|max, 100]|min -%}
-      {% call ui.progress(value=p, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': label ~ ' coverage', 'role': 'progressbar', 'aria-valuemin': '0'}) %}{{ ui.progress_indicator(value=p) }}{% endcall %}
-      <span class="w-24 text-right font-medium tabular-nums">{{ pct|round|int }}%</span>
-      {% else %}
-      <span class="flex-1 text-muted-foreground">Not measured yet</span>
-      {% endif %}
-    </div>
-    {% endfor %}
-    {% if insuf > 0 and insuf >= scored %}
-    <div class="flex flex-col gap-2 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <p class="text-muted-foreground"><span class="font-medium text-foreground">{{ insuf }} of {{ scored }} scored applications</span> need more data before a decision can be made.</p>
-      {{ ui.button(text='Start enrichment', href='/applications/rationalization/enrich', variant='outline', size='sm') }}
-    </div>
-    {% endif %}
-  {% endcall %}
-{% endcall %}
-
-{# ── Detection and consolidation ── #}
-<div class="grid gap-4 md:grid-cols-2">
-  {% call ui.card() %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text='Detection') }}
-      {{ ui.card_description(text='The latest search for applications that do the same job') }}
-      {% call ui.card_action() %}{{ ui.button(text='Review groups', href=url_for('unified_duplicate.duplicate_dashboard'), variant='outline', size='sm') }}{% endcall %}
-    {% endcall %}
-    {% call ui.card_content(class='space-y-4') %}
-      {% if latest_run %}
-      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt class="text-muted-foreground">Last run</dt><dd class="whitespace-nowrap">{{ latest_run.created_at.strftime('%d %b %Y, %H:%M') if latest_run.created_at else 'Date not recorded' }}</dd>
-        <dt class="text-muted-foreground">Strategy</dt><dd>{{ (latest_run.strategy or 'not recorded')|capitalize }}</dd>
-        <dt class="text-muted-foreground">Groups found</dt><dd class="tabular-nums">{{ latest_run.total_duplicates_found or stats.total_groups or 0 }}</dd>
-      </dl>
-      {% else %}
-      <p class="text-sm text-muted-foreground">Detection has not been run yet.</p>
-      {% endif %}
-      <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" class="grid gap-4 border-t pt-4 sm:grid-cols-2" data-testid="run-detection-form">
+      <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" class="grid gap-3 pl-11 sm:grid-cols-[1fr_1fr_auto] sm:items-end" data-testid="run-detection-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="from_dashboard" value="1">
         {% call ui.field() %}
@@ -284,81 +163,109 @@
             {% endcall %}
           {% endcall %}
         {% endcall %}
-        <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-          {% call ui.button(type='submit', size='sm') %}{{ lucide('search') }}Run detection{% endcall %}
-          {% if groups_found %}
-          {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'autoResolveExact', ':disabled': 'autoResolveLoading'}) %}{{ lucide('check') }}Resolve exact matches{% endcall %}
-          {% endif %}
+        <div class="flex items-center gap-2">
+          {% call ui.button(type='submit', variant='outline', size='sm') %}{{ lucide('search') }}Run detection{% endcall %}
+          {% if groups_found %}{{ ui.button(text='Review groups', href=url_for('unified_duplicate.duplicate_dashboard'), variant='outline', size='sm') }}{% endif %}
         </div>
       </form>
-    {% endcall %}
-  {% endcall %}
-  {% call ui.card() %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text='Consolidation') }}
-      {{ ui.card_description(text='Applications planned to be merged or retired') }}
-      {% call ui.card_action() %}{{ ui.button(text='Open list', href='/consolidation-list', variant='outline', size='sm') }}{% endcall %}
-    {% endcall %}
-    {% call ui.card_content() %}
-      {% if stats.consolidation_count %}
-      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt class="text-muted-foreground">On the list</dt><dd class="tabular-nums">{{ stats.consolidation_count }}</dd>
-        <dt class="text-muted-foreground">On the roadmap</dt><dd class="tabular-nums">{{ stats.roadmap_count or 0 }}</dd>
-      </dl>
-      {% else %}
-      <p class="text-sm text-muted-foreground">Nothing is planned yet. Review the duplicate groups, then add the applications to merge to the list.</p>
-      {% endif %}
-    {% endcall %}
-  {% endcall %}
-</div>
-
-{# ── AI gap analysis: one section at a time, read when the person opens it ── #}
-{%- set gap_tabs = [('summary', 'Summary'), ('critical-gaps', 'Critical gaps'), ('rationalization', 'Rationalization opportunities'), ('vendor-lifecycle', 'Vendor lifecycle risks')] -%}
-{%- set gap_tab = gap_tab|default('summary') -%}
-{%- set gaps = ai_gaps|default(none) -%}
-{% call ui.card(id='ai-gap-panel', attrs={'data-testid': 'ai-gap-panel'}) %}
-  {% call ui.card_header() %}
-    {{ ui.card_title(text='Gap analysis') }}
-    {{ ui.card_description(text='Capability gaps, rationalization opportunities and vendor lifecycle risks found in your model') }}
-  {% endcall %}
-  {% call ui.card_content(class='space-y-4') %}
-    <nav class="flex flex-wrap gap-1" aria-label="Gap analysis sections">
-      {% for key, label in gap_tabs %}
-      {{ ui.button(text=label, href=url_for('unified_applications.rationalization_dashboard', gaps=key) ~ '#ai-gap-panel', variant=('secondary' if key == gap_tab else 'ghost'), size='sm', attrs=({'aria-current': 'page'} if key == gap_tab else {})) }}
-      {% endfor %}
-    </nav>
-    {% if not gaps or gaps.error %}
-      <p class="text-sm text-muted-foreground" role="alert">This section could not be read. Reload the page to try again.</p>
-    {% elif gap_tab == 'summary' %}
-      {%- set g = gaps.data or {} -%}
-      <dl class="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {% for label, key in [('Critical gaps', 'critical_gaps'), ('Capabilities no application covers', 'no_coverage_count'), ('Rationalization opportunities', 'rationalization_opportunities'), ('Vendor lifecycle risks', 'vendor_lifecycle_risks')] %}
-        <div class="rounded-lg border p-4">
-          <dt class="text-sm text-muted-foreground">{{ label }}</dt>
-          <dd class="mt-1 text-2xl font-semibold tabular-nums">{{ g.get(key) if g.get(key) is not none else 0 }}</dd>
+    </li>
+    <li class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">3</span>
+        <div>
+          <p class="text-sm font-medium">Add dependencies</p>
+          <p class="text-sm text-muted-foreground">Record what depends on each application so retiring one is safe.</p>
         </div>
-        {% endfor %}
-      </dl>
-    {% elif gap_tab == 'critical-gaps' %}
-      {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), ('Severity', '')], caption='Critical capability gaps', testid='critical-gaps-table', row_testid='critical-gap-row',
-                               search_placeholder='Filter gaps...', empty_message='No critical gaps found. Every critical capability has an application behind it.') %}
-        {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.capability_name or item.name or 'Unnamed capability' }}{% endcall %}
-        {% call table_cell() %}{{ state_badge(item.gap_severity or item.urgency_level) }}{% endcall %}
-      {% endcall %}
-    {% elif gap_tab == 'rationalization' %}
-      {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), {'label': 'Estimated savings a year', 'align': 'right', 'sortable': true}], caption='Rationalization opportunities', testid='rationalization-opportunities-table', row_testid='rationalization-opportunity-row',
-                               search_placeholder='Filter opportunities...', empty_message='No opportunities found. No capability is served by more than one application.') %}
-        {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.capability_name or item.name or 'Unnamed capability' }}{% endcall %}
-        {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': item.estimated_annual_savings if item.estimated_annual_savings is not none else -1}) %}{% if item.estimated_annual_savings is not none %}{{ item.estimated_annual_savings|format_currency }}{% else %}<span class="text-muted-foreground">Not estimated</span>{% endif %}{% endcall %}
-      {% endcall %}
+      </div>
+      <div class="shrink-0 sm:pl-4">{{ ui.button(text='Add dependencies', href=url_for('unified_applications.rationalization_tracking') ~ '#dependencies', variant='outline', size='sm') }}</div>
+    </li>
+    <li class="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">4</span>
+        <div>
+          <p class="text-sm font-medium">Plan consolidations</p>
+          <p class="text-sm text-muted-foreground" data-testid="rationalization-consolidation-counts">
+            {% if stats.consolidation_count %}{{ stats.consolidation_count }} on the consolidation list, {{ stats.roadmap_count or 0 }} on the roadmap.
+            {% else %}Put the applications to merge on the consolidation list and see what that saves.{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="shrink-0 sm:pl-4">{{ ui.button(text='Open consolidation list', href='/consolidation-list', variant='outline', size='sm') }}</div>
+    </li>
+  </ol>
+{% endcall %}
+{% endif %}
+
+{# ── Headline figures ── #}
+{%- set cards = [
+  {'label': 'Applications', 'value': total, 'icon': 'layers', 'href': url_for('unified_applications.application_list'), 'testid': 'stat-total-apps',
+   'sentence': ('Plus ' ~ decom ~ ' decommissioned') if decom else 'In use across your portfolio'},
+  {'label': 'Possible duplicate groups', 'value': groups_found, 'icon': 'copy', 'href': url_for('unified_duplicate.duplicate_dashboard'), 'testid': 'stat-duplicate-groups',
+   'sentence': (((stats.pending_groups or 0) ~ ' waiting for a decision') if stats.pending_groups else 'Every group has a decision') if groups_found else 'Run detection to look for them'},
+  {'label': 'Scored', 'value': scored ~ ' of ' ~ total, 'icon': 'chart-bar', 'href': url_for('unified_applications.rationalization_workbench'), 'testid': 'stat-scored',
+   'sentence': ((insuf ~ ' need more evidence before a decision') if insuf else 'Each has enough evidence for a decision') if scored else 'Score the portfolio to see health'},
+  {'label': 'Estimated savings a year', 'value': _money(savings), 'icon': 'piggy-bank', 'testid': 'stat-savings',
+   'sentence': ((stats.consolidation_count ~ ' on the consolidation list') if stats.consolidation_count else 'From duplicate groups and the consolidation list') if savings > 0 else 'Appears once duplicates carry a cost'},
+] -%}
+{{ stat_cards(cards) }}
+
+{# ── Once anything is scored: health, disposition and the TIME quadrant in one section ── #}
+{% if scored %}
+{% call section('Scores', 'Health, the recommended disposition, and each application by business value and technical health', testid='rationalization-scores') %}
+  <div class="grid gap-6 md:grid-cols-2">
+    {% for title, key in [('Health', 'health_distribution'), ('Disposition', 'disposition_breakdown')] %}
+    <div class="space-y-3">
+      <p class="text-sm font-medium">{{ title }}</p>
+      <div x-show="execSummary.loaded" x-cloak class="space-y-3">
+        <template x-for="(item, idx) in execSummary.{{ key }}" :key="idx">
+          <div class="flex items-center gap-3 text-sm">
+            <span class="w-28 shrink-0 text-muted-foreground" x-text="item.label"></span>
+            <progress class="h-2 flex-1 overflow-hidden rounded-full accent-primary" max="100" :value="item.pct"></progress>
+            <span class="w-8 text-right font-medium tabular-nums" x-text="item.count"></span>
+          </div>
+        </template>
+        {% if loop.first %}
+        <p class="text-sm text-muted-foreground"><span class="font-medium text-foreground tabular-nums" x-text="execSummary.decision_ready_count"></span> ready for a decision</p>
+        {% endif %}
+      </div>
+      <div x-show="!execSummary.loaded && !execSummary.error" class="space-y-3" role="status">
+        {{ ui.skeleton(class='h-4 w-full') }}{{ ui.skeleton(class='h-4 w-4/5') }}{{ ui.skeleton(class='h-4 w-3/5') }}
+      </div>
+      <div x-show="execSummary.error" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground" role="alert">
+        <span>These figures could not be loaded.</span>
+        {{ ui.button(text='Try again', type='button', variant='link', size='sm', class='h-auto p-0', attrs={'@click': 'load'}) }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <template x-if="hasScores">
+    <div class="relative mt-6 h-[400px] border-t pt-6"><canvas id="timeQuadrantChart" aria-label="TIME quadrant chart"></canvas></div>
+  </template>
+{% endcall %}
+{% endif %}
+
+{# ── Data quality ── #}
+{% set fc = (data_quality or {}).get('field_coverage', {}) or {} %}
+{% call section('Data quality', 'How much of your portfolio has each field filled in', content_class='space-y-3', testid='data-quality') %}
+  {% for label, key in [('Cost', 'cost'), ('Owner', 'owner'), ('Vendor', 'vendor'), ('Risk', 'risk'), ('Lifecycle', 'lifecycle')] %}
+  {%- set pct = fc.get(key) if key == 'vendor' else (fc.get(key) or 0) -%}
+  <div class="flex items-center gap-3 text-sm">
+    <span class="w-28 shrink-0 text-muted-foreground">{{ label }}</span>
+    {% if pct is not none %}
+    {%- set p = [[pct|round|int, 0]|max, 100]|min -%}
+    {% call ui.progress(value=p, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': label ~ ' coverage', 'role': 'progressbar', 'aria-valuemin': '0'}) %}{{ ui.progress_indicator(value=p) }}{% endcall %}
+    <span class="w-24 text-right font-medium tabular-nums">{{ pct|round|int }}%</span>
     {% else %}
-      {% call(item) list_table(rows=gaps.data, columns=[('Product', ''), ('Risk', '')], caption='Vendor lifecycle risks', testid='vendor-lifecycle-table', row_testid='vendor-lifecycle-row',
-                               search_placeholder='Filter products...', empty_message='No vendor lifecycle risks found. No product you use is past or near its end of life.') %}
-        {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.product_name or 'Unnamed product' }}{% endcall %}
-        {% call table_cell() %}{{ state_badge(item.risk_level or item.status) }}{% endcall %}
-      {% endcall %}
+    <span class="flex-1 text-muted-foreground">Not measured yet</span>
     {% endif %}
-  {% endcall %}
+  </div>
+  {% endfor %}
+  {% if insuf > 0 and insuf >= scored %}
+  <div class="flex flex-col gap-2 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-muted-foreground"><span class="font-medium text-foreground">{{ insuf }} of {{ scored }} scored applications</span> need more data before a decision can be made.</p>
+    {{ ui.button(text='Start enrichment', href='/applications/rationalization/enrich', variant='outline', size='sm') }}
+  </div>
+  {% endif %}
 {% endcall %}
 {% endif %}
 </div>
