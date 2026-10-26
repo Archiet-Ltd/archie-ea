@@ -56,13 +56,15 @@
     {'label': 'With a recommendation', 'value': s.with_recommendation or 0, 'icon': 'trophy', 'sentence': ('A preferred vendor has been worked out' if s.with_recommendation else 'No analysis has a preferred vendor yet'), 'testid': 'va-stat-recommended'},
 ]) }}
 
+{% macro _no_rec_notice() %}<span data-testid="vendor-analysis-no-recommendation">No analysis has a recommended vendor yet. Score the vendors in an analysis to get one.</span>{% endmacro %}
 {%- set columns = [{'label': 'Analysis', 'sortable': true}, ('Status', ''), {'label': 'Vendors', 'align': 'right', 'sortable': true}] -%}
 {%- if show_recommended %}{% set _ = columns.append({'label': 'Recommended', 'class': 'hidden md:table-cell'}) %}{% endif -%}
 {%- set _ = columns.append({'label': 'Created', 'sortable': true}) -%}
 {%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
 {% call(row) list_table(rows=rows, columns=columns, caption='Vendor options analyses', testid='vendor-analysis-table', row_testid='vendor-analysis-row',
                         search_placeholder='Filter analyses...', toolbar=true, toolbar_actions=_status_filter,
-                        empty_message='No analyses match this status.', empty_action=_clear_filter) %}
+                        empty_message='No analyses match this status.', empty_action=_clear_filter,
+                        notice=(_no_rec_notice() if rows and not show_recommended else none)) %}
   {%- set a = row.analysis -%}
   {% call table_cell(class='max-w-[420px]') %}
     <a href="{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=a.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="vendor-analysis-link">{{ a.name or 'Untitled analysis' }}</a>
@@ -75,7 +77,6 @@
   {% endcall %}
   {% call table_cell(class='w-12 text-right') %}{{ _row_menu(a) }}{% endcall %}
 {% endcall %}
-{% if rows and not show_recommended %}<p class="text-sm text-muted-foreground" data-testid="vendor-analysis-no-recommendation">No analysis has a recommended vendor yet. Score the vendors in an analysis to get one.</p>{% endif %}
 {% else %}
 {% call ui.card(attrs={'data-testid': 'vendor-analysis-empty'}) %}
   {% call ui.card_content() %}

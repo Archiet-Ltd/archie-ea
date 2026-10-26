@@ -2,7 +2,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
-{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset, section %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/modal.html' import modal %}
 {% from 'basecoat/native-select.html' import native_select, native_select_option %}
@@ -37,7 +37,8 @@
 {% if streams %}
 {%- set any_type = streams|selectattr('value_stream_type')|list|length > 0 -%}
 {%- set any_rated = streams|selectattr('strategic_importance')|list|length > 0 -%}
-{%- set cols = [('Value stream', '')] + ([{'label': 'Type', 'class': 'hidden md:table-cell', 'sortable': true}] if any_type else []) + ([{'label': 'Importance', 'sortable': true}] if any_rated else []) + [{'label': 'Stages', 'align': 'right', 'sortable': true}, {'label': 'Capabilities', 'align': 'right', 'sortable': true}, {'label': '', 'class': 'w-12'}] -%}
+{%- set cols = [{'label': 'Value stream', 'sortable': true}] + ([{'label': 'Type', 'class': 'hidden md:table-cell', 'sortable': true}] if any_type else []) + ([{'label': 'Importance', 'sortable': true}] if any_rated else []) + [{'label': 'Stages', 'align': 'right', 'sortable': true}, {'label': 'Capabilities', 'align': 'right', 'sortable': true}, {'label': '', 'class': 'w-12'}] -%}
+{% call section('All value streams', 'Open one to see its stages and the capabilities mapped to each', testid='value-streams-card') %}
 {% call(vs) list_table(rows=streams, columns=cols, caption='Value streams', testid='value-streams-table', row_testid='value-stream-row',
                        search_placeholder='Filter value streams...', toolbar=true) %}
   {% call table_cell(class='max-w-[500px]') %}
@@ -53,6 +54,7 @@
     {{ row_action('Capability grid', href=url_for('value_stream.grid', value_stream_id=vs.id)) }}
     {{ row_action('Delete', action=url_for('value_stream.delete', value_stream_id=vs.id), destructive=true, separator_before=true, confirm='Delete the ' ~ vs.name ~ ' value stream and its stages? This cannot be undone.', testid='value-stream-delete') }}
   {% endcall %}{% endcall %}
+{% endcall %}
 {% endcall %}
 {% else %}
 {% call ui.card() %}

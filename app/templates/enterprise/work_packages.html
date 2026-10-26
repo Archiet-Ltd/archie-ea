@@ -30,6 +30,12 @@
 {%- endcall -%}
 {%- endmacro %}
 
+{% macro _selection_footer() -%}
+<div class="flex items-center px-2" data-slot="data-table-pagination">
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums" data-wp-selected-count data-total="{{ work_packages|length }}">0 of {{ work_packages|length }} row(s) selected.</p>
+</div>
+{%- endmacro %}
+
 {% macro _select_all() -%}
 <input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all work packages on this page" data-wp-select-all>
 {%- endmacro %}
@@ -44,11 +50,11 @@
   {%- if st in ('completed', 'complete', 'done') %}{% set _ = counts.update({'completed': counts.completed + 1}) %}
   {%- elif wp.end_date and (days_until(wp.end_date) or 0) < 0 %}{% set _ = counts.update({'overdue': counts.overdue + 1}) %}{% endif -%}
 {%- endfor -%}
-{%- set show_gaps = wps|selectattr('id', 'in', gaps_by_wp.keys()|list)|list|length > 0 -%}
+{%- set no_gap = wps|rejectattr('id', 'in', gaps_by_wp|dictsort|selectattr(1)|map(attribute=0)|list)|list|length -%}
+{%- set show_gaps = no_gap < wps|length -%}
 {%- set show_progress = wps|selectattr('progress_percentage', 'ne', none)|list|length > 0 -%}
 {%- set show_due = wps|selectattr('end_date')|list|length > 0 -%}
 {%- set no_due = wps|rejectattr('end_date')|list|length -%}
-{%- set no_gap = wps|rejectattr('id', 'in', gaps_by_wp.keys()|list)|list|length -%}
 {%- set no_progress = wps|selectattr('progress_percentage', 'none')|list|length -%}
 {%- set _missing = [] -%}
 {%- if show_due and no_due %}{% set _ = _missing.append(no_due ~ ' ha' ~ ('s' if no_due == 1 else 've') ~ ' no due date') %}{% endif -%}
@@ -69,8 +75,6 @@
     {'label': 'Overdue', 'value': counts.overdue, 'icon': 'clock', 'sentence': ('Past their due date and not finished' if counts.overdue else 'Nothing is past its due date'), 'testid': 'wp-stat-overdue'},
 ]) }}
 
-{% if _missing %}<p class="text-sm text-muted-foreground" data-testid="wp-shared-facts">Of these work packages, {{ _missing|join('; ') }}. Those cells are left empty.</p>{% endif %}
-
 <form id="wp-bulk-form" method="post" action="{{ url_for('enterprise.work_packages') }}" data-confirm="Delete the selected work packages? This cannot be undone." data-testid="wp-bulk-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 </form>
@@ -80,9 +84,12 @@
 {%- if show_progress %}{% set _ = columns.append({'label': 'Progress', 'align': 'right', 'sortable': true}) %}{% endif -%}
 {%- if show_due %}{% set _ = columns.append({'label': 'Due', 'sortable': true}) %}{% endif -%}
 {%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
+{#- Up to 50 rows the table shows them all, with the selection count as its footer; beyond that the table pages them. -#}
 {% call(wp) list_table(rows=wps, columns=columns, caption='Work packages', testid='work-packages-table', row_testid='work-package-row',
                        search_placeholder='Filter work packages...', toolbar=true, toolbar_actions=_bulk_delete,
-                       empty_message='No work packages yet.') %}
+                       empty_message='No work packages yet.',
+                       notice=(('Of these work packages, ' ~ _missing|join('; ') ~ '. Those cells are left empty.') if _missing else none),
+                       server_pagination=(_selection_footer if wps|length <= 50 else none)) %}
   {% call table_cell(class='w-10') %}
     <input type="checkbox" name="ids" value="{{ wp.id }}" form="wp-bulk-form" class="size-4 accent-primary align-middle" aria-label="Select {{ wp.name or 'this work package' }}" data-wp-select>
   {% endcall %}
@@ -106,7 +113,12 @@
   {% endif %}
   {% if show_progress %}
   {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': wp.progress_percentage if wp.progress_percentage is not none else -1}) %}
-    {% if wp.progress_percentage is not none %}{{ wp.progress_percentage|round|int }}%{% endif %}
+    {% if wp.progress_percentage is not none %}
+    <span class="inline-flex items-center justify-end gap-2">
+      <progress class="h-1.5 w-16 overflow-hidden rounded-full accent-primary" max="100" value="{{ wp.progress_percentage }}" aria-hidden="true"></progress>
+      <span class="w-10 text-right">{{ wp.progress_percentage|round|int }}%</span>
+    </span>
+    {% endif %}
   {% endcall %}
   {% endif %}
   {% if show_due %}
@@ -141,6 +153,8 @@
       button.hidden = picked === 0;
       button.lastChild.textContent = picked ? 'Delete ' + picked + ' selected' : 'Delete selected';
     }
+    var count = document.querySelector('[data-wp-selected-count]');
+    if (count) count.textContent = picked + ' of ' + count.getAttribute('data-total') + ' row(s) selected.';
   }
   document.addEventListener('change', function (event) {
     var all = event.target.closest('[data-wp-select-all]');

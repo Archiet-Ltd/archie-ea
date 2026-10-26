@@ -26,11 +26,12 @@
 {%- if show_cost %}{% set _ = columns.append({'label': 'Three-year cost', 'align': 'right', 'sortable': true}) %}{% endif -%}
 {%- if show_roi %}{% set _ = columns.append({'label': 'Return', 'align': 'right', 'sortable': true}) %}{% endif -%}
 {%- set _ = columns.append({'label': 'Updated', 'sortable': true}) -%}
-{% if not show_cost or not show_roi %}<p class="text-sm text-muted-foreground" data-testid="bc-figures-note">{{ 'No business case has its cost or return worked out yet' if not show_cost and not show_roi else ('No business case has its three-year cost worked out yet' if not show_cost else 'No business case has its return worked out yet') }}. Open one to add its figures.</p>{% endif %}
+{% macro _figures_notice() %}<span data-testid="bc-figures-note">{{ 'No business case has its cost or return worked out yet' if not show_cost and not show_roi else ('No business case has its three-year cost worked out yet' if not show_cost else 'No business case has its return worked out yet') }}. Open one to add its figures.</span>{% endmacro %}
 {% call(bc) list_table(rows=business_cases,
                        columns=columns,
                        caption='Business cases', testid='bc-table', row_testid='bc-row', search_placeholder='Filter business cases...',
-                       empty_message='No business cases yet.') %}
+                       empty_message='No business cases yet.',
+                       notice=(_figures_notice() if (not show_cost or not show_roi) else none)) %}
   {% call table_cell(class='max-w-[420px]', attrs={'data-testid': 'bc-row-' ~ bc.id}) %}
     <a href="{{ url_for('business_case.detail', business_case_id=bc.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ bc.title or 'Untitled business case' }}</a>
   {% endcall %}

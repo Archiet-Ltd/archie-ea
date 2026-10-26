@@ -24,28 +24,42 @@
 {%- endmacro %}
 
 {#- The second line: "Capability: Gap: X" becomes "Capability: X"; a line that only repeats the title (or names a capability of the same name) is left out. -#}
-{% macro _detail(gap) -%}
+{% macro _detail(gap, dupes) -%}
 {%- set d = (gap.description or '')|trim -%}
 {%- set title = _unprefixed(gap.name) -%}
 {%- if d.startswith('Capability: ') %}{% set d = '' if _unprefixed(d[12:]) == title else 'Capability: ' ~ _unprefixed(d[12:]) %}{% endif -%}
-{%- if d and d != title %}<span class="block truncate text-xs text-muted-foreground">{{ d }}</span>{% endif -%}
+{%- if d and d != title %}<span class="block truncate text-xs text-muted-foreground">{{ d }}</span>
+{%- elif title in dupes %}<span class="block truncate text-xs text-muted-foreground">Reference {{ gap.id }}{% if gap.created_at is defined and gap.created_at %} · recorded {{ gap.created_at|format_date }}{% endif %}</span>{% endif -%}
 {%- endmacro %}
 
 {% macro _words(value) %}{{ (value|replace('_', ' ')|trim|capitalize) if value else 'Not recorded' }}{% endmacro %}
 
+{#- One row's ellipsis menu: open the gap, or convert it into a work package (posted by the script below). -#}
+{% macro _row_menu(gap) -%}
+{%- call ui.dropdown_menu() -%}
+  {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ _unprefixed(gap.name) or 'this gap' }}</span>{%- endcall -%}
+  {%- call ui.dropdown_menu_content(align='end', class='w-[220px]') -%}
+    {{ ui.dropdown_menu_item(text='Open', href=_gap_url(gap)) }}
+    {{ ui.dropdown_menu_item(text='Convert to a work package', tag='button', type='button', class='w-full',
+                             attrs={'aria-label': 'Convert this gap to a work package', 'data-convert-gap': gap.id, 'data-gap-name': _unprefixed(gap.name) or 'this gap',
+                                    'data-convert-url': '/capability-map/api/roadmap/gaps/' ~ gap.id ~ '/work-packages', 'data-wp-url': url_for('implementation_planning.work_package_detail', work_package_id=0)}) }}
+  {%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
+
 {% macro _sev_rank(gap) %}{{ {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get((gap.severity or '')|lower, 0) }}{% endmacro %}
 
 {#- The register. Columns whose value is the same on every row are left out by the caller and said once above. -#}
-{% macro _gaps_table(gaps, wp_by_gap, columns, show) %}
+{% macro _gaps_table(gaps, wp_by_gap, columns, show, dupes, notice=none) %}
 {% call(gap) list_table(rows=gaps, columns=columns, caption='Recorded gaps', testid='gaps-table', row_testid='gap-row',
-                        search_placeholder='Filter gaps...', toolbar=true, empty_message='No gaps recorded yet.') %}
+                        search_placeholder='Filter gaps...', toolbar=true, empty_message='No gaps recorded yet.', notice=notice) %}
   {%- set wps = wp_by_gap.get(gap.id, []) -%}
   {% call table_cell(class='max-w-[380px]') %}
     <span id="gap-{{ gap.id }}" class="scroll-mt-24"></span>
     <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
-    {{ _detail(gap) }}
+    {{ _detail(gap, dupes) }}
     {% if show.severity %}<span class="mt-1 block md:hidden" data-testid="gap-severity-narrow">{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}</span>{% endif %}
-    {% if not show.work %}<span class="block" data-testid="gap-work-packages-{{ gap.id }}"></span>{% endif %}
+    {% if not show.work %}<span class="block" data-testid="gap-work-packages-{{ gap.id }}">{% if wps %}<a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="block truncate text-xs text-foreground hover:underline" data-testid="gap-work-package-link">Work package: {{ wps[0].name or 'Untitled work package' }}{% if wps|length > 1 %} and {{ wps|length - 1 }} more{% endif %}</a>{% endif %}</span>{% endif %}
   {% endcall %}
   {% if show.type %}{% call table_cell(class='hidden lg:table-cell whitespace-nowrap') %}{{ (gap.gap_type|replace('_', ' ')|capitalize) if gap.gap_type else 'Unclassified' }}{% endcall %}{% endif %}
   {% if show.severity %}{% call table_cell(class='hidden md:table-cell', attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
@@ -61,11 +75,7 @@
     </span>
   {% endcall %}
   {% endif %}
-  {% call table_cell(class='text-right') %}
-    {% call ui.button(type='button', variant='ghost', size='sm',
-                      attrs={'title': 'Create a work package that closes this gap', 'aria-label': 'Convert this gap to a work package', 'data-convert-gap': gap.id, 'data-gap-name': _unprefixed(gap.name) or 'this gap',
-                             'data-convert-url': '/capability-map/api/roadmap/gaps/' ~ gap.id ~ '/work-packages', 'data-wp-url': url_for('implementation_planning.work_package_detail', work_package_id=0)}) %}{{ lucide('folder-plus') }}Convert{% endcall %}
-  {% endcall %}
+  {% call table_cell(class='w-12 text-right') %}{{ _row_menu(gap) }}{% endcall %}
 {% endcall %}
 {% endmacro %}
 
@@ -84,13 +94,16 @@
 {%- set sevs = gaps|map(attribute='severity')|map('default', '', true)|unique|list -%}
 {%- set statuses = gaps|map(attribute='resolution_status')|map('default', 'identified', true)|unique|list -%}
 {%- set impacts = gaps|map(attribute='impact')|map('default', '', true)|unique|list -%}
-{%- set show = {'type': types|length > 1, 'severity': sevs|length > 1, 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': unaddressed|length < gaps|length} -%}
+{%- set show = {'type': types|length > 1, 'severity': sevs|length > 1, 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': (gaps|length - unaddressed|length) * 2 > gaps|length} -%}
 {%- set facts = [] -%}
 {%- if gaps and not show.status %}{% set _ = facts.append('every gap is ' ~ statuses[0]|replace('_', ' ')|lower) %}{% endif -%}
 {%- if gaps and not show.severity %}{% set _ = facts.append(('every gap is rated ' ~ sevs[0]|lower) if sevs[0] else 'no gap has a severity yet') %}{% endif -%}
 {%- if gaps and not show.impact %}{% set _ = facts.append(('every gap has ' ~ impacts[0]|replace('_', ' ')|lower ~ ' impact') if impacts[0] else 'no gap has its impact recorded') %}{% endif -%}
 {%- if gaps and not show.type %}{% set _ = facts.append(('every gap is a ' ~ types[0]|replace('_', ' ')|lower ~ ' gap') if types[0] else 'no gap is classified yet') %}{% endif -%}
-{%- if gaps and not show.work %}{% set _ = facts.append('no gap has a work package yet') %}{% endif -%}
+{%- if gaps and not show.work %}{% set _ = facts.append(('no gap has a work package yet') if unaddressed|length == gaps|length else ((gaps|length - unaddressed|length) ~ ' of ' ~ gaps|length ~ ' gaps have a work package, named under the gap')) %}{% endif -%}
+{#- Titles shared by more than one gap get a reference line so the rows can be told apart. -#}
+{%- set _seen = [] -%}{%- set dupes = [] -%}
+{%- for g in gaps %}{% set t = _unprefixed(g.name) %}{% if t in _seen and t not in dupes %}{% set _ = dupes.append(t) %}{% endif %}{% set _ = _seen.append(t) %}{% endfor -%}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Gap analysis', subtitle='What separates today\'s architecture from the target, and the work that closes each gap',
               breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Gap analysis', none)],
@@ -110,13 +123,13 @@
 {%- if show.status %}{% set _ = columns.append({'label': 'Status', 'sortable': true}) %}{% endif -%}
 {%- if show.impact %}{% set _ = columns.append({'label': 'Impact', 'sortable': true, 'class': 'hidden lg:table-cell'}) %}{% endif -%}
 {%- if show.work %}{% set _ = columns.append(('Work package', '')) %}{% endif -%}
-{%- set _ = columns.append({'label': '', 'class': 'w-24'}) -%}
+{%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
 {%- set facts_line = (facts|join('; ') ~ '.')|capitalize if facts else '' -%}
 
 {% if show.work and unaddressed %}
 {#- Two sections: the register, and the gaps nothing covers yet. -#}
 {% call section('Recorded gaps', description=(facts_line or 'Open a gap to classify it, or convert it into a work package that closes it'), testid='gaps-section') %}
-  {{ _gaps_table(gaps, wp_by_gap, columns, show) }}
+  {{ _gaps_table(gaps, wp_by_gap, columns, show, dupes) }}
 {% endcall %}
 {% call section('Gaps with no work package', description='Each stays an open risk in the move to the target architecture until a work package covers it', testid='gaps-not-addressed') %}
 {% call(gap) list_table(rows=unaddressed, columns=([{'label': 'Gap', 'sortable': true}] + ([{'label': 'Severity', 'sortable': true}] if show.severity else []) + ([('Status', '')] if show.status else [])),
@@ -124,7 +137,7 @@
                         search_placeholder='Filter gaps...', empty_message='Every gap has a work package.') %}
   {% call table_cell(class='max-w-[420px]') %}
     <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
-    {{ _detail(gap) }}
+    {{ _detail(gap, dupes) }}
   {% endcall %}
   {% if show.severity %}{% call table_cell(attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
   {% if show.status %}{% call table_cell() %}{{ state_badge(gap.resolution_status or 'identified') }}{% endcall %}{% endif %}
@@ -132,8 +145,7 @@
 {% endcall %}
 {% else %}
 {#- One table: shown bare under the header, its shared facts said once. -#}
-{% if facts_line %}<p class="text-sm text-muted-foreground" data-testid="gaps-shared-facts">{{ facts_line }}</p>{% endif %}
-{{ _gaps_table(gaps, wp_by_gap, columns, show) }}
+{{ _gaps_table(gaps, wp_by_gap, columns, show, dupes, notice=(facts_line or none)) }}
 {% endif %}
 
 {% else %}
