@@ -9,7 +9,7 @@ icon: search
 
 # Software and tool discovery
 
-*Coming soon: discover the software and tools you actually pay for and use.*
+*Early access: discover the software and tools you actually pay for and use.*
 
 ## What Entelim is building
 
@@ -19,7 +19,7 @@ Entelim is building a way to discover the software and tools your organisation a
 
 Record vendor contracts and software licences in registers with [contracts and licences](/modules/procurement), and score each application with [rationalisation scoring](/modules/rationalization).
 
-Coming soon. Join the waiting list and we will tell you the day it ships.
+Early access. Join the waiting list and we will tell you the day it opens.
 
 ## Related
 

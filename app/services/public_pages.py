@@ -1809,7 +1809,7 @@ def build_landing(page: PublicPage) -> Landing | None:
         segment_label = USE_CASE_SEGMENT_LABELS.get(page.front_matter.get("segment_id", ""))
 
     if page.cta == "waiting_list":
-        primary_action = ("Tell us you need this", "#feature-interest")
+        primary_action = ("Join the waiting list", "#feature-interest")
         # A page for something not built yet never points at pricing: its
         # second action is a conversation, not a plan.
         secondary_action = ("Talk to us", "/contact")

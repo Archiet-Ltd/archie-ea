@@ -1,0 +1,33 @@
+{#- smoke-coverage-ok: covered by tests/test_public_landing_layout.py and tests/test_public_early_access_journey.py
+   Partial: public/_partials/_early_access.html -- an early-access page, laid out like the library's coming-soon page (ported
+   reference coming-soon-page): a status badge, the heading, one sentence, what is being built, what a person can do today,
+   and the waiting-list form. Its action joins a waiting list and never starts a sign-up (section 20). No screenshot, no plan.
+   Expects `page`, `landing`, and the optional `thanks` / `error` the waiting-list form uses. -#}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'basecoat/separator.html' import separator %}
+<section class="home-hero" data-testid="early-access-page">
+  <div class="mx-auto max-w-2xl space-y-8 px-4">
+    <div class="space-y-4">
+      {% call badge('outline', size='pill') %}Early access{% endcall %}
+      <h1 class="home-display !mt-0 !text-left">{{ landing.title }}</h1>
+      {% if landing.lead_html %}<p class="home-lead !mx-0 !text-left">{{ landing.lead_html }}</p>{% endif %}
+      <div class="flex flex-col gap-3 sm:flex-row">
+        {{ button(text='Join the waiting list', href='#feature-interest', size='lg', testid='early-access-join') }}
+        {{ button(text='Talk to us', href='/contact', variant='outline', size='lg') }}
+      </div>
+    </div>
+    {{ separator() }}
+    {% for s in landing.sections %}
+    <div class="public-page-content prose max-w-none" aria-labelledby="{{ s.id }}">
+      <h2 id="{{ s.id }}">{{ s.heading_html }}</h2>
+      {% if not s.cards %}{{ s.body_html }}{% else %}
+      <ul role="list" class="not-prose flex flex-wrap gap-3">
+        {% for c in s.cards %}<li>{{ button(text=c.title_html|striptags, href=c.url, variant='outline') }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% include 'public/_partials/_page_cta_forms.html' %}
+  </div>
+</section>

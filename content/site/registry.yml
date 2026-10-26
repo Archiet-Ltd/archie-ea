@@ -103,13 +103,19 @@ product:
     - [what-it-costs, what-you-are-changing]
     - [approvals]
   coming_soon:
-    label: Coming soon
-    all_link: {label: Everything coming soon, href: "/features#coming-soon", blurb: On the features page}
+    label: Early access
+    all_link: {label: Everything in early access, href: "/features#coming-soon", blurb: On the features page}
     items:
+      - {label: Ask in plain language, icon: message-square, href: /modules/ask-in-plain-language,
+         blurb: "Early access: ask your model a question in plain words, get a cited answer."}
+      - {label: Business model canvas and frameworks, icon: layout-dashboard, href: /modules/business-model-canvas-and-frameworks,
+         blurb: "Early access: draw your business model canvas and other known frameworks."}
+      - {label: Connect GitHub or Jira, icon: git-branch, href: /modules/connect-github-or-jira,
+         blurb: "Early access: build your model from your code and tickets."}
       - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling, capability: CAP-14.01,
-         blurb: "Coming soon: compare what-if plans side by side before you commit."}
+         blurb: "Early access: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
-         blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+         blurb: "Early access: discover the software and tools you actually pay for and use."}
 
 solutions:
   label: Solutions
@@ -133,12 +139,12 @@ solutions:
        own_page: /solutions/architecture-governance,
        blurb: "Review architecture changes, record the decision and its conditions."}
   coming_soon:
-    label: Coming soon
+    label: Early access
     items:
       - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling,
-         blurb: "Coming soon: compare what-if plans side by side before you commit."}
+         blurb: "Early access: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
-         blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+         blurb: "Early access: discover the software and tools you actually pay for and use."}
 
 # Role families, in menu order. The menu and the hub list only the roles that
 # have a page, each a link; a family with no role page is left out of the menu.

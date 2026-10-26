@@ -35,7 +35,11 @@
 {% if jsonld %}
 <script type="application/ld+json">{{ jsonld }}</script>
 {% endif %}
+{% if page.cta == 'waiting_list' %}
+{% include 'public/_partials/_early_access.html' %}
+{% else %}
 {% include 'public/_partials/_landing.html' %}
+{% endif %}
 {% else -%}
 <div class="public-container">
   {% if jsonld %}

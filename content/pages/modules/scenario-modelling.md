@@ -9,7 +9,7 @@ icon: git-compare
 
 # Scenarios
 
-*Coming soon: compare what-if plans side by side before you commit.*
+*Early access: compare what-if plans side by side before you commit.*
 
 ## What Entelim is building
 
@@ -19,7 +19,7 @@ Entelim is building scenarios, so you can set what-if plans side by side and com
 
 Pick a system in the [twin map](/modules/digital-twin) to see the applications and services that depend on it, and place programmes on a [roadmap](/modules/roadmaps).
 
-Coming soon. Join the waiting list and we will tell you the day it ships.
+Early access. Join the waiting list and we will tell you the day it opens.
 
 ## Related
 

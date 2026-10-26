@@ -190,7 +190,7 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
         {"id": "resources", "label": "Resources", "items": resources},
         {"id": "company", "label": "Company", "items": company},
         {"id": "legal", "label": reg["legal"]["label"], "items": legal},
-        {"id": "coming-soon", "label": "Coming soon", "items": soon_items},
+        {"id": "coming-soon", "label": "Early access", "items": soon_items},
     ]
     return {"rows": [{"id": "site-map", "label": "Site map", "columns": [c for c in columns if c["items"]]}]}
 
