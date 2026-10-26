@@ -16,6 +16,8 @@
    section, so it keeps the page-top slot instead -- the figure always renders somewhere. -#}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'public/_partials/_figure.html' import product_frame %}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
 {# A role page with its own captured screen opens with the home page's hero (text left, the screen in
@@ -51,8 +53,8 @@
     <p class="public-lead">{{ landing.lead_html }}</p>
     {% endif %}
     <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-      <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
-      <a href="{{ secondary_url }}" class="public-btn public-btn--outline">{{ secondary_label }}</a>
+      {{ button(text=primary_label, href=primary_url, variant='primary', size='lg') }}
+      {{ button(text=secondary_label, href=secondary_url, variant='outline', size='lg') }}
     </div>
   </div>
 </section>
@@ -66,13 +68,7 @@
       <div class="mt-8 grid gap-8 {% if more_screens | length > 1 %}lg:grid-cols-2{% else %}lg:grid-cols-1{% endif %}">
         {% for shot in more_screens %}
         <figure class="home-hero__figure" data-testid="role-more-screens-figure">
-          <div class="home-frame">
-            <div class="home-frame__bar" aria-hidden="true">
-              <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-              <span class="home-frame__url">{{ shot.frame_label }}</span>
-            </div>
-            <img src="{{ shot.url }}" alt="{{ shot.alt }}" width="{{ shot.width }}" height="{{ shot.height }}" loading="lazy" decoding="async" class="home-frame__img">
-          </div>
+          {{ product_frame(shot, eager=false) }}
           <figcaption class="public-card-body mt-3 text-center">{{ shot.caption }}</figcaption>
         </figure>
         {% endfor %}
@@ -153,7 +149,7 @@
       <div class="public-page-content prose max-w-none"><h2>Other roles</h2></div>
       <ul role="list" class="mt-8 flex flex-wrap gap-3">
         {% for group in siblings %}{% for entry in group.pages %}
-        <li><a href="{{ entry.url }}" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-colors">{{ entry.title }}</a></li>
+        <li>{{ button(text=entry.title, href=entry.url, variant='outline') }}</li>
         {% endfor %}{% endfor %}
       </ul>
     </div>
@@ -181,8 +177,8 @@
   <div class="public-container">
     <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
     <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-      <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
-      <a href="/contact" class="public-btn public-btn--outline">{{ 'Talk to us' if page.family == 'role' else 'Get in touch' }}</a>
+      {{ button(text=primary_label, href=primary_url, variant='primary') }}
+      {{ button(text='Talk to us' if page.family == 'role' else 'Get in touch', href='/contact', variant='outline') }}
     </div>
   </div>
 </section>

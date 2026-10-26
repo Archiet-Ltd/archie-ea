@@ -1,18 +1,22 @@
-{#- smoke-coverage-ok: covered by tests/test_public_landing_layout.py (role pages) and tests/test_proof_assets.py (home page)
-   Partial: public/_partials/_hero.html -- the one hero of the home page and the role pages: category
-   pill, headline, lead and two actions in one centred column, then the product screen in a browser
-   frame below. Layout and type: public_site.css .home-hero*, .home-display, .home-lead, .home-frame*.
+{#- smoke-coverage-ok: covered by tests/test_public_landing_layout.py (role pages), tests/test_proof_assets.py and tests/test_public_home_hero.py (home page)
+   Partial: public/_partials/_hero.html -- the one hero of the home page and the role pages, composed from the
+   library's macros and no raw markup: a badge for the eyebrow, the heading and one sentence, a button for each
+   action, then the real product screen in a card frame (hairline border, no shadow) with a caption saying what
+   it shows. The library has no hero of its own (ruling R25), so the composition lives here once.
    Expects `hero`, a dict:
      testid        data-testid of the <section> ("home-hero" / "landing-hero"); the figure gets "<testid>-figure"
+     fold          optional true: tighter spacing so the screen starts inside the first screen (home page)
      badge_short / badge_long   optional pill text (phone / wider); author-written strings, may hold entities
      breadcrumb    optional (label, url) shown above the pill
      title, lead   headline and lead paragraph (lead may be Markup)
      compact       optional true: smaller headline scale for long headlines (role pages)
-     primary / secondary   (label, url); the secondary is the outline button
-     figure        {url, mobile_url, width, height, mobile_width, mobile_height, alt, caption, frame_label} -#}
+     primary / secondary   (label, url[, testid]); the secondary is the outline button
+     figure        {url, mobile_url, width, height, mobile_width, mobile_height, alt, caption, frame_label, testid} -#}
 {% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'public/_partials/_figure.html' import product_frame %}
 {% set figure = hero.figure %}
-<section class="home-hero" data-testid="{{ hero.testid }}">
+<section class="home-hero{% if hero.fold %} home-hero--fold{% endif %}" data-testid="{{ hero.testid }}">
   <div class="mx-auto max-w-5xl px-4 text-center">
     {% if hero.breadcrumb %}
     <nav aria-label="Breadcrumb" class="mb-6 text-sm font-medium text-muted-foreground">
@@ -32,29 +36,16 @@
     <p class="home-lead">{{ hero.lead }}</p>
     {% endif %}
 
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ hero.primary[1] }}" class="public-btn public-btn--lg public-btn--primary">{{ hero.primary[0] }}</a>
-      <a href="{{ hero.secondary[1] }}" class="public-btn public-btn--lg public-btn--outline">{{ hero.secondary[0] }}</a>
+    <div class="{{ 'mt-6' if hero.fold else 'mt-9' }} flex flex-col gap-3 sm:flex-row sm:justify-center">
+      {{ button(text=hero.primary[0], href=hero.primary[1], size='lg', testid=(hero.primary[2] if hero.primary|length > 2 else none)) }}
+      {{ button(text=hero.secondary[0], href=hero.secondary[1], variant='outline', size='lg', testid=(hero.secondary[2] if hero.secondary|length > 2 else none)) }}
     </div>
   </div>
 
   {% if figure %}
-  <div class="home-hero__stage mt-16">
+  <div class="home-hero__stage {{ 'mt-6' if hero.fold else 'mt-16' }}">
     <figure class="home-hero__figure" data-testid="{{ hero.testid }}-figure">
-      <div class="home-frame">
-        <div class="home-frame__bar" aria-hidden="true">
-          <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">{{ figure.frame_label }}</span>
-        </div>
-        <picture>
-          {% if figure.mobile_url %}
-          <source media="(max-width: 739px)" srcset="{{ figure.mobile_url }}"
-                  width="{{ figure.mobile_width }}" height="{{ figure.mobile_height }}">
-          {% endif %}
-          <img src="{{ figure.url }}" alt="{{ figure.alt }}"
-               width="{{ figure.width }}" height="{{ figure.height }}" decoding="async" fetchpriority="high" class="home-frame__img">
-        </picture>
-      </div>
+      {{ product_frame(figure, eager=true, testid=figure.testid, frame_testid=hero.testid ~ '-frame') }}
       <figcaption class="public-card-body mt-3 text-center">{{ figure.caption }}</figcaption>
     </figure>
   </div>

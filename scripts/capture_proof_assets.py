@@ -227,6 +227,41 @@ def capture_home_chat(browser, base, password, wide: bool) -> tuple[int, int]:
         ctx.close()
 
 
+def capture_home_overview(browser, base, password, wide: bool) -> tuple[int, int]:
+    """The Overview of the sample company, as a startup CTO sees it right after loading the sample.
+
+    The first screen of the public home shows this screen. A capture whose page carries an error
+    or that has no figures is refused; the capture date is the file's own date.
+    """
+    vw, vh = (1280, 800) if wide else (390, 844)
+    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
+    page = ctx.new_page()
+    try:
+        _login(page, base, role_email("startup_cto_chat"), password)
+        page.goto(base + "/ai-chat", wait_until="networkidle")
+        _dismiss_onboarding(page)
+        try:
+            page.get_by_test_id("chat-first-sample").first.wait_for(state="attached", timeout=15000)
+            page.get_by_test_id("chat-first-sample").first.evaluate("el => el.closest('form').submit()")
+        except Exception:
+            pass  # the sample company is already loaded in this organisation
+        page.wait_for_selector('[data-testid="sample-company-indicator"]', timeout=90000)
+        page.goto(base + "/dashboard/overview", wait_until="networkidle")
+        _dismiss_onboarding(page)
+        page.wait_for_timeout(1500)
+        _tidy(page)
+        text = " ".join(page.inner_text("body").split())
+        if re.search(r"Traceback|Internal Server Error|Something went wrong", text):
+            raise SystemExit("the overview shows an error: refusing to photograph it")
+        if not re.search(r"\d", text):
+            raise SystemExit("the overview shows no figures: run the sample company first")
+        name = "overview.webp" if wide else "overview-mobile.webp"
+        png = page.screenshot(clip={"x": 0, "y": 0, "width": vw, "height": vh})
+        return _webp(png, IMG / "home" / name)
+    finally:
+        ctx.close()
+
+
 def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]:
     """The product window under the home hero: the real /applications/ screen.
 
@@ -557,6 +592,8 @@ def main() -> int:
                         help="capture only the Import Applications dialog for the scale-up CTO page")
     parser.add_argument("--home-chat", action="store_true",
                         help="capture only the AI chat answer shown in the home hero")
+    parser.add_argument("--home-overview", action="store_true",
+                        help="capture only the Overview of the sample company shown in the home hero")
     parser.add_argument("--chromium", default=os.environ.get("PROOF_CHROMIUM"))
     args = parser.parse_args()
     password = os.environ.get("DEMO_USER_PASSWORD")
@@ -567,7 +604,7 @@ def main() -> int:
 
     if args.roles:
         seed_role_users(password)
-    if args.home_chat:
+    if args.home_chat or args.home_overview:
         seed_chat_user(password)
     if args.import_dialog:
         seed_import_user(password)
@@ -580,6 +617,11 @@ def main() -> int:
                 for wide in (True, False):
                     w, h = capture_home_chat(browser, args.base, password, wide)
                     print(f"home chat answer     {'desktop' if wide else 'mobile ':8s} {w}x{h} css px")
+                return 0
+            if args.home_overview:
+                for wide in (True, False):
+                    w, h = capture_home_overview(browser, args.base, password, wide)
+                    print(f"home overview        {'desktop' if wide else 'mobile ':8s} {w}x{h} css px")
                 return 0
             if args.import_dialog:
                 for wide in (True, False):

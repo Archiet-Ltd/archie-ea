@@ -1,0 +1,18 @@
+{#- smoke-coverage-ok: covered by tests/test_public_home_hero.py and tests/test_public_landing_layout.py
+   Partial: public/_partials/_figure.html -- the one frame for a real product screen on the public site: a card from the
+   library (hairline border, no shadow) holding a labelled bar and the capture. Used by the hero and the role pages' more-screens band.
+   product_frame(figure, eager=true, testid=none) -#}
+{% from 'basecoat/card.html' import card %}
+{% macro product_frame(figure, eager=true, testid=none, frame_testid=none) -%}
+{% call card(class='gap-0 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-none', attrs=({'data-testid': frame_testid} if frame_testid else {})) %}
+  <div class="flex h-9 items-center gap-2 border-b border-border bg-muted px-4 text-xs text-muted-foreground" aria-hidden="true" data-frame-label>
+    <span class="font-medium">{{ figure.frame_label }}</span>
+  </div>
+  <picture>
+    {% if figure.mobile_url %}
+    <source media="(max-width: 739px)" srcset="{{ figure.mobile_url }}" width="{{ figure.mobile_width }}" height="{{ figure.mobile_height }}">
+    {% endif %}
+    <img src="{{ figure.url }}" alt="{{ figure.alt }}" width="{{ figure.width }}" height="{{ figure.height }}" decoding="async"{% if eager %} fetchpriority="high"{% else %} loading="lazy"{% endif %} class="block h-auto w-full"{% if testid %} data-testid="{{ testid }}"{% endif %}>
+  </picture>
+{% endcall %}
+{%- endmacro %}
