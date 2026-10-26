@@ -241,7 +241,8 @@ def test_safe_kind_filter_journey(browser, live_server):
         # of one element, not a number-twin standing in for it.
         for other in ("Alpha WP 06", "Alpha WP 35", "Alpha WP 15"):
             expect(page.get_by_role("heading", name=other, exact=True)).to_have_count(0)
-        expect(page.get_by_text("ArchiMate Identity", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name="Record", exact=True)).to_be_visible()
+        expect(page.get_by_test_id("element-type").first).to_be_visible()
     finally:
         context.close()
 
