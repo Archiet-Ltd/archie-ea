@@ -14,6 +14,7 @@
 {% from 'components/element_table.html' import element_table %}
 {% from 'components/risk_matrix.html' import risk_matrix %}
 {% from 'components/figures.html' import state_badge %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'components/avatar.html' import avatar %}
 {% from 'solutions/partials/_design_score.html' import design_score_panel, design_score_ring %}
@@ -41,18 +42,21 @@
 {% endmacro %}
 
 {% macro _meta() %}
-  <span data-testid="record-kind">{% call badge(variant='outline') %}Solution{% endcall %}</span>
-  <span data-testid="record-stage">{% call badge(variant=stage_variant) %}{{ stage }}{% endcall %}</span>
+  <span data-testid="record-kind">{% call badge(variant='outline', class='font-normal') %}Solution{% endcall %}</span>
+  <span data-testid="record-stage">{{ state_badge(stage, tone={'Approved': 'positive', 'Approved with conditions': 'positive', 'In review': 'caution', 'Rejected': 'negative'}.get(stage, 'neutral')) }}</span>
+  <span class="text-muted-foreground/60" aria-hidden="true">·</span>
   {% if owner %}
   <span class="text-sm text-muted-foreground" data-testid="record-owner">Owner <span class="font-medium text-foreground">{{ owner }}</span></span>
   {% else %}
   <a href="{{ base }}/edit" class="text-sm text-primary hover:underline" data-testid="record-owner">No owner yet. Name one</a>
   {% endif %}
   {% if programme %}
+  <span class="text-muted-foreground/60" aria-hidden="true">·</span>
   <span class="text-sm text-muted-foreground" data-testid="record-programme">Programme
     {% if programme.href %}<a href="{{ programme.href }}" class="font-medium text-foreground hover:underline">{{ programme.name }}</a>{% else %}<span class="font-medium text-foreground">{{ programme.name }}</span>{% endif %}</span>
   {% endif %}
   {% if gap %}
+  <span class="text-muted-foreground/60" aria-hidden="true">·</span>
   <span class="text-sm text-muted-foreground" data-testid="record-gap">Closes
     {% if gap.href %}<a href="{{ gap.href }}" class="font-medium text-foreground hover:underline">{{ gap.name }}</a>{% else %}<span class="font-medium text-foreground">{{ gap.name }}</span>{% endif %}</span>
   {% endif %}
@@ -66,15 +70,20 @@
   {% if actions.can_edit %}
     {{ button(text='Edit', variant='outline', size='sm', icon='pencil', href=base ~ '/edit', testid='record-edit') }}
   {% endif %}
-  {{ button(text='Compare options', variant='outline', size='sm', icon='git-compare', href=base ~ '/options-advisor', testid='record-compare') }}
   {% if actions.can_submit %}
     {{ button(text='Submit for review', variant='primary', size='sm', icon='send', testid='record-submit', attrs_dict={'data-submit-url': base ~ '/submit-for-arb', 'data-after-url': base ~ '?tab=review'}) }}
   {% endif %}
   {% if actions.can_decide %}
     {{ button(text='Decide', variant='primary', size='sm', icon='gavel', href=actions.decide_href, testid='record-decide') }}
   {% endif %}
-  {{ button(text='Download document', variant='outline', size='sm', icon='download', href=base ~ '/export/sad', testid='record-download') }}
-  {{ button(text='Ask about this solution', variant='outline', size='sm', icon='message-square', href='/ai-chat?q=' ~ ('What does the solution "' ~ solution.name ~ '" change, what does it cost and what should happen next?')|urlencode, testid='record-ask') }}
+  {% call ui.dropdown_menu() %}
+    {% call ui.dropdown_menu_trigger(variant='outline', size='sm', attrs={'data-testid': 'record-more'}) %}{{ lucide('ellipsis') }}More{% endcall %}
+    {% call ui.dropdown_menu_content(align='end', class='w-56') %}
+      {{ ui.dropdown_menu_item(text='Compare options', href=base ~ '/options-advisor', attrs={'data-testid': 'record-compare'}) }}
+      {{ ui.dropdown_menu_item(text='Download document', href=base ~ '/export/sad', attrs={'data-testid': 'record-download'}) }}
+      {{ ui.dropdown_menu_item(text='Ask about this solution', href='/ai-chat?q=' ~ ('What does the solution "' ~ solution.name ~ '" change, what does it cost and what should happen next?')|urlencode, attrs={'data-testid': 'record-ask'}) }}
+    {% endcall %}
+  {% endcall %}
 {% endmacro %}
 
 {% block content %}
@@ -420,7 +429,7 @@
                   {% call table_cell(class='whitespace-nowrap px-2 align-middle text-foreground') %}{% if o.months %}{{ o.months }} month{{ 's' if o.months != 1 }}{% else %}Not stated{% endif %}{% endcall %}
                   {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{% if o.risk %}{{ state_badge(o.risk) }}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}{% endcall %}
                   {% endif %}
-                  {% call table_cell(class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}") %}<span class="block w-0 min-w-full truncate">{{ o.summary }}</span>{% endcall %}
+                  {% call table_cell(class='hidden px-2 align-middle text-muted-foreground ' ~ ('md:table-cell' if opt.source == 'options' else 'lg:table-cell')) %}<span class="block w-0 min-w-full truncate">{{ o.summary }}</span>{% endcall %}
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -483,15 +492,15 @@
                 {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
               {% endcall %}
               {% call card_content(class='p-0') %}
-                {% call(r) list_table(rows=rk.rows, columns=[('Risk', ''), ('Owner', ''), ('Score', ''), ('Status', 'hidden md:table-cell')], caption='Risks', testid='risks-table', row_testid='risk-row') %}
+                {% call(r) list_table(rows=rk.rows, columns=[('Risk', ''), ('Owner', ''), ('Score', 'whitespace-nowrap'), ('Status', 'hidden 2xl:table-cell')], caption='Risks', testid='risks-table', row_testid='risk-row') %}
                     {% call table_cell(class='px-2 !pl-6 align-middle') %}
-                      <a href="{{ r.href }}" class="font-medium text-foreground hover:underline" data-testid="risk-link">{{ r.title }}</a>
+                      <a href="{{ r.href }}" class="block max-w-[320px] truncate font-medium text-foreground hover:underline" title="{{ r.title }}" data-testid="risk-link">{{ r.title }}</a>
                       {% if r.via %}<span class="block text-xs text-muted-foreground">through {{ r.via }}</span>{% endif %}
                       {% if r.mitigation %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
                     {% endcall %}
                     {% call table_cell(class='px-2 align-middle') %}{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}{% endcall %}
                     {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{{ state_badge(r.band_label ~ ' ' ~ r.score, tone={'low': 'positive', 'medium': 'caution', 'high': 'negative', 'critical': 'negative'}[r.band]) }}{% endcall %}
-                    {% call table_cell(class='hidden px-2 align-middle text-muted-foreground md:table-cell') %}{{ state_badge(r.status) }}{% endcall %}
+                    {% call table_cell(class='hidden px-2 align-middle text-muted-foreground 2xl:table-cell') %}{{ state_badge(r.status) }}{% endcall %}
                 {% endcall %}
               {% endcall %}
             {% endcall %}
@@ -608,7 +617,7 @@
             <li class="flex gap-2" data-testid="note-item">
               <i data-lucide="{{ {'meeting': 'users', 'email': 'mail', 'decision': 'gavel', 'escalation': 'alert-triangle', 'status_update': 'activity'}.get(n.kind, 'sticky-note') }}" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
               <div class="min-w-0">
-                <p class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{% call badge(variant='outline') %}{{ n.kind_label }}{% endcall %}{% if n.at %}<span>{{ n.at|format_datetime('d MMM yyyy') }}</span>{% endif %}{% if n.by %}<span>{{ n.by }}</span>{% endif %}</p>
+                <p class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{% call badge(variant='outline') %}{{ n.kind_label }}{% endcall %}{% if n.at %}<span>{{ n.at|format_datetime('d MMM yyyy') }}</span>{% endif %}{% if n.at and n.by %}<span class="text-muted-foreground/60" aria-hidden="true">·</span>{% endif %}{% if n.by %}<span>{{ n.by }}</span>{% endif %}</p>
                 <p class="font-medium text-foreground">{{ n.subject }}</p>
                 {% if n.summary %}<p class="whitespace-pre-line text-foreground">{{ n.summary }}</p>{% endif %}
                 {% if n.outcome %}<p class="text-muted-foreground">Outcome: {{ n.outcome }}</p>{% endif %}
