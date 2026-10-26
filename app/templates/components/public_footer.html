@@ -1,13 +1,14 @@
 {# Shared public footer: a complete map of the site, read from the same registry as the
    navbar (site_registry(), content/site/registry.yml), so it cannot list a page the
    navbar lacks or use a different label. The footer is one set of columns: Product, Solutions, Roles, Compare, Resources, Company and Legal,
-   then one labelled Coming soon group. Do not write a link into this file; add it to the registry.
+   then one labelled Early access group. Do not write a link into this file; add it to the registry.
    Included by main/index.html, public/page.html, public/hub_index.html, public/pricing.html
    and public/vs_hub.html.
    smoke-coverage-ok: covered by tests/test_public_nav_journey.py and tests/test_public_site_registry.py.
 #}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
+{% from 'basecoat/separator.html' import separator %}
 {% set reg = site_registry() %}
 <footer class="border-t border-border bg-background" data-site-footer>
   <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
@@ -19,6 +20,7 @@
 
     <nav aria-label="Site map">
       {% for row in reg.footer.rows %}
+      {% if not loop.first %}<div class="my-8">{{ separator() }}</div>{% endif %}
       <div class="grid grid-cols-2 gap-8 md:grid-cols-4" data-footer-row="{{ row.id }}">
         {% for column in row.columns %}
         <div data-footer-column="{{ column.id }}"{% if column.id == 'coming-soon' %} data-availability="early_access"{% endif %}>
@@ -31,7 +33,7 @@
                  {% if item.legal_slug %}data-legal-link="{{ item.legal_slug }}"{% endif %}
                  {% if item.coming_soon %}data-availability="early_access"{% endif %}>
                 {{ item.label }}
-                {%- if item.coming_soon %} {% call badge('outline') %}Coming soon{% endcall %}{% endif %}
+                {%- if item.coming_soon %} {% call badge('outline') %}Early access{% endcall %}{% endif %}
               </a>
             </li>
             {% endfor %}
@@ -42,7 +44,8 @@
       {% endfor %}
     </nav>
 
-    <div class="mt-10 flex flex-col gap-4 border-t border-border pt-8 md:flex-row md:items-center md:justify-between">
+    <div class="mt-10">{{ separator() }}</div>
+    <div class="flex flex-col gap-4 pt-8 md:flex-row md:items-center md:justify-between">
       <p class="text-sm text-muted-foreground">Entelim is licensed under AGPL-3.0. Made by Archiet Ltd.</p>
       <ul class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
         {% if current_user.is_authenticated %}

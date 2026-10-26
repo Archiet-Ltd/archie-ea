@@ -2,54 +2,61 @@
    (app/services/site_registry.py reading content/site/registry.yml); this file holds
    no link list. The footer reads the same registry, so the two cannot disagree.
 
-   One sticky 64px header. At lg and up: wordmark, Product / Solutions / Roles /
-   Compare / Pricing / Resources, then Sign in, Talk to us and Start free. Below lg:
-   wordmark, Start free and a Menu button that opens one panel under the header with
-   the same menus as accordions. Menus are disclosure panels (button with aria-expanded
-   and aria-controls, the panel follows its trigger in the DOM); behaviour lives in
-   static/js/public/site_nav.js.
+   Built from the library's macros: navigation_menu (list, item, trigger, content, link) for the
+   primary navigation and sheet (content, header, title, close, trigger, overlay) for the phone
+   menu. At lg and up: wordmark, Product / Solutions / Roles / Compare / Pricing / Resources, then
+   Sign in, Talk to us and Start free. Below lg: wordmark, Start free and a Menu trigger that opens
+   the sheet from the right edge with the same menus as accordions. Menus are disclosure panels
+   (trigger with aria-expanded and aria-controls, the panel follows its trigger in the DOM);
+   behaviour lives in static/js/public/site_nav.js.
    smoke-coverage-ok: covered by tests/test_public_nav_journey.py and tests/test_public_site_registry.py.
 #}
 {% from 'components/public_menu.html' import menu_row, menu_group, soon_group, text_link, see_all, group_heading %}
 {% from 'components/button.html' import button %}
+{% from 'basecoat/navigation-menu.html' import navigation_menu, navigation_menu_list, navigation_menu_item, navigation_menu_trigger, navigation_menu_content, navigation_menu_link %}
+{% from 'basecoat/sheet.html' import sheet_overlay, sheet_content, sheet_header, sheet_title, sheet_close, sheet_trigger %}
 {% set reg = site_registry() %}
 {% set trigger_class = 'flex h-11 w-full items-center justify-between rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:w-auto lg:justify-start lg:gap-1 lg:text-muted-foreground lg:hover:text-foreground' %}
-{% set panel_class = 'lg:absolute lg:inset-x-0 lg:top-full lg:border-b lg:border-border lg:bg-popover' %}
+{% set link_class = 'flex h-11 w-full items-center rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:w-auto lg:text-muted-foreground lg:hover:text-foreground' %}
+{% set panel_class = 'static block [&[hidden]]:hidden w-full md:static md:w-full lg:absolute lg:inset-x-0 lg:top-full lg:left-0 lg:right-0 lg:w-auto lg:border-b lg:border-border lg:bg-popover' %}
 <header class="sticky top-0 z-40 h-16 border-b border-border bg-background" data-site-nav>
   <div class="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
     <a href="{{ url_for('main.index') }}" class="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
       {% with logo_class='h-8', logo_label= brand_name|default(config.APP_NAME)  %}{% include 'partials/_brand_logo.html' %}{% endwith %}
     </a>
 
-    {# Below lg: the one action that never hides, then the Menu button. #}
+    {# Below lg: the one action that never hides, then the sheet trigger. #}
     <div class="ml-auto flex items-center gap-2 lg:hidden">
       {% if current_user.is_authenticated %}
       {{ button(text='Open Entelim', href=url_for('dashboard.overview'), variant='primary', attrs_dict={'data-site-cta': '', 'data-open-entelim': ''}) }}
       {% else %}
       {{ button(text='Start free', href=url_for('account.register'), variant='primary', attrs_dict={'data-site-cta': ''}) }}
       {% endif %}
-      <button type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-md text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Menu" aria-expanded="false" aria-controls="site-nav-panel" data-sheet-trigger>
+      {% call sheet_trigger(variant='ghost', size='icon', class='h-11 w-11 text-foreground', aria_label='Menu', aria_expanded='false', aria_controls='site-nav-panel', attrs={'data-sheet-trigger': ''}) %}
         <i data-lucide="menu" class="h-5 w-5" aria-hidden="true" data-sheet-icon="closed"></i>
         <i data-lucide="x" class="hidden h-5 w-5" aria-hidden="true" data-sheet-icon="open"></i>
-      </button>
+      {% endcall %}
     </div>
 
-    <div id="site-nav-panel" hidden
-         class="absolute inset-x-0 top-full max-h-screen overflow-y-auto border-b border-border bg-background px-4 pb-20 pt-2 sm:px-6 lg:static lg:ml-0 lg:flex lg:max-h-none lg:flex-1 lg:items-center lg:justify-between lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0">
-      <nav aria-label="Primary">
-        <ul class="flex flex-col gap-1 lg:flex-row lg:items-center">
+    {{ sheet_overlay(class='bg-background/80 lg:hidden', attrs={'hidden': true, 'data-sheet-overlay': ''}) }}
+    {% call sheet_content(id='site-nav-panel', class='fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col [&[hidden]]:hidden lg:[&[hidden]]:flex gap-2 overflow-y-auto border-l border-border bg-background px-4 pb-20 pt-2 lg:static lg:z-auto lg:ml-0 lg:max-w-none lg:flex-1 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0', attrs={'hidden': true, 'role': 'group', 'aria-modal': 'false', 'aria-label': 'Site menu'}) %}
+      {% call sheet_header(class='flex-row items-center justify-between lg:hidden') %}
+        {% call sheet_title(class='px-3 text-sm font-semibold text-foreground') %}Menu{% endcall %}
+        {% call sheet_close(aria_label='Close menu', class='h-11 w-11', attrs={'data-sheet-close': ''}) %}<i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>{% endcall %}
+      {% endcall %}
+      {% call navigation_menu(class='block max-w-none flex-none lg:static', attrs={'aria-label': 'Primary'}) %}
+        {% call navigation_menu_list(class='lg:static flex flex-col items-stretch justify-start gap-1 lg:flex-row lg:items-center') %}
           {% for entry in reg.nav %}
           {% if entry.kind == 'link' %}
-          <li>
-            <a href="{{ entry.href }}" class="flex h-11 items-center rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:text-muted-foreground lg:hover:text-foreground" data-nav-top data-label="{{ entry.label }}">{{ entry.label }}</a>
-          </li>
+          {% call navigation_menu_item(class='w-full lg:static lg:w-auto') %}
+            {{ navigation_menu_link(text=entry.label, href=entry.href, class=link_class, attrs={'data-nav-top': '', 'data-label': entry.label}) }}
+          {% endcall %}
           {% else %}
-          <li>
-            <button type="button" class="{{ trigger_class }}" aria-expanded="false" aria-controls="menu-{{ entry.id }}" data-menu-trigger data-nav-top>
+          {% call navigation_menu_item(class='w-full lg:static lg:w-auto') %}
+            {% call navigation_menu_trigger(class=trigger_class, aria_expanded='false', aria_controls='menu-' ~ entry.id, attrs={'data-menu-trigger': '', 'data-nav-top': ''}) %}
               {{ entry.label }}<i data-lucide="chevron-down" class="h-4 w-4 transition-transform" aria-hidden="true" data-chevron></i>
-            </button>
-            <div id="menu-{{ entry.id }}" hidden data-menu-panel class="{{ panel_class }}">
+            {% endcall %}
+            {% call navigation_menu_content(id='menu-' ~ entry.id, class=panel_class, attrs={'hidden': true, 'data-menu-panel': ''}) %}
               <div class="mx-auto max-w-7xl px-3 pb-3 pt-2 lg:px-6 lg:py-6">
                 {% if entry.id == 'product' %}
                 <div class="grid gap-6 lg:grid-cols-3 xl:grid-cols-5">
@@ -78,7 +85,7 @@
                   {% for family in reg.roles.menu_families %}
                   <div>
                     <p class="px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <a href="{{ family.href }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-menu-item data-label="{{ family.label }}">{{ family.label }}</a>
+                      {{ navigation_menu_link(text=family.label, href=family.href, class='inline rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'data-menu-item': '', 'data-label': family.label}) }}
                     </p>
                     <ul class="mt-2">
                       {% for role in family.shown %}{{ text_link(role.href, role.card_title) }}{% endfor %}
@@ -108,29 +115,29 @@
                 </div>
                 {% endif %}
               </div>
-            </div>
-          </li>
+            {% endcall %}
+          {% endcall %}
           {% endif %}
           {% endfor %}
-        </ul>
-      </nav>
+        {% endcall %}
+      {% endcall %}
 
       <div class="mt-2 flex flex-col gap-2 border-t border-border pt-4 lg:mt-0 lg:flex-row lg:items-center lg:border-0 lg:pt-0">
         {% if current_user.is_authenticated %}
         <span class="hidden lg:inline-flex">{{ button(text='Open Entelim', href=url_for('dashboard.overview'), variant='primary', attrs_dict={'data-open-entelim': ''}) }}</span>
         <div class="lg:relative">
-          <button type="button" class="{{ trigger_class }}" aria-expanded="false" aria-controls="menu-account" aria-label="Account menu" data-menu-trigger>
+          {% call navigation_menu_trigger(class=trigger_class, aria_expanded='false', aria_controls='menu-account', aria_label='Account menu', attrs={'data-menu-trigger': ''}) %}
             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">{{ current_user.first_name[0] if current_user.first_name else 'U' }}</span>
             <i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true" data-chevron></i>
-          </button>
-          <div id="menu-account" hidden data-menu-panel class="rounded-md border border-border bg-popover p-2 lg:absolute lg:right-0 lg:top-full lg:mt-2 lg:w-56">
+          {% endcall %}
+          {% call navigation_menu_content(id='menu-account', class='static block [&[hidden]]:hidden md:static md:w-full rounded-md border border-border bg-popover p-2 lg:absolute lg:right-0 lg:top-full lg:mt-2 lg:w-56', attrs={'hidden': true, 'data-menu-panel': ''}) %}
             <p class="px-3 py-1.5 text-sm text-muted-foreground">{{ current_user.email }}</p>
             <ul>
               {{ text_link(url_for('account.manage'), 'Profile') }}
               {{ text_link(url_for('dashboard.overview'), 'Dashboard') }}
               {{ text_link(url_for('account.logout'), 'Log out') }}
             </ul>
-          </div>
+          {% endcall %}
         </div>
         {% else %}
         {% for action in reg.actions %}
@@ -142,7 +149,7 @@
         {% endfor %}
         {% endif %}
       </div>
-    </div>
+    {% endcall %}
   </div>
 </header>
 <script src="{{ url_for('static', filename='js/public/site_nav.js') }}" defer></script>

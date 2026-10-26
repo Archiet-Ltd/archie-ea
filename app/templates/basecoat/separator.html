@@ -1,0 +1,6 @@
+{# separator.html: new in site08 (25 Oct design); the same thin-macro pattern as card.html. Markup and attributes come from the shadcn recipe via slot(). #}
+
+{% macro separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
