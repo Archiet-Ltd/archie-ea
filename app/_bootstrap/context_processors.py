@@ -760,7 +760,11 @@ def init_context_processors(app):
         if not has_request_context():
             return {"trail": [], "path": None, "home": None}
         home = registry.resolve(current_user, registry._by_key("home")) if registry._by_key("home") else None
-        return {"trail": registry.page_trail(current_user, request.endpoint), "path": request.path,
+        # a page filtered the way a sidebar item filters (?layer=motivation) is a view of its own, not the
+        # unfiltered entry's page, so its address carries the filter when the header compares the two
+        filtered = any(k in request.args for k in registry.filter_keys())
+        path = request.full_path.rstrip("?") if filtered else request.path
+        return {"trail": registry.page_trail(current_user, request.endpoint, request.args), "path": path,
                 "home": registry.href(home) if home is not None else "/"}
 
     app.jinja_env.globals["page_trail"] = _template_page_trail

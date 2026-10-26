@@ -52,11 +52,13 @@
 {%- if _where.trail -%}
   {%- set _last = _where.trail[-1] -%}
   {%- set _own = breadcrumb[1:] if breadcrumb and breadcrumb[0][0] == 'Home' else breadcrumb -%}
-  {%- if _last[1] and _last[1].split('?')[0] == _where.path -%}
+  {%- if _last[1] and (_last[1].split('?')[0] == _where.path or _last[1] == _where.path) -%}
     {#- the entry's own page; a record chosen on it (?initiative=) stays as the last crumb -#}
     {#- one name per page: the heading of a sidebar entry's own page is the name the sidebar gives it -#}
     {%- set _given = title or '' -%}
     {%- set title = _last[0] -%}
+    {#- a list page keeps its plural heading where the sidebar names the thing in the singular -#}
+    {%- if _given and (_given|lower).startswith(title|lower) and _given|length <= title|length + 2 -%}{%- set title = _given -%}{%- set _where = dict(_where, trail=_where.trail[:-1] + [(_given, _last[1])]) -%}{%- set _last = _where.trail[-1] -%}{%- endif -%}
     {%- if _own|length > 1 and (_own[-1][0]|lower) not in (title|lower) and (_own[-1][0]|lower) not in (_given|lower) -%}
       {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [(_own[-1][0], none)] -%}
     {%- else -%}

@@ -4236,6 +4236,10 @@ _AI_GAP_SECTIONS = {
 _GAP_TABS = [("critical-gaps", "Critical gaps"), ("uncovered", "Capabilities no application covers"),
              ("rationalization", "Rationalization opportunities"),
              ("vendor-lifecycle", "Vendor lifecycle risks")]
+# the summary figure behind each list, in the order the page shows them
+_GAP_TAB_COUNTS = [("critical-gaps", "critical_gaps"), ("uncovered", "no_coverage_count"),
+                   ("rationalization", "rationalization_opportunities"),
+                   ("vendor-lifecycle", "vendor_lifecycle_risks")]
 
 
 def _ai_gap_section(key):
@@ -4257,16 +4261,19 @@ def _ai_gap_section(key):
 @login_required
 def rationalization_gaps():
     """Gap findings: the four headline counts, and the list behind the one the person opens."""
-    gap_tab = request.args.get("gaps", "critical-gaps")
+    summary = _ai_gap_section("summary")
+    gap_tab = request.args.get("gaps")
     if gap_tab not in dict(_GAP_TABS):
-        gap_tab = "critical-gaps"
+        # With no list asked for, open the first one that has something in it.
+        counts = (summary or {}).get("data") or {} if not (summary or {}).get("error") else {}
+        gap_tab = next((key for key, count_key in _GAP_TAB_COUNTS if counts.get(count_key)), "critical-gaps")
     return render_template(
         "applications/rationalization/gaps.html",
         active_tab="gaps",
         gap_tabs=_GAP_TABS,
         gap_tab=gap_tab,
         gap_label=dict(_GAP_TABS)[gap_tab],
-        summary=_ai_gap_section("summary"),
+        summary=summary,
         gaps=_ai_gap_section(gap_tab),
     )
 
