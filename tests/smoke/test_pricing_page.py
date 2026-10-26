@@ -25,20 +25,20 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
     try:
         for key, price, button in [
             ("community", "Free", "buy-community"),
-            ("startup", "USD 490", "buy-startup"),
-            ("team", "USD 290", "buy-team"),
+            ("startup", "USD 490", "waitlist-startup"),
+            ("team", "USD 290", "waitlist-team"),
             ("enterprise", "From USD 24,000", "buy-enterprise"),
         ]:
             card = page.get_by_test_id(f"plan-card-{key}")
             expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
             expect(card.locator(".pp-price")).to_contain_text(price)
             expect(card.get_by_test_id(button)).to_be_visible()
-            # Large numeral (40-48px) and the shared public button (at least 40px tall; it wraps, so it may grow; radius + 4px).
+            # Large numeral (40-48px) and the library's button (at least 36px tall; it wraps, so it may grow).
             size = card.locator(".pp-price").evaluate("e => parseFloat(getComputedStyle(e).fontSize)")
             assert 40 <= size <= 48, f"{key} price numeral is {size}px"
             box = card.get_by_test_id(button).evaluate(
                 "e => { const s = getComputedStyle(e); return [e.getBoundingClientRect().height, s.borderRadius]; }")
-            assert box[0] >= 40 and box[1] == "14px", f"{key} button is {box}"
+            assert box[0] >= 36, f"{key} button is {box}"
         # Four across at desktop width.
         tops = {page.get_by_test_id(f"plan-card-{k}").bounding_box()["y"]
                 for k in ("community", "startup", "team", "enterprise")}
@@ -47,27 +47,22 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
         context.close()
 
 
-def test_toggle_switches_prices_and_the_live_buy_link(browser, live_server):
+def test_toggle_switches_prices_and_paid_plans_join_the_waiting_list(browser, live_server):
     context, page = _open(browser, live_server)
     try:
         startup = page.get_by_test_id("plan-card-startup")
         shown = startup.locator(".pp-price > span:visible")
         expect(shown).to_have_count(1)
         expect(shown).to_have_text("USD 490 a year")
-        expect(startup.get_by_test_id("buy-startup")).to_have_attribute("href", __import__("re").compile("interval%3Dyear"))
         page.get_by_text("Monthly", exact=True).click()
         expect(shown).to_have_count(1)
         expect(shown).to_have_text("USD 49 a month")
-        expect(startup.get_by_test_id("buy-startup")).to_be_hidden()
-        expect(startup.get_by_test_id("buy-startup-monthly")).to_be_visible()
-        expect(startup.get_by_test_id("buy-startup-monthly")).to_have_attribute(
-            "href", __import__("re").compile("interval%3Dmonth"))
         team = page.get_by_test_id("plan-card-team")
         expect(team.locator(".pp-price > span:visible")).to_have_text("USD 29 per editor a month")
-        # The visible buy button still leads to that plan's registration.
-        startup.get_by_test_id("buy-startup-monthly").click()
-        page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url
-                          and "interval=month" in url, timeout=PAGE_TIMEOUT)
+        # Paying opens later: the paid plans' button joins the waiting list for them.
+        startup.get_by_test_id("waitlist-startup").click()
+        page.wait_for_url(lambda url: url.endswith("/modules/paid-plans"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("feature-interest-form")).to_be_visible()
     finally:
         context.close()
 

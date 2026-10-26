@@ -347,7 +347,7 @@ def test_a_new_person_buys_startup_at_checkout_and_then_cancels(browser, checkou
         _shoot(page, "buy-pricing-monthly")
         page.get_by_label("Annual", exact=False).check()
         _shoot(page, "buy-pricing")
-        card.get_by_test_id("buy-startup").click()
+        page.goto(base + "/account/register?plan=startup&interval=year", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)  # paying opens later: the pricing button joins a waiting list
         page.wait_for_url(re.compile(r"/account/register\?.*plan=startup"), timeout=PAGE_TIMEOUT)
 
         # Sign up; no mail server here, so the account is usable at once and goes on to checkout.

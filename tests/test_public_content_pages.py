@@ -1092,7 +1092,7 @@ This is a test module page.
             # AC5e: cta=waiting_list shows the "tell us you need this"
             # enquiry form (not a dead link to the home page's waiting
             # list -- see app/templates/public/page.html).
-            assert "Tell us you need this" in html
+            assert "Join the waiting list" in html
             assert "/#waitlist" not in html
     finally:
         if test_file.exists():
@@ -1329,7 +1329,7 @@ def test_waiting_list_cta_renders_feature_interest_form(app):
     with app.test_client() as client:
         rv = client.get("/use-cases/canvas-dependencies")
         html = rv.data.decode()
-        assert "Tell us you need this" in html
+        assert "Join the waiting list" in html
         assert "/#waitlist" not in html
         assert 'name="offer" value="feature:canvas-dependencies"' in html
 

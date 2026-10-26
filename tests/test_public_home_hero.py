@@ -54,30 +54,42 @@ def _webp_size(data):
     return width & 0x3FFF, height & 0x3FFF
 
 
+@pytest.mark.parametrize("scheme", ["light", "dark"])
 @pytest.mark.parametrize("viewport", [DESKTOP, PHONE], ids=["1440", "390"])
-def test_the_hero_shows_the_chat_answering_with_its_sources(browser, site_url, viewport):
-    context = browser.new_context(viewport=viewport)
+def test_the_hero_shows_the_overview_of_the_first_wave_and_not_the_chat(browser, site_url, viewport, scheme):
+    """While the first wave is live the hero shows real screens of what a person can use: the Overview, dated.
+    The cited chat answer is early access and appears on the waiting-list page, not here."""
+    context = browser.new_context(viewport=viewport, color_scheme=scheme)
     page = context.new_page()
     try:
         page.goto(site_url + "/")
+        expect(page.get_by_test_id("home-hero").locator("h1")).to_contain_text("who owns it")
         figure = page.get_by_test_id("home-hero-figure")
         expect(figure).to_be_visible()
-        # Labelled as the chat the product has today, never as the retired Ask page.
-        expect(figure.locator(".home-frame__url")).to_have_text("AI chat")
+        # The frame is the library's card: a hairline border and no shadow.
+        frame = page.get_by_test_id("home-hero-frame")
+        assert frame.get_attribute("data-slot") == "card"
+        assert frame.evaluate("el => getComputedStyle(el).boxShadow") in ("none", "")
+        assert frame.evaluate("el => parseFloat(getComputedStyle(el).borderTopWidth)") == 1
+        expect(frame).to_contain_text("Overview")
         image = page.get_by_test_id("home-hero-proof")
         alt = image.get_attribute("alt")
-        assert "AI chat" in alt and "source" in alt.lower(), alt
-        expect(figure.locator("figcaption")).to_contain_text("source")
-        # The picture loads, and the size the page declares is the size of the file.
+        assert "overview" in alt.lower() and "chat" not in alt.lower(), alt
+        expect(figure.locator("figcaption")).to_contain_text("captured on")
         src = image.evaluate("el => el.currentSrc")
         response = page.request.get(src)
         assert response.ok and response.headers["content-type"].startswith("image/")
-        assert "chat" in src, src
+        assert "overview" in src and "chat" not in src, src
         loaded = image.evaluate("el => [el.naturalWidth, el.naturalHeight]")
         assert loaded[0] > 0 and loaded[1] > 0, "the picture did not decode"
         if viewport is DESKTOP:
             declared = (int(image.get_attribute("width")), int(image.get_attribute("height")))
             assert _webp_size(response.body()) == (declared[0] * 2, declared[1] * 2)
+        assert "chat-answer" not in page.content()
+        # The chat answer is offered as early access, with a waiting list.
+        early = page.get_by_test_id("home-early-access")
+        expect(early).to_contain_text("Ask in plain language")
+        expect(early.get_by_role("link", name="Join the waiting list").first).to_be_visible()
     finally:
         context.close()
 

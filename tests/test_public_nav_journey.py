@@ -157,22 +157,22 @@ def test_navbar_and_footer_carry_the_same_items(desktop):
     assert missing == [], f"in the navbar but not the footer: {missing}"
     # the footer is one set of columns, not a second copy of the menus
     footer_headings = page.eval_on_selector_all("footer h2", "els => els.map(e => e.textContent.trim())")
-    assert footer_headings == ["Product", "Solutions", "Roles", "Compare", "Resources", "Company", "Legal", "Coming soon"]
+    assert footer_headings == ["Product", "Solutions", "Roles", "Compare", "Resources", "Company", "Legal", "Early access"]
 
 
 def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base_url):
     page = desktop
     _trigger(page, "Product").click()
     soon = page.locator("#menu-product [data-menu-group='coming-soon']")
-    expect(soon.get_by_text("Coming soon", exact=True)).to_be_visible()
+    expect(soon.get_by_text("Early access", exact=True).first).to_be_visible()
     expect(soon.get_by_text("Not available yet. Join the waiting list.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
     assert rows.count() == 2
     for text in ("Scenarios", "Software and tool discovery"):
         expect(soon.get_by_role("link", name=text)).to_be_visible()
-    # nothing delivered sits in the Coming soon group, and nothing coming soon sits among delivered ones
+    # nothing delivered sits in the Early access group, and nothing coming soon sits among delivered ones
     live_labels = page.eval_on_selector_all("#menu-product a[data-availability='live']", "els => els.map(e => e.textContent)")
-    assert not any("Coming soon:" in label for label in live_labels)
+    assert not any("Early access:" in label for label in live_labels)
 
     soon.get_by_role("link", name="Scenarios").click()
     expect(page).to_have_url(base_url + "/modules/scenario-modelling")
@@ -196,7 +196,7 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base
 def test_everything_coming_soon_lands_on_the_features_list(desktop, base_url):
     page = desktop
     _trigger(page, "Product").click()
-    page.locator("#menu-product").get_by_role("link", name="Everything coming soon").click()
+    page.locator("#menu-product").get_by_role("link", name="Everything in early access").click()
     expect(page).to_have_url(base_url + "/features#coming-soon")
     section = page.locator("#coming-soon")
     expect(section).to_be_visible()

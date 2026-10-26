@@ -20,14 +20,15 @@ def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live
     page = context.new_page()
     try:
         page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        buy = page.get_by_test_id("buy-startup")
-        expect(buy).to_be_visible(timeout=PAGE_TIMEOUT)
+        # Paying opens with the next wave: the pricing page's paid buttons join a waiting list, so this
+        # journey starts at the registration link a plan carries (the link the buy button used to hold).
+        expect(page.get_by_test_id("waitlist-startup")).to_be_visible(timeout=PAGE_TIMEOUT)
         # Routed through the click-tracking redirect (app/main/views.py::
         # track_plan_click) before landing on /contact.
         expect(page.get_by_test_id("buy-enterprise")).to_have_attribute(
             "href", "/t/plan-click?plan=enterprise&next=/contact")
 
-        buy.click()
+        page.goto(live_server + "/account/register?plan=startup&interval=year", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         # Not signed in yet: the button opens registration and keeps the plan;
         # someone with an account signs in from there and keeps it too.
         page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url,

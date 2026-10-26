@@ -626,15 +626,16 @@ def test_landing_route_reuses_cached_pages_by_url_across_requests(app, monkeypat
     assert len(calls) <= 1, f"load_all_pages() ran {len(calls)} times across 3 requests, expected at most 1"
 
 
-def test_waiting_list_page_hero_points_at_the_form(app):
+def test_waiting_list_page_opens_with_the_early_access_layout_and_points_at_the_form(app):
     page = next(p for p in _landing_pages() if p.cta == "waiting_list")
     with app.test_client() as client:
         html = client.get(page.url).data.decode()
-    hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
-    assert re.search(r'<a href="#feature-interest" class="public-btn public-btn--primary">Tell us you need this</a>', hero)
+    top = html[html.index('data-testid="early-access-page"'):html.index('id="feature-interest"')]
+    assert re.search(r'<a href="#feature-interest"[^>]*>\s*Join the waiting list\s*</a>', top)
     assert 'id="feature-interest"' in html
     assert 'data-testid="feature-interest-form"' in html
-    assert "Start free" not in hero
+    assert "Start free" not in html[html.index('data-testid="early-access-page"'):html.index('data-site-footer')]
+    assert "<img" not in html[html.index('data-testid="early-access-page"'):html.index('data-site-footer')]
 
 
 def test_live_page_hero_offers_start_free(app):
@@ -845,12 +846,12 @@ def test_home_and_role_pages_open_with_the_one_shared_hero(app):
     captured screen in the frame, and exactly one primary action."""
     with app.test_client() as client:
         home = client.get("/").data.decode()
-        assert 'data-testid="home-hero"' in home and "home-frame__img" in home
+        assert 'data-testid="home-hero"' in home and 'data-testid="home-hero-frame"' in home
         for slug in ROLE_SLUGS:
             html = client.get(f"/roles/{slug}").data.decode()
             hero = html[html.index('data-testid="landing-hero"'): html.index('data-testid="landing-hero-figure"')]
-            assert "home-display" in html and "home-frame" in html, slug
-            assert hero.count("public-btn--primary") == 1, slug
+            assert "home-display" in html and "landing-hero-frame" in html, slug
+            assert hero.count("bg-primary text-primary-foreground") == 1, slug
             figure = html[html.index('data-testid="landing-hero-figure"'):]
             figure = figure[: figure.index("</figure>")]
             assert f"/static/img/roles/{slug}.webp" in figure, slug
