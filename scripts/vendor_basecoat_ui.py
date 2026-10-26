@@ -39,10 +39,10 @@ COLOUR_TOKENS = {
 }
 JS_PARTS = ["core", "components/menu", "components/popover", "components/select", "components/tabs",
             "components/dialog", "components/disclosure", "components/toggles"]
-# The library's base layer hides [hidden] elements whatever their display; its components rely on it. The
-# sidebar keeps this product's own rules (its hidden sub-menus still take their gap, as the approved layout has it).
-HIDDEN_RULE = ("@layer components{[data-slot][hidden]:not([hidden=until-found]):not([data-slot^=sidebar])"
-               "{display:none!important}}")
+# The library's base layer hides [hidden] elements whatever their display; its components and their contents rely
+# on it. The sidebar keeps this product's own rules (its hidden sub-menus still take their gap, as the approved layout has it).
+HIDDEN_RULE = ("@layer components{:is([data-slot], [data-slot] *)[hidden]:not([hidden=until-found])"
+               ":not([data-slot=sidebar] *){display:none!important}}")
 
 
 def git_show(repo, ref, path):

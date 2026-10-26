@@ -8,10 +8,10 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 
-{% macro element_table(rows, columns, caption, testid, first='Element', row_testid='element-row', link_testid='element-link', page_size=25, search_placeholder='Filter elements...', toolbar=True, toolbar_actions=none) %}
+{% macro element_table(rows, columns, caption, testid, first='Element', row_testid='element-row', link_testid='element-link', page_size=25, search_placeholder='Filter elements...', toolbar=none, toolbar_actions=none, empty_message='No elements yet.') %}
 {%- set cells = caller -%}
-{% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table', search_placeholder=search_placeholder, toolbar=toolbar, toolbar_actions=toolbar_actions) %}
-  {% call table_cell(class='px-2 !pl-6 align-middle') %}
+{% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table', search_placeholder=search_placeholder, toolbar=toolbar, toolbar_actions=toolbar_actions, empty_message=empty_message) %}
+  {% call table_cell() %}
     {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
     {% if row.description %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
   {% endcall %}

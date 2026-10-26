@@ -79,7 +79,7 @@
         {% call table_row() %}
           {% for col in columns %}
             {%- set m = col if col is mapping else {'label': col[0], 'class': (col[1] if col|length > 1 else '')} -%}
-            {%- set cls = ((m.get('class') or '') ~ (' text-right' if m.get('align') == 'right' else '') ~ (' pl-4' if loop.first else ''))|trim -%}
+            {%- set cls = ((m.get('class') or '') ~ (' text-right' if m.get('align') == 'right' else ''))|trim -%}
             {% call table_head(class=cls, attrs={'scope': 'col', 'data-col': loop.index0}) %}
               {%- if m.get('sortable') and total > 1 -%}
                 {% call dropdown_menu() %}
