@@ -155,6 +155,31 @@ def owner_user_ids(entity_type: str, target: object, organization_id: int, actio
     return []
 
 
+def subject_of(entity_type: str, target: object, organization_id: int) -> Dict[str, Any]:
+    """The application an owner record or a cost fact is about: its name, for
+    the alert's wording, and its ArchiMate id, for the link to its answer."""
+    if entity_type == "application_owner":
+        application_id = getattr(target, "application_id", None)
+    elif entity_type == "cost_fact" and getattr(target, "element_type", None) == "application":
+        application_id = getattr(target, "element_id", None)
+    else:
+        return {}
+    if application_id is None:
+        return {}
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = db.session.execute(
+        db.select(ApplicationComponent.name, ApplicationComponent.archimate_element_id)
+        .where(ApplicationComponent.id == application_id)
+        .where(ApplicationComponent.organization_id == organization_id)
+        .limit(1)
+    ).first()
+    if row is None:
+        return {}
+    return {"subject_name": row.name, "archimate_element_id": row.archimate_element_id}
+
+
 def _signed_in_user_id() -> Optional[int]:
     """The signed-in user's id, read without resolving the login user.
 
@@ -245,6 +270,10 @@ def describe_change(
         logger.exception("change feed: could not read owners for %s", entity_type)
     if entity_type == "application_component":
         extra["archimate_element_id"] = getattr(target, "archimate_element_id", None)
+    try:
+        extra.update(subject_of(entity_type, target, organization_id))
+    except Exception:  # noqa: BLE001 - the write must go through without a subject
+        logger.exception("change feed: could not read the subject of %s", entity_type)
     return scrub_payload(extra)
 
 
