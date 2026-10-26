@@ -2,7 +2,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
-{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'components/figures.html' import state_badge, value_or_unset, section %}
 {% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Investments{% endblock %}
@@ -40,68 +40,71 @@
     {% endcall %}
   {% endcall %}
 {% else %}
-  {% call ui.card(attrs={'data-testid': 'investment-matrix'}) %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text='Investment priority matrix') }}
-      {{ ui.card_description(text='Each rated capability placed by its strategic importance') }}
-    {% endcall %}
-    {% call ui.card_content() %}
-      {% if not rated %}
-      <div class="flex flex-col items-start gap-3" data-testid="investment-matrix-empty" role="status">
-        <p class="text-sm text-muted-foreground">Nothing is plotted because none of your {{ caps|length }} capabilities has a strategic importance rating yet; rate them on the capability map and each one lands in its quadrant here.</p>
-        {% if rate_href %}{% call ui.button(href=rate_href, variant='outline', size='sm') %}{{ lucide('arrow-right') }}Rate capabilities{% endcall %}{% endif %}
-      </div>
-      {% else %}
-      <div class="grid gap-4 sm:grid-cols-2">
-        {% for key, name, meaning in QUADRANTS %}
-        {%- set inq = rated|selectattr('strategic_importance', 'equalto', key)|list -%}
-        <div class="flex min-h-40 flex-col gap-3 rounded-lg border p-4" data-testid="investment-quadrant-{{ name|lower }}">
-          <div>
-            <p class="flex items-center justify-between gap-2 text-sm font-semibold"><span>{{ name }}</span><span class="text-muted-foreground tabular-nums">{{ inq|length }}</span></p>
-            <p class="text-sm text-muted-foreground">{{ meaning }}</p>
-          </div>
-          {% if inq %}
-          <div class="flex flex-wrap gap-1.5">
-            {% for cap in inq[:24] %}{{ ui.badge(text=cap.name, variant='outline', class='max-w-[220px] truncate font-normal') }}{% endfor %}
-            {% if inq|length > 24 %}<span class="text-sm text-muted-foreground">and {{ inq|length - 24 }} more</span>{% endif %}
-          </div>
-          {% else %}
-          <p class="text-sm text-muted-foreground">No capability here yet.</p>
-          {% endif %}
+  {%- set no_current = caps|selectattr('current_maturity_level', 'none')|list|length -%}
+  {%- set no_target = caps|selectattr('target_maturity_level', 'none')|list|length -%}
+  {%- set show_current = no_current < caps|length -%}
+  {%- set show_target = no_target < caps|length -%}
+  {%- set no_maturity = (caps|selectattr('current_maturity_level', 'none')|list + caps|selectattr('target_maturity_level', 'none')|list)|map(attribute='id')|unique|list|length -%}
+  {%- set columns = [{'label': 'Capability', 'sortable': true}] -%}
+  {%- if rated %}{% set _ = columns.append(('Strategic importance', '')) %}{% endif -%}
+  {%- if show_current %}{% set _ = columns.append({'label': 'Current maturity', 'align': 'right', 'sortable': true}) %}{% endif -%}
+  {%- if show_target %}{% set _ = columns.append({'label': 'Target maturity', 'align': 'right', 'sortable': true}) %}{% endif -%}
+
+  {% macro _rate_action() %}{% if rate_href %}{{ ui.button(text='Rate capabilities', href=rate_href, variant='outline', size='sm') }}{% endif %}{% endmacro %}
+
+  {% macro _matrix() %}
+  {% call section('Investment priority matrix', ('Each rated capability placed by its strategic importance' if rated else 'Capabilities land in a quadrant once they carry a strategic importance rating'), testid='investment-matrix') %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% for key, name, meaning in QUADRANTS %}
+      {%- set inq = rated|selectattr('strategic_importance', 'equalto', key)|list -%}
+      <div class="flex {{ 'min-h-40' if rated else '' }} flex-col gap-3 rounded-lg border p-4" data-testid="investment-quadrant-{{ name|lower }}">
+        <div>
+          <p class="flex items-center justify-between gap-2 text-sm font-semibold"><span>{{ name }}</span>{% if rated %}<span class="text-muted-foreground tabular-nums">{{ inq|length }}</span>{% endif %}</p>
+          <p class="text-sm text-muted-foreground">{{ meaning }}</p>
         </div>
-        {% endfor %}
+        {% if inq %}
+        <div class="flex flex-wrap gap-1.5">
+          {% for cap in inq[:24] %}{{ ui.badge(text=cap.name, variant='outline', class='max-w-[220px] truncate font-normal') }}{% endfor %}
+          {% if inq|length > 24 %}<span class="text-sm text-muted-foreground">and {{ inq|length - 24 }} more</span>{% endif %}
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
-    {% endcall %}
+      {% endfor %}
+    </div>
   {% endcall %}
+  {% endmacro %}
 
   {% if rated %}
-  {% call ui.card(attrs={'data-testid': 'investment-bubble'}) %}
-    {% call ui.card_header() %}
-      {{ ui.card_title(text='Importance against maturity gap') }}
-      {{ ui.card_description(text='Further right matters more, higher has further to go; bubble size is business value') }}
-    {% endcall %}
-    {% call ui.card_content() %}
-      <div id="investment-bubble-empty" class="hidden">
-        <p class="text-sm text-muted-foreground">The chart could not be drawn. Reload the page to try again.</p>
-      </div>
-      <div id="investment-bubble-container" class="relative h-[360px]">
-        <canvas id="investment-bubble-chart" aria-label="Capabilities by strategic importance and maturity gap" role="img"></canvas>
-      </div>
-    {% endcall %}
+  {{ _matrix() }}
+  {% call section('Importance against maturity gap', 'Further right matters more, higher has further to go; bubble size is business value', testid='investment-bubble') %}
+    <div id="investment-bubble-empty" class="hidden">
+      <p class="text-sm text-muted-foreground">The chart could not be drawn. Reload the page to try again.</p>
+    </div>
+    <div id="investment-bubble-container" class="relative h-[360px]">
+      <canvas id="investment-bubble-chart" aria-label="Capabilities by strategic importance and maturity gap" role="img"></canvas>
+    </div>
   {% endcall %}
   {% endif %}
 
-  {% call(cap) list_table(rows=caps, columns=[{'label': 'Capability', 'sortable': true}, ('Strategic importance', ''), {'label': 'Current maturity', 'align': 'right', 'sortable': true}, {'label': 'Target maturity', 'align': 'right', 'sortable': true}],
-                          caption='All capabilities', testid='investment-capabilities-table', row_testid='capability-row', search_placeholder='Filter capabilities...') %}
-    {% call table_cell(class='max-w-[420px]') %}
-      {% set _h = (row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=cap.id)|trim) if cap.id else '' %}
-      {% if _h %}<a href="{{ _h }}" class="block truncate font-medium text-foreground hover:underline">{{ cap.name or 'Unnamed capability' }}</a>{% else %}<span class="block truncate font-medium">{{ cap.name or 'Unnamed capability' }}</span>{% endif %}
+  {% call section('All capabilities', ('Rated by how much each matters to the strategy and how mature it is today' if rated else 'Not one of your ' ~ caps|length ~ ' capabilities has a strategic importance rating yet; rate them on the capability map and each lands in its quadrant below.'),
+                  action=(none if rated else _rate_action), testid='investment-capabilities') %}
+    {% if no_maturity and (show_current or show_target) %}
+    <p class="mb-4 text-sm text-muted-foreground" data-testid="investment-maturity-note">{{ no_maturity }} of {{ caps|length }} capabilities have no maturity level recorded yet; their maturity cells are left blank.</p>
+    {% elif not show_current and not show_target %}
+    <p class="mb-4 text-sm text-muted-foreground" data-testid="investment-maturity-note">No maturity levels are recorded yet, so the maturity columns are hidden.</p>
+    {% endif %}
+    {% call(cap) list_table(rows=caps, columns=columns, caption='All capabilities', testid='investment-capabilities-table', row_testid='capability-row', search_placeholder='Filter capabilities...') %}
+      {% call table_cell(class='max-w-[420px]') %}
+        {% set _h = (row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=cap.id)|trim) if cap.id else '' %}
+        {% if _h %}<a href="{{ _h }}" class="block truncate font-medium text-foreground hover:underline">{{ cap.name or 'Unnamed capability' }}</a>{% else %}<span class="block truncate font-medium">{{ cap.name or 'Unnamed capability' }}</span>{% endif %}
+      {% endcall %}
+      {% if rated %}{% call table_cell() %}{% if cap.strategic_importance %}{{ state_badge(cap.strategic_importance, tone='neutral') }}{% else %}<span class="sr-only">Not rated</span>{% endif %}{% endcall %}{% endif %}
+      {% if show_current %}{% call table_cell(class='text-right tabular-nums', attrs={'data-sort': cap.current_maturity_level if cap.current_maturity_level is not none else -1}) %}{% if cap.current_maturity_level is not none %}{{ cap.current_maturity_level }}{% else %}<span class="sr-only">Not recorded</span>{% endif %}{% endcall %}{% endif %}
+      {% if show_target %}{% call table_cell(class='text-right tabular-nums', attrs={'data-sort': cap.target_maturity_level if cap.target_maturity_level is not none else -1}) %}{% if cap.target_maturity_level is not none %}{{ cap.target_maturity_level }}{% else %}<span class="sr-only">Not recorded</span>{% endif %}{% endcall %}{% endif %}
     {% endcall %}
-    {% call table_cell() %}{{ state_badge(cap.strategic_importance, tone='neutral') if cap.strategic_importance else value_or_unset(none, 'Not rated') }}{% endcall %}
-    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': cap.current_maturity_level if cap.current_maturity_level is not none else -1}) %}{{ value_or_unset(cap.current_maturity_level if cap.current_maturity_level is not none else none) }}{% endcall %}
-    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': cap.target_maturity_level if cap.target_maturity_level is not none else -1}) %}{{ value_or_unset(cap.target_maturity_level if cap.target_maturity_level is not none else none) }}{% endcall %}
   {% endcall %}
+
+  {% if not rated %}{{ _matrix() }}{% endif %}
 {% endif %}
 </div>
 {% endblock %}

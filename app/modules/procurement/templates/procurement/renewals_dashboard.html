@@ -50,7 +50,7 @@
   {# Active contracts exist but not one carries a date, so nothing can be tracked: say that once. #}
   {% call ui.card(attrs={'data-testid': 'renewals-undated'}) %}
     {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
-      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('circle-help') }}</span>
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('calendar-days') }}</span>
       <p class="text-base font-semibold">{{ 'Your active contract has' if summary.total == 1 else 'Your ' ~ summary.total ~ ' active contracts have' }} no renewal date yet</p>
       <p class="max-w-[60ch] text-sm text-muted-foreground">Renewals can only be tracked once a contract carries its end or renewal date. Add the date on each contract and it shows here before it is due.</p>
       {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Add renewal dates{% endcall %}
@@ -78,7 +78,7 @@
        if half else
        {'label': 'Nothing more in six months', 'value': none, 'icon': 'clock', 'testid': 'renewals-upcoming',
         'sentence': (summary.ok ~ ' contract' ~ ('' if summary.ok == 1 else 's') ~ ' renew later than that') if summary.ok else 'No contract renews in this half year'}),
-      ({'label': 'Without a renewal date', 'value': undated, 'icon': 'circle-help', 'testid': 'renewals-unknown',
+      ({'label': 'Without a renewal date', 'value': undated, 'icon': 'calendar-days', 'testid': 'renewals-unknown',
         'sentence': 'Cannot be tracked until a date is added', 'href': url_for('procurement.contracts_list')}
        if undated else
        {'label': 'Every contract has a renewal date', 'value': none, 'icon': 'circle-check', 'testid': 'renewals-unknown',

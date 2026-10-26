@@ -15,8 +15,8 @@
 
 {% macro _actions() %}
 <div class="flex flex-wrap items-center gap-2">
-  {% call ui.button(href=url_for('procurement.renewals_dashboard'), variant='outline') %}{{ lucide('calendar') }}Renewals{% endcall %}
-  {% call ui.button(href=url_for('procurement.contracts_list'), variant='outline') %}{{ lucide('file-text') }}Contracts{% endcall %}
+  {{ ui.button(text='Renewals', href=url_for('procurement.renewals_dashboard'), variant='outline') }}
+  {{ ui.button(text='Contracts', href=url_for('procurement.contracts_list'), variant='outline') }}
 </div>
 {% endmacro %}
 
@@ -61,31 +61,32 @@
     {%- set value_card = {'label': 'No contract value recorded yet', 'value': none, 'icon': 'banknote', 'testid': 'spend-total-value',
         'sentence': 'Add the total value to a contract and the sum shows here'} -%}
   {%- endif -%}
+  {%- set top = (summary.top_vendors|first) if summary.top_vendors else none -%}
+  {%- if top and top[1].annual_cost is not none and (summary.total_annual_cost or 0) > 0 -%}
+    {%- set top_card = {'label': 'Largest vendor: ' ~ top[0], 'value': '%.0f'|format(top[1].annual_cost / summary.total_annual_cost * 100) ~ '%', 'icon': 'building-2', 'testid': 'spend-top-vendor',
+        'sentence': 'Share of annual spend, ' ~ _money(top[1].annual_cost) ~ ' a year', 'href': url_for('unified_applications.vendors')} -%}
+  {%- else -%}
+    {%- set top_card = {'label': 'No vendor costs to rank yet', 'value': none, 'icon': 'building-2', 'testid': 'spend-top-vendor',
+        'sentence': 'Name the vendor and annual cost on each contract to see who you spend most with'} -%}
+  {%- endif -%}
   {{ stat_cards([
       {'label': 'Active contracts', 'value': n, 'icon': 'file-text', 'testid': 'spend-active-contracts',
        'sentence': 'Vendor agreements in force today', 'href': url_for('procurement.contracts_list', status='active')},
-      annual_card, value_card], testid='spend-stat-cards') }}
+      annual_card, value_card, top_card], testid='spend-stat-cards') }}
 
-  <div class="grid items-start gap-4 md:gap-6 lg:grid-cols-7">
-    {% call section('Top vendors by annual spend', 'The vendors that cost the most each year, as a share of the total', class='lg:col-span-4', testid='spend-top-vendors') %}
+    {% call section('Top vendors by annual spend', 'The vendors that cost the most each year, as a share of the total', testid='spend-top-vendors') %}
       {% if summary.top_vendors %}
-      <ul class="space-y-4">
+      <ul class="space-y-3">
         {% for vendor_name, data in summary.top_vendors %}
-        <li class="space-y-1.5" data-testid="spend-vendor-row">
-          <div class="flex items-center justify-between gap-4 text-sm">
-            <span class="truncate font-medium">{{ vendor_name }}</span>
-            {% if data.annual_cost is not none %}
-            <span class="whitespace-nowrap tabular-nums">{{ _money(data.annual_cost) }} a year</span>
-            {% else %}
-            <span class="whitespace-nowrap text-muted-foreground">No annual cost stated</span>
-            {% endif %}
-          </div>
-          {% if data.annual_cost is not none and (summary.total_annual_cost or 0) > 0 %}
-          {% set pct = (data.annual_cost / summary.total_annual_cost * 100) %}
-          <div class="flex items-center gap-2">
-            <progress class="h-2 flex-1 appearance-none overflow-hidden rounded-full bg-secondary [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value="{{ '%.1f'|format(pct) }}" max="100" aria-label="{{ vendor_name }} share of annual spend"></progress>
-            <span class="w-12 text-right text-xs text-muted-foreground tabular-nums">{{ '%.0f'|format(pct) }}%</span>
-          </div>
+        {%- set pct = (data.annual_cost / summary.total_annual_cost * 100) if (data.annual_cost is not none and (summary.total_annual_cost or 0) > 0) else none -%}
+        <li class="flex items-center gap-3 text-sm" data-testid="spend-vendor-row">
+          <span class="w-32 shrink-0 truncate font-medium sm:w-48">{{ vendor_name }}</span>
+          {% if pct is not none %}
+          <progress class="h-2 min-w-0 flex-1 appearance-none overflow-hidden rounded-full bg-secondary [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value="{{ '%.1f'|format(pct) }}" max="100" aria-label="{{ vendor_name }} share of annual spend"></progress>
+          <span class="w-28 shrink-0 whitespace-nowrap text-right tabular-nums">{{ _money(data.annual_cost) }} a year</span>
+          <span class="w-12 shrink-0 text-right tabular-nums text-muted-foreground">{{ '%.0f'|format(pct) }}%</span>
+          {% else %}
+          <span class="flex-1 text-right text-muted-foreground">No annual cost stated</span>
           {% endif %}
         </li>
         {% endfor %}
@@ -95,7 +96,8 @@
       {% endif %}
     {% endcall %}
 
-    {% call section('Spend by contract type', 'Annual cost of active contracts, grouped by type', class='lg:col-span-3', testid='spend-by-type') %}
+  <div class="grid items-start gap-4 md:gap-6 lg:grid-cols-2">
+    {% call section('Spend by contract type', 'Annual cost of active contracts, grouped by type', testid='spend-by-type') %}
       <ul class="divide-y">
         {% for type, data in summary.by_type.items() %}
         {%- set label = ('Type not set' if type in [none, '', 'unknown'] else type|replace('_', ' ')) -%}
@@ -113,11 +115,18 @@
         {% endfor %}
       </ul>
     {% endcall %}
-  </div>
 
   {% call section('Ways to spend less', 'Suggestions drawn from your contracts, licences and renewal dates', action=_recommend_action, testid='spend-recommendations') %}
     {% if not ai_available %}
-      <p class="text-sm text-muted-foreground">Suggestions need an AI provider. Connect one in settings and they appear here.</p>
+      {%- set _admin = current_user.is_authenticated and ((current_user.is_admin() if current_user.is_admin is callable else current_user.is_admin) if current_user.is_admin is defined else false) -%}
+      {% if _admin and 'admin.api_settings' in flask.current_app.view_functions %}
+      <div class="flex flex-col items-start gap-3">
+        <p class="text-sm text-muted-foreground">Suggestions need an AI provider; connect one and they appear here.</p>
+        {{ ui.button(text='Connect an AI provider', href=url_for('admin.api_settings'), variant='outline', size='sm') }}
+      </div>
+      {% else %}
+      <p class="text-sm text-muted-foreground">Suggestions need an AI provider; ask your administrator to connect one and they appear here.</p>
+      {% endif %}
     {% elif recommendations_error %}
       <p class="text-sm text-muted-foreground" role="status">The suggestions could not be generated just now. Try again in a minute.</p>
     {% elif recommendations %}
@@ -137,6 +146,7 @@
       <p class="text-sm text-muted-foreground">Generate suggestions to see where you could consolidate vendors, drop unused licences or renegotiate before a renewal.</p>
     {% endif %}
   {% endcall %}
+  </div>
 {% endif %}
 </div>
 {% endblock %}

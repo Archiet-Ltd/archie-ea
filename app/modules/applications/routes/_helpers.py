@@ -658,10 +658,39 @@ def _vendors_impl(
         db.session.rollback()
         register_rows = []
 
+    # System counts use the Overview's definition of an application (not
+    # decommissioned), through the Overview's own query, so both pages agree.
+    system_counts = None
+    try:
+        from app.models.application_portfolio import ApplicationComponent
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        org_id = vendor_register._org(None)
+        if org_id is not None:
+            active = _active_applications().where(ApplicationComponent.organization_id == org_id)
+            total_systems = db.session.execute(
+                db.select(func.count()).select_from(active.with_only_columns(ApplicationComponent.id).subquery())
+            ).scalar_one()
+            unmapped = db.session.execute(
+                active.where(vendor_register._app_vendor_expr().is_(None)).order_by(
+                    func.lower(ApplicationComponent.name), ApplicationComponent.id)
+            ).scalars().all()
+            system_counts = {
+                "total_systems": total_systems,
+                "supplied_count": total_systems - len(unmapped),
+                "unmapped_count": len(unmapped),
+                "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status}
+                             for a in unmapped[:200]],
+            }
+    except Exception:  # noqa: BLE001 - fall back to the register's own counts
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor page system counts could not be read")
+
     return render_template(
         "vendors/list.html",
         vendors=vendors,
         register_rows=register_rows,
+        system_counts=system_counts,
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,
