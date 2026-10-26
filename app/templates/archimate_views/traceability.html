@@ -272,7 +272,7 @@
         {%- if direction != 'inverse' %}{% set _ = mcols.append(('Technology', '')) %}{% endif -%}
         {%- set _ = mcols.append(('Data', '')) -%}{%- set _ = mcols.append(('', 'w-12')) -%}
         {% call(row) list_table(rows=matrix, columns=mcols, toolbar=false,
-                                caption='Traceability matrix', testid='traceability-matrix', row_testid='traceability-row', page_size=50) %}
+                                caption='Traceability matrix', testid='traceability-matrix', row_testid='traceability-row', page_size=50, server_pagination=(total_pages is defined and total_pages > 1)) %}
             {% call table_cell(class='align-top whitespace-normal font-medium') %}
                 <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}" class="hover:underline">{{ row.application.name }}</a>
                 {%- set other_kind = row.application.type and (direction == 'inverse' or row.application.type != current_pivot_type) -%}

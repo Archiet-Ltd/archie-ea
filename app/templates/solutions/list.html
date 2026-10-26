@@ -188,7 +188,7 @@
                    {'label': 'Created', 'sortable': true, 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}] -%}
 {% call(solution) list_table(rows=solutions, columns=columns, caption='Solutions', testid='solutions-table', row_testid='solution-row', page_size=50,
                              search_placeholder='Filter this page...', toolbar=true, toolbar_actions=_filters,
-                             empty_message='No solutions match these filters.') %}
+                             empty_message='No solutions match these filters.', server_pagination=(pagination and pagination.pages > 1)) %}
   {%- set ws = (workspace_summaries or {}).get(solution.id, {}) -%}
   {%- set readiness = ws.readiness_pct or 0 -%}
   {%- set gov = ws.governance_status or 'draft' -%}

@@ -22,6 +22,8 @@
    toolbar          true / false; by default shown once there are more than 8 rows
    toolbar_actions  a macro rendering buttons at the right of the toolbar, before View
    empty_message    shown in the table when there are no rows; empty_action is an optional macro for the next step
+   server_pagination  set when the server pages the rows: every row given is shown, the table's own footer is left
+                    out, and a macro passed here renders the server's pager in its place
    A sortable column sorts by each cell's data-sort attribute (table_cell(attrs={'data-sort': value})) or its text.
 
    A list of ArchiMate elements uses components/element_table.html, which is this table with the element's name
@@ -41,7 +43,8 @@
 {%- set rows = rows or [] -%}
 {%- set total = rows|length -%}
 {%- set show_toolbar = toolbar if toolbar is not none else (total > 8 or toolbar_actions) -%}
-{%- set show_footer = total > 10 -%}
+{%- set show_footer = total > 10 and not server_pagination -%}
+{%- set page_size = (total or 1) if server_pagination else page_size -%}
 {%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
 <div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
   {% if show_toolbar %}
@@ -120,6 +123,7 @@
     {% endcall %}
   </div>
 
+  {% if server_pagination is callable %}{{ server_pagination() }}{% endif %}
   {% if show_footer %}
   <div class="flex items-center justify-between px-2" data-slot="data-table-pagination">
     <div class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{{ total }} rows</div>
