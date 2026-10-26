@@ -29487,10 +29487,77 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
+"status": "mapped",
+    "tier": "B",
+    "type_changed": false
+   },
+  "app/templates/ea_workflows/vision_not_configured.html": {
+    "allowed_macros": [
+     "components/accessibility_helpers.html",
+     "components/alert.html",
+     "components/breadcrumb_nav.html",
+     "components/button.html",
+     "components/empty_state.html",
+     "components/page_header.html",
+     "macros/page_shell.html"
+    ],
+    "basis": "declared",
+    "block": "empty-state",
+    "components": [
+     "alert",
+     "badge",
+     "breadcrumb",
+     "button",
+     "empty",
+     "page-header"
+    ],
+    "confidence": "high",
+    "controls": {
+     "link": 2
+    },
+    "departures": [
+     {
+      "rule": "brand",
+      "what": "Entelim logo sits above the Empty block, as the error-page slot allows."
+     }
+    ],
+    "extends": [
+     "layouts/admin_base.html"
+    ],
+    "frame": "empty",
+    "grid": "G3",
+    "inhouse_components": [],
+    "macros": [
+     "components/breadcrumb_nav.html",
+     "components/empty_state.html",
+     "components/page_header.html"
+    ],
+    "original": "empty",
+    "page_type": "empty-state",
+    "patterns": [
+     "P26-error-state",
+     "P17-empty-state"
+    ],
+    "persona": "enterprise_architect",
+    "reason": "Vision deliverable not configured; Empty with a link to workflow definitions.",
+    "reference": {
+     "shadcn": {
+      "name": "shadcn components: empty",
+      "url": "https://ui.shadcn.com/docs/components/empty"
+     },
+     "basecoat": {
+      "name": "flask-basecoat examples: coming soon",
+      "image": "docs/design/reference/basecoat-coming-soon.webp"
+     }
+    },
+    "spec": null,
+    "states": [
+     "error-page"
+    ],
+    "status": "mapped",
+    "tier": "B",
+    "type_changed": false
+   },
   "app/templates/ea_workflows/schedules.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
