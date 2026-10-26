@@ -265,7 +265,7 @@
                         <span class="w-24 text-xs font-medium text-muted-foreground shrink-0">
                             {% if phase == 'Unclassified' %}Unclassified{% else %}{{ phase }}: {{ adm_labels.get(phase, '') }}{% endif %}
                         </span>
-                        {{ progress_bar(value=(phase_share if phase_share is not none else 0), max=100, class='flex-1 !h-2 !bg-muted') }}
+                        {{ progress_bar(value=(phase_share if phase_share is not none else 0), max=100, class='flex-1 !h-2 !bg-muted', label=(phase ~ ' share of solutions')) }}
                         <span class="w-8 text-xs text-right text-foreground font-medium shrink-0">{{ count }}</span>
                         <span class="w-12 text-xs text-right text-muted-foreground shrink-0">{% if phase_share is not none %}{{ phase_share }}%{% else %}&#8212;{% endif %}</span>
                     </div>

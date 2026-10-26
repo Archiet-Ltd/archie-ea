@@ -35,11 +35,15 @@
             <p class="text-sm text-muted-foreground mb-4">{{ cap.description|default('No description', true)|truncate(100) }}</p>
             <div class="space-y-2">
                 <div class="flex justify-between text-sm">
-                    <span class="text-muted-foreground">Maturity</span>
-                    <span>{{ cap.current_maturity|default(0) }} / {{ cap.target_maturity|default(5) }}</span>
+                    <span class="text-muted-foreground">Current Maturity</span>
+                    <span>{{ cap.current_maturity_level if cap.current_maturity_level is not none else 'Not assessed' }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-muted-foreground">Target Maturity</span>
+                    <span>{{ cap.target_maturity_level if cap.target_maturity_level is not none else 'No target set' }}</span>
                 </div>
                 <div class="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div class="h-full bg-primary" style="width: {{ (cap.current_maturity|default(0) / 5 * 100)|int }}%"></div>
+                    <div class="h-full bg-primary" style="width: {{ ((cap.current_maturity_level if cap.current_maturity_level is not none else 0) / 5 * 100)|int }}%"></div>
                 </div>
             </div>
         </div>

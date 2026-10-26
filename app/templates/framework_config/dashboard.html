@@ -61,7 +61,7 @@
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <button type="button" @click="Platform.modal.open('create-framework-config')" 
-                class="bg-card rounded-lg border p-6 hover:bg-muted transition-colors text-left w-full" aria-label="Open">
+                class="bg-card rounded-lg border p-6 hover:bg-muted transition-colors text-left w-full">
             <div class="flex items-center space-x-4">
                 <div class="flex-shrink-0">
                     <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,7 +287,7 @@
         <button type="button" @click="Platform.modal.close('create-framework-config')"
                 class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
         <button type="submit" :disabled="submitting"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
             <span x-text="submitting ? 'Creating...' : 'Create Configuration'"></span>
         </button>
