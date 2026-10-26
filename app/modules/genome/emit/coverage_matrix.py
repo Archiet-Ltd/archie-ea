@@ -86,10 +86,9 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
     # Legend / provenance banner.
     parts.append(
         '<div class="mb-4 text-sm text-muted-foreground">'
-        f'Source: <span class="font-medium text-foreground">{escape(source)}</span> '
-        f'&middot; {len(capabilities)} capabilities &times; {len(applications)} applications '
-        f'&middot; {len(cells)} mappings '
-        f'&middot; <span class="font-mono text-xs">{escape(spec_hash)}</span>'
+        f'{len(capabilities)} {"capability" if len(capabilities) == 1 else "capabilities"} '
+        f'and {len(applications)} {"application" if len(applications) == 1 else "applications"}, '
+        f'with {len(cells)} {"link" if len(cells) == 1 else "links"} between them.'
         '</div>'
     )
 
@@ -102,13 +101,13 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
         parts.append('</div>')
         return "".join(parts)
 
-    parts.append('<div class="overflow-x-auto border border-border rounded-lg">')
-    parts.append('<table class="border-collapse text-xs">')
+    parts.append('<div class="max-w-full overflow-auto border border-border rounded-lg" data-coverage-scroll>')
+    parts.append('<table class="min-w-max border-collapse text-xs">')
 
     # Header row: application names as columns.
     parts.append('<thead><tr>')
     parts.append(
-        '<th class="sticky left-0 bg-card z-10 p-2 text-left font-medium '
+        '<th class="bg-card p-2 text-left font-medium min-w-32 '
         'text-foreground border-b border-r border-border">Capability \\ Application</th>'
     )
     for app in applications:
@@ -124,7 +123,7 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
         )
     if planned_work is not None:
         parts.append(
-            '<th class="p-2 border-b border-l border-border text-left font-medium text-foreground" '
+            '<th class="min-w-32 p-2 border-b border-l border-border text-left font-medium text-foreground" '
             'scope="col">Planned work</th>'
         )
     parts.append('</tr></thead>')
@@ -136,7 +135,7 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
         name_cls = "text-foreground" if cap_populated else "text-muted-foreground"
         parts.append('<tr>')
         parts.append(
-            '<th class="sticky left-0 bg-card z-10 p-2 text-left font-normal '
+            '<th class="bg-card p-2 text-left font-normal min-w-32 whitespace-normal '
             f'border-r border-b border-border {name_cls}" '
             f'id="capability-{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
             f'data-capability-id="{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
@@ -176,7 +175,7 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
         if planned_work is not None:
             work = planned_work.get(cap["id"], [])
             parts.append(
-                '<td class="p-2 border-b border-l border-border align-top text-xs" '
+                '<td class="min-w-32 p-2 border-b border-l border-border align-top text-xs" '
                 f'data-planned-work-for="{cap["id"]}">'  # raw-html-ok: cap["id"] is a db.Integer PK
             )
             if work:

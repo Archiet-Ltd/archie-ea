@@ -345,3 +345,59 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
         context.close()
         if second is not None:
             second.close()
+
+
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_the_coverage_page_reads_in_full_on_a_phone_in_light_and_dark_and_in_plain_words(browser, world, scheme):
+    """QA-039 and QA-043: at 390 wide every column of the coverage table can be read (the table slides inside its
+    card, the page itself does not overflow), the planned work is whole, and no engineering name shows."""
+    base, mine = world["base"], world["one"]
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    context.add_init_script(SKIP_WELCOME)
+    context.add_init_script("localStorage.setItem('theme', '%s');" % scheme)
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, base, mine["email"])
+        page.goto(base + "/genome/coverage/generate", wait_until="domcontentloaded")
+        scroller = page.locator("[data-coverage-scroll]")
+        expect(scroller).to_be_visible()
+        assert page.evaluate("document.documentElement.classList.contains('dark')") == (scheme == "dark")
+        # the page itself does not spill sideways; the table slides inside its card
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+        box = scroller.bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= 391, box
+        headers = scroller.locator("thead th")
+        assert headers.count() == 3  # capability, the one application, planned work
+        for i in range(headers.count()):
+            header = headers.nth(i)
+            header.scroll_into_view_if_needed()
+            hb, sb = header.bounding_box(), scroller.bounding_box()
+            assert hb["width"] > 20 and hb["x"] >= sb["x"] - 1 and hb["x"] + hb["width"] <= sb["x"] + sb["width"] + 1, (i, hb, sb)
+        scroller.evaluate("el => { el.scrollLeft = el.scrollWidth; }")
+        scroller.evaluate("el => { el.scrollLeft = 0; }")
+        # no cell shows less text than it holds
+        clipped = page.evaluate("""() => [...document.querySelectorAll('[data-coverage-scroll] th, [data-coverage-scroll] td')]
+            .filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.innerText.trim())""")
+        assert clipped == [], clipped
+        for label in ("Customer Onboarding", "Fraud Screening", "Partner Payouts", "Ledger Hub"):
+            assert scroller.get_by_text(label, exact=False).count() >= 1, label
+        planned = world["seed_one"]["names"]["wp"]
+        link = scroller.get_by_role("link", name=planned)
+        link.scroll_into_view_if_needed()
+        # the whole name is there, not cut: the link's text is not wider than its box
+        assert page.evaluate("(el) => el.scrollWidth <= el.clientWidth + 1", link.element_handle())
+        lb, sb = link.bounding_box(), scroller.bounding_box()
+        assert lb["x"] >= sb["x"] - 1 and lb["x"] + lb["width"] <= sb["x"] + sb["width"] + 1, (lb, sb)
+        assert link.inner_text().strip() == planned
+        text = page.locator("main").inner_text().lower()
+        for engineering in ("unified_capabilities", "business_capability", "sha256", "zero llm", "archimate element ids", "deterministic"):
+            assert engineering not in text, engineering
+        scroller.evaluate("el => { el.scrollLeft = 0; }")
+        if SHOTS:
+            os.makedirs(SHOTS, exist_ok=True)
+            page.screenshot(path=os.path.join(SHOTS, "coverage-390-%s-start.png" % scheme), full_page=True)
+            scroller.evaluate("el => { el.scrollLeft = el.scrollWidth; }")
+            page.screenshot(path=os.path.join(SHOTS, "coverage-390-%s-end.png" % scheme), full_page=True)
+    finally:
+        context.close()
