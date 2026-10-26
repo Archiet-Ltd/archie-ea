@@ -18,6 +18,9 @@ class OrgService:
         org = Organization(name=name, slug=slug)
         db.session.add(org)
         db.session.flush()  # get org.id
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         admin_role = Role.query.filter_by(name="Administrator").first()
         if not admin_role:
             admin_role = Role(name="Administrator", permissions=Permission.ADMINISTER)

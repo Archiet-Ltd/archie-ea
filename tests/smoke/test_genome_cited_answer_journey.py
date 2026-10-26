@@ -24,9 +24,8 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.genome_cited_seed import seed_cited_model
-from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
+from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from tests.smoke.chat_ask import sign_in
-from tests.smoke.fresh_org import create_fresh_org
 from tests.smoke.test_connect_github_to_cited_answer_journey import remove_organisations
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -144,23 +143,36 @@ def server(request, app, model_peer):
     return boot_live_server(request, None, app, extra_env=env)
 
 
+def _sign_up(app, label):
+    """A new startup founder, registered the way the sign-up form registers them: their own organisation,
+    created by the product, with whatever it gives a new organisation (nothing is seeded here)."""
+    import uuid
+
+    from app import db
+    from app.models.user import User
+    from app.modules.account.services.account_service import AccountService
+
+    email = "cto.%s@example.com" % uuid.uuid4().hex[:8]
+    with app.test_request_context("/"):
+        AccountService.register_user("Casey", label, email, PASSWORD, confirmed=True)
+    with app.app_context():
+        org_id = User.query.filter_by(email=email).one().organization_id
+        db.session.remove()
+    return {"email": email, "org_id": org_id}
+
+
 @pytest.fixture(scope="module")
 def world(server, app):
-    """Two organisations with a linked model each; the second spells its records almost the same."""
+    """Two founders, each with an organisation of their own made by sign-up and a linked model each;
+    the second spells its records almost the same."""
     from app import db
 
-    one = create_fresh_org("solution_architect", org_admin=True)
-    two = create_fresh_org("solution_architect", org_admin=True)
+    one = _sign_up(app, "One")
+    two = _sign_up(app, "Two")
     with app.app_context():
         seed_one = seed_cited_model(db.session, one["org_id"])
         seed_two = seed_cited_model(db.session, two["org_id"], suffix=" 2")
         db.session.commit()
-        # The deployed organisations carry the agent charters the deploy seeds; a person asking the chat is bounded by them.
-        from app.commands.seed_agent_charters import seed_charters
-
-        for org_id in (one["org_id"], two["org_id"]):
-            result = app.test_cli_runner().invoke(seed_charters, ["--organization-id", str(org_id)])
-            assert result.exit_code == 0, result.output
         db.session.remove()
     yield {"base": str(server), "one": one, "two": two, "seed_one": seed_one, "seed_two": seed_two}
     _remove_what_the_chat_wrote(app, [one["org_id"], two["org_id"]])
@@ -233,7 +245,7 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
     context.set_default_timeout(PAGE_TIMEOUT)
     page = context.new_page()
     try:
-        sign_in(page, base, mine["emails"]["solution_architect"])
+        sign_in(page, base, mine["email"])
         unsupported = _coverage_page_unsupported(page, base)
         assert unsupported == ["Fraud Screening", "Partner Payouts"], unsupported
         page.goto(base + "/genome/roadmap/", wait_until="domcontentloaded")
@@ -296,7 +308,7 @@ def test_a_startup_cto_asks_what_nothing_supports_and_every_name_in_the_answer_i
 
         # The other organisation's person sees only their own names through the same question.
         model_peer.sent.clear()
-        sign_in(page, base, other["emails"]["solution_architect"])
+        sign_in(page, base, other["email"])
         page.goto(base + "/ai-chat", wait_until="domcontentloaded")
         page.locator("#user-input").fill(QUESTION)
         page.locator("#user-input").press("Enter")

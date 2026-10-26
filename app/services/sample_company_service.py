@@ -201,6 +201,9 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     The route calls this once, straight after a fresh import of the file.
     Everything created is noted on ``log`` so ``remove`` can undo it.
     """
+    from app.commands.seed_agent_charters import ensure_charters
+
+    ensure_charters(org_id)
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent

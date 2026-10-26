@@ -2418,6 +2418,9 @@ def _seed_demo_company() -> dict:
         db.session.flush()
         # Enterprise has no people limit, so the demo cast below fits.
         set_contract_plan(org, "enterprise", None)
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         stats["organization_created"] = 1
     else:
         stats["organization_created"] = 0
