@@ -2835,10 +2835,20 @@ def _seed_demo_company() -> dict:
         from app.modules.capabilities.services.capability_service import ensure_capability_record
         from app.services.archimate_backbone import create_backbone_element
 
+        from app.models.archimate_core import ArchiMateElement
+
         unified_by_code = {u.code: u for u in _resolve_caps(org_id).values()}
+        # Re-read: writing a capability record can already have mirrored its element.
+        elements = _resolve_elements(org_id)
         elements_made = 0
         for name, code, _cur, _tgt, level in _CAPABILITIES:
-            element = elements.get(name)
+            bc_now = existing_bcs.get(code)
+            element = (
+                db.session.get(ArchiMateElement, bc_now.archimate_element_id)
+                if bc_now is not None and bc_now.archimate_element_id is not None else None
+            )
+            if element is None:
+                element = elements.get(name)
             if element is None or element.type != "Capability":
                 element = create_backbone_element(
                     element_type="Capability", layer="strategy", name=name,
