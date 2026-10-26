@@ -499,6 +499,11 @@ else:
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401
 
+    # Every relationship written under a declared source records its origin as it is written.
+    from app.services.relationship_origin import register as _register_relationship_origin
+
+    _register_relationship_origin()
+
     # The one audit store. Imported at boot so its integrity-chain and
     # copy-from-other-audit-stores hooks are registered before any insert.
     from .audit_log import AuditLog  # noqa: F401
