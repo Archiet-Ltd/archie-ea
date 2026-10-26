@@ -13,6 +13,7 @@
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/element_table.html' import element_table %}
 {% from 'components/risk_matrix.html' import risk_matrix %}
+{% from 'components/figures.html' import state_badge %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'components/avatar.html' import avatar %}
 {% from 'solutions/partials/_design_score.html' import design_score_panel, design_score_ring %}
@@ -246,7 +247,7 @@
               <ul class="space-y-2" data-testid="review-findings">
                 {% for f in packet.conformance.findings %}
                 <li class="flex items-start gap-2 text-sm">
-                  {% call badge(variant=('danger' if f.severity == 'critical' else ('warning' if f.severity == 'high' else 'neutral'))) %}{{ f.severity }}{% endcall %}
+                  {{ state_badge(f.severity) }}
                   <span class="text-foreground">{{ f.title }}</span>
                 </li>
                 {% endfor %}
@@ -264,7 +265,7 @@
             {% call card_content() %}
               {% if packet.decision %}
               <p class="text-sm font-medium text-foreground" data-testid="review-decision">{{ packet.decision.title }}</p>
-              <div class="mt-1">{% call badge(variant=('success' if packet.decision.status == 'accepted' else ('danger' if packet.decision.status == 'rejected' else 'warning'))) %}{{ packet.decision.status }}{% endcall %}</div>
+              <div class="mt-1">{{ state_badge(packet.decision.status) }}</div>
               <p class="mt-2 text-sm text-muted-foreground">{{ packet.decision.decision|truncate(240) }}</p>
               {% else %}
               <p class="text-sm text-muted-foreground" data-testid="review-decision">No decision recorded. Compare the options and record which one the design takes.</p>
@@ -288,7 +289,7 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <span class="text-sm font-medium text-foreground">{{ h.review_number }}</span>
-                    {% call badge(variant=('success' if h.decision in ('approved', 'approved_with_conditions') else ('danger' if h.decision == 'rejected' else 'neutral'))) %}{{ h.decision_label }}{% endcall %}
+                    {{ state_badge(h.decision_label, tone=('positive' if h.decision in ('approved', 'approved_with_conditions') else ('negative' if h.decision == 'rejected' else 'neutral'))) }}
                   </div>
                   <p class="text-xs text-muted-foreground">
                     {% if h.submitter_name %}Submitted by {{ h.submitter_name }}{% if h.submitted_at %} on {{ h.submitted_at }}{% endif %}.{% endif %}
@@ -341,7 +342,7 @@
                   {% if r.realised_by %}<a href="{{ r.realised_by.href or (base ~ '?tab=design') }}" class="text-foreground hover:underline" data-testid="requirement-element-link">{{ r.realised_by.name }}</a>
                   {% else %}<a href="{{ base }}?tab=design" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="requirement-unrealised">Not linked yet</a>{% endif %}
                 {% endcall %}
-                {% call table_cell(class='hidden px-2 align-middle text-muted-foreground md:table-cell') %}{{ r.status }}{% endcall %}
+                {% call table_cell(class='hidden px-2 align-middle text-muted-foreground md:table-cell') %}{{ state_badge(r.status) }}{% endcall %}
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -417,7 +418,7 @@
                   {% call table_cell(class='whitespace-nowrap px-2 align-middle text-muted-foreground') %}{{ o.approach or 'Not stated' }}{% endcall %}
                   {% call table_cell(class='whitespace-nowrap px-2 align-middle text-foreground') %}{{ o.cost or 'Not stated' }}{% endcall %}
                   {% call table_cell(class='whitespace-nowrap px-2 align-middle text-foreground') %}{% if o.months %}{{ o.months }} month{{ 's' if o.months != 1 }}{% else %}Not stated{% endif %}{% endcall %}
-                  {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{% if o.risk %}{% call badge(variant={'Low': 'success', 'Medium': 'warning', 'High': 'danger'}.get(o.risk, 'outline')) %}{{ o.risk }}{% endcall %}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}{% endcall %}
+                  {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{% if o.risk %}{{ state_badge(o.risk) }}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}{% endcall %}
                   {% endif %}
                   {% call table_cell(class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}") %}<span class="block w-0 min-w-full truncate">{{ o.summary }}</span>{% endcall %}
               {% endcall %}
@@ -430,7 +431,7 @@
             {% call card_header(class='pb-3') %}
               <div class="flex flex-wrap items-center gap-2">
                 {% call card_title(class='text-base') %}Decision: {{ d.title }}{% endcall %}
-                {% call badge(variant={'accepted': 'success', 'approved': 'success', 'rejected': 'danger', 'superseded': 'neutral', 'deprecated': 'neutral'}.get(d.status_key, 'info')) %}{{ d.status }}{% endcall %}
+                {{ state_badge(d.status, tone={'accepted': 'positive', 'approved': 'positive', 'rejected': 'negative'}.get(d.status_key, 'neutral')) }}
               </div>
               {% call card_description() %}{% if d.decided_by %}{{ d.decided_by }}{% if d.decided_at %}, {{ d.decided_at|format_datetime('d MMM yyyy') }}{% endif %}{% elif d.decided_at %}Recorded {{ d.decided_at|format_datetime('d MMM yyyy') }}{% else %}Decision record{% endif %}{% endcall %}
             {% endcall %}
@@ -456,7 +457,7 @@
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-2">
               <p class="text-sm text-muted-foreground" data-testid="risks-summary">{{ rk.rows|length }} risk{{ 's' if rk.rows|length != 1 }}, {{ rk.open }} open{% if rk.without_owner %}, {{ rk.without_owner }} without an owner{% endif %}.</p>
-              {% for b in rk.bands %}{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[b.key]) %}{{ b.label }} {{ b.count }}{% endcall %}{% endfor %}
+              {% for b in rk.bands %}{{ state_badge(b.label ~ ' ' ~ b.count, tone={'low': 'positive', 'medium': 'caution', 'high': 'negative', 'critical': 'negative'}[b.key]) }}{% endfor %}
             </div>
             <div class="flex gap-2">
               {{ button(text='Risk register', variant='outline', size='sm', icon='shield-alert', href=rk.register_href, testid='risks-register') }}
@@ -466,8 +467,8 @@
           {% if rk.without_owner %}
             {{ alert(kind='warning', title=rk.without_owner ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
           {% endif %}
-          <div class="grid gap-6 lg:grid-cols-3">
-            {% call card(class='lg:col-span-1') %}
+          <div class="space-y-6">
+            {% call card() %}
               {% call card_header(class='pb-3') %}
                 {% call card_title(class='text-base') %}Probability and impact{% endcall %}
                 {% call card_description() %}Probability across, impact upward. Each cell counts the risks in it.{% endcall %}
@@ -476,7 +477,7 @@
                 {{ risk_matrix(rk.grid) }}
               {% endcall %}
             {% endcall %}
-            {% call card(class='overflow-hidden lg:col-span-2') %}
+            {% call card(class='overflow-hidden') %}
               {% call card_header(class='pb-3') %}
                 {% call card_title(class='text-base') %}Risks on the register{% endcall %}
                 {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
@@ -489,8 +490,8 @@
                       {% if r.mitigation %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
                     {% endcall %}
                     {% call table_cell(class='px-2 align-middle') %}{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}{% endcall %}
-                    {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[r.band]) %}{{ r.band_label }} {{ r.score }}{% endcall %}{% endcall %}
-                    {% call table_cell(class='hidden px-2 align-middle text-muted-foreground md:table-cell') %}{{ r.status }}{% endcall %}
+                    {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{{ state_badge(r.band_label ~ ' ' ~ r.score, tone={'low': 'positive', 'medium': 'caution', 'high': 'negative', 'critical': 'negative'}[r.band]) }}{% endcall %}
+                    {% call table_cell(class='hidden px-2 align-middle text-muted-foreground md:table-cell') %}{{ state_badge(r.status) }}{% endcall %}
                 {% endcall %}
               {% endcall %}
             {% endcall %}
@@ -520,7 +521,7 @@
                     {% if p.href %}<a href="{{ p.href }}" class="font-medium text-foreground hover:underline" data-testid="work-package-link">{{ p.name }}</a>{% else %}<span class="font-medium text-foreground">{{ p.name }}</span>{% endif %}
                     {% if p.plateau %}<span class="block text-xs text-muted-foreground">Plateau {{ p.plateau }}</span>{% endif %}
                   {% endcall %}
-                  {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{% call badge(variant={'Completed': 'success', 'Done': 'success', 'In progress': 'info', 'Blocked': 'danger', 'On hold': 'warning'}.get(p.status, 'outline')) %}{{ p.status }}{% endcall %}{% endcall %}
+                  {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{{ state_badge(p.status) }}{% endcall %}
                   {% call table_cell(class='px-2 align-middle') %}
                     <div class="flex items-center gap-2" data-testid="work-package-progress" data-percent="{{ p.percent }}">
                       {{ progress(value=p.percent, class='h-2 w-20') }}
