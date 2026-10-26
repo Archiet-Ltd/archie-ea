@@ -130,7 +130,7 @@
                                     {% if cap.strategic_importance == 'critical' %}bg-destructive/20 text-destructive-emphasis
                                     {% elif cap.strategic_importance == 'high' %}bg-warning/20 text-warning-emphasis
                                     {% else %}bg-muted text-muted-foreground{% endif %}">
-                                    {{ cap.strategic_importance|default('Normal')|title }}
+                                    {{ cap.strategic_importance|default('Normal', true)|title }}
                                 </span>
                             </td>
                             <td class="p-3">{{ cap.current_maturity_level|default(1) }}</td>
