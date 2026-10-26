@@ -72,15 +72,17 @@ class AgentCharter(TenantMixin, db.Model):
         if tool_name in forbidden:
             return False
         proposable = charter.proposable_actions or []
+        from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
+
+        risk_class = TOOL_SCHEMA_BY_NAME.get(tool_name, {}).get("risk_class")
+        if risk_class == "read":
+            # A charter bounds what a persona may propose or change. Reading the
+            # caller own organisation records is open to every persona unless the
+            # charter forbids that tool by name (checked above).
+            return True
         if not proposable:
             # Empty proposable list — persona can only read.
-            from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
-
-            schema = TOOL_SCHEMA_BY_NAME.get(tool_name, {})
-            risk_class = schema.get("risk_class")
-            if risk_class in ("read", "propose"):
-                return True
-            return False
+            return risk_class == "propose"
         if isinstance(proposable, str) and proposable == "all":
             return True
         return tool_name in proposable

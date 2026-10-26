@@ -287,3 +287,23 @@ def test_the_rendered_answer_links_each_cited_record_with_the_notice_and_as_of(t
     assert "Answer written by AI from your model · OpenAI" in html
     assert "Model as of " in html
     assert "[ref:" not in html
+
+
+def test_a_persona_whose_charter_lists_only_writes_can_still_read_the_model(two_orgs, tenant_ctx, db_session):
+    """The design-partner charter lists the tools it may propose; reading the organisation's own
+    model through the one read tool is not refused (it was, so the chat could not answer)."""
+    from app.models.agent_charter import AgentCharter
+    from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
+
+    org = two_orgs["a"]
+    db_session.add(AgentCharter(organization_id=org.id, persona="solutions_architect", version=1,
+                                purpose="p", readable_entities=[], proposable_actions=["create_solution"],
+                                forbidden_actions=[], charter_text=""))
+    db_session.flush()
+    with tenant_ctx(org.id):
+        result = ToolExecutor(two_orgs["user_a"].id, persona="solutions_architect").execute(
+            ToolCall(id="t", name="get_genome_slice", arguments={"domain": "business"}))
+        refused = ToolExecutor(two_orgs["user_a"].id, persona="solutions_architect").execute(
+            ToolCall(id="t", name="create_programme", arguments={}))
+    assert result["success"] is True and result["result"]["nodes"]
+    assert refused.get("code") == "CHARTER_REFUSED"
