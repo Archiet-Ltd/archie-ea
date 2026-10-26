@@ -159,3 +159,17 @@ def test_another_organisation_cannot_reach_the_element_by_either_id(app, db_sess
     c.post(BASE % ae_id + "/delete?ae=1", json={})
     c.post("/architecture/implementation/WorkPackage/bulk-delete", json={"ae_ids": [ae_id], "ids": [wp_id]})
     assert len(_names(org_a.id)) == 2, "another organisation deleted organisation A's work packages"
+
+
+def test_an_edit_with_a_blank_date_saves(app, db_session, make_org, login_as):
+    """The edit form posts every field; an untouched target date arrives blank
+    and must be stored as no date, not fail the save."""
+    org, c = _signed_in(app, db_session, make_org, login_as, "ids-blank-date")
+    ae_id, _, _, _ = _collision(db_session, org.id)
+
+    resp = c.post(
+        BASE % ae_id + "/edit?ae=1",
+        json={"name": "Target with no date", "description": "", "target_date": ""},
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert "Target with no date" in _names(org.id)

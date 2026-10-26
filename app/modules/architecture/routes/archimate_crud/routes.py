@@ -2162,6 +2162,22 @@ def _apply_architecture_state(element, data):
             ae.togaf_plateau = raw
 
 
+def _form_value(element, field, value):
+    """A blank form field means "no value" for a typed column. The edit form
+    posts every field, so an untouched date or number arrives as "" and
+    writing that into a date column failed the whole save."""
+    if isinstance(value, str) and not value.strip():
+        table = getattr(type(element), "__table__", None)
+        column = table.columns.get(field) if table is not None else None
+        if column is not None:
+            try:
+                if column.type.python_type is not str:
+                    return None
+            except NotImplementedError:
+                pass
+    return value
+
+
 def _set_model_fields(element, data, model_class, element_type=None):
     """Set model-specific fields from data.
 
@@ -2183,7 +2199,7 @@ def _set_model_fields(element, data, model_class, element_type=None):
         if (
             hasattr(element, field) and field in data
         ):  # model-safety-ok: polymorphic ArchiMate elements - not all models have all common fields
-            setattr(element, field, data[field])
+            setattr(element, field, _form_value(element, field, data[field]))
 
     # Model-specific field mapping
     field_mappings = {
@@ -2252,7 +2268,7 @@ def _set_model_fields(element, data, model_class, element_type=None):
         if (
             hasattr(element, field) and field in data
         ):  # model-safety-ok: polymorphic ArchiMate elements
-            setattr(element, field, data[field])
+            setattr(element, field, _form_value(element, field, data[field]))
 
 
 def _get_element_relationships(element, element_id):
