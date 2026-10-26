@@ -246,3 +246,32 @@ def test_the_person_is_told_more_facts_will_come_when_the_service_is_less_busy(a
         row = next(r for r in onboarding.sources(db.session.get(Organization, org.id)) if r["key"] == "website")
     assert "More facts will be added when our reading service is less busy." in row["text"]
     assert onboarding.more_facts_coming(db.session.get(Organization, org.id)) == onboarding.MORE_FACTS_LATER
+
+
+def test_step_three_shows_the_sentence_to_a_signed_in_person(app, client, login_as, make_org, site, monkeypatch):
+    from app import db
+    from app.models.job import JobStatus
+    from app.models.user import Role, User
+    from app.modules.organization import website_crawl
+    from app.services.job_queue_service import get_job_queue_service
+
+    org = _org(make_org, site.url)
+    Role.insert_roles()
+    user = User(email="step3@example.com", first_name="Sam", last_name="Founder", organization_id=org.id,
+                confirmed=True, enterprise_role="enterprise_architect")
+    user.role = Role.query.filter_by(name="Architect").one()
+    user.password = "password"
+    db.session.add(user)
+    db.session.commit()
+    user_id = user.id
+    monkeypatch.setattr(website_crawl, "default_model", lambda *a, **k: _busy)
+    job_id = website_crawl.queue_website_crawl(org.id).id
+    result = website_crawl.run_website_crawl_job({"organization_id": org.id, "job_id": job_id})
+    get_job_queue_service().update_job_status(job_id, JobStatus.COMPLETED.value, result=json.loads(json.dumps(result)))
+
+    login_as(client, user_id)
+    page = client.get("/account/welcome?step=3")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "More facts will be added when our reading service is less busy." in html
+    assert 'data-testid="more-facts-coming"' in html, "shown beside the facts to confirm"
