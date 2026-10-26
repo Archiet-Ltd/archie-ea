@@ -145,6 +145,14 @@ document.addEventListener('alpine:init', function() {
                 return Array.from(new Set(arr));
             },
 
+            get currentLayerKindOptions() {
+                // The SAFe kinds the active layer's element types may carry,
+                // straight from the profile registry via the dashboard config.
+                let cfg = this.layerConfig[this.activeTab];
+                let arr = (cfg && Array.isArray(cfg.kind_options)) ? cfg.kind_options : [];
+                return Array.from(new Set(arr));
+            },
+
             get aiGenerateLayerTypes() {
                 let cfg = this.layerConfig[this.aiGenerate.layer];
                 let arr = (cfg && Array.isArray(cfg.elements)) ? cfg.elements : [];
@@ -294,14 +302,49 @@ document.addEventListener('alpine:init', function() {
                 return { total_relationships: connected, connected: connected, orphaned: orphaned, missing_description: missing_desc };
             },
 
+            // The repository-wide size of the active layer, independent of any
+            // filter. It comes from layerCounts (the unfiltered count sweep and
+            // unfiltered element loads), the same number the sidebar tab badge
+            // shows, so the "Elements … repository-wide in this layer" card and
+            // the tab always agree and neither drops to the filtered count.
             get layerTotal() {
+                let c = this.layerCounts[this.activeTab];
+                return typeof c === 'number' ? c : null;
+            },
+
+            get layerTotalKnown() {
+                return typeof this.layerTotal === 'number';
+            },
+
+            // The size of the current result set — what pagination counts and
+            // what "1–12 of 12" describes. A kind/search/type filter narrows it
+            // below layerTotal.
+            get filteredTotal() {
                 return this.pagination && typeof this.pagination.total === 'number'
                     ? this.pagination.total
                     : null;
             },
 
-            get layerTotalKnown() {
-                return typeof this.layerTotal === 'number';
+            get filteredTotalKnown() {
+                return typeof this.filteredTotal === 'number';
+            },
+
+            // True when the list is showing fewer than the whole layer, so the
+            // list header reads "12 of 55" instead of "55 total" — the filtered
+            // count is never presented as the layer total.
+            get listCountIsFiltered() {
+                return this.filteredTotalKnown && this.layerTotalKnown
+                    && this.filteredTotal !== this.layerTotal;
+            },
+
+            // The text shown beside the elements card heading. "12 of 55" while a
+            // filter narrows the layer, "55 total" otherwise, a dash until known.
+            get listCountLabel() {
+                if (!this.filteredTotalKnown) return '— total';
+                if (this.listCountIsFiltered) {
+                    return this.filteredTotal + ' of ' + this.layerTotal;
+                }
+                return this.filteredTotal + ' total';
             },
 
             // D-03: sourceCounts/healthStats are computed from `this.elements`,
@@ -340,6 +383,7 @@ document.addEventListener('alpine:init', function() {
                 this.searchQuery = '';
                 this.typeFilter = '';
                 this.sourceFilter = '';
+                this.kindFilter = '';
                 this.viewpointKey = 'basic';
                 this.viewpointTypeFilter = [];
                 this.filterScope = '';
@@ -354,6 +398,7 @@ document.addEventListener('alpine:init', function() {
             hasActiveFilters() {
                 return !!(
                     this.searchQuery || this.typeFilter || this.sourceFilter ||
+                    this.kindFilter ||
                     this.viewpointKey !== 'basic' || this.filterScope ||
                     this.filterBuildingBlock || this.filterPlateau ||
                     this.filterHasRels || this.cardFilter
@@ -423,6 +468,10 @@ document.addEventListener('alpine:init', function() {
                     ? params.get('source')
                     : '';
                 this.viewpointKey = params.get('viewpoint') || 'basic';
+                let wantedKind = params.get('kind') || '';
+                this.kindFilter = this.currentLayerKindOptions.includes(wantedKind)
+                    ? wantedKind
+                    : '';
                 this.currentPage = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
                 let wantedPageSize = parseInt(params.get('per_page') || '25', 10);
                 this.perPage = [25, 50, 100].includes(wantedPageSize) ? wantedPageSize : 25;
@@ -441,13 +490,14 @@ document.addEventListener('alpine:init', function() {
                 let params = new URLSearchParams(window.location.search);
                 [
                     'layer', 'search', 'element_type', 'source', 'viewpoint',
-                    'page', 'per_page', 'sort_by', 'sort_order', 'scope',
+                    'kind', 'page', 'per_page', 'sort_by', 'sort_order', 'scope',
                     'building_block', 'plateau', 'has_relationships', 'group',
                 ].forEach(function(key) { params.delete(key); });
                 params.set('layer', this.activeTab);
                 if (this.searchQuery) params.set('search', this.searchQuery);
                 if (this.typeFilter) params.set('element_type', this.typeFilter);
                 if (this.sourceFilter) params.set('source', this.sourceFilter);
+                if (this.kindFilter) params.set('kind', this.kindFilter);
                 if (this.viewpointKey !== 'basic') params.set('viewpoint', this.viewpointKey);
                 if (this.currentPage > 1) params.set('page', String(this.currentPage));
                 if (this.perPage !== 25) params.set('per_page', String(this.perPage));
@@ -471,6 +521,7 @@ document.addEventListener('alpine:init', function() {
                 this.activeTab = layerKey;
                 this.searchQuery = '';
                 this.typeFilter = '';
+                this.kindFilter = '';  // kinds are layer-specific; never carry one across tabs
                 this.currentPage = 1;
                 this.selectedIds = [];
                 this.selectAll = false;
@@ -506,16 +557,27 @@ document.addEventListener('alpine:init', function() {
                     this.elements = data.elements || [];
                     this.pagination = data.pagination || { page: 1, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
                     this.currentPage = this.pagination.page || this.currentPage;
-                    this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
-                        ? data.pagination.total
-                        : null;
+                    // pagination.total describes THIS result set, which a kind,
+                    // search or type filter narrows below the layer's size. The
+                    // sidebar badge and the "Elements" stat card report the whole
+                    // layer, so only an unfiltered load may write layerCounts:
+                    // otherwise filtering to Epic would overwrite the layer total
+                    // (55) with the filtered count (12) and the card would then
+                    // claim 12 elements "repository-wide in this layer".
+                    if (!this.hasActiveFilters() && data.pagination && typeof data.pagination.total === 'number') {
+                        this.layerCounts[this.activeTab] = data.pagination.total;
+                    }
                 } catch (err) {
                     // The template already renders an error state + Retry button on
                     // `loadError` (dashboard.html); nothing ever set it until now.
                     this.loadError = err.message || 'Could not load elements for this layer';
                     this.elements = [];
                     this.pagination = { page: this.currentPage, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
-                    this.layerCounts[this.activeTab] = null;   // unknown, not zero
+                    // Only an unfiltered load owns the layer total; a failed
+                    // filtered load must not blank a count we already know.
+                    if (!this.hasActiveFilters()) {
+                        this.layerCounts[this.activeTab] = null;   // unknown, not zero
+                    }
                     // Platform.fetch already showed a toast unless silent:true; we passed silent:true,
                     // so we need to show our own toast here to maintain existing behavior.
                     if (window.Platform && Platform.toast) Platform.toast.error(this.loadError);
