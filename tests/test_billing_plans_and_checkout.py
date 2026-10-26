@@ -734,7 +734,7 @@ def test_currency_context_and_filter_follow_the_switched_organisation(app, db_se
             "{{ active_organization_name }}|{{ currency_config.code }}|{{ 12.5|format_currency(show_code=True) }}"
         )
 
-    assert rendered == f"{switched_org.name}|EUR|EUR 12.50€"
+    assert rendered == f"{switched_org.name}|EUR|EUR €12.50"
 
 
 def test_admin_at_the_limit_is_shown_the_upgrade_instead_of_adding(app, db_session, client, login_as, no_billing):
