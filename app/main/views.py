@@ -705,7 +705,8 @@ def _wave_closed_response(page):
     from app.release_waves import code_slug, entry_for
     from app.release_waves.routes import early_access_page
 
-    rule = next(iter(current_app.url_map.iter_rules(page.front_matter.get("endpoint", ""))), None)
+    endpoint = page.front_matter.get("endpoint")
+    rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
     entry = entry_for(rule.rule, rule.endpoint) if rule is not None else None
     title = page.front_matter.get("module_label") or page.title
     return early_access_page(code_slug(entry[1]) if entry else "pg-ea", title=title)
