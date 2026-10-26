@@ -25,14 +25,14 @@ from app._bootstrap.assets import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_manifest_state(monkeypatch):
+def _reset_manifest_state():
     """Reset module-level manifest state before each test so rate-limit
     timestamps and cached mtimes from one test do not affect the next."""
     import app._bootstrap.assets as assets_mod
 
-    monkeypatch.setattr(assets_mod, "_manifest_cache", {})
-    monkeypatch.setattr(assets_mod, "_manifest_mtime", 0.0)
-    monkeypatch.setattr(assets_mod, "_manifest_last_check", 0.0)
+    assets_mod._manifest_cache = {}
+    assets_mod._manifest_mtime = 0.0
+    assets_mod._manifest_last_check = 0.0
 
 
 @pytest.fixture
@@ -69,8 +69,9 @@ def _write_manifest(app, mapping):
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(mapping, f)
     # Bump mtime deterministically past the rate-limit window.
-    stat = os.stat(manifest_path)
-    os.utime(manifest_path, (stat.st_atime, stat.st_mtime + 5))
+    # Use time.time() to ensure the mtime actually changes even if
+    # two writes happen within the same filesystem timestamp granularity.
+    os.utime(manifest_path, (time.time(), time.time() + 10))
 
 
 def _force_reload(app):
