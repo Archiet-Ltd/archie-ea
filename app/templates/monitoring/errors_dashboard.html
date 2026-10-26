@@ -2,6 +2,8 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu_item %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
@@ -27,26 +29,56 @@
 
 {% block content %}
 <div class="p-6 space-y-6" data-testid="errors-dashboard-page">
-{{ page_shell('Errors', subtitle='Server and browser errors, grouped so each distinct problem appears once with how often it happened',
+{{ page_shell('Errors', subtitle='Server and browser errors, one row per distinct problem with how often it happened',
               breadcrumb=[('Home', url_for('dashboard.overview')), ('Errors', none)]) }}
 
-{% call(e) list_table(rows=events, columns=[('Error', ''), {'label': 'Times', 'align': 'right', 'sortable': true}, {'label': 'Last seen', 'sortable': true}, {'label': '', 'class': 'w-12'}],
+{% set groups = groups if groups is defined else [] %}
+{% call(g) list_table(rows=groups, columns=[{'label': 'Problem', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Times', 'align': 'right', 'sortable': true}, {'label': 'Last seen', 'sortable': true}, {'label': '', 'class': 'w-12'}],
                       caption='Error events', testid='errors-table', row_testid='error-row', search_placeholder='Filter errors...',
                       toolbar=true, toolbar_actions=_filters,
                       empty_message=('No errors match this filter.' if source_filter else ('No errors recorded. Nothing has been logged at warning level or above, and no browser error has been reported.' if not show_resolved else 'No errors recorded, resolved or open.'))) %}
-  {% call table_cell(class='max-w-[420px]', attrs={'title': e.message}) %}
-    <span class="block truncate font-medium">{{ e.message }}</span>
-    <span class="block truncate text-xs text-muted-foreground">{{ 'Browser' if e.source == 'client' else 'Server' }}{% if e.location %} · {{ e.location }}{% endif %}{% if e.resolved %} · Resolved{% endif %}</span>
+  {% call table_cell(class='max-w-[560px]', attrs={'title': g.message}) %}
+    <span class="block truncate font-medium">{{ g.lead }}</span>
+    <span class="block truncate text-xs text-muted-foreground">{{ 'Browser' if g.source == 'client' else 'Server' }}{% if g.name %} · {{ g.name }}{% elif g.location %} · {{ g.location }}{% endif %}{% if g.events|length > 1 %} · {{ g.events|length }} similar reports{% endif %}</span>
   {% endcall %}
-  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': e.occurrence_count or 0}) %}{{ '{:,}'.format(e.occurrence_count or 0) }}{% endcall %}
-  {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': e.last_seen_at.strftime('%Y%m%d%H%M%S') if e.last_seen_at else ''}) %}{{ e.last_seen_at.strftime('%d %b %Y %H:%M') if e.last_seen_at else '' }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': 1 if g.resolved else 0}) %}{{ state_badge('Resolved' if g.resolved else 'Open', tone=('positive' if g.resolved else 'caution')) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': g.count}) %}{{ '{:,}'.format(g.count) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': g.last_seen_at.strftime('%Y%m%d%H%M%S') if g.last_seen_at else ''}) %}{{ g.last_seen_at.strftime('%d %b %Y %H:%M') if g.last_seen_at else '' }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}
-    {% if not e.resolved %}
+    {% if not g.resolved %}
     {% call row_actions('Actions for this error') %}
-      {{ row_action('Mark as resolved', action=url_for('error_events.resolve_error', event_id=e.id), testid='resolve-error-' ~ e.id) }}
+      {% if g.events|length == 1 %}
+      {{ row_action('Mark as resolved', action=url_for('error_events.resolve_error', event_id=g.events[0].id), testid='resolve-error-' ~ g.events[0].id) }}
+      {% else %}
+      {{ dropdown_menu_item(text='Mark all ' ~ g.events|length ~ ' as resolved', attrs={'data-resolve-urls': (g.events|rejectattr('resolved')|map(attribute='id')|map('string')|list|join(',')), 'data-testid': 'resolve-error-group'}) }}
+      {% endif %}
     {% endcall %}
     {% endif %}
   {% endcall %}
 {% endcall %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    // Resolve every report in a group: the resolve route takes one error at a time.
+    var base = {{ url_for('error_events.resolve_error', event_id=0)|tojson }};
+    document.addEventListener('click', async function (e) {
+        var item = e.target.closest('[data-resolve-urls]');
+        if (!item) return;
+        var meta = document.querySelector('meta[name=csrf-token]');
+        var headers = { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': meta ? meta.content : '' };
+        try {
+            for (var id of item.dataset.resolveUrls.split(',')) {
+                var r = await fetch(base.replace('/0/', '/' + id + '/'), { method: 'POST', headers: headers, credentials: 'same-origin' });
+                if (!r.ok) throw new Error('status ' + r.status);
+            }
+            location.reload();
+        } catch (err) {
+            Platform.toast.error('Could not resolve these errors: ' + err.message);
+        }
+    });
+})();
+</script>
 {% endblock %}
