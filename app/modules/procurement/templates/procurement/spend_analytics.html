@@ -13,12 +13,6 @@
 {%- else -%}{{ sym }}{{ '%.0f'|format(a) }}{%- endif -%}
 {%- endmacro %}
 
-{% macro _actions() %}
-<div class="flex flex-wrap items-center gap-2">
-  {{ ui.button(text='Renewals', href=url_for('procurement.renewals_dashboard'), variant='outline') }}
-  {{ ui.button(text='Contracts', href=url_for('procurement.contracts_list'), variant='outline') }}
-</div>
-{% endmacro %}
 
 {% macro _recommend_action() %}
 {% if ai_available %}
@@ -32,7 +26,7 @@
 {% block content %}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Costs', subtitle='What your active vendor contracts cost each year, by type and by vendor',
-              breadcrumb=[('Home', url_for('main.index')), ('Costs', none)], actions_caller=_actions) }}
+              breadcrumb=[('Home', url_for('main.index')), ('Costs', none)]) }}
 
 {% if summary.total_contracts == 0 %}
   {% call ui.card(attrs={'data-testid': 'spend-empty'}) %}
@@ -96,7 +90,7 @@
       {% endif %}
     {% endcall %}
 
-  <div class="grid items-start gap-4 md:gap-6 lg:grid-cols-2">
+  <div class="grid items-stretch gap-4 md:gap-6 lg:grid-cols-2 [&>*]:h-full">
     {% call section('Spend by contract type', 'Annual cost of active contracts, grouped by type', testid='spend-by-type') %}
       <ul class="divide-y">
         {% for type, data in summary.by_type.items() %}

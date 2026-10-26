@@ -14,23 +14,19 @@
 
 {% macro _filters() %}
 {%- set keep = {'search': search or none, 'type': filter_type or none, 'state': filter_state or none, 'status': filter_status or none, 'hierarchy': filter_hierarchy or none} -%}
-<form method="get" action="{{ url_for('admin.feature_flags') }}" class="flex items-center gap-2" data-testid="feature-flag-filters">
-  {% for k in ['search', 'type', 'hierarchy'] %}{% if keep[k] %}<input type="hidden" name="{{ k }}" value="{{ keep[k] }}">{% endif %}{% endfor %}
-  {% call native_select_wrapper() %}{% call native_select(name='state', size='sm', attrs={'aria-label': 'Stage', 'data-autosubmit': ''}) %}
-    {{ native_select_option(text='All stages', value='') }}
-    {% for fstate in FeatureState %}{{ native_select_option(text=fstate.value.replace('_', ' ')|capitalize, value=fstate.value, selected=(filter_state == fstate.value)) }}{% endfor %}
-  {% endcall %}{% endcall %}
-  {% call native_select_wrapper() %}{% call native_select(name='status', size='sm', attrs={'aria-label': 'On or off', 'data-autosubmit': ''}) %}
-    {{ native_select_option(text='On and off', value='') }}
-    {{ native_select_option(text='On', value='enabled', selected=(filter_status == 'enabled')) }}
-    {{ native_select_option(text='Off', value='disabled', selected=(filter_status == 'disabled')) }}
-  {% endcall %}{% endcall %}
-  <noscript>{{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}</noscript>
-</form>
-{%- set more_on = (1 if filter_type else 0) + (1 if filter_hierarchy else 0) -%}
+{%- set more_on = (1 if filter_state else 0) + (1 if filter_status else 0) + (1 if filter_type else 0) + (1 if filter_hierarchy else 0) -%}
 {% call ui.dropdown_menu() %}
   {% call ui.dropdown_menu_trigger(variant='outline', size='sm', class='h-8 border-dashed', attrs={'data-testid': 'feature-flag-more-filters'}) %}{{ lucide('filter') }}Filters{% if more_on %}<span class="tabular-nums text-muted-foreground">{{ more_on }}</span>{% endif %}{% endcall %}
-  {% call ui.dropdown_menu_content(align='end', class='w-[200px]') %}
+  {% call ui.dropdown_menu_content(align='end', class='w-[200px]', attrs={'data-testid': 'feature-flag-filters'}) %}
+    {{ ui.dropdown_menu_label(text='Stage') }}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, state=none))) %}{% if not filter_state %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}All stages{% endcall %}
+    {% for fstate in FeatureState %}{% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, state=fstate.value))) %}{% if filter_state == fstate.value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ fstate.value.replace('_', ' ')|capitalize }}{% endcall %}{% endfor %}
+    {{ ui.dropdown_menu_separator() }}
+    {{ ui.dropdown_menu_label(text='On or off') }}
+    {% for value, label in [('', 'On and off'), ('enabled', 'On'), ('disabled', 'Off')] %}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, status=(value or none)))) %}{% if (filter_status or '') == value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ label }}{% endcall %}
+    {% endfor %}
+    {{ ui.dropdown_menu_separator() }}
     {{ ui.dropdown_menu_label(text='Type') }}
     {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, type=none))) %}{% if not filter_type %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}All types{% endcall %}
     {% for ftype in FeatureType %}{% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, type=ftype.value))) %}{% if filter_type == ftype.value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ ftype.value.replace('_', ' ')|capitalize }}{% endcall %}{% endfor %}
