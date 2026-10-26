@@ -726,6 +726,15 @@ def public_module(slug):
     if page is None:
         from flask import abort
         abort(404)
+    if page.wave_closed and page.cta != "waiting_list":
+        # The screen this page describes opens in a later release (RELEASE_WAVE): say so, take a waiting-list email.
+        from app.release_waves import code_slug, entry_for
+        from app.release_waves.routes import early_access_page
+
+        rule = next(iter(current_app.url_map.iter_rules(page.front_matter.get("endpoint", ""))), None)
+        entry = entry_for(rule.rule, rule.endpoint) if rule is not None else None
+        title = page.front_matter.get("module_label") or page.title
+        return early_access_page(code_slug(entry[1]) if entry else "pg-ea", title=title)
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),

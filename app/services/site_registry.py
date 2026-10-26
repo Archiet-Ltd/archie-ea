@@ -74,10 +74,34 @@ def _item(raw: dict[str, Any], *, coming_soon: bool = False) -> dict[str, Any]:
     return item
 
 
+def wave_released(item: dict[str, Any]) -> bool:
+    """True when the wave switch is off, or the item's page opens in a released wave.
+
+    An item may name its wave (``wave: W3``); otherwise the wave is that of the page its ``href`` opens
+    (a content page by the screen it describes, any other address by the route it matches)."""
+    from app.release_waves import OPEN, configured_wave, is_released_path, state_for
+
+    wave = configured_wave()
+    if wave is None:
+        return True
+    code = item.get("wave")
+    if code:
+        return state_for([str(code), "", "page", None, None], wave) == OPEN
+    path = _path_of(item["href"])
+    from app.services.public_pages import _pages_by_url
+
+    page = _pages_by_url().get(path)
+    if page is not None and page.wave_closed:
+        return False
+    return is_released_path(path)
+
+
 def _visible(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     shown = []
     for item in items:
         if item.get("shown_when") == "live_page" and not is_live_page(item["href"]):
+            continue
+        if not wave_released(item):
             continue
         shown.append(item)
     return shown
@@ -103,7 +127,7 @@ def _roles(raw: dict[str, Any]) -> dict[str, Any]:
         roles = []
         for role in family["roles"]:
             role_id = slugify(role["label"])
-            has_page = bool(role.get("href"))
+            has_page = bool(role.get("href")) and wave_released(role)
             roles.append({
                 "id": role_id,
                 "label": role["label"],
@@ -205,8 +229,15 @@ def site_registry() -> dict[str, Any]:
         {"id": g["id"], "label": g["label"], "items": _visible([_item(i) for i in g["items"]])}
         for g in product["groups"]
     ]
+    from app.release_waves import configured_wave
+
+    if configured_wave() is not None:
+        # a menu group whose every page opens in a later wave is left out, heading and all
+        groups = [g for g in groups if g["items"]]
     by_id = {g["id"]: g for g in groups}
-    columns = [[by_id[gid] for gid in column] for column in product["columns"]]
+    columns = [[by_id[gid] for gid in column if gid in by_id] for column in product["columns"]]
+    if configured_wave() is not None:
+        columns = [column for column in columns if column]
     soon = product["coming_soon"]
 
     reg: dict[str, Any] = {
@@ -224,7 +255,7 @@ def site_registry() -> dict[str, Any]:
         },
         "solutions": {
             "label": raw["solutions"]["label"],
-            "items": [_item(i) for i in raw["solutions"]["items"]],
+            "items": _visible([_item(i) for i in raw["solutions"]["items"]]),
             "coming_soon": {
                 "label": raw["solutions"]["coming_soon"]["label"],
                 "items": [_item(i, coming_soon=True) for i in raw["solutions"]["coming_soon"]["items"]],
@@ -234,7 +265,7 @@ def site_registry() -> dict[str, Any]:
         "compare": {
             "label": raw["compare"]["label"],
             "all_link": raw["compare"]["all_link"],
-            "items": [_item(i) for i in raw["compare"]["items"]],
+            "items": _visible([_item(i) for i in raw["compare"]["items"]]),
         },
         "resources": {"groups": [
             {"id": g["id"], "label": g["label"], "items": _visible([_item(i) for i in g["items"]])}
