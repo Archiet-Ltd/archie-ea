@@ -1454,6 +1454,89 @@ def create_element(layer, element_type):
     )
 
 
+
+def _resolve_element_for_id(model_class, element_id, by_ae, fallback_to_ae=True):
+    """Find the element a list row, quick view or connection linked.
+
+    Two id spaces overlap: a dedicated table's own primary key (work_packages.id)
+    and the archimate_elements id a mirrored row carries. The element list hands
+    out the archimate_elements id for every mirrored element, and a caller that
+    holds one says so with ?ae=1 (or in ``ae_ids`` for a bulk call). Without it
+    the id is the dedicated table's own. Resolving the wrong space opens, saves
+    over or deletes a different element that merely shares the number.
+
+    Returns ``(element, from_ae)``; ``from_ae`` is True when the element is the
+    ArchiMateElement itself because no dedicated row mirrors it. filter_by
+    always emits SQL, so the tenant filter applies even when the row is already
+    in the session identity map.
+    """
+    element = None
+    if model_class is not None:
+        if by_ae:
+            if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
+                element = model_class.query.filter_by(archimate_element_id=element_id).first()
+        else:
+            element = model_class.query.filter_by(id=element_id).first()
+    if element is not None:
+        return element, False
+    if not (by_ae or fallback_to_ae):
+        return None, False
+    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    return element, element is not None
+
+
+def _delete_resolved_element(element, from_ae):
+    """Delete a resolved element with its mirror and every relationship that
+    points at either id; the caller commits."""
+    archimate_element = None
+    if not from_ae:
+        if getattr(element, "archimate_element_id", None):
+            archimate_element = ArchiMateElement.query.get(element.archimate_element_id)
+    else:
+        archimate_element = element
+
+    ae_ids = [aid for aid in (element.id if from_ae else None, getattr(archimate_element, "id", None)) if aid]
+    if ae_ids:
+        ArchiMateRelationship.query.filter(
+            db.or_(
+                ArchiMateRelationship.source_id.in_(ae_ids),
+                ArchiMateRelationship.target_id.in_(ae_ids),
+            )
+        ).delete(synchronize_session=False)
+
+    # DEF-067's actual live failure (found in server logs, and only
+    # reproduced by clicking the real duplicated production element —
+    # see DEF-004): the dashboard card for a DEF-004-duplicated element
+    # links to the ArchiMateElement's own id, not its dedicated-model
+    # twin's id, so model_class.query.get(element_id) returns None and
+    # this falls into the `from_ae` branch — which deleted ONLY the
+    # archimate_elements row. The dedicated row (a *different* id, e.g.
+    # stakeholders.id=2 with archimate_element_id=1287) was never found
+    # or deleted, and it still held stakeholders_archimate_element_id_fkey
+    # (ON DELETE NO ACTION) pointing at the row this branch just tried
+    # to delete. Reordering session.delete() calls and even an explicit
+    # flush did not help THIS path, because the dedicated row was never
+    # looked up here at all. When falling back to the ArchiMateElement,
+    # also find and delete any dedicated-model row of the same type that
+    # mirrors it (the DEF-004 duplicate), before deleting the
+    # ArchiMateElement row itself.
+    if from_ae:
+        dedicated_model = MODEL_REGISTRY.get(getattr(element, "type", None))
+        if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
+            duplicate_rows = dedicated_model.query.filter_by(
+                archimate_element_id=element.id
+            ).all()
+            for row in duplicate_rows:
+                db.session.delete(row)
+            if duplicate_rows:
+                db.session.flush()
+
+    db.session.delete(element)
+    db.session.flush()
+    if not from_ae and archimate_element:
+        db.session.delete(archimate_element)
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>")
 @login_required
 def detail_element(layer, element_type, element_id):
@@ -1470,15 +1553,10 @@ def detail_element(layer, element_type, element_id):
     # ?ae=1 means the id is an archimate_elements id, which is what a connection row carries; without it
     # the id is the dedicated table's own id, which is what the lists carry. The two number spaces overlap,
     # so a connection must say which one it holds or it can open another element's page.
-    if model_class and request.args.get("ae") == "1":
-        if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
-            element = model_class.query.filter_by(archimate_element_id=element_id).first()
-    elif model_class:
-        element = model_class.query.filter_by(id=element_id).first()
-
-    # Fall back to archimate_elements table (native ArchiMate elements)
+    element, _from_ae = _resolve_element_for_id(model_class, element_id, request.args.get("ae") == "1")
     if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+        abort(404)
+    if _from_ae:
         model_class = ArchiMateElement
 
     # Get relationships
@@ -1606,12 +1684,8 @@ def update_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    _from_ae = False
-    if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first()
-        _from_ae = True
+    # Resolve the id space the caller holds (see _resolve_element_for_id).
+    element, _from_ae = _resolve_element_for_id(model_class, element_id, request.args.get("ae") == "1")
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
@@ -1673,6 +1747,7 @@ def update_element(layer, element_type, element_id):
                     layer=layer,
                     element_type=element_type,
                     element_id=element.id,
+                    ae=1 if _from_ae else None,
                 )
             )
 
@@ -1717,12 +1792,8 @@ def delete_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    _from_ae = False
-    if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first()
-        _from_ae = True
+    # Resolve the id space the caller holds (see _resolve_element_for_id).
+    element, _from_ae = _resolve_element_for_id(model_class, element_id, request.args.get("ae") == "1")
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
@@ -1740,53 +1811,7 @@ def delete_element(layer, element_type, element_id):
         # a request-parameter problem). Clear relationships referencing
         # either id first so delete is robust regardless of how the
         # relationship got there.
-        archimate_element = None
-        if not _from_ae:
-            if getattr(element, "archimate_element_id", None):
-                archimate_element = ArchiMateElement.query.get(element.archimate_element_id)
-        else:
-            archimate_element = element
-
-        ae_ids = [aid for aid in (element_id if _from_ae else None, getattr(archimate_element, "id", None)) if aid]
-        if ae_ids:
-            ArchiMateRelationship.query.filter(
-                db.or_(
-                    ArchiMateRelationship.source_id.in_(ae_ids),
-                    ArchiMateRelationship.target_id.in_(ae_ids),
-                )
-            ).delete(synchronize_session=False)
-
-        # DEF-067's actual live failure (found in server logs, and only
-        # reproduced by clicking the real duplicated production element —
-        # see DEF-004): the dashboard card for a DEF-004-duplicated element
-        # links to the ArchiMateElement's own id, not its dedicated-model
-        # twin's id, so model_class.query.get(element_id) returns None and
-        # this falls into the `_from_ae` branch — which deleted ONLY the
-        # archimate_elements row. The dedicated row (a *different* id, e.g.
-        # stakeholders.id=2 with archimate_element_id=1287) was never found
-        # or deleted, and it still held stakeholders_archimate_element_id_fkey
-        # (ON DELETE NO ACTION) pointing at the row this branch just tried
-        # to delete. Reordering session.delete() calls and even an explicit
-        # flush did not help THIS path, because the dedicated row was never
-        # looked up here at all. When falling back to the ArchiMateElement,
-        # also find and delete any dedicated-model row of the same type that
-        # mirrors it (the DEF-004 duplicate), before deleting the
-        # ArchiMateElement row itself.
-        if _from_ae:
-            dedicated_model = MODEL_REGISTRY.get(getattr(element, "type", None))
-            if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
-                duplicate_rows = dedicated_model.query.filter_by(
-                    archimate_element_id=element.id
-                ).all()
-                for row in duplicate_rows:
-                    db.session.delete(row)
-                if duplicate_rows:
-                    db.session.flush()
-
-        db.session.delete(element)
-        db.session.flush()
-        if not _from_ae and archimate_element:
-            db.session.delete(archimate_element)
+        _delete_resolved_element(element, _from_ae)
         db.session.commit()
 
         if request.is_json:
@@ -1821,6 +1846,7 @@ def delete_element(layer, element_type, element_id):
                 layer=layer,
                 element_type=element_type,
                 element_id=element_id,
+                ae=request.args.get("ae") or None,
             )
         )
 
@@ -1856,26 +1882,24 @@ def bulk_delete(layer, element_type):
     if not model_class:
         return jsonify({"success": False, "error": "Element type not supported"}), 400
 
-    data = request.get_json()
-    element_ids = data.get("ids", [])
+    data = request.get_json() or {}
+    # ``ids`` are the dedicated table's own ids; ``ae_ids`` are archimate_elements
+    # ids, which is what the list carries for every mirrored element.
+    element_ids = data.get("ids", []) or []
+    ae_element_ids = data.get("ae_ids", []) or []
 
-    if not element_ids:
+    if not element_ids and not ae_element_ids:
         return jsonify({"success": False, "error": "No elements selected"}), 400
 
     try:
         deleted_count = 0
-        for element_id in element_ids:
-            element = model_class.query.filter_by(id=element_id).first()
-            if element:
-                # Delete linked ArchiMateElement
-                if element.archimate_element_id:
-                    archimate_element = ArchiMateElement.query.get(
-                        element.archimate_element_id
-                    )
-                    if archimate_element:
-                        db.session.delete(archimate_element)
-
-                db.session.delete(element)
+        targets = [(i, False) for i in element_ids] + [(i, True) for i in ae_element_ids]
+        for element_id, by_ae in targets:
+            element, from_ae = _resolve_element_for_id(
+                model_class, element_id, by_ae, fallback_to_ae=False
+            )
+            if element is not None:
+                _delete_resolved_element(element, from_ae)
                 deleted_count += 1
 
         db.session.commit()

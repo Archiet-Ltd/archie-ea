@@ -650,18 +650,29 @@ document.addEventListener('alpine:init', function() {
 
             toggleSelectAll() {
                 if (this.selectAll) {
-                    this.selectedIds = this.elements.map(function(el) { return el.id + ':' + el.element_type; });
+                    var self = this;
+                    this.selectedIds = this.elements.map(function(el) { return self.selectKey(el); });
                 } else {
                     this.selectedIds = [];
                 }
             },
 
+            // A mirrored element is listed by its archimate_elements id, which
+            // overlaps the dedicated table's own ids; ?ae=1 tells the server
+            // which one this is so it never opens, saves or deletes a twin.
+            idSuffix(el) {
+                return (el && el.source === 'architecture') ? '?ae=1' : '';
+            },
+            selectKey(el) {
+                return el.id + ':' + el.element_type + (el.source === 'architecture' ? ':ae' : '');
+            },
             detailUrl(el) {
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id;
+                if (!el) return '#';
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + this.idSuffix(el);
             },
             editPageUrl(el) {
                 if (!el) return '#';
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/edit';
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/edit' + this.idSuffix(el);
             },
 
             formatTypeName(type) {
@@ -781,7 +792,7 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let url;
                     if (this.editingElement) {
-                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.editingElement.id + '/edit';
+                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.editingElement.id + '/edit' + this.idSuffix(this.editingElement);
                     } else {
                         url = '/architecture/' + this.activeTab + '/' + this.formData.element_type + '/new';
                     }
@@ -891,8 +902,8 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let el = this.deletingElement;
                     let data = await Platform.fetch.post(
-                        '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/delete',
-                        null,
+                        '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/delete' + this.idSuffix(el),
+                        {},
                         { silent: true }
                     );
                     if (data.success) {
@@ -918,8 +929,8 @@ document.addEventListener('alpine:init', function() {
                     let parts = key.split(':');
                     let id = parts[0];
                     let type = parts[1];
-                    if (!grouped[type]) grouped[type] = [];
-                    grouped[type].push(parseInt(id));
+                    if (!grouped[type]) grouped[type] = { ids: [], ae_ids: [] };
+                    grouped[type][parts[2] === 'ae' ? 'ae_ids' : 'ids'].push(parseInt(id));
                 }
                 let self = this;
                 let modalId = window.modalManager.createModal({
@@ -933,8 +944,8 @@ document.addEventListener('alpine:init', function() {
                                 let entries = Object.entries(grouped);
                                 for (let j = 0; j < entries.length; j++) {
                                     let type = entries[j][0];
-                                    let ids = entries[j][1];
-                                    await Platform.fetch.post('/architecture/' + self.activeTab + '/' + type + '/bulk-delete', { ids: ids }, { silent: true });
+                                    let group = entries[j][1];
+                                    await Platform.fetch.post('/architecture/' + self.activeTab + '/' + type + '/bulk-delete', { ids: group.ids, ae_ids: group.ae_ids }, { silent: true });
                                 }
                                 self.selectedIds = [];
                                 self.selectAll = false;
