@@ -1,4 +1,7 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import hidden_input, input, textarea %}
+{% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Edit — {{ application.name }}{% endblock %}
@@ -20,33 +23,29 @@
   ) }}
 
   <form method="POST" action="{{ url_for('unified_applications.application_edit', id=application.id) }}" class="space-y-8">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="updated_at" value="{{ application.updated_at.isoformat() if application.updated_at else '' }}">
+    {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
+    {{ hidden_input(("updated_at"), value=(application.updated_at.isoformat() if application.updated_at else '')) }}
 
     {# ── Identity ── #}
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Identity</h2>
 
       {% call form_group(id='name', label='Application Name', required=true) %}
-        <input type="text" id="name" name="name" value="{{ application.name or '' }}" required
-               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        {{ input(type="text", id=("name"), name=("name"), value=(application.name or ''), required=true, size='sm', class="w-full") }}
       {% endcall %}
 
       {% call form_group(id='description', label='Description') %}
-        <textarea id="description" name="description" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.description or '' }}</textarea>
+        {% call textarea(id=("description"), name=("description"), rows=("3"), class="w-full") %}{{ application.description or '' }}{% endcall %}
       {% endcall %}
 
       <div class="grid grid-cols-1 gap-4">
         {% call form_group(id='application_code', label='Application Code', help_text='Managed by Abacus sync') %}
           <!-- entity-picker-ok: readonly, Abacus-managed ID -->
-          <input type="text" id="application_code" name="application_code" value="{{ application.application_code or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" readonly>
+          {{ input(type="text", id=("application_code"), name=("application_code"), value=(application.application_code or ''), size='sm', class="w-full", attrs_dict={"readonly": "readonly"}) }}
         {% endcall %}
         {% call form_group(id='application_type', label='Application Type') %}
           <!-- entity-picker-ok: free-text classification, no canonical type list -->
-          <input type="text" id="application_type" name="application_type" value="{{ application.component_type or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("application_type"), name=("application_type"), value=(application.component_type or ''), size='sm', class="w-full") }}
         {% endcall %}
       </div>
     </section>
@@ -59,12 +58,10 @@
       {# Legacy text columns — read-only, migrated to application_owners #}
       <div class="grid grid-cols-1 gap-4 mb-4">
         {% call form_group(id='business_owner', label='Business Owner (legacy)', help_text='Migrated to owner records. Edit below.') %}
-          <input type="text" id="business_owner" name="business_owner" value="{{ application.business_owner or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" readonly>
+          {{ input(type="text", id=("business_owner"), name=("business_owner"), value=(application.business_owner or ''), size='sm', class="w-full", attrs_dict={"readonly": "readonly"}) }}
         {% endcall %}
         {% call form_group(id='technical_owner', label='Technical Owner (legacy)', help_text='Migrated to owner records. Edit below.') %}
-          <input type="text" id="technical_owner" name="technical_owner" value="{{ application.technical_owner or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" readonly>
+          {{ input(type="text", id=("technical_owner"), name=("technical_owner"), value=(application.technical_owner or ''), size='sm', class="w-full", attrs_dict={"readonly": "readonly"}) }}
         {% endcall %}
       </div>
 
@@ -78,8 +75,7 @@
             <span class="font-medium">{{ o.user_name }}</span>
             <span class="text-muted-foreground ml-2">({{ o.ownership_type | capitalize }})</span>
           </div>
-          <button type="button" class="text-destructive hover:text-destructive-emphasis text-xs remove-owner-btn"
-                  data-owner-id="{{ o.id }}" data-app-id="{{ application.id }}">Remove</button>
+          {% call button(variant='bare', size='bare', class="text-destructive hover:text-destructive-emphasis text-xs remove-owner-btn", attrs_dict={"data-owner-id": (o.id), "data-app-id": (application.id)}) %}Remove{% endcall %}
         </div>
         {% else %}
         <p class="text-sm text-muted-foreground" id="no-owners-msg">No owners assigned yet.</p>
@@ -90,26 +86,21 @@
       <div class="grid grid-cols-1 gap-4 items-end">
         <div>
           <label for="owner_picker_search" class="block text-sm font-medium text-muted-foreground mb-1">Search user</label>
-          <input type="text" id="owner_picker_search"
-                 placeholder="Type at least 2 characters…"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                 data-app-id="{{ application.id }}">
+          {{ input(type="text", id=("owner_picker_search"), placeholder=("Type at least 2 characters…"), size='sm', class="w-full", attrs_dict={"data-app-id": (application.id)}) }}
           <div id="owner_picker_results" class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
         </div>
         {% call form_group(id='owner_type_select', label='Role') %}
-          <select id="owner_type_select"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {% call native_select(id=("owner_type_select"), size='sm', class="w-full") %}
             <option value="primary">Primary</option>
             <option value="backup">Backup</option>
             <option value="technical">Technical</option>
             <option value="business">Business</option>
-          </select>
+          {% endcall %}
         {% endcall %}
         <div>
-          <button type="button" id="add-owner-btn" disabled
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+          {% call button(disabled=true, variant="default", class="justify-center whitespace-nowrap", attrs_dict={"id": ("add-owner-btn")}) %}
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add owner
-          </button>
+          {% endcall %}
         </div>
       </div>
     </section>
@@ -121,8 +112,7 @@
       <div class="grid grid-cols-1 gap-4">
         <div>
           <label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
-          <select id="criticality" name="criticality"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {% call native_select(id=("criticality"), name=("criticality"), size='sm', class="w-full") %}
             {% set current_crit = application.business_criticality %}
             {% set crit_options = ['Critical', 'High', 'Medium', 'Low'] %}
             {% set crit_matched = current_crit and (crit_options | map('lower') | list) | select('equalto', current_crit | lower) | list | length > 0 %}
@@ -134,17 +124,14 @@
             {# Preserve a stored value outside the standard vocabulary so a save never wipes it #}
             <option value="{{ current_crit }}" selected>{{ current_crit | capitalize }}</option>
             {% endif %}
-          </select>
+          {% endcall %}
         </div>
         {% call form_group(id='business_purpose', label='Business Purpose') %}
-          <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
-                 placeholder="e.g. Core business function, compliance reporting"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("business_purpose"), name=("business_purpose"), value=(application.business_purpose or ''), placeholder=("e.g. Core business function, compliance reporting"), size='sm', class="w-full") }}
         {% endcall %}
         <div>
           <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
-          <select id="deployment_status" name="deployment_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {% call native_select(id=("deployment_status"), name=("deployment_status"), size='sm', class="w-full") %}
             <option value="" {% if not application.deployment_status %}selected{% endif %}>Not set</option>
             {% for val in ['production', 'development', 'testing', 'staging', 'retired'] %}
             <option value="{{ val }}" {% if application.deployment_status and application.deployment_status | lower == val | lower %}selected{% endif %}>{{ val | title }}</option>
@@ -152,7 +139,7 @@
             {% if application.deployment_status and application.deployment_status | lower not in ['production','development','testing','staging','retired'] %}
             <option value="{{ application.deployment_status }}" selected>{{ application.deployment_status | title }}</option>
             {% endif %}
-          </select>
+          {% endcall %}
         </div>
         {# F-09, Capgemini dry-run: Lifecycle Status is shown on the detail
            page, in the list filter and the Workbench facet — a genuinely
@@ -161,8 +148,7 @@
            /api/bulk-lifecycle, never per-application. #}
         <div>
           <label for="lifecycle_status" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Status</label>
-          <select id="lifecycle_status" name="lifecycle_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {% call native_select(id=("lifecycle_status"), name=("lifecycle_status"), size='sm', class="w-full") %}
             <option value="" {% if not application.lifecycle_status %}selected{% endif %}>Not set</option>
             {% for val in lifecycle_stage_choices %}
             <option value="{{ val }}" {% if application.lifecycle_status and application.lifecycle_status | lower == val | lower %}selected{% endif %}>{{ val | title }}</option>
@@ -170,17 +156,13 @@
             {% if application.lifecycle_status and application.lifecycle_status | lower not in lifecycle_stage_choices_lower %}
             <option value="{{ application.lifecycle_status }}" selected>{{ application.lifecycle_status | title }}</option>
             {% endif %}
-          </select>
+          {% endcall %}
         </div>
         {% call form_group(id='business_domain', label='Business Domain') %}
-          <input type="text" id="business_domain" name="business_domain" value="{{ application.business_domain or '' }}"
-                 placeholder="e.g. Manufacturing, Finance, HR"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("business_domain"), name=("business_domain"), value=(application.business_domain or ''), placeholder=("e.g. Manufacturing, Finance, HR"), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='technology_stack', label='Technology Stack') %}
-          <input type="text" id="technology_stack" name="technology_stack" value="{{ application.technology_stack or '' }}"
-                 placeholder="e.g. Java, Spring Boot, PostgreSQL"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("technology_stack"), name=("technology_stack"), value=(application.technology_stack or ''), placeholder=("e.g. Java, Spring Boot, PostgreSQL"), size='sm', class="w-full") }}
         {% endcall %}
         {# F-08(c), Capgemini dry-run: applications had no way to record where
            they sit in the baseline/target architecture — the Traceability
@@ -188,13 +170,12 @@
            rows as a direct result. #}
         <div>
           <label for="architecture_state" class="block text-sm font-medium text-muted-foreground mb-1">Architecture state</label>
-          <select id="architecture_state" name="architecture_state"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {% call native_select(id=("architecture_state"), name=("architecture_state"), size='sm', class="w-full") %}
             <option value="" {% if not architecture_state %}selected{% endif %}>Unspecified</option>
             <option value="Baseline" {% if architecture_state == 'Baseline' %}selected{% endif %}>As-Is (baseline)</option>
             <option value="Target" {% if architecture_state == 'Target' %}selected{% endif %}>To-Be (target)</option>
             <option value="Transition" {% if architecture_state == 'Transition' %}selected{% endif %}>Transition</option>
-          </select>
+          {% endcall %}
         </div>
       </div>
     </section>
@@ -205,46 +186,34 @@
 
       <div class="grid grid-cols-1 gap-4">
         {% call form_group(id='cloud_provider', label='Cloud Provider') %}
-          <input type="text" id="cloud_provider" name="cloud_provider" value="{{ application.cloud_provider or '' }}"
-                 placeholder="e.g. AWS, Azure, GCP, On-Prem"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("cloud_provider"), name=("cloud_provider"), value=(application.cloud_provider or ''), placeholder=("e.g. AWS, Azure, GCP, On-Prem"), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='deployment_region', label='Deployment Region') %}
-          <input type="text" id="deployment_region" name="deployment_region" value="{{ application.deployment_region or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("deployment_region"), name=("deployment_region"), value=(application.deployment_region or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='database_platforms', label='Database Platforms') %}
-          <input type="text" id="database_platforms" name="database_platforms" value="{{ application.database_platforms or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("database_platforms"), name=("database_platforms"), value=(application.database_platforms or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='programming_languages', label='Programming Languages') %}
-          <input type="text" id="programming_languages" name="programming_languages" value="{{ application.programming_languages or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("programming_languages"), name=("programming_languages"), value=(application.programming_languages or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='integration_methods', label='Integration Methods') %}
-          <input type="text" id="integration_methods" name="integration_methods" value="{{ application.integration_methods or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("integration_methods"), name=("integration_methods"), value=(application.integration_methods or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='authentication_method', label='Authentication Method') %}
-          <input type="text" id="authentication_method" name="authentication_method" value="{{ application.authentication_method or '' }}"
-                 placeholder="e.g. OAuth2, SAML, LDAP, API Key"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("authentication_method"), name=("authentication_method"), value=(application.authentication_method or ''), placeholder=("e.g. OAuth2, SAML, LDAP, API Key"), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='container_image', label='Container Image') %}
-          <input type="text" id="container_image" name="container_image" value="{{ application.container_image or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("container_image"), name=("container_image"), value=(application.container_image or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='kubernetes_namespace', label='Kubernetes Namespace') %}
-          <input type="text" id="kubernetes_namespace" name="kubernetes_namespace" value="{{ application.kubernetes_namespace or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("kubernetes_namespace"), name=("kubernetes_namespace"), value=(application.kubernetes_namespace or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='version_control_url', label='Version Control URL') %}
-          <input type="text" id="version_control_url" name="version_control_url" value="{{ application.version_control_url or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("version_control_url"), name=("version_control_url"), value=(application.version_control_url or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='main_branch', label='Main Branch') %}
-          <input type="text" id="main_branch" name="main_branch" value="{{ application.main_branch or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("main_branch"), name=("main_branch"), value=(application.main_branch or ''), size='sm', class="w-full") }}
         {% endcall %}
       </div>
     </section>
@@ -255,23 +224,19 @@
 
       <div class="grid grid-cols-1 gap-4">
         {% call form_group(id='compliance_requirements', label='Compliance Requirements') %}
-          <input type="text" id="compliance_requirements" name="compliance_requirements" value="{{ application.compliance_requirements or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("compliance_requirements"), name=("compliance_requirements"), value=(application.compliance_requirements or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='security_certifications', label='Security Certifications') %}
-          <input type="text" id="security_certifications" name="security_certifications" value="{{ application.security_certifications or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          {{ input(type="text", id=("security_certifications"), name=("security_certifications"), value=(application.security_certifications or ''), size='sm', class="w-full") }}
         {% endcall %}
       </div>
 
       {% call form_group(id='notes', label='Notes') %}
-        <textarea id="notes" name="notes" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.notes or '' }}</textarea>
+        {% call textarea(id=("notes"), name=("notes"), rows=("3"), class="w-full") %}{{ application.notes or '' }}{% endcall %}
       {% endcall %}
 
       {% call form_group(id='assessment_notes', label='Assessment Notes') %}
-        <textarea id="assessment_notes" name="assessment_notes" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.assessment_notes or '' }}</textarea>
+        {% call textarea(id=("assessment_notes"), name=("assessment_notes"), rows=("3"), class="w-full") %}{{ application.assessment_notes or '' }}{% endcall %}
       {% endcall %}
     </section>
 
@@ -279,10 +244,9 @@
     <div class="flex items-center justify-between pt-2">
       <a href="{{ url_for('unified_applications.application_detail', id=application.id) }}"
          class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
-      <button type="submit"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+      {% call button(type="submit", variant="default", class="justify-center whitespace-nowrap") %}
         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i> Save Changes
-      </button>
+      {% endcall %}
     </div>
   </form>
 </div>

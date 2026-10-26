@@ -24,7 +24,9 @@ design-tokens passes, because the colours are right. The screen is still
 unusable, and nothing in the estate had eyes.
 
 Scope: only templates that reference the collapse mechanism itself
-(`$store.sidebar` or `sidebar-collapsed`). Breadcrumbs and the public
+(`$store.sidebar`, `sidebar-collapsed`, or the library's `sidebar_menu_button(` part,
+whose anchor is written by the macro and so is checked at its call: a call with no
+`tooltip=` leaves an icon in the rail with no name beside it). Breadcrumbs and the public
 navbar are icon-bearing nav but never collapse, so flagging them would
 be asserting a consequence that cannot happen to them.
 
@@ -52,6 +54,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOW = re.compile(r"collapsed-nav-ok:[ \t]*\S")
+MENU_BUTTON_CALL = re.compile(r"sidebar_menu_button\((?:(?!%\}).)*%\}", re.S)
 ANCHOR = re.compile(r"<a\b[^>]*>(?:(?!</a>).)*?data-lucide(?:(?!</a>).)*?</a>", re.S)
 NAMED = ("title=", "aria-label=")
 
@@ -75,7 +78,8 @@ def scan(root: str) -> list:
                 head = probe.read()
         except (OSError, UnicodeDecodeError):
             continue
-        if "store.sidebar" not in head and "sidebar-collapsed" not in head:
+        uses_parts = "sidebar_menu_button(" in head and not path.endswith("ui_sidebar.html")
+        if "store.sidebar" not in head and "sidebar-collapsed" not in head and not uses_parts:
             continue
         rel = os.path.relpath(path, root).replace(os.sep, "/")
         try:
@@ -83,6 +87,15 @@ def scan(root: str) -> list:
                 source = fh.read()
         except (OSError, UnicodeDecodeError):
             continue
+        for match in MENU_BUTTON_CALL.finditer(source) if uses_parts else ():
+            call = match.group(0)
+            if "tooltip=" in call or ALLOW.search(call):
+                continue
+            line_no = source.count("\n", 0, match.start()) + 1
+            problems.append(
+                "%s:%d [collapsed-nav-affordance] sidebar_menu_button with no tooltip -- "
+                "in the icon rail this is an unlabelled button" % (rel, line_no)
+            )
         for match in ANCHOR.finditer(source):
             segment = match.group(0)
             open_tag = segment.split(">", 1)[0]

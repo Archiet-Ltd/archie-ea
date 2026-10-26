@@ -88,8 +88,12 @@ def test_the_website_needs_consent_and_is_kept_for_this_organisation_only(client
     assert ok.status_code == 200
     rows = {row["key"]: row for row in ok.get_json()["sources"]}
     assert rows["website"]["state"] == "waiting"
-    assert "https://acme.com will be read soon" in rows["website"]["text"]
+    assert "Company website is connected" in rows["website"]["text"]
     from app.modules.account.services import onboarding_service as onboarding
+    from app.services.job_queue_service import get_job_queue_service
+
+    assert len(get_job_queue_service().list_jobs(two["one"].id, limit=5, task=onboarding.WEBSITE_TASK)) == 1
+    assert get_job_queue_service().list_jobs(two["two"].id, limit=5, task=onboarding.WEBSITE_TASK) == []
 
     assert {r["key"]: r["state"] for r in onboarding.sources(two["two"])}["website"] == "not_given"
 
@@ -164,3 +168,114 @@ def test_a_tested_key_is_kept_for_this_organisation_alone_and_named_back(client,
     g.current_org_id = two["two"].id
     assert "sk-journey-key-0001" not in LLMService._get_all_api_keys("openai")
     assert APISettings.query.count() == 0  # org two sees no row of org one
+
+
+def test_register_user_retries_when_slug_already_exists(app, db_session):
+    """When the slug an organisation would take is already in use, the sign-up
+    succeeds with a suffixed slug and no IntegrityError reaches the caller."""
+    import uuid
+    from app.models.organization import Organization
+    from app.modules.account.services.account_service import AccountService
+
+    _slug_base = "caseyfounder-%s" % uuid.uuid4().hex[:6]
+    # Create an organisation whose slug is exactly what "Casey" "Founder" would claim.
+    first = Organization(name="Casey's Workspace", slug=_slug_base)
+    db_session.add(first)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        user = AccountService.register_user("Casey", "Founder", "casey.existing.%s@example.test" % uuid.uuid4().hex[:8], "Sup3r-Secret!pass")
+
+    assert user is not None
+    org = Organization.query.filter_by(id=user.organization_id).first()
+    assert org is not None
+    assert org.slug != _slug_base
+    assert org.slug != "caseyfounder"
+    assert org.slug.startswith("casey")
+
+
+def test_zzz_concurrent_signups_both_succeed(app, db_session):
+    """Two people signing up at the same moment with the same name both get an
+    organisation and neither sees an error."""
+    import multiprocessing
+    import uuid
+    from app.models.organization import Organization
+    from app.modules.account.services.account_service import AccountService
+
+    email1 = "casey.one.%s@example.test" % uuid.uuid4().hex[:8]
+    email2 = "casey.two.%s@example.test" % uuid.uuid4().hex[:8]
+
+    def sign_up_one(email, queue):
+        try:
+            from app import create_app
+            import os
+            os.environ.setdefault("FLASK_CONFIG", "testing")
+            proc_app = create_app("testing")
+            proc_app.config["TESTING"] = True
+            proc_app.config["WTF_CSRF_ENABLED"] = False
+            with proc_app.app_context(), proc_app.test_request_context("/"):
+                user = AccountService.register_user("Casey", "Founder", email, "Sup3r-Secret!pass")
+                org = Organization.query.filter_by(id=user.organization_id).first()
+                queue.put(("ok", email, org.slug))
+        except Exception as exc:
+            queue.put(("err", email, type(exc).__name__ + ": " + str(exc)[:300]))
+
+    queue = multiprocessing.Queue()
+    p1 = multiprocessing.Process(target=sign_up_one, args=(email1, queue))
+    p2 = multiprocessing.Process(target=sign_up_one, args=(email2, queue))
+    p1.start()
+    p2.start()
+    p1.join()
+    p2.join()
+
+    results = []
+    errors = []
+    while not queue.empty():
+        kind, email, slug = queue.get()
+        if kind == "ok":
+            results.append((email, slug))
+        else:
+            errors.append((email, slug))
+
+    assert not errors, "one of the concurrent sign-ups raised: %s" % errors
+    assert len(results) == 2, "expected 2 results, got %d: %s" % (len(results), results)
+    slugs = [s for _, s in results]
+    assert len(set(slugs)) == 2, "both got the same slug: %s" % slugs
+    for slug in slugs:
+        assert slug.startswith("caseyfounder"), slug
+
+    # Multiprocessing commits outside the db_session rollback; clean up
+    # using a real connection so the DELETE is visible to other tests.
+    from sqlalchemy import text
+    from app import db as app_db
+    app_db.session.execute(text(
+        "DELETE FROM organizations WHERE slug LIKE 'caseyfounder%'"
+        " AND id IN (SELECT organization_id FROM users WHERE email LIKE '%concurrent@example.test')"
+    ))
+    app_db.session.execute(text(
+        "DELETE FROM users WHERE email LIKE '%concurrent@example.test'"
+    ))
+    app_db.session.commit()
+
+
+def test_slug_collision_inside_transaction_retries(app, db_session):
+    """Inside a single transaction that already holds the slug, the sign-up retries
+    with no automatic collision detection (the old while-loop is gone)."""
+    import uuid
+    from app.models.organization import Organization
+    from app.modules.account.services.account_service import AccountService
+
+    _slug_base = "caseyfounder-%s" % uuid.uuid4().hex[:6]
+    first = Organization(name="Casey's Workspace", slug=_slug_base)
+    db_session.add(first)
+    db_session.flush()
+
+    with app.test_request_context("/"):
+        user = AccountService.register_user("Casey", "Founder", "casey.same.tx.%s@example.test" % uuid.uuid4().hex[:8], "Sup3r-Secret!pass")
+
+    assert user is not None
+    org = Organization.query.filter_by(id=user.organization_id).first()
+    assert org is not None
+    assert org.slug != _slug_base
+    assert org.slug != "caseyfounder"
+    assert org.slug.startswith("casey")

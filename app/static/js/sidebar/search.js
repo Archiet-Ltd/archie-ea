@@ -1,15 +1,14 @@
 /*
- * The one search box: "Search or ask..." at the top of the sidebar (navigation v3).
+ * The one search box at the top of the sidebar: pages and records, nothing else.
  *
  * Typing two or more characters finds pages (by their current name and every old name,
  * from the navigation registry through /api/sidebar/search) and records (applications,
  * capabilities, solutions, elements). Enter opens the highlighted result; with nothing
- * highlighted, a question opens the AI chat with the question filled in, and anything
- * else opens the best page match (or the chat when nothing matches). The last row is
- * always "Ask the AI chat", so asking is one action from any page.
+ * highlighted, the best page match opens, or the first record when no page matches. The
+ * box never asks anything: questions are asked in the AI chat, which has its own entry.
  *
  * Ctrl+K (Cmd+K on a Mac) focuses the box from anywhere, opening the sidebar first on a
- * phone, unless the page has its own Ctrl+K (data-suppress-global-search-shortcut).
+ * phone or from the icon rail, unless the page has its own Ctrl+K (data-suppress-global-search-shortcut).
  *
  * Network behaviour comes from SidebarModuleSearch (module_search.js): no request under
  * two characters, one debounced request per query, a slow answer never overwrites a newer
@@ -18,18 +17,9 @@
 (function () {
     'use strict';
 
-    var QUESTION_START = /^(who|whom|whose|what|which|why|how|when|where|is|are|am|was|were|can|could|does|do|did|should|would|will|has|have|list|show|tell|explain|compare|summarise|summarize|give|find)\b/i;
-
-    function looksLikeQuestion(text) {
-        var q = (text || '').trim();
-        if (!q) return false;
-        if (q.charAt(q.length - 1) === '?') return true;
-        return QUESTION_START.test(q) && q.split(/\s+/).length >= 3;
-    }
-
     function register() {
         if (!window.Alpine || !window.Alpine.data) return;
-        window.Alpine.data('sidebarSearch', function (chatUrl) {
+        window.Alpine.data('sidebarSearch', function () {
             return {
                 query: '',
                 pages: [],
@@ -37,7 +27,6 @@
                 loading: false,
                 error: false,
                 highlighted: -1,
-                chatUrl: chatUrl,
                 kbd: /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '') ? '⌘K' : 'Ctrl K',
                 init: function () {
                     var self = this;
@@ -65,33 +54,21 @@
                 },
                 focusBox: function () {
                     var input = this.$refs.input;
-                    if (window.Alpine && window.Alpine.store && window.Alpine.store('sidebar')) {
-                        var store = window.Alpine.store('sidebar');
-                        if (window.innerWidth < 1024) store.open = true;
-                        if (store.collapsed && store.toggle) store.toggle();
-                    }
+                    // Opens the drawer on a phone and expands the icon rail (js/sidebar/sidebar_shell.js).
+                    window.dispatchEvent(new CustomEvent('sidebar:open'));
                     setTimeout(function () { if (input) { input.focus(); input.select(); } }, 30);
                 },
                 searching: function () {
                     return this.query.trim().length >= 2;
                 },
-                // Every row a person can choose, in screen order: pages, records, then Ask.
+                // Every row a person can choose, in screen order: pages, then records.
                 rows: function () {
                     var out = [];
                     this.pages.forEach(function (p) { out.push({ kind: 'page', url: p.url }); });
                     this.records.forEach(function (r) { out.push({ kind: 'record', url: r.url }); });
-                    out.push({ kind: 'ask', url: this.askUrl() });
                     return out;
                 },
-                askUrl: function () {
-                    var q = this.query.trim();
-                    return this.chatUrl + (q ? (this.chatUrl.indexOf('?') === -1 ? '?' : '&') + 'q=' + encodeURIComponent(q) : '');
-                },
-                isQuestion: function () {
-                    return looksLikeQuestion(this.query);
-                },
                 recordIndex: function (i) { return this.pages.length + i; },
-                askIndex: function () { return this.pages.length + this.records.length; },
                 // Arrow keys walk the rows; past either end the box itself is "highlighted" (-1).
                 move: function (step) {
                     if (!this.searching()) return;
@@ -110,10 +87,10 @@
                     var rows = this.rows();
                     if (this.highlighted >= 0 && rows[this.highlighted]) {
                         this.go(rows[this.highlighted].url);
-                    } else if (this.isQuestion() || this.pages.length === 0) {
-                        this.go(this.askUrl());
-                    } else {
+                    } else if (this.pages.length) {
                         this.go(this.pages[0].url);
+                    } else if (this.records.length) {
+                        this.go(this.records[0].url);
                     }
                 },
                 clear: function () {
@@ -123,8 +100,6 @@
             };
         });
     }
-
-    window.SidebarSearchQuestion = { looksLikeQuestion: looksLikeQuestion };
 
     if (window.Alpine && window.Alpine.data) {
         register();

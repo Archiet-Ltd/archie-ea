@@ -39,6 +39,23 @@ _KEYWORD_RULES = [
         "github_sourced_records",
         {},
     ),
+    # What the company's own website said, once a person has confirmed it: what we sell, who our customers
+    # are, where we are based, what technology the site uses, who leads. Phrases are specific to the
+    # company itself so a "what breaks for our customers" question is never taken for one.
+    (
+        (
+            "what we sell", "what do we sell", "what does our company sell", "what we offer", "what do we offer",
+            "what does our company do", "what do we do as a company", "who are our customers", "who our customers are",
+            "who do we sell to", "our target market", "where are we based", "where we are based", "where is our company based",
+            "where is our headquarters", "our headquarters", "our site use", "our website use", "our site is built",
+            "our website is built", "who leads", "who runs our company", "who are the leaders", "who is our ceo",
+            "who founded", "our founders", "our leadership", "about our company", "about my company",
+            "about the company", "learned about", "learn about our", "know about our company", "know about us",
+            "our company profile", "what does our website say", "from our website",
+        ),
+        "company_profile",
+        {},
+    ),
     # UC-S2-03: paying twice / duplicate tooling by capability.
     (
         (
@@ -95,11 +112,30 @@ _KEYWORD_RULES = [
 ]
 
 
+_PROFILE_TOPIC_WORDS = (
+    ("leaders", ("who leads", "who runs", "who are the leaders", "ceo", "founder", "leadership")),
+    ("technology", ("site use", "website use", "is built", "technology", "tech stack")),
+    ("location", ("based", "headquarters", "located")),
+    ("customers", ("customer", "sell to", "target market", "clients")),
+    ("products", ("sell", "offer", "product", "what does our company do", "what do we do")),
+)
+
+
+def _profile_topic(lowered: str) -> str:
+    """Which part of the company's profile a question asks about; the whole profile when it names none."""
+    for topic, words in _PROFILE_TOPIC_WORDS:
+        if any(word in lowered for word in words):
+            return topic
+    return "overview"
+
+
 def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
     for keywords, entry_id, params in _KEYWORD_RULES:
         if any(kw in lowered for kw in keywords):
             resolved = dict(params)
+            if entry_id == "company_profile":
+                resolved["topic"] = _profile_topic(lowered)
             if entry_id == "what_breaks_if_fails":
                 # The impact entry needs the service the person named; pull it
                 # out of the question's own phrasing so it can be resolved.

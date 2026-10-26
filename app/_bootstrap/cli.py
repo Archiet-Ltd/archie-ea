@@ -375,6 +375,12 @@ def init_cli(app):
         app.logger.warning(f"Failed to register capability tenancy cutover CLI: {e}")
 
     try:
+        from app.commands.refresh_company_signals import init_app as init_company_signals
+        init_company_signals(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register company signals CLI: {e}")
+
+    try:
         from app.commands.backfill_capability_types import init_app as init_capability_types
 
         init_capability_types(app)

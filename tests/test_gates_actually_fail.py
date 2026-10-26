@@ -417,6 +417,14 @@ def _collapsed_nav_affordance(root, defective):
            "<span class='truncate'>Dashboard</span></a></nav></aside>")
 
 
+def _collapsed_nav_sidebar_parts(root, defective):
+    """A library menu button with no tooltip is an unnamed icon in the rail."""
+    tip = "" if defective else ", tooltip='Dashboard'"
+    _write(root, "app/templates/components/admin_sidebar.html",
+           "{% call sidebar_menu_button(href='/x', active=false" + tip + ") %}"
+           "<i data-lucide='layout-dashboard'></i><span>Dashboard</span>{% endcall %}")
+
+
 def _nav_icon_ambiguity(root, defective):
     """Two destinations behind one icon in one persona's own menu."""
     second = "compass" if defective else "map"
@@ -480,6 +488,7 @@ def _metric_provenance(root, defective):
 
 CASES += [
     ("check_collapsed_nav_affordance.py", _collapsed_nav_affordance),
+    ("check_collapsed_nav_affordance.py", _collapsed_nav_sidebar_parts),
     ("check_nav_icon_ambiguity.py", _nav_icon_ambiguity),
     ("check_nav_label_clarity.py", _nav_label_clarity),
     ("check_handoff_continuity.py", _handoff_continuity),

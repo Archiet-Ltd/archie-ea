@@ -579,39 +579,43 @@ def _load_sample_company_locked(wants_json):
 
     elements_before = ArchiMateElement.query.count()
 
-    # Import the sample
-    try:
-        result = ArchiMateImportService().import_xml(
-            xml_content,
-            strategy="skip_duplicates",
-            source_label=sample_company_service.SOURCE_LABEL,
-            promote_top_level=False,
-        )
-    except ImportRequestError as exc:
-        error = f"Could not import sample company: {exc}"
-        if wants_json:
-            return jsonify({"success": False, "error": error}), 500
-        flash(error, "error")
-        return redirect(url_for("dashboard.overview"))
+    # The sample's records are written with their dates spread over the last 90 days, so the
+    # Overview's chart has a shape and the change history is sealed once, in order.
+    from app.services.history_spread import dated_history
 
-    # The elements alone count no applications and score no health; add the
-    # applications, owners, costs, capabilities and risks a real estate carries.
-    point = sample_company_service.find_restore_point(g.current_org_id)
-    if point is not None:
+    with dated_history(rest=("import", sample_company_service.SOURCE_LABEL), connected=None):
+        # Import the sample
         try:
-            sample_company_service.add_working_data(g.current_org_id, current_user, point)
-            db.session.commit()
-            sample_company_service.work_out_connections(g.current_org_id)
-            sample_company_service.date_the_load(g.current_org_id, point.started_at)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            current_app.logger.exception("sample company working data not added")
-            error = "The sample company's elements loaded, but its applications could not be added."
+            result = ArchiMateImportService().import_xml(
+                xml_content,
+                strategy="skip_duplicates",
+                source_label=sample_company_service.SOURCE_LABEL,
+                promote_top_level=False,
+            )
+        except ImportRequestError as exc:
+            error = f"Could not import sample company: {exc}"
             if wants_json:
                 return jsonify({"success": False, "error": error}), 500
             flash(error, "error")
             return redirect(url_for("dashboard.overview"))
+
+        # The elements alone count no applications and score no health; add the
+        # applications, owners, costs, capabilities and risks a real estate carries.
+        point = sample_company_service.find_restore_point(g.current_org_id)
+        if point is not None:
+            try:
+                sample_company_service.add_working_data(g.current_org_id, current_user, point)
+                db.session.commit()
+                sample_company_service.work_out_connections(g.current_org_id)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("sample company working data not added")
+                error = "The sample company's elements loaded, but its applications could not be added."
+                if wants_json:
+                    return jsonify({"success": False, "error": error}), 500
+                flash(error, "error")
+                return redirect(url_for("dashboard.overview"))
 
     # The first screen now shows the loaded sample: its counts, applications and the
     # "You are looking at the sample company" bar with the way to remove it.

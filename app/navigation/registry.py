@@ -4,22 +4,20 @@ Every entry a person sees in the signed-in shell is declared here once, with the
 serves, who may see it, and the old and new names a person might type for it. Nothing in
 a template decides what the sidebar shows; ``sidebar_for(user)`` does, from this data.
 
-The structure (sentence case, the shadcn sidebar pattern, two levels at most):
+The structure (sentence case, the shadcn sidebar pattern, a group label, a collapsible item and
+its sub-items: two levels at most):
 
 - the organisation switcher, then one search box ("Search or ask...");
-- MAIN: the same seven entries in the same order for every role
-  (Home, AI chat, Systems, Impact, Changes, Spend, Compliance);
-- ARCHITECTURE: one extra group for enterprise and solution architects and review board
-  members (Model, Composer, Review board, Value streams). Frameworks have no
-  entry of their own (ADR-0017): each is a view picker on its job page, and the old
-  framework pages stay searchable and keep their addresses;
-- SECONDARY at the bottom: Integrations, Reports, Help;
+- TOP: Home, AI chat and Approvals (with the number of items waiting for the person);
+- WORK: Systems, Impact, Changes, Spend and Compliance, each opening onto its pages;
+- MODEL, shown to every role: one item per ArchiMate layer opening onto its element types
+  (ADR-0018), then Frameworks and Composer. Frameworks are one gallery page (ADR-0017);
+- SECONDARY at the bottom: Connections, Reports, Help;
 - the user menu in the footer: Account, Billing, Team, Settings, Platform admin, Sign out.
 
-Role depth never renames or reorders anything: procurement, finance and portfolio roles
-get the procurement pages as sub-items under Spend, and the architecture roles get the
-extra group. A startup CTO (any self-serve owner) sees exactly the ten main and
-secondary entries.
+The sidebar has one shape for every role; a person is shown an entry only when its page
+opens for them. A page that a job entry and an element entry both open (Applications,
+Application component) is marked current under both.
 
 The long tail (every page the old sidebar and the All-modules directory listed) is the
 catalogue: each page is filed under the entry whose job it serves, so the search index
@@ -35,15 +33,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from app.models.user import (
-    ROLE_ARB_MEMBER,
-    ROLE_ENTERPRISE_ARCHITECT,
-    ROLE_FINANCE,
-    ROLE_PORTFOLIO_MANAGER,
-    ROLE_PROCUREMENT,
-    ROLE_SOLUTION_ARCHITECT,
-)
-
 # Jobs, in the words of the consolidation map.
 JOBS = {
     "home": "Start here",
@@ -58,8 +47,6 @@ JOBS = {
     "platform": "Platform administration",
 }
 
-ARCHITECTURE_ROLES = frozenset({ROLE_ENTERPRISE_ARCHITECT, ROLE_SOLUTION_ARCHITECT, ROLE_ARB_MEMBER})
-PROCUREMENT_ROLES = frozenset({ROLE_PROCUREMENT, ROLE_FINANCE, ROLE_PORTFOLIO_MANAGER})
 
 
 @dataclass(frozen=True)
@@ -82,6 +69,13 @@ class NavLink:
     owns: tuple = ()
     # Where the canonical page for this job is not built yet, what stands in for it.
     note: str | None = None
+    # A collapsible item: it opens its sub-items and has no page of its own (its endpoint is
+    # the first page it holds, used for the breadcrumb trail).
+    toggle: bool = False
+    # "work" or "model": which sidebar group a collapsible item sits in.
+    group: str = ""
+    # Name of the counter whose number is shown beside the entry (see _COUNTERS).
+    count: str | None = None
 
     @property
     def values(self) -> dict:
@@ -97,104 +91,197 @@ def _l(key, label, endpoint, icon=None, **kw) -> NavLink:
     return NavLink(key=key, label=label, endpoint=endpoint, icon=icon, **kw)
 
 
-# ── Main: the same seven entries, in this order, for every role ──────────────────────────
-_SPEND_CHILDREN = (
-    _l("procurement", "Procurement", "procurement.index", job="3", roles=PROCUREMENT_ROLES,
-       requires="procurement", aliases=("Procurement overview", "Vendor spend")),
-    _l("contracts", "Contracts", "procurement.contracts_list", job="3", roles=PROCUREMENT_ROLES,
-       requires="procurement", aliases=("Vendor contracts",)),
-    _l("licences", "Licences", "procurement.licenses_list", job="3", roles=PROCUREMENT_ROLES,
-       requires="procurement_or_finance", aliases=("Licenses", "Software licences")),
-    _l("renewals", "Renewals", "procurement.renewals_dashboard", job="3", roles=PROCUREMENT_ROLES,
-       requires="procurement", aliases=("Contract renewals",)),
-    _l("spend_analytics", "Spend analytics", "procurement.spend_analytics", job="3",
-       roles=PROCUREMENT_ROLES, requires="procurement_or_finance", aliases=("Spend",)),
-)
-
-MAIN: tuple = (
+# ── Top: the same three entries, in this order, for every role ──────────────────────────
+TOP: tuple = (
     _l("home", "Home", "dashboard.overview", "home", job="home",
        aliases=("Overview", "Dashboard", "Dashboard overview", "Start", "Getting started"),
        owns=("dashboard.overview", "dashboard.index", "dashboards.")),
     _l("ai_chat", "AI chat", "unified_ai_chat.index", "message-square", job="6",
        aliases=("Ask", "Ask a question", "Assistant", "Chat", "Saved answers", "Question"),
        owns=("unified_ai_chat.", "intelligence_ui.ask", "intelligence_ui.answers")),
-    _l("systems", "Systems", "unified_applications.application_list", "boxes", job="1",
-       aliases=("Applications", "Application portfolio", "Services", "Owners", "Ownership", "Costs",
-                "Capabilities", "Capability map", "Vendors", "Model", "Library", "Inventory"),
+    # The one approvals inbox; its number is what the inbox lists for this person.
+    _l("approvals", "Approvals", "unified_ai_chat.approval_inbox", "inbox", job="6", requires="general",
+       aliases=("Approval inbox", "Pending changes", "Proposals", "Waiting for me"), count="approvals"),
+)
+
+# ── Work: five jobs, each a collapsible item with the pages that do it ───────────────────
+WORK: tuple = (
+    _l("systems", "Systems", "unified_applications.application_list", "boxes", job="1", toggle=True, group="work",
+       children=(
+           _l("applications", "Applications", "unified_applications.application_list", job="1",
+              aliases=("Application portfolio", "Services", "Owners", "Ownership", "Inventory", "Library")),
+           _l("portfolio", "Portfolio", "unified_applications.rationalization_dashboard", job="1",
+              aliases=("Rationalisation", "Rationalization", "Portfolio KPIs", "Application rationalisation",
+                       "Consolidation", "Savings")),
+           _l("data_register", "Data register", "data_architecture.data_entity_catalog", job="1",
+              aliases=("Data entities", "Data catalogue", "Data objects", "Data model")),
+           _l("interfaces", "Interfaces", "interface_register.index", job="1", requires="section:data_integration",
+              aliases=("Interface register", "Integrations register")),
+           _l("tech_radar", "Technology radar", "tech_radar.index", job="1", aliases=("Tech radar", "Radar")),
+       ),
        owns=("unified_applications.", "capability_map.", "application_mgmt.", "my_applications.",
              "capabilities.", "organization.", "teams.", "stakeholder_map.", "tech_radar.",
              "data_architecture.", "data_governance.", "interface_register.", "unified_duplicate.",
-             "maturity_management.", "dashboard.health_scorecard")),
-    _l("impact", "Impact", "enterprise.impact_analysis", "zap", job="2",
-       aliases=("Impact analysis", "What breaks", "Dependencies", "Blast radius", "Traceability",
-                "Value streams at risk"),
-       owns=("strategic.impact_analysis", "architect_ui.traceability_matrix", "intelligence_ui.traceability",
-             "intelligence_ui.value_streams_at_risk", "intelligence_ui.twin_map")),
-    _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4",
-       aliases=("Gaps", "Gap", "Gap analysis", "Work packages", "Roadmap", "Roadmaps", "Plateaus", "Programmes",
-                "Transformation", "Change"),
-       owns=("enterprise.work_packages", "enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap",
-             "solution_design.programmes_list", "implementation_planning.", "adm_kanban_view.",
-             "architecture_journey.", "portfolio.", "solution_design.list_solutions"),
-       note="Lands on the gap register, the first step of gaps, work packages and the one roadmap "
-            "(/genome/roadmap/), each linked from the next."),
-    _l("spend", "Spend", "unified_applications.rationalization_dashboard", "wallet", job="3",
-       aliases=("Cost", "Costs", "Rationalisation", "Rationalization", "Portfolio KPIs", "Consolidation",
-                "Investment", "Savings"),
-       children=_SPEND_CHILDREN,
-       owns=("procurement.", "consolidation_list.", "formula_register.",
-             "unified_applications.vendor_catalogue", "unified_applications.vendor_catalogue_product",
-             "unified_applications.vendor_catalogue_link",
-             "dashboard_pages.rationalization_scorecard", "enterprise.investment_matrix")),
-_l("compliance", "Compliance", "risk.risk_register", "shield-check", job="5",
-       aliases=("Risks", "Risk register", "Controls", "Decisions", "Evidence", "Audit", "Policies",
-                 "Governance", "Standards"),
-       owns=("risk.", "arch_decisions.", "policy_monitoring.", "gdpr_bp.", "admin.audit_log_viewer",
-              "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page",
-              "intelligence_ui.history_changes_page"),
+             "maturity_management.", "dashboard.health_scorecard", "consolidation_list.",
+             "dashboard_pages.rationalization_scorecard")),
+    _l("impact", "Impact", "enterprise.impact_analysis", "zap", job="2", toggle=True, group="work",
        children=(
-           _l("data_subject_requests", "Data Subject Requests", "gdpr_bp.dsr_index", job="5",
-              requires="data_subject_requests", aliases=("DSR", "GDPR requests")),
+           _l("impact_analysis", "Impact analysis", "enterprise.impact_analysis", job="2",
+              aliases=("Impact", "What breaks", "Dependencies", "Blast radius")),
+           _l("traceability", "Traceability", "architect_ui.traceability_matrix", job="2",
+              aliases=("Traceability matrix", "Trace", "Requirements traceability", "Value streams at risk")),
        ),
-       note="Lands on the risk register, the canonical page for this job today; the compliance "
-             "dashboard is held back until its views carry data."),
+       owns=("strategic.impact_analysis", "intelligence_ui.traceability", "intelligence_ui.value_streams_at_risk",
+             "intelligence_ui.twin_map")),
+    _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4", toggle=True, group="work",
+       children=(
+           _l("gaps", "Gaps", "enterprise.gap_analysis", job="4", aliases=("Gap", "Gap analysis")),
+           _l("solutions", "Solutions", "solution_design.list_solutions", job="4",
+              aliases=("Solution designs", "Solution design", "Designs")),
+           _l("options_analysis", "Options analysis", "application_mgmt.vendor_analysis_list", job="4",
+              aliases=("Vendor options", "Vendor selection", "Vendor analysis", "Compare options")),
+           _l("business_cases", "Business cases", "business_case.index", job="4",
+              aliases=("Business case", "Case for change", "Investment case", "Cost and benefit")),
+           _l("work_packages", "Work packages", "enterprise.work_packages", job="4",
+              aliases=("Work package", "WorkPackage", "Projects")),
+           _l("roadmap", "Roadmap", "genome_roadmap.index", job="4",
+              aliases=("Roadmaps", "Transformation roadmap", "Capability roadmap", "Technology roadmap",
+                       "Timeline", "Plateaus", "Plateau", "Target states", "Transition states")),
+           _l("programmes", "Programmes", "solution_design.programmes_list", job="4",
+              aliases=("Transformation programmes", "Programs", "Initiatives")),
+           _l("canvases", "Canvases", "business_model.index", job="4",
+              aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models")),
+       ),
+       owns=("enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap", "implementation_planning.",
+             "adm_kanban_view.", "architecture_journey.", "portfolio.", "solution_design.", "business_model.",
+             "business_case.", "application_mgmt.vendor_analysis_")),
+    _l("spend", "Spend", "procurement.spend_analytics", "wallet", job="3", toggle=True, group="work",
+       children=(
+           _l("costs", "Costs", "procurement.spend_analytics", job="3", requires="spend_pages",
+              aliases=("Cost", "Spend analytics", "Spend", "Procurement overview", "Vendor spend")),
+           _l("vendors", "Vendors", "unified_applications.vendors", job="3", requires="spend_pages",
+              aliases=("Suppliers", "Vendor list")),
+           # Finance may open licences but not contracts: it is offered the licences page.
+           _l("contracts", "Contracts and licences", "procurement.contracts_list", job="3", requires="costs",
+              aliases=("Contracts", "Vendor contracts", "Licences", "Licenses", "Software licences"),
+              fallback=_l("licences", "Licences", "procurement.licenses_list", job="3", requires="spend_pages",
+                          aliases=("Licenses", "Software licences", "Contracts and licences"))),
+           _l("renewals", "Renewals", "procurement.renewals_dashboard", job="3", requires="costs",
+              aliases=("Contract renewals",)),
+           _l("investments", "Investments", "enterprise.investment_matrix", job="3",
+              aliases=("Investment", "Investment matrix", "Investment priorities", "Investment analysis")),
+       ),
+       owns=("procurement.", "formula_register.", "unified_applications.vendor_catalogue",
+             "unified_applications.vendor_catalogue_product", "unified_applications.vendor_catalogue_link")),
+    _l("compliance", "Compliance", "policy_monitoring.policy_dashboard", "shield-check", job="5", toggle=True,
+       group="work",
+       children=(
+           _l("controls", "Controls", "policy_monitoring.policy_dashboard", job="5", requires="general",
+              aliases=("Policy monitoring", "Policies", "Policy", "Standards")),
+           _l("risks", "Risks", "risk.risk_register", job="5", aliases=("Risk register", "Risk")),
+           _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5",
+              aliases=("Architecture decisions", "ADRs", "Decision log", "Board decisions")),
+           _l("review_board", "Review board", "arb.dashboard", job="5",
+              aliases=("ARB", "Architecture review board", "ARB dashboard", "Reviews", "Sessions")),
+           _l("evidence", "Evidence", "intelligence_ui.history_changes_page", job="5",
+              aliases=("Model changes", "Changes between dates", "What changed", "Change history", "Audit trail",
+                       "Who changed what", "History", "Audit")),
+       ),
+       owns=("risk.", "arch_decisions.", "policy_monitoring.", "gdpr_bp.", "admin.audit_log_viewer", "arb.",
+             "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page",
+             "intelligence_ui.history_changes_page"),
+       note="Opens on the policy page; the compliance dashboard is held back until its views carry data."),
 )
 
-# ── Architecture: one extra group for the architecture roles ────────────────────────────
-ARCHITECTURE: tuple = (
-    # One "Model" entry (ADR-0018): the model by ArchiMate layer; each element type has its
-    # list and record pages under its job, found by name from the search box.
-    _l("archimate_model", "Model", "archimate_crud.dashboard", "network", job="1",
-       roles=ARCHITECTURE_ROLES,
-       aliases=("ArchiMate model", "Architecture", "Architecture model", "Elements", "Catalogue", "Catalogues",
-                "Repository", "Layers"),
-       # Frameworks are views over this one model (ADR-0017): their pages sit here, with
-       # no sidebar entry of their own, and keep their addresses.
-       owns=("archimate_crud.", "archimate_layers.", "maturity_management.frameworks_overview",
-             "business_model.", "business_case.")),
+# ── Model: one collapsible item per ArchiMate layer, then Frameworks and Composer ───────
+# (key, label, icon, layer key in the model pages, element types in the order the sidebar lists them)
+_MODEL_LAYERS: tuple = (
+    ("strategy", "Strategy", "compass", "strategy",
+     ("Capability", "ValueStream", "Resource", "CourseOfAction")),
+    ("business", "Business", "briefcase", "business",
+     ("BusinessActor", "BusinessRole", "BusinessCollaboration", "BusinessInterface", "BusinessProcess",
+      "BusinessFunction", "BusinessInteraction", "BusinessEvent", "BusinessService", "BusinessObject", "Contract",
+      "Representation", "Product")),
+    ("application", "Application", "app-window", "application",
+     ("ApplicationComponent", "ApplicationCollaboration", "ApplicationInterface", "ApplicationFunction",
+      "ApplicationInteraction", "ApplicationProcess", "ApplicationEvent", "ApplicationService", "DataObject")),
+    ("technology", "Technology", "server", "technology",
+     ("Node", "Device", "SystemSoftware", "TechnologyCollaboration", "TechnologyInterface", "Path",
+      "CommunicationNetwork", "TechnologyFunction", "TechnologyProcess", "TechnologyInteraction", "TechnologyEvent",
+      "TechnologyService", "Artifact")),
+    ("physical", "Physical", "factory", "physical", ("Equipment", "Facility", "DistributionNetwork", "Material")),
+    ("motivation", "Motivation", "target", "motivation",
+     ("Stakeholder", "Driver", "Assessment", "Goal", "Outcome", "Principle", "Requirement", "Constraint", "Meaning",
+      "Value")),
+    ("implementation", "Implementation and migration", "rocket", "implementation",
+     ("WorkPackage", "Deliverable", "ImplementationEvent", "Plateau", "Gap")),
+    ("other", "Other", "shapes", "other", ("Location", "Grouping")),
+)
+
+# A type whose list already has a page of its own opens that page: one page, never two.
+_CANONICAL_TYPE_PAGES = {
+    "ApplicationComponent": "unified_applications.application_list",
+    "DataObject": "data_architecture.data_entity_catalog",
+    "Capability": "capability_map.index",
+    "ValueStream": "value_stream.index",
+    "Gap": "enterprise.gap_analysis",
+    "WorkPackage": "enterprise.work_packages",
+    "Plateau": "enterprise.plateaus",
+}
+# Types the model pages hold no list for: the architecture model page opens instead.
+_MODEL_PAGE_ONLY = frozenset({"Location", "Grouping"})
+
+
+def _type_label(element_type: str) -> str:
+    import re as _re
+
+    words = _re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type).split()
+    return " ".join([words[0]] + [w.lower() for w in words[1:]]) if words else element_type
+
+
+def _element_link(layer_key: str, element_type: str) -> NavLink:
+    key = "type_" + element_type
+    if element_type in _CANONICAL_TYPE_PAGES:
+        return _l(key, _type_label(element_type), _CANONICAL_TYPE_PAGES[element_type], job="1",
+                  aliases=(element_type,))
+    if element_type in _MODEL_PAGE_ONLY:
+        return _l(key, _type_label(element_type), "archimate_crud.dashboard", job="1",
+                  url_values={"element_type": element_type}, aliases=(element_type,))
+    return _l(key, _type_label(element_type), "archimate_crud.list_elements", job="1",
+              url_values={"layer": layer_key, "element_type": element_type}, aliases=(element_type,))
+
+
+MODEL: tuple = tuple(
+    _l("layer_" + key, label, "archimate_crud.dashboard", icon, job="1", toggle=True, group="model",
+       children=tuple(_element_link(layer_key, t) for t in types))
+    for key, label, icon, layer_key, types in _MODEL_LAYERS
+) + (
+    _l("frameworks", "Frameworks", "frameworks.gallery", "library", job="1",
+       aliases=("Maturity frameworks", "Capability frameworks", "TOGAF", "APQC", "Industry frameworks",
+                "Industry process frameworks", "Compliance frameworks"),
+       owns=("frameworks.", "industry_apqc.", "maturity_management.frameworks_overview")),
     # Opens on the layered viewpoint, not a blank canvas.
-    _l("composer", "Composer", "archimate.composer_page", "pen-tool", job="1", roles=ARCHITECTURE_ROLES,
+    _l("composer", "Composer", "archimate.composer_page", "pen-tool", job="1",
        url_values={"viewpoint": "layered"},
        aliases=("ArchiMate composer", "Diagrams", "Diagram", "Views", "Viewpoints"),
        owns=("archimate.",)),
-    _l("review_board", "Review board", "arb.dashboard", "gavel", job="5", roles=ARCHITECTURE_ROLES,
-       aliases=("ARB", "Architecture review board", "ARB dashboard", "Reviews", "Sessions"),
-       owns=("arb.",)),
-    _l("value_streams", "Value streams", "value_stream.index", "waypoints", job="1", roles=ARCHITECTURE_ROLES,
-       aliases=("Value stream", "Stages"), owns=("value_stream.",)),
 )
 
-# ── Secondary, at the bottom of the sidebar ─────────────────────────────────────────────
-# Connecting a source is an administrator's job (the connector pages are admin-only); a
-# person who may not connect one is offered the import pages, the other way in.
-_INTEGRATIONS_FALLBACK = _l("integrations", "Integrations", "batch_import_view.dashboard", "plug", job="0",
-                            aliases=("Imports", "Import", "Batch import"))
+# Not drawn in the sidebar: the entry the model pages sit under for the breadcrumb trail.
+_MODEL_ROOT = _l("archimate_model", "Model", "archimate_crud.dashboard", "network", job="1",
+                 aliases=("ArchiMate model", "Architecture", "Architecture model", "Elements", "Catalogue",
+                          "Catalogues", "Repository", "Layers"),
+                 owns=("archimate_crud.", "archimate_layers.", "value_stream."))
 
+# ── Value streams page: one entry under Model > Strategy (Value stream) ───────────────
+
+# ── Secondary, at the bottom of the sidebar ─────────────────────────────────────────────
+# Connecting a source is for the architects who author the model and for administrators
+# (the connector pages' own guard); nobody else is shown the entry.
 SECONDARY: tuple = (
-    _l("integrations", "Integrations", "m365_connector.connectors_index", "plug", job="0", requires="admin",
-       fallback=_INTEGRATIONS_FALLBACK,
-       aliases=("Connectors", "Connections", "Connect a source", "Connect GitHub", "Connect Jira", "Sources",
-                "GitHub", "Jira", "Import", "Imports"),
+    _l("connections", "Connections", "m365_connector.connectors_index", "plug", job="0", requires="connections",
+       aliases=("Integrations", "Connectors", "Connect a source", "Connect GitHub", "Connect Jira", "Sources",
+                "GitHub", "Jira", "Import", "Imports", "Batch import"),
        owns=("m365_connector.", "batch_import_view.", "admin.salesforce_integration",
              "admin.power_platform_integration", "admin.slack_integration", "admin.teams_meetings_integration",
              "admin.jira_settings", "admin.abacus_")),
@@ -249,53 +336,28 @@ PLATFORM_ADMIN_TOOLS: tuple = (
 PAGES: tuple = (
     _l("capability_map", "Capability map", "capability_map.index", job="1",
        aliases=("Capabilities", "Capability heat map", "Capability health", "Business capabilities")),
-    _l("vendors", "Vendors", "unified_applications.vendors", job="1", aliases=("Suppliers", "Vendor list")),
     _l("health_scorecard", "Health scorecard", "dashboard.health_scorecard", job="1",
        aliases=("CTO scorecard", "Architecture health", "Model health", "Scorecard")),
-    _l("tech_radar", "Technology radar", "tech_radar.index", job="1", aliases=("Tech radar", "Radar")),
     _l("org_chart", "Organisation units", "organization.index", job="1",
        aliases=("Org chart", "RACI", "Org chart and RACI", "Organization")),
     _l("data_architecture", "Data architecture", "data_architecture.data_architecture_dashboard", job="1",
        aliases=("Data model", "Data lineage")),
     _l("duplicates", "Duplicates", "unified_duplicate.simple_dashboard", job="1",
        aliases=("Duplicate detection", "Dedupe")),
-    _l("history_changes", "Model changes", "intelligence_ui.history_changes_page", job="5",
-       aliases=("Changes between dates", "What changed", "Change history", "Audit trail",
-                "Who changed what", "History")),
     _l("history_as_of", "Model as of", "intelligence_ui.history_as_of_page", job="5",
        aliases=("Model as of a date", "Point in time", "As of")),
-    _l("traceability", "Traceability", "architect_ui.traceability_matrix", job="2",
-       aliases=("Traceability matrix", "Trace", "Requirements traceability")),
     _l("value_streams_at_risk", "Value streams at risk", "intelligence_ui.value_streams_at_risk", job="2",
        aliases=("At risk",)),
-    _l("roadmap", "Roadmap", "genome_roadmap.index", job="4",
-       aliases=("Roadmaps", "Transformation roadmap", "Capability roadmap", "Technology roadmap", "Timeline")),
-    _l("work_packages", "Work packages", "enterprise.work_packages", job="4",
-       aliases=("Work package", "WorkPackage", "Projects")),
     _l("plateaus", "Plateaus", "enterprise.plateaus", job="4",
        aliases=("Plateau", "Target states", "Transition states")),
-    _l("programmes", "Programmes", "solution_design.programmes_list", job="4",
-       aliases=("Transformation programmes", "Programs", "Initiatives")),
     _l("consolidation", "Consolidation", "consolidation_list.dashboard", job="3",
        aliases=("Consolidation list", "Retire", "Retirement")),
-    _l("investment_matrix", "Investment matrix", "enterprise.investment_matrix", job="3",
-       aliases=("Investment priorities", "Investment analysis")),
-    _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5",
-       aliases=("Architecture decisions", "ADRs", "Decision log", "Board decisions")),
-    _l("policy_monitoring", "Policy monitoring", "policy_monitoring.policy_dashboard", job="5",
-       requires="general", aliases=("Policies", "Policy")),
     _l("audit_log", "Audit log", "admin.audit_log_viewer", job="5", requires="admin",
        aliases=("Audit trail", "Activity log")),
     _l("data_subject_requests", "Data subject requests", "gdpr_bp.dsr_index", job="5",
        requires="data_subject_requests", aliases=("DSR", "GDPR requests")),
-    _l("approvals", "Approvals", "unified_ai_chat.approval_inbox", job="6", requires="general",
-       aliases=("Approval inbox", "Pending changes", "Proposals")),
     _l("architect_briefing", "Architect briefing", "solution_design.ea_briefings", job="6",
        aliases=("Chief architect synthesis", "Weekly briefing")),
-    _l("frameworks", "Frameworks", "maturity_management.frameworks_overview", job="1",
-       aliases=("Maturity frameworks", "Capability frameworks", "TOGAF")),
-    _l("canvases", "Canvases", "business_model.index", job="1",
-       aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models")),
     _l("all_pages", "All modules", "modules_directory.index", job="account",
        aliases=("Every page", "Modules", "Directory", "Site map")),
 )
@@ -318,8 +380,8 @@ _CATALOGUE_HOME = (
     ("main.ea_workflows_dashboard", "changes"),
     ("roadmap_outcome.", "changes"),
     ("main.archimate_roadmap", "changes"),
-    ("integration.", "integrations"),
-    ("main.integrations", "integrations"),
+    ("integration.", "connections"),
+    ("main.integrations", "connections"),
     ("main.settings", "platform_admin"),
     ("main.capability_framework", "platform_admin"),
     ("usage_analytics.", "settings"),
@@ -331,7 +393,7 @@ _CATALOGUE_HOME = (
     ("admin.", "settings"),
 )
 
-ALL_ENTRIES: tuple = MAIN + ARCHITECTURE + SECONDARY + USER_MENU
+ALL_ENTRIES: tuple = TOP + WORK + MODEL + SECONDARY + USER_MENU + (_MODEL_ROOT,)
 
 
 # ── Predicates ───────────────────────────────────────────────────────────────────────────
@@ -390,13 +452,16 @@ def entry_for_endpoint(endpoint: str | None) -> NavLink | None:
     """The sidebar entry a page belongs to: the entry marked current and the head of its trail."""
     if not endpoint:
         return None
-    # The entry's own page (or the page offered in its place) first ...
+    # The entry's own page (or the page offered in its place) first. A collapsible item has no
+    # page of its own: it answers for the pages it holds, below ...
     for link in ALL_ENTRIES:
+        if link.toggle:
+            continue
         if endpoint == link.endpoint or (link.fallback is not None and endpoint == link.fallback.endpoint):
             return link
     # ... then an exact owner, a sub-item, or a platform admin tool ...
     for link in ALL_ENTRIES:
-        if endpoint in link.owns or any(endpoint == c.endpoint for c in link.children):
+        if endpoint in link.owns or (link.group != "model" and any(endpoint == c.endpoint for c in link.children)):
             return link
     if any(endpoint == tool.endpoint for tool in PLATFORM_ADMIN_TOOLS):
         return _by_key("platform_admin")
@@ -419,48 +484,109 @@ def entry_for_endpoint(endpoint: str | None) -> NavLink | None:
 class SidebarItem:
     key: str
     label: str
-    href: str
+    href: str | None
     icon: str | None
     job: str
     active: bool = False
     current: bool = False
     children: list = field(default_factory=list)
+    toggle: bool = False
+    open: bool = False
+    badge: int | None = None
 
 
-def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: NavLink | None):
+def _waiting_approvals(user) -> int | None:
+    """What the approvals inbox lists for this person: the number shown beside Approvals."""
+    try:
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        return AIChatApprovalService(getattr(user, "id", None)).count_approver_queue()
+    except Exception:  # noqa: BLE001 - a count must not 500 a page
+        return None
+
+
+_COUNTERS = {"approvals": _waiting_approvals}
+
+
+def _here(link: NavLink, endpoint: str | None, values: dict | None) -> bool:
+    """True when the page being shown is this link's page: the endpoint, and the values that tell
+    two links to one endpoint apart (the layer and element type of a list page)."""
+    if endpoint != link.endpoint:
+        return False
+    values = values or {}
+    return all(str(values.get(k)) == str(v) for k, v in link.values.items())
+
+
+def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: NavLink | None,
+          values: dict | None = None, remembered: dict | None = None):
+    if link.toggle:
+        children = []
+        for child in link.children:
+            child_link = resolve(user, child, role)
+            child_url = href(child_link) if child_link else None
+            if child_url:
+                here = _here(child_link, endpoint, values)
+                children.append(SidebarItem(child_link.key, child_link.label, child_url, None, child.job,
+                                            active=here, current=here))
+        if not children:
+            return None
+        in_entry = (current_entry is not None and current_entry.key == link.key) or any(c.current for c in children)
+        # What the person last chose is kept; with no choice, the item holding the page is open.
+        choice = (remembered or {}).get(link.key)
+        return SidebarItem(link.key, link.label, None, link.icon, link.job, active=in_entry, current=False,
+                           children=children, toggle=True, open=in_entry if choice is None else choice)
     chosen = resolve(user, link, role)
     if chosen is None:
         return None
     url = href(chosen)
     if url is None:
         return None
-    children = []
-    for child in link.children:
-        child_link = resolve(user, child, role)
-        child_url = href(child_link) if child_link else None
-        if child_url:
-            here = endpoint == child.endpoint
-            children.append(SidebarItem(child.key, child.label, child_url, None, child.job, active=here, current=here))
+    counter = _COUNTERS.get(link.count) if link.count else None
+    number = counter(user) if counter else None
     in_entry = current_entry is not None and current_entry.key == link.key
-    active = in_entry and not any(c.active for c in children)
-    return SidebarItem(link.key, link.label, url, link.icon, link.job, active=active,
-                       current=endpoint == chosen.endpoint, children=children)
+    return SidebarItem(link.key, link.label, url, link.icon, link.job, active=in_entry or _here(chosen, endpoint, values),
+                       current=_here(chosen, endpoint, values), badge=number or None)
 
 
-def sidebar_for(user, endpoint: str | None = None) -> dict:
-    """{"main", "architecture", "secondary", "user_menu"} -> [SidebarItem] for this user."""
+def sidebar_for(user, endpoint: str | None = None, values: dict | None = None,
+                remembered: dict | None = None) -> dict:
+    """{"main", "work", "model", "secondary", "user_menu"} -> [SidebarItem] for this user.
+
+    ``values`` are the request's path and query values (they tell the list pages of two element
+    types apart); ``remembered`` maps an item's key to True/False for the items this person has
+    opened or closed."""
     role = _role(user)
     current_entry = entry_for_endpoint(endpoint)
 
     def build(links: Iterable[NavLink]):
-        return [i for i in (_item(user, link, role, endpoint, current_entry) for link in links) if i]
+        built = (_item(user, link, role, endpoint, current_entry, values, remembered) for link in links)
+        return [i for i in built if i]
 
     return {
-        "main": build(MAIN),
-        "architecture": build(ARCHITECTURE),
+        "main": build(TOP),
+        "work": build(WORK),
+        "model": build(MODEL),
         "secondary": build(SECONDARY),
         "user_menu": build(USER_MENU),
     }
+
+
+def remembered_cookie_name(user) -> str:
+    """The cookie holding which sidebar items this person has opened or closed."""
+    return "sidebar_items_%s" % (getattr(user, "id", None) or "guest")
+
+
+def remembered_items(cookies, user) -> dict:
+    """{item key: True/False} from the person's cookie ("systems:1,layer_business:0")."""
+    from urllib.parse import unquote
+
+    raw = unquote(cookies.get(remembered_cookie_name(user)) or "")  # the page script stores it URL-encoded
+    out = {}
+    for part in raw.split(","):
+        key, _, state = part.partition(":")
+        if key and state in ("0", "1") and key.replace("_", "").isalnum():
+            out[key] = state == "1"
+    return out
 
 
 def platform_admin_tools(user) -> list:
@@ -472,7 +598,7 @@ def connect_url(user) -> str | None:
     """Where the connect card's one button goes: the connectors page, for a person who may
     connect a source. Nobody else is shown the card (it would promise what they cannot do)."""
     link = resolve(user, SECONDARY[0])
-    return href(link) if link is SECONDARY[0] else None
+    return href(link) if link is SECONDARY[0] else None  # the Connections entry
 
 
 # ── The search index ─────────────────────────────────────────────────────────────────────
@@ -499,20 +625,11 @@ def _catalogue() -> list:
 
 
 # ── ArchiMate element types (ADR-0018) ──────────────────────────────────────────────────
-# Every element type has one list page, under its job; none has a sidebar entry. Types whose
-# list has a canonical page of its own answer from that page.
+# Every element type has one list page. The sidebar's Model group holds the types of each layer;
+# the index also offers the plural names ("Business actors") and the types the sidebar does not list.
 _ELEMENT_TYPE_HOME = {"implementation": "changes", "application": "systems", "technology": "systems",
                       "physical": "systems", "strategy": "systems", "business": "systems", "motivation": "systems"}
 _COMPLIANCE_TYPES = {"Requirement", "Constraint", "Principle", "Assessment"}
-_CANONICAL_TYPE_PAGES = {"Gap": "enterprise.gap_analysis", "WorkPackage": "enterprise.work_packages",
-                         "Plateau": "enterprise.plateaus"}
-
-
-def _type_label(element_type: str) -> str:
-    import re as _re
-
-    words = _re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type).split()
-    return " ".join([words[0]] + [w.lower() for w in words[1:]]) if words else element_type
 
 
 def element_type_pages() -> list:
@@ -525,7 +642,8 @@ def element_type_pages() -> list:
     rows = []
     for layer in ("strategy", "business", "application", "technology", "physical", "motivation", "implementation"):
         for element_type in getattr(types, layer.upper() + "_ELEMENT_TYPES", []):
-            if element_type not in MODEL_REGISTRY:
+            # "Application" is the portfolio record itself: its list is the Applications page.
+            if element_type not in MODEL_REGISTRY or element_type == "Application":
                 continue
             home = "compliance" if element_type in _COMPLIANCE_TYPES else _ELEMENT_TYPE_HOME[layer]
             if element_type in _CANONICAL_TYPE_PAGES:
@@ -539,37 +657,52 @@ def element_type_pages() -> list:
 def search_index(user) -> list:
     """Every page this user may open, once, with the names a person may type for it.
 
-    Each row: label, url, endpoint, section (the sidebar entry it sits under, or the job of
-    an entry) and terms (label plus aliases). Sidebar entries first, then their sub-items
-    and the platform tools, then the named pages (PAGES), then the catalogue of every
-    other page.
+    Each row: label, url, endpoint, section (where it sits in the sidebar) and terms (label plus
+    aliases). A page two entries open (Applications, Application component) is one row that answers
+    to both names. Sidebar entries first, then the platform tools, the named pages (PAGES) and the
+    catalogue of every other page.
     """
     from flask import url_for
 
     role = _role(user)
     rows: list = []
-    seen: set = set()
+    by_url: dict = {}
 
     def add(label, endpoint, url, section, terms):
-        if not url or url in seen:
+        if not url:
             return
-        seen.add(url)
-        rows.append({"label": label, "endpoint": endpoint, "url": url, "section": section,
-                     "terms": [label, *terms]})
+        row = by_url.get(url)
+        if row is not None:
+            # The same page under another name: that name finds it too.
+            for term in (label, *terms):
+                if term not in row["terms"]:
+                    row["terms"].append(term)
+            return
+        row = {"label": label, "endpoint": endpoint, "url": url, "section": section,
+               "terms": [label, *[t for t in terms if t != label]]}
+        by_url[url] = row
+        rows.append(row)
 
-    for links in (MAIN, ARCHITECTURE, SECONDARY, USER_MENU, PLATFORM_ADMIN_TOOLS, PAGES):
+    for links in (TOP, WORK, MODEL, SECONDARY, USER_MENU, PLATFORM_ADMIN_TOOLS, PAGES):
         for link in links:
+            if link.toggle:
+                for child in link.children:
+                    child_link = resolve(user, child, role)
+                    if child_link is not None:
+                        section = link.label if link.group == "work" else "Model, " + link.label
+                        add(child.label, child_link.endpoint, href(child_link), section,
+                            list(child.aliases) + (list(child_link.aliases) if child_link is not child else []))
+                continue
             chosen = resolve(user, link, role)
             if chosen is None:
                 continue
             terms = list(link.aliases) + (list(chosen.aliases) if chosen is not link else [])
             owner = entry_for_endpoint(chosen.endpoint)
-            section = owner.label if owner is not None and owner.key != link.key else JOBS.get(link.job, "")
+            if link in MODEL:
+                section = "Model"
+            else:
+                section = owner.label if owner is not None and owner.key != link.key else JOBS.get(link.job, "")
             add(link.label, chosen.endpoint, href(chosen), section, terms)
-            for child in link.children:
-                child_link = resolve(user, child, role)
-                if child_link is not None:
-                    add(child.label, child.endpoint, href(child_link), link.label, child.aliases)
 
     for label, layer, element_type, endpoint, values, home in element_type_pages():
         if not _registered(endpoint):
@@ -578,9 +711,8 @@ def search_index(user) -> list:
             url = url_for(endpoint, **values)
         except Exception:  # noqa: BLE001
             continue
-        entry = _by_key(home)
         plural = label + ("es" if label.endswith(("s", "x", "ch")) else "s")
-        add(plural, endpoint, url, entry.label if entry else "", [label, element_type, f"{layer} {label}"])
+        add(plural, endpoint, url, "Model, " + layer.capitalize(), [label, element_type, f"{layer} {label}"])
 
     try:
         catalogue = _catalogue()
@@ -606,26 +738,30 @@ def search_index(user) -> list:
 
 
 def search_pages(user, query: str, limit: int = 12) -> list:
-    """Pages whose name or an alias contains the query, spelling-blind, best match first."""
-    from app.utils.search_text import normalise_search_text
+    """Pages whose name or an alias contains the query, spelling-blind and typo-tolerant, best match first."""
+    from app.utils.search_text import normalise_search_text, fuzzy_match_score
 
     q = normalise_search_text(query or "")
     if not q:
         return []
     scored = []
     for order, row in enumerate(search_index(user)):
-        best = None
+        best_exact = -1
+        best_fuzzy = -1
         for rank, term in enumerate(row["terms"]):
             t = normalise_search_text(term)
-            if q not in t:
+            exact, fuzzy = fuzzy_match_score(q, t)
+            if exact == 0 and fuzzy == 0:
                 continue
-            score = (0 if t == q else 1 if t.startswith(q) else 2, 0 if rank == 0 else 1)
-            if best is None or score < best:
-                best = score
-        if best is not None:
-            scored.append((best, order, row))
-    scored.sort(key=lambda s: (s[0], s[1]))
-    return [row for _, _, row in scored[:limit]]
+            # Exact matches rank first (higher exact = better), then fuzzy matches
+            # Within same match type, prefer earlier terms (lower rank)
+            score = (-exact, -fuzzy, rank)
+            if best_exact == -1 or score < ( -best_exact, -best_fuzzy, 999):
+                best_exact, best_fuzzy = exact, fuzzy
+        if best_exact != -1:
+            scored.append((-best_exact, -best_fuzzy, order, row))
+    scored.sort()
+    return [row for _, _, _, row in scored[:limit]]
 
 
 # ── Breadcrumbs ──────────────────────────────────────────────────────────────────────────
@@ -637,7 +773,12 @@ def trail(user, endpoint: str | None) -> list:
     entry = entry_for_endpoint(endpoint)
     if entry is None or entry.key == "home":
         return []
-    chosen = resolve(user, entry)
+    if entry.toggle:
+        # A collapsible item has no page of its own: the trail leads to the first page it holds
+        # that this person may open.
+        chosen = next((c for c in (resolve(user, child) for child in entry.children) if c is not None), None)
+    else:
+        chosen = resolve(user, entry)
     if chosen is not None and chosen.endpoint == endpoint:
         return []
     return [{"label": entry.label, "href": href(chosen) if chosen is not None else None}]

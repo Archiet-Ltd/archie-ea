@@ -58,7 +58,7 @@ def test_shell_parts_follow_pattern_library(page, live_server, seeded):
         page.wait_for_timeout(1200)
 
         # Part 3: Sidebar search input should be h-9
-        search_input = page.locator('input[placeholder*="Search or ask"]')
+        search_input = page.locator('input[placeholder*="Search pages and records"]')
         expect(search_input).to_be_visible()
 
         # Get computed height - h-9 is 2.25rem = 36px
@@ -195,7 +195,7 @@ def test_sidebar_search_works(page, live_server, seeded):
     page.wait_for_timeout(1200)
 
     # Find and use sidebar search
-    search_input = page.locator('input[placeholder*="Search or ask"]')
+    search_input = page.locator('input[placeholder*="Search pages and records"]')
     expect(search_input).to_be_visible()
 
     # Type a search query

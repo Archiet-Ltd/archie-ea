@@ -1,5 +1,5 @@
 /*
- * The sidebar's search box ("Search or ask...") -> every page the user may open, labelled with the
+ * The sidebar's search box -> every page the user may open, labelled with the
  * sidebar entry it sits under, and (with includeRecords) the records that match.
  *
  * The box used to filter whole zones (a hit on one label kept every link in that zone) and had no spelling

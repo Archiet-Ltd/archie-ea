@@ -1,16 +1,17 @@
-"""A new owner finds their way round Entelim from the sidebar alone (navigation v3).
+"""A new owner finds their way round Entelim from the sidebar alone (navigation 3.1).
 
 The person: a startup CTO who has just signed up. Their goals, each asserted as the
 outcome they need, not as an element on a page:
 
 - they are told what to do first (connect GitHub or Jira) and the button takes them to
   the page where they do it;
-- they can ask a question in one action from the sidebar (the AI chat entry) and in one
-  action from the search box (type the question, press Enter), and the question is
-  waiting in the chat;
-- every job is one click away, and each click lands on a page with content for that job
-  and marks that entry as the current one;
-- a page that has no entry of its own is found by its old name from the same box;
+- the search box only searches (a question typed there gets no ask control and does not leave
+  the page), and the AI chat, where questions are asked, is one click from the sidebar;
+- every job opens onto its pages: Changes reaches the Roadmap and Solutions in one click each,
+  Model then Strategy reaches Value stream, Model then Frameworks opens the gallery, and
+  Connections opens the connectors page; each click lands on a page with content and marks that
+  entry as the current one;
+- a page is found by its old name from the same box (plateaus finds the Roadmap);
 - the old Ask address still opens the chat.
 
 Played at 1440 wide in the light theme and at 390 wide in the dark theme (where the
@@ -30,18 +31,24 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 PASSWORD = "NavThree!Journey2026"
 QUESTION = "What breaks if Postgres fails?"
 
-# Entry -> (address it opens, words its page must carry). Same names and order for every role.
+# Entry -> (item that holds it or None, name, address it opens, words its page must carry).
+# Same names and order for every role.
 JOBS = [
-    ("Home", r"/dashboard/overview", None),
-    ("AI chat", r"/ai-chat", None),
-    ("Systems", r"/applications/?$", None),
-    ("Impact", r"/enterprise/analysis/impact-analysis", None),
-    ("Changes", r"/enterprise/implementation/gap-analysis", None),
-    ("Spend", r"/applications/rationalization", None),
-    ("Compliance", r"/risks/?$", None),
-    ("Integrations", r"/admin/connectors", "GitHub"),
-    ("Reports", r"/solutions/briefings", None),
-    ("Help", r"/docs", None),
+    (None, "Home", r"/dashboard/overview", None),
+    (None, "AI chat", r"/ai-chat", None),
+    ("systems", "Applications", r"/applications/?$", None),
+    ("impact", "Impact analysis", r"/enterprise/analysis/impact-analysis", None),
+    ("changes", "Gaps", r"/enterprise/implementation/gap-analysis", None),
+    ("changes", "Roadmap", r"/genome/roadmap", None),
+    ("changes", "Solutions", r"/solutions", None),
+    ("changes", "Business cases", r"/business-case/?$", None),
+    ("spend", "Costs", r"/procurement", None),
+    ("compliance", "Risks", r"/risks/?$", None),
+    ("layer_strategy", "Value stream", r"/value-streams", None),
+    (None, "Frameworks", r"/frameworks/?$", "Industry process frameworks"),
+    (None, "Connections", r"/admin/connectors", "GitHub"),
+    (None, "Reports", r"/solutions/briefings", None),
+    (None, "Help", r"/docs", None),
 ]
 
 
@@ -60,12 +67,13 @@ class Walk:
         self.page.screenshot(path=os.path.join(self.dir, "%02d-%s.png" % (self.n, name)), full_page=False)
 
     def sidebar(self):
-        """The sidebar, opened first on a phone (one tap on its trigger)."""
+        """The sidebar; on a phone the drawer, opened first with one tap on the trigger."""
         if self.phone:
-            opener = self.page.get_by_role("button", name="Open sidebar")
-            if opener.is_visible():
-                opener.click()
-                self.page.wait_for_timeout(300)
+            drawer = self.page.get_by_role("dialog", name="Navigation")
+            if not drawer.is_visible():
+                self.page.get_by_test_id("sidebar-trigger").click()
+            expect(drawer).to_be_visible()
+            return drawer
         side = self.page.get_by_test_id("sidebar")
         expect(side).to_be_visible()
         return side
@@ -113,8 +121,8 @@ def test_01_a_new_owner_signs_up(walk):
     page.fill("#password", PASSWORD)
     page.fill("#password2", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
-    page.wait_for_timeout(1000)
+    page.wait_for_url(re.compile(r".*/(dashboard|account/welcome).*"), timeout=60000)
+    page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
     assert "/dashboard" in page.url
 
@@ -142,19 +150,27 @@ def test_03_the_ai_chat_is_one_click_from_the_sidebar(walk):
     expect(page.locator("#user-input")).to_be_visible()
 
 
-def test_04_a_question_typed_in_the_search_box_opens_the_chat_with_it(walk):
+def test_04_the_search_box_only_searches_and_the_chat_is_one_click_away(walk):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
     walk.sidebar()
     box = page.locator("#sidebar-search")
+    expect(box).to_have_attribute("placeholder", "Search pages and records")
     box.click()
     box.fill(QUESTION)
-    expect(page.get_by_test_id("sidebar-search-ask")).to_contain_text(QUESTION)
-    walk.shot("search-ask")
+    results = page.get_by_test_id("sidebar-search-results")
+    expect(results).to_contain_text("Nothing matches. Try another word.")
+    expect(page.get_by_test_id("sidebar-search-ask")).to_have_count(0)
+    walk.shot("search-no-match")
+    before = page.url
     box.press("Enter")
-    page.wait_for_url(re.compile(r".*/ai-chat.*q=.*"))
-    expect(page.locator("#user-input")).to_have_value(QUESTION)
+    page.wait_for_timeout(500)
+    assert page.url == before, "a question in the search box must not leave the page"
+    box.fill("")
+    walk.sidebar().locator('a[data-nav-key="ai_chat"]').click()
+    page.wait_for_url(re.compile(r".*/ai-chat.*"))
+    expect(page.locator("#user-input")).to_be_visible()
 
 
 def test_05_ctrl_k_reaches_the_search_box_from_any_page(walk):
@@ -167,32 +183,42 @@ def test_05_ctrl_k_reaches_the_search_box_from_any_page(walk):
     assert page.evaluate("() => document.activeElement && document.activeElement.id") == "sidebar-search"
 
 
-@pytest.mark.parametrize("entry,address,words", JOBS, ids=[j[0] for j in JOBS])
-def test_06_each_job_is_one_click_away(walk, entry, address, words):
+@pytest.mark.parametrize("parent,entry,address,words", JOBS, ids=[j[1] for j in JOBS])
+def test_06_each_job_is_one_click_away(walk, parent, entry, address, words):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
-    walk.sidebar().locator('a[data-slot="sidebar-item"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry))).click()
+    side = walk.sidebar()
+    if parent:
+        toggle = side.locator('[data-nav-toggle="%s"]' % parent)
+        if toggle.get_attribute("aria-expanded") != "true":
+            toggle.click()
+        expect(toggle).to_have_attribute("aria-expanded", "true")
+        target = side.locator('a[data-slot="sidebar-menu-sub-button"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry)))
+    else:
+        target = side.locator('a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry)))
+    target.click()
     page.wait_for_url(re.compile(r".*%s.*" % address))
     main = page.locator("main").first
     expect(main).not_to_be_empty()
     assert page.locator("h1").first.inner_text().strip(), "%s opened a page with no title" % entry
+    assert len(main.inner_text().strip()) > 40, "%s opened an empty page" % entry
     if words:
         expect(main).to_contain_text(words)
     assert "Internal Server Error" not in page.content()
     if entry != "Help":  # the documentation page is a public page, outside the signed-in shell
-        current = walk.sidebar().locator('a[data-slot="sidebar-item"][aria-current="page"]')
-        expect(current).to_have_count(1)
-        expect(current).to_contain_text(entry)
+        side = walk.sidebar()
+        current = side.locator('[aria-current="page"]')
+        expect(current.first).to_contain_text(entry)
     walk.shot("job-%s" % entry.lower().replace(" ", "-"))
 
 
-def test_07_a_page_with_no_entry_is_found_by_its_old_name(walk):
+def test_07_a_page_is_found_by_its_old_name(walk):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
     walk.sidebar()
-    page.locator("#sidebar-search").fill("roadmap")
+    page.locator("#sidebar-search").fill("plateaus")
     hit = page.get_by_test_id("sidebar-search-page").filter(has_text="Roadmap").first
     expect(hit).to_contain_text("Changes")
     hit.click()

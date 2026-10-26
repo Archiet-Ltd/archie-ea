@@ -152,7 +152,7 @@ class JobQueueService:
             db.session.remove()
 
     def _worker_loop(self):
-        """Main worker loop that processes pending jobs."""
+        """Worker loop that processes pending jobs."""
         logger.info("Job queue worker loop started")
 
         while not self._shutdown_event.is_set():
@@ -160,7 +160,8 @@ class JobQueueService:
                 # Use application context for database operations
                 with self.app.app_context():
                     # Get next pending job
-                    job = Job.query.filter_by(status=JobStatus.PENDING.value).first()
+                    pending = Job.query.filter_by(status=JobStatus.PENDING.value)
+                    job = pending.first()
 
                     if job:
                         self._process_job(job)
@@ -227,7 +228,11 @@ class JobQueueService:
         elif task == "website_profile_crawl":
             from app.modules.organization.website_crawl import run_website_crawl_job
 
-            return run_website_crawl_job(payload)
+            return run_website_crawl_job({**payload, "job_id": job_id})
+        elif task == "company_signals_refresh":
+            from app.modules.organization.public_signals import run_signals_job
+
+            return run_signals_job(payload)
         elif task in ("onboarding_github_import", "onboarding_jira_import"):
             return self._execute_onboarding_import(task, payload)
         else:

@@ -20,7 +20,7 @@ import logging
 from flask import jsonify
 from flask_login import current_user, login_required
 
-from app.decorators import requires_procurement
+from app.decorators import requires_contract_visibility, requires_procurement, requires_spend_visibility
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 from app.services.feature_flag_service import FeatureFlagService
@@ -57,7 +57,7 @@ def _owned_license_or_404(license_id):
 
 @procurement_bp.route("/api/contracts/<int:contract_id>/ai-renewal-brief", methods=["POST"])
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def contract_ai_renewal_brief(contract_id):
     """POST /procurement/api/contracts/<id>/ai-renewal-brief
 
@@ -125,7 +125,7 @@ def compliance_ai_remediation(license_id):
 
 @procurement_bp.route("/api/licenses/ai-position", methods=["POST"])
 @login_required
-@requires_procurement
+@requires_spend_visibility
 def licenses_ai_position():
     """POST /procurement/api/licenses/ai-position
 
@@ -153,7 +153,7 @@ def licenses_ai_position():
 
 @procurement_bp.route("/api/spend/ai-recommendations", methods=["POST"])
 @login_required
-@requires_procurement
+@requires_spend_visibility
 def spend_ai_recommendations():
     """POST /procurement/api/spend/ai-recommendations
 

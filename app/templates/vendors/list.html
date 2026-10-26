@@ -52,7 +52,7 @@
     <p class="mt-1 text-sm text-muted-foreground">
       {% if vp.unmapped_count %}
         {{ vp.unmapped_count }} of your systems have no vendor recorded.
-        <a href="?tab=mapping" @click.prevent="showTab('mapping')" class="text-primary hover:underline">Set the vendor</a>.
+        <a href="?tab=mapping" @click.prevent="showTab('mapping')" class="text-primary underline underline-offset-2">Set the vendor</a>.
       {% elif vp.total_systems %}
         Every system has a vendor recorded.
       {% else %}

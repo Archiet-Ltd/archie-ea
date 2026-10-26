@@ -1,6 +1,6 @@
 {# Sign-up step 3: the AI provider. The built-in AI needs nothing; an own key is tested before it is kept. #}
 {% set provider_names = providers | map(attribute=1) | join(' or ') %}
-<div data-signup-steps data-url-ai-test="{{ url_for('account.welcome_ai_test') }}"
+<div data-signup-steps data-url-ai-test="{{ url_for('account.welcome_ai_test') }}" data-url-status="{{ url_for('account.welcome_status') }}"
      {% if own_key %}data-key-saved="true"{% endif %}
      class="space-y-6" data-testid="signup-ai"
      x-data="{ ownKey: {{ 'true' if (paying or own_key) else 'false' }} }">
@@ -10,6 +10,7 @@
             {% call card_description() %}Optional. {{ config.APP_NAME }} answers your questions either way.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}
+            {% if website %}{% include 'account/_website_reading.html' %}{% endif %}
             {% macro own_key_card() %}
             <div class="space-y-3" data-testid="signup-own-key" x-show="ownKey" x-cloak>
                 <h2 class="text-sm font-semibold">Add your own AI key</h2>

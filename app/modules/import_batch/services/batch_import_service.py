@@ -586,17 +586,17 @@ class BatchImportService:
             if batch.status == BatchStatus.PROCESSING:
                 current_batch = batch.to_dict()
 
-        # Calculate totals
-        total_elements = sum(b.total_elements_generated for b in job.batches)
-        total_approved = sum(b.elements_approved for b in job.batches)
-        total_rejected = sum(b.elements_rejected for b in job.batches)
+        # Calculate totals (treat None as 0 for legacy/migration data)
+        total_elements = sum((b.total_elements_generated or 0) for b in job.batches)
+        total_approved = sum((b.elements_approved or 0) for b in job.batches)
+        total_rejected = sum((b.elements_rejected or 0) for b in job.batches)
 
         return {
             "job": job.to_dict(),
             "batch_counts": batch_counts,
             "current_batch": current_batch,
             "totals": {
-                "applications_processed": sum(b.processed_applications for b in job.batches),
+                "applications_processed": sum((b.processed_applications or 0) for b in job.batches),
                 "applications_total": job.total_applications,
                 "elements_generated": total_elements,
                 "elements_approved": total_approved,

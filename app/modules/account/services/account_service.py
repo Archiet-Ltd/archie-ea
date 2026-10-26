@@ -151,13 +151,28 @@ class AccountService:
         _label = ("{} {}".format(first_name or "", last_name or "").strip()
                   or (email.split("@")[0] if email else "New"))
         _base_slug = _re.sub(r"[^a-z0-9]+", "-",
-                             ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
+                              ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
         _slug = _base_slug
-        while Organization.query.filter_by(slug=_slug).first():
-            _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
-        org = Organization(name="{}'s Workspace".format(_label), slug=_slug)
-        db.session.add(org)
-        db.session.flush()
+        from app.modules.organization.public_signals import PLACEHOLDER_ENDING
+        # Try the base slug first; when it collides (a concurrent sign-up, or an
+        # organisation already owns it), roll back inside a savepoint and append a
+        # short unique suffix. Up to five tries. The name is a stand-in until the
+        # person confirms their company name.
+        from sqlalchemy.exc import IntegrityError
+
+        org = None
+        for _attempt in range(5):
+            try:
+                with db.session.begin_nested():
+                    org = Organization(name="{}{}".format(_label, PLACEHOLDER_ENDING), slug=_slug)
+                    db.session.add(org)
+                    db.session.flush()
+                break
+            except IntegrityError:
+                org = None
+                _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
+        if org is None:
+            raise RuntimeError("could not find a free organisation address after five tries")
 
         user = User(
             first_name=first_name,

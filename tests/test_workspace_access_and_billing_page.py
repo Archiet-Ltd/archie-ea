@@ -165,20 +165,22 @@ def test_billing_plans_show_the_prices_the_pricing_page_shows(app, db_session, c
 
     html = _owner_page(app, db_session, client, login_as, "prices")
     pricing = client.get("/pricing").get_data(as_text=True)
-    for key, figures in {"free": ["Free"], "startup": ["$490 a year", "$49 a month"],
-                         "team": ["$290 per editor a year", "$29 per editor a month"],
-                         "enterprise": ["From $24,000 a year"]}.items():
+    for key, figures in {"free": ["Free"], "startup": ["USD 490 a year", "USD 49 a month"],
+                         "team": ["USD 290 per editor a year", "USD 29 per editor a month"],
+                         "enterprise": ["From USD 24,000 a year"]}.items():
         card = re.search(r'data-testid="plan-price-%s">(.*?)</div>' % key, html, re.S).group(1)
         text = " ".join(re.sub(r"<[^>]+>", " ", card).split())
         assert text == " ".join(figures), (key, text)
-    # The same figures appear on /pricing.
+    # The same figures appear on /pricing (which uses $, not USD).
+    for figure in ("USD 490", "USD 49", "USD 290", "USD 29", "USD 24,000"):
+        assert figure in html, (figure, 'missing from billing page')
     for figure in ("$490", "$49", "$290", "$29", "$24,000"):
-        assert figure in pricing and figure in html
+        assert figure in pricing, (figure, 'missing from pricing page')
 
 
-def test_billing_without_a_subscription_says_no_renewal_yet(app, db_session, client, login_as):
+def test_billing_without_a_subscription_says_nothing_to_renew(app, db_session, client, login_as):
     html = _owner_page(app, db_session, client, login_as, "norenewal")
-    assert 'data-testid="billing-renewal">No renewal yet<' in html.replace("\n", "").replace("  ", "")
+    assert 'data-testid="billing-renewal">Nothing to renew<' in html.replace("\n", "").replace("  ", "")
     assert '<span class="text-muted-foreground">—</span>' not in html
 
 
@@ -192,7 +194,7 @@ def test_billing_with_a_live_subscription_shows_date_and_amount(app, db_session,
                        billing_interval="year", current_period_end=end)
     flat = " ".join(html.split())
     assert end.strftime("%d %b %Y") in flat
-    assert "$490 a year" in flat
+    assert "USD 490 a year" in flat
 
 
 def test_billing_page_keeps_the_wordmark_in_the_sidebar(app, db_session, client, login_as):

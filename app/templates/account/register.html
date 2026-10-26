@@ -12,23 +12,22 @@
 {% from 'components/alert.html' import alert %}
 {% set step = step | default(1) %}
 {% set sign_up_steps = [{'num': 1, 'label': 'Your account'}, {'num': 2, 'label': 'Your sources'}, {'num': 3, 'label': 'Your company'}, {'num': 4, 'label': 'Your AI provider'}] %}
-
 {% block content %}
 {# layouts/public_base.html already renders the sole <main id="main-content">
    landmark. Wrapping the page in a second one gave the document two main
    landmarks and two elements with the same id, so the "Skip to main content"
    link and screen-reader landmark navigation both resolved ambiguously. #}
-<div class="mx-auto w-full max-w-2xl px-4 py-6 space-y-6" x-data="{ step: {{ step }}, done: {{ range(1, step) | list | tojson }}, locked: [] }">
+<div class="mx-auto w-full {{ 'max-w-4xl' if step == 3 else 'max-w-2xl' }} px-4 py-6 space-y-6" x-data="{ step: {{ step }}, done: {{ range(1, step) | list | tojson }}, locked: [] }">
     {{ stepper(sign_up_steps, current_step_expr='step', completed_expr='done', locked_steps_expr='locked') }}
     {% if step == 1 %}
     <div class="flex justify-center">
         <div class="w-full max-w-md">
- <div class="rounded-lg border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6">
-                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Create an account</h1>
-                    <p class="text-sm text-muted-foreground">Sign up to get started</p>
-                </div>
-                <div class="p-6 pt-0">
+            {% call card() %}
+                {% call card_header() %}
+                    {% call card_title() %}Create an account{% endcall %}
+                    {% call card_description() %}Sign up to get started{% endcall %}
+                {% endcall %}
+                {% call card_content() %}
                     {% set flashes = {
                         'error':   get_flashed_messages(category_filter=['form-error']),
                         'warning': get_flashed_messages(category_filter=['form-check-email']),
@@ -65,12 +64,15 @@
                         Already have an account?
                         <a href="{{ url_for('account.login', **(signin_args or {})) }}" class="text-primary font-medium hover:underline">Sign in</a>
                     </div>
-                </div>
-            </div>
+                {% endcall %}
+            {% endcall %}
         </div>
     </div>
     {{ check.password_check('password', 0) }}
     {% elif step == 2 %}
+    {% for notice in get_flashed_messages(category_filter=['signup-notice']) %}
+    {% call alert('success', testid='signup-notice') %}{{ notice }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+    {% endfor %}
     {% include 'account/_signup_sources.html' %}
     {% elif step == 3 %}
     {% include 'account/_signup_company.html' %}

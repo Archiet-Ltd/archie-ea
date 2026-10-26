@@ -2379,8 +2379,16 @@ def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
     Returns counts keyed by entity kind.  Idempotent: re-running creates
-    nothing new and changes nothing.
+    nothing new and changes nothing. The records are written with their
+    dates spread over the last 90 days, so their history is sealed once.
     """
+    from app.services.history_spread import HAND_LABEL, dated_history
+
+    with dated_history(rest=("manual", HAND_LABEL)):
+        return _seed_demo_company()
+
+
+def _seed_demo_company() -> dict:
     from app.models.organization import Organization
     from app.models.user import User, Role
     from app.models import ArchiMateElement, ArchiMateRelationship
@@ -3193,10 +3201,6 @@ def seed_demo_company() -> dict:
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_data_model(org_id))
 
-        db.session.commit()
-        from app.services.history_spread import HAND_LABEL, spread_history
-
-        stats["history_dated"] = spread_history(org_id, rest=("manual", HAND_LABEL))
         db.session.commit()
 
     return stats

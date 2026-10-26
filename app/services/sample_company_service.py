@@ -442,17 +442,6 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     return import_restore_service.restore(org_id, user_id, log.id, [])
 
 
-def date_the_load(org_id: int, since) -> int:
-    """Date the records this load added across the last 90 days, so the Overview's chart has a shape.
-
-    Only the history written since ``since`` moves; whatever the organisation recorded before the load keeps
-    its date. Returns how many records were dated.
-    """
-    from app.services.history_spread import spread_history
-
-    return spread_history(org_id, rest=("import", SOURCE_LABEL), since=since)
-
-
 def work_out_connections(org_id: int) -> None:
     """Work out the indirect connections now, so the first answer is complete.
 

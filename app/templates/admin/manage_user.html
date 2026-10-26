@@ -1,4 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import hidden_input %}
 {% block title %}{{ user.full_name() }} — Manage User{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% import 'macros/form_macros.html' as f %}
@@ -96,18 +99,16 @@
 
                     <div x-data="{ confirmed: false }" class="rounded-lg border border-border bg-card text-card-foreground p-6">
                         <div class="flex items-start gap-3 mb-4">
-                            <input type="checkbox" x-model="confirmed" id="delete-confirm" class="h-4 w-4 rounded border-input mt-0.5 cursor-pointer">
+                            {{ checkbox(id=("delete-confirm"), class="w-4 mt-0.5", attrs_dict={"x-model": ("confirmed")}) }}
                             <label for="delete-confirm" class="text-sm cursor-pointer select-none">
                                 I understand that this action cannot be undone.
                             </label>
                         </div>
                         <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" :disabled="!confirmed"
-                                    :class="confirmed ? '' : 'pointer-events-none opacity-50'"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                            {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
+                            {% call button(type="submit", variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={":disabled": ("!confirmed"), ":class": ("confirmed ? '' : 'pointer-events-none opacity-50'")}) %}
                                 Delete this user
-                            </button>
+                            {% endcall %}
                         </form>
                     </div>
                 {% elif form %}

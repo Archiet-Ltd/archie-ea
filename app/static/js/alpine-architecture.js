@@ -453,7 +453,11 @@ if (window.__ALPINE_ARCH_LOADED__) {
                         fd.append('options', JSON.stringify(this.formData.options));
                         let data = await _fetch('/api/batch-import/jobs', { method: 'POST', body: fd });
                         let createdJobId = data.job_id || (data.data && data.data.id) || null;
-                        this._handleSuccess('Import job submitted. Job ID: ' + (createdJobId || 'N/A'));
+                        if (createdJobId) {
+                            this._handleSuccess('Import job submitted. Job ID: ' + createdJobId);
+                        } else {
+                            this._handleSuccess('Import started. It appears in the list below.');
+                        }
                         this.$dispatch('batch-job-created', { job: data });
                     } catch (err) { this._handleError(err); }
                 }
