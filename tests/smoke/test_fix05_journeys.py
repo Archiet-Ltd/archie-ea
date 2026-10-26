@@ -100,11 +100,12 @@ def test_hybrid_mapping_no_none_mapping_strength(browser, live_server):
         assert "None/5" not in page_text, "Found 'None/5' in page"
 
         # Verify mapping strength badges show "Not rated" or a number
-        strength_badges = page.locator("span:has-text('/5')")
+        strength_badges = page.locator("span:has-text('Not rated'), span:has-text('/5')")
         count = strength_badges.count()
         for i in range(count):
             badge_text = strength_badges.nth(i).inner_text()
             assert "None/5" not in badge_text, f"Mapping strength badge {i} shows 'None/5': {badge_text}"
+            assert "Not rated/5" not in badge_text, f"Mapping strength badge {i} shows 'Not rated/5': {badge_text}"
 
         assert len(console_errors) == 0, f"Console errors: {console_errors}"
     finally:
@@ -129,7 +130,6 @@ def test_risk_assessment_no_none_risk_factors(browser, live_server):
         page.wait_for_selector("table.dense-table", timeout=PAGE_TIMEOUT)
 
         # Check that no raw "None" appears in risk factors column
-        page_text = page.inner_text("body")
         # The risk factors column (4th column) should not show raw "None"
         risk_factor_cells = page.locator("table.dense-table tbody td:nth-child(4)")
         count = risk_factor_cells.count()
