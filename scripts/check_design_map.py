@@ -69,7 +69,8 @@ SHARED_PREFIXES = ("components/", "macros/")
 STATUSES = ("mapped", "specified", "implemented", "verified")
 DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components",
                    "tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
-                   "confidence", "reason", "patterns", "states", "departures", "grid", "pattern_gap")
+                   "confidence", "reason", "patterns", "states", "departures", "grid", "pattern_gap",
+                   "data_types")
 # The designers' port map: how close each page is to a shadcn original. A is the original verbatim,
 # B is composed inside the nearest original's frame, C1 to C5 are the five forms shadcn has no original for.
 TIERS = ("A", "B", "C1", "C2", "C3", "C4", "C5")

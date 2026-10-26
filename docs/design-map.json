@@ -28,6 +28,10 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/list_table.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/answer_cascade.html",
@@ -92,6 +96,10 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/list_table.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/badge.html",
@@ -158,6 +166,10 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/list_table.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/avatar.html",
@@ -713,6 +725,30 @@
   "value_streams": "business_architect"
  },
  "components": {
+  "element-table": {
+   "source": "app",
+   "macros": [
+    "components/element_table.html"
+   ]
+  },
+  "fact-list": {
+   "source": "app",
+   "macros": [
+    "components/fact_list.html"
+   ]
+  },
+  "list-table": {
+   "source": "app",
+   "macros": [
+    "components/list_table.html"
+   ]
+  },
+  "risk-matrix": {
+   "source": "app",
+   "macros": [
+    "components/risk_matrix.html"
+   ]
+  },
   "accessibility-helpers": {
    "source": "app",
    "macros": [
@@ -38496,6 +38532,161 @@
     "populated"
    ],
    "status": "mapped",
+   "tier": "C3",
+   "type_changed": true
+  },
+  "app/templates/solutions/record.html": {
+   "data_types": [
+    {
+     "type": "archimate-elements",
+     "testid": "requirement-row",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "record-list",
+     "testid": "option-row",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "risks",
+     "testid": "risk-row",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "record-facts",
+     "testid": "record-properties",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    },
+    {
+     "type": "status",
+     "testid": "record-stage",
+     "journey": "tests/smoke/test_solution_record_journey.py"
+    }
+   ],
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html",
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
+   ],
+   "basis": "rule",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "element-table",
+    "fact-list",
+    "list-table",
+    "risk-matrix",
+    "alert",
+    "avatar",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "input",
+    "page-shell",
+    "progress",
+    "select",
+    "table",
+    "tabs"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 72,
+    "form": 1,
+    "link": 4,
+    "modal": 1,
+    "table": 1,
+    "testid": 1
+   },
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: Timeline/List toggle, each bar is a button named 'item, start to end, status', today marker carries text (TML-1 to TML-4)."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G4",
+   "inhouse_components": [
+    "gantt-timeline:Keep",
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "components/gantt_timeline.html",
+    "macros/page_shell.html",
+    "components/disabled_action.html"
+   ],
+   "original": "gap:G-4",
+   "page_type": "timeline",
+   "patterns": [
+    "P01-page-header",
+    "P20-inspect-side-panel",
+    "P23-status-badge",
+    "P29-export-share"
+   ],
+   "persona": "solution_architect",
+   "reason": "Blueprint built on the timeline component; also a generated document (C5), timeline chosen because the roadmap list names it. Kept at C3 over C5 because the page draws a timeline today; the type follows what the page shows (criteria-v2 section 2.3).",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": "docs/buckets: solutions-rethink-v1.md, The solution record (slice 5a)",
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "export-running",
+    "list-view",
+    "populated"
+   ],
+   "status": "implemented",
    "tier": "C3",
    "type_changed": true
   },
