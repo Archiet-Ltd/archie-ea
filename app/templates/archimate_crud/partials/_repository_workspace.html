@@ -297,7 +297,7 @@
                     </tr>
                     <template x-for="el in group.elements" :key="group.type + '-' + el.source + '-' + el.id">
                         <tr x-cloak x-show="!groupByType || !collapsedTypes[group.type]" class="transition-colors hover:bg-muted/20" @click="if (!$event.target.closest('a,button,input')) openDetailPanel(el)">
-                            <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="el.id + ':' + el.element_type" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
+                            <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="selectKey(el)" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
                             <td class="px-4 py-3" data-field="element-name"><button type="button" @click="openDetailPanel(el)" class="h-8 max-w-[240px] truncate rounded-md text-left text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50" x-text="el.name" :title="el.name" :aria-label="'Open details for ' + el.name"></button></td>
                             <td class="px-4 py-3" data-field="element-type"><span class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" x-text="formatTypeName(el.element_type)"></span></td>
                             <td class="px-4 py-3" data-field="element-source"><span class="text-sm capitalize text-muted-foreground" x-text="el.source || '—'"></span></td>

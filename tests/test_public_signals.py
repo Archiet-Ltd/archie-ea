@@ -531,7 +531,7 @@ def test_every_tag_has_a_reason_and_a_signal_with_no_clear_category_has_no_tag()
     assert service.pestle_factor("mention", "Show HN: Phospho – analytics for LLM apps", "We raised funding at a valuation") is None
     assert service.pestle_factor("mention", "Show HN: a platform for cloud software", "") is None  # a product word is not a factor
     # a record type is its own reason
-    assert service.pestle_reason("filing", "x", "") == ("legal", "a regulatory filing")
+    assert service.pestle_reason("filing", "x", "") == ("legal", "it is a regulatory filing")
     assert service.pestle_reason("news", "A quiet day", "") == (None, None)
 
 
@@ -547,3 +547,167 @@ def test_the_launch_post_is_kept_for_posthog_and_carries_no_tag(db_session, make
     mentions = [r for r in service.signals_for_profile(org.id) if r["kind"] == "mention"]
     assert [r["title"] for r in mentions] == ["Launch HN: PostHog (YC W20)"]
     assert mentions[0]["pestle_factor"] is None
+
+
+# ----------------------------------------------------------------------------- crawl04: common-word names, one event one row, tags that say why
+# Stubbed from what QA found with real sign-ups on 25 Oct 2026: linear.app, cal.com and posthog.com.
+
+def _hn(*hits):
+    return [{"title": t, "objectID": str(i), "created_at": d, **extra} for i, (t, d, extra) in enumerate(hits, start=100)]
+
+
+def _sec(*filings):
+    return {"hits": {"hits": [
+        {"_id": "000%d-%s-000001:doc%d.htm" % (i, d[2:4], i), "_source": {
+            "display_names": ["%s  (CIK 000%d)" % (who, i)], "file_description": "Report", "file_date": d, "form": form,
+            "root_form": form, "ciks": ["000%d" % (1000 + i)]}}
+        for i, (who, form, d) in enumerate(filings, start=1)]}}
+
+
+def _with_facts(org_id, **facts):
+    from app.models.organization import Organization
+
+    org = db.session.get(Organization, org_id)
+    settings = dict(org.settings or {})
+    profile = dict(settings.get("company_profile") or {})
+    profile.update({k: {"value": v} for k, v in facts.items()})
+    settings["company_profile"] = profile
+    org.settings = settings
+    from sqlalchemy.orm.attributes import flag_modified
+
+    flag_modified(org, "settings")
+    db.session.commit()
+
+
+def linear_answers():
+    answers = _posthog_answers()
+    answers["https://efts.sec.gov/"] = _sec(
+        ("LINEAR TECHNOLOGY CORP", "10-Q", "2001-05-10"), ("LINEAR TECHNOLOGY CORP", "10-Q", "2001-08-09"),
+        ("LINEAR TECHNOLOGY CORP", "10-K", "2002-09-20"), ("LINEAR TECHNOLOGY CORP", "10-Q", "2003-02-07"),
+        ("MICRO LINEAR CORP", "10-K", "2010-03-30"), ("MICRO LINEAR CORP", "10-K", "2011-03-30"))
+    answers["https://hn.algolia.com/"] = {"hits": _hn(
+        ("Linear algebra for programmers: a visual guide", "2026-04-02T00:00:00Z", {}),
+        ("Linear A is still undeciphered after a century", "2026-04-03T00:00:00Z", {}),
+        ("Integer linear programming for shift scheduling", "2026-04-04T00:00:00Z", {}),
+        ("Linear raises $35M Series B led by Accel", "2026-03-10T00:00:00Z", {}),
+        ("Show HN: Linear – issue tracking for software teams", "2026-02-01T00:00:00Z", {}),
+        ("Linear changelog: cycles, projects and a new roadmap view", "2026-04-01T00:00:00Z", {}),
+        ("Linear's pricing change draws questions from small teams", "2026-01-15T00:00:00Z", {}))}
+    return answers
+
+
+def calcom_answers():
+    answers = _posthog_answers()
+    answers["https://hn.algolia.com/"] = {"hits": _hn(
+        ("Show HN: CalOverlap – Group Scheduling from Multiple Calendly/Cal.com Links", "2026-03-20T00:00:00Z",
+         {"url": "https://github.com/someone/caloverlap"}),
+        ("Cal.com Calendar Scaffold: T3 Stack and Supabase", "2026-03-22T00:00:00Z", {"url": "https://github.com/someone/scaffold"}),
+        ("Cal.com: Open Scheduling Infrastructure", "2025-11-02T00:00:00Z", {}),
+        ("Cal.com: Open Scheduling Infrastructure", "2026-02-20T00:00:00Z", {}),  # reposted outside the three days
+        ("Cal.com is going closed source", "2026-04-15T08:00:00Z", {}),
+        ("Cal.com goes closed source, citing AI scrapers", "2026-04-15T20:00:00Z", {}),
+        ("Why Cal.com is closing its source code", "2026-04-16T09:00:00Z", {}),
+        ("Cal.com moves to closed source: what changes for self-hosters", "2026-04-17T07:00:00Z", {}))}
+    return answers
+
+
+def posthog_answers():
+    answers = _posthog_answers()
+    answers["https://hn.algolia.com/"] = {"hits": _hn(
+        ("PostHog opens its roadmap", "2026-01-10T00:00:00Z", {}),
+        ("Launch HN: PostHog (YC W20)", "2020-03-01T00:00:00Z", {}),
+        ("Posthog's New Website", "2025-09-11T10:00:00Z", {}), ("New Posthog Website", "2025-09-10T10:00:00Z", {}),
+        ("PostHog raises $70M Series E", "2025-06-01T00:00:00Z", {}),
+        ("PostHog moves its enterprise features to a new licence", "2025-08-01T00:00:00Z", {}),
+        ("Show HN: Laminar – Open-Source DataDog + PostHog for LLM Apps", "2025-03-01T00:00:00Z", {}),
+        ("Show HN: Phospho – Text analytics for LLM apps (Posthog for Prompts)", "2025-03-02T00:00:00Z", {}))}
+    return answers
+
+
+def _read(db_session, make_org, name, site, answers, **facts):
+    org = _confirmed(db_session, make_org, name, site)
+    _with_facts(org.id, **facts)
+    service.refresh_organization(org.id, http=FakeHttp(answers), llm=_no_model)
+    return org
+
+
+def _shown(org):
+    return [r for r in service.signals_for_profile(org.id) if r["kind"] != "sentiment"]
+
+
+def test_linear_keeps_its_own_news_and_not_other_companies_filings_or_linear_algebra(db_session, make_org, tenant_ctx, keys):
+    org = _read(db_session, make_org, "Linear", "https://linear.app", linear_answers(),
+                tagline="Plan and build products: issue tracking and project management for software teams")
+    titles = sorted(r["title"] for r in _shown(org))
+    assert titles == sorted([
+        "Linear raises $35M Series B led by Accel", "Show HN: Linear – issue tracking for software teams",
+        "Linear changelog: cycles, projects and a new roadmap view", "Linear's pricing change draws questions from small teams"]), titles
+    assert not [r for r in _rows(org.id) if r.source == "sec_edgar"], "LINEAR TECHNOLOGY CORP and MICRO LINEAR CORP are not Linear"
+
+
+def test_filings_already_kept_for_other_companies_with_a_shared_word_are_tidied_away(db_session, make_org, tenant_ctx, keys):
+    org = _confirmed(db_session, make_org, "Linear", "https://linear.app")
+    for i in range(14):  # kept 14 times under 3 titles, as QA found
+        who = ("LINEAR TECHNOLOGY CORP", "MICRO LINEAR CORP", "LINEAR TECHNOLOGY CORP")[i % 3]
+        _stored(org.id, subject="Linear", source="sec_edgar", source_label="SEC EDGAR", kind="filing", title="%s: 10-K filing" % who,
+                summary="", url="https://www.sec.gov/x/%d" % i, published_at=datetime(2001 + i, 5, 1))
+    _stored(org.id, subject="Linear", source="hackernews", kind="mention", title="Linear algebra for programmers", summary="",
+            published_at=datetime(2026, 4, 2))
+    _stored(org.id, subject="Linear", source="hackernews", kind="mention", title="Linear raises $35M Series B", summary="",
+            published_at=datetime(2026, 3, 10))
+    service.refresh_organization(org.id, http=FakeHttp(linear_answers()), llm=_no_model, force=True)
+    assert [r.title for r in _rows(org.id) if r.source == "sec_edgar"] == []
+    assert "Linear algebra for programmers" not in [r.title for r in _rows(org.id)]
+    assert "Linear raises $35M Series B" in [r.title for r in _rows(org.id)]
+
+
+def test_the_confirmed_legal_name_has_to_match_the_filer():
+    assert src.legal_name_matches("Northwind Freight Inc. (NWF) (CIK 0001234567)", "Northwind Freight")
+    assert src.legal_name_matches("PostHog, Inc.", "PostHog")
+    assert not src.legal_name_matches("LINEAR TECHNOLOGY CORP", "Linear")
+    assert not src.legal_name_matches("MICRO LINEAR CORP", "Linear")
+
+
+def test_calcom_drops_other_peoples_posts_shows_a_repost_once_and_one_event_as_one_row_with_its_count(db_session, make_org, tenant_ctx, keys):
+    org = _read(db_session, make_org, "Cal.com", "https://cal.com", calcom_answers(), tagline="Open Scheduling Infrastructure")
+    shown = _shown(org)
+    titles = [r["title"] for r in shown]
+    assert not any("CalOverlap" in t or "Scaffold" in t for t in titles), titles  # QA-004
+    assert titles.count("Cal.com: Open Scheduling Infrastructure") == 1  # QA-005, reposted months apart
+    story = [r for r in shown if "closed source" in r["title"] or "source code" in r["title"]]
+    assert len(story) == 1 and story[0]["reports"] == 4, [(r["title"], r["reports"]) for r in shown]  # QA-005
+    assert len(shown) == 2, titles
+    assert len([r for r in _rows(org.id) if r.title == "Cal.com: Open Scheduling Infrastructure"]) == 1
+
+
+def test_posthog_keeps_its_own_posts_and_not_the_comparisons(db_session, make_org, tenant_ctx, keys):
+    org = _read(db_session, make_org, "PostHog", "https://posthog.com", posthog_answers(), tagline="Product analytics")
+    titles = [r["title"] for r in _shown(org)]
+    assert "Launch HN: PostHog (YC W20)" in titles and "PostHog opens its roadmap" in titles
+    assert not any("Laminar" in t or "Phospho" in t for t in titles), titles
+    assert len([t for t in titles if "Website" in t]) == 1
+
+
+def test_tags_for_the_three_companies_are_mostly_matched_and_each_says_why(db_session, make_org, tenant_ctx, keys):
+    rows = []
+    for name, site, answers, facts in (("Linear", "https://linear.app", linear_answers(), {"tagline": "Issue tracking for software teams"}),
+                                       ("Cal.com", "https://cal.com", calcom_answers(), {"tagline": "Open Scheduling Infrastructure"}),
+                                       ("PostHog", "https://posthog.com", posthog_answers(), {"tagline": "Product analytics"})):
+        rows += _shown(_read(db_session, make_org, name, site, answers, **facts))
+    unmatched = [r for r in rows if not r["pestle_factor"]]
+    assert len(unmatched) * 2 < len(rows), ([r["title"] for r in unmatched], len(rows))
+    for r in rows:
+        assert (r["pestle_reason"] is None) == (r["pestle_factor"] is None), r
+    closed = next(r for r in rows if r["title"].startswith("Cal.com") and "closed source" in r["title"])
+    assert closed["pestle_factor"] == "technological" and "closed source" in closed["pestle_reason"]
+
+
+def test_a_licence_a_lawsuit_a_regulation_and_open_versus_closed_source_each_get_a_tag_with_its_reason():
+    for title, factor, word in (("PostHog moves its enterprise features to a new licence", "legal", "licence"),
+                                ("Cal.com sued by a former contractor", "legal", "sued"),
+                                ("New EU regulation lands on scheduling apps", "legal", "regulation"),
+                                ("Cal.com is going closed source", "technological", "closed source"),
+                                ("Why we stay open source", "technological", "open source")):
+        got, reason = service.pestle_reason("mention", title)
+        assert got == factor and word in reason, (title, got, reason)
+    assert service.pestle_reason("mention", "Linear A is still undeciphered after a century") == (None, None)
