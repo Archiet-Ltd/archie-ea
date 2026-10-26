@@ -787,3 +787,34 @@ def test_the_crawl_proposes_a_json_ld_name_that_matches_nothing_at_seventy_perce
         assert [r["value"] for r in names] == ["Ifiok"] and names[0]["confidence"] <= 0.7, names
     finally:
         site.stop()
+
+
+def test_a_recorded_archiet_home_page_is_proposed_as_ifiok_at_most_seventy_percent_sure(make_org):
+    """The page calls itself Ifiok in its title, its og:site_name and its structured data, and is not at an address
+    that says so. The founder at step 3 sees Ifiok, not 100% sure."""
+    import json as _json
+    from pathlib import Path
+
+    from app.modules.organization.website_crawl import confirm, crawl_organization_website
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return _json.dumps({"business_model": {}, "company_stage": {}, "technology_stack": {}, "competitive_positioning": {},
+                                "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return _json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return _json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        return _json.dumps({"company": {"name": "Ifiok"}, "field_confidence": {"company_name": 1.0}})
+
+    body = (Path(__file__).parent / "fixtures" / "website_crawl" / "archiet_home.html").read_text(encoding="utf-8")
+    site = _Site({"/": (200, "text/html", body), "/robots.txt": (200, "text/plain", "")})
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=model)
+        facts, _completeness = confirm.proposals(org.id)
+        names = [f for f in facts if f["field"] == "company_name"]
+        assert [f["text"] for f in names] == ["Ifiok"], names
+        assert names[0]["percent"] <= 70, names[0]
+    finally:
+        site.stop()
