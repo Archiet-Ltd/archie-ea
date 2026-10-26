@@ -198,13 +198,18 @@ def test_the_architect_reads_the_record_and_reaches_an_element(browser, live_ser
         added = int(page.get_by_test_id("changes-added").inner_text())
         changed = int(page.get_by_test_id("changes-changed").inner_text())
         assert added + changed >= 1, "the demo solution changes at least one application"
-        # The facts about the record: every property has a label and either a value or a way to set it.
+        # The facts about the record: the set properties show their values; the unset ones are named once, with a way to set them.
         facts = page.get_by_test_id("record-properties")
-        assert facts.locator("dt").count() >= 5
+        unset = page.get_by_test_id("record-properties-unset")
+        named = facts.locator("dt").count() + (len(unset.inner_text().split(":", 1)[1].split(",")) if unset.count() else 0)
+        assert named >= 5
+        if unset.count():
+            assert unset.get_by_role("link", name="Edit").count() == 1
         assert "Chief Operations Officer" in page.get_by_test_id("property-sponsor").inner_text()
         for value in facts.locator("dd").all_inner_texts():
             assert value.strip(), "a property shows an empty value"
-        # The actions an architect who did not author it may take.
+        # The actions an architect who did not author it may take, in the More menu.
+        page.get_by_test_id("record-more").click()
         for testid in ("record-compare", "record-download", "record-ask"):
             assert page.get_by_test_id(testid).is_visible(), testid
         assert page.get_by_test_id("record-decide").count() == 0

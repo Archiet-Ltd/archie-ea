@@ -1,7 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/list_table.html' import list_table %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
@@ -9,7 +9,6 @@
 
 {% macro _actions() %}
 <div class="flex flex-wrap items-center gap-2">
-  {% call ui.button(href=url_for('procurement.renewals_dashboard'), variant='outline') %}{{ lucide('calendar') }}Renewals{% endcall %}
   {% call ui.button(href=url_for('procurement.licenses_list'), variant='outline') %}{{ lucide('key-round') }}Licences{% endcall %}
   {% if may_open_procurement() %}
   {% call ui.button(href=url_for('procurement.contract_create')) %}{{ lucide('plus') }}New contract{% endcall %}
@@ -37,13 +36,11 @@
 {{ page_shell(title='Contracts and licences', subtitle='Every vendor agreement, what it costs a year and when it comes up for renewal',
               breadcrumb=[('Home', url_for('main.index')), ('Contracts and licences', none)], actions_caller=_actions) }}
 
-{% set _cols = [('Contract', ''), ('Vendor', ''), {'label': 'Annual cost', 'align': 'right', 'sortable': true}, ('Status', '')] + ([{'label': 'Renewal', 'sortable': true}] if any_renewal else []) %}
-{% if contracts and not any_renewal %}
-<p class="text-sm text-muted-foreground" data-testid="contracts-no-renewals">None of these contracts has a renewal date yet. Add one on a contract and its renewal shows here and on Renewals.</p>
-{% endif %}
+{% set _cols = [('Contract', ''), ('Vendor', ''), {'label': 'Annual cost', 'align': 'right', 'sortable': true}, ('Status', '')] + ([{'label': 'Renewal', 'sortable': true}] if any_renewal else []) + [{'label': '', 'class': 'w-12'}] %}
 {% call(item) list_table(rows=contracts, columns=_cols,
                           caption='Vendor contracts', testid='contracts-table', row_testid='contract-row', search_placeholder='Filter contracts...',
                           toolbar=true, toolbar_actions=_status_filter,
+                          notice=('None of these contracts has a renewal date yet. Add one on a contract and its renewal shows here and on Renewals.' if contracts and not any_renewal else none),
                           empty_message=('No contracts match these filters.' if (search or status) else 'No vendor contracts yet. Add the first one and its cost and renewal date show here.'),
                           empty_action=(_clear_filter if (search or status) else none)) %}
   {% call table_cell() %}
@@ -67,6 +64,12 @@
     {% endif %}
   {% endcall %}
   {% endif %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% call row_actions('Actions for ' ~ item.contract.contract_name) %}
+      {{ row_action('Open contract', href=url_for('procurement.contract_detail', contract_id=item.contract.id), testid='contract-open') }}
+      {% if may_open_procurement() %}{{ row_action('Edit contract', href=url_for('procurement.contract_edit', contract_id=item.contract.id), testid='contract-edit') }}{% endif %}
+    {% endcall %}
+  {% endcall %}
 {% endcall %}
 
 {% if total > 20 %}

@@ -468,10 +468,6 @@
               <p class="text-sm text-muted-foreground" data-testid="risks-summary">{{ rk.rows|length }} risk{{ 's' if rk.rows|length != 1 }}, {{ rk.open }} open{% if rk.without_owner %}, {{ rk.without_owner }} without an owner{% endif %}.</p>
               {% for b in rk.bands %}{{ state_badge(b.label ~ ' ' ~ b.count, tone={'low': 'positive', 'medium': 'caution', 'high': 'negative', 'critical': 'negative'}[b.key]) }}{% endfor %}
             </div>
-            <div class="flex gap-2">
-              {{ button(text='Risk register', variant='outline', size='sm', icon='shield-alert', href=rk.register_href, testid='risks-register') }}
-              {{ button(text='Add a risk', variant='outline', size='sm', icon='plus', href=rk.add_href, testid='risks-add') }}
-            </div>
           </div>
           {% if rk.without_owner %}
             {{ alert(kind='warning', title=rk.without_owner ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
@@ -487,14 +483,20 @@
               {% endcall %}
             {% endcall %}
             {% call card(class='overflow-hidden') %}
-              {% call card_header(class='pb-3') %}
-                {% call card_title(class='text-base') %}Risks on the register{% endcall %}
-                {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
+              {% call card_header(class='pb-3 flex-row flex-wrap items-start justify-between gap-3 space-y-0') %}
+                <div class="space-y-1.5">
+                  {% call card_title(class='text-base') %}Risks on the register{% endcall %}
+                  {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
+                </div>
+                <div class="flex gap-2">
+                  {{ button(text='Risk register', variant='outline', size='sm', icon='shield-alert', href=rk.register_href, testid='risks-register') }}
+                  {{ button(text='Add a risk', variant='outline', size='sm', icon='plus', href=rk.add_href, testid='risks-add') }}
+                </div>
               {% endcall %}
               {% call card_content(class='p-0') %}
                 {% call(r) list_table(rows=rk.rows, columns=[('Risk', ''), ('Owner', ''), ('Score', 'whitespace-nowrap'), ('Status', 'hidden 2xl:table-cell')], caption='Risks', testid='risks-table', row_testid='risk-row') %}
                     {% call table_cell(class='px-2 !pl-6 align-middle') %}
-                      <a href="{{ r.href }}" class="block max-w-[320px] truncate font-medium text-foreground hover:underline" title="{{ r.title }}" data-testid="risk-link">{{ r.title }}</a>
+                      <a href="{{ r.href }}" class="block max-w-[280px] truncate font-medium text-foreground hover:underline" title="{{ r.title }}" data-testid="risk-link">{{ r.title }}</a>
                       {% if r.via %}<span class="block text-xs text-muted-foreground">through {{ r.via }}</span>{% endif %}
                       {% if r.mitigation %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
                     {% endcall %}
@@ -557,11 +559,16 @@
           {% call card_title(class='text-base') %}Properties{% endcall %}
         {% endcall %}
         {% call card_content() %}
-          {% call(p) fact_list(items=properties, testid='record-properties') %}
-            {%- if p.value and p.key == 'target_date' %}{{ p.value|format_datetime('d MMM yyyy') }}
-            {%- elif p.value %}{{ p.value }}
-            {%- else %}<a href="{{ base }}/edit" class="text-muted-foreground hover:text-foreground hover:underline">Not set</a>{% endif -%}
+          {% set _set = properties|selectattr('value')|list %}
+          {% set _unset = properties|rejectattr('value')|map(attribute='label')|list %}
+          {% if _set %}
+          {% call(p) fact_list(items=_set, testid='record-properties') %}
+            {%- if p.key == 'target_date' %}{{ p.value|format_datetime('d MMM yyyy') }}{% else %}{{ p.value }}{% endif -%}
           {% endcall %}
+          {% endif %}
+          {% if _unset %}
+          <p class="{{ 'mt-4 ' if _set }}text-sm text-muted-foreground" data-testid="record-properties-unset">Not set yet: {{ _unset|join(', ')|lower|capitalize }}. <a href="{{ base }}/edit" class="font-medium text-foreground hover:underline">Edit</a></p>
+          {% endif %}
         {% endcall %}
       {% endcall %}
 
