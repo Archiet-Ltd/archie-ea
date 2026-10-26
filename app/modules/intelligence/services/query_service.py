@@ -1125,13 +1125,8 @@ class IntelligenceQueryService:
                     # Resolve every element id the result set can name in ONE
                     # batched select, INSIDE the latency scope so
                     # ``summary.latency_ms`` and the histogram measure it,
-                    # then let the derived rows name both of their ends. The
-                    # element asked about is named too (as risk_propagation
-                    # does), so an answer with no rows still says what it is
-                    # about instead of "What breaks if — fails".
-                    elements = _resolve_elements_batch(
-                        _element_ids_in_rows(rows) + [element_id], org_id
-                    )
+                    # then let the derived rows name both of their ends.
+                    elements = _resolve_elements_batch(_element_ids_in_rows(rows), org_id)
                     _attach_plain_terms(rows, elements)
 
                     # The distinct Capability element ids the identity map
