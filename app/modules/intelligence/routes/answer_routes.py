@@ -7,6 +7,7 @@ either prefix -- ADR 0008 rule 3):
   GET  /api/v1/intelligence/answers             the organisation's recent answers
   GET  /api/v1/intelligence/answers/<address>   the stored envelope
   GET  /intelligence/answers                    page: ask and list
+  GET  /intelligence/answers/element/<id>       ask about one element, open the answer
   GET  /intelligence/answers/<address>          page: one stored answer
 
 No logic lives here: the question is computed by the query service, wrapped and
@@ -17,7 +18,7 @@ that belongs to another organisation answers exactly as one never issued (404).
 
 from __future__ import annotations
 
-from flask import abort, render_template, request
+from flask import abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.middleware.tenant_context import current_org_id
@@ -134,6 +135,26 @@ def answers_page():
     )
 
 
+@intelligence_ui.route("/answers/element/<int:element_id>", methods=["GET"])
+@login_required
+def answer_for_element(element_id: int):
+    """Open the cited answer for one element: what breaks if it fails, worked out
+    now and stored at its own address. Alerts link here, so a person who opens
+    one lands on a current answer with its citations. An element of another
+    organisation answers as one that does not exist (404)."""
+    if current_org_id() is None:
+        abort(404)
+    try:
+        record = envelope.ask_and_store(
+            envelope.KIND_IMPACT,
+            {"element_id": element_id},
+            user_id=getattr(current_user, "id", None),
+        )
+    except (envelope.AnswerParamError, envelope.AnswerNotAskable):
+        abort(404)
+    return redirect(url_for("intelligence_ui.answer_page", address=record.address))
+
+
 @intelligence_ui.route("/answers/<address>", methods=["GET"])
 @login_required
 def answer_page(address: str):
@@ -144,4 +165,4 @@ def answer_page(address: str):
     return render_template("intelligence/answer.html", answer=envelope.present(record))
 
 
-__all__ = ["ask_answer", "list_answers", "get_answer", "answers_page", "answer_page"]
+__all__ = ["ask_answer", "list_answers", "get_answer", "answers_page", "answer_for_element", "answer_page"]

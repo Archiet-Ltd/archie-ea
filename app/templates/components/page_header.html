@@ -81,7 +81,7 @@
                     {{ action.text }}
                 </a>
                 {% elif action.onclick %}
-                <button type="button" @click="{{ action.onclick }}"
+                <button type="button" x-data @click="{{ action.onclick }}"
                         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-10 px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ btn_classes[variant] }}" aria-label="{{ action.text }}">
                     {% if action.icon %}<i data-lucide="{{ action.icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>{% endif %}
                     {{ action.text }}

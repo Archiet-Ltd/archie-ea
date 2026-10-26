@@ -285,8 +285,7 @@
 
             <button type="button"
                 @click="Platform.fetch.post('{{ url_for("abacus_consolidation.reject_merge", abacus_id=0, manual_id=0) }}'.replace('/0/0','/{{ abacus_cap.id }}/{{ manual_cap.id }}'), null, { silent: true }).then(function () { window.location.href='{{ url_for("abacus_consolidation.index") }}'; }).catch(function (err) { Platform.toast.error('Failed to mark as not duplicate: ' + (err.message || err)); })"
-                class="ml-auto px-6 py-2 bg-destructive/10 text-destructive-emphasis rounded-md hover:bg-destructive/20 font-medium"
-             aria-label="Action">
+                class="ml-auto px-6 py-2 bg-destructive/10 text-destructive-emphasis rounded-md hover:bg-destructive/20 font-medium">
                 Mark as Not Duplicate
             </button>
         </div>

@@ -51,7 +51,7 @@ Parameters:
                 <div class="flex flex-wrap items-center gap-3">
                     <!-- View Toggle -->
                     <div class="flex items-center space-x-2 bg-muted rounded-lg p-1" title="Switch between auto-detected gaps and saved roadmap items">
-                        <button type="button" id="roadmap-view-auto-{{ container_id }}" @click="setRoadmapView{{ container_id }}('auto')" class="px-3 py-1.5 text-sm rounded-md bg-card font-medium text-muted-foreground transition-all" aria-label="Action">
+                        <button type="button" id="roadmap-view-auto-{{ container_id }}" @click="setRoadmapView{{ container_id }}('auto')" class="px-3 py-1.5 text-sm rounded-md bg-card font-medium text-muted-foreground transition-all">
                             Auto-Detected
                         </button>
                         <button type="button" id="roadmap-view-saved-{{ container_id }}" @click="setRoadmapView{{ container_id }}('saved')" class="px-3 py-1.5 text-sm rounded-md font-medium text-muted-foreground hover:text-foreground transition-all" aria-label="Save">
@@ -316,7 +316,7 @@ Parameters:
                     Search & Filters
                 </h3>
                 <div class="flex items-center space-x-2">
-                    <button type="button" @click="clearAllFilters{{ container_id }}()" class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all" aria-label="Filter">
+                    <button type="button" @click="clearAllFilters{{ container_id }}()" class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all">
                         <i data-lucide="x" class="w-4 h-4 inline mr-1"></i>
                         Clear All
                     </button>

@@ -182,13 +182,13 @@
     <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-border">
         <button @click="Platform.modal.close('initiative-{{ id }}')"
                 type="button"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
+                class="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4" aria-label="Cancel">
             Cancel
         </button>
         <button @click="submitInitiativeForm()"
                 :disabled="loading"
                 type="button"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-show="!loading" x-cloak>Create Initiative</span>
             <span x-show="loading" x-cloak class="inline-flex items-center gap-1">
                 <i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i>

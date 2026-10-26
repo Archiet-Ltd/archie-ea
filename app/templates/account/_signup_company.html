@@ -14,6 +14,7 @@
         {% call card_content(class='space-y-6') %}
             {% if facts %}
             {% include 'account/_company_facts.html' %}
+            {% if more_coming %}<p class="text-sm text-muted-foreground" role="status" data-testid="more-facts-coming">{{ more_coming }}</p>{% endif %}
             {% elif website %}
             {% include 'account/_website_reading.html' %}
             {% endif %}
