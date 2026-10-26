@@ -4,6 +4,7 @@ Queries REAL junction/child records to determine whether a Solution has met
 the minimum data requirements for the current ADM phase before allowing
 advancement to the next phase.
 """
+from app import db
 from app.services.kanban_projection_service import normalize_phase_code
 from app.models.solution_models import Solution, SolutionCapabilityMapping
 
@@ -66,7 +67,14 @@ def _count_stakeholder_mappings(solution):
 
 
 def _count_capabilities(solution):
-    """Count capability mappings (direct or via session problem)."""
+    """Count capability mappings (direct or via session problem) and linked Capability elements.
+
+    The design score service reads capabilities from solution_archimate_elements
+    (the table every writer uses). This function now checks both sources so the
+    ARB readiness "Business capabilities mapped" check agrees with the design
+    score's element reads.
+    """
+    # Source 1: SolutionCapabilityMapping (direct or via analysis session)
     direct = SolutionCapabilityMapping.query.filter_by(
         solution_id=solution.id
     ).count()
@@ -83,6 +91,23 @@ def _count_capabilities(solution):
             return SolutionCapabilityMapping.query.filter_by(
                 problem_id=problem.id
             ).count()
+
+    # Source 2: solution_archimate_elements — Capability elements linked to the solution
+    from app.models.solution_models import SolutionArchiMateElement
+    from app.models.archimate_core import ArchiMateElement
+
+    archimate_caps = (
+        db.session.query(SolutionArchiMateElement)
+        .join(ArchiMateElement, ArchiMateElement.id == SolutionArchiMateElement.element_id)
+        .filter(
+            SolutionArchiMateElement.solution_id == solution.id,
+            ArchiMateElement.type == "Capability",
+        )
+        .count()
+    )
+    if archimate_caps > 0:
+        return archimate_caps
+
     return 0
 
 

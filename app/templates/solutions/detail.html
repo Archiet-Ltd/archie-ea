@@ -841,42 +841,6 @@
           </div>
         </div>
 
-        {# PLT-002: Architecture Completeness breakdown card #}
-        {% set _ac = architecture_completeness %}
-        <div class="rounded-lg border border-border bg-card p-4 mb-4">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-semibold text-foreground flex items-center gap-2">
-              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
-              Architecture Completeness
-            </h4>
-            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold
- {{ 'bg-success/10 text-success-emphasis border border-success/20' if _ac.score >= 80
- else ('bg-warning/10 text-warning-emphasis border border-warning/20' if _ac.score >= 40
- else 'bg-destructive/10 text-destructive-emphasis border border-destructive/20') }}">
-              {{ _ac.score }}% &mdash; {{ _ac.filled_count }}/{{ _ac.total }} sections
-            </span>
-          </div>
-          <div class="h-2 w-full rounded-full bg-muted/50 overflow-hidden mb-3">
-            <div class="h-full rounded-full transition-all duration-500
- {{ 'bg-success' if _ac.score >= 80 else ('bg-warning' if _ac.score >= 40 else 'bg-destructive') }}"
-                 style="width: {{ _ac.score }}%"></div>
-          </div>
-          <div class="flex flex-wrap gap-1.5">
-            {% for cat in _ac.filled %}
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-success/10 text-success-emphasis border border-success/20">
-              <svg class="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-              {{ cat|replace('_',' ')|title }}
-            </span>
-            {% endfor %}
-            {% for cat in _ac.missing %}
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted/50 text-muted-foreground border border-dashed border-border/70">
-              <svg class="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"/></svg>
-              {{ cat|replace('_',' ')|title }}
-            </span>
-            {% endfor %}
-          </div>
-        </div>
-
         {# Cross-phase insight: detect broken chain starts #}
         {% if drivers and not goals %}
         <div class="rounded-lg border border-warning/20 bg-warning/5 px-4 py-2.5 mb-4 flex items-start gap-2">
@@ -2194,7 +2158,6 @@ function openSectionComments(section, label) {
     linkedRequirements: {{ ((lifecycle_json or {}).get('requirements') or [])|tojson }},
     workspaceSummary: {{ (workspace_summary or {})|tojson }},
     maturityGaps: {{ (maturity_gaps or [])|tojson }},
-    maturityScore: {{ maturity_score|default(0)|tojson }}
   };
 </script>
 <script>

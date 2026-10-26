@@ -1787,6 +1787,8 @@ def _build_solution_detail_context(solution):
     Accepts a Solution ORM object (already fetched and access-checked).
     Returns a dict suitable for ``render_template("solutions/detail.html", **ctx)``.
     """
+    from app.services.solution_design_score_service import compute as _design_score
+
     solution_id = solution.id
 
     # Get related applications through junction table
@@ -2413,6 +2415,7 @@ def _build_solution_detail_context(solution):
         "saved_viewpoints": _get_solution_viewpoints(solution_id),
         "app_element_count": sum(1 for e in archimate_elements if (e.get("layer") or "").lower() == "application"),
         "architecture_completeness": solution.architecture_completeness_score,
+        "design_score": _design_score(solution).to_dict(),
     }
 
 
@@ -4178,7 +4181,11 @@ def export_solution_sad(solution_id: int):
         logger.debug(f"Could not load ArchiMate elements for SAD export: {e}")
         ctx.setdefault("archimate_elements", [])
 
-    # Maturity score
+    # Design score — the one figure every surface shows
+    from app.services.solution_design_score_service import compute as _design_score
+    ctx["design_score"] = _design_score(solution).to_dict()
+
+    # Maturity score (kept for backward compatibility but not shown)
     ctx["maturity_score"] = ctx.get("document_maturity_score", ctx.get("maturity_score", 0))
 
     ctx["export_timestamp"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")

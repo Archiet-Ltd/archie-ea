@@ -179,11 +179,12 @@
                 <div class="meta-value">{{ solution.technical_lead or '—' }}</div>
             </div>
             <div class="meta-item">
-                <div class="meta-label">Document Maturity</div>
+                <div class="meta-label">Design Score</div>
                 <div class="meta-value">
-                    {% set mat = maturity_score|default(0) %}
-                    <span class="maturity-badge {% if mat >= 70 %}maturity-high{% elif mat >= 40 %}maturity-medium{% else %}maturity-low{% endif %}">
-                        {{ mat }} / 100
+                    {% set ds = design_score %}
+                    <span class="maturity-badge {% if ds.passed >= 8 %}maturity-high{% elif ds.passed >= 4 %}maturity-medium{% else %}maturity-low{% endif %}"
+                          data-design-score="{{ ds.label }}">
+                        {{ ds.label }}
                     </span>
                 </div>
             </div>
