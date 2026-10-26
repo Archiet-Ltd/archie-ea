@@ -1,71 +1,51 @@
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'basecoat/table.html' import table_cell %}
-{% from 'components/button.html' import button %}
-{% from 'components/input.html' import input %}
-{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option, native_select_icon %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
 {% block title %}Errors{% endblock %}
 
+{% macro _filters() %}
+<form method="get" class="flex items-center gap-2" data-testid="errors-filter-form">
+  {% if show_resolved %}<input type="hidden" name="resolved" value="1">{% endif %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name='source', size='sm', attrs={'aria-label': 'Source', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All sources', value='', selected=(not source_filter)) }}
+      {{ native_select_option(text='Server', value='server', selected=(source_filter == 'server')) }}
+      {{ native_select_option(text='Browser', value='client', selected=(source_filter == 'client')) }}
+    {% endcall %}
+  {% endcall %}
+  {{ ui.button(text=('Hide resolved' if show_resolved else 'Show resolved'), href=url_for('error_events.errors_dashboard', source=source_filter or none, resolved=(none if show_resolved else '1')), variant='outline', size='sm', class='h-8', attrs={'data-testid': 'errors-toggle-resolved'}) }}
+</form>
+{% endmacro %}
+
 {% block content %}
-{{ page_shell(
-    'Errors',
-    subtitle='Deduplicated server + client errors, aggregated by fingerprint across every organization.',
-    breadcrumb=[('Home', url_for('dashboard.overview')), ('Errors', None)],
-    icon='alert-triangle'
-) }}
+<div class="p-6 space-y-6" data-testid="errors-dashboard-page">
+{{ page_shell('Errors', subtitle='Server and browser errors, grouped so each distinct problem appears once with how often it happened',
+              breadcrumb=[('Home', url_for('dashboard.overview')), ('Errors', none)]) }}
 
-<div class="space-y-4" data-testid="errors-dashboard-page">
-    <form method="get" class="flex flex-wrap items-center gap-3" data-testid="errors-filter-form">
-        {% call native_select_wrapper(class='w-44') %}
-            {% call native_select(name='source', aria_label='Filter by source', attrs={'onchange': 'this.form.submit()'}) %}
-                {{ native_select_option('All sources', value='', selected=(not source_filter)) }}
-                {{ native_select_option('Server', value='server', selected=(source_filter == 'server')) }}
-                {{ native_select_option('Client (browser)', value='client', selected=(source_filter == 'client')) }}
-            {% endcall %}
-            {{ native_select_icon() }}
-        {% endcall %}
-        {{ input(type='hidden', name='resolved', value=('1' if show_resolved else '')) }}
-        {% call button(variant=('secondary' if show_resolved else 'outline'), size='sm', href=url_for('error_events.errors_dashboard', source=source_filter or none, resolved=(none if show_resolved else '1'))) %}
-            {{ 'Showing resolved' if show_resolved else 'Show resolved' }}
-        {% endcall %}
+{% call(e) list_table(rows=events, columns=[('Source', ''), ('Error', ''), {'label': 'Where', 'class': 'hidden lg:table-cell'}, {'label': 'Times', 'align': 'right', 'sortable': true}, {'label': 'Last seen', 'sortable': true}, {'label': '', 'class': 'w-24'}],
+                      caption='Error events', testid='errors-table', row_testid='error-row', search_placeholder='Filter errors...',
+                      toolbar=true, toolbar_actions=_filters,
+                      empty_message=('No errors match this filter.' if source_filter else ('No errors recorded. Nothing has been logged at warning level or above, and no browser error has been reported.' if not show_resolved else 'No errors recorded, resolved or open.'))) %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge('Browser' if e.source == 'client' else 'Server', tone='neutral') }}{% endcall %}
+  {% call table_cell(class='max-w-[480px] truncate font-medium', attrs={'title': e.message}) %}{{ e.message }}{% endcall %}
+  {% call table_cell(class='hidden lg:table-cell max-w-[260px] truncate text-muted-foreground', attrs={'title': e.location or ''}) %}{{ value_or_unset(e.location, 'Not recorded') }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': e.occurrence_count or 0}) %}{{ '{:,}'.format(e.occurrence_count or 0) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': e.last_seen_at.strftime('%Y%m%d%H%M%S') if e.last_seen_at else ''}) %}{{ e.last_seen_at.strftime('%d %b %Y %H:%M') if e.last_seen_at else value_or_unset(none, 'Unknown') }}{% endcall %}
+  {% call table_cell(class='w-24 text-right') %}
+    {% if not e.resolved %}
+    <form method="post" action="{{ url_for('error_events.resolve_error', event_id=e.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% call ui.button(type='submit', variant='ghost', size='sm', attrs={'data-testid': 'resolve-error-' ~ e.id}) %}{{ lucide('check') }}Resolve{% endcall %}
     </form>
-
-    {% if events %}
-    <div class="overflow-x-auto rounded-lg border border-border">
-        {% call(e) list_table(rows=events, columns=[('Source', ''), ('Message', ''), ('Location', ''), ('Count', ''), ('Last seen', ''), ('', 'text-right')], caption='Error events', testid='errors-table', row_testid='error-row') %}
-            {% call table_cell(class='px-4 py-2.5') %}
-                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium
-                    {% if e.source == 'client' %}bg-warning/10 text-warning{% else %}bg-destructive/10 text-destructive{% endif %}">
-                    {{ e.source }}
-                </span>
-            {% endcall %}
-            {% call table_cell(class='px-4 py-2.5 max-w-md truncate font-medium text-foreground', attrs={'title': e.message}) %}{{ e.message }}{% endcall %}
-            {% call table_cell(class='px-4 py-2.5 text-muted-foreground') %}{{ e.location or '?' }}{% endcall %}
-            {% call table_cell(class='px-4 py-2.5 text-muted-foreground') %}{{ e.occurrence_count }}{% endcall %}
-            {% call table_cell(class='px-4 py-2.5 text-muted-foreground') %}{{ e.last_seen_at.strftime('%Y-%m-%d %H:%M') if e.last_seen_at else '?' }}{% endcall %}
-            {% call table_cell(class='px-4 py-2.5 text-right') %}
-                {% if not e.resolved %}
-                <form method="post" action="{{ url_for('error_events.resolve_error', event_id=e.id) }}">
-                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-                    {% call button(type='submit', variant='outline', size='sm', attrs_dict={'data-testid': 'resolve-error-' ~ e.id}) %}
-                        <i data-lucide="check" class="h-3.5 w-3.5"></i> Resolve
-                    {% endcall %}
-                </form>
-                {% else %}
-                <span class="text-xs text-muted-foreground">Resolved</span>
-                {% endif %}
-            {% endcall %}
-        {% endcall %}
-    </div>
     {% else %}
-    {{ empty_state(
-        title='No errors recorded',
-        description='Nothing has been logged at WARNING level or above, and no client-side JS error has been reported yet.',
-        icon='shield-check'
-    ) }}
+    {{ state_badge('Resolved', tone='positive') }}
     {% endif %}
+  {% endcall %}
+{% endcall %}
 </div>
 {% endblock %}
