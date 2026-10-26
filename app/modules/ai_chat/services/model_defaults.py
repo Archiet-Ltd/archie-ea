@@ -53,6 +53,69 @@ DEFAULT_MODELS = {
     "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
 }
 
+# Ordered free fallback models tried within OpenRouter and NVIDIA before
+# moving on to the next provider when the primary free model is rate-limited
+# or unavailable.
+FALLBACK_MODELS = {
+    "openrouter": (
+        "google/gemma-4-31b-it:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "qwen/qwen-2.5-72b-instruct:free",
+        "mistralai/mistral-small-3.1-24b-instruct:free",
+        "google/gemma-3-27b-it:free",
+        "openrouter/free",
+    ),
+    "nvidia": (
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "meta/llama-3.3-70b-instruct",
+        "qwen/qwen2.5-72b-instruct",
+        "deepseek-ai/deepseek-r1",
+        "mistralai/mistral-nemotron",
+    ),
+}
+
+
+# Calls that carry only public text (a company's own website) may be answered by free providers.
+# This is the order they are tried in; a provider with no key is skipped silently. Calls that carry an
+# organisation's data never use the curated free backups below or the providers that only offer free models.
+PUBLIC_INPUT_CHAIN = ("openrouter", "nvidia", "mistral", "cerebras", "groq", "gemini")
+PUBLIC_INPUT_MODELS = {
+    "openrouter": DEFAULT_MODELS["openrouter"],
+    "nvidia": DEFAULT_MODELS["nvidia"],
+    "mistral": "mistral-small-latest",
+    "cerebras": "llama-3.3-70b",
+    "groq": "llama-3.3-70b-versatile",
+    "gemini": "gemini-2.0-flash",
+}
+# Providers that are used only for public input.
+FREE_ONLY_PROVIDERS = frozenset({"mistral", "cerebras", "groq"})
+# The base address of each OpenAI-compatible free provider.
+OPENAI_COMPATIBLE_BASE_URLS = {
+    "cerebras": "https://api.cerebras.ai/v1",
+    "groq": "https://api.groq.com/openai/v1",
+}
+MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
+
+
+def is_free_model(provider: str, model: str = "") -> bool:
+    """True when this provider and model are a free tier that must not read an organisation's data."""
+    provider = (provider or "").strip().lower()
+    model = (model or "").strip().lower()
+    return (provider in FREE_ONLY_PROVIDERS or provider == "nvidia"
+            or model.endswith(":free") or model == "openrouter/free")
+
+
+def fallback_models_for(provider: str, primary_model: str = "") -> list[str]:
+    """Return ordered list of models to try for *provider*, starting with *primary_model*."""
+    norm = (provider or "").strip().lower()
+    explicit = [m.strip() for m in (primary_model or "").split(",") if m.strip()]
+    defaults = list(FALLBACK_MODELS.get(norm, ()))
+    seen: list[str] = []
+    for candidate in explicit + defaults:
+        if candidate and candidate not in seen:
+            seen.append(candidate)
+    return seen
+
 # A cheaper model for high-volume, low-judgement work (classification, routing,
 # summarisation) where the flagship is not worth its cost.
 ECONOMY_MODELS = {
