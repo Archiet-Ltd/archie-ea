@@ -8,7 +8,7 @@
      fold          optional true: tighter spacing so the screen starts inside the first screen (home page)
      badge_short / badge_long   optional pill text (phone / wider); author-written strings, may hold entities
      breadcrumb    optional (label, url) shown above the pill
-     title, lead   headline and lead paragraph (lead may be Markup)
+     title, lead   headline and lead paragraph (lead may be Markup); first_step optional: the one thing to do first
      compact       optional true: smaller headline scale for long headlines (role pages)
      primary / secondary   (label, url[, testid]); the secondary is the outline button
      figure        {url, mobile_url, width, height, mobile_width, mobile_height, alt, caption, frame_label, testid} -#}
@@ -34,6 +34,9 @@
 
     {% if hero.lead %}
     <p class="home-lead">{{ hero.lead }}</p>
+    {% endif %}
+    {% if hero.first_step %}
+    <p class="mx-auto mt-4 max-w-2xl text-base text-foreground" data-testid="{{ hero.testid }}-first-step">{{ hero.first_step }}</p>
     {% endif %}
 
     <div class="{{ 'mt-6' if hero.fold else 'mt-9' }} flex flex-col gap-3 sm:flex-row sm:justify-center">

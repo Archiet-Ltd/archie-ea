@@ -24,4 +24,4 @@ Early access. Join the waiting list and we will tell you the day it opens.
 ## Related
 
 - [Applications and owners](/modules/applications)
-- [Pricing](/pricing)
+- [Talk to us](/contact)

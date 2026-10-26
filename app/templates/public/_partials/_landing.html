@@ -37,7 +37,7 @@
     'mobile_url': screenshot.mobile.url if screenshot.mobile else none,
     'mobile_width': screenshot.mobile.width if screenshot.mobile else none,
     'mobile_height': screenshot.mobile.height if screenshot.mobile else none,
-    'frame_label': screenshot.frame_label or 'AI chat · Demonstration company',
+    'frame_label': screenshot.frame_label or 'Demonstration company',
     'alt': screenshot.alt, 'caption': screenshot.caption,
   },
 } %}
@@ -175,7 +175,7 @@
 
 <section data-testid="landing-closing" class="border-t border-border bg-background text-center">
   <div class="public-container">
-    <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
+    <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Start free. Give us your company website and see your company profile, your systems and their owners in about fifteen minutes.</p>
     <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
       {{ button(text=primary_label, href=primary_url, variant='primary') }}
       {{ button(text='Talk to us' if page.family == 'role' else 'Get in touch', href='/contact', variant='outline') }}

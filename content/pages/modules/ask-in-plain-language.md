@@ -4,7 +4,7 @@ module_label: "Ask in plain language"
 state: briefed
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-icon: message-square
+icon: message-circle
 ---
 
 # Ask in plain language
@@ -24,4 +24,4 @@ Early access. Join the waiting list and we will tell you the day it opens.
 ## Related
 
 - [Applications and owners](/modules/applications)
-- [Pricing](/pricing)
+- [Talk to us](/contact)

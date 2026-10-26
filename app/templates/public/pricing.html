@@ -72,9 +72,9 @@
 
         {# Startup and Team: price and buy button per interval #}
         {% for key, name, for_whom, items in [
-          ('startup', 'Startup', 'Founders and small teams of up to ten people.',
+          ('startup', 'Startup', 'A founder with 5 to 50 people, up to ten of them using Entelim, who wants to see what the company runs and who owns it without hiring an architect.',
             ['Ten people', 'Email support']),
-          ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
+          ('team', 'Team', 'A CTO with 50 to 500 people who needs one list of every application with an owner on each, kept current by the people who edit it; minimum five editors.',
             ['Pay for editors only; people who only view are free', 'Minimum five editors', 'Email support'])
         ] %}
         {% set prices = plan_prices[key] %}
@@ -90,7 +90,7 @@
             {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. Minimum five editors. People who only view are free.{% endif %}</span>{% endif %}
           </p>
           {# Live charging opens with the next wave: until then the paid plans' button joins a waiting list (CLAUDE.md section 20). #}
-          {{ button(text='Join the waiting list for ' ~ name, href='/modules/paid-plans', variant='primary', size='lg', class='h-auto w-full whitespace-normal text-center py-2', testid='waitlist-' ~ key) }}
+          {{ button(text='Join the ' ~ name ~ ' waiting list', href='/modules/paid-plans', variant='primary', size='lg', class='h-auto w-full whitespace-normal text-center py-2', testid='waitlist-' ~ key) }}
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
@@ -102,7 +102,7 @@
         {# Enterprise #}
         <article class="public-card" data-testid="plan-card-enterprise">
           <h3 class="public-card-title">Enterprise</h3>
-          <p class="pp-for">Enterprise architecture teams.</p>
+          <p class="pp-for">An enterprise architect who needs unlimited editors and supported self-hosting, agreed by contract with a named support contact.</p>
           <p class="pp-price">{{ plan_prices.enterprise[0] }}</p>
           <p class="pp-note">Annual contract from USD 24,000/year.</p>
           {{ button(text='Contact sales', href=url_for('main.track_plan_click', plan='enterprise', next='/contact'), variant='outline', size='lg', class='h-auto w-full whitespace-normal text-center py-2', testid='buy-enterprise') }}

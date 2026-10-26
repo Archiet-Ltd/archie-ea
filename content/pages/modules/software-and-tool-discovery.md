@@ -17,11 +17,11 @@ Entelim is building a way to discover the software and tools your organisation a
 
 ## What you can do today
 
-Record vendor contracts and software licences in registers with [contracts and licences](/modules/procurement), and score each application with [rationalisation scoring](/modules/rationalization).
+Load your applications from a spreadsheet and record who owns each one. See [what you can do today](/features).
 
 Early access. Join the waiting list and we will tell you the day it opens.
 
 ## Related
 
-- [Contracts and licences](/modules/procurement)
-- [Rationalisation scoring](/modules/rationalization)
+- [Applications and owners](/modules/applications)
+- [Features](/features)

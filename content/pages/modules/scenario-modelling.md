@@ -17,11 +17,11 @@ Entelim is building scenarios, so you can set what-if plans side by side and com
 
 ## What you can do today
 
-Pick a system in the [twin map](/modules/digital-twin) to see the applications and services that depend on it, and place programmes on a [roadmap](/modules/roadmaps).
+See your applications, their owners and your overview, and read what is missing on the health page. See [what you can do today](/features).
 
 Early access. Join the waiting list and we will tell you the day it opens.
 
 ## Related
 
-- [Twin map](/modules/digital-twin)
-- [Roadmaps](/modules/roadmaps)
+- [Features](/features)
+- [Applications and owners](/modules/applications)

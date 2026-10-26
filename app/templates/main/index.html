@@ -1,9 +1,9 @@
 {% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — Know what your company runs and who owns it{% endblock %}
+{% block full_title %}Entelim — The company brain{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
 <meta name="description" content="Entelim reads your company website, drafts your company profile and builds one list of your systems and their owners that you can correct and trust. Free for up to three people.">
-<meta property="og:title" content="Entelim — Know what your company runs and who owns it">
+<meta property="og:title" content="Entelim — The company brain">
 <meta property="og:description" content="One list of your systems and their owners, drafted from your website and corrected by you. Open source, free to start.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
@@ -11,7 +11,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — Know what your company runs and who owns it">
+<meta name="twitter:title" content="Entelim — The company brain">
 <meta name="twitter:description" content="One list of your systems and their owners, drafted from your website and corrected by you. Open source, free to start.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim reads your company website and builds one list of your systems and their owners that you can correct and trust."}</script>
@@ -38,8 +38,9 @@
   'testid': 'home-hero',
   'fold': true,
   'badge_long': 'Open source, free to start',
-  'title': 'Know what your company runs and who owns it, in fifteen minutes.',
-  'lead': 'Give us your website. Entelim drafts your company profile from what is public, you correct it, then load your applications from a spreadsheet or try the sample company.',
+  'title': 'The company brain.',
+  'lead': 'One living model of your business, built from what you already have, that answers with its sources.',
+  'first_step': 'Start with your website: we read it, you confirm it. Add your applications from a spreadsheet and see who owns what on one page.',
   'primary': ('Start free', url_for('account.register'), 'home-hero-start'),
   'secondary': ('See pricing', '/pricing', 'home-hero-pricing'),
   'figure': {
@@ -95,29 +96,51 @@
   </div>
 </section>
 
-<!-- 2. What you can do today -->
+<!-- 2. What it does: the jobs, only the first is open today -->
 <section class="home-section" data-testid="home-today">
   <div class="container px-4">
     <div class="max-w-3xl">
-      <p class="home-eyebrow">Available today</p>
-      <h2 class="home-h2">What you can do today.</h2>
+      <p class="home-eyebrow">What it does</p>
+      <h2 class="home-h2">The jobs it does for you.</h2>
+      <p class="home-section-lead">The first is open today. The rest are coming next: join the waiting list for the ones you want.</p>
     </div>
-    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="public-card">
-        <h3 class="public-card-title">Who owns each of our systems?</h3>
-        <p class="public-card-body">Record the owner of every application and see which ones have none.</p>
-        <p class="public-card-body mt-4"><a href="/modules/applications" class="public-link">Applications and owners</a></p>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Show an investor what we run.</h3>
-        <p class="public-card-body">One overview of your applications, owners and how complete the list is.</p>
-        <p class="public-card-body mt-4"><a href="/features" class="public-link">See the features</a></p>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">What is missing from our list?</h3>
-        <p class="public-card-body">One health page lists the gaps, so you know what to fix first.</p>
-        <p class="public-card-body mt-4"><a href="/features" class="public-link">See the features</a></p>
-      </div>
+    <ul class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" role="list">
+      <li class="public-card" data-testid="home-job-today" data-availability="live">
+        {% call badge('secondary') %}Available today{% endcall %}
+        <h3 class="public-card-title mt-3">What you have and who owns it</h3>
+        <p class="public-card-body">One list of your applications with an owner on each, and one overview and health page that show what is missing.</p>
+        <p class="mt-4">{{ button(text='See how it works', href='/features#applications-and-owners', variant='outline') }}</p>
+      </li>
+      {% for title, text, href in [
+        ('What breaks if something fails', 'See what depends on a system, and who owns each part, before it fails.', '/modules/what-breaks-if-something-fails'),
+        ('What it costs', 'See what your systems cost to run and where the money goes.', '/modules/what-it-costs'),
+        ('What you are changing', 'See the changes under way and which systems each one touches.', '/modules/what-you-are-changing'),
+        ('Whether you can prove you are compliant', 'Set the facts in your model against the frameworks you answer to.', '/modules/prove-you-are-compliant'),
+        ('Ask it anything in your chat', 'Ask your model a question in plain words and read an answer that shows its sources.', '/modules/ask-in-plain-language'),
+      ] %}
+      <li class="public-card" data-testid="home-job-next" data-availability="early_access">
+        {% call badge('outline') %}Coming next{% endcall %}
+        <h3 class="public-card-title mt-3">{{ title }}</h3>
+        <p class="public-card-body">{{ text }}</p>
+        <p class="mt-4">{{ button(text='Join the waiting list', href=href, variant='outline') }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<!-- 2b. Coming next: the role advisers, no screenshot, not available today -->
+<section class="home-section" data-testid="home-architecture-team" data-availability="early_access">
+  <div class="container px-4">
+    <div class="public-card public-card--callout">
+      {% call badge('outline') %}Coming next{% endcall %}
+      <h2 class="public-card-title mt-3">Coming next: an architecture team in your chat.</h2>
+      <p class="public-card-body mb-6">
+        Ask Entelim as your technical architect or product manager, and get a course of action built from your own
+        company's facts: what to fix first, what to build next, with every fact linked to where it came from. You approve
+        every change.
+      </p>
+      {{ button(text='Join the early-access list', href='/modules/an-architecture-team-in-your-chat', variant='primary', testid='home-architecture-team-join') }}
     </div>
   </div>
 </section>
@@ -178,21 +201,21 @@
             <td>Startup</td>
             <td><strong>$49</strong>/month</td>
             <td>$490/year.</td>
-            <td>For founders and small teams of up to ten people.</td>
+            <td>For a founder with 5 to 50 people, up to ten of them using Entelim, who wants to see what the company runs and who owns it without hiring an architect.</td>
             <td>Ten people and email support, everything in Community included.</td>
           </tr>
           <tr>
             <td>Team</td>
             <td><strong>$29</strong>/editor/month</td>
             <td>$290/editor/year. Minimum five editors.</td>
-            <td>For scale-ups and services companies, 50 to 500 people.</td>
+            <td>For a CTO with 50 to 500 people who needs one list of every application with an owner on each, kept current by the people who edit it; minimum five editors.</td>
             <td>Pay per editor; people who only view are free. Email support.</td>
           </tr>
           <tr>
             <td>Enterprise</td>
             <td><strong>From $24,000</strong>/year</td>
             <td>Annual contract.</td>
-            <td>For enterprise architecture teams.</td>
+            <td>For an enterprise architect who needs unlimited editors and supported self-hosting, agreed by contract with a named support contact.</td>
             <td>Unlimited editors, an annual contract, supported self-hosting and a named contact.</td>
           </tr>
         </tbody>
