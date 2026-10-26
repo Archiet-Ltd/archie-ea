@@ -97,6 +97,73 @@ entries:
         reason: authenticated page's local pill macro, predates the register; repointing it is outside the
           public-page scope
 
+  - id: element-table
+    concept: A list of ArchiMate elements on a record page (a solution's design or requirements, a programme's
+      elements, an element's related elements) as dense rows, the name a link to the element's own record,
+      paged by 25
+    status: active
+    canonical:
+      path: app/templates/components/element_table.html
+      symbols: [element_table]
+    reuse: >
+      import `element_table` from components/element_table.html and render the other cells in its
+      call block (design-system lead ruling R30, 25 Oct 2026); do not define another element or elements
+      table macro, and do not hand-roll a table whose first column is an element name linking to its record
+    must_not_create:
+      - id: element-table-macro
+        regex: '{%-?\s*macro\s+(\w*element_table\w*|\w*elements_table\w*|\w*element_list_table\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: list-table
+    concept: A list of records on any page, built on the library Table, paged by 25 (data-type register
+      record-list; ruling R31, 26 Oct 2026)
+    status: active
+    canonical:
+      path: app/templates/components/list_table.html
+      symbols: [list_table]
+    reuse: >
+      import `list_table` from components/list_table.html and render one row's cells in its call block;
+      a list of ArchiMate elements uses `element_table`, which is this table with the element link first.
+      dense_table, data_table and workbench_table are retired for new lists (docs/data-type-register.yml)
+    must_not_create:
+      - id: list-table-macro
+        regex: '{%-?\s*macro\s+\w*(?:list|record|records|item|items)_table\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: risk-matrix
+    concept: Risks by probability and impact as a five by five grid that counts the risks in each cell
+      (data-type register risks; ruling R31)
+    status: active
+    canonical:
+      path: app/templates/components/risk_matrix.html
+      symbols: [risk_matrix]
+    reuse: >
+      import `risk_matrix` from components/risk_matrix.html and pass the grid the service builds; do not
+      draw another heat map or risk grid
+    must_not_create:
+      - id: risk-matrix-macro
+        regex: '{%-?\s*macro\s+\w*(?:risk_matrix|risk_grid|heat_?map)\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: fact-list
+    concept: The facts about one record, label left and value right (data-type register record-facts;
+      pattern P25; ruling R31)
+    status: active
+    canonical:
+      path: app/templates/components/fact_list.html
+      symbols: [fact_list]
+    reuse: >
+      import `fact_list` from components/fact_list.html and render each value in its call block; do not
+      hand-build another definition list of record properties
+    must_not_create:
+      - id: fact-list-macro
+        regex: '{%-?\s*macro\s+\w*(?:fact_list|key_value|kv_list|property_list)\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
   - id: capability-visibility
     concept: A capability looked up by id and caller's organisation
     status: active

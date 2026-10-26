@@ -1,0 +1,53 @@
+{# The list table: the one way a page lists records (data-type register: record-list).
+
+   Built on the library Table (components/table.html), the vendored shadcn Table. The caller
+   renders one row's cells in the call block; the macro owns the header, the screen-reader
+   caption, the row wrapper with its test id, and paging by 25 with the pagination control.
+   Short columns keep to one line; the first column takes the remaining width.
+
+   {% from 'components/list_table.html' import list_table %}
+   {% call(o) list_table(rows=options, columns=[('Option', ''), ('Cost', ''), ('Summary', 'hidden md:table-cell')],
+                         caption='Options compared', testid='options-table', row_testid='option-row') %}
+     <td class="px-2 !pl-6 align-middle font-medium text-foreground">{{ o.name }}</td>
+     <td class="whitespace-nowrap px-2 align-middle">{{ o.cost }}</td>
+     <td class="hidden px-2 align-middle md:table-cell">{{ o.summary }}</td>
+   {% endcall %}
+
+   rows        the records, one row each
+   columns     (label, extra header classes); the first column is the record's name
+   caption     what the table lists, read by screen readers
+   testid      the table's test id; the pager wrapper is <testid>-pager
+   row_testid  each row's test id
+   page_size   rows per page; at or under it there are no page controls
+   component   the data-component marker (element-table passes its own)
+
+   A list of ArchiMate elements uses components/element_table.html, which is this table with the
+   element's name and link in the first column. #}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head %}
+{% from 'components/pagination_controls.html' import pagination_controls %}
+
+{% macro list_table(rows, columns, caption, testid, row_testid='list-row', page_size=25, component='list-table') %}
+{%- set cells = caller -%}
+{%- set total = rows|length -%}
+{%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
+<div x-data="{ currentPage: 1, pageSize: {{ page_size }}, totalItems: {{ total }}, totalPages: {{ pages }} }" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}">
+  {% call table(attrs_dict={'data-testid': testid}) %}
+    <caption class="sr-only">{{ caption }}</caption>
+    {% call table_header() %}
+      {% call table_row(class='hover:bg-transparent') %}
+        {% for col in columns %}
+          {% call table_head(class=('!pl-6 ' if loop.first else 'whitespace-nowrap ') ~ (col[1] if col|length > 1 else ''), attrs_dict={'scope': 'col'}) %}{{ col[0] }}{% endcall %}
+        {% endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% call table_body() %}
+      {% for row in rows %}
+        {%- set attrs = {'data-testid': row_testid} -%}
+        {%- if total > page_size %}{% set _ = attrs.update({'x-show': 'Math.ceil(' ~ loop.index ~ ' / pageSize) === currentPage'}) %}{% endif -%}
+        {% call table_row(class='group h-12', attrs_dict=attrs) %}{{ cells(row) }}{% endcall %}
+      {% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {% if total > page_size %}{{ pagination_controls(class='border-t border-border') }}{% endif %}
+</div>
+{% endmacro %}

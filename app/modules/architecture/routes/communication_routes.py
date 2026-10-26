@@ -8,7 +8,7 @@ Endpoints:
 
 import logging
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request
 
 from app.services import communication_log_service
 from flask_login import login_required
@@ -65,16 +65,9 @@ def list_communications():
 @communication_bp.route("/solutions/<int:solution_id>/communications", methods=["GET"])
 @login_required
 def communication_log_view(solution_id: int):
-    """GET /solutions/<id>/communications — render the communication timeline page."""
+    """GET /solutions/<id>/communications: the old communication log page. The notes
+    live on the solution record now (the solutions rethink, slice 5b)."""
     from app.models.solution_models import Solution
     from app.utils.route_guards import require_entity
-
-    # An empty timeline for a solution that does not exist reads exactly like a
-    # real solution nobody has logged a communication against yet.
     require_entity(Solution, solution_id, description="Solution not found")
-    entries = communication_log_service.get_communication_log(solution_id)
-    return render_template(
-        "solutions/communication_log.html",
-        solution_id=solution_id,
-        entries=entries,
-    ), 200
+    return redirect("/solutions/%d#record-notes" % solution_id)
