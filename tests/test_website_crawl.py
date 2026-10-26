@@ -563,3 +563,64 @@ def test_the_name_confidence_is_not_100_percent_when_the_home_page_gives_none(ma
         assert names[0]["confidence_basis"] == "default"
     finally:
         site.stop()
+
+
+# ---------------------------------------------------------------- the name read from a page title (crawl03)
+
+_LONG = 900  # a page with real text on it
+
+
+@pytest.mark.parametrize("title, url, name, at_least", [
+    ("Cal.com | Scheduling Software for Online…", "https://cal.com/", "Cal.com", 0.9),
+    ("Scheduling Software for Online Meetings – Cal.com", "https://www.cal.com/", "Cal.com", 0.9),
+    ("PostHog - How developers build successful products", "https://posthog.com/", "PostHog", 0.9),
+    ("Linear | Plan and build products", "https://linear.app/", "Linear", 0.9),
+    ("Brand | tagline", "http://127.0.0.1:8123/", "Brand", 0.7),
+])
+def test_a_page_title_with_a_tagline_gives_the_company_name_at_a_confidence_that_is_ticked(title, url, name, at_least):
+    from app.modules.organization.website_crawl.service import _home_page_company_name
+
+    got = _home_page_company_name({"url": url, "static": {"title": title, "text_length": _LONG}})
+    assert got is not None and got["value"] == name, got
+    assert got["confidence"] is not None and got["confidence"] >= at_least, got
+
+
+def test_a_title_that_is_only_a_sentence_is_not_cut_and_stays_unsure():
+    from app.modules.organization.website_crawl.service import _home_page_company_name
+
+    got = _home_page_company_name({"url": "http://127.0.0.1:8123/", "static": {
+        "title": "Scheduling software for online meetings and teams", "text_length": _LONG}})
+    assert got["value"] == "Scheduling software for online meetings and teams" and got["confidence"] is None
+
+
+_BRAND_PAGES = {
+    "/": (200, "text/html", """<!doctype html><html><head><title>Brand | Plans that run themselves</title></head>
+<body><h1>Plans that run themselves</h1><p>%s</p></body></html>""" % ("We help small teams plan their work together. " * 10)),
+    "/robots.txt": (200, "text/plain", ""),
+}
+
+
+def test_the_crawl_proposes_the_brand_from_a_branded_title_ticked_for_the_person(make_org):
+    import json as _json
+
+    from app.modules.organization.website_crawl import crawl_organization_website, pending_website_proposals
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return _json.dumps({"business_model": {}, "company_stage": {}, "technology_stack": {}, "competitive_positioning": {},
+                                "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return _json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return _json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        return _json.dumps({"company": {}, "field_confidence": {}})
+
+    site = _Site(_BRAND_PAGES)
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=model)
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert [r["value"] for r in names] == ["Brand"], names
+        assert names[0]["confidence"] >= 0.5  # the sign-up ticks a fact from half up
+    finally:
+        site.stop()

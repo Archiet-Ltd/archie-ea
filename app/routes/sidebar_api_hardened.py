@@ -30,6 +30,16 @@ _VALID_ARCHIMATE_LAYERS = {
     "implementation",
 }
 
+# Type labels for search results: PascalCase-to-words fallback, plus overrides where
+# the automatic conversion would be wrong (ApplicationComponent -> Application, not
+# "Application Component"; CourseOfAction -> Course of Action, not "Course Of Action").
+_TYPE_OVERRIDES = {
+    "ApplicationComponent": "Application",
+    "CourseOfAction": "Course of Action",
+}
+
+import re as _re
+
 logger = logging.getLogger(__name__)
 
 sidebar_api_bp = Blueprint("sidebar_api", __name__, url_prefix="/api/sidebar")
@@ -479,6 +489,101 @@ def get_quick_access_items():
         return jsonify({"error": "Internal server error"}), 500
 
 
+def _search_filter(query, model_class, column, org_id, limit=100):
+    """
+    Two-pass candidate search so an exact name is never lost to a limit:
+    1. Exact-substring match on the normalised name (ilike %query%) — up to `limit`,
+       ordered so exact and prefix matches come first.
+    2. Fill the remainder from a 3-letter-chunk OR query ordered by the number of
+       chunks matched (CASE sum DESC), then exact/prefix/name, excluding ids already found.
+    Returns at most `limit` rows from the model, with exact matches first.
+    """
+    from sqlalchemy import case, func, or_
+    from app.utils.search_text import normalise_search_text
+
+    q_norm = normalise_search_text(query)
+
+    # Ordering for both passes: exact match first, then prefix, then shorter names, then alphabetical
+    exact_order = case((func.lower(column) == q_norm, 0), else_=1)
+    prefix_order = case((func.lower(column).ilike(q_norm + "%"), 0), else_=1)
+
+    # Pass 1: exact-substring match — catches exact names and close spellings
+    exact_matches = (
+        model_class.query
+        .filter(model_class.organization_id == org_id)
+        .filter(column.ilike(f"%{q_norm}%"))
+        .order_by(exact_order, prefix_order, func.length(column), column)
+        .limit(limit)
+        .all()
+    )
+
+    remaining = limit - len(exact_matches)
+    if remaining <= 0:
+        return list(exact_matches)
+
+    exact_ids = {row.id for row in exact_matches}
+
+    # Pass 2: 3-letter chunks, ordered by how many chunks hit, then exact/prefix/name
+    words = [w for w in q_norm.split() if len(w) >= 3]
+    if not words:
+        return list(exact_matches)
+
+    chunks = []
+    for w in words:
+        for i in range(len(w) - 2):
+            chunks.append(w[i : i + 3])
+
+    if not chunks:
+        return list(exact_matches)
+
+    # Unique chunks while preserving the list order for the CASE sum
+    seen = set()
+    unique_chunks = []
+    for c in chunks:
+        if c not in seen:
+            seen.add(c)
+            unique_chunks.append(c)
+
+    # Build CASE sum: +1 for each chunk that ilike-matches the column
+    chunk_sum = case((column.ilike(f"%{unique_chunks[0]}%"), 1), else_=0)
+    for c in unique_chunks[1:]:
+        chunk_sum = chunk_sum + case((column.ilike(f"%{c}%"), 1), else_=0)
+
+    chunk_or = or_(*[column.ilike(f"%{c}%") for c in unique_chunks])
+
+    # Exclude ids already found in pass 1
+    base = (
+        model_class.query
+        .filter(model_class.organization_id == org_id)
+        .filter(chunk_or)
+    )
+    if exact_ids:
+        base = base.filter(~model_class.id.in_(exact_ids))
+
+    chunk_matches = (
+        base
+        .order_by(chunk_sum.desc(), exact_order, prefix_order, func.length(column), column)
+        .limit(remaining)
+        .all()
+    )
+
+    return list(exact_matches) + chunk_matches
+
+
+def _type_label(element_type):
+    """Plain-word label for an ArchiMate element type."""
+    if not element_type:
+        return "ArchiMate Element"
+    if element_type in _TYPE_OVERRIDES:
+        return _TYPE_OVERRIDES[element_type]
+    # PascalCase -> "Pascal Case", then lowercase trailing words as a sentence
+    words = _re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type).split()
+    if not words:
+        return element_type
+    return " ".join([words[0]] + [w.lower() for w in words[1:]])
+
+
+
 @sidebar_api_bp.route("/search", methods=["GET"])
 @login_required
 @rate_limit(calls_per_minute=60)
@@ -488,82 +593,56 @@ def api_global_search():
     if len(q) < 2:
         return jsonify({"error": "Query parameter 'q' must be at least 2 characters"}), 400
 
-    limit_per_type = 5
-    pattern = f"%{q}%"
     results = []
 
     try:
+        from app.middleware.tenant_context import current_org_id
+        org_id = current_org_id()
+        if not org_id:
+            return jsonify({"results": [], "total_count": 0})
+
+        # Two-pass DB-side candidate filter: exact-substring match first,
+        # then chunk query ordered by CASE sum, so an exact name in a large
+        # organisation is never lost to the limit.
+        fetch_limit = 100
+
         # Applications
         try:
-            apps = (
-                ApplicationComponent.query
-                .filter(ApplicationComponent.name.ilike(pattern))
-                .limit(limit_per_type)
-                .all()
-            )
+            apps = _search_filter(q, ApplicationComponent, ApplicationComponent.name, org_id, fetch_limit)
             for a in apps:
-                results.append({"type": "application", "id": a.id, "name": a.name, "url": f"/applications/{a.id}"})
+                results.append({"type": "Application", "id": a.id, "name": a.name, "url": f"/applications/{a.id}"})
         except Exception as e:
             logger.debug(f"Search skip applications: {e}")
 
         # Capabilities
         try:
             from app.models.unified_capability import UnifiedCapability
-            caps = (
-                UnifiedCapability.query
-                .filter(UnifiedCapability.name.ilike(pattern))
-                .limit(limit_per_type)
-                .all()
-            )
+            caps = _search_filter(q, UnifiedCapability, UnifiedCapability.name, org_id, fetch_limit)
             for c in caps:
-                # P-10: #cap-{id} was a dead fragment — capabilities.html has no
-                # per-row id="cap-N" anchor to scroll to, so this landed on the
-                # capability map with no indication a specific row was ever
-                # matched. Link to the real page rather than a fake deep link;
-                # the page itself is the correct destination until an anchor
-                # exists to jump to.
-                results.append({"type": "capability", "id": c.id, "name": c.name, "url": "/capability-map"})
+                results.append({"type": "Capability", "id": c.id, "name": c.name, "url": "/capability-map"})
         except Exception as e:
             logger.debug(f"Search skip capabilities: {e}")
 
         # Solutions
         try:
             from app.models.truly_missing_models import Solution
-            sols = (
-                Solution.query
-                .filter(Solution.name.ilike(pattern))
-                .limit(limit_per_type)
-                .all()
-            )
+            sols = _search_filter(q, Solution, Solution.name, org_id, fetch_limit)
             for s in sols:
-                results.append({"type": "solution", "id": s.id, "name": s.name, "url": f"/solutions/{s.id}"})
+                results.append({"type": "Solution", "id": s.id, "name": s.name, "url": f"/solutions/{s.id}"})
         except Exception as e:
             logger.debug(f"Search skip solutions: {e}")
 
-        # ArchiMate elements
+        # ArchiMate elements — labelled with their actual type in plain words
         try:
             from app.models.models import ArchiMateElement
-            elems = (
-                ArchiMateElement.query
-                .filter(ArchiMateElement.name.ilike(pattern))
-                .limit(limit_per_type)
-                .all()
-            )
+            elems = _search_filter(q, ArchiMateElement, ArchiMateElement.name, org_id, fetch_limit)
             for e in elems:
-                # P-10: /archimate/elements/{id} does not exist as a page route
-                # (only /archimate/elements with no id, and /api/archimate/...
-                # variants) — every archimate_element result 404'd. The real
-                # detail page is archimate_crud.detail_element(layer,
-                # element_type, element_id); element_type only has to be a
-                # non-empty string (it falls back to the ArchiMateElement table
-                # when it doesn't match a registered model), but layer must be
-                # one of the seven ArchiMate layers or the route 404s before it
-                # even queries anything.
                 layer = (e.layer or "").lower()
                 if layer not in _VALID_ARCHIMATE_LAYERS:
                     layer = "application"
                 url = f"/architecture/{layer}/element/{e.id}"
-                results.append({"type": "archimate_element", "id": e.id, "name": e.name, "url": url})
+                elem_type = _type_label(e.type)
+                results.append({"type": elem_type, "id": e.id, "name": e.name, "url": url})
         except Exception as e:
             logger.debug(f"Search skip archimate elements: {e}")
 
@@ -593,7 +672,28 @@ def api_global_search():
         except Exception as e:
             logger.debug(f"Search skip pages: {e}")
 
-        return jsonify({"results": results, "total_count": len(results)})
+        # Apply fuzzy matching to records (non-module results) and re-rank
+        from app.utils.search_text import fuzzy_match_score, normalise_search_text
+        q_norm = normalise_search_text(q)
+
+        modules = [r for r in results if r["type"] == "module"]
+        records = [r for r in results if r["type"] != "module"]
+
+        # Score records with fuzzy matching
+        scored_records = []
+        for idx, r in enumerate(records):
+            exact, fuzzy = fuzzy_match_score(q_norm, normalise_search_text(r["name"]))
+            if exact > 0 or fuzzy > 0:
+                scored_records.append((-exact, -fuzzy, idx, r))
+
+        # Sort: exact matches first, then fuzzy matches, then by original order
+        scored_records.sort()
+        top_records = [r for _, _, _, r in scored_records[:5]]
+
+        # Combine: pages first, then top records
+        final_results = modules + top_records
+
+        return jsonify({"results": final_results, "total_count": len(final_results)})
 
     except Exception as e:
         logger.error(f"Error in global search: {e}", exc_info=True)
