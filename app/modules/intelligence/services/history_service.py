@@ -35,6 +35,8 @@ AUDITED_TABLES = {
     "application_component": "Application",
     "unified_capabilities": "Capability",
     "business_capability": "Business capability",
+    "solution": "Solution",
+    "user": "User",
 }
 _MODEL_TABLES = ("archimate_elements", "archimate_relationships")
 _ACTIONS = {"create": "insert", "update": "update", "delete": "delete"}

@@ -10,6 +10,7 @@ queue, so this page and the dashboard read one record of how far each source has
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -18,8 +19,11 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app import db
 
+_log = logging.getLogger(__name__)
+
 GITHUB_TASK = "onboarding_github_import"
 JIRA_TASK = "onboarding_jira_import"
+WEBSITE_TASK = "website_profile_crawl"
 
 # (key, label, starter capability model). The model is the one starter set the industry picks
 # later; this round only records the choice.
@@ -49,6 +53,27 @@ FRAMEWORKS = (
 )
 
 KINDS = (("startup", "Startup"), ("scaleup", "Scale-up"), ("enterprise", "Enterprise"))
+
+# Which frameworks suit a first goal and a company kind; the sign-up step offers only these (the rest stay in Settings).
+FRAMEWORKS_FOR_GOAL = {
+    "understand": ("archimate", "togaf"),
+    "change": ("togaf", "safe", "archimate"),
+    "cost": ("itil4", "cobit2019"),
+    "audit": ("iso27001", "soc2", "gdpr", "nistcsf"),
+    "strategy": ("togaf", "archimate"),
+}
+FRAMEWORKS_FOR_KIND = {
+    "startup": ("soc2", "safe"),
+    "scaleup": ("soc2", "iso27001", "safe"),
+    "enterprise": ("iso27001", "cobit2019", "itil4", "togaf"),
+}
+
+
+def suggested_frameworks(kind: Optional[str], goal: Optional[str]) -> List[str]:
+    """The framework keys worth offering for this goal and company kind, goal first."""
+    keys = list(FRAMEWORKS_FOR_GOAL.get(goal or "understand", ())) + list(FRAMEWORKS_FOR_KIND.get(kind or "startup", ()))
+    return list(dict.fromkeys(keys))
+
 
 _KIND_KEYS = {key for key, _label in KINDS}
 _INDUSTRY_KEYS = {key for key, _label, _model in INDUSTRIES}
@@ -82,7 +107,15 @@ def choices(org) -> Dict[str, Any]:
 
 def settings_card(org) -> Dict[str, Any]:
     """What Settings shows so the two choices can be changed after sign-up."""
-    return {"kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org)}
+    from app.modules.organization import public_signals
+    from app.modules.organization.website_crawl import confirm
+
+    return {
+        "kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org),
+        "profile": confirm.profile_entries(org),
+        "company_name": public_signals.company_name(org),
+        "signals": public_signals.signals_for_profile(org.id), "signals_state": public_signals.refresh_state(org),
+    }
 
 
 def save_choices(
@@ -134,7 +167,20 @@ def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int])
     state["website"] = {"url": url, "consent_by": user_id, "consent_at": datetime.utcnow().isoformat()}
     _write(org, "onboarding", state)
     db.session.commit()
+    _queue_reading(org.id)
     return url
+
+
+def _queue_reading(org_id: int) -> None:
+    """Start reading the site in the background. A queue that is down never stops the person moving on."""
+    from app.modules.organization.website_crawl import CrawlRefused, queue_website_crawl
+
+    try:
+        queue_website_crawl(org_id)
+    except CrawlRefused:
+        _log.info("website not read for organisation %s", org_id, exc_info=True)
+    except Exception:
+        _log.warning("could not queue the website reading for organisation %s", org_id, exc_info=True)
 
 
 def mark_finished(org) -> None:
@@ -274,14 +320,98 @@ def sources(org) -> List[Dict[str, Any]]:
     rows.append({"key": "github", "label": "GitHub", **github})
     jira = _source_state(org.id, JIRA_TASK, "Jira", lambda r: "Read %s issues." % r.get("issues", 0))
     rows.append({"key": "jira", "label": "Jira", **jira})
-    site = _onboarding(org).get("website")
-    rows.append({
-        "key": "website",
-        "label": "Company website",
-        "state": "waiting" if site else "not_given",
-        "text": "%s will be read soon. Nothing from it is in your model yet." % site["url"] if site else "Not given.",
-    })
+    rows.append({"key": "website", "label": "Company website", **website_state(org)})
     return rows
+
+
+# Why a site could not be read, in words a person can act on, by the reason the reading gives.
+_WEBSITE_REASONS = {
+    "robots": "%s asks readers like ours to stay out, in its robots.txt, so we have not read it.",
+    "no_answer": "%s did not answer when we tried to read it.",
+    "blocked": "%s is an address we cannot read from here.",
+    "script_only": "%s builds its pages with scripts, and the browser we use could not show them, so nothing could be read.",
+    "nothing_found": "We read %s but found no facts we could state with confidence.",
+    "no_consent": "%s has not been agreed to be read yet.",
+    "no_site": "No website is recorded yet.",
+}
+_INSTEAD = " You can connect GitHub or Jira instead, or look around the sample company."
+
+
+def _host(url: str) -> str:
+    parts = urlparse(url)
+    return parts.netloc + (parts.path if parts.path not in ("", "/") else "")
+
+
+def _address(url: Optional[str]) -> str:
+    """A page address as a person reads it: no scheme."""
+    return (url or "").replace("https://", "").replace("http://", "").rstrip("/")
+
+
+def website_instead() -> List[Dict[str, str]]:
+    """What a person can do when their website cannot be read: each opens a page with content."""
+    from flask import url_for
+
+    return [
+        {"label": "Connect GitHub", "url": url_for("account.welcome") + "#signup-github"},
+        {"label": "Connect Jira", "url": url_for("account.welcome") + "#signup-jira"},
+        {"label": "See the sample company", "url": url_for("unified_ai_chat.index")},
+    ]
+
+
+def website_state(org) -> Dict[str, Any]:
+    """How far the reading of the company website has got, in a sentence a person can read, with the
+    counts behind it and what to do next: confirm what was read, or, when the site could not be read,
+    what to do instead."""
+    from flask import url_for
+
+    from app.models.job import JobStatus
+    from app.modules.organization.website_crawl import confirm
+    from app.services.job_queue_service import get_job_queue_service
+
+    site = _onboarding(org).get("website")
+    if not site:
+        return {"state": "not_given", "text": "Not given."}
+    host = _host(site["url"])
+    jobs = get_job_queue_service().list_jobs(org.id, limit=1, task=WEBSITE_TASK)
+    if not jobs:
+        return {"state": "waiting", "text": "%s will be read in a moment. Nothing from it is in your model until you confirm it." % site["url"]}
+    job = jobs[0]
+    result = job.result or {}
+    if job.status == JobStatus.COMPLETED.value and result.get("success") is not False:
+        facts, _completeness = confirm.proposals(org.id)
+        read = result.get("pages_read", 0)
+        pages = "%s %s" % (read, "page" if read == 1 else "pages")
+        if facts:
+            return {
+                "state": "done",
+                "text": "Read %s; %s %s for you to confirm in the next step." % (
+                    pages, len(facts), "fact waits" if len(facts) == 1 else "facts wait"),
+                "next": {"label": "Confirm what we read", "url": url_for("account.welcome", step=3)},
+                "progress": {"read": read, "limit": read, "percent": 100},
+            }
+        return {"state": "done", "text": "Read %s. What was found is confirmed and in your profile." % pages}
+    if job.status in (JobStatus.FAILED.value, JobStatus.CANCELLED.value) or result.get("success") is False:
+        reason = result.get("reason")
+        if reason in _WEBSITE_REASONS:
+            sentence = _WEBSITE_REASONS[reason] % host if "%s" in _WEBSITE_REASONS[reason] else _WEBSITE_REASONS[reason]
+            if reason == "no_answer" and result.get("status"):
+                sentence = "%s answered with an error (status %s) when we tried to read it." % (host, result["status"])
+        else:
+            sentence = "Something went wrong while reading %s, and nothing was added to your model." % host
+        return {"state": "failed", "text": sentence + _INSTEAD, "instead": website_instead()}
+    if job.status == JobStatus.IN_PROGRESS.value:
+        progress = result.get("progress") or {}
+        limit = int(progress.get("limit") or 30)
+        read = int(progress.get("pages_read") or 0)
+        percent = min(100, int(round(100.0 * read / limit))) if limit else 0
+        if progress.get("stage") == "working_out":
+            text = "Read %d of up to %d pages. Working out what they say; this takes a minute." % (read, limit)
+        elif read == 0:
+            text = "Opening %s. Up to %d pages will be read." % (_address(progress.get("current")) or host, limit)
+        else:
+            text = "Read %d of up to %d pages. Reading now: %s." % (read, limit, _address(progress.get("current")))
+        return {"state": "reading", "text": text, "progress": {"read": read, "limit": limit, "percent": percent}}
+    return {"state": "waiting", "text": "Company website is connected. Reading starts in a moment; carry on."}
 
 
 def any_source_given(org) -> bool:

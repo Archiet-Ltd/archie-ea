@@ -131,3 +131,7 @@ table.selectable tr:hover {
 
 /* Alpine.js: hide elements with x-cloak until Alpine initializes */
 [x-cloak] { display: none !important; }
+
+/* The account avatar's initial is drawn from data-initial so a screen reader's name for the
+   account menu is the words beside it, not a stray letter (WCAG 2.5.3 label in name). */
+.avatar-initial::before { content: attr(data-initial); }

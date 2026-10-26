@@ -3244,6 +3244,8 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/button.html",
+    "components/input.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -3577,6 +3579,8 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/button.html",
+    "components/input.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -6937,8 +6941,12 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/empty_state.html",
-    "components/page_header.html"
+    "components/input.html",
+    "components/page_header.html",
+    "components/select.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -9298,6 +9306,9 @@
     "form-macros:Replace"
    ],
    "macros": [
+    "components/button.html",
+    "components/checkbox.html",
+    "components/input.html",
     "components/page_header.html",
     "macros/form_macros.html"
    ],
@@ -10029,6 +10040,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/card.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -10038,7 +10052,8 @@
    "macros": [
     "components/card.html",
     "components/filter_bar.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/table.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -11027,6 +11042,8 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/button.html",
+    "components/input.html",
     "macros/page_shell.html"
    ],
    "original": "preview",
@@ -13751,7 +13768,10 @@
    ],
    "macros": [
     "components/breadcrumb_nav.html",
+    "components/button.html",
     "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
     "macros/page_shell.html"
    ],
    "original": "preview",
@@ -14138,6 +14158,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -14146,7 +14169,8 @@
    ],
    "macros": [
     "components/empty_state.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/table.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -20503,7 +20527,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/card.html"
+    "components/card.html",
+    "components/progress.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
@@ -20513,8 +20538,15 @@
    "macros": [
     "components/badge.html",
     "components/breadcrumb.html",
+    "components/button.html",
     "components/card.html",
+    "components/checkbox.html",
+    "components/dialog.html",
+    "components/input.html",
     "components/page_header.html",
+    "components/progress.html",
+    "components/select.html",
+    "components/table.html",
     "components/tabs.html"
    ],
    "original": "example:tasks",
@@ -20622,6 +20654,9 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
+    "components/checkbox.html",
+    "components/input.html",
+    "components/select.html",
     "components/table.html"
    ],
    "frame": "dashboard-01",
@@ -20635,10 +20670,13 @@
     "components/badge.html",
     "components/button.html",
     "components/card.html",
+    "components/checkbox.html",
+    "components/input.html",
     "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
     "components/progress.html",
+    "components/select.html",
     "components/skeleton.html",
     "components/table.html"
    ],
@@ -20752,6 +20790,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G3",
    "inhouse_components": [
@@ -20761,11 +20802,14 @@
    ],
    "macros": [
     "components/badge.html",
+    "components/button.html",
     "components/card.html",
     "components/detail_meta.html",
+    "components/dialog.html",
     "components/metrics_card.html",
     "components/progress.html",
     "components/skeleton.html",
+    "components/table.html",
     "components/tabs.html",
     "macros/page_shell.html"
    ],
@@ -20883,8 +20927,12 @@
    ],
    "macros": [
     "components/breadcrumb.html",
+    "components/button.html",
     "components/card.html",
+    "components/checkbox.html",
+    "components/input.html",
     "components/page_header.html",
+    "components/select.html",
     "components/tabs.html"
    ],
    "original": "preview",
@@ -26174,6 +26222,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -26182,9 +26233,12 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/card.html",
     "components/metrics_card.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/progress.html",
+    "components/table.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -35906,7 +35960,9 @@
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [],
-   "macros": [],
+   "macros": [
+    "components/card.html"
+   ],
    "original": "gap:G-1",
    "page_type": "public",
    "pattern_gap": "G-1: no pattern yet for a public page",
@@ -36302,6 +36358,10 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/input.html",
+    "components/table.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -36309,7 +36369,10 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/empty_state.html",
+    "components/input.html",
+    "components/table.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
@@ -37740,7 +37803,9 @@
    "macros": [
     "components/public_faq.html",
     "components/public_footer.html",
-    "components/public_navbar.html"
+    "components/public_navbar.html",
+    "components/radio_group.html",
+    "components/table.html"
    ],
    "original": "gap:G-1",
    "page_type": "public",
@@ -37814,6 +37879,7 @@
     "public-navbar:Compose"
    ],
    "macros": [
+    "components/card.html",
     "components/public_footer.html",
     "components/public_navbar.html"
    ],

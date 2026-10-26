@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -20,7 +21,7 @@
         {% call card_content() %}
             <form method="POST" id="createForm" class="space-y-6">
                 {{ form.hidden_tag() if form.hidden_tag is defined else '' }}
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
 
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
@@ -89,10 +90,10 @@
                             {{ form[field_id](id=field_id, class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='Search by name or email...', autocomplete='off', **{'@input.debounce.300ms': 'usearch()', '@focus': 'usearch()'}) if form[field_id] is defined else '' }}
                             <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                                 <template x-for="u in ures" :key="u.id">
-                                    <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
+                                    {% call button(variant='bare', size='bare', class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between", attrs_dict={"@click": ("uselect(u)")}) %}
                                         <span x-text="u.name" class="font-medium"></span>
                                         <span x-text="u.email" class="text-xs text-muted-foreground"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>

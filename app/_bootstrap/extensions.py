@@ -384,6 +384,28 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Company signals: each organisation that agreed to its public footprint being read has its
+        # sources refreshed once a day. It declares its organisation per run through
+        # run_for_each_tenant (public_signals.refresh_all), which scopes every organisation in turn.
+        def run_company_signals():
+            with app.app_context():
+                try:
+                    from app.modules.organization.public_signals import refresh_all
+
+                    refresh_all(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler company-signals error: %s", exc)
+
+        scheduler.add_job(
+            func=run_company_signals,
+            trigger=CronTrigger(hour=3, minute=30),
+            id="company_signals_refresh",
+            name="Company public signals refresh",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # PLT-031: Weekly executive summary (Monday 7am UTC). Declares its
         # organisation per run via run_for_each_tenant / tenant_scope, same as
         # the maturity digest above.

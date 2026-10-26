@@ -1,6 +1,7 @@
 {# smoke-coverage-ok: account settings page -- display preferences toggle is a non-visual preference, tested by tests/test_plain_language.py unit tests #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Account Settings{% endblock %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/company_kind.html' import company_kind_picker %}
 {% from 'components/card.html' import card, card_content with context %}
@@ -11,6 +12,8 @@
 {% block extra_head_js %}<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>{% endblock %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/input.html' import label %}
@@ -40,7 +43,7 @@
 {% macro user_info(user) %}
     {% call card() %}
     {% call card_content() %}
-            <div class="space-y-4">
+            <dl class="space-y-4">
                 <div class="flex justify-between items-start py-3 border-b border-border">
                     <dt class="font-medium text-sm text-muted-foreground">Full name</dt>
                     <dd class="text-sm">{{ user.full_name() }}</dd>
@@ -58,7 +61,7 @@
                         {% endif %}
                     </dd>
                 </div>
-            </div>
+            </dl>
     {% endcall %}
     {% endcall %}
 
@@ -138,6 +141,69 @@
         {% endcall %}
     </div>
     <script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>
+
+    {% if company.profile %}
+    <div class="mt-6" data-testid="company-profile-card">
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Company profile{% endcall %}
+                {% call card_description() %}What you confirmed from your website, and the page each fact came from.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                {% call dense_table(columns=[('Fact', ''), ('Value', ''), ('Source', '')], caption='Company profile', testid='company-profile-table', rows=company.profile|length, max_height='24rem', flush=true) %}
+                    {% for entry in company.profile %}
+                    <tr class="h-12">
+                        <td class="px-2 align-middle font-medium whitespace-nowrap">{{ entry.label }}</td>
+                        <td class="px-2 align-middle">{{ entry.text }}</td>
+                        <td class="px-2 align-middle max-w-64 truncate">{% if entry.source == 'person' %}Corrected by {{ entry.confirmed_by_name }}{% else %}<a href="{{ entry.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ entry.source_url | replace('https://', '') | replace('http://', '') }}</a>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+
+    {# Public signals: news, filings, patents, research and public mentions about the company, each with its source and date. #}
+    {% set sig_state = company.signals_state %}
+    {% if sig_state.agreed %}
+    <div class="mt-6" data-testid="company-signals-card">
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Public signals{% endcall %}
+                {% call card_description() %}What the public sources say about {{ company.company_name or current_user.organization.name }}, with where each came from and when. Read once a day{% if sig_state.refreshed_at %}; last read {{ sig_state.refreshed_at.strftime('%d %b %Y') }}{% endif %}.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                {% if company.signals %}
+                {% call dense_table(columns=[('Signal', ''), ('Informs', '')], caption='Public signals', testid='company-signals-table', rows=company.signals|length, max_height='28rem', flush=true) %}
+                    {% for sig in company.signals %}
+                    <tr class="min-h-12 border-b border-border last:border-0" data-signal-kind="{{ sig.kind }}">
+                        <td class="px-2 py-2 align-top">
+                            {% if sig.url %}<a href="{{ sig.url }}" class="font-medium text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ sig.title }}</a>{% else %}<span class="font-medium">{{ sig.title }}</span>{% endif %}
+                            <p class="mt-0.5 text-xs text-muted-foreground" data-testid="signal-cite">{{ sig.source }} &middot; {% if sig.published_at %}{{ sig.published_at.strftime('%d %b %Y') }}{% else %}read {{ sig.fetched_at.strftime('%d %b %Y') }}{% endif %}</p>
+                        </td>
+                        <td class="px-2 py-2 align-top">
+                            <div class="flex flex-wrap gap-1">
+                            {% if sig.pestle_factor %}{% call badge('neutral') %}{{ sig.pestle_factor | capitalize }}{% endcall %}{% endif %}
+                            {% if sig.swot_quadrant %}{% call badge('info') %}{{ sig.swot_quadrant | capitalize }}{% endcall %}{% endif %}
+                            {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-xs text-muted-foreground" data-testid="signal-informs-none">Not matched to PESTLE or SWOT</span>{% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endcall %}
+                {% elif not company.company_name %}
+                {{ empty_state(icon='newspaper', title='Confirm your company name first', description='The public sources are searched for the company name you confirm from your website, so nothing has been read yet.', compact=True, class='py-6') }}
+                {% else %}
+                {{ empty_state(icon='newspaper', title='No public signals have been read yet', description='Your company agreed to its public footprint being read. The sources are read once a day, and again when you confirm your profile. Read them now to see the first signals.', cta_text='Read the public sources now', cta_href=url_for('account.signals_refresh'), cta_method='post', compact=True, class='py-6') }}
+                {% endif %}
+                {% if sig_state.some_unread %}
+                <p class="mt-3 text-xs text-muted-foreground" data-testid="company-signals-left-out">Some public sources could not be read today; we try again tomorrow.</p>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
     {% endif %}
 
     {# Security Information -- Last Login #}
@@ -145,7 +211,7 @@
     {% call card() %}
     {% call card_content() %}
             <h3 class="text-sm font-semibold mb-4">Security Information</h3>
-            <div class="space-y-4">
+            <dl class="space-y-4">
                 {# V-06: sourced from the audit log (soc2_audit_log), the same store
                    /admin/audit-log reads, so the two cannot disagree. An em dash means
                    "no prior login recorded" -- never a fabricated placeholder. #}
@@ -187,7 +253,7 @@
                         {% endif %}
                     </dd>
                 </div>
-            </div>
+            </dl>
     {% endcall %}
     {% endcall %}
     </div>
@@ -219,7 +285,7 @@
                             </div>
                             <div class="flex-shrink-0 pt-0.5">
                                 {{ switch(id='pref_' + pref_key + '_btn', bind_checked='checked', on_click='checked = !checked', aria_label=pref_label) }}
-                                {{ input(type='checkbox', id='pref_' + pref_key, name=pref_key, value='on',
+                                {{ input(type='checkbox', id='pref_' + pref_key, name=pref_key, value='on', aria_label=pref_label,
                                           class='sr-only', attrs_dict={'x-model': 'checked'}) }}
                             </div>
                         </div>
@@ -252,7 +318,7 @@
                         </div>
                         <div class="flex-shrink-0 pt-0.5">
                             {{ switch(id='pref_show_archimate_btn', bind_checked='checked', on_click='checked = !checked', aria_label='Show ArchiMate names') }}
-                            {{ input(type='checkbox', id='pref_show_archimate', name='show_archimate_names', value='on',
+                            {{ input(type='checkbox', id='pref_show_archimate', name='show_archimate_names', value='on', aria_label='Show ArchiMate names',
                                       class='sr-only', attrs_dict={'x-model': 'checked'}) }}
                         </div>
                     </div>

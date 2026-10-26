@@ -26,7 +26,7 @@ TRUTH_CLASS_SYNCHRONISED = "synchronised"
 # that recompute a value from other rows are "derived". Nothing in this
 # catalogue reads from a sync-mirror table today, so "synchronised" is
 # available for a future entry but unused here — never guessed per row.
-_DRAWN_SOURCE_TABLES = {"application_owners", "application_components"}
+_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile"}
 
 
 def truth_class_for(source_table: Optional[str]) -> str:
@@ -727,6 +727,103 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     }
 
 
+# What each plain question about the company asks for: the profile fields that answer it, in the order shown.
+PROFILE_TOPICS = {
+    "products": ("What do we sell?", "what the company sells",
+                 ("product", "value_proposition", "business_model", "revenue_model", "tagline")),
+    "customers": ("Who are our customers?", "who the company's customers are",
+                  ("target_market", "market_segment", "case_study")),
+    "location": ("Where are we based?", "where the company is based",
+                 ("hq_address", "hq_city", "hq_region", "hq_country", "geographic_focus")),
+    "technology": ("What technology does our website use?", "the technology the company's website uses", ("technology",)),
+    "leaders": ("Who leads the company?", "who leads the company", ("key_person",)),
+    "overview": ("What do we know about our company?", "what is known about the company", None),
+}
+
+
+def _read_on(fetched_at: Optional[str]) -> Optional[str]:
+    from datetime import datetime
+
+    try:
+        when = datetime.fromisoformat(str(fetched_at))
+    except (TypeError, ValueError):
+        return None
+    return "%d %s" % (when.day, when.strftime("%b %Y"))
+
+
+def _address(url: Optional[str]) -> str:
+    return (url or "").replace("https://", "").replace("http://", "").rstrip("/")
+
+
+def _profile_next_step(organization_id: int, has_site: bool, pending: int):
+    """What lets the chat answer when the confirmed facts hold nothing for the question, and where to do it."""
+    try:
+        from flask import url_for
+
+        if pending:
+            return "Confirm what we read from your website, and the chat can answer from it.", url_for("account.welcome", step=3), "Confirm what we read"
+        if has_site:
+            return ("Your confirmed facts say nothing about this. Read your website again, or confirm more of what it states.",
+                    url_for("account.welcome"), "Read the website again")
+        return ("Give your company website, and what it states comes here to confirm.", url_for("account.welcome"), "Give your website")
+    except RuntimeError:  # outside a request there is no page to point to
+        return None, None, None
+
+
+def _company_profile(organization_id: int, topic: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"What do we sell? Who are our customers? Where are we based? What does our website use? Who leads
+    us?" Answered only from the facts a person confirmed from their own website (the organisation's
+    company profile), each cited to the page it was read from. A fact the person corrected is cited as
+    theirs. Nothing is inferred here and nothing unconfirmed is used."""
+    from app.models.organization import Organization
+    from app.modules.organization.website_crawl import confirm, pending_website_proposals
+
+    topic = topic if topic in PROFILE_TOPICS else "overview"
+    title, summary, fields = PROFILE_TOPICS[topic]
+    org = db.session.get(Organization, organization_id)
+    entries = [e for e in (confirm.profile_entries(org) if org is not None else [])
+               if fields is None or e["field"] in fields]
+    if fields:
+        order = {name: i for i, name in enumerate(fields)}
+        entries.sort(key=lambda e: order[e["field"]])
+
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    for index, entry in enumerate(entries):
+        page = entry.get("source_url")
+        read = _read_on(entry.get("fetched_at"))
+        who = entry.get("confirmed_by_name") or "a member"
+        origin = "from %s%s" % (_address(page), ", as of %s" % read if read else "")
+        line = "%s, %s by %s" % (origin, "corrected" if entry.get("corrected") else "confirmed", who)
+        name = "%s: %s" % (entry["label"], entry["text"])
+        rows.append({"id": index, "name": name, "source_line": line, "source_table": "company_profile",
+                     "truth_class": truth_class_for("company_profile")})
+        if page:
+            citations.append({"type": "page", "id": index, "name": name, "target": page, "source_line": line})
+
+    has_site = bool(((org.settings or {}).get("onboarding") or {}).get("website")) if org is not None else False
+    pending = len(pending_website_proposals(organization_id)) if not rows else 0
+    if rows:
+        reason = None
+    elif pending:
+        reason = "what was read from your website has not been confirmed yet"
+    elif has_site:
+        reason = "your confirmed facts say nothing about this yet"
+    else:
+        reason = "no company website has been read for this organisation"
+    next_step, next_url, next_label = (None, None, None) if rows else _profile_next_step(organization_id, has_site, pending)
+    return {
+        "answer": "%s, from the facts you confirmed from your website" % summary,
+        "title": title,
+        "topic": topic,
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": reason,
+        "next_step": next_step, "next_url": next_url, "next_label": next_label,
+    }
+
+
 CATALOGUE: Dict[str, CatalogueEntry] = {
     "applications_without_owner": CatalogueEntry(
         id="applications_without_owner",
@@ -769,6 +866,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="The records a GitHub connector brought into the model, by connector-stamped provenance.",
         params=[],
         run=_github_sourced_records,
+    ),
+    "company_profile": CatalogueEntry(
+        id="company_profile",
+        title="What do we know about our company?",
+        description="What the company sells, who its customers are, where it is based, what technology its site uses and who leads it, from the facts confirmed from its own website, each cited to the page it was read from.",
+        params=["topic"],
+        run=_company_profile,
     ),
     "what_breaks_if_fails": CatalogueEntry(
         id="what_breaks_if_fails",
