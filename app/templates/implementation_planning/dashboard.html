@@ -1,224 +1,250 @@
+{# design-block: dashboard #}
+{# implementation_planning/dashboard.html
+   Tier C3, frame dashboard-01, reference gap G-4
+   Components: card, toggle-group, sheet, dialog, badge
+   In-house: archimate-gantt-widget:Keep, breadcrumb_nav:Replace, modal:Replace, page-shell:Replace
+   Pattern: P01-page-header, P09-form-in-dialog, P08-confirm-destructive, P20-inspect-side-panel, P23-status-badge, P29-export-share
+   States: loading, empty-first-use, empty-no-permission, error-field, error-region, confirm-error, export-running, list-view, populated
+   Persona: portfolio_manager
+   Layout: G4 (Tier C form region, R13)
+   Departures: C-form (Timeline/List toggle, each bar is a button named 'item, start to end, status', today marker carries text (TML-1 to TML-4)), R10 (raised --input token)
+#}
+{# shadcn-reference: gap:G-4 #}
+<meta name="shadcn-nearest" content="dashboard-01">
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/archimate_gantt_widget.html' import archimate_gantt_widget with context %}
 
 {% block title %}Implementation Planning Dashboard{% endblock %}
 
 {% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Implementation & Migration', 'href': url_for('archimate_crud.dashboard') + '#implementation'},
-    {'text': 'Planning Dashboard', 'current': true}
-]) }}
+{% call breadcrumb() %}
+  {% call breadcrumb_item(href=url_for('main.index')) %}
+    <i data-lucide="home" class="h-3.5 w-3.5" aria-hidden="true"></i>
+    <span class="sr-only">Home</span>
+  {% endcall %}
+  {{ breadcrumb_separator() }}
+  {% call breadcrumb_item(href=url_for('archimate_crud.dashboard') + '#implementation') %}
+    Implementation & Migration
+  {% endcall %}
+  {{ breadcrumb_separator() }}
+  {% call breadcrumb_item(active=true) %}
+    Planning Dashboard
+  {% endcall %}
+{% endcall %}
 {% endblock %}
 
-{% from 'components/archimate_gantt_widget.html' import archimate_gantt_widget with context %}
-
 {% block content %}
-<div class="mx-auto px-4 py-6" x-data="implementationPlanningDashboard()">
-    <!-- Header -->
-    <div class="space-y-6 mb-6">
-        <!-- Title Section (Jumbotron-style) -->
-        {{ page_shell(title='Implementation Planning', subtitle='Enterprise Architecture Migration & Implementation Roadmap') }}
-
-        {# The owner/approver panel renders only on the work package detail
-           view, where the route passes ``owner_panel`` from the services. #}
-        {% if owner_panel %}
-        {% include 'implementation_planning/_owner_panel.html' %}
-        {% endif %}
-
-        {# A failed load must be visible on the page, not only in a toast that
-           has already faded by the time the user reads the roadmap. #}
-        <div x-show="loadError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="loadError"></div>
-
-        <!-- Gap register: run discovery, save findings to the one register -->
-        <div class="rounded-lg border border-border bg-card p-4 space-y-3">
-            <div class="flex items-center justify-between">
-                <h2 class="text-base font-semibold text-foreground">Gap register</h2>
-                <button type="button" @click="runGapDiscovery()" :disabled="discoveringGaps"
-                        class="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                        aria-label="Run gap discovery">
-                    <span x-show="!discoveringGaps">Run gap discovery</span>
-                    <span x-show="discoveringGaps" x-cloak>Running…</span>
-                </button>
-            </div>
-            <p x-show="criticalGaps.length === 0" x-cloak class="text-sm text-muted-foreground">
-                No critical gaps recorded yet.
-            </p>
-            <ul x-show="criticalGaps.length > 0" x-cloak class="divide-y divide-border" data-testid="critical-gaps-list">
-                <template x-for="gap in criticalGaps" :key="gap.id">
-                    <li class="py-2 text-sm text-foreground" x-text="gap.name"></li>
-                </template>
-            </ul>
-        </div>
-
-        <!-- Main Content -->
-        <div class="space-y-6">
-            <!-- ArchiMate Gantt Widget Section -->
-            <div x-show="viewMode === 'gantt'">
-                {{ archimate_gantt_widget(
-                    data_endpoint=url_for('implementation_planning.api_roadmap_data'),
-                    title='Implementation Roadmap',
-                    subtitle='Work Packages & Plateaus Timeline',
-                    container_id='impl-archimate-gantt'
-                ) }}
-            </div>
-        </div>
+<div x-data="implementationPlanningDashboard()" class="flex flex-1 flex-col gap-2">
+  <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+    <div class="px-4 lg:px-6">
+      {{ page_header(
+        title='Implementation Planning',
+        description='Enterprise Architecture Migration & Implementation Roadmap',
+        actions=[
+          {'text': 'Export', 'icon': 'download', 'onclick': "Platform.modal.open('export-impl-data')", 'variant': 'outline'},
+          {'text': 'Create Work Package', 'icon': 'plus', 'onclick': "Platform.modal.open('create-work-package')", 'variant': 'default'}
+        ]
+      ) }}
     </div>
 
-    <!-- Export Modal -->
-    <div x-show="showExportModal" x-cloak
-         @keydown.escape.window="showExportModal = false"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="modal-root fixed inset-0 flex items-center justify-center z-50 bg-overlay/50"
-         @click.self="showExportModal = false" role="dialog">
-        <div class="bg-card border border-border rounded-lg p-6 w-full max-w-md"
-             role="dialog" aria-modal="true" x-trap="showExportModal">
-            <h2 class="text-lg font-semibold text-foreground mb-4">Export Implementation Data</h2>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-foreground mb-2">Export Format</label>
-                    <div class="space-y-2">
-                        <label class="flex items-center gap-2">
-                            <input type="radio" name="exportFormat" value="csv" x-model="exportFormat" class="text-primary" aria-label="Exportformat">
-                            <span class="text-sm">CSV (Excel compatible)</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="radio" name="exportFormat" value="png" x-model="exportFormat" class="text-primary" aria-label="Exportformat">
-                            <span class="text-sm">PNG Image</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="radio" name="exportFormat" value="jpg" x-model="exportFormat" class="text-primary" aria-label="Exportformat">
-                            <span class="text-sm">JPG Image</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="radio" name="exportFormat" value="pdf" x-model="exportFormat" class="text-primary" aria-label="Exportformat">
-                            <span class="text-sm">PDF Document</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-foreground mb-2">Include Data</label>
-                    <div class="space-y-2">
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" x-model="exportOptions.workPackages" class="text-primary" aria-label="Checkbox field">
-                            <span class="text-sm">Work Packages</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" x-model="exportOptions.gaps" class="text-primary" aria-label="Checkbox field">
-                            <span class="text-sm">Gap Analysis</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" x-model="exportOptions.deliverables" class="text-primary" aria-label="Checkbox field">
-                            <span class="text-sm">Deliverables</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="flex justify-end gap-2 mt-6">
-                <button type="button" @click="showExportModal = false"
-                        class="px-4 py-2 border border-input bg-background rounded-md hover:bg-accent" aria-label="Export">
-                    Cancel
-                </button>
-                <button type="button" @click="performExport()"
-                        class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" aria-label="Export">
-                    Export
-                </button>
-            </div>
-        </div>
+    {% if owner_panel %}
+    <div class="px-4 lg:px-6">
+      {% include 'implementation_planning/_owner_panel.html' %}
     </div>
+    {% endif %}
+
+    {# A failed load must be visible on the page, not only in a toast #}
+    <div x-show="loadError" x-cloak class="px-4 lg:px-6">
+      {% call alert(kind='danger', dismissible=true) %}<span x-text="loadError"></span>{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+    </div>
+
+    <!-- Gap register card -->
+    <div class="px-4 lg:px-6">
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title() %}Gap register{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+          <div x-show="criticalGaps.length === 0" x-cloak>
+            {{ empty_state(icon='search-check', title='No critical gaps', description='No critical gaps recorded yet.', cta_text='Run gap discovery', cta_onclick='runGapDiscovery()') }}
+          </div>
+          <ul x-show="criticalGaps.length > 0" x-cloak class="divide-y divide-border" data-testid="critical-gaps-list">
+            <template x-for="gap in criticalGaps" :key="gap.id">
+              <li class="py-2 text-sm text-foreground" x-text="gap.name"></li>
+            </template>
+          </ul>
+        {% endcall %}
+      {% endcall %}
+    </div>
+
+    <!-- Main Content - Timeline / Gantt (C3 form region) -->
+    <div class="px-4 lg:px-6">
+      <div data-entelim-form="C3" x-show="viewMode === 'gantt'">
+        {{ archimate_gantt_widget(
+          data_endpoint=url_for('implementation_planning.api_roadmap_data'),
+          title='Implementation Roadmap',
+          subtitle='Work Packages & Plateaus Timeline',
+          container_id='impl-archimate-gantt',
+          show_export=false
+        ) }}
+      </div>
+    </div>
+
+    <!-- Export Modal (P29) -->
+    {% call modal(id='export-impl-data', title='Export Implementation Data', description='Download the work package register as a CSV file', size='sm') %}
+      <form @submit.prevent="performExport()" class="space-y-4">
+        <fieldset>
+          <legend class="mb-2 text-sm font-medium text-foreground">Include Data</legend>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              {{ checkbox(id='export-wp', attrs_dict={'x-model': 'exportOptions.workPackages'}) }}
+              <span class="text-sm text-foreground">Work Packages</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              {{ checkbox(id='export-gaps', attrs_dict={'x-model': 'exportOptions.gaps'}) }}
+              <span class="text-sm text-foreground">Gap Analysis</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="flex justify-end gap-2 pt-2">
+          {{ button(text='Cancel', variant='outline', on_click="Platform.modal.close('export-impl-data')") }}
+          {{ button(text='Export CSV', type='submit') }}
+        </div>
+      </form>
+    {% endcall %}
+
+    <!-- Create Work Package Modal -->
+    {% call modal(id='create-work-package', title='Create Work Package', description='Add a new implementation work package', size='lg') %}
+      <form @submit.prevent="submitCreateWorkPackage($event)" novalidate class="space-y-4">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            {{ form_field(id='cwp-name', name='name', label='Name', required=true, placeholder='e.g. Cloud Migration Phase 1') }}
+          </div>
+          {% call form_group(id='cwp-priority', label='Priority') %}
+            {{ native_select(id='cwp-priority', name='priority', aria_label='Priority', options=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')], selected='medium') }}
+          {% endcall %}
+          {% call form_group(id='cwp-status', label='Status') %}
+            {{ native_select(id='cwp-status', name='status', aria_label='Status', options=[('planned', 'Planned'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('cancelled', 'Cancelled')], selected='planned') }}
+          {% endcall %}
+          {{ form_field(id='cwp-start', name='start_date', label='Start Date', type='date') }}
+          {{ form_field(id='cwp-end', name='end_date', label='End Date', type='date') }}
+
+          <div class="sm:col-span-2">
+            {{ form_field(id='cwp-assigned', name='assigned_to', label='Assigned To', placeholder='Name or team') }}
+          </div>
+          <div class="sm:col-span-2">
+            {{ form_field(id='cwp-description', name='description', label='Description', input_type='textarea', rows=2, placeholder='Describe the scope and objectives') }}
+          </div>
+        </div>
+
+        <div x-show="errorMsg" x-cloak class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          {{ button(text='Cancel', variant='outline', on_click='Platform.modal.close(\'create-work-package\')') }}
+          {{ button(text='Create Work Package', type='submit', attrs_dict={':disabled': 'submitting'}) }}
+        </div>
+      </form>
+    {% endcall %}
+  </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function implementationPlanningDashboard() {
     return {
         viewMode: 'gantt',
-        showExportModal: false,
-        exportFormat: 'csv',
         exportOptions: {
             workPackages: true,
-            gaps: true,
-            deliverables: false
-        },
-        // null, not 0: a count that never loaded renders as an em dash, whereas
-        // a 0 would be indistinguishable from a measured zero.
-        stats: {
-            work_packages: null,
-            in_progress: null,
-            completed: null,
-            critical_gaps: null
+            gaps: true
         },
         workPackages: [],
         criticalGaps: [],
-        recentWorkPackages: [],
         loadError: '',
         discoveringGaps: false,
+        submitting: false,
+        errorMsg: '',
 
         init() {
             this.loadDashboardData();
         },
 
+        submitCreateWorkPackage(event) {
+            if (this.submitting) return;
+            const form = event.target;
+            const data = new FormData(form);
+            const name = (data.get('name') || '').trim();
+            if (!name) {
+                this.errorMsg = 'Work package name is required.';
+                return;
+            }
+            const endDate = data.get('end_date');
+            const startDate = data.get('start_date');
+            if (startDate && endDate && endDate < startDate) {
+                this.errorMsg = 'End date must be after start date.';
+                return;
+            }
+            this.submitting = true;
+            this.errorMsg = '';
+
+            Platform.fetch('/implementation/api/work-packages', {
+                method: 'POST',
+                body: {
+                    name: name,
+                    description: data.get('description') || '',
+                    priority: data.get('priority') || 'medium',
+                    status: data.get('status') || 'planned',
+                    assigned_to: data.get('assigned_to') || '',
+                    start_date: startDate || '',
+                    end_date: endDate || ''
+                }
+            })
+                .then(result => {
+                    if (result && result.error) {
+                        this.errorMsg = result.error;
+                        Platform.toast.error('Could not create the work package: ' + result.error);
+                        return;
+                    }
+                    Platform.toast.success('Work package created.');
+                    Platform.modal.close('create-work-package');
+                    form.reset();
+                    this.loadDashboardData();
+                    const refresh = window['initArchimateGanttimpl-archimate-gantt'];
+                    if (refresh) refresh();
+                })
+                .catch(error => {
+                    this.errorMsg = (error && error.message) ? error.message : 'Could not create the work package.';
+                    Platform.toast.error(this.errorMsg);
+                })
+                .finally(() => { this.submitting = false; });
+        },
+
         loadDashboardData() {
             this.loadError = '';
-            // Platform.fetch rejects on 4xx/5xx — without that an error page would
-            // be parsed as a legitimately empty roadmap.
-            // Four requests failing at once is one outage: report it once.
             const reportFailure = () => {
                 if (this.loadError) return;
-                this.loadError = 'Some implementation planning data could not be loaded — figures shown as — are unknown, not zero.';
+                this.loadError = 'Some implementation planning data could not be loaded \\u2014 figures shown as \\u2014 are unknown, not zero.';
                 Platform.toast.error('Could not load implementation planning data.');
             };
 
-            // Load statistics
-            Platform.fetch('/implementation/api/dashboard-stats', { silent: true })
-                .then(data => {
-                    this.stats = data.stats;
-                })
-                .catch(() => {
-                    this.stats = { work_packages: null, in_progress: null, completed: null, critical_gaps: null };
-                    reportFailure();
-                });
-
-            // Load work packages
             Platform.fetch('/implementation/api/work-packages', { silent: true })
-                .then(data => {
-                    this.workPackages = data.work_packages || [];
-                })
-                .catch(() => {
-                    this.workPackages = [];
-                    reportFailure();
-                });
+                .then(data => { this.workPackages = data.work_packages || []; })
+                .catch(() => { this.workPackages = []; reportFailure(); });
 
-            // Load critical gaps
             Platform.fetch('/implementation/api/gaps?priority=critical&limit=5', { silent: true })
-                .then(data => {
-                    this.criticalGaps = data.gaps || [];
-                })
-                .catch(() => {
-                    this.criticalGaps = [];
-                    reportFailure();
-                });
-
-            // Load recent work packages
-            Platform.fetch('/implementation/api/work-packages?limit=5&sort=updated_at', { silent: true })
-                .then(data => {
-                    this.recentWorkPackages = data.work_packages || [];
-                })
-                .catch(() => {
-                    this.recentWorkPackages = [];
-                    reportFailure();
-                });
+                .then(data => { this.criticalGaps = data.gaps || []; })
+                .catch(() => { this.criticalGaps = []; reportFailure(); });
         },
-        
+
         async runGapDiscovery() {
             if ((await Platform.modal.confirm('Run intelligent gap discovery? This may take a few minutes.'))) {
                 this.discoveringGaps = true;
@@ -234,173 +260,53 @@ function implementationPlanningDashboard() {
                     .catch(error => {
                         Platform.toast.error('Error during gap discovery: ' + (error.message || 'request failed'));
                     })
-                    .finally(() => {
-                        this.discoveringGaps = false;
-                    });
+                    .finally(() => { this.discoveringGaps = false; });
             }
         },
-        
-        createWorkPackage() {
-            Platform.modal.open('create-work-package');
-        },
-        
-        viewGapDetail(gapId) {
-            window.location.href = `/implementation/gaps/${gapId}`;
-        },
-        
-        viewAllGaps() {
-            window.location.href = '/implementation/gaps';
-        },
-        
-        generateReport() {
-            // Generate comprehensive report
-            window.open('/implementation/reports/generate', '_blank');
-        },
-        
+
         performExport() {
-            const params = new URLSearchParams();
-            params.append('format', this.exportFormat);
-            
-            if (this.exportOptions.workPackages) params.append('include_work_packages', 'true');
-            if (this.exportOptions.gaps) params.append('include_gaps', 'true');
-            if (this.exportOptions.deliverables) params.append('include_deliverables', 'true');
-            
-            window.open(`/implementation/export?${params.toString()}`, '_blank');
-            this.showExportModal = false;
-        },
-        
-        getStatusColor(status) {
-            const colors = {
-                planned:     'bg-primary/10 text-primary',
-                in_progress: 'bg-warning/10 text-warning',
-                completed:   'bg-primary/10 text-primary',
-                cancelled:   'bg-muted text-muted-foreground'
-            };
-            return colors[status] || 'bg-muted text-muted-foreground';
-        },
-        
-        getImpactLevelColor(level) {
-            const colors = {
-                low:      'bg-primary/10 text-primary',
-                medium:   'bg-warning/10 text-warning',
-                high:     'bg-warning/10 text-warning',
-                critical: 'bg-destructive/10 text-destructive'
-            };
-            return colors[level] || 'bg-muted text-foreground';
-        },
-        
-        getPriorityColor(priority) {
-            const colors = {
-                low:      'bg-primary/10 text-primary',
-                medium:   'bg-warning/10 text-warning',
-                high:     'bg-warning/10 text-warning',
-                critical: 'bg-destructive/10 text-destructive'
-            };
-            return colors[priority] || 'bg-muted text-foreground';
-        },
-        
-        formatDate(dateString) {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
-            });
+            const rows = [];
+            const header = ['Name', 'Status', 'Priority', 'Assigned to', 'Start', 'End'];
+            rows.push(header);
+
+            const workPackages = this.exportOptions.workPackages ? this.workPackages : [];
+            for (const wp of workPackages) {
+                rows.push([
+                    wp.name || '',
+                    wp.status || '',
+                    wp.priority || '',
+                    wp.assigned_to || '',
+                    wp.start_date || '',
+                    wp.end_date || ''
+                ]);
+            }
+
+            const gapRows = this.exportOptions.gaps ? this.criticalGaps : [];
+            for (const gap of gapRows) {
+                rows.push(['Gap: ' + (gap.name || ''), 'critical', '', '', '', '']);
+            }
+
+            const csv = rows.map(row =>
+                row.map(cell => {
+                    const s = String(cell == null ? '' : cell);
+                    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+                }).join(',')
+            ).join('\n');
+
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'implementation-data.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            Platform.toast.success('Implementation data exported.');
+            Platform.modal.close('export-impl-data');
         }
     };
-}
-</script>
-
-{% call modal(id='create-work-package', title='Create Work Package', description='Add a new implementation work package', size='lg') %}
-<form @submit.prevent="submitCreateWorkPackage()" class="space-y-4" x-data="workPackageCreateModal()">
-  <div class="grid grid-cols-1 gap-4">
-    <div class="">
-      <label for="cwp-name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-      <input type="text" id="cwp-name" x-model="formData.name" required maxlength="255"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-             placeholder="e.g. Cloud Migration Phase 1">
-    </div>
-    <div>
-      <label for="cwp-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
-      <select id="cwp-priority" x-model="formData.priority"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <option value="low">Low</option>
-        <option value="medium" selected>Medium</option>
-        <option value="high">High</option>
-        <option value="critical">Critical</option>
-      </select>
-    </div>
-    <div>
-      <label for="cwp-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-      <select id="cwp-status" x-model="formData.status"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <option value="planned" selected>Planned</option>
-        <option value="in_progress">In Progress</option>
-        <option value="completed">Completed</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-    </div>
-    <div>
-      <label for="cwp-start" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
-      <input type="date" id="cwp-start" x-model="formData.start_date"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    </div>
-    <div>
-      <label for="cwp-end" class="block text-sm font-medium text-muted-foreground mb-1">End Date</label>
-      <input type="date" id="cwp-end" x-model="formData.end_date"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    </div>
-    <div>
-      <label for="cwp-assigned" class="block text-sm font-medium text-muted-foreground mb-1">Assigned To</label>
-      <input type="text" id="cwp-assigned" x-model="formData.assigned_to" maxlength="255"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-             placeholder="Name or team">
-    </div>
-    <div class="">
-      <label for="cwp-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-      <textarea id="cwp-description" x-model="formData.description" rows="2"
-                class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Describe the scope and objectives"></textarea>
-    </div>
-  </div>
-  <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
-  <div class="flex justify-end gap-3 pt-2 border-t border-border">
-    <button type="button" data-modal-close="create-work-package"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
-    <button type="submit" :disabled="submitting"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
-      <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
-      <span x-text="submitting ? 'Creating...' : 'Create Work Package'"></span>
-    </button>
-  </div>
-</form>
-{% endcall %}
-
-<script>
-function workPackageCreateModal() {
-  return {
-    formData: { name: '', description: '', assigned_to: '', priority: 'medium', status: 'planned', start_date: '', end_date: '' },
-    submitting: false,
-    errorMsg: '',
-    submitCreateWorkPackage() {
-      if (!this.formData.name.trim()) { this.errorMsg = 'Name is required.'; return; }
-      this.submitting = true;
-      this.errorMsg = '';
-      Platform.fetch.post('{{ url_for("implementation_planning.create_work_package") }}', this.formData, { silent: true })
-      .then(data => {
-        this.submitting = false;
-        if (!data.success) {
-          this.errorMsg = Object.values(data.errors || {}).join(' ') || 'An error occurred.';
-          return;
-        }
-        Platform.modal.close('create-work-package');
-        showToast({ title: 'Work package created successfully', variant: 'default' });
-        setTimeout(() => window.location.reload(), 800);
-      })
-      .catch((e) => { this.submitting = false; this.errorMsg = e.message || 'Network error. Please try again.'; });
-    }
-  };
 }
 </script>
 {% endblock %}

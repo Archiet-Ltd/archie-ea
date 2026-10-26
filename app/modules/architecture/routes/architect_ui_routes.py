@@ -579,39 +579,43 @@ def _load_sample_company_locked(wants_json):
 
     elements_before = ArchiMateElement.query.count()
 
-    # Import the sample
-    try:
-        result = ArchiMateImportService().import_xml(
-            xml_content,
-            strategy="skip_duplicates",
-            source_label=sample_company_service.SOURCE_LABEL,
-            promote_top_level=False,
-        )
-    except ImportRequestError as exc:
-        error = f"Could not import sample company: {exc}"
-        if wants_json:
-            return jsonify({"success": False, "error": error}), 500
-        flash(error, "error")
-        return redirect(url_for("dashboard.overview"))
+    # The sample's records are written with their dates spread over the last 90 days, so the
+    # Overview's chart has a shape and the change history is sealed once, in order.
+    from app.services.history_spread import dated_history
 
-    # The elements alone count no applications and score no health; add the
-    # applications, owners, costs, capabilities and risks a real estate carries.
-    point = sample_company_service.find_restore_point(g.current_org_id)
-    if point is not None:
+    with dated_history(rest=("import", sample_company_service.SOURCE_LABEL), connected=None):
+        # Import the sample
         try:
-            sample_company_service.add_working_data(g.current_org_id, current_user, point)
-            db.session.commit()
-            sample_company_service.work_out_connections(g.current_org_id)
-            sample_company_service.date_the_load(g.current_org_id, point.started_at)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            current_app.logger.exception("sample company working data not added")
-            error = "The sample company's elements loaded, but its applications could not be added."
+            result = ArchiMateImportService().import_xml(
+                xml_content,
+                strategy="skip_duplicates",
+                source_label=sample_company_service.SOURCE_LABEL,
+                promote_top_level=False,
+            )
+        except ImportRequestError as exc:
+            error = f"Could not import sample company: {exc}"
             if wants_json:
                 return jsonify({"success": False, "error": error}), 500
             flash(error, "error")
             return redirect(url_for("dashboard.overview"))
+
+        # The elements alone count no applications and score no health; add the
+        # applications, owners, costs, capabilities and risks a real estate carries.
+        point = sample_company_service.find_restore_point(g.current_org_id)
+        if point is not None:
+            try:
+                sample_company_service.add_working_data(g.current_org_id, current_user, point)
+                db.session.commit()
+                sample_company_service.work_out_connections(g.current_org_id)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("sample company working data not added")
+                error = "The sample company's elements loaded, but its applications could not be added."
+                if wants_json:
+                    return jsonify({"success": False, "error": error}), 500
+                flash(error, "error")
+                return redirect(url_for("dashboard.overview"))
 
     # The first screen now shows the loaded sample: its counts, applications and the
     # "You are looking at the sample company" bar with the way to remove it.
@@ -878,6 +882,11 @@ def traceability_matrix():
     """Cross-layer traceability matrix across Strategy/Business/Application/Technology."""
     from app.services.archimate_traceability_service import ArchiMateTraceabilityService, get_archimate_gap_analysis
 
+    from app.modules.intelligence.services.traceability_check_service import (
+        TraceabilityCheckService,
+        broken_chains,
+    )
+
     service = ArchiMateTraceabilityService()
     direction = request.args.get('direction', 'forward')
     pivot_type = request.args.get('pivot_type', 'ApplicationComponent')
@@ -913,8 +922,18 @@ def traceability_matrix():
         fallback_matrix = _build_solution_traceability_fallback_matrix(limit=50)
         if fallback_matrix:
             matrix = fallback_matrix
+    element_id = request.args.get('element', type=int)
+    element_check = None
+    broken = None
+    if element_id is not None:
+        element_check = TraceabilityCheckService.check(element_id, getattr(g, 'current_org_id', None))
+    else:
+        broken = broken_chains(getattr(g, 'current_org_id', None))
     return render_template(
         "archimate_views/traceability.html",
+        element_id=element_id,
+        element_check=element_check,
+        broken=broken,
         matrix=matrix,
         gap_analysis=gap_analysis,
         store_counts=_traceability_store_counts(),

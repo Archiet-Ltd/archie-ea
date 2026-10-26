@@ -1,6 +1,11 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/card.html' import card, card_content %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_content, card_header, card_title %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/status_badge.html' import status_badge_auto %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Blocked by another programme{% endblock %}
 
@@ -16,30 +21,33 @@
     ) }}
 
     {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Blocked work packages{% endcall %}
+        {% endcall %}
         {% call card_content() %}
             {% if blocked %}
-            <table id="blocked-table" class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="text-left">
-                        <th class="py-2">Work package</th>
-                        <th class="py-2">Programme</th>
-                        <th class="py-2">Blocked by</th>
-                        <th class="py-2">Blocker's programme</th>
+            {% call table(id='blocked-table') %}
+                {% call table_header() %}
+                    <tr>
+                        {% call table_head() %}Work package{% endcall %}
+                        {% call table_head() %}Programme{% endcall %}
+                        {% call table_head() %}Blocked by{% endcall %}
+                        {% call table_head() %}Blocker's programme{% endcall %}
                     </tr>
-                </thead>
-                <tbody>
+                {% endcall %}
+                {% call table_body() %}
                     {% for item in blocked %}
                     {% for blocker in item.blocked_by %}
-                    <tr data-work-package-id="{{ item.work_package.id }}">
-                        <td class="py-2"><a class="underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a></td>
-                        <td class="py-2">{{ programme_names.get(item.work_package.enterprise_initiative_id, '') }}</td>
-                        <td class="py-2">{{ blocker.name }} ({{ blocker.status|replace('_', ' ') }})</td>
-                        <td class="py-2">{{ programme_names.get(blocker.enterprise_initiative_id, '') }}</td>
-                    </tr>
+                    {% call table_row(attrs_dict={'data-work-package-id': item.work_package.id}) %}
+                        {% call table_cell() %}<a class="text-primary hover:underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a>{% endcall %}
+                        {% call table_cell() %}{{ programme_names.get(item.work_package.enterprise_initiative_id, '') }}{% endcall %}
+                        {% call table_cell() %}{{ blocker.name }} ({{ status_badge_auto(blocker.status) }}){% endcall %}
+                        {% call table_cell() %}{{ programme_names.get(blocker.enterprise_initiative_id, '') }}{% endcall %}
+                    {% endcall %}
                     {% endfor %}
                     {% endfor %}
-                </tbody>
-            </table>
+                {% endcall %}
+            {% endcall %}
             {% else %}
             <p id="blocked-empty" class="text-sm text-muted-foreground">No work package is waiting on another programme. When one depends on an unfinished work package in a different programme, it appears here.</p>
             {% endif %}

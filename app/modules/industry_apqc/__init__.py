@@ -37,4 +37,13 @@ def register(app: Flask) -> None:
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] Failed to register APQC API: {e}")
 
-    app.logger.info("[MODULE] industry_apqc registered (~25 routes, 2 blueprints)")
+    # --- 3. The frameworks gallery ---
+    try:
+        from app.modules.industry_apqc.routes.frameworks_gallery_routes import frameworks_bp
+
+        app.register_blueprint(frameworks_bp)
+        app.logger.info("[BLUEPRINT] Frameworks gallery registered at /frameworks")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] Failed to register the frameworks gallery: {e}")
+
+    app.logger.info("[MODULE] industry_apqc registered (~25 routes, 3 blueprints)")

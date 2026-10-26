@@ -67,7 +67,7 @@
             ] %}
             {% for step in steps %}
             {% set pct = ((step.count / step.total * 100)|round|int) if step.total > 0 else 0 %}
-            <a href="{{ step.url }}" class="flex flex-col items-center text-center group flex-1 {{ 'opacity-50' if step.count == 0 else '' }}">
+            <a href="{{ step.url }}" class="flex flex-col items-center text-center group flex-1">
                 <div class="flex items-center justify-center w-10 h-10 rounded-full border-2 {{ 'border-primary bg-primary/10 text-primary' if step.count > 0 else 'border-border text-muted-foreground' }} group-hover:border-primary/70 transition-colors mb-1.5">
                     <i data-lucide="{{ step.icon }}" class="h-4 w-4"></i>
                 </div>

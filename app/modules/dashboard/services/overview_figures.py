@@ -14,6 +14,7 @@ never turns a missing figure into a zero.
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
@@ -39,14 +40,29 @@ def _currency():
     except Exception:
         organization = None
     cfg = CurrencyConfig.get_org_currency_config(organization)
-    return cfg["symbol"], cfg["position"] == "prefix"
+    return cfg["symbol"], cfg["position"] == "prefix", cfg["code"]
+
+
+def _currency_code():
+    """The organisation's currency code (e.g., 'GBP', 'USD')."""
+    from flask import has_request_context
+
+    from app.middleware.tenant_context import current_org
+    from config import CurrencyConfig
+
+    try:
+        organization = current_org() if has_request_context() else None
+    except Exception:
+        organization = None
+    cfg = CurrencyConfig.get_org_currency_config(organization)
+    return cfg["code"]
 
 
 def _money(amount, compact=False):
     """An amount in whole pounds, or short ("£250k", "£20.8k") for a card; the table keeps the whole figure."""
     if amount is None:
         return None
-    symbol, prefix = _currency()
+    symbol, prefix, _code = _currency()
     amount = float(amount)
     if compact and abs(amount) >= 1000:
         for size, suffix in ((1_000_000, "m"), (1_000, "k")):
@@ -144,13 +160,19 @@ def _sourced_share(org_id):
 def _relationships(org_id, now):
     from app.models import ArchiMateElement as E
     from app.models import ArchiMateRelationship as R
+    from app.models.audit_log import AuditLog
 
     total = db.session.execute(db.select(func.count(R.id)).where(R.organization_id == org_id)).scalar_one()
     if not total:
         return {"total": 0}
     since = now - timedelta(days=30)
     added = db.session.execute(
-        db.select(func.count(R.id)).where(R.organization_id == org_id, R.created_at >= since)
+        db.select(func.count(AuditLog.id)).where(
+            AuditLog.organization_id == org_id,
+            AuditLog.table_name == "archimate_relationships",
+            AuditLog.action == "create",
+            AuditLog.created_at >= since,
+        )
     ).scalar_one()
     ends = Counter()
     for source_id, target_id in db.session.execute(
@@ -255,14 +277,96 @@ def _application_names(changes):
     return dict(rows)
 
 
-def _name_of(change, applications=None):
-    """What a change row is about: the record's name, or its type and name once the record is deleted."""
+#: What a relationship reads as between the names of the two elements it joins.
+_RELATION_VERBS = {
+    "serving": "serves", "serves": "serves", "uses": "serves",
+    "realization": "realises", "realisation": "realises", "realizes": "realises", "realises": "realises",
+    "assignment": "is assigned to", "assigns": "is assigned to",
+    "flow": "flows to", "flows": "flows to",
+    "triggering": "triggers", "triggers": "triggers",
+    "access": "accesses", "accesses": "accesses",
+    "association": "is associated with", "associates": "is associated with",
+    "aggregation": "aggregates", "aggregates": "aggregates",
+    "composition": "is composed of", "composes": "is composed of",
+    "influence": "influences", "influences": "influences",
+    "specialization": "is a kind of", "specialisation": "is a kind of",
+    "specializes": "is a kind of", "specialises": "is a kind of",
+}
+
+
+def _relation_verb(relation_type):
+    key = (relation_type or "").strip().lower().replace("_", "").replace(" ", "")
+    if key.endswith("relationship"):
+        key = key[: -len("relationship")]
+    return _RELATION_VERBS.get(key, "is connected to")
+
+
+def _relationship_phrases(org_id, changes):
+    """What each relationship the changes are about reads as, by relationship id: "Order management system serves Checkout".
+
+    The relationship and the two elements it joins are read from this organisation's model. A relationship
+    that has since been deleted is read from the version the change history kept.
+    """
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    rows = [c for c in changes if c.table_name == "archimate_relationships"]
+    if not rows:
+        return {}
+    ids = {c.record_id for c in rows}
+    current = {
+        r[0]: (r[1], r[2], r[3])
+        for r in db.session.execute(
+            db.select(
+                ArchiMateRelationship.id, ArchiMateRelationship.type,
+                ArchiMateRelationship.source_id, ArchiMateRelationship.target_id,
+            ).where(ArchiMateRelationship.id.in_(ids), ArchiMateRelationship.organization_id == org_id)
+        ).all()
+    }
+    joined = {}
+    for change in rows:
+        if change.record_id in current:
+            joined[change.record_id] = current[change.record_id]
+            continue
+        for values in (change.snapshot, change.previous_snapshot):
+            if values and values.get("source_id") and values.get("target_id"):
+                joined[change.record_id] = (values.get("type"), values["source_id"], values["target_id"])
+                break
+    element_ids = {i for _t, source, target in joined.values() for i in (source, target)}
+    names = {}
+    if element_ids:
+        names = {
+            r[0]: r[1]
+            for r in db.session.execute(
+                db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+                    ArchiMateElement.id.in_(element_ids), ArchiMateElement.organization_id == org_id
+                )
+            ).all()
+            if r[1]
+        }
+    phrases = {}
+    for record_id, (kind, source, target) in joined.items():
+        if names.get(source) and names.get(target):
+            phrases[record_id] = "%s %s %s" % (names[source], _relation_verb(kind), names[target])
+    return phrases
+
+
+def _name_of(change, applications=None, relationships=None):
+    """What a change row is about: the record's name, or its type and name once the record is deleted.
+
+    A relationship reads as the two elements it joins: "Order management system serves Checkout".
+    """
     snapshot = change.snapshot or {}
     before = change.previous_snapshot or {}
     kind = change.kind or "Record"
     if change.table_name == "archimate_relationships":
-        relation = (snapshot.get("type") or before.get("type") or "").replace("_", " ")
-        return "%s relationship" % relation.capitalize() if relation else "Relationship"
+        phrase = (relationships or {}).get(change.record_id)
+        if phrase:
+            return phrase
+        # the history's own label for it, "serving: Order management system to Checkout"
+        match = re.fullmatch(r"(\w+): (.+) to (.+)", change.label or "")
+        if match:
+            return "%s %s %s" % (match.group(2), _relation_verb(match.group(1)), match.group(3))
+        return "Relationship between two elements"
     if change.table_name in ("application_owners", "application_ownership"):
         app_id = snapshot.get("application_id") or before.get("application_id")
         app_name = (applications or {}).get(app_id)
@@ -271,6 +375,13 @@ def _name_of(change, applications=None):
     if not name:
         return kind
     return "%s %s" % (kind, name) if change.action == "delete" else name
+
+
+def _person_names(org_id, changes):
+    """The names of the people who made the changes, as the change history knows them (never an email address)."""
+    from app.modules.intelligence.services.history_service import HistoryService
+
+    return HistoryService(db.session, org_id).person_names(c.changed_by_id for c in changes)
 
 
 def _is_connected(change):
@@ -299,7 +410,7 @@ def _bars(inserts, today, days):
     ]
 
 
-def _activity(changes, now):
+def _activity(changes, now, org_id):
     if changes is None:
         return None
     today = now.date()
@@ -328,8 +439,19 @@ def _activity(changes, now):
         {"day": (week_start + timedelta(days=i)).strftime("%a"), "changes": per_weekday[week_start + timedelta(days=i)]}
         for i in range(7)
     ]
-    recent = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)[:5]
+    recent_all = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)
+    # Collapse changes to the same element on the same day into one row, keeping the latest.
+    seen = {}
+    recent = []
+    for c in recent_all:
+        key = (c.table_name, c.record_id, c.valid_from.date())
+        if key not in seen:
+            seen[key] = c
+            recent.append(c)
+    recent = recent[:5]
     applications = _application_names(recent)
+    relationships = _relationship_phrases(org_id, recent)
+    people = _person_names(org_id, recent)
     return {
         "ranges": ranges,
         "default_range": default_range,
@@ -349,9 +471,9 @@ def _activity(changes, now):
         },
         "recent": [
             {
-                "name": _name_of(c, applications),
+                "name": _name_of(c, applications, relationships),
                 "action": {"insert": "Added", "update": "Updated", "delete": "Removed"}.get(c.action, c.action),
-                "by": c.changed_by_name,
+                "by": people.get(c.changed_by_id),
                 "when": c.valid_from,
                 "kind": "relationship" if c.table_name == "archimate_relationships" else "element",
             }
@@ -375,8 +497,20 @@ def _areas(org_id):
     return [{"area": r[0], "applications": r[1]} for r in rows]
 
 
+def _once(names):
+    """The names with each person listed once, in the order first met."""
+    seen, kept = set(), []
+    for name in names:
+        key = " ".join(name.split()).casefold()
+        if key not in seen:
+            seen.add(key)
+            kept.append(name)
+    return kept
+
+
 def _table(org_id):
     from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import lifecycle_label
     from app.models.application_portfolio import ApplicationComponent as A
     from app.services.application_cost_accessor import get_annual_cost_float
     from app.services.element_ownership_service import application_is_owned
@@ -387,7 +521,7 @@ def _table(org_id):
     for app in apps:
         names = []
         if application_is_owned(app):
-            names = [o["user_name"] for o in owners.get(app.id, []) if o.get("user_name") and o["user_name"] != "—"]
+            names = _once([o["user_name"] for o in owners.get(app.id, []) if o.get("user_name") and o["user_name"] != "—"])
             if not names:
                 legacy = (app.legacy_business_owner or app.legacy_application_owner or "").strip()
                 names = [legacy] if legacy else ["Name not recorded"]
@@ -395,7 +529,8 @@ def _table(org_id):
             "id": app.id,
             "name": app.name,
             "type": (app.component_type or "").strip() or None,
-            "status": ((app.lifecycle_status or "").strip()[:1].upper() + (app.lifecycle_status or "").strip()[1:]) or None,
+            "status": lifecycle_label(app.lifecycle_status),
+            "owners": names,
             "owner": ", ".join(names) if names else None,
             "cost": get_annual_cost_float(app),
         })
@@ -430,7 +565,7 @@ def build_overview(org_id, user, now=None):
     relationships = _relationships(org_id, now)
     run_cost = _run_cost(org_id, now)
     changes = _history(org_id, now)
-    activity = _activity(changes, now)
+    activity = _activity(changes, now, org_id)
     table = _table(org_id)
     _name_the_basis(run_cost, table["cost_total"])
     empty = not apps["total"] and not relationships["total"] and sourced is None
@@ -445,6 +580,7 @@ def build_overview(org_id, user, now=None):
         "areas": _areas(org_id),
         "table": table,
         "ranges": RANGES,
+        "currency_code": _currency_code(),
         # the chart ramp tokens as colours a chart can draw with
         "chart_colours": ["hsl(var(--chart-1))", "hsl(var(--chart-tint))"],
     }

@@ -35,7 +35,8 @@ HOME = """<!doctype html><html><head><title>Acme Robotics | Warehouse robots</ti
 <a href="%(other)s/elsewhere">Partner site</a>
 </nav></header>
 <main><h1>Acme Robotics</h1><p>We build warehouse robots that pick and pack orders for logistics
-operators, delivered as a monthly subscription to businesses.</p></main></body></html>"""
+operators, delivered as a monthly subscription to businesses.</p>
+<p>Our robots work alongside people in busy distribution centres, learn a new layout in a day and need no changes to your racking or conveyors.</p></main></body></html>"""
 
 ABOUT = """<html><head><title>About Acme Robotics</title></head><body><main>
 <h1>About us</h1><p>Founded in 2014, we are a team of about 40 people.</p>
@@ -136,7 +137,26 @@ def _path(url):
     return re.sub(r"^https?://[^/]+", "", url or "") or "/"
 
 
-def fake_model(prompt):
+def batched(page_model):
+    """A model that reads the batched request (every page in one prompt) by asking a stand-in that
+    answers for one page at a time, and answers the way the prompt asks: one object with a ``pages``
+    list and an ``inference`` reading."""
+
+    def ask(prompt):
+        if "=== PAGE " not in prompt:
+            return page_model(prompt)
+        pages = re.findall(r"=== PAGE \d+: (\S+) ===\n(.*?)(?=\n\n=== PAGE |\Z)", prompt, re.S)
+        out = {"pages": [], "inference": json.loads(page_model("Business Model Inference"))}
+        for url, html in pages:
+            html = html.split("\n```", 1)[0]
+            one = json.loads(page_model("**Page URL**: %s\n```html\n%s\n```" % (url, html)))
+            out["pages"].append({**one, "url": url})
+        return json.dumps(out)
+
+    return ask
+
+
+def _page_model(prompt):
     """Answers only from the page handed over, like a careful reader would."""
     if "Business Model Inference" in prompt:
         return json.dumps({
@@ -181,6 +201,9 @@ def fake_model(prompt):
     out["case_studies"] = re.findall(r"Case study: ([^<]+?)(?:\.|<)", html)
     out["links"] = []
     return json.dumps(out)
+
+
+fake_model = batched(_page_model)
 
 
 def _org(make_org, website, consent=True):
@@ -451,3 +474,264 @@ def test_an_unclear_page_follows_the_rendering_strategy_answer(answer, expected)
     words = "<p>%s</p>" % ("some words " * 40)
     html = "<html><body>%s%s</body></html>" % (words, "<script src='/x.js'></script>" * 6)
     assert needs_browser("https://x.test/", html, 200, llm=lambda p: json.dumps(answer)) is expected
+
+
+# ---------------------------------------------------------------- company name from home page
+
+_HOME_DOCS_PAGES = {
+    "/": (200, "text/html", """<!doctype html><html><head>
+<title>Cal.com | Scheduling infrastructure for everyone</title>
+<meta property="og:site_name" content="Cal.com">
+</head><body><h1>Welcome to Cal.com</h1><p>Open source scheduling.</p>
+<a href="/docs">Docs</a></body></html>"""),
+    "/docs": (200, "text/html", """<!doctype html><html><head>
+<title>Cal.com Docs — Developer Documentation</title>
+</head><body><h1>Documentation</h1><p>API reference.</p>
+<a href="/">Home</a></body></html>"""),
+    "/robots.txt": (200, "text/plain", ""),
+}
+
+
+def test_the_company_name_comes_from_the_home_page_not_a_sub_page(make_org):
+    """A site whose home page and docs page differ (like cal.com vs Cal.com Docs):
+    the name must be what the home page calls itself."""
+    import json
+
+    from app.modules.organization.website_crawl import (crawl_organization_website,
+                                                         pending_website_proposals)
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return json.dumps({"business_model": {}, "company_stage": {},
+                               "technology_stack": {}, "competitive_positioning": {},
+                               "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        html = prompt.split("```html", 1)[1].rsplit("```", 1)[0] if "```html" in prompt else ""
+        url_line = next((line for line in prompt.splitlines() if "Page URL" in line), "")
+        out = {"company": {}, "field_confidence": {}}
+        if "/docs" in url_line or "Developer Documentation" in html:
+            # A sub-page whose title differs from the home page — the model might well
+            # read it and answer with the page's own title as the company name.
+            out["company"] = {"name": "Cal.com Docs"}
+            out["field_confidence"] = {"company_name": 1.0}
+        elif "Scheduling infrastructure" in html or "og:site_name" in html:
+            out["company"] = {"name": "Cal.com"}
+            out["field_confidence"] = {"company_name": 0.9}
+        return json.dumps(out)
+
+    site = _Site(_HOME_DOCS_PAGES)
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=batched(model))
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert names, "no company name was proposed"
+        name_row = names[0]
+        assert name_row["value"] == "Cal.com", "got %r from %s" % (name_row["value"], name_row["source_url"])
+        # The name came from the home page, not docs
+        assert _path(name_row["source_url"]) == "/"
+        assert name_row["confidence"] < 1.0  # the home page model gave 0.9
+    finally:
+        site.stop()
+
+
+_NO_NAME_PAGES = {
+    "/": (200, "text/html", """<!doctype html><html><head>
+<title></title>
+</head><body><h1></h1><p>A page with no company name, no og:site_name and an empty title.</p>
+<a href="/about">About</a></body></html>"""),
+    "/about": (200, "text/html", """<!doctype html><html><head>
+<title>Mystery Corp | About us</title>
+</head><body><h1>About Mystery Corp</h1><p>We are a mystery.</p></body></html>"""),
+    "/robots.txt": (200, "text/plain", ""),
+}
+
+
+def test_the_name_confidence_is_not_100_percent_when_the_home_page_gives_none(make_org):
+    """A home page with no site name, no og:site_name and an empty title: whatever name
+    another page gives, its confidence is capped at the default floor, never 100%."""
+    import json
+
+    from app.modules.organization.website_crawl import (crawl_organization_website,
+                                                         pending_website_proposals)
+    from app.modules.organization.website_crawl.service import DEFAULT_CONFIDENCE
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return json.dumps({"business_model": {}, "company_stage": {},
+                               "technology_stack": {}, "competitive_positioning": {},
+                               "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        url_line = next((line for line in prompt.splitlines() if "Page URL" in line), "")
+        out = {"company": {}, "field_confidence": {}}
+        if "/about" in url_line:
+            out["company"] = {"name": "Mystery Corp"}
+            out["field_confidence"] = {"company_name": 1.0}
+        return json.dumps(out)
+
+    site = _Site(_NO_NAME_PAGES)
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=batched(model))
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert names, "no company name was proposed"
+        assert names[0]["value"] == "Mystery Corp"
+        # The home page gave no name — whatever another page says must not be 100%
+        assert names[0]["confidence"] <= DEFAULT_CONFIDENCE, names[0]["confidence"]
+        assert names[0]["confidence_basis"] == "default"
+    finally:
+        site.stop()
+
+
+# ---------------------------------------------------------------- the name read from a page title (crawl03)
+
+_LONG = 900  # a page with real text on it
+
+
+@pytest.mark.parametrize("title, url, name, at_least", [
+    ("Cal.com | Scheduling Software for Online…", "https://cal.com/", "Cal.com", 0.9),
+    ("Scheduling Software for Online Meetings – Cal.com", "https://www.cal.com/", "Cal.com", 0.9),
+    ("PostHog - How developers build successful products", "https://posthog.com/", "PostHog", 0.9),
+    ("Linear | Plan and build products", "https://linear.app/", "Linear", 0.9),
+    ("Brand | tagline", "http://127.0.0.1:8123/", "Brand", 0.7),
+])
+def test_a_page_title_with_a_tagline_gives_the_company_name_at_a_confidence_that_is_ticked(title, url, name, at_least):
+    from app.modules.organization.website_crawl.service import _home_page_company_name
+
+    got = _home_page_company_name({"url": url, "static": {"title": title, "text_length": _LONG}})
+    assert got is not None and got["value"] == name, got
+    assert got["confidence"] is not None and got["confidence"] >= at_least, got
+
+
+def test_a_title_that_is_only_a_sentence_is_not_cut_and_stays_unsure():
+    from app.modules.organization.website_crawl.service import _home_page_company_name
+
+    got = _home_page_company_name({"url": "http://127.0.0.1:8123/", "static": {
+        "title": "Scheduling software for online meetings and teams", "text_length": _LONG}})
+    assert got["value"] == "Scheduling software for online meetings and teams" and got["confidence"] is None
+
+
+_BRAND_PAGES = {
+    "/": (200, "text/html", """<!doctype html><html><head><title>Brand | Plans that run themselves</title></head>
+<body><h1>Plans that run themselves</h1><p>%s</p></body></html>""" % ("We help small teams plan their work together. " * 10)),
+    "/robots.txt": (200, "text/plain", ""),
+}
+
+
+def test_the_crawl_proposes_the_brand_from_a_branded_title_ticked_for_the_person(make_org):
+    import json as _json
+
+    from app.modules.organization.website_crawl import crawl_organization_website, pending_website_proposals
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return _json.dumps({"business_model": {}, "company_stage": {}, "technology_stack": {}, "competitive_positioning": {},
+                                "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return _json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return _json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        return _json.dumps({"company": {}, "field_confidence": {}})
+
+    site = _Site(_BRAND_PAGES)
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=batched(model))
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert [r["value"] for r in names] == ["Brand"], names
+        assert names[0]["confidence"] >= 0.5  # the sign-up ticks a fact from half up
+    finally:
+        site.stop()
+
+
+# ----------------------------------------------------------------------------- two passes (QA-026)
+
+SLOW_MODEL_SECONDS = 8  # stands in for a free model that takes its time; the point is the order, not the wait
+
+
+class _SlowModel:
+    """A model that takes SLOW_MODEL_SECONDS per call and notes, as each call starts, how long the reading has
+    taken so far and which facts a person could already see."""
+
+    def __init__(self, org_id_of, started):
+        self.calls = 0
+        self.started = started
+        self.org_id_of = org_id_of
+        self.seen = None
+        self.at = None
+
+    def __call__(self, prompt):
+        from app.modules.organization.website_crawl import pending_website_proposals
+
+        self.calls += 1
+        if self.seen is None:
+            self.at = time.monotonic() - self.started
+            self.seen = {row["field"]: row["value"] for row in pending_website_proposals(self.org_id_of())}
+        time.sleep(SLOW_MODEL_SECONDS)
+        return fake_model(prompt)
+
+
+def test_the_facts_that_need_no_model_are_proposed_before_the_model_is_asked_once_for_the_rest(make_org, site):
+    """QA-026: with a slow model the person used to wait for one call per page. Now the name and the
+    other stated facts are proposed first, and the model is asked once, for every page together."""
+    org = _org(make_org, site.url)
+    model = _SlowModel(lambda: org.id, time.monotonic())
+    summary = _crawl(org, llm=model)
+
+    assert model.calls == 1, "the model was asked %d times; it should be asked once for all the pages" % model.calls
+    assert model.at < 10, "the first facts took %.1f s" % model.at
+    assert model.seen["company_name"] == "Acme Robotics Ltd", model.seen
+    assert "contact_email" in model.seen and "linkedin_url" in model.seen
+    assert "category" not in model.seen, "a model-only fact was there before the model was asked"
+    assert summary["pages_read"] >= 5
+
+    found = _by_field(org.id)
+    assert [r["value"] for r in found["company_name"]] == ["Acme Robotics Ltd"], "the name was proposed twice"
+    assert found["category"][0]["value"] == "Transportation & Logistics", "the model's reading was not added"
+    assert found["product"] and found["key_person"] and found["hq_city"]
+    assert summary["proposals"] == sum(len(rows) for rows in found.values())
+
+
+def test_a_model_that_fails_leaves_the_facts_already_proposed(make_org, site):
+    org = _org(make_org, site.url)
+
+    def broken(prompt):
+        raise TimeoutError("the provider did not answer in time")
+
+    summary = _crawl(org, llm=broken)
+    assert summary["model_errors"] == 1
+    found = _by_field(org.id)
+    assert found["company_name"][0]["value"] == "Acme Robotics Ltd"
+    assert "category" not in found and summary["proposals"] == sum(len(rows) for rows in found.values()) > 0
+
+
+def test_thirty_pages_are_read_with_one_model_call_however_slow_it_is(make_org):
+    links = " ".join('<a href="/p%d">page %d</a>' % (i, i) for i in range(45))
+    pages = {"/": _html("<html><head><title>Big Co | Things</title></head><body>%s</body></html>" % links),
+             "/robots.txt": (404, "text/plain", "")}
+    for i in range(45):
+        pages["/p%d" % i] = _html("<html><body><p>page %d with warehouse robots text</p></body></html>" % i)
+    big = _Site(pages)
+    try:
+        org = _org(make_org, big.url)
+        model = _SlowModel(lambda: org.id, time.monotonic())
+        summary = _crawl(org, llm=model)
+        assert summary["pages_read"] == 30
+        assert model.calls == 1
+        assert model.at < 10 and model.seen.get("company_name") == "Big Co"
+    finally:
+        big.stop()
+
+
+def test_the_progress_says_when_the_first_facts_are_ready(make_org, site):
+    org = _org(make_org, site.url)
+    stages = []
+    _crawl(org, progress=lambda state: stages.append(state["stage"]))
+    assert "facts_ready" in stages
+    assert "reading" not in stages[stages.index("facts_ready"):], "reading went back after the first facts were ready"
+    assert stages[-1] == "facts_ready"

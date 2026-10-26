@@ -123,8 +123,13 @@ def _emit(nodes: list, scopes: list, out: list) -> None:
             raise ValueError("unknown block %s" % node[0])
 
 
-def render(name: str, context: dict) -> str:
-    text = _strip_block_lines(load(name))
+def render_text(text: str, context: dict) -> str:
+    """Render any prompt written in the same Handlebars subset (the sentiment prompt reuses this)."""
+    text = _strip_block_lines(text)
     out: list = []
     _emit(_parse(text), [{"this": context}], out)
     return "".join(out)
+
+
+def render(name: str, context: dict) -> str:
+    return render_text(load(name), context)

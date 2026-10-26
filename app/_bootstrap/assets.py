@@ -4,12 +4,17 @@ Asset pipeline setup — Flask-Assets Environment + manifest-based fingerprintin
 
 import json
 import os
+import time
 
 from app._bootstrap.build_info import get_build_id
 
-# Module-level manifest cache — loaded once at startup, reloaded on each request
-# in debug mode for development convenience.
+# Module-level manifest cache — loaded once at startup. Outside production the
+# cached manifest is reloaded when its mtime changes, checked at most once a
+# second, so a stylesheet rebuild never leaves a running preview linking a file
+# that no longer exists.
 _manifest_cache = {}
+_manifest_mtime = 0.0
+_manifest_last_check = 0.0
 
 
 def _asset_version(static_folder, filename, debug=False):
@@ -43,14 +48,41 @@ def _load_manifest(app):
     Returns a dict mapping original filenames to content-hashed filenames,
     e.g. {"css/tailwind-output.css": "css/tailwind-output.a1b2c3d4.css"}.
     """
-    global _manifest_cache
+    global _manifest_cache, _manifest_mtime
     manifest_path = os.path.join(app.static_folder, "manifest.json")
     try:
+        _manifest_mtime = os.path.getmtime(manifest_path)
         with open(manifest_path, "r", encoding="utf-8") as f:
             _manifest_cache = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         _manifest_cache = {}
+        _manifest_mtime = 0.0
     return _manifest_cache
+
+
+def _maybe_reload_manifest(app):
+    """Reload the manifest if its mtime changed, at most once per second.
+
+    Outside production a stylesheet rebuild writes a new manifest.json while
+    the process is running.  Checking the mtime (capped at 1 Hz) lets the next
+    request pick up the new hashed filename without a restart.
+    """
+    global _manifest_mtime, _manifest_last_check
+    now = time.time()
+    if now - _manifest_last_check < 1.0:
+        return
+    _manifest_last_check = now
+    manifest_path = os.path.join(app.static_folder, "manifest.json")
+    try:
+        current_mtime = os.path.getmtime(manifest_path)
+    except OSError:
+        # File was deleted (or never existed).  If we had a manifest loaded,
+        # clear the cache so callers fall back to the mtime-based URL.
+        if _manifest_mtime != 0.0:
+            _load_manifest(app)
+        return
+    if current_mtime != _manifest_mtime:
+        _load_manifest(app)
 
 
 def init_assets(app):
@@ -60,10 +92,10 @@ def init_assets(app):
     # setup fails (e.g. missing source files in development).
     _load_manifest(app)
 
-    if app.debug:
+    if app.config.get("ASSET_MANIFEST_RELOAD", False):
         @app.before_request
         def _reload_asset_manifest():
-            _load_manifest(app)
+            _maybe_reload_manifest(app)
 
     @app.template_filter("asset_url")
     def asset_url_filter(filename):

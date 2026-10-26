@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/metrics_card.html" import metrics_card %}
@@ -37,7 +38,9 @@
         {'label': 'Applications', 'href': url_for('unified_applications.application_list')},
         {'label': app.name, 'href': url_for('unified_applications.application_detail', id=app.id)},
         {'label': 'Fact sheet'}
-      ]
+      ],
+      actions=[{'text': 'Trace', 'icon': 'route', 'variant': 'outline',
+                'href': url_for('architect_ui.traceability_matrix', element=app.archimate_element_id)}] if app.archimate_element_id else []
   ) }}
 
   {# ── Top band: completeness + headline signals ──────────────────────── #}
@@ -46,7 +49,7 @@
     {# Completeness ring — the score that shames the gaps #}
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
-      <div class="relative shrink-0" style="width:76px;height:76px"> {# inline-style-ok: fixed ring geometry #}
+      <div class="relative shrink-0 h-20 w-20">
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="3"></circle>
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring }}" stroke-width="3"

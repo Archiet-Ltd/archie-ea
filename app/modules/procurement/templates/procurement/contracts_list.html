@@ -12,9 +12,11 @@
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Vendor Contracts'}
         ],
-        actions=[
-            {'text': 'New Contract', 'icon': 'plus', 'href': url_for('procurement.contract_create'), 'variant': 'default'},
-            {'text': 'Renewal Alerts', 'icon': 'calendar-clock', 'href': url_for('procurement.renewals_dashboard'), 'variant': 'outline'}
+        actions=(
+            [{'text': 'New Contract', 'icon': 'plus', 'href': url_for('procurement.contract_create'), 'variant': 'default'}] if may_open_procurement() else []
+        ) + [
+            {'text': 'Renewal Alerts', 'icon': 'calendar-clock', 'href': url_for('procurement.renewals_dashboard'), 'variant': 'outline'},
+            {'text': 'Licences', 'icon': 'key-round', 'href': url_for('procurement.licenses_list'), 'variant': 'outline'}
         ]
     ) }}
 

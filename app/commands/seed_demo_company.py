@@ -2379,8 +2379,16 @@ def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
     Returns counts keyed by entity kind.  Idempotent: re-running creates
-    nothing new and changes nothing.
+    nothing new and changes nothing. The records are written with their
+    dates spread over the last 90 days, so their history is sealed once.
     """
+    from app.services.history_spread import HAND_LABEL, dated_history
+
+    with dated_history(rest=("manual", HAND_LABEL)):
+        return _seed_demo_company()
+
+
+def _seed_demo_company() -> dict:
     from app.models.organization import Organization
     from app.models.user import User, Role
     from app.models import ArchiMateElement, ArchiMateRelationship
@@ -2405,13 +2413,23 @@ def seed_demo_company() -> dict:
     if org is None:
         from app.services.billing_plans import set_contract_plan
 
-        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG)
+        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG, settings={"currency_code": "GBP"}, reporting_currency="GBP")
         db.session.add(org)
         db.session.flush()
         # Enterprise has no people limit, so the demo cast below fits.
         set_contract_plan(org, "enterprise", None)
         stats["organization_created"] = 1
     else:
+        # Ensure the demo organisation has its currency set.
+        changed = False
+        if not (org.settings or {}).get("currency_code"):
+            org.settings = {**(org.settings or {}), "currency_code": "GBP"}
+            changed = True
+        if not org.reporting_currency:
+            org.reporting_currency = "GBP"
+            changed = True
+        if changed:
+            db.session.flush()
         stats["organization_created"] = 0
     org_id = org.id
     # Commit the org row before tenant_scope, which calls db.session.remove()
@@ -3193,10 +3211,6 @@ def seed_demo_company() -> dict:
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_data_model(org_id))
 
-        db.session.commit()
-        from app.services.history_spread import HAND_LABEL, spread_history
-
-        stats["history_dated"] = spread_history(org_id, rest=("manual", HAND_LABEL))
         db.session.commit()
 
     return stats

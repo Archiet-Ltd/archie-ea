@@ -729,7 +729,10 @@ def init_context_processors(app):
         current_user = user if user is not None else signed_in
 
         endpoint = request.endpoint if has_request_context() else None
-        nav = registry.sidebar_for(current_user, endpoint)
+        values = {**request.args.to_dict(), **(request.view_args or {})} if has_request_context() else {}
+        remembered = registry.remembered_items(request.cookies, current_user) if has_request_context() else {}
+        nav = registry.sidebar_for(current_user, endpoint, values, remembered)
+        nav["cookie_name"] = registry.remembered_cookie_name(current_user)
         org_id = getattr(g, "current_org_id", None) if has_request_context() else None
         if org_id is None:
             org_id = getattr(current_user, "organization_id", None)

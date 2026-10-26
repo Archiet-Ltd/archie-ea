@@ -48,7 +48,7 @@ def test_dark_theme_toggle_applies_and_removes_dark_class(page, live_server, see
 
 
 def test_ctrl_k_focuses_the_one_search_box_empty(page, live_server, seeded):
-    """Navigation v3: Ctrl+K focuses the sidebar's one search box ("Search or ask..."),
+    """Navigation v3: Ctrl+K focuses the sidebar's one search box (pages and records),
     empty, not filled with ``[object KeyboardEvent]``; there is no second search."""
     _login(page, live_server, seeded["emails"]["enterprise_architect"])
     _visit(page, live_server, "/dashboard/overview")

@@ -21,7 +21,7 @@
     {% set planned = plateaus|selectattr('status', 'equalto', 'planned')|list|length %}
     {% set in_progress = plateaus|selectattr('status', 'equalto', 'in_progress')|list|length %}
     {% set completed = plateaus|selectattr('status', 'equalto', 'completed')|list|length %}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div data-slot="card" class="rounded-lg border border-border bg-card px-6 py-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wide">Total</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ total }}</p>

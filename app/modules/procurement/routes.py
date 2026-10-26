@@ -12,7 +12,11 @@ from datetime import date, timedelta
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import requires_procurement, requires_procurement_or_finance
+from app.decorators import (
+    requires_contract_visibility,
+    requires_procurement,
+    requires_spend_visibility,
+)
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
@@ -60,7 +64,7 @@ def _compliance_summary(licenses):
 
 @procurement_bp.route("/contracts")
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def contracts_list():
     """List all vendor contracts for current organization."""
     org_id = current_user.organization_id
@@ -119,7 +123,7 @@ def contracts_list():
 
 @procurement_bp.route("/contracts/<int:contract_id>")
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def contract_detail(contract_id):
     """View contract details (scoped to org)."""
     org_id = current_user.organization_id
@@ -144,7 +148,7 @@ def contract_detail(contract_id):
 
 @procurement_bp.route("/renewals")
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def renewals_dashboard():
     """Dashboard showing upcoming contract renewals."""
     org_id = current_user.organization_id
@@ -187,7 +191,7 @@ def renewals_dashboard():
 
 @procurement_bp.route("/licenses")
 @login_required
-@requires_procurement_or_finance
+@requires_spend_visibility
 def licenses_list():
     """List all license entitlements for current organization."""
     org_id = current_user.organization_id
@@ -218,7 +222,7 @@ def licenses_list():
 
 @procurement_bp.route("/licenses/<int:license_id>")
 @login_required
-@requires_procurement
+@requires_spend_visibility
 def license_detail(license_id):
     """View license details (scoped to org)."""
     org_id = current_user.organization_id
@@ -277,7 +281,7 @@ def compliance_dashboard():
 
 @procurement_bp.route("/spend")
 @login_required
-@requires_procurement_or_finance
+@requires_spend_visibility
 def spend_analytics():
     """Spend analytics dashboard."""
     org_id = current_user.organization_id

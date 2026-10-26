@@ -1,5 +1,4 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card %}
@@ -7,6 +6,7 @@
 {% from 'components/input.html' import input, label %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}{{ req.type_label }} request — {{ config.APP_NAME }}{% endblock %}
 {# design-block: record-detail #}
@@ -18,19 +18,13 @@
 {% set result = (req.erasure_evidence_json or {}).get('result') %}
 
 <div class="flex-1 overflow-auto">
-  <nav aria-label="Breadcrumb" class="px-4 lg:px-6 pt-4 mb-3">
-    <ol class="flex items-center gap-1.5 text-sm text-muted-foreground">
-      <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">Home</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
-      <li class="flex items-center gap-1.5"><a href="{{ url_for('gdpr_bp.dsr_index') }}" class="hover:text-foreground transition-colors">Data subject requests</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
-      <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">{{ req.type_label }} request</span></li>
-    </ol>
-  </nav>
+  {{ page_shell(
+      title=req.type_label ~ ' request',
+      subtitle='Recorded ' ~ (req.requested_at.strftime('%Y-%m-%d %H:%M') if req.requested_at else '—') ~ '. Status: ' ~ (req.status or '—') ~ '.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data Subject Requests', url_for('gdpr_bp.dsr_index')), (req.type_label ~ ' request', None)]
+  ) }}
 
-  <div class="px-4 lg:px-6 pb-6 space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold text-foreground">{{ req.type_label }} request</h1>
-      <p class="mt-1 text-sm text-muted-foreground">Recorded {{ req.requested_at.strftime('%Y-%m-%d %H:%M') if req.requested_at else '—' }}. Status: {{ req.status }}.</p>
-    </div>
+  <div class="p-6 space-y-6">
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="rounded-lg border border-border bg-card p-4">

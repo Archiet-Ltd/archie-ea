@@ -201,6 +201,15 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     The route calls this once, straight after a fresh import of the file.
     Everything created is noted on ``log`` so ``remove`` can undo it.
     """
+    from app import db
+    from app.models.organization import Organization
+
+    # Ensure the organisation has a reporting currency set (H-04: single currency source)
+    org = db.session.get(Organization, org_id)
+    if org and not org.reporting_currency:
+        org.reporting_currency = "GBP"
+        db.session.flush()
+
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
@@ -440,17 +449,6 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
             db.session.delete(row)
     db.session.flush()
     return import_restore_service.restore(org_id, user_id, log.id, [])
-
-
-def date_the_load(org_id: int, since) -> int:
-    """Date the records this load added across the last 90 days, so the Overview's chart has a shape.
-
-    Only the history written since ``since`` moves; whatever the organisation recorded before the load keeps
-    its date. Returns how many records were dated.
-    """
-    from app.services.history_spread import spread_history
-
-    return spread_history(org_id, rest=("import", SOURCE_LABEL), since=since)
 
 
 def work_out_connections(org_id: int) -> None:

@@ -2,55 +2,52 @@
 {% block title %}Accept Invitation{% endblock %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
+{% from 'components/input.html' import input %}
 
 {% block content %}
     <div class="flex justify-center px-4 py-10">
         <div class="w-full max-w-md">
- <div class="rounded-lg border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6">
+            {% call card() %}
+                {% call card_header() %}
                     {% if existing %}
-                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Join {{ organisation_name }}</h1>
-                    <p class="text-sm text-muted-foreground">
+                    {% call card_title() %}Join {{ organisation_name }}{% endcall %}
+                    {% call card_description() %}
                         {% if inviter %}{{ inviter.full_name() }} invited you.{% endif %}
                         Accepting adds <span class="font-medium text-foreground break-words">{{ email }}</span>
-                        to {{ organisation_name }} with the role <span class="font-medium text-foreground">{{ role or '—' }}</span>.
-                    </p>
+                        to {{ organisation_name }} with the role <span class="font-medium text-foreground">{{ role or '-' }}</span>.
+                    {% endcall %}
                     {% elif organisation_name %}
-                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Join {{ organisation_name }}</h1>
-                    <p class="text-sm text-muted-foreground">
+                    {% call card_title() %}Join {{ organisation_name }}{% endcall %}
+                    {% call card_description() %}
                         {% if inviter %}{{ inviter.full_name() }} invited you.{% endif %}
                         Choose a password for <span class="font-medium text-foreground break-words">{{ email }}</span> to accept.
-                    </p>
+                    {% endcall %}
                     {% else %}
-                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Create your password</h1>
-                    <p class="text-sm text-muted-foreground">Set up your account by creating a password</p>
+                    {% call card_title() %}Create your password{% endcall %}
+                    {% call card_description() %}Set up your account by creating a password{% endcall %}
                     {% endif %}
-                </div>
-                <div class="p-6 pt-0">
+                {% endcall %}
+                {% call card_content() %}
                     {% if existing %}
                     <div class="flex flex-wrap gap-3" data-join-existing>
                         <form method="POST" action="{{ join_url }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="decision" value="accept">
-                            <button type="submit"
-                                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
-                                Accept invitation
-                            </button>
+                            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                            {{ input(type='hidden', name='decision', value='accept') }}
+                            {{ button(type='submit', text='Accept invitation') }}
                         </form>
                         <form method="POST" action="{{ join_url }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="decision" value="decline">
-                            <button type="submit"
-                                class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
-                                Decline
-                            </button>
+                            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                            {{ input(type='hidden', name='decision', value='decline') }}
+                            {{ button(type='submit', variant='outline', text='Decline') }}
                         </form>
                     </div>
                     {% else %}
                     {{ f.render_form(form) }}
                     {% endif %}
-                </div>
-            </div>
+                {% endcall %}
+            {% endcall %}
         </div>
     </div>
     {% if not existing %}{{ check.password_check('password', 0) }}{% endif %}

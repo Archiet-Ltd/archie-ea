@@ -341,6 +341,12 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register principle tenancy backfill CLI: {e}")
 
     try:
+        from app.commands.backfill_vendor_links import init_app as init_vendor_links
+        init_vendor_links(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register vendor link backfill CLI: {e}")
+
+    try:
         from app.commands.backfill_outcome_org import init_app as init_outcome_org
         init_outcome_org(app)
         app.logger.info("✅ Outcome tenancy backfill CLI command registered")
@@ -367,6 +373,12 @@ def init_cli(app):
         app.logger.info("Capability tenancy cutover CLI command registered")
     except Exception as e:
         app.logger.warning(f"Failed to register capability tenancy cutover CLI: {e}")
+
+    try:
+        from app.commands.refresh_company_signals import init_app as init_company_signals
+        init_company_signals(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register company signals CLI: {e}")
 
     try:
         from app.commands.backfill_capability_types import init_app as init_capability_types
@@ -538,6 +550,14 @@ def init_cli(app):
         app.logger.info("✅ Demo company seed CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
+
+    # T-seed04: remove and re-seed the demonstration company
+    try:
+        from app.commands import reset_demo_company
+        reset_demo_company.init_app(app)
+        app.logger.info("Demo company reset CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register demo company reset CLI: {e}")
 
 # Domain element backfill
     try:
