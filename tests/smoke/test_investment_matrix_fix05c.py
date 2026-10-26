@@ -5,10 +5,11 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.smoke.conftest import PASSWORD
+from tests.smoke.test_strategic_modals_fix05f import linked_portfolio  # noqa: F401
 
 PAGE_TIMEOUT = 30000
 
-STRATEGIC_URL = "/architecture/investment-priorities"
+STRATEGIC_URL = "/strategic/investment-matrix"
 ENTERPRISE_URL = "/enterprise/strategic/investment-matrix"
 
 VIEWPORTS = [
@@ -26,9 +27,9 @@ def _login(page, base, email):
 
 
 @pytest.fixture(scope="module")
-def seeded_org(seeded):
-    """Use the existing seeded org from the capability type journey test."""
-    return seeded["emails"]["enterprise_architect"]
+def seeded_org(linked_portfolio):
+    """An organisation whose capabilities are linked to an application, so the matrix has rows."""
+    return linked_portfolio["emails"]["enterprise_architect"]
 
 
 @pytest.mark.smoke
