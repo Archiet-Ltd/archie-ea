@@ -551,6 +551,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+    # T-seed04: remove and re-seed the demonstration company
+    try:
+        from app.commands import reset_demo_company
+        reset_demo_company.init_app(app)
+        app.logger.info("Demo company reset CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register demo company reset CLI: {e}")
+
 # Domain element backfill
     try:
         from app.commands.backfill_domain_elements import init_app as init_domain_elements
