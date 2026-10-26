@@ -97,3 +97,31 @@ def test_create_batch_import_job_via_paste_and_reload(browser, live_server, seed
     h1_text = page.locator("h1").first.inner_text()
     assert job_name in h1_text, "job name %r not in page <h1> %r" % (job_name, h1_text)
     context.close()
+
+
+def test_a_successful_import_names_the_file_it_is_importing(browser, live_server, seeded, tmp_path):
+    """The toast after submitting says which file is being imported, not a job number."""
+    csv = tmp_path / "applications.csv"
+    csv.write_text("name,description\nSmkApp1,First\nSmkApp2,Second\n", encoding="utf-8")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    _login(page, live_server, seeded["emails"]["data_architect"])
+    page.add_init_script("window.__toasts = []; window.showToast = function (m) { window.__toasts.push(m); };")
+    # the job is created for real by the server; the answer is held back from the page so that it stays and shows its toast
+    page.route("**/api/batch-import/jobs", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"success": true}') if route.request.method == "POST" else route.continue_())
+    page.goto(live_server + "/batch-import/new", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_selector('[role="tab"]', timeout=PAGE_TIMEOUT)
+    page.locator("#jobName").fill("File toast %s" % uuid.uuid4().hex[:6])
+    page.locator("#fileUpload").set_input_files(str(csv))
+    page.wait_for_timeout(1500)
+    button = page.get_by_role("button", name="Create Import Job")
+    expect(button.first).to_be_enabled(timeout=PAGE_TIMEOUT)
+    button.first.click()
+    for _ in range(40):
+        if page.evaluate("window.__toasts.length"):
+            break
+        page.wait_for_timeout(250)
+    toasts = page.evaluate("window.__toasts")
+    assert toasts == ["Importing applications.csv; it appears in the list below."], toasts
+    context.close()

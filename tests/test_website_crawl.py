@@ -735,3 +735,55 @@ def test_the_progress_says_when_the_first_facts_are_ready(make_org, site):
     assert "facts_ready" in stages
     assert "reading" not in stages[stages.index("facts_ready"):], "reading went back after the first facts were ready"
     assert stages[-1] == "facts_ready"
+
+
+# ---------------------------------------------------------------- polish01: QA-030, a name that matches nothing is never sure
+
+@pytest.mark.parametrize("static, url", [
+    # structured data names the company "Ifiok" on archiet.dev: neither the address nor a declared site name says so
+    ({"title": "Ifiok \u2014 Spec-Driven Development Platform | PRD to Code in 12 Stacks", "text_length": 900,
+      "company_name": {"value": "Ifiok", "confidence": 1.0}, "site_name": ""}, "https://archiet.dev/"),
+    # the same name from the title alone
+    ({"title": "Ifiok \u2014 Spec-Driven Development Platform | PRD to Code in 12 Stacks", "text_length": 900}, "https://archiet.dev/"),
+])
+def test_a_name_that_matches_neither_the_address_nor_the_site_name_is_at_most_seventy_percent(static, url):
+    from app.modules.organization.website_crawl.service import _home_page_company_name
+
+    got = _home_page_company_name({"url": url, "static": static})
+    assert got["value"] == "Ifiok" and got["confidence"] <= 0.7, got
+
+
+def test_a_declared_site_name_that_matches_the_address_keeps_its_confidence():
+    from app.modules.organization.website_crawl.service import _home_page_company_name
+
+    got = _home_page_company_name({"url": "https://cal.com/", "static": {
+        "title": "Cal.com | Scheduling", "text_length": 900, "company_name": {"value": "Cal.com", "confidence": 1.0}, "site_name": ""}})
+    assert got["value"] == "Cal.com" and got["confidence"] == 1.0, got
+
+
+def test_the_crawl_proposes_a_json_ld_name_that_matches_nothing_at_seventy_percent(make_org):
+    import json as _json
+
+    from app.modules.organization.website_crawl import crawl_organization_website, pending_website_proposals
+
+    def model(prompt):
+        if "Business Model Inference" in prompt:
+            return _json.dumps({"business_model": {}, "company_stage": {}, "technology_stack": {}, "competitive_positioning": {},
+                                "data_quality": {"completeness_score": 0.5, "reliability_score": 0.5}})
+        if "Indicators for Full Chromium Rendering" in prompt:
+            return _json.dumps({"rendering_strategy": "static", "confidence": 0.9})
+        if "HTML structure analyzer" in prompt:
+            return _json.dumps({"extraction_strategy": {"recommended_selectors": []}})
+        return _json.dumps({"company": {"name": "Ifiok"}, "field_confidence": {"company_name": 1.0}})
+
+    body = ("<!doctype html><html><head><title>Ifiok \u2014 Spec-Driven Development Platform | PRD to Code in 12 Stacks</title>"
+            '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Ifiok"}</script>'
+            "</head><body><main><h1>Spec-driven development</h1><p>%s</p></main></body></html>" % ("We turn a product spec into code. " * 12))
+    site = _Site({"/": (200, "text/html", body), "/robots.txt": (200, "text/plain", "")})
+    try:
+        org = _org(make_org, site.url)
+        crawl_organization_website(org.id, llm=model)
+        names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
+        assert [r["value"] for r in names] == ["Ifiok"] and names[0]["confidence"] <= 0.7, names
+    finally:
+        site.stop()

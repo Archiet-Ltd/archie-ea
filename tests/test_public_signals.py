@@ -711,3 +711,38 @@ def test_a_licence_a_lawsuit_a_regulation_and_open_versus_closed_source_each_get
         got, reason = service.pestle_reason("mention", title)
         assert got == factor and word in reason, (title, got, reason)
     assert service.pestle_reason("mention", "Linear A is still undeciphered after a century") == (None, None)
+
+
+# ----------------------------------------------------------------------------- polish01: QA-023 leftovers, QA-007 follow-up
+
+def test_a_name_inside_a_hyphenated_word_is_not_the_company():
+    assert not src.names_company("Show HN: I built a non-linear UI for ChatGPT", "Linear")
+    assert not src.names_company("Linear-algebra flashcards", "Linear")
+    assert src.names_company("Linear raises $35M", "Linear")
+    assert src.names_company("Show HN: Linear \u2013 issue tracking", "Linear")
+    assert src.names_company("Launch HN: PostHog (YC W20) - open source analytics", "PostHog")
+
+
+def test_someone_elses_tool_that_connects_to_the_company_does_not_count():
+    domain = "linear.app"
+    other = "https://synclinear.com/"
+    assert not src.counts_as_news("Synclinear.com to Sync Linear.app with GitHub", "Linear", domain, other)
+    assert not src.counts_as_news("Show HN: I built a non-linear UI for ChatGPT", "Linear", domain,
+                                  "https://news.ycombinator.com/item?id=5")
+    assert not src.counts_as_news("Show HN: Sync Jira tickets with Linear", "Linear", domain, "https://syncer.example/")
+    assert src.counts_as_news("Show HN: Linear \u2013 issue tracking for software teams", "Linear", domain, "https://linear.app/")
+    assert src.counts_as_news("Linear raises $35M Series B led by Accel", "Linear", domain, "https://news.ycombinator.com/item?id=6")
+
+
+def test_an_unsupported_stored_currency_falls_back_to_gbp(app, db_session, make_org):
+    from app.services.application_cost_accessor import get_reporting_currency
+    from config import CurrencyConfig
+
+    org = make_org("currency")
+    org.reporting_currency = "usd"
+    db_session.commit()
+    assert get_reporting_currency(org.id) == CurrencyConfig.get_org_currency_code(organization_id=org.id) == "USD"
+    org.reporting_currency = "ZZZ"
+    db_session.commit()
+    assert get_reporting_currency(org.id) == "GBP"
+    assert CurrencyConfig.get_org_currency_code(organization_id=org.id) == "GBP"
