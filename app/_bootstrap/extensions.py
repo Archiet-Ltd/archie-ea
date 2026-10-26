@@ -461,6 +461,44 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Sign-ups (founder, 26 Oct 2026): mail the founder once when a new account has no first answer 30
+        # minutes after sign-up (checked every five minutes), and a report of the last day's sign-ups each
+        # morning. Both are platform jobs, not per-organisation, and send nothing without FOUNDER_ALERT_EMAIL.
+        def run_signup_alerts():
+            with app.app_context():
+                try:
+                    from app.services.signup_attribution import alert_stuck_accounts
+                    alert_stuck_accounts(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler signup-alert error: %s", exc)
+
+        def run_signup_report():
+            with app.app_context():
+                try:
+                    from app.services.signup_attribution import send_daily_report
+                    send_daily_report(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler signup-report error: %s", exc)
+
+        scheduler.add_job(
+            func=run_signup_alerts,
+            trigger=IntervalTrigger(minutes=5),
+            id="signup_alerts",
+            name="Stuck Sign-up Alert",
+            replace_existing=True,
+            max_instances=1,
+        )
+        scheduler.add_job(
+            func=run_signup_report,
+            trigger=CronTrigger(hour=8, minute=0),
+            id="signup_report",
+            name="Daily Sign-up Report",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Per-owner in-app notification digest: email each opted-in user their
         # own unread in-app notifications. Daily, like the maturity/summary
         # digests; per-day idempotency and weekly_digest / digest_frequency
