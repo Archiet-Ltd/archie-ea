@@ -253,7 +253,7 @@ def test_the_architect_reads_the_record_and_reaches_an_element(browser, live_ser
         # Options and decision: the leader, the comparison and the decision record.
         page.goto("%s/solutions/%d?tab=options" % (live_server, sid), wait_until="domcontentloaded")
         assert page.locator("[data-testid=option-row]").count() == len(OPTIONS)
-        assert "is recommended" in page.get_by_test_id("options-recommendation").inner_text()
+        assert "Recommended" in page.get_by_test_id("options-recommendation").inner_text()
         assert "one store of readings" in page.get_by_test_id("options-decision").inner_text()
         page.screenshot(path=str(SHOTS / "options-1440.png"), full_page=True)
 

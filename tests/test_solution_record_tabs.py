@@ -117,7 +117,7 @@ def test_options_show_the_leader_and_the_decision(record):
 
     html = client.get(f"/solutions/{solution.id}?tab=options").get_data(as_text=True)
     assert 'data-testid="options-table"' in html and html.count('data-testid="option-row"') == 2
-    assert "Build on the ledger is recommended" in html
+    assert "Recommended" in html and "Build on the ledger." in html
     assert 'data-testid="options-decision"' in html and "It keeps one store of readings." in html
     assert f"/solutions/{solution.id}/options-advisor" in html
 

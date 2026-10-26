@@ -20,13 +20,15 @@
 {%- set total = rows|length -%}
 {%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
 {%- set cells = caller -%}
+{%- set ns = namespace(cols=[(first, '!pl-6')]) -%}
+{%- for c in columns -%}{%- set ns.cols = ns.cols + [(c[0], (c[1] ~ ' whitespace-nowrap')|trim)] -%}{%- endfor -%}
 <div x-data="{ currentPage: 1, pageSize: {{ page_size }}, totalItems: {{ total }}, totalPages: {{ pages }} }" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}">
-  {% call dense_table(columns=[(first, '!pl-6')] + columns, rows=total, caption=caption, testid=testid, flush=flush) %}
+  {% call dense_table(columns=ns.cols, rows=total, caption=caption, testid=testid, flush=flush) %}
     {% for row in rows %}
     <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="{{ row_testid }}"{% if total > page_size %} x-show="Math.ceil({{ loop.index }} / pageSize) === currentPage"{% endif %}>
       <td class="px-2 !pl-6 align-middle">
         {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
-        {% if row.description %}<span class="block max-w-md truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
+        {% if row.description %}<span class="block max-w-md text-xs text-muted-foreground line-clamp-1">{{ row.description }}</span>{% endif %}
       </td>
       {{ cells(row) }}
     </tr>

@@ -195,7 +195,7 @@
             {% endcall %}
             {% call card_content(class='p-0') %}
               {% call(e) element_table(rows=g.elements, columns=[('Type', ''), ('Change', ''), ('Note', 'hidden md:table-cell')], caption=g.label ~ ' elements', testid='design-table-' ~ g.layer, row_testid='design-row', link_testid='design-element-link') %}
-                <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
+                <td class="whitespace-nowrap px-2 align-middle text-muted-foreground">{{ e.type }}</td>
                 <td class="px-2 align-middle">{% call badge(variant=change_variant.get(e.change, 'neutral')) %}{{ e.change }}{% endcall %}</td>
                 <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ e.notes }}</td>
               {% endcall %}
@@ -319,7 +319,7 @@
             </div>
           </div>
           {% if reqs.unrealised %}
-            {{ alert(kind='warning', title=reqs.unrealised ~ ' requirement' ~ ('s' if reqs.unrealised != 1 else '') ~ ' not yet realised by a design element', text='Link each one to the application, data or technology element that delivers it, so the matrix and the design agree.', link_href=base ~ '?tab=design', link_text='Open Design', testid='requirements-unrealised') }}
+            {{ alert(kind='warning', title=reqs.unrealised ~ ' not yet realised', text='Link each requirement to the application, data or technology element that delivers it, so the matrix and the design agree.', link_href=base ~ '?tab=design', link_text='Open Design', testid='requirements-unrealised') }}
           {% endif %}
           {% if reqs.rows %}
           {% call card(class='overflow-hidden') %}
@@ -329,8 +329,8 @@
             {% endcall %}
             {% call card_content(class='p-0') %}
               {% call(r) element_table(rows=reqs.rows, columns=[('Kind', ''), ('Priority', ''), ('Realised by', ''), ('Status', 'hidden md:table-cell')], caption='Requirements', testid='requirements-table', first='Requirement', row_testid='requirement-row', link_testid='requirement-link') %}
-                <td class="px-2 align-middle text-muted-foreground">{{ r.kind }}</td>
-                <td class="px-2 align-middle">
+                <td class="whitespace-nowrap px-2 align-middle text-muted-foreground">{{ r.kind }}</td>
+                <td class="whitespace-nowrap px-2 align-middle">
                   {% if r.priority %}{% call badge(variant='outline') %}{{ r.priority }}{% endcall %}
                   {% elif r.mandatory %}{% call badge(variant='outline') %}Mandatory{% endcall %}
                   {% else %}<span class="text-muted-foreground">Not set</span>{% endif %}
@@ -354,7 +354,7 @@
             {% endcall %}
             {% call card_content(class='p-0') %}
               {% call(c) element_table(rows=reqs.constraints, columns=[('Kind', ''), ('Limit', ''), ('Weight', 'hidden md:table-cell')], caption='Constraints', testid='constraints-table', first='Constraint', row_testid='constraint-row') %}
-                <td class="px-2 align-middle text-muted-foreground">{{ c.kind }}</td>
+                <td class="whitespace-nowrap px-2 align-middle text-muted-foreground">{{ c.kind }}</td>
                 <td class="px-2 align-middle text-foreground">{{ c.value or 'Not quantified' }}</td>
                 <td class="hidden px-2 align-middle md:table-cell">{% call badge(variant='warning' if c.hard else 'outline') %}{{ 'Hard' if c.hard else 'Soft' }}{% endcall %}</td>
               {% endcall %}
@@ -369,7 +369,7 @@
             {% endcall %}
             {% call card_content(class='p-0') %}
               {% call(e) element_table(rows=reqs.motivation, columns=[('Type', ''), ('Change', ''), ('Note', 'hidden md:table-cell')], caption='Motivation elements', testid='motivation-table', row_testid='motivation-row', link_testid='motivation-link') %}
-                <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
+                <td class="whitespace-nowrap px-2 align-middle text-muted-foreground">{{ e.type }}</td>
                 <td class="px-2 align-middle">{% call badge(variant=change_variant.get(e.change, 'neutral')) %}{{ e.change }}{% endcall %}</td>
                 <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ e.notes }}</td>
               {% endcall %}
@@ -388,7 +388,7 @@
             {{ button(text='Compare options', variant='outline', size='sm', icon='scale', href=opt.compare_href, testid='options-compare') }}
           </div>
           {% if opt.leader %}
-            {{ alert(kind='success', title=opt.leader.name ~ ' is recommended', text=(opt.leader.summary or (opt.decision.rationale if opt.decision else '')), testid='options-recommendation') }}
+            {{ alert(kind='success', title='Recommended', text=opt.leader.name ~ '. ' ~ (opt.leader.summary or (opt.decision.rationale if opt.decision else '')), testid='options-recommendation') }}
           {% endif %}
           {% if opt.options %}
           {% call card(class='overflow-hidden') %}
@@ -398,9 +398,9 @@
             {% endcall %}
             {% call card_content(class='p-0') %}
               {% if opt.source == 'options' %}
-                {% set opt_columns = [('Option', '!pl-6'), ('Fit', ''), ('Coverage', ''), ('Risk', ''), ('Summary', 'hidden md:table-cell')] %}
+                {% set opt_columns = [('Option', '!pl-6'), ('Fit', 'whitespace-nowrap'), ('Coverage', 'whitespace-nowrap'), ('Risk', 'whitespace-nowrap'), ('Summary', 'hidden md:table-cell')] %}
               {% else %}
-                {% set opt_columns = [('Option', '!pl-6'), ('Approach', ''), ('Cost', ''), ('Time', ''), ('Risk', ''), ('Summary', 'hidden lg:table-cell')] %}
+                {% set opt_columns = [('Option', '!pl-6'), ('Approach', 'whitespace-nowrap'), ('Cost', 'whitespace-nowrap'), ('Time', 'whitespace-nowrap'), ('Risk', 'whitespace-nowrap'), ('Summary', 'hidden lg:table-cell')] %}
               {% endif %}
               {% call dense_table(columns=opt_columns, rows=opt.options|length, caption='Options compared', testid='options-table', flush=true) %}
                 {% for o in opt.options %}
@@ -410,16 +410,16 @@
                     {% if o.recommended %} {% call badge(variant='success') %}Leader{% endcall %}{% endif %}
                   </td>
                   {% if opt.source == 'options' %}
-                  <td class="px-2 align-middle tabular-nums text-foreground">{{ o.fit or 'Not scored' }}</td>
-                  <td class="px-2 align-middle tabular-nums text-foreground">{{ o.coverage or 'Not scored' }}</td>
-                  <td class="px-2 align-middle tabular-nums text-foreground">{{ o.risk or 'Not scored' }}</td>
+                  <td class="whitespace-nowrap px-2 align-middle tabular-nums text-foreground">{{ o.fit or 'Not scored' }}</td>
+                  <td class="whitespace-nowrap px-2 align-middle tabular-nums text-foreground">{{ o.coverage or 'Not scored' }}</td>
+                  <td class="whitespace-nowrap px-2 align-middle tabular-nums text-foreground">{{ o.risk or 'Not scored' }}</td>
                   {% else %}
-                  <td class="px-2 align-middle text-muted-foreground">{{ o.approach or 'Not stated' }}</td>
-                  <td class="px-2 align-middle text-foreground">{{ o.cost or 'Not stated' }}</td>
-                  <td class="px-2 align-middle text-foreground">{% if o.months %}{{ o.months }} month{{ 's' if o.months != 1 }}{% else %}Not stated{% endif %}</td>
-                  <td class="px-2 align-middle">{% if o.risk %}{% call badge(variant={'Low': 'success', 'Medium': 'warning', 'High': 'danger'}.get(o.risk, 'outline')) %}{{ o.risk }}{% endcall %}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}</td>
+                  <td class="whitespace-nowrap px-2 align-middle text-muted-foreground">{{ o.approach or 'Not stated' }}</td>
+                  <td class="whitespace-nowrap px-2 align-middle text-foreground">{{ o.cost or 'Not stated' }}</td>
+                  <td class="whitespace-nowrap px-2 align-middle text-foreground">{% if o.months %}{{ o.months }} month{{ 's' if o.months != 1 }}{% else %}Not stated{% endif %}</td>
+                  <td class="whitespace-nowrap px-2 align-middle">{% if o.risk %}{% call badge(variant={'Low': 'success', 'Medium': 'warning', 'High': 'danger'}.get(o.risk, 'outline')) %}{{ o.risk }}{% endcall %}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}</td>
                   {% endif %}
-                  <td class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}"><span class="block max-w-md truncate">{{ o.summary }}</span></td>
+                  <td class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}"><span class="block max-w-md line-clamp-1">{{ o.summary }}</span></td>
                 </tr>
                 {% endfor %}
               {% endcall %}
@@ -466,7 +466,7 @@
             </div>
           </div>
           {% if rk.without_owner %}
-            {{ alert(kind='warning', title=rk.without_owner ~ ' risk' ~ ('s' if rk.without_owner != 1 else '') ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
+            {{ alert(kind='warning', title=rk.without_owner ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
           {% endif %}
           <div class="grid gap-6 lg:grid-cols-3">
             {% call card(class='lg:col-span-1') %}
@@ -503,16 +503,16 @@
                 {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
               {% endcall %}
               {% call card_content(class='p-0') %}
-                {% call dense_table(columns=[('Risk', '!pl-6'), ('Owner', ''), ('Score', ''), ('Status', 'hidden md:table-cell')], rows=rk.rows|length, caption='Risks', testid='risks-table', flush=true) %}
+                {% call dense_table(columns=[('Risk', '!pl-6'), ('Owner', 'whitespace-nowrap'), ('Score', 'whitespace-nowrap'), ('Status', 'hidden md:table-cell whitespace-nowrap')], rows=rk.rows|length, caption='Risks', testid='risks-table', flush=true) %}
                   {% for r in rk.rows %}
                   <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="risk-row">
                     <td class="px-2 !pl-6 align-middle">
                       <a href="{{ r.href }}" class="font-medium text-foreground hover:underline" data-testid="risk-link">{{ r.title }}</a>
                       {% if r.via %}<span class="block text-xs text-muted-foreground">through {{ r.via }}</span>{% endif %}
-                      {% if r.mitigation %}<span class="block max-w-md truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
+                      {% if r.mitigation %}<span class="block max-w-md line-clamp-1 text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
                     </td>
                     <td class="px-2 align-middle">{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}</td>
-                    <td class="px-2 align-middle">{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[r.band]) %}{{ r.band_label }} {{ r.score }}{% endcall %}</td>
+                    <td class="whitespace-nowrap px-2 align-middle">{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[r.band]) %}{{ r.band_label }} {{ r.score }}{% endcall %}</td>
                     <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ r.status }}</td>
                   </tr>
                   {% endfor %}
@@ -540,21 +540,21 @@
               {% call card_description() %}The delivery work of this solution, in order, with what each depends on and what needs it.{% endcall %}
             {% endcall %}
             {% call card_content(class='p-0') %}
-              {% call dense_table(columns=[('Work package', '!pl-6'), ('Status', ''), ('Progress', ''), ('Dates', 'hidden lg:table-cell'), ('Owner', 'hidden md:table-cell'), ('Depends on', 'hidden md:table-cell'), ('Needed by', 'hidden md:table-cell')], rows=dl.packages|length, caption='Work packages', testid='delivery-table', flush=true) %}
+              {% call dense_table(columns=[('Work package', '!pl-6 whitespace-nowrap'), ('Status', 'whitespace-nowrap'), ('Progress', 'whitespace-nowrap'), ('Dates', 'hidden lg:table-cell whitespace-nowrap'), ('Owner', 'hidden md:table-cell whitespace-nowrap'), ('Depends on', 'hidden md:table-cell whitespace-nowrap'), ('Needed by', 'hidden md:table-cell whitespace-nowrap')], rows=dl.packages|length, caption='Work packages', testid='delivery-table', flush=true) %}
                 {% for p in dl.packages %}
                 <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="work-package-row">
                   <td class="px-2 !pl-6 align-middle">
                     {% if p.href %}<a href="{{ p.href }}" class="font-medium text-foreground hover:underline" data-testid="work-package-link">{{ p.name }}</a>{% else %}<span class="font-medium text-foreground">{{ p.name }}</span>{% endif %}
                     {% if p.plateau %}<span class="block text-xs text-muted-foreground">Plateau {{ p.plateau }}</span>{% endif %}
                   </td>
-                  <td class="px-2 align-middle">{% call badge(variant={'Completed': 'success', 'Done': 'success', 'In progress': 'info', 'Blocked': 'danger', 'On hold': 'warning'}.get(p.status, 'outline')) %}{{ p.status }}{% endcall %}</td>
+                  <td class="whitespace-nowrap px-2 align-middle">{% call badge(variant={'Completed': 'success', 'Done': 'success', 'In progress': 'info', 'Blocked': 'danger', 'On hold': 'warning'}.get(p.status, 'outline')) %}{{ p.status }}{% endcall %}</td>
                   <td class="px-2 align-middle">
                     <div class="flex items-center gap-2" data-testid="work-package-progress" data-percent="{{ p.percent }}">
                       {{ progress(value=p.percent, class='h-2 w-20') }}
                       <span class="text-xs tabular-nums text-muted-foreground">{{ p.percent }}%</span>
                     </div>
                   </td>
-                  <td class="hidden px-2 align-middle text-muted-foreground lg:table-cell">{% if p.start or p.target %}{{ p.start|format_datetime('d MMM yyyy') if p.start else 'Start not set' }} to {{ p.target|format_datetime('d MMM yyyy') if p.target else 'end not set' }}{% else %}Not scheduled{% endif %}</td>
+                  <td class="hidden px-2 align-middle text-muted-foreground lg:table-cell">{% if p.start or p.target %}<span class="block whitespace-nowrap">{{ p.start|format_datetime('d MMM yyyy') if p.start else 'Start not set' }}</span><span class="block whitespace-nowrap text-xs">to {{ p.target|format_datetime('d MMM yyyy') if p.target else 'end not set' }}</span>{% else %}Not scheduled{% endif %}</td>
                   <td class="hidden px-2 align-middle md:table-cell">{% if p.owner %}<span class="text-foreground">{{ p.owner }}</span>{% else %}<span class="text-muted-foreground">No owner yet</span>{% endif %}</td>
                   <td class="hidden px-2 align-middle text-muted-foreground md:table-cell" data-testid="work-package-depends">{{ p.depends_on|join(', ') if p.depends_on else 'Nothing' }}</td>
                   <td class="hidden px-2 align-middle text-muted-foreground md:table-cell" data-testid="work-package-needed">{{ p.needed_by|join(', ') if p.needed_by else 'Nothing' }}</td>
