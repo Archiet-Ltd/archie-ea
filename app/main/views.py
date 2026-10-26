@@ -948,6 +948,9 @@ def public_use_case(slug):
             return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
