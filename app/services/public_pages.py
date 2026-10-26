@@ -448,20 +448,17 @@ class PublicPage:
     def wave_closed(self) -> bool:
         """True while the wave switch (RELEASE_WAVE) is on and this page's screen opens in a later wave.
 
-        A page names its wave in front matter (``wave: W3``) or through the product screen it describes
-        (``endpoint:``); a page with neither is not gated. Such a page is out of the sitemap and every menu
+        Every content page names its wave in front matter (``wave: 1`` to ``wave: 5``, or ``wave: EA``
+        for early access); a page that names none is closed. A closed page is out of the sitemap and every menu
         and shows the early-access page at its own address instead of describing a screen that is not open.
         """
-        from app.release_waves import OPEN, configured_wave, is_released_endpoint, state_for
+        from app.release_waves import OPEN, configured_wave, page_wave_code, state_for
 
         wave = configured_wave()
         if wave is None:
             return False
-        code = self.front_matter.get("wave")
-        if code:
-            return state_for([str(code), "", "page", None, None], wave) != OPEN
-        endpoint = self.front_matter.get("endpoint")
-        return bool(endpoint) and not is_released_endpoint(str(endpoint))
+        # a page with no wave is closed, never open by default (tests/test_release_waves.py fails for it)
+        return state_for([page_wave_code(self.front_matter.get("wave")), "", "page", None, None], wave) != OPEN
 
     @property
     def description(self) -> str | None:

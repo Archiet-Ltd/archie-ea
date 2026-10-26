@@ -298,3 +298,26 @@ def test_a_signed_out_crawl_of_every_plain_get_page_never_errors_under_wave_one(
                     assert b"early-access-page" in rv.data, rule.rule
     assert seen > 100
     assert not bad, bad[:10]
+
+
+def test_every_public_content_page_names_its_wave():
+    """Role, use-case, module, comparison, connector, site, legal and story pages each say which wave they
+    belong to (wave: 1 to 5, or EA). A page that says nothing fails here; at runtime it is closed."""
+    from app.release_waves import page_wave_code
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    assert len(pages) >= 100
+    missing = [p.url for p in pages if page_wave_code(p.front_matter.get("wave")) == "X"]
+    assert not missing, f"{len(missing)} content pages name no wave: {missing[:10]}"
+
+
+def test_a_use_case_page_of_a_later_wave_answers_early_access_and_a_first_wave_page_its_body(wave1):
+    client = wave1.test_client()
+    later = client.get("/use-cases/duplicate-software-spend")
+    assert later.status_code == 200 and b"early-access-page" in later.data
+    first = client.get("/use-cases/what-i-own")
+    assert first.status_code == 200 and b"early-access-page" not in first.data
+    role = client.get("/roles/chief-architects")
+    assert b"early-access-page" in role.data
+    assert b"early-access-page" not in client.get("/roles/startup-founder").data

@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: dogfood
 page_role: "The proof story — Archiet Ltd's own operating model, run on Entelim."
 source: founder-vision-2026-09-24.md

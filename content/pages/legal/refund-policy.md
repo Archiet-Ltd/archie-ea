@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: legal
 title: "Refund policy"
 page_role: "Cancellation and refund terms for business subscriptions."

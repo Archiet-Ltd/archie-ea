@@ -62,6 +62,16 @@ def _wave_number(code: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def page_wave_code(value) -> str:
+    """A content page's front-matter wave (3, "3", "W3", "EA") as a map code; anything else is "X" (closed)."""
+    text = str(value).strip().upper() if value is not None else ""
+    if re.fullmatch(r"[0-6]", text):
+        return "W" + text
+    if re.fullmatch(r"W[0-6]", text) or text in ("EA", "RT"):
+        return text
+    return "X"
+
+
 def entry_for(rule: str, endpoint: str | None = None) -> list | None:
     """[wave, group, basis, to, ships] for a route rule, or None when the map does not list it."""
     rules = wave_map()["rules"]

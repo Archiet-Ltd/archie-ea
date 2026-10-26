@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Org Chart & RACI"
 endpoint: organization.index

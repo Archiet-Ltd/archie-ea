@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Architecture health check"
 page_role: "Fixed-price, one-time engagement page for the architecture health check offer."

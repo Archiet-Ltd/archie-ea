@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: legal
 title: "Data processing agreement"
 page_role: "UK GDPR Article 28 terms for customer personal data processed in the hosted service."
