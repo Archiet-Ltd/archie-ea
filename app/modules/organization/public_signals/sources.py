@@ -117,6 +117,13 @@ def name_variants(company: str) -> List[str]:
     return variants
 
 
+def legal_name_matches(filer: str, company: str) -> bool:
+    """True when a filer or assignee name is the company itself: the same name once legal endings (Inc., Corp, Ltd)
+    and bracketed tickers or numbers are set aside. "LINEAR TECHNOLOGY CORP" is not "Linear"."""
+    filer = re.sub(r"\([^)]*\)", " ", filer or "")
+    return bool(set(name_variants(filer)) & set(name_variants(company)))
+
+
 def names_domain(text: str, domain: Optional[str]) -> bool:
     """True when the company's web address (posthog.com, also www. or a subdomain of it) is written in the text."""
     host = (domain or "").strip().lower()
@@ -141,7 +148,7 @@ def link_is_on(link: Optional[str], domain: Optional[str]) -> bool:
 
 
 _LAUNCH_POST = re.compile(r"^\s*(show|launch|ask|tell)\s+hn\s*:", re.I)
-_COMPARING_BEFORE = re.compile(r"(\+|&|\bfor|\bvs\.?|\bversus|\blike|\bmeets|\binstead of|\b(alternatives?|competitors?|rivals?|replacement|clone) (to|of|for))\s*$", re.I)
+_COMPARING_BEFORE = re.compile(r"(\+|&|/|\bfor|\bvs\.?|\bversus|\blike|\bmeets|\binstead of|\b(alternatives?|competitors?|rivals?|replacement|clone) (to|of|for))\s*$", re.I)
 
 
 def _named_as_subject(title: str, variant: str) -> bool:
@@ -165,6 +172,55 @@ def uses_name_as_comparison(title: str, company: str) -> bool:
     variants = name_variants(company)
     present = [v for v in variants if names_company(title, v)]
     return bool(present) and not any(_named_as_subject(title, v) for v in present)
+
+
+_COMPANY_WORDS = {
+    "company", "startup", "founder", "founders", "ceo", "yc", "raises", "raised", "funding", "series", "valuation", "ipo",
+    "launches", "launched", "ships", "shipped", "releases", "released", "announces", "announced", "opens", "opened",
+    "acquires", "acquired", "acquisition", "hiring", "hires", "layoffs", "pricing", "roadmap", "changelog", "license",
+    "licence", "licensing", "open source", "closed source", "source code", "customers", "users", "product", "products",
+    "platform", "api", "sdk", "saas", "outage", "breach", "profile", "website",
+}
+_PREFIX = r"(?:(?:show|launch|ask|tell)\s+hn\s*:\s*)?"
+
+
+def has_company_context(title: str, company: str, words=()) -> bool:
+    """A name that is also an ordinary word needs company around it before a headline is about the company: the
+    headline opens with the name as its subject ("Linear: ...", "Linear's ...", "Launch HN: Linear"), or names what a
+    company does (raises, ships, pricing, open source) or one of its product words from the confirmed facts.
+    "Linear algebra", "Linear A" and "integer linear programming" have none of these."""
+    text = " ".join(re.findall(r"[a-z0-9]+", (title or "").lower()))
+    for v in name_variants(company):
+        shape = r"[^a-z0-9]*".join(re.escape(w) for w in v.split())
+        if re.match(r"^\W*%s%s(?:['\u2019]s\b|\s*[:\u2013\u2014|-](?:\s|$))" % (_PREFIX, shape), title or "", re.I):
+            return True
+        if re.match(r"^\W*(?:show|launch|ask|tell)\s+hn\s*:\s*%s(?=\s*(?:\(|[:\u2013\u2014|-]|$))" % shape, title or "", re.I):
+            return True
+    padded = " %s " % text
+    return any((" %s " % w) in padded for w in set(_COMPANY_WORDS) | set(words or ()))
+
+
+def is_single_name(company: str) -> bool:
+    """True when the name is one word (Linear, Cal.com, PostHog, Brand): other people's headlines reuse it, so it is
+    never enough alone. A name of two words or more (Northwind Freight) says which company it is."""
+    words = [w for w in re.split(r"[\s,]+", (company or "").strip()) if w]
+    while len(words) > 1 and words[-1].lower().strip(".") in _LEGAL_ENDINGS:
+        words.pop()
+    return len(words) == 1
+
+
+def counts_as_news(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None, words=()) -> bool:
+    """What a free-text search may keep: the company's web address is in the title or the story's own link is on it,
+    or the name is in the title as the company and not as a comparison, with company context around it."""
+    if link_is_on(link, domain):
+        return True
+    host = (domain or "").strip().lower()
+    host = host[4:] if host.startswith("www.") else host
+    if names_domain(title, host) and _named_as_subject(title, host) and _norm(host) not in name_variants(company):
+        return True  # its web address, written in the title, when that address is not also the name others reuse (cal.com)
+    if not is_single_name(company):  # a name of two words or more says which company it is
+        return is_about(title, company)
+    return is_about(title, company) and has_company_context(title, company, words)
 
 
 def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None) -> bool:
@@ -212,7 +268,7 @@ def sec_edgar(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
     for hit in (data.get("hits") or {}).get("hits") or []:
         src = hit.get("_source") or {}
         names = src.get("display_names") or []
-        if not any(names_company(n, query) for n in names):
+        if not any(legal_name_matches(n, query) for n in names):  # a filer that only shares a word with the name is another company
             continue
         form = src.get("form") or src.get("root_form") or "filing"
         ident, ciks = hit.get("_id") or "", src.get("ciks") or []
