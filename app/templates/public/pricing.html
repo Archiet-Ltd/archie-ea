@@ -10,6 +10,7 @@
 
 {% from 'components/public_faq.html' import faq_chevron %}
 {% from 'components/table.html' import table %}
+{% from 'components/button.html' import button %}
 {% from 'components/radio_group.html' import radio_group %}
 {% block title %}{{ page.title }}{% endblock %}
 
@@ -58,23 +59,23 @@
           <p class="pp-for">Evaluation, one-person companies and self-hosters.</p>
           <p class="pp-price">Free</p>
           <p class="pp-note">No trial clock. One organisation, up to three people.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
+          {{ button(text='Start free', href=url_for('main.track_plan_click', plan='community', next=url_for('account.register')), variant='outline', size='lg', class='h-auto w-full whitespace-normal text-center py-2', testid='buy-community') }}
           <div class="pp-alt"></div>
           <ul class="pp-list">
-            <li>Ask the AI chat what breaks, what is at risk and who is accountable</li>
-            <li>The ArchiMate Composer, drawing your systems, suppliers and dependencies</li>
-            <li>The Business Model Canvas</li>
-            <li>Import from files: ArchiMate Open Exchange and spreadsheets</li>
+            <li>Your company profile, drafted from your website for you to confirm</li>
+            <li>Your applications and who owns each one</li>
+            <li>Spreadsheet import with a preview, and the sample company</li>
+            <li>One overview and one health page</li>
             <li>Community support</li>
           </ul>
         </article>
 
         {# Startup and Team: price and buy button per interval #}
         {% for key, name, for_whom, items in [
-          ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
+          ('startup', 'Startup', 'Founders and small teams of up to ten people.',
             ['Ten people', 'Email support']),
           ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-            ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
+            ['Pay for editors only; people who only view are free', 'Minimum five editors', 'Email support'])
         ] %}
         {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
@@ -85,17 +86,11 @@
             {% if prices[1] %}<span data-interval="month">{{ prices[1] }}</span>{% endif %}
           </p>
           <p class="pp-note">
-            <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of ten. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
-            {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
+            <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of ten. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year, minimum five editors. People who only view are free.{% endif %}</span>
+            {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. Minimum five editors. People who only view are free.{% endif %}</span>{% endif %}
           </p>
-          {% if _billing %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
-             class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
-             class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
-          {% else %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-{{ key }}">Contact us to buy {{ name }}</a>
-          {% endif %}
+          {# Live charging opens with the next wave: until then the paid plans' button joins a waiting list (CLAUDE.md section 20). #}
+          {{ button(text='Join the waiting list for ' ~ name, href='/modules/paid-plans', variant='primary', size='lg', class='h-auto w-full whitespace-normal text-center py-2', testid='waitlist-' ~ key) }}
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
@@ -110,16 +105,14 @@
           <p class="pp-for">Enterprise architecture teams.</p>
           <p class="pp-price">{{ plan_prices.enterprise[0] }}</p>
           <p class="pp-note">Annual contract from USD 24,000/year.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
+          {{ button(text='Contact sales', href=url_for('main.track_plan_click', plan='enterprise', next='/contact'), variant='outline', size='lg', class='h-auto w-full whitespace-normal text-center py-2', testid='buy-enterprise') }}
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
             <li>Unlimited editors</li>
-            <li>SAML sign-in</li>
-            <li>Audit log export</li>
-            <li>Your own model key by default</li>
-            <li>Supported self-hosting and dedicated deployment</li>
-            <li>Custom service levels and a named support contact</li>
+            <li>An annual contract</li>
+            <li>Supported self-hosting</li>
+            <li>A named support contact</li>
           </ul>
         </article>
       </div>
@@ -127,7 +120,7 @@
 
     <section class="pp-section" aria-labelledby="compare-heading" data-testid="pricing-compare">
       <h2 id="compare-heading">Compare plans</h2>
-      <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
+      <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit and how you are supported. Paying for Startup and Team opens soon: join the waiting list, or start on Community today.</p>
       <div class="pp-frame rounded-2xl border border-border">
         {% call table(class='public-table public-table--fit') %}
           <caption class="sr-only">What each plan includes</caption>
@@ -142,30 +135,18 @@
           </thead>
           <tbody>
             {% set _rows = [
-              ('Modelling', [
-                ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit']),
-                ('Business Model Canvas', [1, 1, 1, 1]),
-                ('ArchiMate Composer for systems, suppliers and dependencies', [1, 1, 1, 1]),
-                ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
-              ]),
-              ('Questions and answers', [
-                ('AI chat: what breaks, what is at risk, who is accountable', [1, 1, 1, 1]),
-                ('The model as of a date, and what changed between two dates', [1, 1, 1, 1]),
-              ]),
-              ('Governance', [
-                ('Architecture review board workflow', [0, 0, 1, 1]),
-                ('Audit log export', [0, 0, 0, 1]),
-              ]),
-              ('Security and access', [
-                ('Single sign-on', [0, 0, 1, 1]),
-                ('SAML sign-in', [0, 0, 0, 1]),
-                ('Your own model key', [0, 0, 1, 'By default']),
-                ('Supported self-hosting and dedicated deployment', [0, 0, 0, 1]),
+              ('Your company', [
+                ('People included', ['3', '10', 'Editors you buy; people who only view are free', 'No limit']),
+                ('Company profile drafted from your website', [1, 1, 1, 1]),
+                ('Applications and owners', [1, 1, 1, 1]),
+                ('Spreadsheet import with a preview, and the sample company', [1, 1, 1, 1]),
+                ('Overview and health page', [1, 1, 1, 1]),
               ]),
               ('Support', [
                 ('Community support', [1, 1, 1, 1]),
                 ('Email support', [0, 1, 1, 1]),
-                ('Custom service levels and a named support contact', [0, 0, 0, 1]),
+                ('Supported self-hosting', [0, 0, 0, 1]),
+                ('A named support contact', [0, 0, 0, 1]),
               ]),
             ] %}
             {% for group, rows in _rows %}
@@ -191,7 +172,7 @@
         <h2 id="selfhost-heading">Self-hosting is always free</h2>
         <p>Entelim is open source under AGPL-3.0. Run it on your own infrastructure, at any size, for as long as you like. That path is the product, not a trial. A commercial licence exists for organisations that want Entelim run for them or need different terms.</p>
       </div>
-      <a href="https://github.com/Archiet-Ltd/archie-ea" class="public-btn public-btn--lg public-btn--primary" data-testid="selfhost-github">View on GitHub</a>
+      {{ button(text='View on GitHub', href='https://github.com/Archiet-Ltd/archie-ea', variant='primary', size='lg', testid='selfhost-github') }}
     </div>
   </section>
 
@@ -203,13 +184,13 @@
           <h3 class="public-card-title">Architecture health check</h3>
           <p class="public-card-body">We run Entelim over your own application data and deliver a written report within two weeks of kickoff.</p>
           <p class="pp-price pp-price--sm">USD 4,500<small>one time</small></p>
-          <a href="/architecture-health-check" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
+          {{ button(text='See what is included', href='/architecture-health-check', variant='outline', size='lg') }}
         </div>
         <div class="public-card">
           <h3 class="public-card-title">Team annual plan with onboarding</h3>
           <p class="public-card-body">The Team plan billed annually, plus working sessions to build your first model and import your data.</p>
           <p class="pp-price pp-price--sm">USD 1,500<small>one-time onboarding</small></p>
-          <a href="/team-annual-onboarding" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
+          {{ button(text='See what is included', href='/team-annual-onboarding', variant='outline', size='lg') }}
         </div>
       </div>
     </section>
@@ -223,7 +204,7 @@
         </details>
         <details>
           <summary>What happens when I add or remove seats?{{ faq_chevron() }}</summary>
-          <p>On Team you pay for editors, and people who only ask questions are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
+          <p>On Team you pay for editors (minimum five), and people who only view are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
         </details>
         <details>
           <summary>How are tax and VAT handled?{{ faq_chevron() }}</summary>
@@ -239,11 +220,11 @@
         </details>
         <details>
           <summary>Can I pay monthly instead of annually?{{ faq_chevron() }}</summary>
-          <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: USD 490/year for Startup and USD 290/editor/year for Team.</p>
+          <p>Yes, when paid plans open. Use the toggle above. Annual billing costs ten months for twelve: USD 490/year for Startup and USD 290/editor/year for Team, minimum five editors.</p>
         </details>
         <details>
           <summary>What if I already self-host Entelim?{{ faq_chevron() }}</summary>
-          <p>Move to a hosted plan whenever you want to stop running it yourself, and import your model from files. Keep self-hosting for as long as you like: it stays free. If you want Entelim run for you on dedicated infrastructure, talk to us about Enterprise.</p>
+          <p>Move to a hosted plan whenever you want to stop running it yourself, and bring your applications in from a spreadsheet. Keep self-hosting for as long as you like: it stays free. If you want Entelim run for you on dedicated infrastructure, talk to us about Enterprise.</p>
         </details>
       </div>
     </section>

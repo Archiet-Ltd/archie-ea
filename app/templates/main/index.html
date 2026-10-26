@@ -1,20 +1,20 @@
 {% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — See what breaks before you change it{% endblock %}
+{% block full_title %}Entelim — Know what your company runs and who owns it{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
-<meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
-<meta property="og:title" content="Entelim — See what breaks before you change it">
-<meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<meta name="description" content="Entelim reads your company website, drafts your company profile and builds one list of your systems and their owners that you can correct and trust. Free for up to three people.">
+<meta property="og:title" content="Entelim — Know what your company runs and who owns it">
+<meta property="og:description" content="One list of your systems and their owners, drafted from your website and corrected by you. Open source, free to start.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — See what breaks before you change it">
-<meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<meta name="twitter:title" content="Entelim — Know what your company runs and who owns it">
+<meta name="twitter:description" content="One list of your systems and their owners, drafted from your website and corrected by you. Open source, free to start.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim reads your company website and builds one list of your systems and their owners that you can correct and trust."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
 {% endif %}
@@ -32,298 +32,120 @@
 {% endblock %}
 
 {% block content %}
-<!-- Hero: category name first, product-in-search-terms second. One centred column, then the real
-     product window (the applications portfolio) in a browser frame. The captures are 2x and shown 1:1
-     (scripts/capture_proof_assets.py). -->
-<section class="home-hero home-hero--fold" data-testid="home-hero">
-  <div class="mx-auto max-w-5xl px-4 text-center">
-    <h1 class="home-display">
-      See what breaks before you change it.
-    </h1>
+{# Hero: what the first wave delivers, shown with real screens. The product image is a capture of the Overview of the
+   sample company (scripts/capture_proof_assets.py --home-overview); the file's own date is the capture date. #}
+{% set hero = {
+  'testid': 'home-hero',
+  'fold': true,
+  'badge_long': 'Open source, free to start',
+  'title': 'Know what your company runs and who owns it, in fifteen minutes.',
+  'lead': 'Give us your website. Entelim drafts your company profile from what is public, you correct it, then load your applications from a spreadsheet or try the sample company.',
+  'primary': ('Start free', url_for('account.register'), 'home-hero-start'),
+  'secondary': ('See pricing', '/pricing', 'home-hero-pricing'),
+  'figure': {
+    'url': url_for('static', filename='img/home/overview.webp'), 'width': 1280, 'height': 800,
+    'mobile_url': url_for('static', filename='img/home/overview-mobile.webp'), 'mobile_width': 390, 'mobile_height': 844,
+    'frame_label': 'Overview',
+    'alt': 'The Entelim overview of the sample company: its applications, who owns them and how complete the list is.',
+    'caption': 'The overview of the sample company, captured on 26 October 2026. Your own company appears here once you confirm your profile.',
+    'testid': 'home-hero-proof',
+  },
+} %}
+{% include 'public/_partials/_hero.html' %}
 
-    <p class="home-lead">
-      Connect GitHub and Entelim maps your services, owners and dependencies, then answers in plain words,
-      citing the file and commit behind every fact.
-    </p>
-
-    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      {{ button(text='Start free', href=url_for('account.register'), size='lg', testid='home-hero-start') }}
-      {{ button(text='See pricing', href='/pricing', variant='outline', size='lg', testid='home-hero-pricing') }}
-    </div>
-  </div>
-
-  <div class="home-hero__stage mt-6">
-    <figure class="home-hero__figure" data-testid="home-hero-figure">
-      <div class="home-frame">
-        <div class="home-frame__bar" aria-hidden="true">
-          <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">AI chat</span>
-        </div>
-        {# A real answer from the sample company in the AI chat, captured by scripts/capture_proof_assets.py --home-chat. #}
-        <picture>
-          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/chat-answer-mobile.webp') }}"
-                  width="374" height="529">
-          <img src="{{ url_for('static', filename='img/home/chat-answer.webp') }}"
-               alt="The AI chat answering what breaks if the Payments service fails: it lists the connections, and under each one the owner and the source the link was read from."
-               width="908" height="670" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
-        </picture>
-      </div>
-      <figcaption class="public-card-body mt-3 text-center">
-        A real answer in the AI chat: what depends on one system, with the owner and the source behind each connection.
-      </figcaption>
-    </figure>
-  </div>
-</section>
-
-<!-- 1. The category: the problem, the analogy, a capability not a department -->
-<section class="home-section">
+<!-- 1. See it in one sitting: the four steps the first wave delivers -->
+<section class="home-section" data-testid="home-one-sitting">
   <div class="container px-4">
     <div class="max-w-3xl">
-      <p class="home-eyebrow">The category</p>
-      <h2 class="home-h2">
-        Every enterprise runs on knowledge it cannot see in one place.
-      </h2>
-    </div>
-    <div class="mt-12 grid gap-6 lg:grid-cols-2 lg:gap-x-12">
-      <p class="home-section-lead !mt-0">
-        Every company, from a five-person startup to a global group, has a strategy, the capabilities that
-        deliver it, the systems and suppliers those capabilities depend on, the money it spends, the risks it
-        carries and the people who own each piece. That knowledge is spread across spreadsheets, diagrams,
-        contracts, tickets and people's heads. When someone asks "what breaks if this fails?", "what does this
-        really cost?" or "are we doing what we said we would?", the answer is assembled by hand, late, and rarely
-        trusted. An AI assistant asked the same question, with no grounded source to check, guesses &mdash;
-        confidently and wrongly.
-      </p>
-      <p class="home-section-lead !mt-0">
-        <strong>This isn't a search problem, and it isn't a chatbot problem.</strong>
-        Searching your documents faster doesn't fix knowledge that was never written down in a structured,
-        checkable form in the first place, and a chatbot trained on whatever it can find repeats the same gaps
-        with more confidence. What's missing is a living, explainable model of how the enterprise actually works
-        &mdash; its strategy, systems, data, people, money, risk and suppliers &mdash; kept current, and built so
-        both the people who run the business and the AI assistants working alongside them have one governed
-        source to ask instead of guessing.
-      </p>
-      <p class="home-section-lead !mt-0">
-        <strong>Enterprise Intelligence Management is the capability that builds that
-        model.</strong> Customer relationship management gave every company one record of its customers.
-        Enterprise resource planning gave it one record of its operations and finances. Enterprise Intelligence
-        Management gives it one record of the enterprise itself: a company brain holding strategy, business,
-        applications, data, technology, people, money, risk, suppliers, operations and AI, kept current from the
-        systems that master each fact, and turned into answers, insights, recommendations and simulations for
-        every person who runs the business, and for the machines that work for them.
-      </p>
-      <p class="home-section-lead !mt-0">
-        <strong>It is a capability, not a department.</strong> A startup is an
-        enterprise. So is a 200-person family business, a scale-up preparing for its first audit and a
-        multinational with ten thousand applications. Each of them needs to know what it runs on, what that
-        costs, what could go wrong and whether its plans are working. What changes with size is the depth of the
-        model, not the need for it.
-      </p>
-    </div>
-  </div>
-</section>
-
-<!-- 2. Proof today: one cross-layer question, answered and cited -->
-<section class="home-section">
-  <div class="container px-4">
-    <div class="max-w-3xl">
-      <p class="home-eyebrow">Cited answers</p>
-      <h2 class="home-h2">
-        Ask a question. Get an answer that shows its working.
-      </h2>
+      <p class="home-eyebrow">See it in one sitting</p>
+      <h2 class="home-h2">From your website to one list of what you run.</h2>
       <p class="home-section-lead">
-        Ask the AI chat what breaks if a system fails, which strategy it serves, which programmes touch it
-        and which risks reach it. Every answer names the records behind it, and you can see the model as it
-        stood on any past date.
+        You do the first step in a minute. Entelim does the reading, and you stay in charge of what it records.
       </p>
     </div>
-    <div class="mt-12 grid gap-6 sm:grid-cols-2">
-      <div class="public-card" data-testid="home-proof-what-breaks">
-        <h3 class="public-card-title">What breaks if this fails?</h3>
-        <p class="public-card-body">Everything that depends on it, across every layer, cited back to the record it came from.</p>
-      </div>
-      <div class="public-card" data-testid="home-proof-strategy">
-        <h3 class="public-card-title">Which strategy does it serve?</h3>
-        <p class="public-card-body">The goals and value streams this element carries, traced back to the motivation model.</p>
-      </div>
-      <div class="public-card" data-testid="home-proof-programmes">
-        <h3 class="public-card-title">Which programmes touch it?</h3>
-        <p class="public-card-body">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
-      </div>
-      <div class="public-card" data-testid="home-proof-risk">
-        <h3 class="public-card-title">Which risks reach it?</h3>
-        <p class="public-card-body">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
-      </div>
-    </div>
-    <div class="mt-8">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask the AI chat</a>
-    </div>
-  </div>
-</section>
-
-<!-- 3. The five groups and eighteen capabilities -->
-<section class="home-section">
-  <div class="container px-4">
-    <div class="max-w-3xl">
-      <p class="home-eyebrow">Capabilities</p>
-      <h2 class="home-h2">
-        The eighteen capabilities of Enterprise Intelligence Management.
-      </h2>
-      <p class="home-section-lead">
-        Grouped by the question each one answers.
-      </p>
-    </div>
-
-    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="public-card">
-        <h3 class="public-card-title">Set direction</h3>
-        <p class="public-card-body">Where are we going, and is the money following the plan?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#strategy-management" class="public-link text-foreground">Strategy Management</a></li>
-          <li><a href="/features#portfolio-management" class="public-link text-foreground">Portfolio Management</a></li>
-          <li><a href="/features#transformation-management" class="public-link text-foreground">Transformation Management</a></li>
-          <li><a href="/features#investment-and-financial-management" class="public-link text-foreground">Investment and Financial Management</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Know what you run</h3>
-        <p class="public-card-body">What does the business actually run on, and who owns it?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#architecture-management" class="public-link text-foreground">Architecture Management</a></li>
-          <li><a href="/features#data-management" class="public-link text-foreground">Data Management</a></li>
-          <li><a href="/features#people-and-organisation-management" class="public-link text-foreground">People and Organisation Management</a></li>
-          <li><a href="/features#operations-and-service-management" class="public-link text-foreground">Operations and Service Management</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Stay in control</h3>
-        <p class="public-card-body">What could hurt us, what must we prove, and what are we committed to?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#risk-management" class="public-link text-foreground">Risk Management</a></li>
-          <li><a href="/features#compliance-and-governance" class="public-link text-foreground">Compliance and Governance</a></li>
-          <li><a href="/features#vendor-and-procurement-management" class="public-link text-foreground">Vendor and Procurement Management</a></li>
-          <li><a href="/features#ai-management" class="public-link text-foreground">AI Management</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Get answers before you need them</h3>
-        <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/modules/scenario-modelling" class="public-link text-foreground">Scenarios (coming soon)</a></li>
-          <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Connect and trust</h3>
-        <p class="public-card-body">Does it fit how we work, and can we trust it with our data?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#collaboration-and-communication" class="public-link text-foreground">Collaboration and Communication</a></li>
-          <li><a href="/features#integration-and-interoperability" class="public-link text-foreground">Integration and Interoperability</a></li>
-          <li><a href="/features#administration-and-trust" class="public-link text-foreground">Administration and Trust</a></li>
-        </ul>
-      </div>
-    </div>
-
-    <p class="public-card-body mt-10">
-      Every capability is in the product today or has a quarter on the published roadmap.
-      <a href="/features" class="public-link">See all eighteen in full</a>.
-    </p>
-  </div>
-</section>
-
-<!-- 4. Give your AI assistants one true source -->
-<section class="home-section">
-  <div class="container px-4">
-    <div class="max-w-3xl">
-      <p class="home-eyebrow">AI assistants</p>
-      <h2 class="home-h2">
-        Give your AI assistants one true source about your company.
-      </h2>
-      <p class="home-section-lead">
-        Your teams already ask AI assistants about your systems, suppliers, risks and plans. Without a source of
-        truth, those assistants guess. A company brain closes that loop: Entelim connects to AI assistants through
-        the Model Context Protocol, the open standard for linking assistants to tools and data, so an assistant
-        asks the same governed questions the platform's own screens ask and gets back answers that cite the
-        records they came from.
-      </p>
-    </div>
-    <ul class="home-emphasis-list mt-12 max-w-3xl">
-      <li><strong>You connect it yourself.</strong> Any member can connect their own AI assistant from their account, and an administrator can disconnect it at any time.</li>
-      <li><strong>Read first, change only with approval.</strong> Assistants start with read access; a suggested change arrives in your approval queue, and nothing changes until a person approves it.</li>
-      <li><strong>Every call on the record.</strong> Each request is logged with the assistant, the grant and the person it acted for.</li>
-    </ul>
-    <p class="home-note mt-8 max-w-3xl">
-      Connecting your own AI assistant is live on every plan. Entelim's own AI chat works the same way:
-      every action passes one permission check and every change waits for approval.
-    </p>
-  </div>
-</section>
-
-<!-- 5. How the company brain grows -->
-<section class="home-section">
-  <div class="container px-4">
-    <div class="max-w-3xl">
-      <p class="home-eyebrow">Roadmap</p>
-      <h2 class="home-h2">
-        How the company brain grows.
-      </h2>
-    </div>
-    <ol class="public-stepper mt-12">
-      <li>
-        <p class="home-eyebrow">Today</p>
-        <p class="public-stepper__name">Modelled</p>
+    <ol class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4" role="list">
+      <li class="public-card" data-testid="home-step-website">
+        <p class="public-card-eyebrow">1. Give your website</p>
+        <h3 class="public-card-title">Entelim reads it</h3>
+        <p class="public-card-body">Pages it is allowed to read, one at a time, with a bar showing how far it has got.</p>
       </li>
-      <li>
-        <p class="home-eyebrow">Next</p>
-        <p class="public-stepper__name">Synchronised</p>
+      <li class="public-card" data-testid="home-step-confirm">
+        <p class="public-card-eyebrow">2. Confirm the profile</p>
+        <h3 class="public-card-title">You correct it</h3>
+        <p class="public-card-body">Every fact names the page it came from. Nothing is recorded until you continue.</p>
       </li>
-      <li>
-        <p class="home-eyebrow">Q2 2027</p>
-        <p class="public-stepper__name">Operational</p>
+      <li class="public-card" data-testid="home-step-applications">
+        <p class="public-card-eyebrow">3. Applications and owners</p>
+        <h3 class="public-card-title">One list</h3>
+        <p class="public-card-body">Import a spreadsheet with a preview, or start from the sample company, and record who owns each one.</p>
       </li>
-      <li>
-        <p class="home-eyebrow">Q3 2027</p>
-        <p class="public-stepper__name">Predictive</p>
-      </li>
-      <li>
-        <p class="home-eyebrow">Q1 2028</p>
-        <p class="public-stepper__name">Self-maintaining</p>
+      <li class="public-card" data-testid="home-step-overview">
+        <p class="public-card-eyebrow">4. Overview and health</p>
+        <h3 class="public-card-title">Figures that agree</h3>
+        <p class="public-card-body">One overview and one health page show what is missing, such as an application with no owner.</p>
       </li>
     </ol>
+    <figure class="mt-12 max-w-3xl" data-testid="home-confirm-figure">
+      <img src="{{ url_for('static', filename='img/home/confirm-profile.webp') }}" alt="The confirm step: company name, tagline, founding year and contact email, each with a tick box and a field you can change." width="517" height="222" loading="lazy" decoding="async" class="block h-auto w-full rounded-xl border border-border">
+      <figcaption class="public-card-body mt-3">The confirm step as it looks today, on a demonstration company, captured on 26 October 2026.</figcaption>
+    </figure>
+    <div class="mt-8">
+      {{ button(text='Start free and give your website', href=url_for('account.register'), variant='outline') }}
+    </div>
   </div>
 </section>
 
-<!-- 6. See it for your segment: curated use cases per persona -->
-<section class="home-section">
+<!-- 2. What you can do today -->
+<section class="home-section" data-testid="home-today">
   <div class="container px-4">
     <div class="max-w-3xl">
-      <p class="home-eyebrow">Use cases</p>
-      <h2 class="home-h2">
-        See it answered for where you are.
-      </h2>
+      <p class="home-eyebrow">Available today</p>
+      <h2 class="home-h2">What you can do today.</h2>
     </div>
-
-    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      {% for group in use_case_highlights %}
+    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <div class="public-card">
-        <h3 class="public-card-title">{{ group.label }}</h3>
-        <ul class="public-card-body mt-4 space-y-2">
-          {% for page in group.pages %}
-          <li><a href="{{ page.url }}" class="public-link">{{ page.title }}</a></li>
-          {% endfor %}
-        </ul>
+        <h3 class="public-card-title">Who owns each of our systems?</h3>
+        <p class="public-card-body">Record the owner of every application and see which ones have none.</p>
+        <p class="public-card-body mt-4"><a href="/modules/applications" class="public-link">Applications and owners</a></p>
       </div>
-      {% endfor %}
-    </div>
-
-    <div class="mt-8">
-      <a href="/use-cases" class="public-btn public-btn--outline">See every use case</a>
+      <div class="public-card">
+        <h3 class="public-card-title">Show an investor what we run.</h3>
+        <p class="public-card-body">One overview of your applications, owners and how complete the list is.</p>
+        <p class="public-card-body mt-4"><a href="/features" class="public-link">See the features</a></p>
+      </div>
+      <div class="public-card">
+        <h3 class="public-card-title">What is missing from our list?</h3>
+        <p class="public-card-body">One health page lists the gaps, so you know what to fix first.</p>
+        <p class="public-card-body mt-4"><a href="/features" class="public-link">See the features</a></p>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- 7. Pricing summary: four tiers plus both fixed-price offers -->
+<!-- 3. Early access: what is coming next, each with a waiting list -->
+<section class="home-section" data-testid="home-early-access" data-availability="early_access">
+  <div class="container px-4">
+    <div class="max-w-3xl">
+      <p class="home-eyebrow">Early access</p>
+      <h2 class="home-h2">Coming next. Join the waiting list.</h2>
+      <p class="home-section-lead">
+        These are not available yet. Tell us which you want and we will tell you the day each one opens.
+      </p>
+    </div>
+    <ul class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" role="list">
+      {% for item in site_registry().product.coming_soon['items'][:3] %}
+      <li class="public-card" data-testid="home-early-access-card">
+        <h3 class="public-card-title">{{ item.label }}</h3>
+        {% set what = item.blurb | replace('Early access: ', '') %}
+        <p class="public-card-body">{{ what[0] | upper }}{{ what[1:] }}</p>
+        <p class="mt-4">{{ button(text='Join the waiting list', href=item.href, variant='outline') }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<!-- 4. Pricing summary: four tiers plus both fixed-price offers -->
 <section class="home-section">
   <div class="container px-4">
     <div class="max-w-3xl">
@@ -350,32 +172,33 @@
             <td><strong>Free</strong></td>
             <td>No trial clock.</td>
             <td>For evaluation, one-person companies and self-hosters.</td>
-            <td>One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer. File import. Community support.</td>
+            <td>One organisation, three people. Company profile from your website, applications and owners, overview and health, spreadsheet import, the sample company. Community support.</td>
           </tr>
           <tr>
             <td>Startup</td>
             <td><strong>$49</strong>/month</td>
             <td>$490/year.</td>
-            <td>For founders and small services firms, 5 to 50 people.</td>
+            <td>For founders and small teams of up to ten people.</td>
             <td>Ten people and email support, everything in Community included.</td>
           </tr>
           <tr>
             <td>Team</td>
             <td><strong>$29</strong>/editor/month</td>
-            <td>$290/editor/year. Askers free.</td>
+            <td>$290/editor/year. Minimum five editors.</td>
             <td>For scale-ups and services companies, 50 to 500 people.</td>
-            <td>Single sign-on and the review-board workflow.</td>
+            <td>Pay per editor; people who only view are free. Email support.</td>
           </tr>
           <tr>
             <td>Enterprise</td>
             <td><strong>From $24,000</strong>/year</td>
             <td>Annual contract.</td>
             <td>For enterprise architecture teams.</td>
-            <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
+            <td>Unlimited editors, an annual contract, supported self-hosting and a named contact.</td>
           </tr>
         </tbody>
       {% endcall %}
     </div>
+    <p class="public-card-body mt-4">Paying for Startup and Team opens soon. <a href="/modules/paid-plans" class="public-link" data-testid="home-paid-waiting-list">Join the paid-plan waiting list</a>. Community is free today.</p>
 
     <div class="mt-6 grid gap-6 sm:grid-cols-2">
       <div class="public-card">
@@ -393,12 +216,12 @@
     </div>
 
     <div class="mt-8">
-      <a href="/pricing" class="public-btn public-btn--outline">See the full comparison and FAQ</a>
+      {{ button(text='See the full comparison and FAQ', href='/pricing', variant='outline') }}
     </div>
   </div>
 </section>
 
-<!-- 8. A startup is an enterprise too; open source and self-hosting -->
+<!-- 5. A startup is an enterprise too; open source and self-hosting -->
 <section class="home-section">
   <div class="container px-4">
     <div class="grid gap-6 lg:grid-cols-2">
@@ -408,11 +231,10 @@
           A startup is an enterprise too.
         </h2>
         <p class="public-card-body mb-6">
-          A startup has a strategy, a handful of systems it cannot live without, suppliers it pays every month and
-          risks nobody has written down. Entelim puts all of it in one place on a free plan for up to three people, or
-          on the Startup plan for a team of ten at $49 a month.
+          A startup has a handful of systems it cannot live without and nobody has written down who owns them. Entelim
+          puts them in one list on a free plan for up to three people, or on the Startup plan for a team of ten.
         </p>
-        <a href="/use-cases" class="public-btn public-btn--outline">See it for startups and growing businesses</a>
+        {{ button(text='Start free', href=url_for('account.register'), variant='outline') }}
       </div>
       <div class="public-card public-card--callout">
         <p class="public-card-eyebrow">Open source</p>
@@ -420,35 +242,16 @@
           Licensed under AGPL-3.0.
         </h2>
         <p class="public-card-body mb-6">
-          Every question, the Business Model Canvas and the ArchiMate Composer run on software licensed under AGPL-3.0. Run it
-          on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you,
-          support it under contract, or connect it to your systems.
+          Entelim is software licensed under AGPL-3.0. Run it on your own servers at any size, free, for as long as you
+          like. Pay us when you want us to run it for you or support it under contract.
         </p>
-        <a href="/contact" class="public-btn public-btn--outline">Get in touch</a>
+        {{ button(text='Get in touch', href='/contact', variant='outline') }}
       </div>
     </div>
   </div>
 </section>
 
-<!-- 9. Comparisons -->
-<section class="home-section">
-  <div class="container px-4">
-    <div class="max-w-3xl">
-      <p class="home-eyebrow">Compare</p>
-      <h2 class="home-h2">
-        How Entelim compares.
-      </h2>
-      <p class="home-section-lead">
-        See how Enterprise Intelligence Management compares to the enterprise architecture tools you already know.
-      </p>
-    </div>
-    <div class="mt-8">
-      <a href="/vs" class="public-btn public-btn--outline">Compare Entelim to other tools</a>
-    </div>
-  </div>
-</section>
-
-<!-- 10. FAQ -->
+<!-- 6. FAQ -->
 <section class="home-section">
   <div class="container px-4">
     <div class="max-w-3xl">
@@ -458,43 +261,39 @@
       </h2>
       <div class="public-faq mt-12">
         <details>
-          <summary>What is Enterprise Intelligence Management?{{ faq_chevron() }}</summary>
-          <p>The capability that builds your company brain: one living, explainable model of your enterprise, kept current from the systems that master each fact, and turned into cited answers for every person who runs the business.</p>
+          <summary>What works today?{{ faq_chevron() }}</summary>
+          <p>Give us your company website and confirm the profile Entelim drafts. Load your applications from a spreadsheet or explore the sample company, and record who owns each one. See one overview and one health page whose figures agree. Buy or cancel a plan yourself.</p>
         </details>
         <details>
-          <summary>How is this different from a company-wide search or a chatbot over your documents?{{ faq_chevron() }}</summary>
-          <p>Search finds documents faster; it doesn't fix knowledge that was never written down in a structured, checkable form. A chatbot trained on whatever it can find repeats the same gaps with more confidence. Entelim builds a living, explainable model of how your enterprise actually works, and every answer cites the record it came from.</p>
+          <summary>Can I ask questions in plain language?{{ faq_chevron() }}</summary>
+          <p>Not yet. Asking your model in plain words, with a cited answer, is in early access. <a href="/modules/ask-in-plain-language" class="public-link">Join the waiting list</a>.</p>
         </details>
         <details>
-          <summary>How is it different from enterprise architecture management?{{ faq_chevron() }}</summary>
-          <p>Enterprise architecture management models your systems. Enterprise Intelligence Management models the whole enterprise, keeps that model current, and answers plain-language questions across it, for every person who runs the business, not only architects.</p>
+          <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
+          <p>Not yet. Connecting your own AI assistant is in early access. Join the waiting list from the early access section of this page.</p>
         </details>
         <details>
           <summary>Is it only for large companies?{{ faq_chevron() }}</summary>
           <p>No. A startup is an enterprise too. What changes with size is the depth of the model, not the need for it: a free plan covers up to three people, and the paid plans grow with you.</p>
         </details>
         <details>
-          <summary>What works today?{{ faq_chevron() }}</summary>
-          <p>Connect GitHub or Jira when you sign up, or import an existing architecture model, then ask the AI chat what breaks if a system fails and get a cited answer. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
-        </details>
-        <details>
-          <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
-          <p>Yes. Connect your own AI assistant from your account, on every plan, through the open Model Context Protocol. It reads your model and cites the records; any change it suggests waits in your approval queue.</p>
+          <summary>What does it cost?{{ faq_chevron() }}</summary>
+          <p>Community is free. Startup is $49 a month or $490 a year. Team is $29 per editor a month, minimum five editors. Paying for Startup and Team opens soon; <a href="/modules/paid-plans" class="public-link">join the waiting list</a>.</p>
         </details>
       </div>
     </div>
   </div>
 </section>
 
-<!-- 11. Closing call to action -->
+<!-- 7. Closing call to action -->
 <section class="home-closing">
   <div class="container px-4">
     <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
+    <h2 class="home-h2 mx-auto max-w-3xl">Start with your website. See your company in one place.</h2>
     <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
     <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/contact" class="public-btn public-btn--lg public-btn--outline">Get in touch</a>
+      {{ button(text='Start free', href=url_for('account.register'), variant='primary', size='lg') }}
+      {{ button(text='Get in touch', href='/contact', variant='outline', size='lg') }}
     </div>
   </div>
 </section>
