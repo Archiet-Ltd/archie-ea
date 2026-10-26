@@ -2,7 +2,10 @@
 {% from 'macros/page_shell.html' import page_shell, empty_state, section_card %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/button.html' import button %}
-{% from 'components/input.html' import input %}
+{% from 'basecoat/button.html' import button as bc_button %}
+{% from 'basecoat/input.html' import input as bc_input %}
+{% from 'basecoat/textarea.html' import textarea as bc_textarea %}
+{% from 'basecoat/checkbox.html' import checkbox as bc_checkbox %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/dialog.html' import dialog %}
@@ -36,8 +39,7 @@
         <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between">
             <div class="relative flex-1 max-w-sm">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
-                <input type="search" placeholder="Search work packages..." class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    @input.debounce.300ms="setSearch($event.target.value)" aria-label="Search work packages...">
+                {{ bc_input(type='search', placeholder='Search work packages...', class='pl-9', aria_label='Search work packages...', attrs={'@input.debounce.300ms': 'setSearch($event.target.value)'}) }}
             </div>
             <div class="flex items-center gap-2 shrink-0">
                 {% call native_select(id='per-page', aria_label='Work packages per page', attrs_dict={'@change': 'setPerPage($event.target.value)'}) %}
@@ -66,10 +68,9 @@
         <div x-show="selectAllState === 'page' && totalItems > pageSize" x-cloak
              class="px-4 py-2 bg-primary/5 border-b text-sm text-center">
             <span x-text="items.length + ' on this page selected.'"></span>
-            <button type="button" @click="selectAllCrossPage()"
-                    class="ml-1 font-medium text-primary hover:underline">
+            {% call bc_button(type='button', variant='link', size='sm', class='ml-1 h-auto p-0 font-medium text-primary hover:underline', attrs={'@click': 'selectAllCrossPage()'}) %}
                 Select all <span x-text="totalItems"></span> items
-            </button>
+            {% endcall %}
         </div>
 
         {# Table #}
@@ -77,18 +78,14 @@
             {% call table_header() %}
                 <tr>
                     {% call table_head() %}
-                        <input aria-label="Select all work packages" type="checkbox"
-                               class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
-                               :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
-                               @change="toggleSelectAll()"
-                               aria-label="Select all on this page">
+                        {{ bc_checkbox(aria_label='Select all work packages', class='cursor-pointer', attrs={':checked': "items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })", '@change': 'toggleSelectAll()'}) }}
                     {% endcall %}
                     {% call table_head(class='tabular-nums') %}#{% endcall %}
                     {% call table_head() %}
-                        <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('name')">
+                        {% call bc_button(type='button', variant='ghost', size='sm', class='h-auto p-0 inline-flex items-center gap-1 hover:text-foreground transition-colors', attrs={'@click': "setSort('name')"}) %}
                             Name
                             <i data-lucide="arrow-up-down" class="h-3.5 w-3.5"></i>
-                        </button>
+                        {% endcall %}
                     {% endcall %}
                     {% call table_head() %}Status{% endcall %}
                     {% call table_head() %}Priority{% endcall %}
@@ -126,11 +123,7 @@
                     <tr class="border-b transition-colors hover:bg-muted/50"
                         :class="isSelected(row.id) ? 'bg-primary/5' : ''">
                         {% call table_cell() %}
-                            <input type="checkbox"
-                                   class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
-                                   :checked="isSelected(row.id)"
-                                   @change="handleRowCheckboxClick($event, rowIdx)"
-                                   aria-label="Select row">
+                            {{ bc_checkbox(aria_label='Select row', class='cursor-pointer', attrs={':checked': 'isSelected(row.id)', '@change': 'handleRowCheckboxClick($event, rowIdx)'}) }}
                         {% endcall %}
                         {% call table_cell(class='tabular-nums') %}<span class="text-muted-foreground text-sm" x-text="row.row_number"></span>{% endcall %}
                         {% call table_cell() %}
@@ -158,16 +151,16 @@
                         {% endcall %}
                         {% call table_cell() %}
                             <div class="w-24">
-                                <div class="h-2 bg-secondary rounded-full overflow-hidden">
-                                    <div class="h-full bg-primary" :style="'width: ' + progressWidth(row.percent_complete)"></div>
-                                </div>
+                                <progress class="h-2 w-full rounded-full overflow-hidden accent-primary" max="100" :value="row.percent_complete || 0"></progress>
                                 <span class="text-xs text-muted-foreground" x-text="row.percent_complete == null ? '—' : row.percent_complete + '%'"></span>
                             </div>
                         {% endcall %}
                         {% call table_cell() %}<span class="text-sm text-muted-foreground" x-text="row.target_date || 'TBD'"></span>{% endcall %}
-                        {% call table_cell(class='text-right') %}
-                            {{ button(text='Edit', variant='default', icon='pencil', size='sm', on_click='openEditModal(row)') }}
-                            {{ button(text='Delete', variant='destructive', size='sm', on_click='deleteRow(row)') }}
+                        {% call table_cell(class='text-right whitespace-nowrap') %}
+                            <div class="inline-flex items-center justify-end gap-2">
+                                {{ button(text='Edit', variant='outline', icon='pencil', size='sm', on_click='openEditModal(row)') }}
+                                {{ button(text='Delete', variant='destructive', size='sm', on_click='deleteRow(row)') }}
+                            </div>
                         {% endcall %}
                     </tr>
                 </template>
@@ -185,10 +178,7 @@
                 {{ button(text='', variant='outline', size='icon', icon='chevron-left', aria_label='Previous page', on_click='prevPage()', disabled='!hasPrev') }}
                 <template x-for="(pg, idx) in getVisiblePages()" :key="'pg-' + idx">
                     <span>
-                        <button type="button" x-show="pg !== '...'" x-cloak
-                                class="min-w-[2rem] h-8 rounded-md text-sm font-medium transition-colors"
-                                :class="pg === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"
-                                @click="goToPage(pg)" x-text="pg"></button>
+                        {% call bc_button(type='button', variant='ghost', size='sm', class='min-w-[2rem] h-8', attrs={'x-show': "pg !== '...'", 'x-cloak': true, ':class': "pg === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'", '@click': 'goToPage(pg)', 'x-text': 'pg'}) %}{% endcall %}
                         <span x-show="pg === '...'" x-cloak class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
                     </span>
                 </template>
@@ -203,15 +193,11 @@
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" x-model="editForm.name" required
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                       placeholder="Work package name" aria-label="Name">
+                {{ bc_input(type='text', required=true, placeholder='Work package name', aria_label='Name', attrs={'x-model': 'editForm.name'}) }}
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1">Summary</label>
-                <textarea x-model="editForm.summary" rows="2"
-                          class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          placeholder="Brief summary" aria-label="Summary"></textarea>
+                {{ bc_textarea(rows=2, placeholder='Brief summary', aria_label='Summary', attrs={'x-model': 'editForm.summary'}) }}
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -237,14 +223,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Progress %</label>
-                    <input type="number" x-model="editForm.percent_complete" min="0" max="100"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                           placeholder="0" aria-label="Progress %">
+                    {{ bc_input(type='number', min='0', max='100', placeholder='0', aria_label='Progress %', attrs={'x-model': 'editForm.percent_complete'}) }}
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Due Date</label>
-                    <input type="date" x-model="editForm.target_date"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Due Date">
+                    {{ bc_input(type='date', aria_label='Due Date', attrs={'x-model': 'editForm.target_date'}) }}
                 </div>
             </div>
             <div x-show="editError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="editError"></div>
@@ -260,15 +243,11 @@
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" x-model="createForm.name" required
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                       placeholder="Work package name" aria-label="Name">
+                {{ bc_input(type='text', required=true, placeholder='Work package name', aria_label='Name', attrs={'x-model': 'createForm.name'}) }}
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1">Summary</label>
-                <textarea x-model="createForm.summary" rows="2"
-                          class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          placeholder="Brief summary" aria-label="Summary"></textarea>
+                {{ bc_textarea(rows=2, placeholder='Brief summary', aria_label='Summary', attrs={'x-model': 'createForm.summary'}) }}
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -294,14 +273,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Progress %</label>
-                    <input type="number" x-model="createForm.percent_complete" min="0" max="100"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                           placeholder="0" aria-label="Progress %">
+                    {{ bc_input(type='number', min='0', max='100', placeholder='0', aria_label='Progress %', attrs={'x-model': 'createForm.percent_complete'}) }}
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Due Date</label>
-                    <input type="date" x-model="createForm.target_date"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Due Date">
+                    {{ bc_input(type='date', aria_label='Due Date', attrs={'x-model': 'createForm.target_date'}) }}
                 </div>
             </div>
             <div x-show="createError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="createError"></div>
@@ -318,9 +294,7 @@
             This will permanently delete the selected work packages and cannot be undone.
             Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
         </p>
-        <input type="text" x-model="bulkConfirmText"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
-               placeholder="DELETE" @keydown.enter="executeBulkDelete()" aria-label="DELETE">
+        {{ bc_input(type='text', class='font-mono mb-4', placeholder='DELETE', aria_label='DELETE', attrs={'x-model': 'bulkConfirmText', '@keydown.enter': 'executeBulkDelete()'}) }}
         <div class="flex justify-end gap-3">
             {{ button(text='Cancel', variant='outline', on_click='bulkDeleteDialogOpen = false') }}
             {{ button(text='Delete', variant='destructive', on_click='executeBulkDelete()', disabled='bulkConfirmText !== "DELETE" || deleteInProgress') }}

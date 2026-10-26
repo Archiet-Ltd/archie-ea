@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/progress.html' import progress %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 {% block title %}Spend Analytics{% endblock %}
@@ -75,11 +77,7 @@
          }">
         <div class="flex items-center justify-between">
             <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Spend Recommendations (AI)</h2>
-            <button type="button" @click="open = !open; if (open && !result && !loading) generate()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <i data-lucide="sparkles" class="w-4 h-4"></i>
-                <span x-text="open ? 'Hide' : 'Generate recommendations'"></span>
-            </button>
+            {% call button(variant='outline', attrs_dict={'@click': 'open = !open; if (open && !result && !loading) generate()'}) %}<i data-lucide="sparkles" class="w-4 h-4"></i><span x-text="open ? 'Hide' : 'Generate recommendations'"></span>{% endcall %}
         </div>
 
         <div x-show="open" x-cloak class="space-y-3">
@@ -142,10 +140,7 @@
                     </div>
                     {% if data.annual_cost is not none %}
                     <div class="flex items-center gap-2">
-                        <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            {% set pct = (data.annual_cost / summary.total_annual_cost * 100) if (summary.total_annual_cost or 0) > 0 else 0 %}
-                            <div class="h-full bg-primary rounded-full" style="width: {{ pct }}%"></div>
-                        </div>
+                        {% set pct = (data.annual_cost / summary.total_annual_cost * 100) if (summary.total_annual_cost or 0) > 0 else 0 %}{{ progress(value=pct, class='flex-1 h-2') }}
                         <span class="text-xs text-muted-foreground w-12 text-right">{{ "{:.1f}".format(pct) }}%</span>
                     </div>
                     {% endif %}

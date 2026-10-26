@@ -2,6 +2,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/native-select.html' import native_select, native_select_option %}
+{% from 'basecoat/textarea.html' import textarea %}
 
 {% block title %}Tech Radar — {{ config.APP_NAME }}{% endblock %}
 
@@ -90,18 +94,16 @@
             below, and works with scripting off entirely.
           #}
           <form method="POST" action="{{ url_for('tech_radar.classify') }}" class="flex items-center gap-2 shrink-0">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="archimate_element_id" value="{{ row.element.id }}">
-            <select name="ring" aria-label="Reclassify {{ row.element.name }}"
-              class="h-9 rounded-md border border-input bg-transparent px-2 text-xs">
+            {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
+            {{ input(type="hidden", name="archimate_element_id", value=row.element.id) }}
+            {% call native_select(name='ring', aria_label='Reclassify ' ~ row.element.name, class='text-xs') %}
               {% for r in rings %}
-              <option value="{{ r }}" {% if r == ring %}selected{% endif %}>{{ ring_labels[r] }}</option>
+              {{ native_select_option(ring_labels[r], value=r, selected=(r == ring)) }}
               {% endfor %}
-            </select>
-            <button type="submit" data-testid="radar-reclassify-{{ row.element.id }}"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            {% endcall %}
+            {% call button(type='submit', variant='outline', attrs={'data-testid': 'radar-reclassify-' ~ row.element.id}) %}
               Move
-            </button>
+            {% endcall %}
           </form>
         </li>
         {% endfor %}
@@ -128,35 +130,28 @@
           </div>
           <form method="POST" action="{{ url_for('tech_radar.classify') }}" class="space-y-2 lg:w-96 shrink-0"
                 data-testid="radar-classify-form-{{ element.id }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="archimate_element_id" value="{{ element.id }}">
+            {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
+            {{ input(type="hidden", name="archimate_element_id", value=element.id) }}
             <details class="rounded-md border border-border px-3 py-2 text-xs">
               <summary class="cursor-pointer font-medium">Rationale, review date and requesting initiative</summary>
               <div class="mt-2 space-y-2">
                 <label class="block text-sm font-medium text-muted-foreground mb-1">
                   <span class="block text-muted-foreground mb-1">Rationale</span>
-                  <textarea name="rationale" rows="2" maxlength="2000"
-                    class="w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs"></textarea>
+                  {{ textarea(name='rationale', rows=2, maxlength=2000, class='text-xs') }}
                 </label>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">
                   <span class="block text-muted-foreground mb-1">Review by</span>
-                  <input type="date" name="review_date"
-                    class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-xs">
+                  {{ input(type='date', name='review_date', class='text-xs') }}
                 </label>
                 <div x-data="radarInitiativePicker()" class="relative">
                   <label class="block text-sm font-medium text-muted-foreground mb-1" for="radar-initiative-{{ element.id }}">Requesting initiative</label>
-                  <input type="hidden" name="requesting_initiative_id" :value="picked ? picked.id : ''">
-                  <input id="radar-initiative-{{ element.id }}" type="text" autocomplete="off"
-                    role="combobox" aria-autocomplete="list" :aria-expanded="results.length > 0 ? 'true' : 'false'"
-                    aria-controls="radar-initiative-results-{{ element.id }}"
-                    x-model="query" @input.debounce.300ms="search()"
-                    placeholder="Search initiatives and programmes"
-                    class="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs">
+                  {{ input(type="hidden", name="requesting_initiative_id", attrs={":value": "picked ? picked.id : ''"}) }}
+                  {{ input(id='radar-initiative-' ~ element.id, type='text', autocomplete='off', placeholder='Search initiatives and programmes', class='h-8 text-xs', attrs={'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': "results.length > 0 ? 'true' : 'false'", 'aria-controls': 'radar-initiative-results-' ~ element.id, 'x-model': 'query', '@input.debounce.300ms': 'search()'}) }}
                   <ul id="radar-initiative-results-{{ element.id }}" role="listbox" x-show="results.length" x-cloak
                     class="absolute z-10 mt-1 w-full rounded-md border border-border bg-popover max-h-48 overflow-auto">
                     <template x-for="item in results" :key="item.id">
                       <li role="option" aria-selected="false">
-                        <button type="button" @click="choose(item)" class="w-full text-left px-2 py-1.5 text-xs hover:bg-muted" x-text="item.name"></button>
+                        {% call button(type='button', variant='ghost', size='sm', class='w-full justify-start text-left px-2 py-1.5 h-auto text-xs', attrs={'@click': 'choose(item)', 'x-text': 'item.name'}) %}{% endcall %}
                       </li>
                     </template>
                   </ul>
@@ -166,17 +161,15 @@
               </div>
             </details>
             <div class="flex items-center justify-end gap-2">
-              <select name="ring" required aria-label="Classify {{ element.name }}"
-                class="h-9 rounded-md border border-input bg-transparent px-2 text-xs">
-                <option value="" selected disabled>Classify…</option>
+              {% call native_select(name='ring', required=true, aria_label='Classify ' ~ element.name, class='text-xs') %}
+                {{ native_select_option('Classify…', value='', selected=true, disabled=true) }}
                 {% for r in rings %}
-                <option value="{{ r }}">{{ ring_labels[r] }}</option>
+                {{ native_select_option(ring_labels[r], value=r) }}
                 {% endfor %}
-              </select>
-              <button type="submit" data-testid="radar-classify-{{ element.id }}"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+              {% endcall %}
+              {% call button(type='submit', variant='default', attrs={'data-testid': 'radar-classify-' ~ element.id}) %}
                 Set
-              </button>
+              {% endcall %}
             </div>
           </form>
         </li>

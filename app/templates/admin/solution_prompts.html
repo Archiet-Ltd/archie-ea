@@ -1,6 +1,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/textarea.html' import textarea %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}Solution AI Prompts{% endblock %}
 
@@ -10,11 +14,10 @@
     {% macro _ps_actions() %}
 <div class="flex items-center gap-2">
             <span x-show="loading" x-cloak class="text-sm text-muted-foreground">Loading...</span>
-            <button type="button" @click="loadPrompts()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            {% call button(type='button', variant='outline', attrs={'@click': 'loadPrompts()'}) %}
                 <i data-lucide="refresh-cw" class="h-4 w-4 mr-2"></i>
                 Refresh
-            </button>
+            {% endcall %}
         </div>
     {% endmacro %}
     {{ page_shell(title='Solution AI Prompts', breadcrumb=[('Home', '/'), ('Solution AI Prompts', none)], subtitle='Customize the prompts used by the Architecture Journey to generate ArchiMate elements. Overrides are stored in the database and take precedence over defaults.', actions_caller=_ps_actions) }}
@@ -35,69 +38,57 @@
 
     <!-- Prompts Table -->
     <div class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b border-border bg-muted/50">
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Prompt</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Phase</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                        <th class="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
+        {% call table(class='w-full text-sm') %}
+            {% call table_header() %}
+                {% call table_row(class='bg-muted/50') %}
+                    {% call table_head() %}Prompt{% endcall %}
+                    {% call table_head() %}Phase{% endcall %}
+                    {% call table_head() %}Description{% endcall %}
+                    {% call table_head() %}Status{% endcall %}
+                    {% call table_head(class='text-right') %}Actions{% endcall %}
+                {% endcall %}
+            {% endcall %}
+            {% call table_body() %}
+                <template x-for="prompt in prompts" :key="prompt.key">
+                    <tr data-slot="table-row" class="border-b border-border hover:bg-muted/30 transition-colors">
+                        {% call table_cell(class='font-medium text-foreground', attrs={'x-text': 'prompt.name'}) %}{% endcall %}
+                        {% call table_cell() %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
+                                  x-text="prompt.category">
+                            </span>
+                        {% endcall %}
+                        {% call table_cell(class='text-muted-foreground max-w-sm truncate', attrs={'x-text': 'prompt.description'}) %}{% endcall %}
+                        {% call table_cell() %}
+                            <span x-show="prompt.has_override" x-cloak
+                                  class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">
+                                Custom
+                            </span>
+                            <span x-show="!prompt.has_override" x-cloak
+                                  class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
+                                Default
+                            </span>
+                        {% endcall %}
+                        {% call table_cell(class='text-right') %}
+                            <div class="flex items-center justify-end gap-2">
+                                {% call button(type='button', variant='outline', attrs={'@click': 'openEdit(prompt)'}) %}
+                                    <i data-lucide="pencil" class="h-3.5 w-3.5 mr-1.5"></i>
+                                    Edit
+                                {% endcall %}
+                                {% call button(type='button', variant='outline', size='sm', class='border-destructive/50 text-destructive-emphasis hover:bg-destructive/10', attrs={'x-show': 'prompt.has_override', 'x-cloak': true, '@click': 'openReset(prompt)'}) %}
+                                    <i data-lucide="rotate-ccw" class="h-3.5 w-3.5 mr-1.5"></i>
+                                    Reset
+                                {% endcall %}
+                            </div>
+                        {% endcall %}
                     </tr>
-                </thead>
-                <tbody>
-                    <template x-for="prompt in prompts" :key="prompt.key">
-                        <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                            <td class="px-4 py-3 font-medium text-foreground" x-text="prompt.name"></td>
-                            <td class="px-4 py-3">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-primary/10 text-info-emphasis border border-primary/30"
-                                      x-text="prompt.category">
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-muted-foreground max-w-sm truncate" x-text="prompt.description"></td>
-                            <td class="px-4 py-3">
-                                <span x-show="prompt.has_override" x-cloak
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-warning/10 text-warning-emphasis border border-warning/30">
-                                    Custom
-                                </span>
-                                <span x-show="!prompt.has_override" x-cloak
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-success/10 text-success-emphasis border border-success/30">
-                                    Default
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <button type="button" @click="openEdit(prompt)"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                        <i data-lucide="pencil" class="h-3.5 w-3.5 mr-1.5"></i>
-                                        Edit
-                                    </button>
-                                    <button type="button" x-show="prompt.has_override" x-cloak
-                                            @click="openReset(prompt)"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-destructive/50 text-destructive-emphasis hover:bg-destructive/10
- h-8 px-3">
-                                        <i data-lucide="rotate-ccw" class="h-3.5 w-3.5 mr-1.5"></i>
-                                        Reset
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
-                    <tr x-show="!loading && prompts.length === 0" x-cloak>
-                        <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-                            No prompt configurations found.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                </template>
+                <tr data-slot="table-row" x-show="!loading && prompts.length === 0" x-cloak>
+                    {% call table_cell(colspan=5, class='py-8 text-center text-muted-foreground') %}
+                        No prompt configurations found.
+                    {% endcall %}
+                </tr>
+            {% endcall %}
+        {% endcall %}
     </div>
 </div>
 {% endblock %}
@@ -110,16 +101,14 @@
         <!-- Prompt Name (read-only) -->
         <div class="mb-4">
             <label for="edit-prompt-name" class="block text-sm font-medium text-muted-foreground mb-1">Prompt Name</label>
-            <input type="text" id="edit-prompt-name" readonly
-                   class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed">
+            {{ input(type='text', id='edit-prompt-name', readonly=true, class='bg-muted text-muted-foreground cursor-not-allowed') }}
         </div>
 
         <!-- Phase & Description -->
         <div class="grid grid-cols-1 gap-4 mb-4">
             <div>
                 <label for="edit-prompt-category" class="block text-sm font-medium text-muted-foreground mb-1">ADM Phase</label>
-                <input type="text" id="edit-prompt-category" readonly
-                       class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed">
+                {{ input(type='text', id='edit-prompt-category', readonly=true, class='bg-muted text-muted-foreground cursor-not-allowed') }}
             </div>
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
@@ -140,17 +129,11 @@
         <div class="mb-4">
             <div class="flex items-center justify-between mb-1">
                 <label for="edit-prompt-text" class="block text-sm font-medium text-muted-foreground mb-1">Prompt Text</label>
-                <button type="button" id="btn-restore-default"
-                        class="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                {% call button(type='button', variant='ghost', size='sm', id='btn-restore-default', class='h-auto p-0 text-xs text-muted-foreground hover:text-foreground') %}
                     Restore default text
-                </button>
+                {% endcall %}
             </div>
-            <textarea id="edit-prompt-text"
-                      rows="20"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground font-mono leading-relaxed
- placeholder:text-muted-foreground
- focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                      placeholder="Enter your prompt template..."></textarea>
+            {{ textarea(id='edit-prompt-text', rows=20, class='font-mono leading-relaxed', placeholder='Enter your prompt template...') }}
             <p class="text-xs text-muted-foreground mt-1">
                 <span id="edit-prompt-charcount">0</span> characters
             </p>
@@ -158,17 +141,13 @@
 
         <!-- Footer -->
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-            <button type="button"
-                    data-modal-close="edit-prompt-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+            {% call button(type='button', variant='ghost', attrs={'data-modal-close': 'edit-prompt-modal'}) %}
                 Cancel
-            </button>
-            <button type="submit"
-                    id="btn-save-prompt"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            {% endcall %}
+            {% call button(type='submit', variant='default', id='btn-save-prompt') %}
                 <i data-lucide="save" class="h-3.5 w-3.5 mr-1.5"></i>
                 Save Changes
-            </button>
+            {% endcall %}
         </div>
     </form>
 </div>
@@ -182,16 +161,12 @@
         This will remove your custom override.
     </p>
     <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-        <button type="button"
-                data-modal-close="reset-prompt-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        {% call button(type='button', variant='outline', attrs={'data-modal-close': 'reset-prompt-modal'}) %}
             Cancel
-        </button>
-        <button type="button"
-                id="btn-confirm-reset"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        {% endcall %}
+        {% call button(type='button', variant='destructive', id='btn-confirm-reset') %}
             Reset to Default
-        </button>
+        {% endcall %}
     </div>
 </div>
 {% endcall %}

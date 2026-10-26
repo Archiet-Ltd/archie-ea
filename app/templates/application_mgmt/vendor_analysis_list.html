@@ -2,6 +2,10 @@
 {% block title %}Vendor Options Analysis{% endblock %}
 
 {% from "components/page_header.html" import page_header %}
+{% from "basecoat/button.html" import button %}
+{% from "basecoat/input.html" import input %}
+{% from "basecoat/native-select.html" import native_select, native_select_option %}
+{% from "basecoat/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block content %}
 <div class="space-y-6" x-data="vendorAnalysisList()">
@@ -19,7 +23,7 @@
 
   <!-- Summary Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-    <div class="rounded-lg border border-border bg-card p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <i data-lucide="bar-chart-3" class="h-5 w-5 text-primary"></i>
@@ -30,7 +34,7 @@
         </div>
       </div>
     </div>
-    <div class="rounded-lg border border-border bg-card p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
           <i data-lucide="check-circle" class="h-5 w-5 text-success"></i>
@@ -41,7 +45,7 @@
         </div>
       </div>
     </div>
-    <div class="rounded-lg border border-border bg-card p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
           <i data-lucide="clock" class="h-5 w-5 text-warning"></i>
@@ -52,7 +56,7 @@
         </div>
       </div>
     </div>
-    <div class="rounded-lg border border-border bg-card p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <i data-lucide="trophy" class="h-5 w-5 text-primary"></i>
@@ -69,23 +73,21 @@
   <div class="flex flex-wrap items-center gap-3">
     <div class="relative flex-1 max-w-sm">
       <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"></i>
-      <input type="text" x-model="searchQuery" @input.debounce.300ms="loadAnalyses(1)" placeholder="Search analyses..."
-        class="w-full pl-9 pr-3 py-2 border border-border rounded-md text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-        aria-label="Search analyses">
+      {{ input(type='text', placeholder='Search analyses...', class='pl-9', aria_label='Search analyses', attrs={'x-model': 'searchQuery', '@input.debounce.300ms': 'loadAnalyses(1)'}) }}
     </div>
-    <select x-model="statusFilter" @change="loadAnalyses(1)" class="px-3 py-2 border border-border rounded-md text-sm bg-card text-foreground" aria-label="Filter by Status">
-      <option value="">All Statuses</option>
-      <option value="draft">Draft</option>
-      <option value="running">Running</option>
-      <option value="completed">Completed</option>
-      <option value="approved">Approved</option>
-      <option value="rejected">Rejected</option>
-    </select>
-    <select x-model="sortBy" @change="loadAnalyses(1)" class="px-3 py-2 border border-border rounded-md text-sm bg-card text-foreground" aria-label="Sort By">
-      <option value="created_at">Newest First</option>
-      <option value="name">Name A-Z</option>
-      <option value="updated_at">Recently Updated</option>
-    </select>
+    {% call native_select(aria_label='Filter by Status', attrs={'x-model': 'statusFilter', '@change': 'loadAnalyses(1)'}) %}
+      {{ native_select_option('All Statuses', value='') }}
+      {{ native_select_option('Draft', value='draft') }}
+      {{ native_select_option('Running', value='running') }}
+      {{ native_select_option('Completed', value='completed') }}
+      {{ native_select_option('Approved', value='approved') }}
+      {{ native_select_option('Rejected', value='rejected') }}
+    {% endcall %}
+    {% call native_select(aria_label='Sort By', attrs={'x-model': 'sortBy', '@change': 'loadAnalyses(1)'}) %}
+      {{ native_select_option('Newest First', value='created_at') }}
+      {{ native_select_option('Name A-Z', value='name') }}
+      {{ native_select_option('Recently Updated', value='updated_at') }}
+    {% endcall %}
     <span class="text-sm text-muted-foreground" x-show="loading" x-cloak>
       <i data-lucide="loader-2" class="h-4 w-4 inline animate-spin"></i> Loading...
     </span>
@@ -93,85 +95,83 @@
 
   <!-- Analysis Table -->
   <div class="rounded-lg border border-border bg-card">
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full">
-        <thead>
-          <tr class="border-b bg-muted/50">
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Vendors</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Recommended</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Created</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Actions</th>
+    {% call table(class='w-full') %}
+      {% call table_header() %}
+        {% call table_row(class='bg-muted/50') %}
+          {% call table_head() %}Name{% endcall %}
+          {% call table_head() %}Status{% endcall %}
+          {% call table_head() %}Vendors{% endcall %}
+          {% call table_head() %}Recommended{% endcall %}
+          {% call table_head() %}Created{% endcall %}
+          {% call table_head(class='text-right') %}Actions{% endcall %}
+        {% endcall %}
+      {% endcall %}
+      {% call table_body() %}
+        <template x-if="loading && analyses.length === 0">
+          <tr data-slot="table-row">
+            {% call table_cell(colspan=6) %}
+              <div class="space-y-3">
+                <template x-for="i in 5" :key="i">
+                  <div class="flex items-center gap-4">
+                    <div class="h-4 w-48 bg-muted animate-pulse rounded"></div>
+                    <div class="h-4 w-20 bg-muted animate-pulse rounded"></div>
+                    <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
+                    <div class="h-4 w-32 bg-muted animate-pulse rounded"></div>
+                    <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
+                    <div class="h-4 w-16 bg-muted animate-pulse rounded ml-auto"></div>
+                  </div>
+                </template>
+              </div>
+            {% endcall %}
           </tr>
-        </thead>
-        <tbody>
-          <template x-if="loading && analyses.length === 0">
-            <tr>
-              <td colspan="6" class="px-4 py-3">
-                <div class="space-y-3">
-                  <template x-for="i in 5" :key="i">
-                    <div class="flex items-center gap-4">
-                      <div class="h-4 w-48 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-20 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-32 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-16 bg-muted animate-pulse rounded ml-auto"></div>
-                    </div>
-                  </template>
-                </div>
-              </td>
-            </tr>
-          </template>
-          <template x-if="!loading && analyses.length === 0">
-            <tr>
-              <td colspan="6" class="px-4 py-12 text-center">
-                <div class="flex flex-col items-center gap-3">
-                  <i data-lucide="bar-chart-3" class="h-12 w-12 text-muted-foreground/30"></i>
-                  <p class="text-muted-foreground" x-text="searchQuery || statusFilter ? 'No analyses match your filters' : 'No vendor analyses yet'"></p>
-                  <a x-show="!searchQuery && !statusFilter" href="{{ url_for('application_mgmt.vendor_analysis_new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="plus" class="h-4 w-4"></i> Create Your First Analysis
-                  </a>
-                </div>
-              </td>
-            </tr>
-          </template>
-          <template x-for="a in analyses" :key="a.id">
-            <tr class="border-b hover:bg-muted/30 transition-colors">
-              <td class="px-4 py-3">
-                <a :href="'{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=0) }}'.replace('/0', '/' + a.id)" class="font-medium text-foreground hover:text-primary" x-text="a.name"></a>
-              </td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border"
-                  :class="{
-                    'bg-success/10 text-success-emphasis border-success/30': a.status === 'completed' || a.approval_status === 'approved',
-                    'bg-warning/10 text-warning-emphasis border-warning/30': a.status === 'draft' || a.status === 'running',
-                    'bg-destructive/10 text-destructive-emphasis border-destructive/30': a.approval_status === 'rejected',
-                    'bg-muted-foreground/10 text-foreground/80 border-muted-foreground/30': !['completed','draft','running'].includes(a.status) && !a.approval_status
-                  }"
-                  x-text="a.approval_status || a.status"></span>
-              </td>
-              <td class="px-4 py-3 text-sm text-muted-foreground" x-text="a.vendor_count + ' vendors'"></td>
-              <td class="px-4 py-3">
-                <span class="text-sm" :class="a.recommended_vendor ? 'text-success-emphasis font-medium' : 'text-muted-foreground'" x-text="a.recommended_vendor || 'Pending'"></span>
-              </td>
-              <td class="px-4 py-3 text-sm text-muted-foreground" x-text="a.created_at ? new Date(a.created_at).toLocaleDateString() : ''"></td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-2">
-                  <a :href="'{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=0) }}'.replace('/0', '/' + a.id)" class="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="View" aria-label="View analysis">
-                    <i data-lucide="eye" class="h-4 w-4"></i>
-                  </a>
-                  <button type="button" @click="confirmDelete(a.id, a.name)" class="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive-emphasis" title="Delete" aria-label="Delete analysis">
-                    <i data-lucide="trash-2" class="h-4 w-4"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
+        </template>
+        <template x-if="!loading && analyses.length === 0">
+          <tr data-slot="table-row">
+            {% call table_cell(colspan=6, class='py-12 text-center') %}
+              <div class="flex flex-col items-center gap-3">
+                <i data-lucide="bar-chart-3" class="h-12 w-12 text-muted-foreground/30"></i>
+                <p class="text-muted-foreground" x-text="searchQuery || statusFilter ? 'No analyses match your filters' : 'No vendor analyses yet'"></p>
+                <a x-show="!searchQuery && !statusFilter" href="{{ url_for('application_mgmt.vendor_analysis_new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                  <i data-lucide="plus" class="h-4 w-4"></i> Create Your First Analysis
+                </a>
+              </div>
+            {% endcall %}
+          </tr>
+        </template>
+        <template x-for="a in analyses" :key="a.id">
+          <tr data-slot="table-row" class="border-b hover:bg-muted/30 transition-colors">
+            {% call table_cell() %}
+              <a :href="'{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=0) }}'.replace('/0', '/' + a.id)" class="font-medium text-foreground hover:text-primary" x-text="a.name"></a>
+            {% endcall %}
+            {% call table_cell() %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border"
+                :class="{
+                  'bg-success/10 text-success-emphasis border-success/30': a.status === 'completed' || a.approval_status === 'approved',
+                  'bg-warning/10 text-warning-emphasis border-warning/30': a.status === 'draft' || a.status === 'running',
+                  'bg-destructive/10 text-destructive-emphasis border-destructive/30': a.approval_status === 'rejected',
+                  'bg-muted-foreground/10 text-foreground/80 border-muted-foreground/30': !['completed','draft','running'].includes(a.status) && !a.approval_status
+                }"
+                x-text="a.approval_status || a.status"></span>
+            {% endcall %}
+            {% call table_cell(class='text-sm text-muted-foreground', attrs={'x-text': "a.vendor_count + ' vendors'"}) %}{% endcall %}
+            {% call table_cell() %}
+              <span class="text-sm" :class="a.recommended_vendor ? 'text-success-emphasis font-medium' : 'text-muted-foreground'" x-text="a.recommended_vendor || 'Pending'"></span>
+            {% endcall %}
+            {% call table_cell(class='text-sm text-muted-foreground', attrs={'x-text': "a.created_at ? new Date(a.created_at).toLocaleDateString() : ''"}) %}{% endcall %}
+            {% call table_cell(class='text-right') %}
+              <div class="flex items-center justify-end gap-2">
+                <a :href="'{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=0) }}'.replace('/0', '/' + a.id)" class="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="View" aria-label="View analysis">
+                  <i data-lucide="eye" class="h-4 w-4"></i>
+                </a>
+                {% call button(type='button', variant='ghost', size='icon-sm', class='hover:bg-destructive/10 text-muted-foreground hover:text-destructive-emphasis', title='Delete', aria_label='Delete analysis', attrs={'@click': 'confirmDelete(a.id, a.name)'}) %}
+                  <i data-lucide="trash-2" class="h-4 w-4"></i>
+                {% endcall %}
+              </div>
+            {% endcall %}
+          </tr>
+        </template>
+      {% endcall %}
+    {% endcall %}
 
     <!-- Pagination -->
     <div x-show="pagination.pages > 1" x-cloak class="flex items-center justify-between px-4 py-3 border-t">
@@ -180,28 +180,22 @@
         of <span x-text="pagination.total"></span>
       </p>
       <div class="flex items-center gap-1">
-        <button type="button" @click="loadAnalyses(pagination.page - 1)" :disabled="!pagination.has_prev"
-          class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">
+        {% call button(type='button', variant='outline', size='sm', attrs={'@click': 'loadAnalyses(pagination.page - 1)', ':disabled': '!pagination.has_prev'}) %}
           Previous
-        </button>
+        {% endcall %}
         <template x-for="p in paginationRange()" :key="'pg-'+p">
-          <button type="button" @click="typeof p === 'number' && loadAnalyses(p)"
-            class="px-3 py-1.5 text-sm border rounded-md min-w-[36px]"
-            :class="p === pagination.page ? 'bg-primary text-primary-foreground border-primary' : typeof p === 'number' ? 'border-border hover:bg-muted' : 'border-transparent cursor-default'"
-            :disabled="typeof p !== 'number'"
-            x-text="p"></button>
+          {% call button(type='button', variant='outline', size='sm', class='min-w-[36px]', attrs={'@click': "typeof p === 'number' && loadAnalyses(p)", ':class': "p === pagination.page ? 'bg-primary text-primary-foreground border-primary' : typeof p === 'number' ? 'border-border hover:bg-muted' : 'border-transparent cursor-default'", ':disabled': "typeof p !== 'number'", 'x-text': 'p'}) %}{% endcall %}
         </template>
-        <button type="button" @click="loadAnalyses(pagination.page + 1)" :disabled="!pagination.has_next"
-          class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">
+        {% call button(type='button', variant='outline', size='sm', attrs={'@click': 'loadAnalyses(pagination.page + 1)', ':disabled': '!pagination.has_next'}) %}
           Next
-        </button>
+        {% endcall %}
       </div>
     </div>
   </div>
 
   <!-- Delete Confirmation Modal -->
-  <div x-show="deleteTarget" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
-    @keydown.escape.window="deleteTarget = null" role="dialog" aria-modal="true" aria-label="Confirm deletion">
+  <div x-show="deleteTarget" x-cloak data-slot="dialog" class="fixed inset-0 z-50 flex items-center justify-center"
+    @keydown.escape.window="deleteTarget = null" aria-label="Confirm deletion">
     <div class="fixed inset-0 bg-overlay/50" @click="deleteTarget = null"></div>
     <div class="relative bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 z-10">
       <h3 class="text-lg font-semibold text-foreground mb-2">Delete Analysis</h3>
@@ -209,8 +203,8 @@
         Are you sure you want to permanently delete "<span class="font-medium text-foreground" x-text="deleteTargetName"></span>"? This action cannot be undone.
       </p>
       <div class="flex justify-end gap-3">
-        <button type="button" @click="deleteTarget = null" class="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted">Cancel</button>
-        <button type="button" @click="executeDelete()" class="px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">Delete</button>
+        {% call button(type='button', variant='outline', attrs={'@click': 'deleteTarget = null'}) %}Cancel{% endcall %}
+        {% call button(type='button', variant='destructive', attrs={'@click': 'executeDelete()'}) %}Delete{% endcall %}
       </div>
     </div>
   </div>

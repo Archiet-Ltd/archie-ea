@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Investment Matrix{% endblock %}
@@ -108,41 +110,23 @@
         <div class="p-6">
             <h3 class="font-semibold mb-4">All Capabilities</h3>
             <div class="overflow-x-auto">
-                <table class="dense-table w-full">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left p-3 font-medium">Capability</th>
-                            <th class="text-left p-3 font-medium">Strategic Importance</th>
-                            <th class="text-left p-3 font-medium">Current Maturity</th>
-                            <th class="text-left p-3 font-medium">Target Maturity</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        {% for cap in capabilities|default([]) %}
-                        <tr class="border-b hover:bg-muted/50">
-                            <td class="p-3">
+                {% call(cap) list_table(rows=capabilities|default([]), columns=[('Capability', ''), ('Strategic Importance', ''), ('Current Maturity', ''), ('Target Maturity', '')], caption='All Capabilities', testid='investment-capabilities-table', row_testid='capability-row') %}
+                            {% call table_cell(class='p-3') %}
                                 {% if cap.id %}
                                 {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=cap.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ cap.name|default('N/A') }}</a>{% else %}{{ cap.name|default('N/A') }}{% endif %}
                                 {% else %}{{ cap.name|default('N/A') }}{% endif %}
-                            </td>
-                            <td class="p-3">
+                            {% endcall %}
+                            {% call table_cell(class='p-3') %}
                                 <span class="px-2 py-1 text-xs rounded-full
                                     {% if cap.strategic_importance == 'critical' %}bg-destructive/20 text-destructive-emphasis
                                     {% elif cap.strategic_importance == 'high' %}bg-warning/20 text-warning-emphasis
                                     {% else %}bg-muted text-muted-foreground{% endif %}">
                                     {{ cap.strategic_importance|default('Normal')|title }}
                                 </span>
-                            </td>
-                            <td class="p-3">{{ cap.current_maturity_level|default(1) }}</td>
-                            <td class="p-3">{{ cap.target_maturity_level|default(3) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="p-6 text-center text-muted-foreground">No capabilities found</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            {% endcall %}
+                            {% call table_cell(class='p-3') %}{{ cap.current_maturity_level|default(1) }}{% endcall %}
+                            {% call table_cell(class='p-3') %}{{ cap.target_maturity_level|default(3) }}{% endcall %}
+                {% endcall %}
             </div>
         </div>
     </div>

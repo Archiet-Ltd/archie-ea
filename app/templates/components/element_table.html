@@ -1,28 +1,20 @@
 {# The element table: the one way a page lists ArchiMate elements (data-type register:
    archimate-elements; ruling R30, 25 Oct 2026).
 
-   The list table with the element's name in the first column, a link to the element's own
-   record, and its description under it. The caller renders the other cells. The page puts
-   "Open in Composer" beside the table, so the same elements open on the canvas.
-
-   {% from 'components/element_table.html' import element_table %}
-   {% call(e) element_table(rows=items, columns=[('Type', ''), ('Change', '')], caption='Application elements',
-                            testid='design-table-application') %}
-     <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
-     ...
-   {% endcall %}
-
-   rows: dicts with name, href (None when the element has no page of its own) and optionally
-   description. #}
+   Built on components/list_table.html and basecoat/table.html (table_cell) with the element's
+   name in the first column, a link to the element's own record, and its single-line truncated
+   description under it. The caller renders the other cells using table_cell.
+#}
 {% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% macro element_table(rows, columns, caption, testid, first='Element', row_testid='element-row', link_testid='element-link', page_size=25) %}
+{% macro element_table(rows, columns, caption, testid, first='Element', row_testid='element-row', link_testid='element-link', page_size=25, search_placeholder='Filter elements...', toolbar=True, toolbar_actions=none) %}
 {%- set cells = caller -%}
-{% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table') %}
-  <td class="px-2 !pl-6 align-middle">
+{% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table', search_placeholder=search_placeholder, toolbar=toolbar, toolbar_actions=toolbar_actions) %}
+  {% call table_cell(class='px-2 !pl-6 align-middle') %}
     {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
     {% if row.description %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
-  </td>
+  {% endcall %}
   {{ cells(row) }}
 {% endcall %}
 {% endmacro %}

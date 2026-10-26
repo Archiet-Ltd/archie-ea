@@ -1,8 +1,12 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
-{% from 'components/data_card.html' import data_card %}
+{% from 'components/kpi_row.html' import kpi_row %}
 {% from 'components/modal.html' import modal %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/native-select.html' import native_select, native_select_option %}
+{% from 'basecoat/textarea.html' import textarea %}
 
 {% block title %}Value Streams{% endblock %}
 
@@ -22,12 +26,12 @@
 
     <div class="p-6 space-y-6">
         {% if streams %}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {{ data_card(icon='workflow', icon_color='blue', value=streams|length, label='Value Streams', subtitle='Defined end-to-end flows') }}
-            {{ data_card(icon='layers', icon_color='green', value=streams|sum(attribute='stage_count'), label='Total Stages', subtitle='Across all value streams') }}
-            {{ data_card(icon='link', icon_color='purple', value=streams|sum(attribute='mapped_capability_count'), label='Mapped Capabilities', subtitle='BIZBOK grid rows') }}
-            {{ data_card(icon='target', icon_color='amber', value=(streams|selectattr('strategic_importance', 'equalto', 'critical')|list|length), label='Critical Streams', subtitle='Strategic importance') }}
-        </div>
+        {{ kpi_row([
+            {'label': 'Value Streams', 'value': streams|length, 'icon': 'workflow', 'subtext': 'Defined end-to-end flows'},
+            {'label': 'Total Stages', 'value': streams|sum(attribute='stage_count'), 'icon': 'layers', 'subtext': 'Across all value streams'},
+            {'label': 'Mapped Capabilities', 'value': streams|sum(attribute='mapped_capability_count'), 'icon': 'link', 'subtext': 'BIZBOK grid rows'},
+            {'label': 'Critical Streams', 'value': (streams|selectattr('strategic_importance', 'equalto', 'critical')|list|length), 'icon': 'target', 'subtext': 'Strategic importance'}
+        ]) }}
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for vs in streams %}
@@ -76,19 +80,15 @@
 
     {% call modal(id='vs-create-modal', title='New Value Stream', description='Define an end-to-end value delivery flow.', size='default') %}
     <form method="POST" action="{{ url_for('value_stream.create') }}" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
         <div>
             <label for="vs-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input type="text" id="vs-name" name="name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                   placeholder="e.g. Order to Cash">
+            {{ input(type='text', id='vs-name', name='name', required=true, class='mt-1', placeholder='e.g. Order to Cash') }}
         </div>
         <div class="grid grid-cols-1 gap-4">
             <div>
                 <label for="vs-code" class="block text-sm font-medium text-muted-foreground mb-1">Code</label>
-                <input type="text" id="vs-code" name="code"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                       placeholder="OTC">
+                {{ input(type='text', id='vs-code', name='code', class='mt-1 font-mono', placeholder='OTC') }}
             </div>
             <div>
                 <label for="vs-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
@@ -96,47 +96,41 @@
                    browser pre-selected "Customer Facing" (the first option) —
                    a value stream saved without the user ever touching this
                    field, silently, as if it had been chosen deliberately. #}
-                <select id="vs-type" name="value_stream_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="">Select type…</option>
-                    <option value="customer_facing">Customer Facing</option>
-                    <option value="internal">Internal</option>
-                    <option value="supporting">Supporting</option>
-                </select>
+                {% call native_select(id='vs-type', name='value_stream_type', class='mt-1 w-full') %}
+                    {{ native_select_option('Select type…', value='') }}
+                    {{ native_select_option('Customer Facing', value='customer_facing') }}
+                    {{ native_select_option('Internal', value='internal') }}
+                    {{ native_select_option('Supporting', value='supporting') }}
+                {% endcall %}
             </div>
         </div>
         <div>
             <label for="vs-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea id="vs-description" name="description" rows="3"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+            {{ textarea(id='vs-description', name='description', rows=3, class='mt-1') }}
         </div>
         <div class="grid grid-cols-1 gap-4">
             <div>
                 <label for="vs-importance" class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
-                <select id="vs-importance" name="strategic_importance"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="">—</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
+                {% call native_select(id='vs-importance', name='strategic_importance', class='mt-1 w-full') %}
+                    {{ native_select_option('—', value='') }}
+                    {{ native_select_option('Critical', value='critical') }}
+                    {{ native_select_option('High', value='high') }}
+                    {{ native_select_option('Medium', value='medium') }}
+                    {{ native_select_option('Low', value='low') }}
+                {% endcall %}
             </div>
             <div>
                 <label for="vs-owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
-                <input type="text" id="vs-owner" name="business_owner"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                {{ input(type='text', id='vs-owner', name='business_owner', class='mt-1') }}
             </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
-            <button type="button" data-modal-close="vs-create-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+            {% call button(type='button', variant='ghost', attrs={'data-modal-close': 'vs-create-modal'}) %}
                 Cancel
-            </button>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            {% endcall %}
+            {% call button(type='submit', variant='default') %}
                 Create
-            </button>
+            {% endcall %}
         </div>
     </form>
     {% endcall %}

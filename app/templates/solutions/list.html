@@ -9,6 +9,11 @@
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/button.html' import button %}
+{% from 'basecoat/button.html' import button as bc_button %}
+{% from 'basecoat/input.html' import input as bc_input %}
+{% from 'basecoat/checkbox.html' import checkbox as bc_checkbox %}
+{% from 'basecoat/native-select.html' import native_select, native_select_option %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 
 {% block title %}All Solutions{% endblock %}
@@ -131,13 +136,11 @@
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider shrink-0">Created:</span>
           <div class="flex items-center gap-2">
             <label for="createdAfterFilter" class="text-xs text-muted-foreground">From</label>
-            <input type="date" id="createdAfterFilter" value="{{ created_after|default('') }}" lang="en-GB"
-                   class="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {{ bc_input(type='date', id='createdAfterFilter', value=created_after|default(''), lang='en-GB', class='h-8 px-2 py-1 text-xs') }}
           </div>
           <div class="flex items-center gap-2">
             <label for="createdBeforeFilter" class="text-xs text-muted-foreground">To</label>
-            <input type="date" id="createdBeforeFilter" value="{{ created_before|default('') }}" lang="en-GB"
-                   class="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {{ bc_input(type='date', id='createdBeforeFilter', value=created_before|default(''), lang='en-GB', class='h-8 px-2 py-1 text-xs') }}
           </div>
           {% if created_after or created_before %}
           <a href="{{ request.path }}?search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}"
@@ -187,224 +190,207 @@
           {# Select-all-pages banner — shown when user checks the header checkbox on a filtered/paginated view #}
           {% if total_count is defined %}
           <span id="sol-select-all-pages-banner" class="hidden text-xs text-primary font-medium">
-            <button type="button" id="sol-select-all-pages-btn" class="underline underline-offset-2 hover:text-primary/80 transition-colors">
+            {% call bc_button(type='button', variant='link', size='sm', id='sol-select-all-pages-btn', class='h-auto p-0 underline underline-offset-2 hover:text-primary/80 transition-colors') %}
               Select all {{ total_count|dash }} solution{{ 's' if total_count != 1 else '' }} matching this filter
-            </button>
+            {% endcall %}
             <span id="sol-all-pages-active-label" class="hidden ml-1 text-muted-foreground">(all selected — delete will affect all {{ total_count|dash }})</span>
           </span>
           {% endif %}
           <div class="flex items-center gap-2 ml-auto">
-              <button type="button" id="compareSolutionsBtn" @click="openSolutionCompare()" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border border-border/50 bg-card hover:bg-accent transition-colors" aria-label="Compare selected" title="Select 2 or 3 solutions to compare">
+              {% call bc_button(type='button', variant='outline', size='sm', id='compareSolutionsBtn', aria_label='Compare selected', title='Select 2 or 3 solutions to compare', attrs={'@click': 'openSolutionCompare()'}) %}
                 <i data-lucide="git-compare" class="h-3.5 w-3.5" aria-hidden="true"></i>Compare
-              </button>
-              <button type="button" data-action="bulk-export-solutions"
-                      class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border border-border/50 bg-card hover:bg-accent transition-colors" aria-label="Export selected">
+              {% endcall %}
+              {% call bc_button(type='button', variant='outline', size='sm', aria_label='Export selected', attrs={'data-action': 'bulk-export-solutions'}) %}
                 <i data-lucide="download" class="h-3.5 w-3.5" aria-hidden="true"></i>Export
-              </button>
-              <button type="button" data-action="bulk-delete-solutions"
-                      class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border border-destructive/30 bg-card hover:bg-destructive/10 text-destructive-emphasis transition-colors" aria-label="Delete selected">
+              {% endcall %}
+              {% call bc_button(type='button', variant='outline', size='sm', class='border-destructive/30 hover:bg-destructive/10 text-destructive-emphasis', aria_label='Delete selected', attrs={'data-action': 'bulk-delete-solutions'}) %}
                 <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>Delete
-              </button>
+              {% endcall %}
           </div>
         </div>
 
         {# Table #}
-        <div class="overflow-x-auto">
-            <table class="dense-table min-w-full solutions-table">
-                <thead>
-                    <tr class="border-b border-border/50 bg-muted/30">
-                        <th class="px-5 py-3.5 w-10"><input type="checkbox" data-select-all="solution-table" class="h-4 w-4 rounded border-input" aria-label="Select all solutions"></th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Solution</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Phase &amp; Status</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Design Maturity</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Architecture Scope</th>
-                        <th class="px-5 py-3.5 text-center text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Arch. Score</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Next Action</th>
-                        <th class="px-5 py-3.5 text-right text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border/50">
-                    {% for solution in solutions %}
-                        {% set ws = (workspace_summaries or {}).get(solution.id, {}) %}
-                        <tr class="hover:bg-muted/30 transition-colors group"
-                            data-name="{{ solution.name|lower }}"
-                            data-domain="{{ (solution.business_domain or '')|lower }}"
-                            data-status="{{ (solution.status or solution.governance_status or '')|lower }}"
-                            data-type="{{ (solution.solution_type or '')|lower }}"
-                            data-owner="{{ (ws.owner_display or '')|lower }}"
-                            data-next-action="{{ (ws.next_action or '')|lower }}">
-                            <td class="px-5 py-4 w-10">
-                                <input type="checkbox" data-select-row="solution-table" value="{{ solution.id }}" class="h-4 w-4 rounded border-input" aria-label="Select {{ solution.name }}">
-                            </td>
-                            <td class="px-5 py-4 min-w-[14rem]">
-                                <div class="space-y-1.5">
-                                    <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="text-sm font-semibold text-foreground hover:text-primary transition-colors">{{ solution.name }}</a>
-                                    <p class="text-xs text-muted-foreground leading-relaxed">{{ solution.description[:90] if solution.description else 'No summary yet.' }}{% if solution.description and solution.description|length > 90 %}...{% endif %}</p>
-                                    <div class="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.business_domain or 'No domain' }}</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.solution_type|replace('_', ' ')|title if solution.solution_type else 'Type not set' }}</span>
-                                        <span class="text-muted-foreground/60">Lead: {{ ws.owner_display or 'Unassigned' }}</span>
-                                    </div>
-                                    {# Below 2xl: Architecture Scope and Arch. Score inline #}
-                                    <div class="2xl:hidden flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground mt-1">
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.capability_count or 0 }} capabilities</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.application_count or 0 }} apps</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.archimate_count or 0 }} ArchiMate</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.risk_count or 0 }} risks</span>
-                                        {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
-                                        {% set _score = _cs.get('score', 0) %}
-                                        <span class="px-2 py-0.5 rounded bg-muted/50 font-medium">Score: {{ _score }}%</span>
-                                    </div>
+        {% call table(class='min-w-full solutions-table') %}
+            {% call table_header() %}
+                {% call table_row(class='border-b border-border/50 bg-muted/30') %}
+                    {% call table_head(class='px-5 py-3.5 w-10') %}{{ bc_checkbox(aria_label='Select all solutions', attrs={'data-select-all': 'solution-table'}) }}{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider') %}Solution{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider') %}Phase &amp; Status{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell') %}Design Maturity{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell') %}Architecture Scope{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-center text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell') %}Arch. Score{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider') %}Next Action{% endcall %}
+                    {% call table_head(class='px-5 py-3.5 text-right text-2xs font-semibold text-muted-foreground uppercase tracking-wider') %}Actions{% endcall %}
+                {% endcall %}
+            {% endcall %}
+            {% call table_body(class='divide-y divide-border/50') %}
+                {% for solution in solutions %}
+                    {% set ws = (workspace_summaries or {}).get(solution.id, {}) %}
+                    <tr data-slot="table-row" class="hover:bg-muted/30 transition-colors group"
+                        data-name="{{ solution.name|lower }}"
+                        data-domain="{{ (solution.business_domain or '')|lower }}"
+                        data-status="{{ (solution.status or solution.governance_status or '')|lower }}"
+                        data-type="{{ (solution.solution_type or '')|lower }}"
+                        data-owner="{{ (ws.owner_display or '')|lower }}"
+                        data-next-action="{{ (ws.next_action or '')|lower }}">
+                        {% call table_cell(class='px-5 py-4 w-10') %}
+                            {{ bc_checkbox(value=solution.id, aria_label='Select ' ~ solution.name, attrs={'data-select-row': 'solution-table'}) }}
+                        {% endcall %}
+                        {% call table_cell(class='px-5 py-4 min-w-[14rem]') %}
+                            <div class="space-y-1.5">
+                                <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="text-sm font-semibold text-foreground hover:text-primary transition-colors">{{ solution.name }}</a>
+                                <p class="text-xs text-muted-foreground leading-relaxed">{{ solution.description[:90] if solution.description else 'No summary yet.' }}{% if solution.description and solution.description|length > 90 %}...{% endif %}</p>
+                                <div class="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
+                                    <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.business_domain or 'No domain' }}</span>
+                                    <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.solution_type|replace('_', ' ')|title if solution.solution_type else 'Type not set' }}</span>
+                                    <span class="text-muted-foreground/60">Lead: {{ ws.owner_display or 'Unassigned' }}</span>
                                 </div>
-                            </td>
-                            <td class="px-5 py-4 whitespace-nowrap">
-                                <div class="space-y-2">
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        <span class="inline-flex items-center rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-semibold text-info-emphasis">{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}</span>
-                                        {{ status_badge_auto(solution.status or 'planned') }}
-                                    </div>
-                                    {% set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In Review', 'under_review': 'Under Review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In Progress', 'proposed': 'Submitted'} %}
-                                    {% set _gov = ws.governance_status or 'draft' %}
-                                    {% set _gov_label = GOV_LABELS.get(_gov, _gov|replace('_',' ')|title) %}
-                                    {% if _gov == 'approved' %}
-                                        {% set _gov_cls = 'bg-success/10 text-success-emphasis border border-success/20' %}
-                                    {% elif _gov in ('arb_review', 'under_review') %}
-                                        {% set _gov_cls = 'bg-warning/10 text-warning-emphasis border border-warning/20' %}
-                                    {% elif _gov == 'rejected' %}
-                                        {% set _gov_cls = 'bg-destructive/10 text-destructive border border-destructive/20' %}
+                                {# Below 2xl: Architecture Scope and Arch. Score inline #}
+                                <div class="2xl:hidden flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground mt-1">
+                                    <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.capability_count or 0 }} capabilities</span>
+                                    <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.application_count or 0 }} apps</span>
+                                    <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.archimate_count or 0 }} ArchiMate</span>
+                                    <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.risk_count or 0 }} risks</span>
+                                    {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
+                                    {% set _score = _cs.get('score', 0) %}
+                                    <span class="px-2 py-0.5 rounded bg-muted/50 font-medium">Score: {{ _score }}%</span>
+                                </div>
+                            </div>
+                        {% endcall %}
+                        {% call table_cell(class='px-5 py-4 whitespace-nowrap') %}
+                            <div class="space-y-2">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span class="inline-flex items-center rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-semibold text-info-emphasis">{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}</span>
+                                    {{ status_badge_auto(solution.status or 'planned') }}
+                                </div>
+                                {% set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In Review', 'under_review': 'Under Review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In Progress', 'proposed': 'Submitted'} %}
+                                {% set _gov = ws.governance_status or 'draft' %}
+                                {% set _gov_label = GOV_LABELS.get(_gov, _gov|replace('_',' ')|title) %}
+                                {% if _gov == 'approved' %}
+                                    {% set _gov_cls = 'bg-success/10 text-success-emphasis border border-success/20' %}
+                                {% elif _gov in ('arb_review', 'under_review') %}
+                                    {% set _gov_cls = 'bg-warning/10 text-warning-emphasis border border-warning/20' %}
+                                {% elif _gov == 'rejected' %}
+                                    {% set _gov_cls = 'bg-destructive/10 text-destructive border border-destructive/20' %}
+                                {% else %}
+                                    {% set _gov_cls = 'bg-muted text-muted-foreground border border-border/50' %}
+                                {% endif %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ _gov_cls }}">{{ _gov_label }}</span>
+                            </div>
+                        {% endcall %}
+                        {% call table_cell(class='px-5 py-4 whitespace-nowrap hidden xl:table-cell') %}
+                            <div class="space-y-2">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-2xl font-bold tracking-tight {% if (ws.readiness_pct or 0) >= 80 %}text-success{% elif (ws.readiness_pct or 0) >= 40 %}text-warning{% else %}text-foreground{% endif %}">{{ ws.readiness_pct or 0 }}%</span>
+                                </div>
+                                <progress class="h-1.5 w-32 rounded-full overflow-hidden {{ 'accent-success' if (ws.readiness_pct or 0) >= 80 else ('accent-warning' if (ws.readiness_pct or 0) >= 40 else 'accent-primary') }}" max="100" value="{{ ws.readiness_pct or 0 }}"></progress>
+                                <p class="text-xs text-muted-foreground">{{ ws.readiness_passed or 0 }}/{{ ws.readiness_total or 0 }} TOGAF maturity checks</p>
+                            </div>
+                        {% endcall %}
+                        {% call table_cell(class='px-5 py-4 hidden 2xl:table-cell') %}
+                            <div class="flex flex-wrap gap-1.5 max-w-xs">
+                                <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.capability_count or 0 }} capabilities</span>
+                                <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.application_count or 0 }} apps</span>
+                                <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} elements</span>
+                                <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.risk_count or 0 }} risks</span>
+                            </div>
+                        {% endcall %}
+                        {# PLT-002: Architecture completeness score ring #}
+                        {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
+                        {% set _score = _cs.get('score', 0) %}
+                        {% call table_cell(class='px-5 py-4 whitespace-nowrap hidden 2xl:table-cell') %}
+                          <div class="flex flex-col items-center gap-1">
+                            <div class="relative flex items-center justify-center w-11 h-11">
+                              <svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3" class="text-muted/40"/>
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3"
+                                        stroke-dasharray="{{ _score }}, 100"
+                                        class="{{ 'text-success-emphasis' if _score >= 80 else ('text-warning' if _score >= 40 else 'text-destructive') }}"/>
+                              </svg>
+                              <span class="absolute text-2xs font-bold leading-none">{{ _score }}%</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground">{{ _cs.get('filled_count', 0) }}/{{ _cs.get('total', 14) }}</span>
+                          </div>
+                        {% endcall %}
+                        {% set _disconnected = (ws.capability_count or 0) == 0 and (ws.application_count or 0) == 0 and (ws.archimate_count or 0) == 0 %}
+                        {% call table_cell(class='px-5 py-4') %}
+                            <div class="space-y-1 max-w-[200px]">
+                                <p class="text-xs font-medium leading-relaxed {{ 'text-warning-emphasis' if _disconnected else 'text-foreground' }}">{{ ws.next_action or 'Continue modelling' }}</p>
+                                <p class="text-xs text-muted-foreground">{{ solution.created_at | format_date }}</p>
+                            </div>
+                        {% endcall %}
+                        {% call table_cell(class='px-5 py-4 whitespace-nowrap text-right') %}
+                            <div class="flex flex-col items-end gap-2">
+                                <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}"
+                                       class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
+                                       title="Open Workspace">
+                                        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    </a>
+                                    <a href="/solutions/{{ solution.id }}/traceability"
+                                       class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
+                                       title="Traceability">
+                                        <i data-lucide="git-branch" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    </a>
+                                    <a href="/solutions/{{ solution.id }}/risks/heatmap"
+                                       class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
+                                       title="Risk Heatmap">
+                                        <i data-lucide="flame" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    </a>
+                                    {% if can_modify_solution(solution) %}
+                                    <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}"
+                                       class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
+                                       title="Edit">
+                                        <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    </a>
                                     {% else %}
-                                        {% set _gov_cls = 'bg-muted text-muted-foreground border border-border/50' %}
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card text-muted-foreground opacity-50 cursor-not-allowed"
+                                          aria-disabled="true" role="img" aria-label="Edit is not available: only the person who made this solution or an administrator can edit it" title="Only the person who made this solution or an administrator can edit it. Ask an administrator in Team settings.">
+                                        <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    </span>
                                     {% endif %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ _gov_cls }}">{{ _gov_label }}</span>
                                 </div>
-                            </td>
-                            <td class="px-5 py-4 whitespace-nowrap hidden xl:table-cell">
-                                <div class="space-y-2">
-                                    <div class="flex items-baseline gap-2">
-                                        <span class="text-2xl font-bold tracking-tight
- {% if (ws.readiness_pct or 0) >= 80 %}text-success
- {% elif (ws.readiness_pct or 0) >= 40 %}text-warning
- {% else %}text-foreground{% endif %}">{{ ws.readiness_pct or 0 }}%</span>
-                                    </div>
-                                    <div class="h-1.5 w-32 rounded-full bg-muted/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all
- {% if (ws.readiness_pct or 0) >= 80 %}bg-success
- {% elif (ws.readiness_pct or 0) >= 40 %}bg-warning
- {% else %}bg-primary{% endif %}"
-                                             style="width: {{ ws.readiness_pct or 0 }}%"></div>
-                                    </div>
-                                    <p class="text-xs text-muted-foreground">{{ ws.readiness_passed or 0 }}/{{ ws.readiness_total or 0 }} TOGAF maturity checks</p>
+                                <div class="flex items-center gap-1.5">
+                                    {% call bc_button(type='button', variant='outline', size='sm', class='h-auto text-xs px-2 py-1', attrs={'@click': 'toggleCompare(' ~ solution.id ~ ')', ':class': "isInCompare(" ~ solution.id ~ ") ? 'text-primary border-primary bg-primary/10' : 'text-muted-foreground border-border/50'", 'x-text': "isInCompare(" ~ solution.id ~ ") ? '✓ Compare' : '+ Compare'"}) %}{% endcall %}
+                                    {% call bc_button(type='button', variant='outline', size='sm', class='h-auto text-xs px-2 py-1 border-destructive/20 text-destructive-emphasis hover:bg-destructive/10 hover:text-destructive-emphasis', aria_label='Delete', attrs={'@click': "window.deleteSolution(" ~ solution.id ~ ", '" ~ (solution.name|e) ~ "')"}) %}Delete{% endcall %}
                                 </div>
-                            </td>
-                            <td class="px-5 py-4 hidden 2xl:table-cell">
-                                <div class="flex flex-wrap gap-1.5 max-w-xs">
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.capability_count or 0 }} capabilities</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.application_count or 0 }} apps</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} elements</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.risk_count or 0 }} risks</span>
-                                </div>
-                            </td>
-                            {# PLT-002: Architecture completeness score ring #}
-                            {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
-                            {% set _score = _cs.get('score', 0) %}
-                            <td class="px-5 py-4 whitespace-nowrap hidden 2xl:table-cell">
-                              <div class="flex flex-col items-center gap-1">
-                                <div class="relative flex items-center justify-center w-11 h-11">
-                                  <svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3" class="text-muted/40"/>
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3"
-                                            stroke-dasharray="{{ _score }}, 100"
-                                            class="{{ 'text-success-emphasis' if _score >= 80 else ('text-warning' if _score >= 40 else 'text-destructive') }}"/>
-                                  </svg>
-                                  <span class="absolute text-2xs font-bold leading-none">{{ _score }}%</span>
-                                </div>
-                                <span class="text-xs text-muted-foreground">{{ _cs.get('filled_count', 0) }}/{{ _cs.get('total', 14) }}</span>
-                              </div>
-                            </td>
-                            {% set _disconnected = (ws.capability_count or 0) == 0 and (ws.application_count or 0) == 0 and (ws.archimate_count or 0) == 0 %}
-                            <td class="px-5 py-4">
-                                <div class="space-y-1 max-w-[200px]">
-                                    <p class="text-xs font-medium leading-relaxed {{ 'text-warning-emphasis' if _disconnected else 'text-foreground' }}">{{ ws.next_action or 'Continue modelling' }}</p>
-                                    <p class="text-xs text-muted-foreground">{{ solution.created_at | format_date }}</p>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 whitespace-nowrap text-right">
-                                <div class="flex flex-col items-end gap-2">
-                                    <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
-                                           title="Open Workspace">
-                                            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        <a href="/solutions/{{ solution.id }}/traceability"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
-                                           title="Traceability">
-                                            <i data-lucide="git-branch" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        <a href="/solutions/{{ solution.id }}/risks/heatmap"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
-                                           title="Risk Heatmap">
-                                            <i data-lucide="flame" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        {% if can_modify_solution(solution) %}
-                                        <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
-                                           title="Edit">
-                                            <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        {% else %}
-                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card text-muted-foreground opacity-50 cursor-not-allowed"
-                                              aria-disabled="true" role="img" aria-label="Edit is not available: only the person who made this solution or an administrator can edit it" title="Only the person who made this solution or an administrator can edit it. Ask an administrator in Team settings.">
-                                            <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <button type="button" @click="toggleCompare({{ solution.id }})"
-                                                :class="isInCompare({{ solution.id }}) ? 'text-primary border-primary bg-primary/10' : 'text-muted-foreground border-border/50'"
-                                                class="text-xs px-2 py-1 rounded-md border font-medium transition-colors"
-                                                x-text="isInCompare({{ solution.id }}) ? '✓ Compare' : '+ Compare'"></button>
-                                        <button type="button" @click="window.deleteSolution({{ solution.id }}, '{{ solution.name|e }}')"
-                                                class="text-xs px-2 py-1 rounded-md border border-destructive/20 text-destructive-emphasis hover:bg-destructive/10 hover:text-destructive-emphasis transition-colors" aria-label="Delete">Delete</button>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                            </div>
+                        {% endcall %}
+                    </tr>
+                {% endfor %}
+            {% endcall %}
+        {% endcall %}
 
         <!-- ENT-010: Comparison panel (2-3 solutions) -->
         <div id="solutionComparePanel" class="border hidden border-t border-border/50 px-3 py-2 bg-muted/20">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-sm font-semibold text-foreground">Solution comparison</h3>
-                    <button id="btn-close-compare" type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close comparison">
+                    {% call bc_button(id='btn-close-compare', type='button', variant='ghost', size='icon-sm', aria_label='Close comparison') %}
                         <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-                    </button>
+                    {% endcall %}
                 </div>
-                <div id="solutionCompareTableWrap" class="overflow-x-auto">
-                    <table class="dense-table w-full border-collapse text-sm" id="solutionCompareTable">
-                        <thead>
-                            <tr class="border-b border-border">
-                                <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Attribute</th>
-                                <th id="compareCol1" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground"></th>
-                                <th id="compareCol2" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground"></th>
-                                <th id="compareCol3" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="solutionCompareBody"></tbody>
-                    </table>
+                <div id="solutionCompareTableWrap">
+                    {% call table(class='w-full border-collapse text-sm', id='solutionCompareTable') %}
+                        {% call table_header() %}
+                            {% call table_row(class='border-b border-border') %}
+                                {% call table_head(class='text-left py-2 px-3 text-xs font-medium text-muted-foreground') %}Attribute{% endcall %}
+                                {% call table_head(id='compareCol1', class='text-left py-2 px-3 text-xs font-medium text-muted-foreground') %}{% endcall %}
+                                {% call table_head(id='compareCol2', class='text-left py-2 px-3 text-xs font-medium text-muted-foreground') %}{% endcall %}
+                                {% call table_head(id='compareCol3', class='text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden') %}{% endcall %}
+                            {% endcall %}
+                        {% endcall %}
+                        <tbody data-slot="table-body" id="solutionCompareBody"></tbody>
+                    {% endcall %}
                 </div>
             </div>
             <div class="flex items-center gap-2">
               <div class="flex items-center gap-2 mr-4">
                 <label class="text-xs text-muted-foreground">Per page:</label>
-                <select @change="changeSolPerPage($event.target.value)" class="h-8 w-16 rounded-md border border-border/50 bg-card px-2 py-1 text-xs font-medium" aria-label="Per page">
+                {% call native_select(class='h-8 w-20 text-xs font-medium', aria_label='Per page', attrs={'@change': 'changeSolPerPage($event.target.value)'}) %}
                   {% for size in [10, 20, 50, 100] %}
-                  <option value="{{ size }}" {{ 'selected' if (per_page|default(20)) == size else '' }}>{{ size }}</option>
+                  {{ native_select_option(size, value=size, selected=((per_page|default(20)) == size)) }}
                   {% endfor %}
-                </select>
+                {% endcall %}
               </div>
               {% if pagination.has_prev %}
               <a href="?page={{ pagination.prev_num }}&per_page={{ per_page|default(20) }}&search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}&created_after={{ created_after|default('') }}&created_before={{ created_before|default('') }}"
@@ -548,11 +534,11 @@
         <template x-for="cid in ($data.compareIds || [])" :key="cid">
           <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted text-xs font-medium">
             <span x-text="cid"></span>
-            <button type="button" @click="toggleCompare(cid)" class="hover:text-destructive-emphasis transition-colors">×</button>
+            {% call bc_button(type='button', variant='ghost', size='sm', class='h-auto p-0 hover:text-destructive-emphasis transition-colors', attrs={'@click': 'toggleCompare(cid)'}) %}×{% endcall %}
           </span>
         </template>
       </div>
-      <button type="button" @click="if($data.compareIds !== undefined){ compareIds=[]; compareMode=false; }" class="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear All</button>
+      {% call bc_button(type='button', variant='ghost', size='sm', class='h-auto p-0 text-xs text-muted-foreground hover:text-foreground transition-colors', attrs={'@click': "if($data.compareIds !== undefined){ compareIds=[]; compareMode=false; }"}) %}Clear All{% endcall %}
     </div>
   </div>
 </div>
@@ -720,7 +706,7 @@
                 '<p class="text-xs text-muted-foreground mt-0.5">' + (t.description || '').slice(0, 120) + (t.description && t.description.length > 120 ? '…' : '') + '</p>' +
                 '<span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">' + (t.domain || 'General') + '</span>' +
                 ' <span class="text-xs text-muted-foreground">· used ' + (t.usage_count || 0) + '×</span></div>' +
-                '<button type="button" data-tid="' + t.id + '" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">Use Template</button></div>';
+                '<but' + 'ton type="button" data-slot="button" data-tid="' + t.id + '" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">Use Template</button></div>';
             }).join('');
       })
       .catch(function(err) {
@@ -832,14 +818,12 @@
 <div class="space-y-4">
   <p id="sol-bulk-delete-msg" class="text-sm text-muted-foreground">You are about to permanently delete the selected solutions. This action cannot be undone.</p>
   <div class="flex justify-end gap-2">
-    <button type="button" data-modal-close="sol-bulk-delete-confirm"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel">
+    {% call bc_button(type='button', variant='outline', aria_label='Cancel', attrs={'data-modal-close': 'sol-bulk-delete-confirm'}) %}
       Cancel
-    </button>
-    <button type="button" data-action="execute-bulk-delete" id="sol-bulk-delete-btn"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Confirm delete">
+    {% endcall %}
+    {% call bc_button(type='button', variant='destructive', id='sol-bulk-delete-btn', aria_label='Confirm delete', attrs={'data-action': 'execute-bulk-delete'}) %}
       Delete
-    </button>
+    {% endcall %}
   </div>
 </div>
 {% endcall %}

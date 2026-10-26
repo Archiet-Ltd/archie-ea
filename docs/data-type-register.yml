@@ -44,8 +44,9 @@ types:
   - id: record-list
     data: a list of records of one kind (applications, vendors, contracts, risks, requirements,
       decisions, work packages, users, audit entries)
-    show_with: the list table on the library Table, paged by 25 with the pagination control
-    components: [components/list_table.html, components/element_table.html]
+    show_with: the list table on the library Table (basecoat/table.html + basecoat/pagination.html),
+      with search toolbar, column visibility menu, and pagination footer
+    components: [components/list_table.html, components/element_table.html, basecoat/table.html, basecoat/index.html, basecoat/macros.html]
     pages: every list page and every list inside a record (pattern P03, P05)
     signals:
       - '<table\b'
@@ -66,11 +67,20 @@ types:
     data: the three or four numbers that matter at the top of a dashboard or record
     show_with: the section card (card, card_header, card_description, card_title, card_action), at
       most four in a row, each with a label and a comparison or explanation (pattern P24)
-    components: [components/card.html]
+    components: [components/card.html, basecoat/card.html, basecoat/index.html, basecoat/macros.html]
     pages: every dashboard
     signals:
       - 'stat-card|kpi-card|metric-card'
     retired: [components/metrics_card.html, components/data_card.html, components/app_stats_grid.html]
+
+  - id: time-series-and-breakdowns
+    data: trends over time, category distributions, or primary chart + side breakdown on dashboards
+    show_with: the Chart + Side Panel Grid (lg:grid-cols-7 with lg:col-span-4 + lg:col-span-3) or
+      Equal 2-Column Grid (md:grid-cols-2) inside card / chart containers using var(--chart-1..5)
+    components: [components/card.html, basecoat/card.html, basecoat/chart.html, basecoat/index.html, basecoat/macros.html]
+    pages: analytical dashboards (spend analytics, rationalization, overview, errors, policy monitoring)
+    signals: []
+    retired: []
 
   - id: record-facts
     data: the facts about one record (owner, sponsor, dates, lifecycle, cost centre)
@@ -84,7 +94,7 @@ types:
   - id: status
     data: a state, severity, priority or confidence
     show_with: the badge, with the word always present (pattern P23)
-    components: [components/badge.html]
+    components: [components/badge.html, basecoat/badge.html, basecoat/index.html, basecoat/macros.html]
     pages: every cell and header that shows a state
     signals:
       - '\b(?:pill|chip|tag)-(?:success|warning|danger|info|neutral)\b'
@@ -99,9 +109,42 @@ types:
       - '>\s*Source:\s*<|>\s*Confidence:\s*<'
     retired: []
 
+  - id: form-controls
+    data: editable fields, settings forms, and filter controls
+    show_with: single-column form (max-w-2xl space-y-6) with field wrappers, basecoat input/select/textarea/switch,
+      and a submit button (type="submit")
+    components: [components/input.html, components/select.html, components/form_field.html, basecoat/field.html, basecoat/input.html, basecoat/select.html, basecoat/index.html, basecoat/macros.html]
+    pages: forms, account settings, organisation settings, prompt configuration, feature flags
+    signals: []
+    retired: []
+
+  - id: canvas-9box
+    data: 9-box strategic grids (Business Model Canvas, Operating Model Canvas, Lean Canvas)
+    show_with: the canvas box component inside a structured 9-box grid
+    components: [components/canvas_box.html, components/canvas/business_model_canvas.html]
+    pages: business model canvas, operating model canvas
+    signals: []
+    retired: []
+
+  - id: board-kanban
+    data: stage or status-column boards (work packages, portfolio kanban)
+    show_with: the kanban board macro built on card, badge, and scroll area
+    components: [macros/kanban_board.html]
+    pages: work package boards, SAFe portfolio kanban
+    signals: []
+    retired: []
+
+  - id: diagram-canvas
+    data: interactive node-edge diagrams (ArchiMate Composer, dependency and hierarchy graphs)
+    show_with: the diagram toolbar, palette, minimap, finder, and properties sheet inside workspace_shell
+    components: [components/diagram/toolbar.html, components/diagram/palette.html, components/diagram/minimap.html]
+    pages: ArchiMate Composer and interactive model views
+    signals: []
+    retired: []
+
 hand_pagination:
   signal: '\b\w+\.(?:iter_pages\(|has_next\b|has_prev\b|next_num\b|prev_num\b)'
-  allowed_with: [components/pagination_controls.html, components/list_table.html, components/element_table.html]
+  allowed_with: [components/pagination_controls.html, components/list_table.html, components/element_table.html, basecoat/pagination.html, basecoat/index.html, basecoat/macros.html]
 
 placeholder_content:
   signed_in: 'layouts/admin_base\.html|layouts/app_base\.html'

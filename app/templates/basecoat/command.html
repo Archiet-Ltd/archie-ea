@@ -1,0 +1,60 @@
+{# command: port of shadcn/ui command.tsx (pinned in compliance/upstream). Macros: command, command_dialog, command_input_wrapper, command_input, command_list, command_empty, command_group, command_separator, command_item, command_shortcut #}
+
+{#- Command -#}
+{% macro command(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandDialog: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro command_dialog(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- CommandInput -#}
+{% macro command_input_wrapper(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-input-wrapper', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandInput -#}
+{% macro command_input(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-input', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandList -#}
+{% macro command_list(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-list', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandEmpty -#}
+{% macro command_empty(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-empty', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandGroup -#}
+{% macro command_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandSeparator -#}
+{% macro command_separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandItem -#}
+{% macro command_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CommandShortcut -#}
+{% macro command_shortcut(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('command-shortcut', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

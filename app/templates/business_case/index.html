@@ -2,6 +2,10 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/list_table.html' import list_table, table_cell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/textarea.html' import textarea %}
 {% import 'components/card.html' as card %}
 
 {% block title %}Business Cases{% endblock %}
@@ -30,43 +34,36 @@
   <div class="p-6 space-y-6">
     {% if business_cases %}
     {% call card.card() %}
-      {% call card.card_content(class='p-0') %}
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full text-sm" data-testid="bc-table">
-            <thead>
-              <tr class="border-b border-border text-left">
-                <th class="px-4 py-3 font-medium text-muted-foreground">Title</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground text-right">3yr TCO</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground text-right">ROI</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for bc in business_cases %}
-              <tr class="border-b border-border last:border-0 hover:bg-accent/50 transition-colors" data-testid="bc-row-{{ bc.id }}">
-                <td class="px-4 py-3">
-                  <a href="{{ url_for('business_case.detail', business_case_id=bc.id) }}" class="font-medium text-foreground hover:text-primary transition-colors">
-                    {{ bc.title or 'Untitled Business Case' }}
-                  </a>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ _status_badge.get(bc.status, _status_badge['draft']) }}">
-                    {{ (bc.status or 'draft') | capitalize }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-right tabular-nums">
-                  {{ bc.tco_3yr|format_currency if bc.tco_3yr is not none else '—' }}
-                </td>
-                <td class="px-4 py-3 text-right tabular-nums">
-                  {% if bc.roi_percentage is not none %}{{ bc.roi_percentage }}%{% else %}—{% endif %}
-                </td>
-                <td class="px-4 py-3 text-muted-foreground">{{ bc.updated_at.strftime('%Y-%m-%d') if bc.updated_at else '—' }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+      {% call card.card_content(class='p-4') %}
+        {% call list_table(columns=[
+            {'label': 'Title'},
+            {'label': 'Status'},
+            {'label': '3yr TCO', 'align': 'right'},
+            {'label': 'ROI', 'align': 'right'},
+            {'label': 'Updated'}
+        ], rows=business_cases, testid='bc-table', page_size=25) %}
+          {% for bc in business_cases %}
+          <tr data-slot="table-row" class="border-b border-border last:border-0 hover:bg-accent/50 transition-colors" data-testid="bc-row-{{ bc.id }}">
+            {% call table_cell() %}
+              <a href="{{ url_for('business_case.detail', business_case_id=bc.id) }}" class="font-medium text-foreground hover:text-primary transition-colors">
+                {{ bc.title or 'Untitled Business Case' }}
+              </a>
+            {% endcall %}
+            {% call table_cell() %}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ _status_badge.get(bc.status, _status_badge['draft']) }}">
+                {{ (bc.status or 'draft') | capitalize }}
+              </span>
+            {% endcall %}
+            {% call table_cell(class='text-right tabular-nums') %}
+              {{ bc.tco_3yr|format_currency if bc.tco_3yr is not none else '—' }}
+            {% endcall %}
+            {% call table_cell(class='text-right tabular-nums') %}
+              {% if bc.roi_percentage is not none %}{{ bc.roi_percentage }}%{% else %}—{% endif %}
+            {% endcall %}
+            {% call table_cell(class='text-muted-foreground') %}{{ bc.updated_at.strftime('%Y-%m-%d') if bc.updated_at else '—' }}{% endcall %}
+          </tr>
+          {% endfor %}
+        {% endcall %}
       {% endcall %}
     {% endcall %}
     {% else %}
@@ -85,42 +82,34 @@
 {% call modal(id='bc-create-modal', title='New Business Case', description='Give it a title — you can fill in the rest of the document next.', size='default') %}
 <form method="POST" action="{{ url_for('business_case.create') }}" class="space-y-4" data-testid="bc-create-form"
       x-data="businessCaseSeed('{{ url_for('business_case.ai_prefill_new_case') }}')">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
   <div class="rounded-md border border-border bg-muted/30 p-3 space-y-2">
     <label for="bc-seed-description" class="block text-sm font-medium text-muted-foreground mb-1">
       <i data-lucide="sparkles" class="h-4 w-4 inline-block align-text-bottom"></i>
       Generate with AI
     </label>
-    <textarea id="bc-seed-description" x-model="seedDescription" rows="2" maxlength="2000"
-      placeholder="Describe the problem in a sentence or two — e.g. we run four regional CRM instances with duplicate licence costs and no shared customer view"
-      class="flex min-h-[52px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-    <button type="button" data-testid="bc-seed-generate"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-      :disabled="loading || !seedDescription.trim()" @click="generateSeed()">
+    {{ textarea(id='bc-seed-description', rows=2, maxlength=2000, placeholder='Describe the problem in a sentence or two — e.g. we run four regional CRM instances with duplicate licence costs and no shared customer view', attrs={'x-model': 'seedDescription'}) }}
+    {% call button(type='button', variant='default', attrs={'data-testid': 'bc-seed-generate', ':disabled': 'loading || !seedDescription.trim()', '@click': 'generateSeed()'}) %}
       <span x-text="loading ? 'Generating…' : 'Generate'"></span>
-    </button>
+    {% endcall %}
     <p class="text-xs text-muted-foreground" x-show="applied" x-cloak data-testid="bc-seed-applied">Title/description below were pre-filled — review before creating.</p>
     <div class="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error" data-testid="bc-seed-error"></div>
   </div>
   <div>
     <label for="bc-title" class="block text-sm font-medium text-muted-foreground mb-1">Title <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
-    <input id="bc-title" x-ref="bcTitle" name="title" type="text" required maxlength="256" placeholder="e.g. Consolidate Regional CRM Instances"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+    {{ input(id='bc-title', name='title', type='text', required=true, maxlength=256, placeholder='e.g. Consolidate Regional CRM Instances', attrs={'x-ref': 'bcTitle'}) }}
   </div>
   <div>
     <label for="bc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-    <textarea id="bc-description" x-ref="bcDescription" name="description" rows="2" maxlength="2000" placeholder="Optional context for this business case"
-      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+    {{ textarea(id='bc-description', name='description', rows=2, maxlength=2000, placeholder='Optional context for this business case', attrs={'x-ref': 'bcDescription'}) }}
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
-    <button type="button" data-modal-close="bc-create-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+    {% call button(type='button', variant='ghost', attrs={'data-modal-close': 'bc-create-modal'}) %}
       Cancel
-    </button>
-    <button type="submit" data-testid="bc-create-submit"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+    {% endcall %}
+    {% call button(type='submit', variant='default', attrs={'data-testid': 'bc-create-submit'}) %}
       Create Business Case
-    </button>
+    {% endcall %}
   </div>
 </form>
 {% endcall %}

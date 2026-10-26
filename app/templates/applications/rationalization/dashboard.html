@@ -2,6 +2,8 @@
 {# design-block: dashboard #}
 {% import 'components/card.html' as card %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
 {% block title %}Application Rationalization{% endblock %}
 
 {% block guided_mode_steps %}
@@ -100,11 +102,10 @@
                 <div class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold mb-3">1</div>
                 <p class="text-sm font-medium text-foreground mb-1">Score Your Portfolio</p>
                 <p class="text-xs text-muted-foreground mb-3">You have {{ stats.total_applications|dash }} apps. Score them using the TIME framework.</p>
-                <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                {% call button(type='button', variant='default', attrs={'@click': 'scorePortfolio()', ':disabled': 'isScoring'}) %}
                     <span x-show="isScoring" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1.5"></span>
                     Score Portfolio
-                </button>
+                {% endcall %}
             </div>
             <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
                 <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">2</div>
@@ -239,11 +240,7 @@
                     <template x-for="(item, idx) in execSummary.health_distribution" :key="idx">
                         <div class="flex items-center gap-3">
                             <span class="text-xs font-medium w-16 text-muted-foreground" x-text="item.label"></span>
-                            <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-500"
-                                     :class="item.color"
-                                     :style="'width:' + item.pct + '%'"></div>
-                            </div>
+                            <progress class="flex-1 h-5 rounded-full overflow-hidden accent-primary" max="100" :value="item.pct"></progress>
                             <span class="text-xs font-semibold w-8 text-right" x-text="item.count"></span>
                         </div>
                     </template>
@@ -253,11 +250,10 @@
                 <div class="flex flex-col items-center py-8 text-center">
                     <i data-lucide="bar-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
                     <p class="text-sm text-muted-foreground mb-3">No applications scored yet. Score your portfolio to see health distribution.</p>
-                    <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    {% call button(type='button', variant='outline', attrs={'@click': 'scorePortfolio()', ':disabled': 'isScoring'}) %}
                         <span x-show="isScoring" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                         Score Portfolio
-                    </button>
+                    {% endcall %}
                 </div>
             </template>
             <template x-if="!execSummary.loaded && !execSummary.error">
@@ -271,7 +267,7 @@
                 <div class="text-sm text-destructive-emphasis flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4"></i>
                     <span>Failed to load.</span>
-                    <button type="button" @click="load()" class="text-primary hover:underline text-xs">Retry</button>
+                    {% call button(type='button', variant='link', size='sm', class='h-auto p-0 text-primary hover:underline text-xs', attrs={'@click': 'load()'}) %}Retry{% endcall %}
                 </div>
             </template>
         </div>
@@ -283,12 +279,7 @@
                     <template x-for="(item, idx) in execSummary.disposition_breakdown" :key="idx">
                         <div class="flex items-center gap-3">
                             <span class="text-xs font-medium w-20 text-muted-foreground" x-text="item.label"></span>
-                            <div class="flex-1 h-5 rounded-full overflow-hidden"
-                                 :class="item.label.toLowerCase().includes('insufficient') ? 'border border-dashed border-border bg-muted' : 'bg-muted'">
-                                <div class="h-full rounded-full transition-all duration-500"
-                                     :class="item.color"
-                                     :style="'width:' + item.pct + '%'"></div>
-                            </div>
+                            <progress class="flex-1 h-5 rounded-full overflow-hidden accent-primary" max="100" :value="item.pct"></progress>
                             <span class="text-xs font-semibold w-8 text-right" x-text="item.count"></span>
                         </div>
                     </template>
@@ -298,10 +289,9 @@
                 <div class="flex flex-col items-center py-8 text-center">
                     <i data-lucide="pie-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
                     <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see disposition breakdown.</p>
-                    <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    {% call button(type='button', variant='outline', attrs={'@click': 'scorePortfolio()', ':disabled': 'isScoring'}) %}
                         Score Portfolio
-                    </button>
+                    {% endcall %}
                 </div>
             </template>
             <template x-if="!execSummary.loaded && !execSummary.error">
@@ -315,7 +305,7 @@
                 <div class="text-sm text-destructive-emphasis flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4"></i>
                     <span>Failed to load.</span>
-                    <button type="button" @click="load()" class="text-primary hover:underline text-xs">Retry</button>
+                    {% call button(type='button', variant='link', size='sm', class='h-auto p-0 text-primary hover:underline text-xs', attrs={'@click': 'load()'}) %}Retry{% endcall %}
                 </div>
             </template>
         </div>
@@ -333,10 +323,9 @@
             <div class="flex flex-col items-center justify-center py-12 text-center">
                 <i data-lucide="scatter-chart" class="h-12 w-12 text-muted-foreground/40 mb-4"></i>
                 <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see the TIME quadrant visualization.</p>
-                <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                {% call button(type='button', variant='outline', attrs={'@click': 'scorePortfolio()', ':disabled': 'isScoring'}) %}
                     Score Portfolio
-                </button>
+                {% endcall %}
             </div>
         </template>
     </div>
@@ -367,39 +356,29 @@
             {# Cost Coverage #}
             <div class="flex items-center gap-3">
                 <span class="text-xs font-medium w-32 text-muted-foreground">Cost Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if cost_pct < 25 else ('bg-warning' if cost_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ cost_pct }}%"></div>
-                </div>
+                <progress class="flex-1 h-5 rounded-full overflow-hidden {{ 'accent-destructive' if cost_pct < 25 else ('accent-warning' if cost_pct <= 75 else 'accent-success') }}" max="100" value="{{ cost_pct }}"></progress>
                 <span class="text-xs font-semibold w-10 text-right">{{ cost_pct }}%</span>
             </div>
             {# Ownership Coverage #}
             <div class="flex items-center gap-3">
                 <span class="text-xs font-medium w-32 text-muted-foreground">Ownership Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if owner_pct < 25 else ('bg-warning' if owner_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ owner_pct }}%"></div>
-                </div>
+                <progress class="flex-1 h-5 rounded-full overflow-hidden {{ 'accent-destructive' if owner_pct < 25 else ('accent-warning' if owner_pct <= 75 else 'accent-success') }}" max="100" value="{{ owner_pct }}"></progress>
                 <span class="text-xs font-semibold w-10 text-right">{{ owner_pct }}%</span>
             </div>
             {# Vendor Coverage #}
             <div class="flex items-center gap-3">
                 <span class="text-xs font-medium w-32 text-muted-foreground">Vendor Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    {% if vendor_pct is not none %}
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if vendor_pct < 25 else ('bg-warning' if vendor_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ vendor_pct }}%"></div>
-                    {% endif %}
-                </div>
+                {% if vendor_pct is not none %}
+                <progress class="flex-1 h-5 rounded-full overflow-hidden {{ 'accent-destructive' if vendor_pct < 25 else ('accent-warning' if vendor_pct <= 75 else 'accent-success') }}" max="100" value="{{ vendor_pct }}"></progress>
+                {% else %}
+                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden"></div>
+                {% endif %}
                 <span class="text-xs font-semibold w-10 text-right">{{ (vendor_pct ~ '%') if vendor_pct is not none else '—' }}</span>
             </div>
             {# Risk Coverage #}
             <div class="flex items-center gap-3">
                 <span class="text-xs font-medium w-32 text-muted-foreground">Risk Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if risk_pct < 25 else ('bg-warning' if risk_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ risk_pct }}%"></div>
-                </div>
+                <progress class="flex-1 h-5 rounded-full overflow-hidden {{ 'accent-destructive' if risk_pct < 25 else ('accent-warning' if risk_pct <= 75 else 'accent-success') }}" max="100" value="{{ risk_pct }}"></progress>
                 <span class="text-xs font-semibold w-10 text-right">{{ risk_pct }}%</span>
             </div>
             {# Labelled for what it actually measures. This bar plots lifecycle_pct;
@@ -408,10 +387,7 @@
                business_criticality value is passed in. #}
             <div class="flex items-center gap-3">
                 <span class="text-xs font-medium w-32 text-muted-foreground">Lifecycle Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if lifecycle_pct < 25 else ('bg-warning' if lifecycle_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ lifecycle_pct }}%"></div>
-                </div>
+                <progress class="flex-1 h-5 rounded-full overflow-hidden {{ 'accent-destructive' if lifecycle_pct < 25 else ('accent-warning' if lifecycle_pct <= 75 else 'accent-success') }}" max="100" value="{{ lifecycle_pct }}"></progress>
                 <span class="text-xs font-semibold w-10 text-right">{{ lifecycle_pct }}%</span>
             </div>
         </div>
@@ -471,9 +447,7 @@
     <h2 class="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {# RATA-004: Score Portfolio button #}
-        <button type="button" @click="scorePortfolio()"
-                :disabled="isScoring"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
+        {% call button(type='button', variant='outline', class='rounded-xl border bg-card p-5 h-auto justify-start text-left hover:border-primary/50 transition-all group', attrs={'@click': 'scorePortfolio()', ':disabled': 'isScoring'}) %}
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
                     <template x-if="isScoring">
@@ -492,10 +466,9 @@
                        x-text="'Error: ' + (scoringResult?.error || 'unknown')"></p>
                 </div>
             </div>
-        </button>
+        {% endcall %}
 
-        <button type="button" @click="showDetectionModal = true"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
+        {% call button(type='button', variant='outline', class='rounded-xl border bg-card p-5 h-auto justify-start text-left hover:border-primary/50 transition-all group', attrs={'@click': 'showDetectionModal = true'}) %}
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
                     <i data-lucide="search" class="h-5 w-5"></i>
@@ -505,11 +478,9 @@
                     <p class="text-xs text-muted-foreground mt-0.5">Find duplicate applications using fast, hybrid, or enhanced strategies</p>
                 </div>
             </div>
-        </button>
+        {% endcall %}
 
-        <button type="button" @click="autoResolveExact()"
-                :disabled="autoResolveLoading"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
+        {% call button(type='button', variant='outline', class='rounded-xl border bg-card p-5 h-auto justify-start text-left hover:border-primary/50 transition-all group', attrs={'@click': 'autoResolveExact()', ':disabled': 'autoResolveLoading'}) %}
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10 text-success-emphasis group-hover:bg-success/20 transition-colors">
                     <i data-lucide="check-check" class="h-5 w-5"></i>
@@ -519,7 +490,7 @@
                     <p class="text-xs text-muted-foreground mt-0.5">Automatically resolve 100% similarity duplicates</p>
                 </div>
             </div>
-        </button>
+        {% endcall %}
 
         <a href="/consolidation-list"
            class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
@@ -561,8 +532,7 @@
         </a>
 
         {# RATA-018: Export Business Case button #}
-        <button type="button" @click="showExportModal = true" x-show="hasScores" x-cloak
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
+        {% call button(type='button', variant='outline', class='rounded-xl border bg-card p-5 h-auto justify-start text-left hover:border-primary/50 transition-all group', attrs={'@click': 'showExportModal = true', 'x-show': 'hasScores', 'x-cloak': true}) %}
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
                     <i data-lucide="download" class="h-5 w-5"></i>
@@ -572,39 +542,36 @@
                     <p class="text-xs text-muted-foreground mt-0.5">Download PDF, Excel, or CSV export for leadership</p>
                 </div>
             </div>
-        </button>
+        {% endcall %}
     </div>
 
     {# ── RATA-018: Export Modal ──────────────────────────────────── #}
-    <div x-show="showExportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
+    <div x-show="showExportModal" x-cloak data-slot="dialog" class="fixed inset-0 z-50 flex items-center justify-center"
          @keydown.escape.window="showExportModal = false"
-         role="dialog" aria-modal="true" aria-labelledby="export-title">
+         aria-labelledby="export-title">
         <div class="absolute inset-0 bg-overlay/50" @click="showExportModal = false"></div>
         <div class="relative bg-card rounded-lg border border-border w-full max-w-sm mx-4 p-6">
             <h3 id="export-title" class="text-base font-semibold text-foreground mb-4">Export Business Case</h3>
-            <div class="space-y-3">
+            <div class="space-y-3" data-slot="radio-group">
                 <label class="block text-xs font-medium text-muted-foreground mb-1">Format</label>
                 <div class="space-y-2">
                     <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" x-model="exportFormat" value="excel" class="rounded border-border"> Excel Workbook (.xlsx)
+                        {{ input(type="radio", value="excel", class="h-4 w-4 rounded border-border", attrs={"x-model": "exportFormat"}) }} Excel Workbook (.xlsx)
                     </label>
                     <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" x-model="exportFormat" value="csv" class="rounded border-border"> CSV Data Export
+                        {{ input(type="radio", value="csv", class="h-4 w-4 rounded border-border", attrs={"x-model": "exportFormat"}) }} CSV Data Export
                     </label>
                     <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" x-model="exportFormat" value="pdf" class="rounded border-border"> Executive Summary (HTML)
+                        {{ input(type="radio", value="pdf", class="h-4 w-4 rounded border-border", attrs={"x-model": "exportFormat"}) }} Executive Summary (HTML)
                     </label>
                 </div>
             </div>
             <div class="flex justify-end gap-2 mt-5">
-                <button type="button" @click="showExportModal = false"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted">Cancel</button>
-                <button type="button" @click="doExport()"
-                        :disabled="exportLoading"
-                        class="px-4 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {% call button(type='button', variant='outline', size='sm', attrs={'@click': 'showExportModal = false'}) %}Cancel{% endcall %}
+                {% call button(type='button', variant='default', size='sm', attrs={'@click': 'doExport()', ':disabled': 'exportLoading'}) %}
                     <span x-show="exportLoading" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1"></span>
                     Download
-                </button>
+                {% endcall %}
             </div>
         </div>
     </div>
@@ -630,11 +597,7 @@
         {# Section tabs #}
         <div class="flex flex-wrap gap-2 mb-5 border-b border-border">
             <template x-for="tab in tabs" :key="tab.key">
-                <button type="button"
-                        @click="openTab(tab.key)"
-                        class="px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors"
-                        :class="activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                        x-text="tab.label"></button>
+                {% call button(type='button', variant='ghost', size='sm', class='px-3 py-2 h-auto rounded-none text-xs font-medium border-b-2 -mb-px transition-colors', attrs={'@click': 'openTab(tab.key)', ':class': "activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'", 'x-text': 'tab.label'}) %}{% endcall %}
             </template>
         </div>
 
@@ -644,7 +607,7 @@
                 <p class="text-sm text-destructive-emphasis flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4"></i>
                     <span x-text="sections.summary.error"></span>
-                    <button type="button" @click="loadSection('summary')" class="text-primary hover:underline text-xs">Retry</button>
+                    {% call button(type='button', variant='link', size='sm', class='h-auto p-0 text-primary hover:underline text-xs', attrs={'@click': "loadSection('summary')"}) %}Retry{% endcall %}
                 </p>
             </template>
             <template x-if="!sections.summary.error && !sections.summary.loaded">
@@ -681,7 +644,7 @@
                 <p class="text-sm text-destructive-emphasis flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4"></i>
                     <span x-text="sections.criticalGaps.error"></span>
-                    <button type="button" @click="loadSection('criticalGaps')" class="text-primary hover:underline text-xs">Retry</button>
+                    {% call button(type='button', variant='link', size='sm', class='h-auto p-0 text-primary hover:underline text-xs', attrs={'@click': "loadSection('criticalGaps')"}) %}Retry{% endcall %}
                 </p>
             </template>
             <template x-if="!sections.criticalGaps.error && !sections.criticalGaps.loaded">
@@ -709,7 +672,7 @@
                 <p class="text-sm text-destructive-emphasis flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4"></i>
                     <span x-text="sections.rationalization.error"></span>
-                    <button type="button" @click="loadSection('rationalization')" class="text-primary hover:underline text-xs">Retry</button>
+                    {% call button(type='button', variant='link', size='sm', class='h-auto p-0 text-primary hover:underline text-xs', attrs={'@click': "loadSection('rationalization')"}) %}Retry{% endcall %}
                 </p>
             </template>
             <template x-if="!sections.rationalization.error && !sections.rationalization.loaded">
@@ -737,7 +700,7 @@
                 <p class="text-sm text-destructive-emphasis flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4"></i>
                     <span x-text="sections.vendorLifecycle.error"></span>
-                    <button type="button" @click="loadSection('vendorLifecycle')" class="text-primary hover:underline text-xs">Retry</button>
+                    {% call button(type='button', variant='link', size='sm', class='h-auto p-0 text-primary hover:underline text-xs', attrs={'@click': "loadSection('vendorLifecycle')"}) %}Retry{% endcall %}
                 </p>
             </template>
             <template x-if="!sections.vendorLifecycle.error && !sections.vendorLifecycle.loaded">

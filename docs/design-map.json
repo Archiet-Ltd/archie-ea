@@ -30,7 +30,9 @@
    "allowed_macros": [
     "components/element_table.html",
     "components/fact_list.html",
+    "components/kpi_row.html",
     "components/list_table.html",
+    "components/record_facts.html",
     "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -98,7 +100,9 @@
    "allowed_macros": [
     "components/element_table.html",
     "components/fact_list.html",
+    "components/kpi_row.html",
     "components/list_table.html",
+    "components/record_facts.html",
     "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -168,7 +172,9 @@
    "allowed_macros": [
     "components/element_table.html",
     "components/fact_list.html",
+    "components/kpi_row.html",
     "components/list_table.html",
+    "components/record_facts.html",
     "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -236,6 +242,12 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/kpi_row.html",
+    "components/list_table.html",
+    "components/record_facts.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/badge.html",
@@ -302,6 +314,12 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/kpi_row.html",
+    "components/list_table.html",
+    "components/record_facts.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/badge.html",
@@ -368,6 +386,12 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/kpi_row.html",
+    "components/list_table.html",
+    "components/record_facts.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/answer_cascade.html",
@@ -426,6 +450,12 @@
     }
    },
    "allowed_macros": [
+    "components/element_table.html",
+    "components/fact_list.html",
+    "components/kpi_row.html",
+    "components/list_table.html",
+    "components/record_facts.html",
+    "components/risk_matrix.html",
     "components/accessibility_helpers.html",
     "components/alert.html",
     "components/badge.html",

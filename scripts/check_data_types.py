@@ -69,7 +69,7 @@ def _page_templates(root: Path):
     tpl = root / TEMPLATES
     for path in sorted(tpl.rglob("*.html")):
         rel = path.relative_to(tpl).as_posix()
-        if rel.startswith(("components/", "macros/")):
+        if rel.startswith(("components/", "macros/", "basecoat/")):
             continue
         yield path, rel
 

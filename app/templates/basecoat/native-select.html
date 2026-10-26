@@ -14,14 +14,13 @@
 
 {#- NativeSelect -#}
 {% macro native_select_icon(text='', class='', id=none, attrs={}) -%}
-{%- set s = slot('native-select-icon', kwargs, class, id, attrs) -%}
-{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{#- basecoat.css already renders the chevron on select.select; omit duplicate icon -#}
 {%- endmacro %}
 
 {#- NativeSelectOption -#}
 {% macro native_select_option(text='', class='', id=none, attrs={}) -%}
 {%- set s = slot('native-select-option', kwargs, class, id, attrs) -%}
-{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text or kwargs.get('label', '') }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
 {%- endmacro %}
 
 {#- NativeSelectOptGroup -#}

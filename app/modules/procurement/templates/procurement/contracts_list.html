@@ -1,4 +1,9 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option, native_select_icon %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 {% block title %}Vendor Contracts{% endblock %}
@@ -24,20 +29,18 @@
     <div class="bg-card border border-border rounded-lg p-4">
         <form method="get" class="flex flex-wrap items-center gap-4">
             <div class="flex-1 min-w-[200px]">
-                <input type="text" name="search" value="{{ search or '' }}"
-                       placeholder="Search contracts..."
-                       class="h-9 w-full px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search contracts...">
+                {{ input(name='search', value=(search or ''), placeholder='Search contracts...', aria_label='Search contracts...') }}
             </div>
-            <select name="status" class="h-9 px-3 rounded-md border border-input bg-background text-sm" aria-label="Filter by Status">
-                <option value="">All Statuses</option>
-                <option value="active" {{ 'selected' if status == 'active' }}>Active</option>
-                <option value="expired" {{ 'selected' if status == 'expired' }}>Expired</option>
-                <option value="draft" {{ 'selected' if status == 'draft' }}>Draft</option>
-                <option value="terminated" {{ 'selected' if status == 'terminated' }}>Terminated</option>
-            </select>
-            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
-                Filter
-            </button>
+            {% call native_select_wrapper(class='w-44') %}
+                {% call native_select(name='status', aria_label='Filter by Status') %}
+                    {{ native_select_option('All Statuses', value='') }}
+                    {{ native_select_option('Active', value='active', selected=(status == 'active')) }}
+                    {{ native_select_option('Expired', value='expired', selected=(status == 'expired')) }}
+                    {{ native_select_option('Draft', value='draft', selected=(status == 'draft')) }}
+                    {{ native_select_option('Terminated', value='terminated', selected=(status == 'terminated')) }}
+                {% endcall %}
+            {% endcall %}
+            {{ button('Filter', type='submit') }}
         </form>
     </div>
 
@@ -45,46 +48,31 @@
     {% if contracts %}
     <div class="bg-card border border-border rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
-        <table class="dense-table w-full border-collapse">
-            <thead>
-                <tr class="bg-muted/40 border-b">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contract</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual Cost</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Renewal</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y">
-                {% for item in contracts %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
+        {% call(item) list_table(rows=contracts, columns=[('Contract', ''), ('Vendor', ''), ('Annual Cost', ''), ('Status', ''), ('Renewal', ''), ('Actions', 'text-right')], caption='Vendor contracts', testid='contracts-table', row_testid='contract-row') %}
+                    {% call table_cell(class='px-4 py-3') %}
                         <div class="font-medium">{{ item.contract.contract_name }}</div>
-                        <div class="text-sm text-muted-foreground">{{ item.contract.contract_number or '—' }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                        {{ item.contract.vendor.name if item.contract.vendor else '—' }}
-                    </td>
-                    <td class="px-4 py-3 text-sm">
+                        <div class="text-sm text-muted-foreground">{{ item.contract.contract_number or '?' }}</div>
+                    {% endcall %}
+                    {% call table_cell(class='px-4 py-3 text-sm') %}
+                        {{ item.contract.vendor.name if item.contract.vendor else '?' }}
+                    {% endcall %}
+                    {% call table_cell(class='px-4 py-3 text-sm') %}
                         {% if item.annual_cost is not none %}
                             {{ item.annual_cost|format_currency }}
                         {% else %}
-                            <span class="text-muted-foreground">—</span>
+                            <span class="text-muted-foreground">?</span>
                         {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
+                    {% endcall %}
+                    {% call table_cell(class='px-4 py-3') %}
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
                             {% if item.contract.status == 'active' %}bg-success/10 text-success-emphasis
                             {% elif item.contract.status == 'expired' %}bg-destructive/10 text-destructive-emphasis
                             {% elif item.contract.status == 'draft' %}bg-muted text-muted-foreground
                             {% else %}bg-warning/10 text-warning-emphasis{% endif %}">
-                            {# Stored values are snake_case; render them as words.
-                               "under_negotiation" was shown to the user verbatim. #}
                             {{ (item.contract.status or 'unknown') | replace('_', ' ') | title }}
                         </span>
-                    </td>
-                    <td class="px-4 py-3">
+                    {% endcall %}
+                    {% call table_cell(class='px-4 py-3') %}
                         {% if item.days_until_renewal is not none %}
                             <div class="flex items-center gap-2">
                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
@@ -98,17 +86,14 @@
                                 </span>
                             </div>
                         {% else %}
-                            <span class="text-muted-foreground text-sm">—</span>
+                            <span class="text-muted-foreground text-sm">?</span>
                         {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-right">
+                    {% endcall %}
+                    {% call table_cell(class='px-4 py-3 text-right') %}
                         <a href="{{ url_for('procurement.contract_detail', contract_id=item.contract.id) }}"
                            class="text-primary hover:underline text-sm">View</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endcall %}
+        {% endcall %}
         </div>
     </div>
 

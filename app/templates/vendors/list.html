@@ -4,6 +4,11 @@
 {% from "components/page_header.html" import page_header %}
 {% from "components/workbench_table.html" import workbench_table with context %}
 {% from "components/modal.html" import modal %}
+{% from "basecoat/button.html" import button %}
+{% from "basecoat/input.html" import input %}
+{% from "basecoat/native-select.html" import native_select, native_select_option %}
+{% from "basecoat/textarea.html" import textarea %}
+{% from "basecoat/table.html" import table_cell %}
 
 {% block title %}Vendors{% endblock %}
 
@@ -69,18 +74,14 @@
   </div>
   {% endif %}
 
-  <div role="tablist" aria-label="Vendor views" class="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground">
-    <button type="button" role="tab" id="tab-vendors" aria-controls="panel-vendors" :aria-selected="tab === 'vendors'"
-            @click="showTab('vendors')" :class="tab === 'vendors' ? 'bg-background text-foreground' : ''"
-            class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Vendors</button>
-    <button type="button" role="tab" id="tab-mapping" aria-controls="panel-mapping" :aria-selected="tab === 'mapping'"
-            @click="showTab('mapping')" :class="tab === 'mapping' ? 'bg-background text-foreground' : ''"
-            class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      Mapping{% if vp and vp.unmapped_count %} <span class="ml-2 rounded-full bg-primary/10 px-2 text-xs text-primary">{{ vp.unmapped_count }}</span>{% endif %}
-    </button>
+  <div role="tablist" data-slot="tabs-list" aria-label="Vendor views" class="inline-flex h-10 items-center gap-1 rounded-md bg-muted p-1 text-muted-foreground">
+    {% call button(type='button', variant='ghost', size='sm', id='tab-vendors', class='px-3', attrs={'role': 'tab', 'data-slot': 'tabs-trigger', 'aria-controls': 'panel-vendors', ':aria-selected': "tab === 'vendors'", '@click': "showTab('vendors')", ':class': "tab === 'vendors' ? 'bg-background text-foreground font-medium' : ''"}) %}Vendors{% endcall %}
+    {% call button(type='button', variant='ghost', size='sm', id='tab-mapping', class='px-3', attrs={'role': 'tab', 'data-slot': 'tabs-trigger', 'aria-controls': 'panel-mapping', ':aria-selected': "tab === 'mapping'", '@click': "showTab('mapping')", ':class': "tab === 'mapping' ? 'bg-background text-foreground font-medium' : ''"}) %}
+      Mapping{% if vp and vp.unmapped_count %} <span class="ml-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{{ vp.unmapped_count }}</span>{% endif %}
+    {% endcall %}
   </div>
 
-  <div id="panel-mapping" role="tabpanel" aria-labelledby="tab-mapping" x-show="tab === 'mapping'" x-cloak>
+  <div id="panel-mapping" role="tabpanel" data-slot="tabs-content" aria-labelledby="tab-mapping" x-show="tab === 'mapping'" x-cloak>
     {% if vp and vp.unmapped_count %}
     <p class="mb-3 text-sm" data-testid="mapping-answer">
       <strong>{{ vp.unmapped_count }}</strong> of your systems have no vendor recorded. Pick the vendor for each; it is saved straight away.
@@ -94,17 +95,13 @@
         </div>
         <div class="relative w-full sm:w-72">
           <div class="flex gap-2">
-            <input type="text" x-model="query" @input="search()" @focus="search()" @keydown.enter.prevent="saveTyped()"
-                   @keydown.escape="open = false" autocomplete="off" role="combobox" aria-autocomplete="list" :aria-expanded="open"
-                   aria-label="Vendor for {{ system.name }}" placeholder="Search or type a vendor"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <button type="button" @click="saveTyped()" :disabled="saving" aria-label="Save the vendor choice for {{ system.name }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">Save</button>
+            {{ input(type='text', autocomplete='off', aria_label='Vendor for ' ~ system.name, placeholder='Search or type a vendor', attrs={'x-model': 'query', '@input': 'search()', '@focus': 'search()', '@keydown.enter.prevent': 'saveTyped()', '@keydown.escape': 'open = false', 'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': 'open'}) }}
+            {% call button(type='button', variant='default', aria_label='Save the vendor choice for ' ~ system.name, attrs={'@click': 'saveTyped()', ':disabled': 'saving'}) %}Save{% endcall %}
           </div>
           <ul x-show="open && choices.length" x-cloak role="listbox"
-              class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-card shadow-sm">
+              class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-card">
             <template x-for="vendor in choices" :key="vendor.id">
-              <li role="option"><button type="button" @click="choose(vendor)" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted" x-text="vendor.name"></button></li>
+              <li role="option">{% call button(type='button', variant='ghost', size='sm', class='w-full justify-start px-3 py-2 h-auto text-left text-sm', attrs={'@click': 'choose(vendor)', 'x-text': 'vendor.name'}) %}{% endcall %}</li>
             </template>
           </ul>
           <p x-show="error" x-cloak class="mt-1 text-xs text-destructive-emphasis" x-text="error" role="alert"></p>
@@ -129,7 +126,7 @@
   </div>
 
   {# Main layout: table + side panel #}
-  <div id="panel-vendors" role="tabpanel" aria-labelledby="tab-vendors" x-show="tab === 'vendors'" class="flex flex-col lg:flex-row gap-6">
+  <div id="panel-vendors" role="tabpanel" data-slot="tabs-content" aria-labelledby="tab-vendors" x-show="tab === 'vendors'" class="flex flex-col lg:flex-row gap-6">
 
     {# LEFT: Table Card — uses workbench_table macro.
        min-w-0 overrides the flex item's default min-width:auto -- without it, a flex
@@ -156,12 +153,10 @@
            tests/smoke/test_vendor_dialog_controls.py, whose own selector is (rightly) unscoped
            since it targets the header action specifically. #}
         <span class="mt-3 block" x-show="!hasActiveFilters">
-          <button type="button" @click="Platform.modal.open('create-vendor')" aria-label="Add your first vendor"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add your first vendor</button>
+          {% call button(type='button', variant='default', aria_label='Add your first vendor', attrs={'@click': "Platform.modal.open('create-vendor')"}) %}Add your first vendor{% endcall %}
         </span>
         <span class="mt-3 block" x-show="hasActiveFilters" x-cloak>
-          <button type="button" @click="clearAllFilters()" aria-label="Clear filters"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Clear filters</button>
+          {% call button(type='button', variant='outline', aria_label='Clear filters', attrs={'@click': 'clearAllFilters()'}) %}Clear filters{% endcall %}
         </span>
       {% endset %}
       {% call workbench_table(
@@ -182,32 +177,32 @@
           per_page_default=25
       ) %}
         {# ── Page-specific cell templates (repeated per row by Alpine x-for) ── #}
-        <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
-        <td class="px-4 py-3 align-middle">
+        {% call table_cell(class='px-3 align-middle tabular-nums text-muted-foreground text-sm', attrs={'x-text': 'row.row_number'}) %}{% endcall %}
+        {% call table_cell(class='px-4 py-3 align-middle') %}
           <div>
-            <button type="button" @click="openEditModal(row)" class="font-medium text-left hover:text-primary hover:underline transition-colors" x-text="row.name"></button>
+            {% call button(type='button', variant='link', size='sm', class='h-auto p-0 font-medium text-left hover:text-primary hover:underline transition-colors', attrs={'@click': 'openEditModal(row)', 'x-text': 'row.name'}) %}{% endcall %}
             <template x-if="row.website">
               <a :href="row.website" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block" x-text="row.website"></a>
             </template>
           </div>
-        </td>
-        <td class="px-4 py-3 align-middle text-sm">
+        {% endcall %}
+        {% call table_cell(class='px-4 py-3 align-middle text-sm') %}
           <a :href="'{{ url_for('unified_applications.vendor_detail', vendor_id=0) }}'.replace('/0', '/' + row.id) + '#vendor-systems'"
              class="text-primary hover:underline"
              x-text="row.system_count + (row.system_count === 1 ? ' system' : ' systems')"></a>
           <p class="text-xs text-muted-foreground" x-show="row.system_count === 0">None of your systems name it yet</p>
-        </td>
-        <td class="px-4 py-3 align-middle text-sm tabular-nums">
+        {% endcall %}
+        {% call table_cell(class='px-4 py-3 align-middle text-sm tabular-nums') %}
           <span x-show="row.annual_cost !== null && row.annual_cost !== undefined" x-text="(row.annual_cost === null || row.annual_cost === undefined) ? '' : (window.currencyManager ? window.currencyManager.format(row.annual_cost) : row.annual_cost)"></span>
           <span x-show="(row.annual_cost === null || row.annual_cost === undefined)" class="text-xs text-muted-foreground"
                 x-text="row.cost_visible === false ? 'Not shown for your role' : 'No cost recorded'"></span>
-        </td>
-        <td class="px-4 py-3 align-middle text-sm">
+        {% endcall %}
+        {% call table_cell(class='px-4 py-3 align-middle text-sm') %}
           <span x-show="row.next_renewal" x-text="row.next_renewal"></span>
           <span x-show="row.renewal_due" class="ml-2 inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis">Due within 90 days</span>
           <span x-show="!row.next_renewal" class="text-xs text-muted-foreground">No contract renewal ahead</span>
-        </td>
-        <td class="px-4 py-3 align-middle text-right" @click.stop>
+        {% endcall %}
+        {% call table_cell(class='px-4 py-3 align-middle text-right', attrs={'@click.stop': true}) %}
           <div class="flex items-center gap-2 justify-end">
             <a :href="'{{ url_for('application_mgmt.vendor_detail', vendor_id=0) }}'.replace('0', row.id)"
                aria-label="View vendor details"
@@ -215,13 +210,12 @@
               <i data-lucide="eye" class="h-3 w-3"></i>
               View
             </a>
-            <button type="button" @click.stop="openEditModal(row)"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+            {% call button(type='button', variant='default', attrs={'@click.stop': 'openEditModal(row)'}) %}
               <i data-lucide="pencil" class="h-3 w-3"></i>
               Edit
-            </button>
+            {% endcall %}
           </div>
-        </td>
+        {% endcall %}
       {% endcall %}
     </div>
 
@@ -243,64 +237,52 @@
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-medium mb-1">Vendor Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" x-model="editForm.name" required maxlength="200"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="Vendor name" aria-label="Vendor Name">
+        {{ input(type='text', required=true, maxlength=200, placeholder='Vendor name', aria_label='Vendor Name', attrs={'x-model': 'editForm.name'}) }}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium mb-1">Vendor Type</label>
-          <select x-model="editForm.vendor_type"
-                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Vendor Type">
-            <option value="">Select type...</option>
-            <option value="software_vendor">Software Vendor</option>
-            <option value="saas_platform">SaaS Platform</option>
-            <option value="cloud_provider">Cloud Provider</option>
-            <option value="systems_integrator">Systems Integrator</option>
-            <option value="consulting_partner">Consulting Partner</option>
-            <option value="managed_service_provider">Managed Service Provider</option>
-          </select>
+          {% call native_select(class='w-full', aria_label='Vendor Type', attrs={'x-model': 'editForm.vendor_type'}) %}
+            {{ native_select_option('Select type...', value='') }}
+            {{ native_select_option('Software Vendor', value='software_vendor') }}
+            {{ native_select_option('SaaS Platform', value='saas_platform') }}
+            {{ native_select_option('Cloud Provider', value='cloud_provider') }}
+            {{ native_select_option('Systems Integrator', value='systems_integrator') }}
+            {{ native_select_option('Consulting Partner', value='consulting_partner') }}
+            {{ native_select_option('Managed Service Provider', value='managed_service_provider') }}
+          {% endcall %}
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Country</label>
-          <input type="text" x-model="editForm.country"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                 placeholder="e.g. United Kingdom" aria-label="Country">
+          {{ input(type='text', placeholder='e.g. United Kingdom', aria_label='Country', attrs={'x-model': 'editForm.country'}) }}
         </div>
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Website</label>
-        <input type="url" x-model="editForm.website"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="https://example.com" aria-label="Website">
+        {{ input(type='url', placeholder='https://example.com', aria_label='Website', attrs={'x-model': 'editForm.website'}) }}
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Status</label>
-        <select x-model="editForm.status"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Status">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="catalog">Catalog</option>
-          <option value="contracted">Contracted</option>
-          <option value="deployed">Deployed</option>
-        </select>
+        {% call native_select(class='w-full', aria_label='Status', attrs={'x-model': 'editForm.status'}) %}
+          {{ native_select_option('Active', value='active') }}
+          {{ native_select_option('Inactive', value='inactive') }}
+          {{ native_select_option('Catalog', value='catalog') }}
+          {{ native_select_option('Contracted', value='contracted') }}
+          {{ native_select_option('Deployed', value='deployed') }}
+        {% endcall %}
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Description</label>
-        <textarea x-model="editForm.description" rows="3"
-                  class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Brief description" aria-label="Description"></textarea>
+        {{ textarea(rows=3, placeholder='Brief description', aria_label='Description', attrs={'x-model': 'editForm.description'}) }}
       </div>
       <div x-show="editError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="editError"></div>
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-      <button type="button" data-modal-close="edit-vendor-modal"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-      <button type="button" @click="saveEdit()" :disabled="editSaving"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+      {% call button(type='button', variant='outline', attrs={'data-modal-close': 'edit-vendor-modal'}) %}Cancel{% endcall %}
+      {% call button(type='button', variant='default', attrs={'@click': 'saveEdit()', ':disabled': 'editSaving'}) %}
         <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="editSaving" x-cloak></i>
         <span x-text="editSaving ? 'Saving...' : 'Save Changes'"></span>
-      </button>
+      {% endcall %}
     </div>
   {% endcall %}
 
@@ -310,18 +292,13 @@
       This will permanently delete the selected vendors and cannot be undone.
       Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
     </p>
-    <input type="text" x-model="deleteConfirmText"
-           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
-           placeholder="DELETE" @keydown.enter="executeBulkDelete()" aria-label="DELETE">
+    {{ input(type='text', class='font-mono mb-4', placeholder='DELETE', aria_label='DELETE', attrs={'x-model': 'deleteConfirmText', '@keydown.enter': 'executeBulkDelete()'}) }}
     <div class="flex justify-end gap-3">
-      <button type="button" data-modal-close="bulk-delete-confirm-modal"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-      <button type="button" @click="executeBulkDelete()"
-              :disabled="deleteConfirmText !== 'DELETE' || deleteInProgress"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+      {% call button(type='button', variant='outline', attrs={'data-modal-close': 'bulk-delete-confirm-modal'}) %}Cancel{% endcall %}
+      {% call button(type='button', variant='destructive', attrs={'@click': 'executeBulkDelete()', ':disabled': "deleteConfirmText !== 'DELETE' || deleteInProgress"}) %}
         <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak></i>
         <span x-text="deleteInProgress ? 'Deleting...' : 'Delete'"></span>
-      </button>
+      {% endcall %}
     </div>
   {% endcall %}
 
@@ -329,50 +306,39 @@
   {% call modal(id='create-vendor', title='New Vendor', description='Add a new vendor to the catalogue', size='lg') %}
     <div x-data="vendorCreateModal()">
       <form @submit.prevent="submitCreateVendor()" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
         {% call form_group(id='cv-name', label='Vendor Name', required=true) %}
-          <input type="text" id="cv-name" name="name" x-model="formData.name" required maxlength="200"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                 placeholder="Enter vendor name">
+          {{ input(type='text', id='cv-name', name='name', required=true, maxlength=200, placeholder='Enter vendor name', attrs={'x-model': 'formData.name'}) }}
         {% endcall %}
         <div class="grid grid-cols-1 gap-4">
           {% call form_group(id='cv-type', label='Vendor Type') %}
-            <select id="cv-type" name="vendor_type" x-model="formData.vendor_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="">Select type...</option>
-              <option value="software_vendor">Software Vendor</option>
-              <option value="saas_platform">SaaS Platform</option>
-              <option value="cloud_provider">Cloud Provider</option>
-              <option value="systems_integrator">Systems Integrator</option>
-              <option value="consulting_partner">Consulting Partner</option>
-              <option value="managed_service_provider">Managed Service Provider</option>
-            </select>
+            {% call native_select(id='cv-type', name='vendor_type', class='w-full', attrs={'x-model': 'formData.vendor_type'}) %}
+              {{ native_select_option('Select type...', value='') }}
+              {{ native_select_option('Software Vendor', value='software_vendor') }}
+              {{ native_select_option('SaaS Platform', value='saas_platform') }}
+              {{ native_select_option('Cloud Provider', value='cloud_provider') }}
+              {{ native_select_option('Systems Integrator', value='systems_integrator') }}
+              {{ native_select_option('Consulting Partner', value='consulting_partner') }}
+              {{ native_select_option('Managed Service Provider', value='managed_service_provider') }}
+            {% endcall %}
           {% endcall %}
           {% call form_group(id='cv-country', label='Country') %}
-            <input type="text" id="cv-country" name="country" x-model="formData.country"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                   placeholder="e.g. United Kingdom">
+            {{ input(type='text', id='cv-country', name='country', placeholder='e.g. United Kingdom', attrs={'x-model': 'formData.country'}) }}
           {% endcall %}
         </div>
         {% call form_group(id='cv-website', label='Website') %}
-          <input type="url" id="cv-website" name="website" x-model="formData.website"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                 placeholder="https://example.com">
+          {{ input(type='url', id='cv-website', name='website', placeholder='https://example.com', attrs={'x-model': 'formData.website'}) }}
         {% endcall %}
         {% call form_group(id='cv-description', label='Description') %}
-          <textarea id="cv-description" name="description" x-model="formData.description" rows="3"
-                    class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Brief description of the vendor"></textarea>
+          {{ textarea(id='cv-description', name='description', rows=3, placeholder='Brief description of the vendor', attrs={'x-model': 'formData.description'}) }}
         {% endcall %}
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
         <div class="flex justify-end gap-3 pt-2 border-t border-border">
-          <button type="button" @click="Platform.modal.close('create-vendor')"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
-          <button type="submit" :disabled="submitting"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+          {% call button(type='button', variant='ghost', attrs={'@click': "Platform.modal.close('create-vendor')"}) %}Cancel{% endcall %}
+          {% call button(type='submit', variant='default', attrs={'x-bind:disabled': 'submitting'}) %}
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
             <span x-text="submitting ? 'Creating...' : 'Create Vendor'"></span>
-          </button>
+          {% endcall %}
         </div>
       </form>
     </div>

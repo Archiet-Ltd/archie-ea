@@ -1,53 +1,142 @@
-{# The list table: the one way a page lists records (data-type register: record-list).
+{# The canonical shadcn/ui Data Table + Pagination component (data-type register: record-list).
+   Ported from Anioko/flask-basecoat (examples/ported/tasks.html, examples/ported/_admin.html,
+   examples/reference/portfolio.html, and basecoat/pagination.html).
 
-   Built on the library Table (components/table.html), the vendored shadcn Table. The caller
-   renders one row's cells in the call block; the macro owns the header, the screen-reader
-   caption, the row wrapper with its test id, and paging by 25 with the pagination control.
-   Short columns keep to one line; the first column takes the remaining width.
+   Built on basecoat/table.html (table, table_header, table_body, table_row, table_head, table_cell),
+   basecoat/input.html, basecoat/button.html, basecoat/dropdown-menu.html, basecoat/native-select.html,
+   and basecoat/pagination.html.
 
-   {% from 'components/list_table.html' import list_table %}
-   {% call(o) list_table(rows=options, columns=[('Option', ''), ('Cost', ''), ('Summary', 'hidden md:table-cell')],
-                         caption='Options compared', testid='options-table', row_testid='option-row') %}
-     <td class="px-2 !pl-6 align-middle font-medium text-foreground">{{ o.name }}</td>
-     <td class="whitespace-nowrap px-2 align-middle">{{ o.cost }}</td>
-     <td class="hidden px-2 align-middle md:table-cell">{{ o.summary }}</td>
-   {% endcall %}
+   Features:
+   - Data Table Toolbar (search filter input, optional Reset action, View column visibility menu)
+   - Sortable / hideable column headers with data-slot="table-head"
+   - Row cells using table_cell (data-slot="table-cell") with single-line truncation support
+   - Data Table Pagination footer (row count summary, Rows per page selector [10, 20, 25, 30, 40, 50],
+     Page X of Y indicator, and First / Previous / Next / Last pagination controls via basecoat/pagination.html)
+#}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu, dropdown_menu_trigger, dropdown_menu_content, dropdown_menu_label, dropdown_menu_separator, dropdown_menu_checkbox_item %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option, native_select_icon %}
+{% from 'basecoat/pagination.html' import pagination, pagination_content, pagination_item %}
 
-   rows        the records, one row each
-   columns     (label, extra header classes); the first column is the record's name
-   caption     what the table lists, read by screen readers
-   testid      the table's test id; the pager wrapper is <testid>-pager
-   row_testid  each row's test id
-   page_size   rows per page; at or under it there are no page controls
-   component   the data-component marker (element-table passes its own)
-
-   A list of ArchiMate elements uses components/element_table.html, which is this table with the
-   element's name and link in the first column. #}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head %}
-{% from 'components/pagination_controls.html' import pagination_controls %}
-
-{% macro list_table(rows, columns, caption, testid, row_testid='list-row', page_size=25, component='list-table') %}
+{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter records...', toolbar=True, toolbar_actions=none, server_pagination=none) %}
 {%- set cells = caller -%}
 {%- set total = rows|length -%}
 {%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
-<div x-data="{ currentPage: 1, pageSize: {{ page_size }}, totalItems: {{ total }}, totalPages: {{ pages }} }" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}">
-  {% call table(attrs_dict={'data-testid': testid}) %}
-    <caption class="sr-only">{{ caption }}</caption>
+<div x-data="{ currentPage: 1, pageSize: {{ page_size }}, totalItems: {{ total }}, totalPages: {{ pages }}, searchQuery: '', hiddenCols: {} }"
+     data-component="{{ component }}"
+     data-slot="data-table"
+     data-testid="{{ testid }}-pager"
+     data-total="{{ total }}"
+     data-page-size="{{ page_size }}"
+     class="flex flex-col gap-3">
+  {% if toolbar %}
+  <div class="flex flex-wrap items-center justify-between gap-2 px-1" data-slot="data-table-toolbar">
+    <div class="flex flex-1 items-center gap-2">
+      {{ input(type='search', placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', aria_label=search_placeholder, attrs={'x-model': 'searchQuery', '@input': 'currentPage = 1'}) }}
+      {% call button(variant='ghost', size='sm', class='h-8 px-2 lg:px-3', attrs={'x-show': 'searchQuery.length > 0', 'x-cloak': '', '@click': "searchQuery = ''; currentPage = 1"}) %}
+        Reset
+        <i data-lucide="x" class="ml-1 size-4" aria-hidden="true"></i>
+      {% endcall %}
+    </div>
+    <div class="flex items-center gap-2">
+      {% if toolbar_actions %}{{ toolbar_actions() }}{% endif %}
+      {% if columns|length > 1 %}
+      {% call dropdown_menu() %}
+        {% call dropdown_menu_trigger(variant='outline', size='sm', class='ml-auto hidden h-8 lg:flex') %}
+          <i data-lucide="sliders-horizontal" class="mr-1.5 size-4" aria-hidden="true"></i>
+          View
+        {% endcall %}
+        {% call dropdown_menu_content(align='end', class='w-[160px]') %}
+          {{ dropdown_menu_label('Toggle columns') }}
+          {{ dropdown_menu_separator() }}
+          {% for col in columns %}
+            {% if not loop.first %}
+              {%- set col_label = col.label if col is mapping else col[0] -%}
+              {% call dropdown_menu_checkbox_item(checked=true, class='capitalize', attrs={'@click': 'hiddenCols[' ~ loop.index0 ~ '] = !hiddenCols[' ~ loop.index0 ~ ']'}) %}
+                {{ col_label }}
+              {% endcall %}
+            {% endif %}
+          {% endfor %}
+        {% endcall %}
+      {% endcall %}
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% call table(attrs={'data-testid': testid}) %}
+    {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
     {% call table_header() %}
       {% call table_row(class='hover:bg-transparent') %}
         {% for col in columns %}
-          {% call table_head(class=('!pl-6 ' if loop.first else 'whitespace-nowrap ') ~ (col[1] if col|length > 1 else ''), attrs_dict={'scope': 'col'}) %}{{ col[0] }}{% endcall %}
+          {%- set col_label = col.label if col is mapping else col[0] -%}
+          {%- set col_class = (col.class if col is mapping else (col[1] if col|length > 1 else '')) or '' -%}
+          {%- set col_align = ('text-right ' if (col is mapping and col.get('align') == 'right') else '') -%}
+          {% call table_head(class=('!pl-6 ' if loop.first else 'whitespace-nowrap ') ~ col_align ~ col_class, attrs={'scope': 'col', ':class': "hiddenCols[" ~ loop.index0 ~ "] ? 'hidden' : ''"}) %}
+            {{ col_label }}
+          {% endcall %}
         {% endfor %}
       {% endcall %}
     {% endcall %}
     {% call table_body() %}
       {% for row in rows %}
         {%- set attrs = {'data-testid': row_testid} -%}
-        {%- if total > page_size %}{% set _ = attrs.update({'x-show': 'Math.ceil(' ~ loop.index ~ ' / pageSize) === currentPage'}) %}{% endif -%}
-        {% call table_row(class='group h-12', attrs_dict=attrs) %}{{ cells(row) }}{% endcall %}
+        {%- if total > page_size -%}
+          {%- set _ = attrs.update({'x-show': '(!searchQuery || $el.innerText.toLowerCase().includes(searchQuery.toLowerCase())) && (searchQuery ? true : Math.ceil(' ~ loop.index ~ ' / pageSize) === currentPage)'}) -%}
+        {%- else -%}
+          {%- set _ = attrs.update({'x-show': '!searchQuery || $el.innerText.toLowerCase().includes(searchQuery.toLowerCase())'}) -%}
+        {%- endif -%}
+        {% call table_row(class='group h-12', attrs=attrs) %}{{ cells(row) }}{% endcall %}
       {% endfor %}
     {% endcall %}
   {% endcall %}
-  {% if total > page_size %}{{ pagination_controls(class='border-t border-border') }}{% endif %}
+
+  <div class="flex flex-col gap-3 border-t border-border px-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-slot="data-table-pagination">
+    <div class="text-muted-foreground flex-1 text-sm tabular-nums">
+      {{ total }} row(s) total
+    </div>
+    <div class="flex flex-wrap items-center space-x-4 lg:space-x-6">
+      <div class="flex items-center space-x-2">
+        <span class="text-sm font-medium">Rows per page</span>
+        {% call native_select_wrapper(class='w-[72px]') %}
+          {% call native_select(size='sm', aria_label='Rows per page', attrs={'x-model.number': 'pageSize', '@change': 'currentPage = 1; totalPages = Math.max(1, Math.ceil(totalItems / pageSize))'}) %}
+            {% for opt in [10, 20, 25, 30, 40, 50] %}
+              {{ native_select_option(opt|string, value=opt|string, selected=(opt == page_size)) }}
+            {% endfor %}
+          {% endcall %}
+          {{ native_select_icon() }}
+        {% endcall %}
+      </div>
+      <div class="flex w-[100px] items-center justify-center text-sm font-medium tabular-nums">
+        Page <span class="mx-1" x-text="currentPage">1</span> of <span class="ml-1" x-text="Math.max(1, Math.ceil(totalItems / pageSize))">{{ pages }}</span>
+      </div>
+      {% call pagination(aria_label='Table pagination', class='mx-0 w-auto') %}
+        {% call pagination_content(class='flex items-center space-x-2') %}
+          {% call pagination_item() %}
+            {% call button(variant='outline', size='icon-sm', class='hidden size-8 p-0 lg:flex', aria_label='Go to first page', attrs={'@click': 'currentPage = 1', ':disabled': 'currentPage <= 1'}) %}
+              <i data-lucide="chevrons-left" class="size-4" aria-hidden="true"></i>
+            {% endcall %}
+          {% endcall %}
+          {% call pagination_item() %}
+            {% call button(variant='outline', size='icon-sm', class='size-8 p-0', aria_label='Go to previous page', attrs={'@click': 'if (currentPage > 1) currentPage--', ':disabled': 'currentPage <= 1'}) %}
+              <i data-lucide="chevron-left" class="size-4" aria-hidden="true"></i>
+            {% endcall %}
+          {% endcall %}
+          {% call pagination_item() %}
+            {% call button(variant='outline', size='icon-sm', class='size-8 p-0', aria_label='Go to next page', attrs={'@click': 'if (currentPage < Math.max(1, Math.ceil(totalItems / pageSize))) currentPage++', ':disabled': 'currentPage >= Math.max(1, Math.ceil(totalItems / pageSize))'}) %}
+              <i data-lucide="chevron-right" class="size-4" aria-hidden="true"></i>
+            {% endcall %}
+          {% endcall %}
+          {% call pagination_item() %}
+            {% call button(variant='outline', size='icon-sm', class='hidden size-8 p-0 lg:flex', aria_label='Go to last page', attrs={'@click': 'currentPage = Math.max(1, Math.ceil(totalItems / pageSize))', ':disabled': 'currentPage >= Math.max(1, Math.ceil(totalItems / pageSize))'}) %}
+              <i data-lucide="chevrons-right" class="size-4" aria-hidden="true"></i>
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
+    </div>
+  </div>
 </div>
 {% endmacro %}

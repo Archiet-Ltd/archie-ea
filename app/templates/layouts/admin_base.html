@@ -7,9 +7,9 @@
                strategic/*, governance/*, and all other authenticated pages.
    See also: public_base.html (unauthenticated), base.html (legacy, avoid).
 #}
-{% from 'components/button.html' import button %}
-{% from 'components/dialog.html' import dialog %}
-{% from 'components/input.html' import input %}
+{% from 'components/button.html' import button as _layout_button %}
+{% from 'components/dialog.html' import dialog as _layout_dialog %}
+{% from 'components/input.html' import input as _layout_input %}
 {% from 'components/ui_sidebar.html' import sidebar_wrapper, sidebar_inset %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
@@ -129,10 +129,10 @@
                     {% if sample_company_restore_point_id %}
                     <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-testid="sample-company-indicator">
                         <p class="text-muted-foreground">You are looking at the sample company.</p>
-                        {% call dialog(trigger_text='Remove it', trigger_label='Remove it', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
+                        {% call _layout_dialog(trigger_text='Remove it', trigger_label='Remove it', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
                         <form method="post" action="{{ url_for('architect_ui.remove_sample_company') }}" class="flex justify-end">
-                            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-                            {{ button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
+                            {{ _layout_input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                            {{ _layout_button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
                         </form>
                         {% endcall %}
                     </div>
@@ -235,8 +235,8 @@
                 </div>
             </div>
             <div class="flex items-center justify-between border-t border-border px-4 py-3">
-                {{ button(text='Exit', variant='ghost', on_click='exit()') }}
-                {{ button(text='Next', variant='default', on_click='next()', attrs_dict={'x-text': "currentIndex === steps.length - 1 ? 'Done' : 'Next'"}) }}
+                {{ _layout_button(text='Exit', variant='ghost', on_click='exit()') }}
+                {{ _layout_button(text='Next', variant='default', on_click='next()', attrs_dict={'x-text': "currentIndex === steps.length - 1 ? 'Done' : 'Next'"}) }}
             </div>
         </div>
     </div>

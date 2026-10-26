@@ -1,6 +1,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/badge.html' import badge %}
+{% from 'basecoat/table.html' import table_row, table_cell %}
 {% block title %}License Entitlements{% endblock %}
 
 {% block content %}
@@ -46,11 +50,10 @@
          }">
         <div class="flex items-center justify-between">
             <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Licence Position (AI)</h2>
-            <button type="button" @click="open = !open; if (open && !position && !loading) generate()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+            {% call button(type='button', variant='outline', **{'@click': 'open = !open; if (open && !position && !loading) generate()'}) %}
                 <i data-lucide="sparkles" class="w-4 h-4"></i>
                 <span x-text="open ? 'Hide' : 'Generate position'"></span>
-            </button>
+            {% endcall %}
         </div>
 
         <div x-show="open" x-cloak class="space-y-3">
@@ -79,69 +82,45 @@
         </div>
     </div>
 
-    <div class="bg-card border border-border rounded-lg overflow-hidden">
-        <div class="overflow-x-auto">
-        <table class="dense-table w-full border-collapse">
-            <thead>
-                <tr class="bg-muted/40 border-b">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Product</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Entitled</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Consumed</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Used</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Utilization</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y">
-                {% for license in licenses %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                        <div class="font-medium">{{ license.product_name }}</div>
-                        <div class="text-sm text-muted-foreground">{{ license.license_type or '—' }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm">{{ license.vendor.name if license.vendor else '—' }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_entitled if license.quantity_entitled is not none else '—' }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_deployed if license.quantity_deployed is not none else '—' }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_used if license.quantity_used is not none else '—' }}</td>
-                    <td class="px-4 py-3 text-center">
-                        {% if license.quantity_deployed is none or not license.quantity_entitled %}
-                        <span class="text-sm text-muted-foreground">—</span>
-                        {% else %}
-                        {% set util = license.quantity_deployed / license.quantity_entitled * 100 %}
-                        <div class="flex items-center justify-center gap-2">
-                            <div class="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                <div class="h-full rounded-full
-                                    {% if util > 100 %}bg-destructive
-                                    {% elif util > 90 %}bg-warning
-                                    {% else %}bg-success{% endif %}"
-                                     style="width: {{ [util, 100]|min }}%"></div>
-                            </div>
-                            <span class="text-sm">{{ "{:.0f}".format(util) }}%</span>
-                        </div>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                            {% if license.compliance_status == 'compliant' %}bg-success/10 text-success-emphasis
-                            {% elif license.compliance_status == 'warning' %}bg-warning/10 text-warning-emphasis
-                            {% elif not license.compliance_status %}bg-muted text-muted-foreground
-                            {% else %}bg-destructive/10 text-destructive-emphasis{% endif %}">
-                            {# Stored snake_case; render as words. 'over_deployed' was shown verbatim. #}
-                    {{ (license.compliance_status or 'unknown') | replace('_', ' ') | title }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}"
-                           class="text-primary hover:underline text-sm">View</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
-    </div>
+    {% call list_table(
+        columns=[('Product', ''), ('Vendor', ''), ('Entitled', 'text-center'), ('Consumed', 'text-center'), ('Used', 'text-center'), ('Utilization', 'text-center'), ('Status', ''), ('Actions', 'text-right')],
+        total=licenses|length,
+        filter_placeholder='Filter licences...'
+    ) %}
+        {% for license in licenses %}
+        {% call table_row(attrs={'data-table-row': ''}) %}
+            {% call table_cell() %}
+                <div class="font-medium">{{ license.product_name }}</div>
+                <div class="text-sm text-muted-foreground">{{ license.license_type or '—' }}</div>
+            {% endcall %}
+            {% call table_cell(class='text-sm') %}{{ license.vendor.name if license.vendor else '—' }}{% endcall %}
+            {% call table_cell(class='text-center font-medium tabular-nums') %}{{ license.quantity_entitled if license.quantity_entitled is not none else '—' }}{% endcall %}
+            {% call table_cell(class='text-center font-medium tabular-nums') %}{{ license.quantity_deployed if license.quantity_deployed is not none else '—' }}{% endcall %}
+            {% call table_cell(class='text-center font-medium tabular-nums') %}{{ license.quantity_used if license.quantity_used is not none else '—' }}{% endcall %}
+            {% call table_cell(class='text-center') %}
+                {% if license.quantity_deployed is none or not license.quantity_entitled %}
+                <span class="text-sm text-muted-foreground">—</span>
+                {% else %}
+                {% set util = license.quantity_deployed / license.quantity_entitled * 100 %}
+                <div class="flex items-center justify-center gap-2">
+                    <progress class="w-16 h-2 rounded-full overflow-hidden accent-primary" max="100" value="{{ [util, 100]|min }}"></progress>
+                    <span class="text-sm tabular-nums">{{ "{:.0f}".format(util) }}%</span>
+                </div>
+                {% endif %}
+            {% endcall %}
+            {% call table_cell() %}
+                {{ badge(
+                    text=(license.compliance_status or 'unknown') | replace('_', ' ') | title,
+                    variant='secondary' if license.compliance_status == 'compliant' else ('outline' if not license.compliance_status else 'destructive')
+                ) }}
+            {% endcall %}
+            {% call table_cell(class='text-right') %}
+                <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}"
+                   class="text-primary hover:underline text-sm">View</a>
+            {% endcall %}
+        {% endcall %}
+        {% endfor %}
+    {% endcall %}
     {% else %}
     {{ empty_state(
         icon='key',

@@ -89,7 +89,7 @@ from app.services.core.cache_service import cache_service
 CACHE_TTL_SECONDS = 3600  # fabricated-ok: named config constant (cache TTL), not displayed data
 DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (token cost multiplier), not displayed data
 
-from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS, fallback_models_for
 
 # Fallback in-memory cache if Redis is not available
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
@@ -1866,17 +1866,44 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
                 elif provider == "nvidia":
-                    response_text, token_input, token_output, cost = LLMService._call_nvidia(
-                        prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
-                    )
+                    nv_models = fallback_models_for("nvidia", model)
+                    nv_success = False
+                    nv_last_error = None
+                    for nv_model in nv_models:
+                        try:
+                            _, nv_model, _ = LLMService._guard_provider_call(
+                                provider,
+                                nv_model,
+                                organization_id,
+                                prompt=prompt,
+                                prompt_version=prompt_version,
+                                retention_setting=retention_setting,
+                            )
+                            response_text, token_input, token_output, cost = LLMService._call_nvidia(
+                                prompt, nv_model, api_key, max_tokens=max_tokens, timeout=timeout
+                            )
+                            model = nv_model
+                            nv_success = True
+                            if nv_model != nv_models[0]:
+                                logger.info(f"🔄 NVIDIA backup model {nv_model} succeeded (primary was {nv_models[0]})")
+                            break
+                        except ProviderNotAllowed:
+                            raise
+                        except Exception as nv_err:
+                            nv_last_error = nv_err
+                            logger.warning(f"⚠️  NVIDIA model {nv_model} failed: {str(nv_err)[:80]}")
+                            continue
+                    if not nv_success:
+                        raise nv_last_error or RuntimeError("All NVIDIA models failed")
                 elif provider == "huggingface":
                     response_text, token_input, token_output, cost = LLMService._call_huggingface(
                         prompt, model, api_key, max_tokens=max_tokens
                     )
                 elif provider == "openrouter":
-                    # OpenRouter supports multiple backup models (comma-separated in default_model)
-                    # Try each model in sequence before failing the key
-                    or_models = [m.strip() for m in model.split(",") if m.strip()] if "," in model else [model]
+                    # OpenRouter supports multiple backup models (comma-separated in default_model
+                    # plus the curated free-tier fallback list in model_defaults.FALLBACK_MODELS).
+                    # Try each model in sequence before failing the key.
+                    or_models = fallback_models_for("openrouter", model)
                     or_success = False
                     or_last_error = None
                     for or_model in or_models:
@@ -1897,6 +1924,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                             if or_model != or_models[0]:
                                 logger.info(f"🔄 OpenRouter backup model {or_model} succeeded (primary was {or_models[0]})")
                             break
+                        except ProviderNotAllowed:
+                            raise
                         except Exception as or_err:
                             or_last_error = or_err
                             logger.warning(f"⚠️  OpenRouter model {or_model} failed: {str(or_err)[:80]}")

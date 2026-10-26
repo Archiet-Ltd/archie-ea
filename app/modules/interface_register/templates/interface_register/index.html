@@ -1,5 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Interface Register — {{ config.APP_NAME }}{% endblock %}
 
@@ -57,50 +59,30 @@
   {% if rows %}
   <div class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="hidden md:block overflow-x-auto">
-      <table class="dense-table w-full text-sm" data-testid="interface-register-table">
-        <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
-          <tr>
-            <th class="text-left px-4 py-2.5">Name</th>
-            <th class="text-left px-4 py-2.5">Type</th>
-            <th class="text-left px-4 py-2.5">Protocol</th>
-            <th class="text-left px-4 py-2.5">Pattern</th>
-            <th class="text-left px-4 py-2.5">Sync</th>
-            <th class="text-left px-4 py-2.5">Criticality</th>
-            <th class="text-left px-4 py-2.5">Daily volume</th>
-            <th class="text-left px-4 py-2.5">Status</th>
-            <th class="text-right px-4 py-2.5">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          {% for row in rows %}
+      {% call(row) list_table(rows=rows, columns=[('Name', ''), ('Type', ''), ('Protocol', ''), ('Pattern', ''), ('Sync', ''), ('Criticality', ''), ('Daily volume', ''), ('Status', ''), ('Actions', 'text-right')], caption='Interfaces', testid='interface-register-table', row_testid='interface-row') %}
           {% set element = row.element %}
           {% set meta = row.metadata %}
           {% set full_name = (element.custom_properties or {}).get('source_name') %}
-          <tr data-testid="interface-row-{{ element.id }}">
-            <td class="px-4 py-2.5 font-medium"
-                {% if full_name %}title="{{ full_name }}"{% endif %}>{{ element.name }}</td>
-            <td class="px-4 py-2.5">{{ meta.interface_type | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.protocol | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.message_pattern | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">
-              {% if meta and meta.is_synchronous is not none %}
-                {{ 'Sync' if meta.is_synchronous else 'Async' }}
-              {% else %}—{% endif %}
-            </td>
-            <td class="px-4 py-2.5">{{ meta.business_criticality | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.transaction_volume_daily | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.operational_status | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5 text-right">
-              <a href="{{ url_for('interface_register.edit', element_id=element.id) }}"
-                 data-testid="interface-edit-{{ element.id }}"
-                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Edit
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          {% call table_cell(class='px-4 py-2.5 font-medium', attrs=({'title': full_name} if full_name else {})) %}{{ element.name }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}{{ meta.interface_type | dash if meta else '?' }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}{{ meta.protocol | dash if meta else '?' }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}{{ meta.message_pattern | dash if meta else '?' }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}
+            {% if meta and meta.is_synchronous is not none %}
+              {{ 'Sync' if meta.is_synchronous else 'Async' }}
+            {% else %}?{% endif %}
+          {% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}{{ meta.business_criticality | dash if meta else '?' }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}{{ meta.transaction_volume_daily | dash if meta else '?' }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5') %}{{ meta.operational_status | dash if meta else '?' }}{% endcall %}
+          {% call table_cell(class='px-4 py-2.5 text-right') %}
+            <a href="{{ url_for('interface_register.edit', element_id=element.id) }}"
+               data-testid="interface-edit-{{ element.id }}"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+              Edit
+            </a>
+          {% endcall %}
+      {% endcall %}
     </div>
 
     <!-- Narrow width: card list. Name and business_criticality survive the collapse. -->

@@ -2,7 +2,11 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/kpi_row.html' import kpi_row %}
+{% from 'components/list_table.html' import list_table, table_cell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/textarea.html' import textarea %}
 
 {% block title %}Framework Configuration{% endblock %}
 
@@ -49,19 +53,18 @@
             </div>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {{ metrics_card(title='Enabled Domains', value=active_config.get_enabled_domains()|length, icon='layers') }}
-            {{ metrics_card(title='Extensions', value=active_config.get_enabled_extensions()|length, icon='puzzle') }}
-            {{ metrics_card(title='Capability Levels', value=active_config.capability_levels, icon='bar-chart-2') }}
-            {{ metrics_card(title='Industry Focus', value=active_config.industry_focus, icon='factory') }}
-        </div>
+        {{ kpi_row([
+            {'label': 'Enabled Domains', 'value': active_config.get_enabled_domains()|length, 'icon': 'layers'},
+            {'label': 'Extensions', 'value': active_config.get_enabled_extensions()|length, 'icon': 'puzzle'},
+            {'label': 'Capability Levels', 'value': active_config.capability_levels, 'icon': 'bar-chart-2'},
+            {'label': 'Industry Focus', 'value': active_config.industry_focus, 'icon': 'factory'}
+        ]) }}
     </div>
     {% endif %}
 
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <button type="button" @click="Platform.modal.open('create-framework-config')" 
-                class="bg-card rounded-lg border p-6 hover:bg-muted transition-colors text-left w-full" aria-label="Open">
+        {% call button(type='button', variant='outline', class='bg-card rounded-lg border p-6 h-auto hover:bg-muted transition-colors text-left w-full justify-start', aria_label='Open', attrs={'@click': "Platform.modal.open('create-framework-config')"}) %}
             <div class="flex items-center space-x-4">
                 <div class="flex-shrink-0">
                     <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,7 +76,7 @@
                     <p class="text-sm text-muted-foreground mt-1">Create a new framework configuration</p>
                 </div>
             </div>
-        </button>
+        {% endcall %}
 
         <a href="{{ url_for('framework_config_ui.templates') }}" 
            class="bg-card rounded-lg border p-6 hover:bg-muted transition-colors">
@@ -195,52 +198,45 @@
                class="text-sm text-primary hover:underline">View All</a>
         </div>
         
-        <div class="bg-card rounded-lg border border-border">
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full">
-                    <thead>
-                        <tr class="border-b border-border">
-                            <th class="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Name</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Organization</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Industry</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Created</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        {% for config in recent_configs %}
-                        <tr class="border-b border-border hover:bg-muted/50">
-                            <td class="px-4 py-3">
-                                <div class="font-medium text-foreground">{{ config.configuration_name }}</div>
-                                <div class="text-sm text-muted-foreground">{{ config.configuration_code }}</div>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-foreground">{{ config.organization_name or 'No organisation set' }}</td>
-                            <td class="px-4 py-3 text-sm text-foreground">{{ config.industry_focus }}</td>
-                            <td class="px-4 py-3">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                       {% if config.status == 'active' %}bg-success/10 text-success-emphasis
-                                       {% elif config.status == 'draft' %}bg-warning/10 text-warning-emphasis
-                                       {% else %}bg-muted text-foreground{% endif %}">
-                                    {{ config.status.title() }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-muted-foreground">
-                                {{ config.created_at.strftime('%Y-%m-%d') }}
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center space-x-2">
-                                    <a href="{{ url_for('framework_config_ui.view_configuration', config_id=config.id) }}" 
-                                       class="text-sm text-primary hover:underline">View</a>
-                                    <a href="{{ url_for('framework_config_ui.edit_configuration', config_id=config.id) }}" 
-                                       class="text-sm text-primary hover:underline">Edit</a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="bg-card rounded-lg border border-border p-4">
+            {% call list_table(columns=[
+                {'label': 'Name'},
+                {'label': 'Organization'},
+                {'label': 'Industry'},
+                {'label': 'Status'},
+                {'label': 'Created'},
+                {'label': 'Actions'}
+            ], rows=recent_configs, empty_message='No configurations found', page_size=10) %}
+                {% for config in recent_configs %}
+                <tr data-slot="table-row" class="border-b border-border hover:bg-muted/50">
+                    {% call table_cell() %}
+                        <div class="font-medium text-foreground">{{ config.configuration_name }}</div>
+                        <div class="text-sm text-muted-foreground">{{ config.configuration_code }}</div>
+                    {% endcall %}
+                    {% call table_cell(class='text-sm text-foreground') %}{{ config.organization_name or 'No organisation set' }}{% endcall %}
+                    {% call table_cell(class='text-sm text-foreground') %}{{ config.industry_focus }}{% endcall %}
+                    {% call table_cell() %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                               {% if config.status == 'active' %}bg-success/10 text-success-emphasis
+                               {% elif config.status == 'draft' %}bg-warning/10 text-warning-emphasis
+                               {% else %}bg-muted text-foreground{% endif %}">
+                            {{ config.status.title() }}
+                        </span>
+                    {% endcall %}
+                    {% call table_cell(class='text-sm text-muted-foreground') %}
+                        {{ config.created_at.strftime('%Y-%m-%d') }}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        <div class="flex items-center space-x-2">
+                            <a href="{{ url_for('framework_config_ui.view_configuration', config_id=config.id) }}" 
+                               class="text-sm text-primary hover:underline">View</a>
+                            <a href="{{ url_for('framework_config_ui.edit_configuration', config_id=config.id) }}" 
+                               class="text-sm text-primary hover:underline">Edit</a>
+                        </div>
+                    {% endcall %}
+                </tr>
+                {% endfor %}
+            {% endcall %}
         </div>
     </div>
     {% endif %}
@@ -265,32 +261,24 @@
 <form @submit.prevent="submit()" class="space-y-4">
     <div>
         <label for="cfc-name" class="block text-sm font-medium text-muted-foreground mb-1">Configuration Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" id="cfc-name" x-model="formData.configuration_name" required
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="e.g. Enterprise Framework 2026">
+        {{ input(type='text', id='cfc-name', required=true, placeholder='e.g. Enterprise Framework 2026', attrs={'x-model': 'formData.configuration_name'}) }}
     </div>
     <div>
         <label for="cfc-code" class="block text-sm font-medium text-muted-foreground mb-1">Configuration Code <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" id="cfc-code" x-model="formData.configuration_code" required
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="e.g. ENT-FW-2026">
+        {{ input(type='text', id='cfc-code', required=true, placeholder='e.g. ENT-FW-2026', attrs={'x-model': 'formData.configuration_code'}) }}
         <p class="text-xs text-muted-foreground mt-1">Unique identifier code for this configuration</p>
     </div>
     <div>
         <label for="cfc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-        <textarea id="cfc-description" x-model="formData.description" rows="2"
-                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Describe this configuration"></textarea>
+        {{ textarea(id='cfc-description', rows=2, placeholder='Describe this configuration', attrs={'x-model': 'formData.description'}) }}
     </div>
     <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
     <div class="flex justify-end gap-3 pt-2 border-t border-border">
-        <button type="button" @click="Platform.modal.close('create-framework-config')"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
-        <button type="submit" :disabled="submitting"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
+        {% call button(type='button', variant='ghost', size='sm', aria_label='Close', attrs={'@click': "Platform.modal.close('create-framework-config')"}) %}Cancel{% endcall %}
+        {% call button(type='submit', variant='default', aria_label='Submit', attrs={'x-bind:disabled': 'submitting'}) %}
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
             <span x-text="submitting ? 'Creating...' : 'Create Configuration'"></span>
-        </button>
+        {% endcall %}
     </div>
 </form>
 {% endcall %}

@@ -167,16 +167,7 @@
                             <span class="font-medium">{{ candidate.target.name }}</span>
                             <span class="block text-xs text-muted-foreground">Already recorded in the {{ candidate.held_in }}, but not as a relationship.</span>
                         </span>
-                        <button type="button"
-                                data-candidate-key="{{ key }}"
-                                data-source-id="{{ candidate.source.id }}"
-                                data-target-id="{{ candidate.target.id }}"
-                                data-relationship-type="{{ candidate.relationship_type }}"
-                                :disabled="adding !== null"
-                                @click="addCandidate($event)"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                            Add this relationship
-                        </button>
+                        {{ button('Add this relationship', variant='outline', attrs_dict={'data-candidate-key': key, 'data-source-id': candidate.source.id, 'data-target-id': candidate.target.id, 'data-relationship-type': candidate.relationship_type, ':disabled': 'adding !== null', '@click': 'addCandidate($event)'}) }}
                     </li>
                     {% endfor %}
                 </ul>
