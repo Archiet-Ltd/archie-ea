@@ -9,6 +9,11 @@ same rule the repair migration and the team pages use
 
     python scripts/check_org_administrators.py          # list, exit 1 if any
     python scripts/check_org_administrators.py --count  # print the number only
+
+Proven-against: a database holding an organisation whose only members are
+Architects -- the check names that organisation and exits 1; after the repair
+migration (20261027_admin_every_org) it exits 0. Pinned red-and-green by
+tests/test_administrator_every_org.py.
 """
 from __future__ import annotations
 
