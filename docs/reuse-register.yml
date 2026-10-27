@@ -863,3 +863,42 @@ entries:
     known_exceptions:
       - path: app/templates/components/ui_sidebar.html
         reason: the canonical parts
+
+  - id: basecoat-navigation-menu
+    concept: The primary navigation of a page, the shadcn navigation menu (list, item, trigger, content, link)
+    status: active
+    canonical:
+      path: app/templates/basecoat/navigation-menu.html
+      symbols: [navigation_menu, navigation_menu_list, navigation_menu_item, navigation_menu_trigger, navigation_menu_content, navigation_menu_link, navigation_menu_viewport, navigation_menu_indicator]
+    reuse: >
+      The file is the library's own port of the shadcn/ui component, copied unchanged (apart from the raw-repr-ok
+      marker the product gate reads) from Flask-Basecoat at commit b327186, the commit the vendored set in
+      app/templates/basecoat/ comes from; the upstream source it follows is shadcn/ui's navigation-menu.tsx (pinned in the
+      library's compliance/upstream). A page draws a navigation menu with this file's macros and the library's class recipes,
+      never with raw markup or a second copy. Do not edit it here: change the library and re-vendor.
+
+  - id: basecoat-sheet
+    concept: A panel that slides in from an edge, the shadcn sheet (overlay, content, header, title, close, trigger)
+    status: active
+    canonical:
+      path: app/templates/basecoat/sheet.html
+      symbols: [sheet, sheet_trigger, sheet_close, sheet_portal, sheet_overlay, sheet_content, sheet_header, sheet_footer, sheet_title, sheet_description]
+    reuse: >
+      The file is the library's own port of the shadcn/ui component, copied unchanged (apart from the raw-repr-ok
+      marker the product gate reads) from Flask-Basecoat at commit b327186, the commit the vendored set in
+      app/templates/basecoat/ comes from; the upstream source it follows is shadcn/ui's sheet.tsx (pinned in the
+      library's compliance/upstream). A page draws a sheet, such as the phone menu with this file's macros and the library's class recipes,
+      never with raw markup or a second copy. Do not edit it here: change the library and re-vendor.
+
+  - id: basecoat-separator
+    concept: A hairline divider between parts of a page, the shadcn separator
+    status: active
+    canonical:
+      path: app/templates/basecoat/separator.html
+      symbols: [separator]
+    reuse: >
+      The file is the library's own port of the shadcn/ui component, copied unchanged (apart from the raw-repr-ok
+      marker the product gate reads) from Flask-Basecoat at commit b327186, the commit the vendored set in
+      app/templates/basecoat/ comes from; the upstream source it follows is shadcn/ui's separator.tsx (pinned in the
+      library's compliance/upstream). A page draws a divider with this file's macros and the library's class recipes,
+      never with raw markup or a second copy. Do not edit it here: change the library and re-vendor.
