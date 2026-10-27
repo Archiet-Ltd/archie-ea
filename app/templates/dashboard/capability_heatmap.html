@@ -94,7 +94,7 @@
               @keydown.enter.prevent="selectedDomain = selectedDomain === domain ? null : domain"
               @keydown.space.prevent="selectedDomain = selectedDomain === domain ? null : domain"
               :aria-expanded="(selectedDomain === domain).toString()"
-              :aria-label="'Show detail for ' + domain.name">
+              :title="'Show detail for ' + domain.name">
             <td class="py-2 px-3">
               <span class="font-medium text-foreground" x-text="domain.name"></span>
               <span x-show="domain.code" x-cloak class="text-muted-foreground ml-1" x-text="'(' + domain.code + ')'"></span>
@@ -102,8 +102,8 @@
             <template x-for="level in [1,2,3,4,5]" :key="level">
               <td class="text-center py-2 px-2">
                 <span x-show="domain.counts[level] > 0" x-cloak
-                      class="inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold text-primary-foreground"
-                      :style="'background-color:' + getLevelColor(level)"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold"
+                      :class="'heat-' + level"
                       x-text="domain.counts[level]"></span>
                 <span x-show="!domain.counts[level] || domain.counts[level] === 0" x-cloak
                       class="text-muted-foreground/40">-</span>

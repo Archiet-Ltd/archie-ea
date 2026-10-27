@@ -246,6 +246,12 @@ def _link_strategy_archimate(connection, target, element_type, desc_prefix):
 
     result = connection.execute(archimate_table.insert().values(**values))
     new_id = result.inserted_primary_key[0]
+    # The mirror is written with a Core insert, which fires no mapper event, so its first version is
+    # recorded here: the element then has its create entry in the change history like any other.
+    from app.middleware.audit_middleware import record_create
+
+    # reuse-ok: a transient instance, never added to a session, that only describes the row the Core insert above wrote
+    record_create(connection, "archimate_elements", ArchiMateElement(id=new_id, **values))
 
     connection.execute(
         target.__table__.update()

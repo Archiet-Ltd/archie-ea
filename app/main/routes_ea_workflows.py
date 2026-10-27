@@ -439,7 +439,14 @@ def register_ea_workflow_routes(main_blueprint):
             engine = EAWorkflowEngine()
             definition = engine.get_workflow_definition(workflow_code)
             if not definition or workflow_code != "ADM_PHASE_A_VISION":
-                return render_template("errors/404.html"), 404
+                # Vision deliverable requires the ADM Phase A Vision workflow to be defined.
+                # Show a helpful page linking to the workflow definitions instead of 404.
+                from flask import url_for
+                return render_template(
+                    "ea_workflows/vision_not_configured.html",
+                    workflow_code=workflow_code,
+                    definitions_url=url_for("main.ea_workflows_definitions"),
+                )
 
             selected_application = None
             if application_id:

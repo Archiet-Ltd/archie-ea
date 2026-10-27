@@ -41,18 +41,22 @@ SWOT = ("strength", "weakness", "opportunity", "threat")
 # read by their headline alone, for whole words that name the matter (a lawsuit, a tariff, an emissions target).
 # Words that only describe a product (launch, platform, software, cloud, AI) and words in the body text decide
 # nothing: where the headline names no matter the signal carries no factor, and is never forced into one.
-_KIND_FACTOR = {"filing": ("legal", "a regulatory filing"), "financial": ("economic", "a market figure"),
-                "patent": ("technological", "a patent"), "research": ("technological", "a research paper")}
+_KIND_FACTOR = {"filing": ("legal", "it is a regulatory filing"), "financial": ("economic", "it is a market figure"),
+                "patent": ("technological", "it is a patent"), "research": ("technological", "it is a research paper")}
 _WORDS = (
     ("legal", ("lawsuit", "lawsuits", "sued", "sues", "court", "fined", "antitrust", "gdpr", "regulator", "regulators",
-               "regulation", "settlement")),
+               "regulation", "regulations", "settlement", "license", "licence", "licensing", "relicensing", "trademark",
+               "copyright")),
     ("political", ("government", "election", "tariff", "tariffs", "sanction", "sanctions", "minister", "congress",
                    "parliament", "treaty")),
     ("environmental", ("climate", "emission", "emissions", "carbon", "sustainability", "net zero", "renewable", "renewables")),
     ("economic", ("revenue", "profit", "earnings", "inflation", "funding", "investment", "acquisition", "acquires",
-                  "acquired", "layoffs", "ipo", "valuation")),
-    ("technological", ("outage", "breach", "cyberattack", "ransomware", "vulnerability")),
-    ("social", ("hiring", "workforce", "boycott", "protest", "diversity")),
+                  "acquired", "layoffs", "ipo", "valuation", "raises", "raised", "series a", "series b", "series c",
+                  "series d", "pricing")),
+    # open versus closed source is a choice about the technology and who may use it: technological
+    ("technological", ("open source", "closed source", "source code", "infrastructure", "outage", "breach", "cyberattack",
+                       "ransomware", "vulnerability", "vulnerabilities", "api", "sdk")),
+    ("social", ("hiring", "hires", "workforce", "boycott", "protest", "diversity")),
 )
 
 
@@ -86,6 +90,29 @@ def company_name(org) -> str:
         return named
     own = str(org.name or "").strip()
     return "" if is_placeholder_name(own) else own
+
+
+_PRODUCT_FIELDS = ("tagline", "product", "category", "value_proposition", "business_model", "industry_sector")
+_PLAIN = {"about", "their", "which", "where", "while", "these", "those", "other", "software", "company", "business",
+          "online", "teams", "people", "everyone", "everything", "great", "better", "simple", "based"}
+
+
+def product_words(org) -> List[str]:
+    """The words the company's own confirmed facts use for what it does ("scheduling", "infrastructure"): a headline
+    that names the company beside one of them is about the company. Taken only from facts a person confirmed."""
+    from ..website_crawl.confirm import PROFILE_KEY
+
+    mine = (org.settings or {}).get(PROFILE_KEY) or {}
+    brand = set(re.findall(r"[a-z0-9]+", company_name(org).lower()))
+    words = set()
+    for field in _PRODUCT_FIELDS:
+        entry = mine.get(field)
+        for value in (entry if isinstance(entry, list) else [entry]):
+            text = value.get("value") if isinstance(value, dict) else value
+            for w in re.findall(r"[a-z]{5,}", str(text or "").lower()):
+                if w not in brand and w not in _PLAIN:
+                    words.add(w)
+    return sorted(words)
 
 
 def company_domain(org) -> str:
@@ -170,10 +197,55 @@ def title_words(title: str) -> tuple:
     return tuple(sorted(w for w in re.findall(r"[a-z0-9]+", text) if w not in ("a", "an", "the")))
 
 
-def _near(a: Optional[datetime], b: Optional[datetime]) -> bool:
+def _near(a: Optional[datetime], b: Optional[datetime], days: int = NEAR_DAYS) -> bool:
     if a is None or b is None:
         return a is None and b is None
-    return abs(a - b) <= timedelta(days=NEAR_DAYS)
+    return abs(a - b) <= timedelta(days=days)
+
+
+EVENT_DAYS = 4
+_EVENT_STOP = {"a", "an", "the", "of", "in", "on", "for", "and", "to", "is", "are", "its", "it", "as", "at", "by", "with", "from",
+               "why", "how", "what", "going", "goes", "go", "hn", "show", "launch", "ask", "tell", "our", "we", "this", "that",
+               "be", "has", "have", "will", "s", "now"}
+
+
+def _stem(word: str) -> str:
+    for ending in ("ing", "ed", "es", "s"):
+        if word.endswith(ending) and len(word) - len(ending) >= 3:
+            word = word[:-len(ending)]
+            break
+    return word[:-1] if word.endswith("e") and len(word) > 4 else word
+
+
+def event_words(title: str, brand: str) -> frozenset:
+    """The words that say what happened: the title less the company's name, filler and word endings."""
+    left = set(re.findall(r"[a-z0-9]+", (brand or "").lower()))
+    return frozenset(_stem(w) for w in re.findall(r"[a-z0-9]+", re.sub(r"['\u2019]s\b", "", (title or "").lower()))
+                     if w not in left and w not in _EVENT_STOP)
+
+
+def _one_event(a: frozenset, b: frozenset) -> bool:
+    shared = len(a & b)
+    return shared >= 2 and shared / min(len(a), len(b)) >= 0.6
+
+
+def group_events(rows, brand: str) -> List[list]:
+    """Rows, newest first, as groups of ``[first, [every row about the same event]]``: stories published within a few
+    days that use the same words for what happened ("is going closed source", "closes its source code") are one event.
+    A sentiment summary is never grouped."""
+    groups: List[list] = []
+    for row in rows:
+        words = None if row.kind == "sentiment" else event_words(row.title, brand)
+        for group in groups:
+            if words is not None and any(
+                    held is not None and _near(row.published_at, other.published_at, EVENT_DAYS) and _one_event(words, held)
+                    for other, held in group[2]):  # the same event as any story already in the group
+                group[1].append(row)
+                group[2].append((row, words))
+                break
+        else:
+            groups.append([row, [row], [(row, words)]])
+    return [[g[0], g[1]] for g in groups]
 
 
 def near_repeats(rows) -> List[Any]:
@@ -194,6 +266,13 @@ def near_repeats(rows) -> List[Any]:
 
 # ----------------------------------------------------------------------------- tidying
 
+def _title_key(title: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", (title or "").lower()))
+
+
+_RECORD_KINDS = ("sentiment", "filing", "financial")  # a record is told apart by its date, not only its title
+
+
 def tidy(org_id: int, org=None) -> int:
     """Remove what should never have been kept: signals stored under the stand-in name, and, for the confirmed
     company, hits from a free-text search that are not about it, and repeats of one source, title and date. Returns how many went.
@@ -204,11 +283,14 @@ def tidy(org_id: int, org=None) -> int:
     removed = 0
     rows = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id).all()
     name, domain = (company_name(org), company_domain(org)) if org is not None else ("", "")
+    words = product_words(org) if org is not None else []
     searched = {s.key for s in src.REGISTRY if s.searched}
     for row in rows:
         gone = is_placeholder_name(row.subject) or (
             bool(name) and row.subject == name and row.source in searched
-            and not src.is_about(row.title, name, domain, src.own_link(row.url, row.details)))
+            and not src.counts_as_news(row.title, name, domain, src.own_link(row.url, row.details), words)) or (
+            bool(name) and row.subject == name and row.source == "sec_edgar"
+            and not src.legal_name_matches(row.title.split(": ")[0], name))
         if gone:
             db.session.delete(row)
             removed += 1
@@ -221,6 +303,15 @@ def tidy(org_id: int, org=None) -> int:
             db.session.delete(row)
             removed += 1
         seen.add(key)
+    titled = set()  # the same title again, on whatever date, is a repeat
+    for row in sorted(rows, key=lambda r: r.id):
+        if row in db.session.deleted or row.kind in _RECORD_KINDS:
+            continue
+        key = (row.source, row.subject, _title_key(row.title))
+        if key in titled:
+            db.session.delete(row)
+            removed += 1
+        titled.add(key)
     live = [r for r in sorted(rows, key=lambda r: r.id) if r not in db.session.deleted]
     for row in near_repeats(live):  # the same words in another order, a day or two apart
         db.session.delete(row)
@@ -233,13 +324,13 @@ def tidy(org_id: int, org=None) -> int:
 
 # ----------------------------------------------------------------------------- writing
 
-def _relevant(source: src.Source, subject: str, domain: str, items: List[src.Item], is_company: bool) -> List[src.Item]:
+def _relevant(source: src.Source, subject: str, domain: str, items: List[src.Item], is_company: bool, words=()) -> List[src.Item]:
     """What a free-text search gave back, less each hit that names neither the company nor its web address
     in its title.
     Only the confirmed company is held to this. Sources that already match on the company's own records are left as they are."""
     if not source.searched or not is_company:
         return items
-    return [i for i in items if src.is_about(i.title, subject, domain, src.own_link(i.url, i.details))]
+    return [i for i in items if src.counts_as_news(i.title, subject, domain, src.own_link(i.url, i.details), words)]
 
 
 class _Candidate:
@@ -265,6 +356,10 @@ def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item],
             row = next((r for r in OrganizationSignal.query.filter_by(
                 organization_id=org_id, source=source.key, subject=subject, title=title).all()
                 if _day(r.published_at) == _day(published)), None)
+        if row is None and source.kind not in ("filing", "financial") and any(
+                _title_key(r.title) == _title_key(title) for r in OrganizationSignal.query.filter_by(
+                    organization_id=org_id, source=source.key, subject=subject).all()):
+            continue  # reposted: the same title, another date
         if row is None and any(near_repeats([r, _Candidate(source.key, subject, title, published)])
                                for r in OrganizationSignal.query.filter_by(
                                    organization_id=org_id, source=source.key, subject=subject).all()):
@@ -355,7 +450,7 @@ def refresh_organization(
     name, ctx = company_name(org), _context(org)
     if not name:
         raise SignalsRefused("The company name has not been confirmed yet, so there is nothing to search for.")
-    domain = company_domain(org)
+    domain, words = company_domain(org), product_words(org)
     http = http or src.Http()
     if llm is None:
         from ..website_crawl.service import default_model
@@ -380,7 +475,7 @@ def refresh_organization(
                     if source.searched and is_company and domain:  # the company's web address is searched as well as its name
                         seen = {(i.url, i.title) for i in items}
                         items = items + [i for i in source.fetch(http, domain, ctx) if (i.url, i.title) not in seen]
-                    items = _relevant(source, subject, domain, items, is_company)
+                    items = _relevant(source, subject, domain, items, is_company, words)
                 except src.SourceFailed as exc:
                     logger.warning("signal source %s failed for organisation %s: %s", source.key, org_id, exc)
                     failure = "%s %s" % (source.label, exc)
@@ -482,7 +577,7 @@ def _row(sig: OrganizationSignal) -> Dict[str, Any]:
         "title": sig.title, "summary": sig.summary, "url": sig.url, "published_at": sig.published_at,
         "fetched_at": sig.fetched_at, "pestle_factor": sig.pestle_factor, "swot_quadrant": sig.swot_quadrant,
         "pestle_reason": pestle_reason(sig.kind, sig.title)[1] if sig.pestle_factor else None,
-        "sentiment_score": sig.sentiment_score,
+        "sentiment_score": sig.sentiment_score, "reports": 1,
     }
 
 
@@ -502,8 +597,18 @@ def signals_for_profile(org_id: int, limit: int = 50) -> List[Dict[str, Any]]:
         if key not in seen:
             seen.add(key)
             shown.append(r)
-    again = {id(r) for r in near_repeats(shown)}  # and so is the same story with its words moved
-    return [_row(r) for r in shown if id(r) not in again][:limit]
+    titled, once = set(), []
+    for r in shown:  # the same title again, on whatever date, is shown once
+        key = (r.source, r.subject, _title_key(r.title))
+        if r.kind in _RECORD_KINDS or key not in titled:
+            titled.add(key)
+            once.append(r)
+    out = []
+    for first, members in group_events(once, name):  # stories of one event are one row with a count
+        row = _row(first)
+        row["reports"] = len(members)
+        out.append(row)
+    return out[:limit]
 
 
 def framework_view(org_id: int, framework: str) -> Dict[str, List[Dict[str, Any]]]:

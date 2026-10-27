@@ -68,7 +68,7 @@
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
                 Add Requirement
             {% endcall %}
-            {% call button(variant='outline', class='gap-2 justify-center', aria_label='Export requirements as CSV', attrs_dict={'@click': "window.location.href='/api/enterprise/requirements/export'"}) %}
+            {% call button(variant='outline', class='gap-2 justify-center', attrs_dict={'title': 'Export requirements as CSV', '@click': "window.location.href='/api/enterprise/requirements/export'"}) %}
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
                 Export CSV
             {% endcall %}

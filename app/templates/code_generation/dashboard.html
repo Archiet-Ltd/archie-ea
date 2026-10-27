@@ -12,11 +12,11 @@
     <div class="mb-6">
         <div class="flex space-x-4">
             <button type="button" id="enhancementModeBtn" class="px-4 py-2 rounded-md font-medium transition-colors
-                {% if mode == 'enhancement' %}bg-primary text-primary-foreground{% else %}bg-muted text-foreground hover:bg-muted/80{% endif %}" aria-label="Action">
+                {% if mode == 'enhancement' %}bg-primary text-primary-foreground{% else %}bg-muted text-foreground hover:bg-muted/80{% endif %}">
                 Application Enhancement
             </button>
             <button type="button" id="architectureModeBtn" class="px-4 py-2 rounded-md font-medium transition-colors
-                {% if mode == 'architecture' %}bg-primary text-primary-foreground{% else %}bg-muted text-foreground hover:bg-muted/80{% endif %}" aria-label="Action">
+                {% if mode == 'architecture' %}bg-primary text-primary-foreground{% else %}bg-muted text-foreground hover:bg-muted/80{% endif %}">
                 Architecture-to-Code
             </button>
         </div>
@@ -248,10 +248,10 @@ function displayResults(artifacts) {
                         <p class="text-sm text-muted-foreground">${artifact.language} • ${artifact.type}</p>
                     </div>
                     <div class="flex space-x-2">
-                        <button type="button" data-action="copyCode" data-id="${index}" class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90" aria-label="Action">
+                        <button type="button" data-action="copyCode" data-id="${index}" class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90">
                             Copy
                         </button>
-                        <button type="button" data-action="downloadCode" data-id="${index}" class="px-3 py-1 text-sm border border-input bg-background text-foreground rounded hover:bg-accent hover:text-accent-foreground" aria-label="Action">
+                        <button type="button" data-action="downloadCode" data-id="${index}" class="px-3 py-1 text-sm border border-input bg-background text-foreground rounded hover:bg-accent hover:text-accent-foreground">
                             Download
                         </button>
                     </div>

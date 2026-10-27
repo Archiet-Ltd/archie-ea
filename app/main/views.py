@@ -1056,6 +1056,9 @@ def public_site_page(slug):
     template = "public/page.html"
     if page.front_matter.get("template") == "pricing":
         template = "public/pricing.html"
+        from app.services import billing_plans
+        plan_data = {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS}
+        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data)
     return render_template(template, page=page, jsonld=build_jsonld(page))
 
 

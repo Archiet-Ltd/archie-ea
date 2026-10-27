@@ -164,7 +164,7 @@ class AccountService:
         for _attempt in range(5):
             try:
                 with db.session.begin_nested():
-                    org = Organization(name="{}{}".format(_label, PLACEHOLDER_ENDING), slug=_slug)
+                    org = Organization(name="{}{}".format(_label, PLACEHOLDER_ENDING), slug=_slug, reporting_currency="GBP")
                     db.session.add(org)
                     db.session.flush()
                 break

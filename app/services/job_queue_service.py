@@ -160,8 +160,8 @@ class JobQueueService:
                 # Use application context for database operations
                 with self.app.app_context():
                     # Get next pending job
-                    pending = Job.query.filter_by(status=JobStatus.PENDING.value)
-                    job = pending.first()
+                    pending = Job.query.filter_by(status=JobStatus.PENDING.value).order_by(Job.id)
+                    job = next((j for j in pending.limit(50) if self._is_due(j)), None)
 
                     if job:
                         self._process_job(job)
@@ -183,6 +183,17 @@ class JobQueueService:
                 self._reset_session()
 
         logger.info("Job queue worker loop ended")
+
+    @staticmethod
+    def _is_due(job: Job) -> bool:
+        """A job whose payload names ``not_before`` (UTC, ISO) waits until then."""
+        not_before = (job.payload or {}).get("not_before") if isinstance(job.payload, dict) else None
+        if not not_before:
+            return True
+        try:
+            return datetime.fromisoformat(str(not_before)) <= datetime.utcnow()
+        except ValueError:
+            return True
 
     def _process_job(self, job: Job):
         """Process a single job."""
@@ -229,6 +240,10 @@ class JobQueueService:
             from app.modules.organization.website_crawl import run_website_crawl_job
 
             return run_website_crawl_job({**payload, "job_id": job_id})
+        elif task == "website_profile_crawl_more":
+            from app.modules.organization.website_crawl import run_website_retry_job
+
+            return run_website_retry_job(payload)
         elif task == "company_signals_refresh":
             from app.modules.organization.public_signals import run_signals_job
 
