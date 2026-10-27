@@ -232,9 +232,9 @@ def _link_element_to_a_new_solution(db_session, org_id, element_id):
     ), {"n": "linked-solution", "o": org_id}).scalar()
     db_session.execute(db.text(
         "INSERT INTO solution_archimate_elements "
-        "(solution_id, element_id, element_role, created_at) "
-        "VALUES (:s, :e, 'component', NOW())"
-    ), {"s": sol_id, "e": element_id})
+        "(solution_id, element_id, element_role, organization_id, created_at) "
+        "VALUES (:s, :e, 'component', :o, NOW())"
+    ), {"s": sol_id, "e": element_id, "o": org_id})
     db_session.flush()
     return sol_id
 

@@ -86,7 +86,11 @@ def _exists(model, row_id):
     from app import db
 
     db.session.remove()
-    return db.session.query(model.id).filter(model.id == row_id).first() is not None
+    # Raw SQL: the ORM read is tenant-filtered to whoever is signed in, and these tests ask whether
+    # the row survived an attempt by ANOTHER organisation.
+    return db.session.execute(
+        db.text(f'SELECT 1 FROM "{model.__tablename__}" WHERE id = :i'), {"i": row_id}  # nosec B608 - model table name
+    ).first() is not None
 
 
 def _unknown_org(monkeypatch):
