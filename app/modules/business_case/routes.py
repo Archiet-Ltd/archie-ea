@@ -86,6 +86,21 @@ def detail(business_case_id):
 
     saved_diagram_id = resolve_canvas_saved_diagram_id(business_case, "business_case")
 
+    # Fields dict for form_field macros (mirrors the x-data fields object)
+    fields = {
+        "problem_statement": business_case.problem_statement or "",
+        "options_considered": business_case.options_considered or "",
+        "recommended_option": business_case.recommended_option or "",
+        "expected_benefits": business_case.expected_benefits or "",
+        "key_risks": business_case.key_risks or "",
+        "financial_benefit_annual": business_case.financial_benefit_annual if business_case.financial_benefit_annual is not None else "",
+        "capex": business_case.capex if business_case.capex is not None else "",
+        "opex_annual": business_case.opex_annual if business_case.opex_annual is not None else "",
+        "tco_3yr": business_case.tco_3yr if business_case.tco_3yr is not None else "",
+        "roi_percentage": business_case.roi_percentage if business_case.roi_percentage is not None else "",
+        "payback_months": business_case.payback_months if business_case.payback_months is not None else "",
+    }
+
     return render_template(
         "business_case/detail.html",
         business_case=business_case,
@@ -96,6 +111,7 @@ def detail(business_case_id):
         canvas_zones={z["box_key"]: z for z in canvas_zones},
         canvas_unclassified_count=0,
         canvas_saved_diagram_id=saved_diagram_id,
+        fields=fields,
     )
 
 

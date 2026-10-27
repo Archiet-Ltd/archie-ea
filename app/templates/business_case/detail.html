@@ -3,7 +3,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/canvas_box.html' import canvas_box_entries, canvas_unclassified %}
-{% from 'components/card.html' import card %}
+{% import 'components/card.html' as card %}
 {% from 'components/form_field.html' import form_field, form_group, form_footer %}
 {% from 'components/input.html' import input, textarea, hidden_input %}
 {% from 'components/select.html' import native_select %}
@@ -89,13 +89,17 @@
       <div class="flex flex-wrap items-center gap-3">
         <div class="flex items-center gap-2">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</span>
+          {% set status_options = [] %}
+          {% for s in statuses %}
+            {% set _ = status_options.append((s, s|replace('_', ' ')|title)) %}
+          {% endfor %}
           {% call form_group(id='bc-status-select', label='', class='w-auto') %}
             {{ native_select(
                 id='bc-status-select',
                 name='status',
                 size='sm',
                 attrs_dict={'x-model': 'status', '@change': 'saveMeta()'},
-                options=statuses | map(attribute=0) | list | zip(statuses | map(attribute=1) | list) | list,
+                options=status_options,
                 selected=status
             ) }}
           {% endcall %}
@@ -108,33 +112,45 @@
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           {% call form_group(id='bc-link-capability', label='Linked Capability') %}
+            {% set capability_options = [('', 'Not linked')] %}
+            {% for c in capabilities %}
+              {% set _ = capability_options.append((c.id|string, c.name)) %}
+            {% endfor %}
             {{ native_select(
                 id='bc-link-capability',
                 name='capability_id',
                 attrs_dict={'x-model': 'capabilityId', '@change': 'saveMeta()'},
-                options=capabilities | map(attribute='id') | list | zip(capabilities | map(attribute='name') | list) | list,
+                options=capability_options,
                 selected=capabilityId
             ) }}
           {% endcall %}
         </div>
         <div>
           {% call form_group(id='bc-link-initiative', label='Linked Strategic Initiative') %}
+            {% set initiative_options = [('', 'Not linked')] %}
+            {% for i in initiatives %}
+              {% set _ = initiative_options.append((i.id|string, i.name)) %}
+            {% endfor %}
             {{ native_select(
                 id='bc-link-initiative',
                 name='strategic_initiative_id',
                 attrs_dict={'x-model': 'strategicInitiativeId', '@change': 'saveMeta()'},
-                options=initiatives | map(attribute='id') | list | zip(initiatives | map(attribute='name') | list) | list,
+                options=initiative_options,
                 selected=strategicInitiativeId
             ) }}
           {% endcall %}
         </div>
         <div>
           {% call form_group(id='bc-link-solution', label='Linked Solution') %}
+            {% set solution_options = [('', 'Not linked')] %}
+            {% for s in solutions %}
+              {% set _ = solution_options.append((s.id|string, s.name)) %}
+            {% endfor %}
             {{ native_select(
                 id='bc-link-solution',
                 name='solution_id',
                 attrs_dict={'x-model': 'solutionId', '@change': 'saveMeta()'},
-                options=solutions | map(attribute='id') | list | zip(solutions | map(attribute='name') | list) | list,
+                options=solution_options,
                 selected=solutionId
             ) }}
           {% endcall %}
@@ -189,7 +205,7 @@
     <div id="bc-canvas-content">
 
     {# 1. Executive summary ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="file-text" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Executive summary
@@ -201,7 +217,7 @@
     {% endcall %}
 
     {# 2. Reasons (strategic context) ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="alert-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Reasons (strategic context)
@@ -233,7 +249,7 @@
     {% endcall %}
 
     {# 3. Business options ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Business options
@@ -265,7 +281,7 @@
     {% endcall %}
 
     {# 4. Recommendation ── #}
-    {% call card(class='border-primary/30') %}
+    {% call card.card(class='border-primary/30') %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="target" class="h-4 w-4 text-primary" aria-hidden="true"></i> Recommendation
@@ -296,7 +312,7 @@
     {% endcall %}
 
     {# 5. Expected benefits ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="trending-up" class="h-4 w-4 text-success" aria-hidden="true"></i> Expected benefits
@@ -328,7 +344,7 @@
     {% endcall %}
 
     {# 6. Expected dis-benefits ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="trending-down" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Expected dis-benefits
@@ -340,7 +356,7 @@
     {% endcall %}
 
     {# 7. Timescale ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="calendar-clock" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Timescale
@@ -352,7 +368,7 @@
     {% endcall %}
 
     {# 8. Costs ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="coins" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs
@@ -364,7 +380,7 @@
     {% endcall %}
 
     {# 9. Costs, Benefits & ROI ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="calculator" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs, Benefits & ROI
@@ -489,7 +505,7 @@
     {% endcall %}
 
     {# 10. Investment appraisal ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="scale" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Investment appraisal
@@ -501,7 +517,7 @@
     {% endcall %}
 
     {# 11. Major risks ── #}
-    {% call card() %}
+    {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="shield-alert" class="h-4 w-4 text-destructive" aria-hidden="true"></i> Major risks

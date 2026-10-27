@@ -377,5 +377,8 @@ class TestBusinessCaseDetailTemplate:
         )
         with open(path) as fh:
             content = fh.read()
-        assert ">Not linked<" in content, "detail.html must use 'Not linked' not 'None'"
+        # The template builds option lists as tuples: ('', 'Not linked')
+        assert "'Not linked'" in content, "detail.html must use 'Not linked' not 'None'"
         assert ">None<" not in content, "detail.html must not contain 'None' as an option"
+        # Verify all three link dropdowns have the Not linked option
+        assert content.count("'Not linked'") >= 3, "all three link dropdowns must have 'Not linked' option"
