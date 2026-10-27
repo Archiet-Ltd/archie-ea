@@ -1542,6 +1542,7 @@ def detail_element(layer, element_type, element_id):
 
     return render_template(
         "archimate_crud/detail.html",
+        **_technology_cost_context(layer, element, ae_id),
         layer=layer,
         element_type=element_type,
         element=element,
@@ -3052,3 +3053,92 @@ def api_element_set_wsjf(element_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+def _technology_cost_context(layer, element, ae_id):
+    """A technology's cost: what is recorded on it and its share of the applications that run on it."""
+    if layer != "technology" or not ae_id:
+        return {"cost": None}
+    from flask_login import current_user
+
+    from app.core.auth.permissions import can_change_model
+    from app.services import cost_view
+
+    org_id = getattr(element, "organization_id", None) or g.current_org_id
+    return {
+        "cost": cost_view.technology_cost(org_id, ae_id),
+        "cost_categories": cost_view.PERSON_CATEGORIES,
+        "cost_periods": cost_view.PERIODS,
+        "cost_kinds": tuple(cost_view.KIND_WORDS.items()),
+        "cost_add_url": url_for("archimate_crud.technology_cost_add", ae_id=ae_id),
+        "cost_can_edit": can_change_model(current_user),
+    }
+
+
+def _save_technology_cost_line(ae_id, write, done):
+    """Run one cost-line write for a technology of this organisation and return to its cost section."""
+    from app.services.cost_view import CostLineError
+
+    element = ArchiMateElement.query.filter_by(id=ae_id).first_or_404()
+    try:
+        write()
+        db.session.commit()
+        flash(done, "success")
+    except CostLineError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+    except LookupError:
+        db.session.rollback()
+        abort(404)
+    return redirect(url_for("archimate_crud.detail_element", layer="technology", element_type=element.type,
+                            element_id=ae_id, ae=1, _anchor="cost"))
+
+
+def _technology_cost_form():
+    form = request.form
+    return {
+        "category": form.get("category", ""),
+        "amount": form.get("amount", ""),
+        "currency": form.get("currency", ""),
+        "period": form.get("period", "annual"),
+        "kind": form.get("kind", "actual"),
+    }
+
+
+@archimate_crud.route("/technology/costs/<int:ae_id>", methods=["POST"])
+@login_required
+@write_role_required
+def technology_cost_add(ae_id):
+    """Add a cost line a person typed to a technology."""
+    from flask_login import current_user
+
+    from app.models.cost_fact import ELEMENT_TECHNOLOGY
+    from app.services import cost_view
+
+    return _save_technology_cost_line(ae_id, lambda: cost_view.add_line(
+        g.current_org_id, ELEMENT_TECHNOLOGY, ae_id, user_id=current_user.id, **_technology_cost_form()),
+        "Cost line added.")
+
+
+@archimate_crud.route("/technology/costs/<int:ae_id>/<int:fact_id>", methods=["POST"])
+@login_required
+@write_role_required
+def technology_cost_edit(ae_id, fact_id):
+    """Change a cost line a person added to a technology."""
+    from app.models.cost_fact import ELEMENT_TECHNOLOGY
+    from app.services import cost_view
+
+    return _save_technology_cost_line(ae_id, lambda: cost_view.update_line(
+        g.current_org_id, ELEMENT_TECHNOLOGY, ae_id, fact_id, **_technology_cost_form()), "Cost line saved.")
+
+
+@archimate_crud.route("/technology/costs/<int:ae_id>/<int:fact_id>/delete", methods=["POST"])
+@login_required
+@write_role_required
+def technology_cost_delete(ae_id, fact_id):
+    """Delete a cost line a person added to a technology."""
+    from app.models.cost_fact import ELEMENT_TECHNOLOGY
+    from app.services import cost_view
+
+    return _save_technology_cost_line(ae_id, lambda: cost_view.delete_line(
+        g.current_org_id, ELEMENT_TECHNOLOGY, ae_id, fact_id), "Cost line deleted.")

@@ -185,6 +185,17 @@
         {% endif %}
     </section>
 
+    {% if cost %}
+    {# ── Cost: what is recorded on this technology and its share of the applications it runs ── #}
+    <section id="cost" class="space-y-4" aria-labelledby="cost-heading" data-testid="technology-cost">
+        <h2 id="cost-heading" class="text-lg font-semibold text-foreground">Cost</h2>
+        {% with cost_rule='What is recorded on this technology, plus its share of the infrastructure and hosting of each application that runs on it: split evenly, unless a percentage is recorded on the link. Licences and maintenance stay with the application, and a share is counted once, in the application\'s own total.',
+                cost_line_url=cost_add_url ~ '/' %}
+            {% include 'cost/_cost_panel.html' %}
+        {% endwith %}
+    </section>
+    {% endif %}
+
     {# ── 4. Connections ── #}
     <section id="connections" class="rounded-lg border border-border bg-card" data-testid="connections" aria-labelledby="connections-heading">
         <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
