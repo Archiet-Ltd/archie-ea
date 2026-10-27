@@ -39,7 +39,11 @@
 {% macro dense_table(columns=[], header=None, rows=None, empty_text='Nothing recorded yet.', empty_caller=None, caption=None, testid=None, max_height=None, flush=false, class='', table_class='', id=None, attrs='', tbody_id=None, tbody_attrs='', variant=None, legend=None) %}
 {% set matrix = variant == 'matrix' %}
 <div class="{% if flush %}bg-card{% else %}rounded-lg border border-border bg-card{% endif %} {{ class }}" role="region"{% if caption %} aria-label="{{ caption }}"{% endif %}{% if id %} id="{{ id }}"{% endif %}>
-    <div class="overflow-x-auto overflow-y-auto"{% if max_height %} style="max-height: {{ max_height }}"{% endif %}>
+    {# A scroll container must be reachable by keyboard so a person who cannot use a
+       pointer can still scroll a table that is wider than the viewport (axe:
+       scrollable-region-focusable). The outer div carries the region label; this
+       one is the thing that actually scrolls, so it takes the tab stop. #}
+    <div class="overflow-x-auto overflow-y-auto" tabindex="0"{% if max_height %} style="max-height: {{ max_height }}"{% endif %}>
         <table class="dense-table {% if matrix %}matrix sticky-header sticky-col {% endif %}w-full border-collapse text-sm {{ table_class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if attrs %}{{ attrs|xmlattr }}{% endif %}>
             {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
             <thead class="sticky top-0 z-10 bg-card">
