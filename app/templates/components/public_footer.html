@@ -33,7 +33,6 @@
                  {% if item.legal_slug %}data-legal-link="{{ item.legal_slug }}"{% endif %}
                  {% if item.coming_soon %}data-availability="early_access"{% endif %}>
                 {{ item.label }}
-                {%- if item.coming_soon %} {% call badge('outline') %}Early access{% endcall %}{% endif %}
               </a>
             </li>
             {% endfor %}
