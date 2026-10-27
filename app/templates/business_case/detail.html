@@ -5,7 +5,7 @@
 {% from 'components/canvas_box.html' import canvas_box_entries, canvas_unclassified %}
 {% from 'components/card.html' import card %}
 {% from 'components/form_field.html' import form_field, form_group, form_footer %}
-{% from 'components/input.html' import input, textarea %}
+{% from 'components/input.html' import input, textarea, hidden_input %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
@@ -539,7 +539,7 @@
 
 {% call modal(id='bc-delete-modal', title='Delete this business case?', description='This cannot be undone.', size='sm') %}
 <form method="POST" action="{{ url_for('business_case.delete', business_case_id=business_case.id) }}" data-testid="bc-delete-form">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {{ hidden_input('csrf_token', csrf_token()) }}
   <div class="flex justify-end gap-3 pt-2">
     {{ button(
         text='Cancel',
