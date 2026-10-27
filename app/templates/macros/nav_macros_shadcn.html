@@ -15,8 +15,7 @@
                 role="tab"
                 id="tab-{{ tab.id }}"
                 aria-controls="panel-{{ tab.id }}"
-                {% if is_empty %}aria-disabled="true" title="No {{ tab.label }} data yet"{% endif %}
-                aria-label="{{ tab.label }}{% if is_empty %} (no data yet){% endif %}">
+                {% if is_empty %}aria-disabled="true" title="No {{ tab.label }} data yet" aria-label="{{ tab.label }} (no data yet)"{% endif %}>
                 {{ tab.label }}{% if count is not none and count > 0 %}<span class="ml-1 text-xs font-semibold rounded-full bg-primary/10 text-info-emphasis px-1.5 py-0.5">{{ count }}</span>{% endif %}
             </button>
         {% endfor %}
