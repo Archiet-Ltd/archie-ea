@@ -191,6 +191,22 @@ def mark_finished(org) -> None:
     db.session.commit()
 
 
+def mark_profile_confirmed(org) -> None:
+    """Record that the person went through the company-profile step (the website reading's confirm step)."""
+    state = _onboarding(org)
+    state.setdefault("profile_confirmed_at", datetime.utcnow().isoformat())
+    _write(org, "onboarding", state)
+    db.session.commit()
+
+
+def profile_confirmed_at(org):
+    raw = _onboarding(org).get("profile_confirmed_at")
+    try:
+        return datetime.fromisoformat(raw) if raw else None
+    except ValueError:
+        return None
+
+
 def skipped_sources(org) -> bool:
     """True once sign-up is finished and no source was given, so the dashboard can say so."""
     return is_finished(org) and not any_source_given(org)

@@ -243,7 +243,7 @@ class TestMCPInitialize:
         expected = {
             "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
             "ask_risk", "ask_accountability", "search_elements", "get_element",
-            "list_canvases", "get_canvas", "answer",
+            "list_canvases", "get_canvas", "answer", "get_genome_slice",
         }
         assert tool_names == expected
 
@@ -308,7 +308,7 @@ class TestBearerOnlySessionLess:
         )
         assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
-        assert len(data["result"]["tools"]) == 11
+        assert len(data["result"]["tools"]) == 12  # the eleven, and get_genome_slice
 
     def test_tools_call_with_no_session_cookie_succeeds(self, client, db_session, make_org, login_as):
         """A real tools/call (ask_impact) over a bearer token, on a client
