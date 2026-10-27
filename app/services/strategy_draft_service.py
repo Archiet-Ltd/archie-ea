@@ -737,7 +737,7 @@ def _write_statement(org, user, payload: Dict[str, Any], text: str, canvases: Di
     spec = ANALYSES[analysis]
     existing = _by_proposal(org.id, spec["element"], pid)
     if existing is not None:
-        existing.superseded_at = None  # drafted and accepted again: it is the current reading once more
+        _clear_retired(existing)  # drafted and accepted again: it is the current reading once more
         return existing
     props: Dict[str, Any] = {
         "origin": "strategy_draft", "framework": analysis, "group": group, "row": row, "proposal_id": pid,
@@ -770,18 +770,54 @@ def _write_statement(org, user, payload: Dict[str, Any], text: str, canvases: Di
     return element
 
 
+RETIRED_AT = "retired_at"  # the service's own retirement mark; the history trigger owns superseded_at and resets
+RETIRED_BY = "retired_by_element_id"  # it to NULL on every write, so a reading cannot be retired through that column
+
+
+def _is_retired(props: Dict[str, Any]) -> bool:
+    """True when a reading carries the service's own retirement mark and so is no longer the current analysis."""
+    return bool((props or {}).get(RETIRED_AT))
+
+
+def _mark_retired(element, replaced_by_id: Optional[int]) -> None:
+    """Stamp the service's retirement mark onto the element's custom_properties, merging the dict (never replacing
+    it) so every other tagged value survives. The history trigger does not own custom_properties, so the mark
+    stands after the row is written."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    props = dict(element.custom_properties or {})
+    props[RETIRED_AT] = datetime.utcnow().isoformat(timespec="seconds")
+    props[RETIRED_BY] = replaced_by_id
+    element.custom_properties = props
+    flag_modified(element, "custom_properties")
+
+
+def _clear_retired(element) -> None:
+    """Drop the retirement mark (drafted and accepted again: the reading is current once more), merging the dict."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    props = dict(element.custom_properties or {})
+    if RETIRED_AT in props or RETIRED_BY in props:
+        props.pop(RETIRED_AT, None)
+        props.pop(RETIRED_BY, None)
+        element.custom_properties = props
+        flag_modified(element, "custom_properties")
+
+
 def _retire_older(org_id: int, competitor: str, keep_ids: set) -> int:
     """A new accepted reading of a competitor replaces the matrix column: the earlier statements stay in the model,
-    marked superseded, and are no longer read as the current analysis."""
+    carrying the service's own retirement mark, and are no longer read as the current analysis. superseded_at is
+    not used -- the entity-history trigger owns it and resets it to NULL as the row is written."""
     from app.models.archimate_core import ArchiMateElement
 
-    now = datetime.utcnow()
+    replaced_by = min(keep_ids) if keep_ids else None
     retired = 0
-    for el in ArchiMateElement.query.filter_by(organization_id=org_id, type="Assessment").filter(
-            ArchiMateElement.superseded_at.is_(None)).all():
+    for el in ArchiMateElement.query.filter_by(organization_id=org_id, type="Assessment").all():
         props = el.custom_properties or {}
+        if _is_retired(props):
+            continue
         if props.get("framework") == "competitors" and props.get("competitor") == competitor and el.id not in keep_ids:
-            el.superseded_at = now
+            _mark_retired(el, replaced_by)
             retired += 1
     return retired
 
@@ -837,14 +873,14 @@ def accept_drafts(org, user, decisions: Optional[List[Dict[str, Any]]] = None) -
 
 def accepted_statements(org_id: int, analysis: str) -> List[Dict[str, Any]]:
     """The accepted statements of one analysis, newest first: ``{element_id, group, row, text, sources,
-    percent, confirmed_by_name, confirmed_at}``. Superseded statements are not the current analysis."""
+    percent, confirmed_by_name, confirmed_at}``. A reading that carries the retirement mark is not current."""
     from app.models.archimate_core import ArchiMateElement
 
     out = []
-    for el in ArchiMateElement.query.filter_by(organization_id=org_id, type=ANALYSES[analysis]["element"]).filter(
-            ArchiMateElement.superseded_at.is_(None)).order_by(ArchiMateElement.id.desc()).all():
+    for el in ArchiMateElement.query.filter_by(organization_id=org_id, type=ANALYSES[analysis]["element"]).order_by(
+            ArchiMateElement.id.desc()).all():
         props = el.custom_properties or {}
-        if props.get("framework") != analysis:
+        if props.get("framework") != analysis or _is_retired(props):
             continue
         out.append({
             "element_id": el.id, "group": props.get("group"), "row": props.get("row"), "text": el.description or el.name,
