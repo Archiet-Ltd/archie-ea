@@ -8,14 +8,31 @@ Endpoints:
 
 import logging
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, render_template, request
+from flask_login import current_user, login_required
 
 from app.services import communication_log_service
-from flask_login import login_required
 
 logger = logging.getLogger(__name__)
 
 communication_bp = Blueprint("communication_log", __name__)
+
+
+def _solution_in_active_org(solution_id):
+    """Return the solution when it belongs to the signed-in user's organisation, else 404.
+
+    The same 404 answers a missing id and another organisation's id, so the route never
+    reveals that a solution exists elsewhere.
+    """
+    from app.models.solution_models import Solution
+
+    org_id = getattr(current_user, "organization_id", None)
+    solution = None
+    if solution_id and org_id is not None:
+        solution = Solution.query.filter_by(id=solution_id, organization_id=org_id).first()
+    if solution is None:
+        abort(404, description="Solution not found")
+    return solution
 
 
 @communication_bp.route("/api/communications", methods=["POST"])
@@ -32,15 +49,19 @@ def create_communication():
     if not subject:
         return jsonify({"error": "subject is required"}), 400
 
+    solution = _solution_in_active_org(solution_id)
+
     try:
         entry = communication_log_service.log_communication(
-            solution_id=solution_id,
+            solution_id=solution.id,
             stakeholder_id=data.get("stakeholder_id"),
             comm_type=comm_type,
             subject=subject,
             summary=data.get("summary"),
             outcome=data.get("outcome"),
             action_items=data.get("action_items", []),
+            logged_by=current_user.id,
+            organization_id=solution.organization_id,
         )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
@@ -58,7 +79,9 @@ def list_communications():
     if not solution_id:
         return jsonify({"error": "solution_id query parameter is required"}), 400
 
-    entries = communication_log_service.get_communication_log(solution_id, stakeholder_id)
+    solution = _solution_in_active_org(solution_id)
+    entries = communication_log_service.get_communication_log(
+        solution.id, stakeholder_id, organization_id=solution.organization_id)
     return jsonify(entries), 200
 
 
@@ -66,13 +89,11 @@ def list_communications():
 @login_required
 def communication_log_view(solution_id: int):
     """GET /solutions/<id>/communications — render the communication timeline page."""
-    from app.models.solution_models import Solution
-    from app.utils.route_guards import require_entity
-
     # An empty timeline for a solution that does not exist reads exactly like a
     # real solution nobody has logged a communication against yet.
-    require_entity(Solution, solution_id, description="Solution not found")
-    entries = communication_log_service.get_communication_log(solution_id)
+    solution = _solution_in_active_org(solution_id)
+    entries = communication_log_service.get_communication_log(
+        solution.id, organization_id=solution.organization_id)
     return render_template(
         "solutions/communication_log.html",
         solution_id=solution_id,
