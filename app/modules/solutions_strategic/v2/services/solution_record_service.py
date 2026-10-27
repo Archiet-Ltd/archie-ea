@@ -404,16 +404,19 @@ def properties(solution, groups) -> list[dict]:
     ]
 
 
-def comments(solution_id: int) -> list[dict]:
+def comments(solution_id: int) -> list[dict] | None:
+    """The record's comments, newest first; None when they could not be read, so the page says so
+    rather than showing "No comments yet"."""
     try:
         from app.models.solution_models import SolutionComment
         rows = (SolutionComment.query.filter_by(solution_id=solution_id)
                 .order_by(SolutionComment.created_at.desc()).limit(50).all())
         return [{"id": c.id, "author": c.author_name, "content": c.content,
                  "created_at": c.created_at, "section": c.section_name} for c in rows]
-    except Exception:
+    except Exception as exc:
+        logger.warning("solution record reader (comments): %s", exc)
         db.session.rollback()
-        return []
+        return None
 
 
 def actions_for(solution, user, latest_review) -> dict:
@@ -832,6 +835,7 @@ def delivery_for(solution, groups) -> dict:
     owners, plateau_names = {}, {}
     if owner_ids:
         try:
+            # tenant-scoping-ok: names for owner ids read from this solution's own work packages, by id
             owners = {u.id: _name_of(u) for u in User.query.filter(User.id.in_(owner_ids))}
         except Exception as exc:
             logger.warning("solution record reader (owners): %s", exc)
@@ -952,6 +956,7 @@ def notes_for(solution_id: int) -> list[dict]:
                 .order_by(StakeholderCommunication.logged_at.desc(), StakeholderCommunication.id.desc())
                 .limit(50).all())
         ids = {r.logged_by for r in rows if r.logged_by}
+        # tenant-scoping-ok: names for the authors of this solution's own notes, read by their ids
         users = {u.id: u for u in User.query.filter(User.id.in_(ids))} if ids else {}
         out = []
         for r in rows:

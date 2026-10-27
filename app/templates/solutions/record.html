@@ -4,12 +4,12 @@
    Requirements, Options and decision, Risks, Review and Delivery.
    Context: app/modules/solutions_strategic/v2/services/solution_record_service.py #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/section_tabs.html' import section_tabs %}
+{% from 'components/tabs.html' import section_tabs %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
-{% from 'components/alert.html' import alert %}
+{% from 'components/alert.html' import alert as page_alert %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/element_table.html' import element_table %}
@@ -116,7 +116,7 @@
           {% endcall %}
         {% endcall %}
 
-        {% call alert(kind='info', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step', class='flex-wrap') %}{% endcall %}
+        {% call page_alert(kind='info', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step', class='flex-wrap') %}{% endcall %}
 
         <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2 [&>*]:h-full">
             {% call card() %}
@@ -213,7 +213,7 @@
 
       {% elif tab == 'review' %}
         {% if not packet.success %}
-          {% call alert(kind='warning', text=packet.error or 'The review packet could not be assembled.', testid='review-unavailable') %}{% endcall %}
+          {% call page_alert(kind='warning', text=packet.error or 'The review packet could not be assembled.', testid='review-unavailable') %}{% endcall %}
         {% else %}
         {% call card(class=('border-success/30' if packet.tone == 'good' else ('border-warning/30' if packet.tone == 'warn' else ''))) %}
           {% call card_content(class='p-6') %}
@@ -324,7 +324,7 @@
             </div>
           </div>
           {% if reqs.unrealised %}
-            {{ alert(kind='warning', title=reqs.unrealised ~ ' not yet realised', text='Link each requirement to the application, data or technology element that delivers it, so the matrix and the design agree.', link_href=base ~ '?tab=design', link_text='Open Design', testid='requirements-unrealised') }}
+            {{ page_alert(kind='warning', title=reqs.unrealised ~ ' not yet realised', text='Link each requirement to the application, data or technology element that delivers it, so the matrix and the design agree.', link_href=base ~ '?tab=design', link_text='Open Design', testid='requirements-unrealised') }}
           {% endif %}
           {% if reqs.rows %}
           {% call card(class='overflow-hidden') %}
@@ -393,7 +393,7 @@
             {{ button(text='Compare options', variant='outline', size='sm', icon='scale', href=opt.compare_href, testid='options-compare') }}
           </div>
           {% if opt.leader %}
-            {{ alert(kind='success', title='Recommended', text=opt.leader.name ~ '. ' ~ (opt.leader.summary or (opt.decision.rationale if opt.decision else '')), testid='options-recommendation') }}
+            {{ page_alert(kind='success', title='Recommended', text=opt.leader.name ~ '. ' ~ (opt.leader.summary or (opt.decision.rationale if opt.decision else '')), testid='options-recommendation') }}
           {% endif %}
           {% if opt.options %}
           {% call card(class='overflow-hidden') %}
@@ -447,7 +447,7 @@
             {% endcall %}
           {% endcall %}
           {% else %}
-            {{ alert(kind='info', title='No decision recorded yet', text='Choose the leading option and record the decision, so the board can decide on it.', link_href=opt.compare_href, link_text='Compare options', testid='options-no-decision') }}
+            {{ page_alert(kind='info', title='No decision recorded yet', text='Choose the leading option and record the decision, so the board can decide on it.', link_href=opt.compare_href, link_text='Compare options', testid='options-no-decision') }}
           {% endif %}
         {% else %}
           {{ empty_tab('options-empty', 'No options compared yet. Compare build, buy and extend for this solution and record the decision.', opt.compare_href, 'Compare options') }}
@@ -463,7 +463,7 @@
             </div>
           </div>
           {% if rk.without_owner %}
-            {{ alert(kind='warning', title=rk.without_owner ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
+            {{ page_alert(kind='warning', title=rk.without_owner ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
           {% endif %}
           <div class="space-y-6">
             {% call card() %}
@@ -512,7 +512,7 @@
             {{ button(text='Open the roadmap', variant='outline', size='sm', icon='map', href=dl.roadmap_href, testid='delivery-roadmap') }}
           </div>
           {% if dl.roadmap and dl.roadmap.headline %}
-            {{ alert(kind='info', title=dl.roadmap.headline, text=(dl.roadmap.plateaus ~ ' plateau' ~ ('s' if dl.roadmap.plateaus != 1 else '')) ~ (' over ' ~ dl.roadmap.horizon ~ ' months' if dl.roadmap.horizon else '') ~ '.', link_href=dl.roadmap_href, link_text='Open the roadmap', testid='delivery-roadmap-summary') }}
+            {{ page_alert(kind='info', title=dl.roadmap.headline, text=(dl.roadmap.plateaus ~ ' plateau' ~ ('s' if dl.roadmap.plateaus != 1 else '')) ~ (' over ' ~ dl.roadmap.horizon ~ ' months' if dl.roadmap.horizon else '') ~ '.', link_href=dl.roadmap_href, link_text='Open the roadmap', testid='delivery-roadmap-summary') }}
           {% endif %}
           {% call card(class='overflow-hidden') %}
             {% call card_header(class='pb-3') %}
@@ -641,7 +641,9 @@
             {{ textarea(id='record-comment', name='content', placeholder='Add a comment', rows=3, required=true) }}
             {{ button(text='Post', variant='outline', size='sm', type='submit', testid='comment-post') }}
           </form>
-          {% if comments %}
+          {% if comments is none %}
+          <p class="mt-3 text-sm text-muted-foreground" data-testid="record-comments">The comments could not be loaded. Reload the page to try again.</p>
+          {% elif comments %}
           <ul class="mt-4 space-y-3 text-sm" data-testid="record-comments">
             {% for c in comments %}
             <li class="flex gap-2">
@@ -666,19 +668,15 @@
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
 (function () {
-  function csrf() {
-    var m = document.querySelector('meta[name="csrf-token"]');
-    return m ? m.content : '';
-  }
+  // Platform.fetch sends the CSRF token, parses the reply and raises on a failed request; the
+  // callers read one shape either way: {ok, body}.
   function post(url, body) {
-    return fetch(url, {
-      method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRFToken': csrf()},
-      body: JSON.stringify(body || {})
-    }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
+    return Platform.fetch(url, {method: 'POST', body: body || {}, silent: true}).then(
+      function (j) { return {ok: true, body: j}; },
+      function (err) { return {ok: false, body: (err && err.data) || {error: err && err.message}}; });
   }
   function say(kind, text) {
-    if (window.Platform && Platform.toast && Platform.toast[kind]) { Platform.toast[kind](text); } else { window.console && console.log(text); }
+    if (window.Platform && Platform.toast && Platform.toast[kind]) { Platform.toast[kind](text); }
   }
   document.querySelectorAll('[data-submit-url]').forEach(function (btn) {
     btn.addEventListener('click', function () {
