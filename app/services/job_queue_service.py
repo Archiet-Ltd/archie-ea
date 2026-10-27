@@ -13,6 +13,10 @@ from typing import Any, Dict, List, Optional
 
 from app import db
 from app.models import Job, JobStatus
+from app.models.registry import import_all_models
+
+# The worker maps every model on its first look at the queue, so all of them are loaded before it can run.
+import_all_models()
 
 logger = logging.getLogger(__name__)
 
