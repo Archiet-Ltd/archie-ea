@@ -56,9 +56,12 @@ def test_startup_cto_reads_okta_in_the_catalogue_and_links_it(page, live_server,
 
     _login(page, live_server, seeded["emails"]["cto"])
     page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_test_id("vendors-tab-catalogue").click()
+    # The sidebar's Spend group offers the catalogue beside Vendors.
+    page.locator("nav a[href$='/applications/vendors/catalogue']").first.click()
     page.wait_for_selector("[data-testid=catalogue-table]", timeout=PAGE_TIMEOUT)
-    assert page.get_by_test_id("vendors-tab-catalogue").get_attribute("aria-current") == "page"
+    assert page.get_by_role("tab", name="Catalogue").get_attribute("aria-selected") == "true"
+    # The tabs lead back to the organisation's own vendors.
+    assert page.get_by_role("tab", name="Vendors").count() == 1
     assert page.locator("[data-testid^=catalogue-row-]").count() >= 20
 
     page.get_by_test_id("catalogue-row-okta").get_by_role("link", name="Okta Workforce Identity").click()

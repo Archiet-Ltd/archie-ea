@@ -1,9 +1,11 @@
-{# The Vendors page's two tabs: the organisation's vendors and the public catalogue. #}
-{% from 'components/tabs.html' import tab_links %}
+{# The catalogue pages' tabs: the organisation's vendors, their mapping, and the public catalogue. #}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger %}
 {% macro vendor_tabs(active) %}
-{{ tab_links([
-    {'label': 'Vendors', 'href': url_for('unified_applications.vendors'), 'active': active == 'vendors', 'testid': 'vendors-tab-vendors'},
-    {'label': 'Mapping', 'href': url_for('unified_applications.vendors', tab='mapping'), 'active': active == 'mapping', 'testid': 'vendors-tab-mapping'},
-    {'label': 'Catalogue', 'href': url_for('unified_applications.vendor_catalogue'), 'active': active == 'catalogue', 'testid': 'vendors-tab-catalogue'},
-], label='Vendors sections', class='mb-6') }}
+{% call tabs(id='vendor-sections', default_value=active, class='mb-6') %}
+{% call tabs_list() %}
+{% call tabs_trigger('vendors', click="window.location.href='" ~ url_for('unified_applications.vendors') ~ "'") %}Vendors{% endcall %}
+{% call tabs_trigger('mapping', click="window.location.href='" ~ url_for('unified_applications.vendors', tab='mapping') ~ "'") %}Mapping{% endcall %}
+{% call tabs_trigger('catalogue', click="window.location.href='" ~ url_for('unified_applications.vendor_catalogue') ~ "'") %}Catalogue{% endcall %}
+{% endcall %}
+{% endcall %}
 {% endmacro %}
