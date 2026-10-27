@@ -81,6 +81,17 @@ def _default_deny_unauthorized_writes():
 
     if current_user.can(Permission.GENERAL):
         return None
+    # A route that names its own permission-matrix cell (require_permission) is decided by that cell:
+    # a person the matrix grants "edit application" saves, whatever their platform role carries.
+    # The route repeats the same check, so this lets nothing through that it would refuse.
+    from flask import current_app
+
+    guard = getattr(current_app.view_functions.get(request.endpoint), "matrix_guard", None)
+    if guard:
+        from app.core.auth.permissions import can as _matrix_can
+
+        if _matrix_can(current_user, guard[0], guard[1]):
+            return None
     if request.endpoint in ("unified_applications.add_owner", "unified_applications.remove_owner"):
         # Recording or clearing an owner is granted by the permission matrix's
         # "assign owner" cell, which the architect personas hold whatever

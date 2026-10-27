@@ -245,16 +245,21 @@ def _finish_sso(config, org, claims, *, test_mode: bool):
     user = _svc.provision_user(org, claims)
 
     from app.services import mfa_service
+    from app.utils.safe_redirect import safe_next_url
+
+    # Where the person was going when sign-in began (read before the session is rebuilt).
+    landing = safe_next_url(session.pop("_post_login_next", "") or "", url_for("dashboard.overview"))
 
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
+        session["_mfa_pending_next"] = landing
         return redirect(url_for("account.mfa_challenge"))
 
     from app.services import session_registry
 
     session_registry.login_and_register(user)
-    return redirect(url_for("dashboard.overview"))
+    return redirect(landing)
 
 
 def _record_test_result(org_id, status: str, message: str, claims_preview: dict | None = None):
