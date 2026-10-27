@@ -510,3 +510,33 @@ def test_competitors_the_site_names_are_offered_at_sign_up_and_compared_once_con
     assert done["confirmed"] == 1 and done["left_out"] == 1
     named = engine.competitors_named(db.session.get(Organization, org_id))
     assert [c["name"] for c in named] == ["Harbor Logistics"]
+
+
+def test_strategy_drafts_are_not_in_the_approvals_queue_count_or_inbox_and_cannot_be_decided_there(company):
+    from app import db
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService, create_approval_record
+    from app.services import strategy_draft_service as engine
+
+    org_id, user_id = company
+    reviewer_id = _person(org_id, "reviewer").id
+    _drafts(org_id)
+    ids = [d["id"] for d in engine.pending_statements(org_id)]
+    assert ids
+    # a change that really is waiting for review stays visible
+    real_id = create_approval_record(organization_id=org_id, operation_type="create", entity_type="capability",
+                                  summary="Create a capability", operation_payload={"name": "X"}, user_id=None).id
+    db.session.commit()
+    service = AIChatApprovalService(reviewer_id)
+    assert service.count_approver_queue() == 1
+    queue = service.get_approver_queue()
+    listed = json.dumps(queue)
+    assert str(real_id) in listed and not any(('"id": %d,' % i) in listed for i in ids)
+    # decided only on the strategy screens: the inbox's own actions treat a draft as absent
+    approved = service.approve_and_execute(ids[0])
+    assert approved["success"] is False and approved["code"] == "NOT_FOUND"
+    assert service.reject_approval(ids[0])["code"] == "NOT_FOUND"
+    assert AIChatCRUDApproval.query.get(ids[0]).status == ApprovalStatus.PENDING
+    # ...and the person's own pending list leaves them out as well
+    mine = AIChatApprovalService(user_id)
+    assert mine.get_pending_approvals() == []

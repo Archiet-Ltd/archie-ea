@@ -21,6 +21,16 @@ from app.models.user import User
 from app.services.ai_data_interaction_service import AIDataInteractionService
 from app.utils.duplicate_guard import normalize_name
 
+# Proposals that are decided on their own screens (the sign-up confirm step, the strategy screens), one row per
+# drafted fact or statement. They are never counted in the approvals queue, listed in the inbox or decided there:
+# approving one here would execute nothing, and forty of them would bury the changes a person is meant to review.
+DECIDED_ELSEWHERE = ("strategy_draft", "website_crawler")
+
+
+def _not_decided_elsewhere():
+    """A filter that leaves out the proposals decided on their own screens (a row with no source is kept)."""
+    return db.or_(AIChatCRUDApproval.source_table.is_(None), AIChatCRUDApproval.source_table.notin_(DECIDED_ELSEWHERE))
+
 logger = logging.getLogger(__name__)
 
 
@@ -210,7 +220,7 @@ class AIChatApprovalService:
             AIChatCRUDApproval.query.filter_by(
                 id=approval_id,
                 organization_id=actor.organization_id,
-            ).first()
+            ).filter(_not_decided_elsewhere()).first()
         )
 
     @staticmethod
@@ -1292,6 +1302,7 @@ class AIChatApprovalService:
                 organization_id=actor.organization_id,
                 status=ApprovalStatus.PENDING,
             )
+            .filter(_not_decided_elsewhere())
             .all()
         )
         return [approval.to_dict() for approval in approvals]
@@ -1302,7 +1313,7 @@ class AIChatApprovalService:
         return AIChatCRUDApproval.query.filter_by(
             organization_id=actor.organization_id,
             status=ApprovalStatus.PENDING,
-        ).filter(
+        ).filter(_not_decided_elsewhere()).filter(
             db.or_(
                 AIChatCRUDApproval.user_id.is_(None),
                 AIChatCRUDApproval.user_id != actor.id,
