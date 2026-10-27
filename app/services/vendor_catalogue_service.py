@@ -216,6 +216,24 @@ def link_for_vendor_product(vendor_product_id: int) -> Optional[VendorCatalogueL
 NOT_YOURS = "That vendor product is not one your organisation uses."
 
 
+def applications_using(vendor_product_id: int) -> list[str]:
+    """Names of the signed-in organisation's applications that use a vendor product, by name."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.capability_to_vendor_mapping import ApplicationVendorProductMapping
+
+    mapped = db.session.query(ApplicationVendorProductMapping.application_component_id).filter(
+        ApplicationVendorProductMapping.vendor_product_id == vendor_product_id
+    )
+    rows = (
+        ApplicationComponent.query.filter(ApplicationComponent.organization_id == current_org_id())
+        .filter(db.or_(ApplicationComponent.vendor_product_id == vendor_product_id,
+                       ApplicationComponent.id.in_(mapped)))
+        .order_by(ApplicationComponent.name)
+        .all()
+    )
+    return [row.name for row in rows]
+
+
 class LinkRefused(ValueError):
     pass
 

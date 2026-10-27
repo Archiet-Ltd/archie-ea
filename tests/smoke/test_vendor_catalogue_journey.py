@@ -39,7 +39,7 @@ def _seed(seeded):
         not_used = VendorProduct(vendor_organization_id=okta.id, name=f"Okta elsewhere {uuid.uuid4().hex[:6]}")
         db.session.add(not_used)
         db.session.commit()
-        return {"vendor_product": vp.name, "not_used": not_used.id, "cto_role": cto.enterprise_role,
+        return {"vendor_product": vp.name, "application": app_row.name, "not_used": not_used.id, "cto_role": cto.enterprise_role,
                 "cto_admin": bool(cto.is_platform_admin or cto.is_org_admin)}
 
 
@@ -104,5 +104,5 @@ def test_startup_cto_reads_okta_in_the_catalogue_and_links_it(page, live_server,
     page.get_by_test_id("catalogue-link-submit").click()
     page.wait_for_selector("[data-testid=catalogue-links]", timeout=PAGE_TIMEOUT)
     assert page.get_by_test_id("catalogue-links").get_by_text(seed["vendor_product"]).count() == 1
-    done = page.get_by_role("status").filter(has_text=f"{seed['vendor_product']} is now linked to Okta Workforce Identity.")
+    done = page.get_by_role("status").filter(has_text=f"Okta Workforce Identity is now linked to {seed['application']}.")
     assert done.count() == 1 and done.is_visible()
