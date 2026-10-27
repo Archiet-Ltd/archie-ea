@@ -624,14 +624,20 @@ def data_flow_overview(org_id) -> Dict:
 
 
 def default_flow_entity(overview):
-    """The entity whose flow the data architecture page opens on: the first
-    personal-data entity that something writes, else the first that is used."""
+    """The entity whose flow the data architecture page opens on: of the
+    personal-data entities something writes, the one with the most to show
+    (applications that use it, and its recorded copies, which lead on to more
+    hops); else the first entity that is used."""
     used = [row for row in overview["entities"] if row["applications"] and row["element_id"]]
-    for row in used:
+    written = [
+        row for row in used
         if row["personal_data"] and any(
             set(app["access"]) & {"creates", "updates", "deletes", "writes"} for app in row["applications"]
-        ):
-            return row
+        )
+    ]
+    if written:
+        # max keeps the first of equals, so the order of the list breaks ties.
+        return max(written, key=lambda row: len(row["applications"]) + 2 * row["copies"])
     return used[0] if used else None
 
 
