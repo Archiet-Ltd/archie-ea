@@ -861,7 +861,9 @@ class AgentRunner:
                     # Monitor mode: the answer is shown unchanged; the gate
                     # is evaluated (and logged) once, in _apply_citation_gate.
                     gate_passes = True
-                self._release_held_tokens(gate_passes)
+                # An answer that read the genome is shown only after its
+                # citation post-check, drawn by the server (see _finalize).
+                self._release_held_tokens(gate_passes and not self._grounding.genome_slices)
                 return self._finalize(
                     {
                         "response": llm_resp.get("text", ""),
@@ -1803,6 +1805,27 @@ class AgentRunner:
             return
         self._log_would_refuse(uncited)
 
+    def _apply_genome_post_check(self, result: dict, provider: Optional[str]) -> None:
+        """When this turn read a genome slice: remove every sentence that cites an
+        id outside the turn's ledger, and attach the server-drawn answer (links,
+        AI notice, provider, as-of line, partial note) as ``genome_answer``."""
+        text = result.get("response")
+        if not self._grounding.genome_slices or result.get("error")                 or result.get("system_generated") or not isinstance(text, str) or not text.strip():
+            return
+        from app.modules.ai_chat.services import genome_answer
+
+        built = genome_answer.build(text, self._grounding, provider)
+        result["response"] = built["text"]
+        result["genome_answer"] = {
+            "html": built["html"],
+            "removed": built["removed"],
+            "slices": built["slices"],
+        }
+        if built["removed"]:
+            logger.warning(
+                "genome_post_check removed %d citation(s) outside the turn ledger", built["removed"],
+            )
+
     def _log_would_refuse(self, uncited: list) -> None:
         """One structured WARNING per answer the gate would have refused. The
         unverified record names are logged; the answer text is not."""
@@ -1844,7 +1867,10 @@ class AgentRunner:
         ``answered_by`` names the provider and model that produced the reply,
         read from the entry that answered (``model_used``), never the first one
         tried. A refused or failed turn carries none, so no model is named."""
+        self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
+        if (result.get("citation_gate") or {}).get("refused"):
+            result.pop("genome_answer", None)
         if model_used and not result.get("error"):
             result["answered_by"] = {"provider": provider_used, "model": model_used}
         record_error = self._record_run(

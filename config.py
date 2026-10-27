@@ -268,6 +268,9 @@ class Config:
     # page, including /contact). Unset means enquiries are still stored, just
     # not emailed — see app/main/views.py:product_inquiry_submit.
     SALES_NOTIFY_EMAIL = os.environ.get("SALES_NOTIFY_EMAIL")
+    # Who hears of a new sign-up that has stalled, and gets the daily sign-up report
+    # (app/services/signup_attribution.py). Unset means neither is sent.
+    FOUNDER_ALERT_EMAIL = os.environ.get("FOUNDER_ALERT_EMAIL")
 
     # Analytics
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")

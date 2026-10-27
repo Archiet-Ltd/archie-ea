@@ -43,6 +43,10 @@ _NAME_LIKE_ARG_KEYS = frozenset({"name", "title"})
 # server. A tool argument that names one is text the model was given by a user
 # or a document, so it is dropped here, at the one dispatch point, before any
 # handler can read it.
+# A genome node id, the citation unit of a slice: <domain>:<kind>:<store id>.
+_GENOME_NODE_ID = re.compile(r"[a-z_]{1,20}:[a-z_]{1,20}:[A-Za-z0-9_]{1,64}")
+GENOME_NOTICE = "Answer written by AI from your model"
+
 _SCOPE_ARG_KEYS = frozenset({"organization_id", "organisation_id", "org_id", "tenant_id"})
 
 
@@ -350,6 +354,8 @@ class ToolExecutor:
         # One stored answer per identical question per turn (an executor lives
         # for one turn): a repeated call returns the same address.
         self._answers_this_turn: dict = {}
+        # Genome slices read this turn, by their exact arguments (LG-1 budgets).
+        self._genome_this_turn: dict = {}
 
     @staticmethod
     def _coverage(rows, total, noun):
@@ -1699,6 +1705,94 @@ class ToolExecutor:
                 + (" The list is partial: report the total, not the rows shown." if len(shown) < total else "")
             )
         return {"success": True, "result": body, "message": message}
+
+    # ------------------------------------------------------------------ #
+    # Tool: get_genome_slice (read-only)                                 #
+    # ------------------------------------------------------------------ #
+
+    GENOME_NOT_FOUND = {"success": False, "error": "Not found.", "code": "NOT_FOUND"}
+
+    def _tool_get_genome_slice(self, args: dict) -> dict:
+        """One registered domain slice of the caller's organisation, serialised to
+        its budget (ADR-genome-01, LG-1). The organisation is the session's (chat)
+        or the token's user's (MCP), never an argument; arguments are a domain
+        name, ids and declared filters only. Read-only: nothing is queued or written."""
+        import json as _json
+
+        from app.modules.genome.slices import serialise as genome_serialise
+        from app.modules.genome.slices.registry import SLICES, get_slice, registered_domains
+
+        domain = args.get("domain")
+        if not isinstance(domain, str) or domain not in SLICES:
+            return {
+                "success": True,
+                "result": {"registered_domains": registered_domains()},
+                "message": "No such part of the model. Ask for one of: %s." % ", ".join(registered_domains()),
+            }
+        focus = args.get("focus_ids") or []
+        if not isinstance(focus, list) or len(focus) > genome_serialise.MAX_FOCUS:
+            return {"success": False, "error": "focus_ids must be a list of at most 20 ids.", "code": "INVALID_PARAMETER"}
+        for ident in focus:
+            if not (type(ident) is int or (isinstance(ident, str) and _GENOME_NODE_ID.fullmatch(ident))):
+                return {"success": False, "error": "focus_ids takes node or element ids only.", "code": "INVALID_PARAMETER"}
+        filters = args.get("filters") or {}
+        if not isinstance(filters, dict):
+            return {"success": False, "error": "filters must be an object.", "code": "INVALID_PARAMETER"}
+        depth = args.get("depth", 1)
+        budget = args.get("budget_tokens", genome_serialise.DEFAULT_BUDGET)
+        if type(depth) is not int or type(budget) is not int:
+            return {"success": False, "error": "depth and budget_tokens are whole numbers.", "code": "INVALID_PARAMETER"}
+
+        # An executor lives for one turn: a repeated identical call returns the
+        # first result, and the turn's slice budget and fetch count hold.
+        key = _json.dumps(args, sort_keys=True, default=str)
+        cache = self._genome_this_turn
+        if key in cache:
+            return cache[key]
+        spent = sum(r["result"].get("tokens", 0) for r in cache.values() if r.get("success"))
+        if len(cache) >= 4 or spent >= genome_serialise.TURN_BUDGET:
+            return {
+                "success": False,
+                "error": "This question has read as much of the model as one answer may; narrow it.",
+                "code": "SLICE_BUDGET_SPENT",
+            }
+        budget = min(budget, genome_serialise.TURN_BUDGET - spent)
+
+        org_id = self._get_organization_id()
+        envelope = get_slice(domain, org_id)
+        if focus:
+            known = {n["id"] for n in envelope["nodes"]} | {
+                str((n.get("provenance") or {}).get("archimate_element_id")) for n in envelope["nodes"]
+            }
+            if not any(str(f) in known for f in focus):
+                # Another organisation's id reads exactly like an id that does not exist.
+                return dict(self.GENOME_NOT_FOUND)
+        result = genome_serialise.serialise(
+            envelope, focus_ids=focus, depth=depth, filters=filters, budget_tokens=budget,
+        )
+        base = ""
+        try:
+            from flask import current_app
+
+            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+        except Exception:
+            base = ""
+        for node in result["nodes"]:
+            if base and node.get("link"):
+                node["url"] = base + node["link"]
+        result["notice"] = GENOME_NOTICE
+        result["tokens"] = genome_serialise.estimate_tokens(result)
+        out = {
+            "success": True,
+            "result": result,
+            "message": (
+                "%d records from the %s part of the model, as of %s. Cite each record you "
+                "state as [ref:<node id>]." % (len(result["nodes"]), domain, result["as_of"])
+                if result["nodes"] else (result.get("reason") or "Nothing recorded.")
+            ),
+        }
+        cache[key] = out
+        return out
 
     def _tool_answer(self, args: dict) -> dict:
         kind = args.get("question")

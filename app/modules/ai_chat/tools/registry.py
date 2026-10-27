@@ -789,6 +789,68 @@ TOOL_SCHEMAS = [
         },
         "tier": "auto",
     },
+    {
+        "name": "get_genome_slice",
+        "surfaces": ["chat", "mcp"],
+        "route": "app.modules.genome.slices.registry.get_slice",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Read one domain of the organisation's model as citeable facts: 'business' "
+            "(capabilities, the applications that support each, and which capabilities "
+            "nothing supports), 'implementation' (plateaus and work packages, with the "
+            "capability each work package changes), 'security' (controls bound to "
+            "requirements) or 'ai_systems'. The same facts the Capability Coverage page "
+            "and the roadmap show. Every node has an id such as business:cap:7; cite each "
+            "record you state as [ref:<node id>] and the page shows its name as a link. "
+            "State only what the nodes say. Read-only."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "enum": ["business", "implementation", "security", "ai_systems"],
+                    "description": "Which domain of the model to read",
+                },
+                "focus_ids": {
+                    "type": "array",
+                    "items": {"type": ["string", "integer"]},
+                    "maxItems": 20,
+                    "description": "Optional node ids (business:cap:7) or element ids to centre on",
+                },
+                "depth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2,
+                    "description": "Links to follow from the focus, 0 to 2 (default 1)",
+                },
+                "filters": {
+                    "type": "object",
+                    "description": "Optional filters the domain declares (kind, status, supported, framework)",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["cap", "app", "plateau", "wp", "control", "system"]},
+                        "supported": {"type": "boolean"},
+                        "status": {"type": "string", "maxLength": 40},
+                        "framework": {"type": "string", "maxLength": 40},
+                        "risk_class": {"type": "string", "maxLength": 40},
+                    },
+                    "additionalProperties": False,
+                },
+                "budget_tokens": {
+                    "type": "integer",
+                    "minimum": 500,
+                    "maximum": 6000,
+                    "description": "Size of the result, default 3000",
+                },
+            },
+            "required": ["domain"],
+            "additionalProperties": False,
+        },
+        "tier": "auto",
+    },
     # ------------------------------------------------------------------ #
     # Solution State tools                                                #
     # ------------------------------------------------------------------ #
