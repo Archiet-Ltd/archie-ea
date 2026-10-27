@@ -138,10 +138,34 @@ def _impact_answer(args: dict) -> dict:
     )
 
 
+def _data_flow(args: dict) -> dict:
+    """``ask_data_flow``: the data entities overview from the data architecture
+    route, or, for one data object, the answer service's data-flow envelope
+    (stored like ``ask_impact``'s)."""
+    if args.get("element_id") is None:
+        _status, data = call_internal_api("GET", "/architecture/api/data-flows", pass_session=True)
+        if isinstance(data, dict):
+            _fence_response_text(data)
+        return data
+
+    from flask_login import current_user
+
+    from .executor import ToolCall, ToolExecutor
+
+    return ToolExecutor(user_id=current_user.id).execute(
+        ToolCall(
+            id="mcp-ask-data-flow",
+            name="answer",
+            arguments={"question": "data_flow", "element_id": args["element_id"]},
+        ),
+        propagate_errors=True,
+    )
+
+
 # Tools whose result is the answer service's envelope. It names records and
 # carries free text (element names, reasons, messages), so on the connector it
 # is fenced like every route tool's payload. Chat does not go through here.
-ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact"})
+ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact", "ask_data_flow"})
 
 
 def fence_connector_result(tool_name: str, result: Any) -> Any:
@@ -231,6 +255,7 @@ def _get_canvas(args: dict) -> dict:
 
 ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
     "ask_impact": _impact_answer,
+    "ask_data_flow": _data_flow,
     "ask_strategy": _intelligence("strategy"),
     "ask_portfolio": _intelligence("portfolio"),
     "ask_programme": _intelligence("programme"),

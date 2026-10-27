@@ -30,6 +30,8 @@ PUBLISHED_NAMES = {
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "search_elements", "get_element",
     "list_canvases", "get_canvas", "answer",
+    # Where data flows and who handles personal data (T-sub-04).
+    "ask_data_flow",
 }
 
 # The answer tool is published to both chat and the connector so that
