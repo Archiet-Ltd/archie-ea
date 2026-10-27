@@ -120,6 +120,9 @@ class VendorProductDetail(db.Model):
     )
     product_name = db.Column(db.String(200), nullable=False, index=True)
     product_code = db.Column(db.String(50), index=True)  # e.g., "S4F", "SFE"
+    # The public catalogue's address for this shared record (ADR-0021); null when
+    # the product is not in the catalogue.
+    catalogue_slug = db.Column(db.String(80), unique=True, index=True)
     current_version = db.Column(db.String(50))  # e.g., "2023", "2023 Q2", "v15.0"
     deployment_model = db.Column(db.String(50))  # "Cloud", "On-Premise", "Hybrid", "SaaS"
 
