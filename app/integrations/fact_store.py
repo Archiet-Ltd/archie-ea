@@ -541,3 +541,46 @@ def citation_sources(
         "relationships": sources_for_relationships(relationship_ids, organization_id),
         "elements": sources_for_elements(element_ids, organization_id),
     }
+
+
+def record_applied(
+    *,
+    organization_id: int,
+    system: str,
+    external_id: str,
+    path: str,
+    fact_type: str,
+    data: Dict[str, Any],
+    source_url: Optional[str] = None,
+    source_item_type: Optional[str] = None,
+    element_id: Optional[int] = None,
+    relationship_id: Optional[int] = None,
+) -> IntegrationFact:
+    """Record a fact a connector applied through its own writer, already applied.
+
+    A connector that writes the model itself (GitHub's reviewed proposals) keeps
+    the same record a mapped item does, so the one citation builder reads every
+    connector-derived element and link from here. ``data["name"]`` on the
+    ``element`` path is the external item's name (the repository, for GitHub).
+    A second call for the same item and path updates the record.
+    """
+    fact = IntegrationFact.query.filter_by(
+        organization_id=organization_id, system=system, external_id=external_id, path=path
+    ).first()
+    if fact is None:
+        fact = IntegrationFact(
+            organization_id=organization_id, system=system, external_id=external_id, path=path
+        )
+        db.session.add(fact)
+    now = datetime.utcnow()
+    fact.fact_type = fact_type
+    fact.fact_data = json.dumps(data, sort_keys=True, default=str)
+    fact.source_url = source_url
+    fact.source_item_type = source_item_type
+    fact.source_read_at = now
+    fact.status = IntegrationFactStatus.APPLIED
+    fact.applied_at = now
+    fact.applied_element_id = element_id
+    fact.applied_relationship_id = relationship_id
+    db.session.flush()
+    return fact

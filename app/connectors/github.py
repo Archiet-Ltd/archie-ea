@@ -323,6 +323,43 @@ def file_url(repository, commit, file) -> "str | None":
     return "https://github.com/%s/%s/blob/%s/%s" % (parts[0], parts[1], commit, "/".join(quote(seg, safe="") for seg in segments))
 
 
+def repository_url(repository) -> "str | None":
+    """The address of a repository on GitHub, only when its name is plainly an owner and a repository."""
+    parts = str(repository or "").split("/")
+    if len(parts) != 2 or any(not _SAFE_NAME.match(p) or set(p) == {"."} for p in parts):
+        return None
+    return "https://github.com/%s/%s" % (parts[0], parts[1])
+
+
+def _record_applied(org_id, repository, path, *, fact_type, fact_path, data, commit=None, file=None,
+                    element_id=None, relationship_id=None) -> None:
+    """Keep what an approved proposal wrote in the fact store, so its citation names the repository."""
+    from app.integrations.fact_store import record_applied
+
+    record_applied(
+        organization_id=org_id,
+        system=SOURCE_SYSTEM,
+        external_id=_identity(repository, path)[:255],
+        path=fact_path,
+        fact_type=fact_type,
+        data=data,
+        source_url=file_url(repository, commit, file) or repository_url(repository),
+        source_item_type="repository",
+        element_id=element_id,
+        relationship_id=relationship_id,
+    )
+
+
+def _record_element(org_id, element, payload) -> None:
+    """The fact an approved application or part rests on: its repository (or monorepo folder)."""
+    _record_applied(
+        org_id, payload.get("repository"), payload.get("path"),
+        fact_type="element", fact_path="element",
+        data={"archimate_type": element.type, "name": payload.get("repository"), "element_name": element.name},
+        commit=payload.get("commit"), file=payload.get("evidence_file"), element_id=element.id,
+    )
+
+
 def origin_ref(repository, commit, file=None, path=None, detail=None) -> str:
     """The JSON a connector-written element or relationship keeps in ``source_ref``."""
     body = {"system": SOURCE_SYSTEM, "repository": repository, "commit": commit, "file": file}
@@ -460,6 +497,7 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     )
     db.session.flush()
     _write_facts(element, _facts_from_payload(payload))
+    _record_element(org_id, element, payload)
     _assign_owner_from_payload(org_id, row, payload.get("owners") or [], assigned_by)
 
 
@@ -522,6 +560,13 @@ def _create_component(approval, payload) -> Dict[str, Any]:
     stamp_origin(link, repository=payload.get("repository"), commit=payload.get("commit"), file=payload.get("evidence_file"), detail=detail)
     db.session.add(link)
     db.session.flush()
+    _record_element(org_id, element, payload)
+    _record_applied(
+        org_id, payload.get("repository"), payload.get("path"),
+        fact_type="relationship", fact_path=f"relationships.{link.id}",
+        data={"type": "Composition", "source": parent.name, "target": element.name, "description": detail[:500]},
+        commit=payload.get("commit"), file=payload.get("evidence_file"), relationship_id=link.id,
+    )
     return {"success": True, "element_id": element.id, "composition_id": link.id}
 
 
@@ -555,6 +600,12 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
     stamp_origin(link, repository=payload.get("from"), commit=payload.get("commit"), file=payload.get("file"), detail=detail)
     db.session.add(link)
     db.session.flush()
+    _record_applied(
+        org_id, payload.get("from"), None,
+        fact_type="relationship", fact_path=f"relationships.{link.id}",
+        data={"type": kind, "source": source.name, "target": target.name, "description": detail[:500]},
+        commit=payload.get("commit"), file=payload.get("file"), relationship_id=link.id,
+    )
     return {"success": True, "relationship_id": link.id}
 
 
