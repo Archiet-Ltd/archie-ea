@@ -1,17 +1,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/figures.html' import stat_cards, state_badge, section %}
+{% from 'components/figures.html' import stat_cards, state_badge, section, money_short with context %}
 {% block title %}Costs{% endblock %}
 
 {#- A headline amount the way the Overview writes it: the symbol once, abbreviated, no trailing pence. -#}
-{% macro _money(v) -%}
-{%- set sym = (currency_config.symbol if currency_config is defined and currency_config and currency_config.symbol else '£') -%}
-{%- set a = v|float -%}
-{%- if a|abs >= 1000000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000000))|replace('.0', '') }}m
-{%- elif a|abs >= 1000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000))|replace('.0', '') }}k
-{%- else -%}{{ sym }}{{ '%.0f'|format(a) }}{%- endif -%}
-{%- endmacro %}
 
 
 {% macro _recommend_action() %}
@@ -42,14 +35,14 @@
   {%- set no_annual = summary.contracts_without_annual_cost or 0 -%}
   {%- set no_value = summary.contracts_without_value or 0 -%}
   {%- if summary.total_annual_cost is not none -%}
-    {%- set annual_card = {'label': 'Annual recurring cost', 'value': _money(summary.total_annual_cost), 'icon': 'calendar', 'testid': 'spend-annual-cost',
+    {%- set annual_card = {'label': 'Annual recurring cost', 'value': money_short(summary.total_annual_cost), 'icon': 'calendar', 'testid': 'spend-annual-cost',
         'sentence': (('Leaves out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else 'Every active contract states its annual cost')} -%}
   {%- else -%}
     {%- set annual_card = {'label': 'No annual cost recorded yet', 'value': none, 'icon': 'calendar', 'testid': 'spend-annual-cost',
         'sentence': 'Add the annual cost to a contract and the yearly total shows here'} -%}
   {%- endif -%}
   {%- if summary.total_value is not none -%}
-    {%- set value_card = {'label': 'Total contract value', 'value': _money(summary.total_value), 'icon': 'banknote', 'testid': 'spend-total-value',
+    {%- set value_card = {'label': 'Total contract value', 'value': money_short(summary.total_value), 'icon': 'banknote', 'testid': 'spend-total-value',
         'sentence': (('Leaves out ' ~ no_value ~ ' contract' ~ ('' if no_value == 1 else 's') ~ ' with no stated value') if no_value else 'The full value of every active contract')} -%}
   {%- else -%}
     {%- set value_card = {'label': 'No contract value recorded yet', 'value': none, 'icon': 'banknote', 'testid': 'spend-total-value',
@@ -58,7 +51,7 @@
   {%- set top = (summary.top_vendors|first) if summary.top_vendors else none -%}
   {%- if top and top[1].annual_cost is not none and (summary.total_annual_cost or 0) > 0 -%}
     {%- set top_card = {'label': 'Largest vendor: ' ~ top[0], 'value': '%.0f'|format(top[1].annual_cost / summary.total_annual_cost * 100) ~ '%', 'icon': 'building-2', 'testid': 'spend-top-vendor',
-        'sentence': 'Share of annual spend, ' ~ _money(top[1].annual_cost) ~ ' a year', 'href': url_for('unified_applications.vendors')} -%}
+        'sentence': 'Share of annual spend, ' ~ money_short(top[1].annual_cost) ~ ' a year', 'href': url_for('unified_applications.vendors')} -%}
   {%- else -%}
     {%- set top_card = {'label': 'No vendor costs to rank yet', 'value': none, 'icon': 'building-2', 'testid': 'spend-top-vendor',
         'sentence': 'Name the vendor and annual cost on each contract to see who you spend most with'} -%}
@@ -77,7 +70,7 @@
           <span class="w-32 shrink-0 truncate font-medium sm:w-48">{{ vendor_name }}</span>
           {% if pct is not none %}
           <progress class="h-2 min-w-0 flex-1 appearance-none overflow-hidden rounded-full bg-secondary [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value="{{ '%.1f'|format(pct) }}" max="100" aria-label="{{ vendor_name }} share of annual spend"></progress>
-          <span class="w-28 shrink-0 whitespace-nowrap text-right tabular-nums">{{ _money(data.annual_cost) }} a year</span>
+          <span class="w-28 shrink-0 whitespace-nowrap text-right tabular-nums">{{ money_short(data.annual_cost) }} a year</span>
           <span class="w-12 shrink-0 text-right tabular-nums text-muted-foreground">{{ '%.0f'|format(pct) }}%</span>
           {% else %}
           <span class="flex-1 text-right text-muted-foreground">No annual cost stated</span>
@@ -101,7 +94,7 @@
             <span class="block text-muted-foreground">{{ data.count }} contract{{ '' if data.count == 1 else 's' }}</span>
           </span>
           {% if data.annual_cost is not none %}
-          <span class="whitespace-nowrap tabular-nums">{{ _money(data.annual_cost) }} a year</span>
+          <span class="whitespace-nowrap tabular-nums">{{ money_short(data.annual_cost) }} a year</span>
           {% else %}
           <span class="whitespace-nowrap text-muted-foreground">No annual cost stated</span>
           {% endif %}

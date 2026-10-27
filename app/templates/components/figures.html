@@ -11,6 +11,7 @@
                           "Every application has an owner".
    state_badge(value)     a state, severity or priority as an outline badge with a coloured dot; the word is
                           always there, written as a person writes it ("In progress", not "in_progress").
+   money_short(value)    an amount as a list shows it: £87.6k, £1.7m, £950; a record shows the full figure.
    value_or_unset(value)  the value, or "Not set" in muted text when there is none (None, '', '?', 'None',
                           'TBD', 'N/A'), never a dash or a question mark. #}
 {% import 'basecoat/index.html' as ui %}
@@ -62,6 +63,14 @@
 {%- else -%}
 <div{% if item.testid %} data-testid="{{ item.testid }}"{% endif %}>{{ inner }}</div>
 {%- endif -%}
+{%- endmacro %}
+
+{% macro money_short(v) -%}
+{%- set sym = (currency_config.symbol if currency_config is defined and currency_config and currency_config.symbol else '£') -%}
+{%- set a = v|float -%}
+{%- if a|abs >= 1000000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000000))|replace('.0', '') }}m
+{%- elif a|abs >= 1000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000))|replace('.0', '') }}k
+{%- else -%}{{ sym }}{{ '%.0f'|format(a) }}{%- endif -%}
 {%- endmacro %}
 
 {% macro stat_cards(items, testid='stat-cards') -%}

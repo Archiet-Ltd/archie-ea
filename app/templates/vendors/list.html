@@ -3,7 +3,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
-{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'components/figures.html' import state_badge, value_or_unset, money_short with context %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -31,13 +31,6 @@
 {%- endmacro %}
 
 {#- A headline amount the way the Overview writes it: the symbol once, abbreviated, no trailing pence. -#}
-{% macro _money(v) -%}
-{%- set sym = (currency_config.symbol if currency_config is defined and currency_config and currency_config.symbol else '£') -%}
-{%- set a = v|float -%}
-{%- if a|abs >= 1000000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000000))|replace('.0', '') }}m
-{%- elif a|abs >= 1000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000))|replace('.0', '') }}k
-{%- else -%}{{ sym }}{{ '%.0f'|format(a) }}{%- endif -%}
-{%- endmacro %}
 
 {% macro _actions() %}
 <div class="flex flex-wrap items-center gap-2">
@@ -137,7 +130,7 @@
     {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
-      {% if row.contract_annual_cost is not none %}{{ _money(row.contract_annual_cost) }}{% else %}<span class="text-muted-foreground">{{ 'No contract' if not row.contract_count else 'Not stated' }}</span>{% endif %}
+      {% if row.contract_annual_cost is not none %}{{ money_short(row.contract_annual_cost) }}{% else %}<span class="text-muted-foreground">{{ 'No contract' if not row.contract_count else 'Not stated' }}</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if any_systems %}
