@@ -148,7 +148,8 @@
                        history, subscribe) for every signed-in user. Outside the sidebar
                        so it does not spend a navigation slot. #}
                     {% if current_user.is_authenticated and 'service_status.status_page' in flask.current_app.view_functions %}
-                    <footer class="flex h-8 items-center px-6 text-xs text-muted-foreground" data-testid="app-footer">
+                    {# The footer link sits on the content column; the Overview keeps the placement the founder approved. #}
+                    <footer class="flex h-8 items-center{% if request.path != '/dashboard/overview' %} px-6{% endif %} text-xs text-muted-foreground" data-testid="app-footer">
                         <a href="{{ url_for('service_status.status_page') }}"
                            class="inline-flex items-center gap-1.5 hover:text-foreground"
                            data-testid="footer-service-status">
