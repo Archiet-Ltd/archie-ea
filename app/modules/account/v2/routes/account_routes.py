@@ -492,6 +492,7 @@ def save_preferences():
         "solution_updates",
         "assignment_changes",
         "weekly_digest",
+        "alert_email",
         "mention_notifications",
     ]
     try:

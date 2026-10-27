@@ -62,11 +62,32 @@ class AgentCharter(TenantMixin, db.Model):
         )
 
     @classmethod
+    def effective_for(cls, persona: str, organization_id: int):
+        """The charter in force: the stored latest version, else the persona's current default.
+
+        An organisation created before charters existed (or whose charters were never seeded)
+        holds none for a persona; refusing everything would break its chat, so the executor
+        falls back to the default charter, which is never written. A persona with no default
+        either gets None.
+        """
+        stored = cls.current_for(persona, organization_id)
+        if stored is not None:
+            return stored
+        from types import SimpleNamespace
+
+        from app.commands.seed_agent_charters import default_charter_fields
+
+        fields = default_charter_fields(persona)
+        if fields is None:
+            return None
+        return SimpleNamespace(version=1, persona=persona, organization_id=organization_id, **fields)
+
+    @classmethod
     def tool_allowed(cls, persona: str, tool_name: str, organization_id: int) -> bool:
         """Check whether a tool call is within the persona's charter bounds."""
-        charter = cls.current_for(persona, organization_id)
+        charter = cls.effective_for(persona, organization_id)
         if charter is None:
-            # No charter at all — fail CLOSED.
+            # No stored charter and no default for this persona (unknown persona) — fail CLOSED.
             return False
         forbidden = charter.forbidden_actions or []
         if tool_name in forbidden:

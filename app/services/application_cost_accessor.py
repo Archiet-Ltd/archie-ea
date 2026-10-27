@@ -54,7 +54,9 @@ def get_reporting_currency(organization_id: Optional[int] = None) -> str:
         code = db.session.execute(
             db.select(Organization.reporting_currency).where(Organization.id == organization_id)
         ).scalar_one_or_none()
-        if code:
+        from config import CurrencyConfig
+
+        if code and CurrencyConfig.is_supported(code.upper()):
             return code.upper()
     return current_app.config.get("DEFAULT_CURRENCY", "GBP")
 

@@ -504,6 +504,10 @@ else:
 
     _register_relationship_origin()
 
+    # Cited public signals per organisation. Imported at boot so create_all()/reconcile-schema
+    # know about the table; before this the tests that read it ran on a database without it.
+    from .organization_signal import OrganizationSignal  # noqa: F401
+
     # The one audit store. Imported at boot so its integrity-chain and
     # copy-from-other-audit-stores hooks are registered before any insert.
     from .audit_log import AuditLog  # noqa: F401
