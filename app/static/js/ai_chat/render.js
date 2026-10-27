@@ -613,14 +613,17 @@
 
     /* The cited answer cards for an estate question. The HTML is drawn on the
        server from the stored answer; it is sanitised again here because it is
-       inserted as markup. */
+       inserted as markup. A citation to a repository file opens in a new tab,
+       so target and rel are kept through the sanitiser: without them the
+       default allow-list drops both, and the link lands nowhere with no
+       protection against the opener reaching back into this page. */
     function appendAnswerCards(html) {
         var div = document.createElement('div');
         div.className = 'flex gap-4';
         div.setAttribute('data-testid', 'estate-answer');
         div.innerHTML = avatarHtml() +
             '<div class="min-w-0 max-w-3xl flex-1">' +
-              (window.DOMPurify ? DOMPurify.sanitize(html) : '') +
+              (window.DOMPurify ? DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] }) : '') +
             '</div>';
         var container = messages();
         if (container) container.appendChild(div);
