@@ -7,7 +7,7 @@
 {% from "components/button.html" import button %}
 {% from "components/select.html" import native_select %}
 {% from "components/input.html" import input %}
-{% from "vendors/_catalogue_tabs.html" import vendor_tabs with context %}
+{% from "components/alert.html" import alert %}
 
 {% block title %}{{ product.product_name }} · Vendor catalogue{% endblock %}
 
@@ -23,15 +23,14 @@
   {{ page_shell(
       title=product.product_name,
       subtitle=(grouped.summary[0].detail if grouped.summary else None),
-      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', url_for('unified_applications.vendor_catalogue')), (product.product_name, None)]
+      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', url_for('unified_applications.vendor_catalogue')), (product.product_name, None)],
+      tabs=[('Vendors', url_for('unified_applications.vendors'), False), ('Mapping', url_for('unified_applications.vendors', tab='mapping'), False), ('Catalogue', url_for('unified_applications.vendor_catalogue'), True)]
   ) }}
-
-  {{ vendor_tabs('catalogue') }}
 
   <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
     <span>Vendor <span class="text-foreground font-medium">{{ vendor.name if vendor else '' }}</span></span>
     {% if category %}<span>Category {% call badge(variant='secondary') %}{{ category }}{% endcall %}</span>{% endif %}
-    {% if grouped.summary %}<span data-testid="summary-source">Summary from <a class="text-primary hover:underline underline-offset-4" href="{{ grouped.summary[0].source_url }}" target="_blank" rel="noopener noreferrer">{{ grouped.summary[0].source_url|replace('https://', '')|truncate(40, true, '…') }}</a>, checked {{ grouped.summary[0].checked_on.strftime('%-d %b %Y') }}</span>{% endif %}
+    {% if grouped.summary %}<span data-testid="summary-source">Summary from <a class="text-primary underline underline-offset-2" href="{{ grouped.summary[0].source_url }}" target="_blank" rel="noopener noreferrer">{{ grouped.summary[0].source_url|replace('https://', '')|truncate(40, true, '…') }}</a>, checked {{ grouped.summary[0].checked_on.strftime('%-d %b %Y') }}</span>{% endif %}
   </div>
 
   <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -130,7 +129,7 @@
           {% else %}
             <p class="text-foreground">No end-of-life date published.</p>
           {% endif %}
-            <p class="text-xs text-muted-foreground">From the end-of-life register at <a class="text-primary hover:underline underline-offset-4" href="{{ lifecycle.source_url }}" target="_blank" rel="noopener noreferrer">endoflife.date</a>{% if lifecycle.last_synced %}, synced {{ lifecycle.last_synced.strftime('%-d %b %Y') }}{% else %}; not yet synced for this product{% endif %}.</p>
+            <p class="text-xs text-muted-foreground">From the end-of-life register at <a class="text-primary underline underline-offset-2" href="{{ lifecycle.source_url }}" target="_blank" rel="noopener noreferrer">endoflife.date</a>{% if lifecycle.last_synced %}, synced {{ lifecycle.last_synced.strftime('%-d %b %Y') }}{% else %}; not yet synced for this product{% endif %}.</p>
           </div>
         {% endcall %}
       {% endcall %}
@@ -141,6 +140,9 @@
           {% call card_description() %}Link a vendor product your organisation uses to this catalogue entry. Only your organisation sees its links.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-4') %}
+          {% if link_message %}
+            {% call alert(link_message.kind, testid='catalogue-link-message') %}{{ link_message.text }}{% endcall %}
+          {% endif %}
           {% if links %}
           <ul class="space-y-1 text-sm" data-testid="catalogue-links">
             {% for link in links %}
@@ -148,7 +150,9 @@
             {% endfor %}
           </ul>
           {% endif %}
-          {% if org_options %}
+          {% if not can_link %}
+            <p class="text-sm text-muted-foreground" data-testid="catalogue-link-read-only">Linking needs permission to edit applications. Someone who edits your applications can link it.</p>
+          {% elif org_options %}
           <form method="post" action="{{ url_for('unified_applications.vendor_catalogue_link', slug=product.catalogue_slug) }}" class="space-y-2" data-testid="catalogue-link-form">
             {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
             <label for="vendor_product_id" class="text-sm font-medium text-foreground">Vendor product</label>
