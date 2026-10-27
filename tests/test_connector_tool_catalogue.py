@@ -29,13 +29,13 @@ from app.modules.ai_chat.tools.route_read_tools import (
 PUBLISHED_NAMES = {
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "search_elements", "get_element",
-    "list_canvases", "get_canvas", "answer",
+    "list_canvases", "get_canvas", "answer", "get_genome_slice",
 }
 
 # The answer tool is published to both chat and the connector so that
 # answers through the connector carry citations. Its handler is the
 # executor's own _tool_answer, not an entry in ROUTE_READ_HANDLERS.
-SHARED_WITH_CHAT = {"answer"}
+SHARED_WITH_CHAT = {"answer", "get_genome_slice"}
 
 
 def _mcp_violations(schemas):
