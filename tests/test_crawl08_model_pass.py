@@ -312,3 +312,57 @@ def test_an_address_shown_in_a_code_block_is_not_the_companys_contact():
     only_example = ("<html><head><title>Docs</title></head><body><pre>onboarding@resend.dev</pre>"
                     "<code>a@b.dev</code><a href=\"mailto:x@y.dev\"><code>x@y.dev</code></a></body></html>")
     assert "contact_email" not in extract_static("https://docs.example/", only_example, "https://docs.example")
+
+
+# ----------------------------------------------------------------------------- the pass reads a few pages per call
+
+def test_the_model_reads_nine_pages_three_at_a_time_and_only_the_first_call_gives_the_business_reading(make_org, site, monkeypatch):
+    from app.modules.organization.website_crawl import service
+
+    prompts = []
+
+    def model(prompt):
+        prompts.append(prompt)
+        return fake_model(prompt)
+
+    org = _org(make_org, site.url)
+    summary = _crawl(org, llm=model)
+    assert summary["pages_read"] >= 5
+    assert 2 <= len(prompts) <= 3 and all(len(p) <= 32000 for p in prompts), [len(p) for p in prompts]
+    marker = 'The "inference" object'
+    assert marker in prompts[0] and all(marker not in p for p in prompts[1:]), "only the first call asks for it"
+    assert service.MODEL_PAGES_PER_CALL == 3
+
+
+def test_when_the_first_call_fails_the_rest_are_not_asked(make_org, site):
+    asked = []
+
+    def broken(prompt):
+        asked.append(prompt)
+        raise RuntimeError("no provider answered")
+
+    org = _org(make_org, site.url)
+    summary = _crawl(org, llm=broken)
+    assert len(asked) == 1 and summary["model_errors"] == 1 and summary["model_error"]["type"] == "RuntimeError"
+
+
+def test_a_public_page_may_go_to_the_free_models_that_keep_what_they_are_sent(providers, monkeypatch):
+    """OpenRouter refused every free model with "no endpoints match your data policy" while the policy said deny."""
+    import requests
+
+    impl = providers["impl"]
+    monkeypatch.setattr(impl, "PUBLIC_INPUT_CHAIN", ("openrouter",))
+    seen = []
+    real_post = requests.post
+
+    def post(url, **kwargs):
+        seen.append(kwargs["json"]["provider"])
+        return real_post(url, **kwargs)
+
+    monkeypatch.setattr(requests, "post", post)
+    providers["openrouter"] = ["answer"]
+    impl.LLMService.generate_from_prompt("a public page", use_cache=False, timeout=20, public_input=True)
+    assert seen and all(policy == {"data_collection": "allow"} for policy in seen)
+    seen.clear()
+    impl.LLMService._call_openrouter("organisation data", "some/model:free", "key", public_input=False)
+    assert seen == [{"data_collection": "deny"}]

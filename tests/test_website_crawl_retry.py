@@ -116,7 +116,7 @@ def chain(monkeypatch, catalogue):
     calls, sleeps, script = [], [], {}
 
     def caller(provider):
-        def call(prompt, model, api_key, max_tokens=None, timeout=None):
+        def call(prompt, model, api_key, max_tokens=None, timeout=None, **_ignored):
             calls.append((provider, model))
             outcomes = script.get(provider, ["answer from " + provider])
             seen = sum(1 for p, _ in calls if p == provider) - 1
@@ -239,8 +239,11 @@ def test_the_person_is_told_more_facts_will_come_when_the_service_is_less_busy(a
     monkeypatch.setattr(website_crawl, "default_model", lambda *a, **k: _busy)
     job_id = website_crawl.queue_website_crawl(org.id).id
     result = website_crawl.run_website_crawl_job({"organization_id": org.id, "job_id": job_id})
-    assert result["more_to_come"] is True
+    assert result["more_to_come"] is True and result["model_pass_queued"] is True
     get_job_queue_service().update_job_status(job_id, JobStatus.COMPLETED.value, result=json.loads(json.dumps(result)))
+    # the model pass is its own job; it finds every provider busy, so a retry is queued for later
+    retry = website_crawl.run_website_retry_job({"organization_id": org.id, "retry_attempt": 0})
+    assert retry["retry_queued"]
 
     with app.test_request_context("/welcome"):
         row = next(r for r in onboarding.sources(db.session.get(Organization, org.id)) if r["key"] == "website")
@@ -268,6 +271,7 @@ def test_step_three_shows_the_sentence_to_a_signed_in_person(app, client, login_
     job_id = website_crawl.queue_website_crawl(org.id).id
     result = website_crawl.run_website_crawl_job({"organization_id": org.id, "job_id": job_id})
     get_job_queue_service().update_job_status(job_id, JobStatus.COMPLETED.value, result=json.loads(json.dumps(result)))
+    assert website_crawl.run_website_retry_job({"organization_id": org.id, "retry_attempt": 0})["retry_queued"]  # the model pass found them busy
 
     login_as(client, user_id)
     page = client.get("/account/welcome?step=3")

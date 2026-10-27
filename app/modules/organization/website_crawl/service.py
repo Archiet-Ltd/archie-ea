@@ -41,7 +41,9 @@ PROPOSAL_DUE_DAYS = 14
 MAX_PAGES = 30
 TIME_LIMIT_SECONDS = 120.0  # each pass has its own
 MODEL_TIMEOUT_SECONDS = 120.0  # the one batched model call
-PROMPT_PAGE_CHARS = 30000  # the pages handed to the model together, shared between them; the whole prompt stays near 40,000
+PROMPT_PAGE_CHARS = 15000  # the pages handed to the model in one call, shared between them; one call stays under 40,000 characters
+MODEL_PAGES = 9  # the pages the model pass reads: the home page and the first pages after it
+MODEL_PAGES_PER_CALL = 3
 DEFAULT_CONFIDENCE = 0.3  # the floor of OperateIQ's own scale ("weak inference") when a model gives none
 
 TAXONOMY = (
@@ -158,15 +160,24 @@ Use only what each page states. Give a page you learned nothing from an empty ob
 """
 
 
-def _batched_prompt(pages: List[Dict[str, Any]]) -> str:
-    """One prompt for every page read: OperateIQ's analysis prompt over all of them, then the inference."""
+PAGES_ONLY_ADDENDUM = BATCH_ADDENDUM[:BATCH_ADDENDUM.index("### The \"inference\" object")].replace(
+    ',\n "inference": {<the business-level reading below>}}', "}")
+
+
+def _batched_prompt(pages: List[Dict[str, Any]], with_inference: bool = True) -> str:
+    """One prompt for a few pages: OperateIQ's analysis prompt over them, then (once per read) the inference."""
     share = max(1000, min(12000, PROMPT_PAGE_CHARS // max(1, len(pages))))
     body = "\n\n".join(
         "=== PAGE %d: %s ===\n%s" % (i, page["url"], trimmed_html(page["html"] or "", share))
         for i, page in enumerate(pages, 1))
     first = pages[0]
     return prompts.render("website_analysis", {"url": first["url"], "title": first["static"]["title"],
-                                               "html_content": body}) + ADDENDUM + BATCH_ADDENDUM
+                                               "html_content": body}) + ADDENDUM + (BATCH_ADDENDUM if with_inference else PAGES_ONLY_ADDENDUM)
+
+
+def _model_chunks(pages: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    selected = pages[:MODEL_PAGES]
+    return [selected[i:i + MODEL_PAGES_PER_CALL] for i in range(0, len(selected), MODEL_PAGES_PER_CALL)]
 
 
 def _no_model(prompt: str) -> str:
@@ -672,25 +683,31 @@ def crawl_organization_website(
             "stopped": read["stopped"], "model_errors": 0, "proposals": stored,
         }
 
-    # Pass 2: one model call over every page read; what it adds is proposed when it arrives.
+    # Pass 2: the model reads the pages a few at a time (the first call also gives the business-level reading);
+    # what it adds is proposed when it arrives.
     inferred: Dict[str, Any] = {}
     model_error: Optional[Dict[str, str]] = None
-    try:
-        answer = parse_json(model(_batched_prompt(read["pages"])))
-        entries = [entry for entry in (answer.get("pages") or []) if isinstance(entry, dict)]
-        by_url = {str(entry.get("url")): entry for entry in entries}
-        for position, page in enumerate(read["pages"]):
-            entry = by_url.get(page["url"])
-            if entry is None and len(entries) == len(read["pages"]):
-                entry = entries[position]
-            page["analysis"] = entry or {}
-        inferred = answer.get("inference") if isinstance(answer.get("inference"), dict) else {}
-    except Exception as exc:
-        # the type and a short message go on the job's result, so a failed model pass is visible without the log
-        model_error = {"type": type(exc).__name__, "message": str(exc)[:200]}
-        logger.warning("website reading by the model failed for organisation %s: %s: %s",
-                       org_id, model_error["type"], model_error["message"], exc_info=True)
-        read["model_errors"] += 1
+    for number, chunk in enumerate(_model_chunks(read["pages"])):
+        try:
+            answer = parse_json(model(_batched_prompt(chunk, with_inference=(number == 0))))
+            entries = [entry for entry in (answer.get("pages") or []) if isinstance(entry, dict)]
+            by_url = {str(entry.get("url")): entry for entry in entries}
+            for position, page in enumerate(chunk):
+                entry = by_url.get(page["url"])
+                if entry is None and len(entries) == len(chunk):
+                    entry = entries[position]
+                page["analysis"] = entry or {}
+            if number == 0:
+                inferred = answer.get("inference") if isinstance(answer.get("inference"), dict) else {}
+        except Exception as exc:
+            # the type and a short message go on the job's result, so a failed model pass is visible without the log
+            model_error = model_error or {"type": type(exc).__name__, "message": str(exc)[:200]}
+            logger.warning("website reading by the model failed for organisation %s (pages %d to %d): %s: %s",
+                           org_id, number * MODEL_PAGES_PER_CALL + 1, number * MODEL_PAGES_PER_CALL + len(chunk),
+                           type(exc).__name__, str(exc)[:200], exc_info=True)
+            read["model_errors"] += 1
+            if number == 0:
+                break  # the providers are failing: the rest are not asked, and the pass is tried again later
     facts = _facts_from(read["pages"])
     _from_inference(facts, first["url"], first["fetched_at"], inferred)
     added = [row for row in facts.ordered()
