@@ -20,7 +20,7 @@ Idempotent: a second run changes nothing. A database built fresh from the models
 columns, so the revision then only fences.
 
 Revision ID: 20261027_fence_solution_family
-Revises: 20261027_stakeholder_comm_org
+Revises: 20261025_vendor_catalogue
 Create Date: 2026-10-27
 """
 from alembic import op
@@ -28,7 +28,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261027_fence_solution_family"
-down_revision = "20261027_stakeholder_comm_org"
+down_revision = "20261025_vendor_catalogue"
 branch_labels = None
 depends_on = None
 

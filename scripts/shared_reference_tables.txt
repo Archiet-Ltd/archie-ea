@@ -4,3 +4,4 @@
 apqc_process  # the APQC process classification framework, shared reference catalogue seeded only by commands (GLOBAL_MODELS)
 technical_capabilities  # the ACM technical capability catalogue, shared reference data seeded only by commands (GLOBAL_MODELS)
 vendor_organizations  # shared vendor catalogue, facts about vendors in the world, name globally unique (ADR-0003, GLOBAL_MODELS)
+vendor_catalogue_facts  # the public vendor catalogue (ADR-0021): the same for every organisation, read-only to them, written only by the research and review commands
