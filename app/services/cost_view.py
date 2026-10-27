@@ -1,8 +1,9 @@
 """What an application or a technology costs, read from the one cost fact store.
 
-Every screen that shows an element's cost (the application's Cost tab, a technology's element page, the canvas
-Cost Structure box and the organisation total under it) reads this module, so the same figure is the same on each.
-Nothing here reads the legacy cost columns: they reach the store through ``application_cost_accessor``.
+Every screen that shows an element's cost reads this module: the application's Cost tab, a technology's element
+page and the canvas directly, and every other screen through ``application_cost_accessor.get_annual_cost``, so the
+same figure is the same on each. The cost columns reach the store through that accessor; a row recorded before the
+store existed is read from its columns as the same lines, until the backfill records them.
 
 The rules, in the words the pages state them:
 - An application's annual cost is the sum of its cost lines. Lines recorded on the application's cost fields are
@@ -240,10 +241,74 @@ def _view(lines: List[CostLine], currency: str) -> CostView:
     return CostView(lines=lines, currency=currency, total=amount, missing=missing, as_of=as_of)
 
 
-def application_cost(organization_id: int, application_id: int) -> CostView:
+def _field_facts(app, currency: str) -> list:
+    """An application's cost fields read as the facts the accessor writes, for a row recorded before the store
+    existed (never backfilled). Nothing is written: the page shows the same lines the backfill would make."""
+    from types import SimpleNamespace
+
+    from app.services.application_cost_accessor import FACT_COLUMNS
+
+    facts = []
+    for column, (category, period) in FACT_COLUMNS.items():
+        value = getattr(app, column, None)
+        if value is None:
+            continue
+        facts.append(SimpleNamespace(
+            id=None, category=category, kind=KIND_ACTUAL, period=period, amount=Decimal(str(value)),
+            currency=currency, source=_COLUMN_SOURCE, source_id=f"{app.id}:{column}",
+            updated_at=getattr(app, "updated_at", None), created_at=getattr(app, "created_at", None),
+        ))
+    return facts
+
+
+def _with_fields(app, facts: list, currency: str) -> list:
+    if app is not None and not any(f.source == _COLUMN_SOURCE for f in facts):
+        return _field_facts(app, currency) + facts
+    return facts
+
+
+def application_cost(organization_id: int, application_id: int, app=None) -> CostView:
     """An application's cost lines and annual total, in the organisation's reporting currency."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    currency = reporting_currency(organization_id)
     facts = list_facts(organization_id, element_type=ELEMENT_APPLICATION, element_ids=[application_id])
-    return _view(_application_lines(facts, _people(facts)), reporting_currency(organization_id))
+    if app is None:
+        app = db.session.get(ApplicationComponent, application_id)
+    if app is not None and app.organization_id != organization_id:
+        app = None
+    facts = _with_fields(app, facts, currency)
+    return _view(_application_lines(facts, _people(facts)), currency)
+
+
+def annual_cost(app) -> Optional[Decimal]:
+    """The one annual figure for an application: the total on its Cost tab, in the reporting currency.
+
+    Every screen that shows what an application costs reads this (through ``application_cost_accessor``), so the
+    fact sheet, rationalisation, consolidation, vendors, the dashboards, the Cost tab and the canvas agree. None
+    when nothing is recorded, or when a line's currency has no rate on file.
+    """
+    if app.id is None or app.organization_id is None:
+        value = getattr(app, "total_cost_of_ownership", None)
+        return Decimal(str(value)) if value is not None else None
+    return application_cost(app.organization_id, app.id, app=app).total
+
+
+def annual_costs(organization_id: int, apps) -> Dict[int, Optional[Decimal]]:
+    """``annual_cost`` for many applications of one organisation, in two queries."""
+    apps = [a for a in apps if a.id is not None and a.organization_id == organization_id]
+    if not apps:
+        return {}
+    currency = reporting_currency(organization_id)
+    facts = list_facts(organization_id, element_type=ELEMENT_APPLICATION, element_ids=[a.id for a in apps])
+    people = _people(facts)
+    by_app: Dict[int, list] = {}
+    for f in facts:
+        by_app.setdefault(f.element_id, []).append(f)
+    return {
+        a.id: _view(_application_lines(_with_fields(a, by_app.get(a.id, []), currency), people), currency).total
+        for a in apps
+    }
 
 
 def _runs_on(organization_id: int) -> Dict[int, List[tuple]]:
@@ -338,9 +403,10 @@ def technology_cost(organization_id: int, element_id: int) -> CostView:
     ).scalars().all()
     facts = list_facts(organization_id, element_type=ELEMENT_APPLICATION, element_ids=[a.id for a in apps] or [0])
     app_people = _people(facts)
+    currency = reporting_currency(organization_id)
     for app in apps:
         links = runs_on[app.archimate_element_id]
-        own = [f for f in facts if f.element_id == app.id]
+        own = _with_fields(app, [f for f in facts if f.element_id == app.id], currency)
         for line in _application_lines(own, app_people):
             if not line.counted or line.category not in ALLOCATED_CATEGORIES:
                 continue
@@ -354,7 +420,7 @@ def technology_cost(organization_id: int, element_id: int) -> CostView:
                     as_of=line.as_of, note="Part of the application's own cost; counted once, there",
                     application_id=app.id, source_name=app.name,
                 ))
-    return _view(lines, reporting_currency(organization_id))
+    return _view(lines, currency)
 
 
 @dataclass
@@ -379,22 +445,22 @@ def organisation_cost(organization_id: int) -> OrganisationCost:
     facts = list_facts(organization_id, element_type=ELEMENT_APPLICATION)
     tech_facts = list_facts(organization_id, element_type=ELEMENT_TECHNOLOGY)
     people = _people(facts + tech_facts)
-    names = {
-        a.id: a.name for a in db.session.execute(
+    rows = {
+        a.id: a for a in db.session.execute(
             db.select(ApplicationComponent).where(
                 ApplicationComponent.organization_id == organization_id,
-                ApplicationComponent.id.in_({f.element_id for f in facts} or {0}),
                 ApplicationComponent.deleted_at.is_(None),
             )
         ).scalars()
     }
-    by_app: Dict[int, List[CostFact]] = {}
+    names = {app_id: a.name for app_id, a in rows.items()}
+    by_app: Dict[int, list] = {app_id: [] for app_id in rows}
     for f in facts:
         if f.element_id in names:
-            by_app.setdefault(f.element_id, []).append(f)
+            by_app[f.element_id].append(f)
     applications, all_lines = [], []
     for app_id, own in by_app.items():
-        view = _view(_application_lines(own, people), currency)
+        view = _view(_application_lines(_with_fields(rows[app_id], own, currency), people), currency)
         if not view.counted_lines:
             continue
         all_lines.extend(view.lines)

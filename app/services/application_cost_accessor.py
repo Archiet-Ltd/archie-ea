@@ -66,15 +66,20 @@ def get_annual_cost(app: ApplicationComponent) -> Optional[Decimal]:
     Return the application's annual cost as Decimal, or None if not recorded.
 
     All screens, reports and exports that need "the annual cost of this
-    application" must call this.
+    application" must call this. It is the total on the application's Cost tab
+    (``cost_view``): its cost fields, the rest of its recorded total, and lines a
+    person added, in the reporting currency.
     """
-    value = getattr(app, _ANNUAL_COST_COLUMN, None)
-    if value is None:
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError):
-        return None
+    from app.services.cost_view import annual_cost
+
+    return annual_cost(app)
+
+
+def get_annual_costs(organization_id: int, apps) -> Dict[int, Optional[Decimal]]:
+    """``get_annual_cost`` for many applications of one organisation at once."""
+    from app.services.cost_view import annual_costs
+
+    return annual_costs(organization_id, apps)
 
 
 def get_annual_cost_float(app: ApplicationComponent) -> Optional[float]:
@@ -113,7 +118,10 @@ def get_annual_cost_with_source(app: ApplicationComponent):
     the sum of the legacy per-category columns for a row never re-imported
     through set_annual_cost, labelled so the caller can show its provenance."""
     canonical = get_annual_cost(app)
-    if canonical is not None and canonical > 0:
+    column = getattr(app, _ANNUAL_COST_COLUMN, None)
+    legacy_only = (column is None or column <= 0) and any(
+        getattr(app, field, None) is not None for field in _LEGACY_COST_FIELDS)
+    if canonical is not None and canonical > 0 and not legacy_only:
         return float(canonical), "ApplicationComponent.total_cost_of_ownership"
     legacy_values = [getattr(app, field, None) for field in _LEGACY_COST_FIELDS]
     if any(v is not None for v in legacy_values):
@@ -213,6 +221,24 @@ def _finish_new_applications(session, flush_context) -> None:
 
 
 event.listen(Session, "after_flush_postexec", _finish_new_applications)
+
+
+def _sync_changed_cost_columns(session, flush_context, instances) -> None:
+    """A cost column changed by any route reaches the store in the same flush, so the Cost tab and every screen
+    reading ``get_annual_cost`` never show a figure the fields no longer hold."""
+    from sqlalchemy import inspect as sa_inspect
+
+    for app in [o for o in (*session.new, *session.dirty) if isinstance(o, ApplicationComponent)]:
+        state = sa_inspect(app)
+        changed = [c for c in FACT_COLUMNS if c in state.attrs and state.attrs[c].history.has_changes()]
+        if not changed:
+            continue
+        with session.no_autoflush:
+            for column in changed:
+                sync_cost_fact(app, column)
+
+
+event.listen(Session, "before_flush", _sync_changed_cost_columns)
 
 
 def parse_cost_cell(
@@ -526,25 +552,20 @@ def get_cost_summary_for_org(org_id: int) -> Dict[str, Any]:
     from app import db
     from sqlalchemy import text
 
-    result = db.session.execute(
-        text("""
-            SELECT 
-                COUNT(*) as application_count,
-                COUNT(total_cost_of_ownership) as applications_with_cost,
-                SUM(total_cost_of_ownership) as total_annual_cost
-            FROM application_components
-            WHERE organization_id = :org_id
-        """),
-        {"org_id": org_id}
-    ).fetchone()
+    from app.services.cost_view import organisation_cost
 
-    apps_with_cost = result.applications_with_cost or 0
+    count = db.session.execute(
+        text("SELECT COUNT(*) FROM application_components WHERE organization_id = :org_id"),
+        {"org_id": org_id}
+    ).scalar()
+    org = organisation_cost(org_id)
 
     return {
-        "total_annual_cost": Decimal(str(result.total_annual_cost)) if result.total_annual_cost is not None and apps_with_cost > 0 else None,
-        "application_count": result.application_count or 0,
-        "applications_with_cost": apps_with_cost,
+        "total_annual_cost": org.total if org.applications else None,
+        "application_count": count or 0,
+        "applications_with_cost": len(org.applications),
     }
+
 
 def state_contract(app: ApplicationComponent, vendor_name: str, annual_cost, months_ago: int = 6):
     """Give an application one active contract stating its annual cost, the Spend page's source.
