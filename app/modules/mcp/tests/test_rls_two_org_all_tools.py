@@ -142,6 +142,9 @@ calls += [("get_genome_slice", {"domain": "business"}, "A"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": B["bmc"]}, "B"),
           ("get_canvas", {"canvas_type": "business_case", "canvas_id": A["bc"]}, "A"),
           ("get_canvas", {"canvas_type": "business_case", "canvas_id": B["bc"]}, "B")]
+with app.app_context():
+    from app.modules.ai_chat.tools.route_read_tools import tool_released
+    calls = [x for x in calls if tool_released(x[0])]
 leaks = 0; alpha_hits = 0; called = set()
 bad_status = []
 for name, args, tag in calls:
@@ -280,13 +283,19 @@ def test_all_tools_see_zero_rows_from_the_other_organisation_under_rls(
         role_name, is_super, is_bypass = json.loads(role_line.split(" ", 1)[1])
         assert (role_name, is_super, is_bypass) == (ROLE, False, False)
 
+        from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+        with app.app_context():
+            # the wave map decides which tools can answer at the released wave
+            wanted_tools = [t for t in ALL_TOOLS if tool_released(t)]
+
         tools_line = next(line for line in out.splitlines() if line.startswith("TOOLS_LIST"))
         listed_tools = json.loads(tools_line.split(" ", 1)[1])
-        assert listed_tools == sorted(ALL_TOOLS), f"tool list drifted: {listed_tools}"
+        assert listed_tools == sorted(wanted_tools), f"tool list drifted: {listed_tools}"
 
         called_line = next(line for line in out.splitlines() if line.startswith("CALLED"))
         called_tools = set(json.loads(called_line.split(" ", 1)[1]))
-        assert called_tools == set(ALL_TOOLS), f"not all tools were exercised: missing {set(ALL_TOOLS) - called_tools}"
+        assert called_tools == set(wanted_tools), f"not all tools were exercised: missing {set(wanted_tools) - called_tools}"
 
         bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
         bad_status = json.loads(bad_status_line.split(" ", 1)[1])
