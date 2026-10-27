@@ -210,7 +210,7 @@ class ViewpointStakeholderMapping(db.Model):
         return [mapping.stakeholder_role for mapping in mappings]
 
 
-class ViewpointView(db.Model):
+class ViewpointView(TenantMixin, db.Model):
     """Concrete views created from viewpoints for specific architecture models.
 
     A view is an instantiation of a viewpoint for a specific architecture model,
@@ -232,6 +232,7 @@ class ViewpointView(db.Model):
     """
 
     __tablename__ = "viewpoint_views"
+    __tenant_parent__ = (('viewpoint_id', 'archimate_viewpoints'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -342,10 +343,11 @@ class ViewpointView(db.Model):
         return query.all()
 
 
-class ArchimateAuditLog(db.Model):
+class ArchimateAuditLog(TenantMixin, db.Model):
     """Audit log for ArchiMate composer actions."""
 
     __tablename__ = "archimate_audit_logs"
+    __tenant_parent__ = (('user_id', 'users'),)
 
     id = db.Column(db.Integer, primary_key=True)
     # CMP-03: viewpoint_id is the COMPOSER diagram id (saved_diagrams.id), which
@@ -423,7 +425,7 @@ class ArchimateViewpointTemplate(db.Model):
         return f"<ArchimateViewpointTemplate {self.name}>"
 
 
-class ArchimateViewpointSnapshot(db.Model):
+class ArchimateViewpointSnapshot(TenantMixin, db.Model):
     """Version snapshot of a saved diagram (viewpoint).
 
     Created by the composer's "Save Snapshot" action.  Stores a full
@@ -432,6 +434,7 @@ class ArchimateViewpointSnapshot(db.Model):
     """
 
     __tablename__ = "archimate_viewpoint_snapshots"
+    __tenant_parent__ = (('viewpoint_id', 'saved_diagrams'),)
 
     id = db.Column(db.Integer, primary_key=True)
     viewpoint_id = db.Column(
@@ -446,10 +449,11 @@ class ArchimateViewpointSnapshot(db.Model):
         return f"<ArchimateViewpointSnapshot {self.name} vp={self.viewpoint_id}>"
 
 
-class ArchimateElementComment(db.Model):
+class ArchimateElementComment(TenantMixin, db.Model):
     """CMP-024: a comment on an ArchiMate element, optionally scoped to a viewpoint."""
 
     __tablename__ = "archimate_element_comments"
+    __tenant_parent__ = (('element_id', 'archimate_elements'),)
 
     id = db.Column(db.Integer, primary_key=True)
     element_id = db.Column(

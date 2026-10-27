@@ -133,7 +133,7 @@ class RelationshipType(str, Enum):
 # =============================================================================
 
 
-class ArchitectureElement(db.Model):
+class ArchitectureElement(TenantMixin, db.Model):
     """
     Architecture Element Model
 
@@ -167,7 +167,7 @@ class ArchitectureElement(db.Model):
         }
 
 
-class Relationship(db.Model):
+class Relationship(TenantMixin, db.Model):
     """
     Relationship Model
 
@@ -175,6 +175,7 @@ class Relationship(db.Model):
     """
 
     __tablename__ = "architecture_relationships"
+    __tenant_parent__ = (('source_id', 'architecture_elements'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

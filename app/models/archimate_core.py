@@ -218,10 +218,11 @@ if _FAST_INIT:
 # RelationshipSuggestion — always available (not gated by _FAST_INIT)
 # -----------------------------------------------------------------------
 
-class RelationshipSuggestion(db.Model):  # migration-exempt — uses db.create_all()
+class RelationshipSuggestion(TenantMixin, db.Model):  # migration-exempt — uses db.create_all()
     """AI-suggested relationship awaiting EA review (BPP-006)."""
 
     __tablename__ = "relationship_suggestions"
+    __tenant_parent__ = (('source_element_id', 'archimate_elements'),)
     __table_args__ = (
         db.UniqueConstraint(
             "source_element_id", "target_element_id", "relationship_type",
@@ -438,10 +439,11 @@ def validate_relationship(rel_type, source_type, target_type):
 
 
 # Extended ArchiMate 3.2 models
-class CompositeStructure(db.Model):
+class CompositeStructure(TenantMixin, db.Model):
     """Composite structures (ArchiMate 3.2 Other relationship)."""
 
     __tablename__ = "composite_structures"
+    __tenant_parent__ = (('parent_element_id', 'archimate_elements'),)
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
@@ -534,10 +536,11 @@ class SavedDiagram(TenantMixin, db.Model):
         }
 
 
-class SavedDiagramElement(db.Model):
+class SavedDiagramElement(TenantMixin, db.Model):
     """Element position within a saved diagram."""
 
     __tablename__ = "saved_diagram_elements"
+    __tenant_parent__ = (('diagram_id', 'saved_diagrams'),)
     __table_args__ = (
         db.UniqueConstraint("diagram_id", "element_id", name="uq_diagram_element"),
         {"extend_existing": True},
@@ -556,10 +559,11 @@ class SavedDiagramElement(db.Model):
     canvas_box = db.Column(db.String(64), nullable=True)
 
 
-class SavedDiagramRelationship(db.Model):
+class SavedDiagramRelationship(TenantMixin, db.Model):
     """Relationship routing within a saved diagram."""
 
     __tablename__ = "saved_diagram_relationships"
+    __tenant_parent__ = (('diagram_id', 'saved_diagrams'),)
     __table_args__ = (
         db.UniqueConstraint("diagram_id", "relationship_id", name="uq_diagram_rel"),
         {"extend_existing": True},

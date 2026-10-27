@@ -344,7 +344,7 @@ class BusinessFunction(TenantMixin, db.Model):
         }
 
 
-class FunctionalRequirement(db.Model):
+class FunctionalRequirement(TenantMixin, db.Model):
     """
     Functional Requirement GENERATED from business function.
 
@@ -353,6 +353,7 @@ class FunctionalRequirement(db.Model):
     """
 
     __tablename__ = "functional_requirement"
+    __tenant_parent__ = (('function_id', 'business_function'),)
 
     id = db.Column(db.Integer, primary_key=True)
     function_id = db.Column(
@@ -444,7 +445,7 @@ class FunctionalRequirement(db.Model):
         }
 
 
-class NonFunctionalRequirement(db.Model):
+class NonFunctionalRequirement(TenantMixin, db.Model):
     """
     Non-Functional Requirement GENERATED from capability maturity target.
 
@@ -453,6 +454,7 @@ class NonFunctionalRequirement(db.Model):
     """
 
     __tablename__ = "non_functional_requirement"
+    __tenant_parent__ = (('capability_id', 'business_capability'),)
 
     id = db.Column(db.Integer, primary_key=True)
     capability_id = db.Column(
@@ -544,7 +546,7 @@ class NonFunctionalRequirement(db.Model):
         }
 
 
-class ApplicationCapabilityCoverage(db.Model):
+class ApplicationCapabilityCoverage(TenantMixin, db.Model):
     """
     Tracks which applications support which business capabilities.
 
@@ -553,6 +555,7 @@ class ApplicationCapabilityCoverage(db.Model):
     """
 
     __tablename__ = "application_capability_coverage"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

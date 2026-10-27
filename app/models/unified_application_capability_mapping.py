@@ -21,9 +21,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class UnifiedApplicationCapabilityMapping(db.Model):
+class UnifiedApplicationCapabilityMapping(TenantMixin, db.Model):
     """
     Unified Application-Capability Mapping
 
@@ -32,6 +33,7 @@ class UnifiedApplicationCapabilityMapping(db.Model):
     """
 
     __tablename__ = "unified_application_capability_mapping"
+    __tenant_parent__ = (('unified_capability_id', 'unified_capabilities'),)
 
     id = Column(db.Integer, primary_key=True)
 

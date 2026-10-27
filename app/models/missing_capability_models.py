@@ -7,12 +7,13 @@ import json
 from datetime import datetime
 
 from .. import db
+from app.models.mixins import TenantMixin
 
 
 # ============================================================================
 # APPLICATION CAPABILITY MODEL (Copied from source)
 # ============================================================================
-class ApplicationCapability(db.Model):
+class ApplicationCapability(TenantMixin, db.Model):
     """
     Maps business capabilities to application/IT capabilities.
 
@@ -21,6 +22,7 @@ class ApplicationCapability(db.Model):
     """
 
     __tablename__ = "application_capability"
+    __tenant_parent__ = (('business_capability_id', 'business_capability'),)
 
     id = db.Column(db.Integer, primary_key=True)
     business_capability_id = db.Column(

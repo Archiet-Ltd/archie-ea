@@ -17,9 +17,10 @@ from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integ
 from sqlalchemy.orm import relationship
 
 from .. import db
+from app.models.mixins import TenantMixin
 
 
-class SoftwareModule(db.Model):
+class SoftwareModule(TenantMixin, db.Model):
     """
     ArchiMate-inspired Software Module model.
 
@@ -33,6 +34,7 @@ class SoftwareModule(db.Model):
     """
 
     __tablename__ = "software_modules"
+    __tenant_parent__ = (('archimate_element_id', 'archimate_elements'),)
 
     id = Column(db.Integer, primary_key=True)
     name = Column(db.String(255), nullable=False, index=True)
@@ -100,7 +102,7 @@ class SoftwareModule(db.Model):
         return f"<SoftwareModule {self.name} ({self.module_type})>"
 
 
-class DesignPattern(db.Model):
+class DesignPattern(TenantMixin, db.Model):
     """
     Software Design Pattern model.
 
@@ -115,6 +117,7 @@ class DesignPattern(db.Model):
     """
 
     __tablename__ = "design_patterns"
+    __tenant_parent__ = (('archimate_element_id', 'archimate_elements'),)
 
     id = Column(db.Integer, primary_key=True)
     name = Column(db.String(255), nullable=False, index=True)
@@ -185,7 +188,7 @@ class DesignPattern(db.Model):
         return f"<DesignPattern {self.name} ({self.pattern_category})>"
 
 
-class SoftwareDependency(db.Model):
+class SoftwareDependency(TenantMixin, db.Model):
     """
     Software Dependency model.
 
@@ -199,6 +202,7 @@ class SoftwareDependency(db.Model):
     """
 
     __tablename__ = "software_dependencies"
+    __tenant_parent__ = (('archimate_element_id', 'archimate_elements'),)
 
     id = Column(db.Integer, primary_key=True)
     name = Column(db.String(255), nullable=False, index=True)

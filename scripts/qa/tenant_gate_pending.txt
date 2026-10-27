@@ -2,15 +2,3 @@
 # One file:table:batch line per read; the batch is the tenant-fence batch that will fence the table.
 # This list can only shrink: a grown list fails, and a line whose table is fenced or shared must be removed.
 # First populated by the solution-family batch (the one allowed growth); later batches remove their lines.
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:application_capability:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:architecture_vision_documents:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:compliance_scan_reports:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:copilot_insights:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:manufacturing_capabilities:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:migration_plan_documents:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:process_application_mapping:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:roadmap_work_packages:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:runtime_compliance_checks:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:solution_embeddings:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:solution_stakeholder_mappings:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:technology_roadmap_initiatives:b4

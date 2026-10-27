@@ -8,6 +8,7 @@ Provides process classification, benchmarking, and operational improvement capab
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
 class APQCProcess(db.Model):
@@ -287,7 +288,7 @@ class CapabilityProcessMapping(db.Model):
         }
 
 
-class ProcessApplicationMapping(db.Model):
+class ProcessApplicationMapping(TenantMixin, db.Model):
     """
     Junction table linking APQC processes to applications
 
@@ -295,6 +296,7 @@ class ProcessApplicationMapping(db.Model):
     """
 
     __tablename__ = "process_application_mapping"
+    __tenant_parent__ = (('application_id', 'application_components'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

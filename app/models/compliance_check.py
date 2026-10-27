@@ -9,12 +9,14 @@ Table created via db.create_all() — no Alembic migration needed (migration fre
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class RuntimeComplianceCheck(db.Model):
+class RuntimeComplianceCheck(TenantMixin, db.Model):
     """Records a compliance check between published spec and runtime service."""
 
     __tablename__ = "runtime_compliance_checks"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

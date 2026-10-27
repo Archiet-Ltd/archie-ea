@@ -182,13 +182,14 @@ class ChatMessageEmbedding(db.Model):
         return f"<ChatMessageEmbedding session={self.chat_session_id} role={self.message_role}>"
 
 
-class SolutionEmbedding(db.Model):
+class SolutionEmbedding(TenantMixin, db.Model):
     """
     Vector embeddings for solutions.
     Used for solution discovery and recommendation.
     """
 
     __tablename__ = "solution_embeddings"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = (
         UniqueConstraint("solution_id", name="uq_solution_embedding"),
         Index("ix_solution_embedding_created", "created_at"),

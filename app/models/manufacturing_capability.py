@@ -31,6 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from .. import db
+from app.models.mixins import TenantMixin
 
 
 class ManufacturingDomainHierarchy(db.Model):
@@ -73,7 +74,7 @@ class ManufacturingDomainHierarchy(db.Model):
         return f"<ManufacturingDomainHierarchy {self.code} - {self.name}>"
 
 
-class ManufacturingCapability(db.Model):
+class ManufacturingCapability(TenantMixin, db.Model):
     """
     Manufacturing-Specific Capability Model
 
@@ -82,6 +83,7 @@ class ManufacturingCapability(db.Model):
     """
 
     __tablename__ = "manufacturing_capabilities"
+    __tenant_parent__ = (('unified_capability_id', 'unified_capabilities'),)
 
     id = Column(db.Integer, primary_key=True)
 
