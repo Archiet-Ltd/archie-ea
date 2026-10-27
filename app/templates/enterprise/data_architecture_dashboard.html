@@ -1,10 +1,12 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/explained_value.html' import explained_value %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% import 'components/card.html' as card %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/progress.html' import progress %}
 
 {% block title %}Data Architecture Dashboard{% endblock %}
 
@@ -31,18 +33,51 @@
         {'text': 'Data Models', 'icon': 'database', 'href': url_for('enterprise.data_models'), 'variant': 'default'}
     ]) }}
 
-    <!-- Metrics Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        <div data-testid="conceptual-models-card">
-            {{ metrics_card(title='Conceptual Models', value=conceptual_count|dash, icon='brain', href=url_for('enterprise.data_models', model_type='conceptual') if conceptual_count > 0 else None, description='No conceptual models yet. Add one to start.' if conceptual_count == 0 else None) }}
+    {# Stat card row — the dashboard-01 recipe from the pattern library's LAYOUT.md:
+       up to four KPI cards of one structure, one column on a phone, two on a wide
+       column, four when it is very wide. Each card is a container so its value grows
+       with the card. A model count that is real links to that kind's page; a count of
+       zero is replaced by a plain line saying what that kind of model is and the one
+       action that creates the first one, never a bare zero with no next step. #}
+    {% macro model_stat_card(testid, title, count, model_type, icon, what) %}
+    <div data-testid="{{ testid }}">
+    {% call card.card(class='@container/card') %}
+        {% call card.card_header() %}
+            {% call card.card_description() %}{{ title }}{% endcall %}
+            {% call card.card_title(class='tabular-nums @[250px]/card:text-3xl') %}{{ count|dash }}{% endcall %}
+            {% call card.card_action() %}<i data-lucide="{{ icon }}" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+        {% endcall %}
+        {% call card.card_content() %}
+            {% if count > 0 %}
+            <a href="{{ url_for('enterprise.data_models', model_type=model_type) }}" class="text-sm text-primary underline underline-offset-4 hover:no-underline">See {{ title|lower }}</a>
+            {% else %}
+            <p class="text-sm text-muted-foreground">{{ what }}</p>
+            <a href="{{ url_for('enterprise.data_models') }}" class="mt-3 inline-flex items-center gap-1 text-sm text-primary underline underline-offset-4 hover:no-underline">
+                <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add the first one
+            </a>
+            {% endif %}
+        {% endcall %}
+    {% endcall %}
+    </div>
+    {% endmacro %}
+
+    <!-- Stat card row -->
+    <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-6 mb-8">
+        {{ model_stat_card('conceptual-models-card', 'Conceptual Models', conceptual_count, 'conceptual', 'brain',
+            'A conceptual model names the main things your organisation cares about and how they relate, in plain business terms.') }}
+        {{ model_stat_card('logical-models-card', 'Logical Models', logical_count, 'logical', 'git-branch',
+            'A logical model works those things into entities, their attributes and keys, without tying them to any one database.') }}
+        {{ model_stat_card('physical-models-card', 'Physical Models', physical_count, 'physical', 'server',
+            'A physical model maps the logical design onto the tables, columns and indexes of a specific database.') }}
+        <div data-testid="data-lineage-flows-card">
+        {% call card.card(class='@container/card') %}
+            {% call card.card_header() %}
+                {% call card.card_description() %}Data Lineage Flows{% endcall %}
+                {% call card.card_title(class='tabular-nums @[250px]/card:text-3xl') %}{{ data_lineage_count|dash }}{% endcall %}
+                {% call card.card_action() %}<i data-lucide="git-merge" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+            {% endcall %}
+        {% endcall %}
         </div>
-        <div data-testid="logical-models-card">
-            {{ metrics_card(title='Logical Models', value=logical_count|dash, icon='git-branch', href=url_for('enterprise.data_models', model_type='logical') if logical_count > 0 else None, description='No logical models yet. Add one to start.' if logical_count == 0 else None) }}
-        </div>
-        <div data-testid="physical-models-card">
-            {{ metrics_card(title='Physical Models', value=physical_count|dash, icon='server', href=url_for('enterprise.data_models', model_type='physical') if physical_count > 0 else None, description='No physical models yet. Add one to start.' if physical_count == 0 else None) }}
-        </div>
-        {{ metrics_card(title='Data Lineage Flows', value=data_lineage_count|dash, icon='git-merge') }}
     </div>
 
     {% if overview %}
@@ -114,69 +149,51 @@
                 <p class="text-sm text-muted-foreground mt-1">Technical capabilities and products powering the data ecosystem</p>
             </div>
         </div>
-        <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Data architecture capabilities">
-            <table class="dense-table w-full text-sm text-left">
-                <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input">
-                    <tr>
-                        <th class="px-6 py-4">Capability Area</th>
-                        <th class="px-6 py-4">Domain</th>
-                        <th class="px-6 py-4">Technology Solutions</th>
-                        <th class="px-6 py-4 text-center">Maturity Level</th>
-                        <th class="px-6 py-4 text-center">Solution Fit</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-input">
-                    {% for item in data_stack %}
-                    <tr class="hover:bg-muted/30 transition-colors">
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-foreground">{{ item.capability }}</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full border border-border font-bold uppercase tracking-wider">{{ item.domain }}</span>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex flex-col">
-                                <span class="font-medium text-foreground">{{ item.product }}</span>
-                                {% if item.vendor_id %}
-                                <span class="text-xs italic">{% set _h = row_href('unified_vendors.vendor_detail', vendor_id=item.vendor_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.vendor }}</a>{% else %}{{ item.vendor }}{% endif %}</span>
-                                {% else %}
-                                <span class="text-xs text-muted-foreground italic">{{ item.vendor }}</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center justify-center gap-1.5">
-                                {% for i in range(5) %}
-                                <div class="w-2 h-4 rounded-sm {% if i < item.maturity %}bg-primary {% else %}bg-muted{% endif %}"></div>
-                                {% endfor %}
-                                <span class="ml-2 text-xs font-black text-primary">L{{ item.maturity }}</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center justify-center gap-3">
-                                <div class="flex-1 max-w-[100px] h-2 bg-muted rounded-full overflow-hidden border border-border">
-                                    <div class="h-full bg-success rounded-full transition-all duration-700" style="width: {{ item.fit }}%"></div>
-                                </div>
-                                <span class="text-xs font-black text-success-emphasis tabular-nums">{{ item.fit }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-
-                    {% if not data_stack %}
-                    <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-muted-foreground">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="database" class="h-10 w-10 opacity-20 mb-2" aria-hidden="true"></i>
-                                <p class="text-sm font-medium">No platform capabilities are mapped to this stack yet.</p>
-                                <p class="text-xs opacity-70">Connect Technical Capabilities in DATA-STORAGE or AI-ANALYTICS to Vendor Products to populate this stack.</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+        {% macro stack_empty() %}
+        <div class="flex flex-col items-center gap-2">
+            <i data-lucide="database" class="h-10 w-10 opacity-20 mb-2" aria-hidden="true"></i>
+            <p class="text-sm font-medium text-foreground">No platform capabilities are mapped to this stack yet.</p>
+            <p class="text-xs text-muted-foreground">Connect Technical Capabilities in DATA-STORAGE or AI-ANALYTICS to Vendor Products to populate this stack.</p>
         </div>
+        {% endmacro %}
+        {% call dense_table(
+            columns=[('Capability Area', ''), ('Domain', ''), ('Technology Solutions', ''), ('Maturity Level', 'text-center'), ('Solution Fit', 'text-center')],
+            rows=data_stack|length, flush=true, caption='Data architecture capabilities', empty_caller=stack_empty) %}
+            {% for item in data_stack %}
+            <tr class="hover:bg-muted/30 transition-colors">
+                <td class="px-6 py-4">
+                    <div class="font-medium text-foreground">{{ item.capability }}</div>
+                </td>
+                <td class="px-6 py-4">
+                    {% call badge(variant='secondary') %}{{ item.domain }}{% endcall %}
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex flex-col">
+                        <span class="font-medium text-foreground">{{ item.product }}</span>
+                        {% if item.vendor_id %}
+                        <span class="text-xs italic">{% set _h = row_href('unified_vendors.vendor_detail', vendor_id=item.vendor_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.vendor }}</a>{% else %}{{ item.vendor }}{% endif %}</span>
+                        {% else %}
+                        <span class="text-xs text-muted-foreground italic">{{ item.vendor }}</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center justify-center gap-1.5">
+                        {% for i in range(5) %}
+                        <div class="w-2 h-4 rounded-sm {% if i < item.maturity %}bg-primary {% else %}bg-muted{% endif %}"></div>
+                        {% endfor %}
+                        <span class="ml-2 text-xs font-black text-primary">L{{ item.maturity }}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center justify-center gap-3">
+                        {{ progress(value=item.fit, max=100, class='flex-1 max-w-[100px] !h-2', label='Solution fit for ' ~ item.capability) }}
+                        <span class="text-xs font-black text-success-emphasis tabular-nums">{{ item.fit }}%</span>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        {% endcall %}
     </div>
 </div>
 
