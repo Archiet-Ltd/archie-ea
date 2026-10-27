@@ -270,16 +270,9 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ends: Dict[Tuple[str, int], set] = {}
     row_elements: set = set()
 
-    def cite(
-        kind_of: str,
-        ident: Any,
-        joins: Optional[List[Any]] = None,
-        connector_source: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    def cite(kind_of: str, ident: Any, joins: Optional[List[Any]] = None) -> None:
         if isinstance(ident, int):
             cited.setdefault((kind_of, ident), None)
-            if connector_source and not cited[(kind_of, ident)]:
-                cited[(kind_of, ident)] = connector_source
             if joins:
                 ends.setdefault((kind_of, ident), set()).update(j for j in joins if isinstance(j, int))
 
@@ -296,17 +289,10 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if isinstance(row.get("element_id"), int):
             row_elements.add(row["element_id"])
         for relation in _relations_of(kind, row):
-            connector_sources = relation.get("origins") or {}
             path = relation.get("chain_elements") or []
             chain = relation.get("chain") or []
             for position, relationship_id in enumerate(chain):
-                # A link a connector wrote cites the repository and commit it was read at.
-                cite(
-                    "relationship",
-                    relationship_id,
-                    path[position:position + 2],
-                    connector_sources.get(str(relationship_id)),
-                )
+                cite("relationship", relationship_id, path[position:position + 2])
             cite("derived_relationship", relation.get("derived_id"), [path[0], path[-1]] if path else None)
             # The relationship a recorded row rests on carries its origin and
             # date, so the citation says where the fact came from.
@@ -320,14 +306,21 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                         "confidence": relation.get("confidence"),
                     }
 
-    # A fact that rests on a connector-derived element says which system,
-    # item and read it came from. Elements nobody derived from a connector add
-    # nothing, so a citation without a connector origin is unchanged.
-    from app.integrations.fact_store import sources_for_elements
+    # Where each fact came from, from the fact store's one citation builder: a
+    # link a connector wrote cites its own read (for GitHub, the repository,
+    # commit and file); anything else that rests on a connector-derived element
+    # cites that element's. Facts no connector touched add nothing, so their
+    # citations are unchanged.
+    from app.integrations.fact_store import citation_sources
 
     org_id = current_org_id()
     all_elements = set(row_elements).union(*ends.values()) if (row_elements or ends) else set()
-    sources = sources_for_elements(all_elements, org_id)
+    found = citation_sources(
+        relationship_ids={i for t, i in cited if t == "relationship"},
+        element_ids=all_elements,
+        organization_id=org_id,
+    )
+    links, sources = found["relationships"], found["elements"]
     for element_id in sorted(row_elements & sources.keys()):
         cited.setdefault(("element", element_id), None)
         ends.setdefault(("element", element_id), set()).add(element_id)
@@ -336,13 +329,11 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for t, i in sorted(cited):
         citation: Dict[str, Any] = {"type": t, "id": i}
         citation.update(origins.get((t, i), {}))
-        if cited[(t, i)]:
-            # Where a connector read the link (repository, file, commit, read time).
-            citation["source"] = cited[(t, i)]
-        else:
+        source = links.get(i) if t == "relationship" else None
+        if source is None:
             source = next((sources[e] for e in sorted(ends.get((t, i), ())) if e in sources), None)
-            if source is not None:
-                citation["source"] = dict(source)
+        if source is not None:
+            citation["source"] = dict(source)
         out.append(citation)
     return out[:MAX_CITATIONS]
 

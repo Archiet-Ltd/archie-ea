@@ -737,57 +737,23 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
 def _attach_connector_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
     """Say where each connector-written link of an explicit chain came from.
 
-    A link a connector wrote carries its origin (``source_kind`` ``connector``):
-    the repository, the commit it was read at and the file that shows it. Rows
-    whose chain holds such a link gain ``relation["origins"]``, keyed by the
-    relationship id as text; a chain of drawn or imported links gains nothing,
-    so those rows keep exactly the shape they had. One batched select, fenced
-    to the organisation; nothing but the origin's own fields is read.
+    Rows whose chain holds a link a connector wrote gain ``relation["origins"]``,
+    keyed by the relationship id as text: the system and item it was read from,
+    and for a GitHub link the repository, the commit it was read at and the file
+    that shows it. The sources come from the fact store's one citation builder,
+    the same one the answer's citations use; a chain of drawn or imported links
+    gains nothing, so those rows keep exactly the shape they had.
     """
-    import json
+    from app.integrations.fact_store import sources_for_relationships
 
-    from app.connectors.github import file_url as github_file_url
-    from app.models import ArchiMateRelationship
-
-    ids = sorted({rid for row in rows for rid in row["relation"]["chain"]})
+    ids = {rid for row in rows for rid in row["relation"]["chain"]}
     if not ids or org_id is None:
         return
-    found = db.session.execute(
-        db.select(
-            ArchiMateRelationship.id,
-            ArchiMateRelationship.source_ref,
-            ArchiMateRelationship.source_label,
-            ArchiMateRelationship.source_recorded_at,
-        ).where(
-            ArchiMateRelationship.id.in_(ids),
-            ArchiMateRelationship.organization_id == org_id,
-            ArchiMateRelationship.source_kind == "connector",
-        )
-    ).all()
-    origins: Dict[str, Dict[str, Any]] = {}
-    for rel_id, ref, label, recorded_at in found:
-        try:
-            body = json.loads(ref or "{}")
-        except ValueError:
-            body = {}
-        if not isinstance(body, dict):
-            body = {}
-        origins[str(rel_id)] = {
-            "system": body.get("system"),
-            "repository": body.get("repository"),
-            "commit": body.get("commit"),
-            "file": body.get("file"),
-            "detail": body.get("detail"),
-            "label": label,
-            "recorded_at": recorded_at.isoformat() if recorded_at else None,
-            "url": github_file_url(body.get("repository"), body.get("commit"), body.get("file"))
-            if body.get("system") == "github"
-            else None,
-        }
-    if not origins:
+    found = sources_for_relationships(ids, org_id)
+    if not found:
         return
     for row in rows:
-        mine = {str(r): origins[str(r)] for r in row["relation"]["chain"] if str(r) in origins}
+        mine = {str(r): found[r] for r in row["relation"]["chain"] if r in found}
         if mine:
             row["relation"]["origins"] = mine
 
