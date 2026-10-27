@@ -91,6 +91,19 @@ def _fact_ids(org_id):
     return ids
 
 
+def _applied_links(org_id):
+    """The links approved facts wrote, as each fact recorded them."""
+    from app import create_app, db
+    from app.models.integration_fact import IntegrationFact
+
+    app = create_app("testing")
+    with app.app_context():
+        ids = {f.applied_relationship_id for f in IntegrationFact.query.filter_by(organization_id=org_id)
+               if f.applied_relationship_id is not None}
+        db.session.remove()
+    return ids
+
+
 def _forget_answers(org_id):
     """Remove the answers the journey stored; the shared test database outlives the run."""
     from app import create_app, db
@@ -163,6 +176,8 @@ def test_a_github_read_joins_the_model_only_when_approved_and_cites_its_source(b
     assert answer["rows"], "the owning team is affected by the application"
     sourced = [c for c in answer["citations"] if c.get("source")]
     assert {c["type"] for c in sourced} == {"relationship", "element"}
+    # The link is cited by the fact that wrote it: the team's assignment the approval made.
+    assert {c["id"] for c in sourced if c["type"] == "relationship"} == _applied_links(org_a["org_id"])
     for citation in sourced:
         assert citation["source"]["system"] == "github"
         assert citation["source"]["item"] == app_name
