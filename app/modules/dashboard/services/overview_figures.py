@@ -18,7 +18,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 from app import db
 
@@ -96,12 +96,9 @@ def _first_name(user):
 
 def _active_applications():
     """The applications the Systems list shows by default."""
-    from app.models.application_portfolio import ApplicationComponent as A
+    from app.models.application_portfolio import ApplicationComponent as A, current_application_criteria
 
-    return db.select(A).where(
-        ~A.name.ilike("(Duplicate)%", escape="\\"),
-        or_(A.lifecycle_status.is_(None), func.lower(A.lifecycle_status) != "5. decommissioned"),
-    )
+    return db.select(A).where(*current_application_criteria(A))
 
 
 def _applications(org_id, now):

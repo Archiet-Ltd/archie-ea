@@ -757,16 +757,19 @@ def get_tco_cost_tiers():
             },
         ]
 
-        # Each in-scope application's annual cost, as its Cost tab shows it (the query is the organisation's own)
+        # Each current application's annual cost, as its Cost tab shows it: the applications the Systems list
+        # and the dashboard count, whatever lifecycle vocabulary the organisation uses.
+        from app.middleware.tenant_context import current_org_id
+        from app.models.application_portfolio import current_application_criteria
         from app.services.application_cost_accessor import get_annual_costs
 
-        scope_filter = ApplicationComponent.lifecycle_status.in_(
-            ["operational", "testing", "development", "deprecated"]
-        )
-        in_scope = ApplicationComponent.query.filter(scope_filter).all()
-        costs = {}
-        for org_id in {a.organization_id for a in in_scope}:
-            costs.update(get_annual_costs(org_id, [a for a in in_scope if a.organization_id == org_id]))
+        org_id = current_org_id()
+        in_scope = ApplicationComponent.query.filter(
+            ApplicationComponent.organization_id == org_id,
+            ApplicationComponent.deleted_at.is_(None),
+            *current_application_criteria(ApplicationComponent),
+        ).all() if org_id else []
+        costs = get_annual_costs(org_id, in_scope) if in_scope else {}
         values = [float(v) for v in costs.values() if v is not None]
         total_portfolio = len(in_scope)
         apps_with_tco = len(values)

@@ -550,13 +550,17 @@ def get_cost_summary_for_org(org_id: int) -> Dict[str, Any]:
     application_count, applications_with_cost.
     """
     from app import db
-    from sqlalchemy import text
+    from sqlalchemy import func
 
+    from app.models.application_portfolio import current_application_criteria
     from app.services.cost_view import organisation_cost
 
     count = db.session.execute(
-        text("SELECT COUNT(*) FROM application_components WHERE organization_id = :org_id"),
-        {"org_id": org_id}
+        db.select(func.count(ApplicationComponent.id)).where(
+            ApplicationComponent.organization_id == org_id,
+            ApplicationComponent.deleted_at.is_(None),
+            *current_application_criteria(ApplicationComponent),
+        )
     ).scalar()
     org = organisation_cost(org_id)
 

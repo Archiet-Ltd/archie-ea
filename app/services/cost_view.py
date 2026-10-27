@@ -439,17 +439,19 @@ def organisation_cost(organization_id: int) -> OrganisationCost:
     Technology lines a person recorded are counted too; a technology's share of an application is not, because it
     is already part of that application.
     """
-    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_portfolio import ApplicationComponent, current_application_criteria
 
     currency = reporting_currency(organization_id)
     facts = list_facts(organization_id, element_type=ELEMENT_APPLICATION)
     tech_facts = list_facts(organization_id, element_type=ELEMENT_TECHNOLOGY)
     people = _people(facts + tech_facts)
+    # Run cost is what the current applications cost: a decommissioned one is not counted, in the total or the count.
     rows = {
         a.id: a for a in db.session.execute(
             db.select(ApplicationComponent).where(
                 ApplicationComponent.organization_id == organization_id,
                 ApplicationComponent.deleted_at.is_(None),
+                *current_application_criteria(ApplicationComponent),
             )
         ).scalars()
     }

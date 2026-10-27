@@ -81,6 +81,29 @@ _LIFECYCLE_WORDS = {
 }
 
 
+DECOMMISSIONED_STAGE = "5. decommissioned"
+DUPLICATE_PREFIX = "(Duplicate)"
+
+
+def current_application_criteria(model=None):
+    """SQL criteria for a current application: the Systems list's default, the dashboard's count and every
+    run-cost total. An application marked as a duplicate, or decommissioned, is not current."""
+    from sqlalchemy import func, or_
+
+    a = model or ApplicationComponent
+    return (
+        ~a.name.ilike(DUPLICATE_PREFIX + "%", escape="\\"),
+        or_(a.lifecycle_status.is_(None), func.lower(a.lifecycle_status) != DECOMMISSIONED_STAGE),
+    )
+
+
+def is_current_application(app) -> bool:
+    """``current_application_criteria`` for a row already loaded."""
+    name = (getattr(app, "name", "") or "").lower()
+    stage = (getattr(app, "lifecycle_status", "") or "").strip().lower()
+    return not name.startswith(DUPLICATE_PREFIX.lower()) and stage != DECOMMISSIONED_STAGE
+
+
 def lifecycle_label(stage):
     """The stage in plain words, or None when none is recorded."""
     text = (stage or "").strip()

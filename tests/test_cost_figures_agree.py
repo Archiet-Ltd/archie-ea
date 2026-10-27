@@ -188,3 +188,66 @@ def test_a_cost_field_changed_anywhere_reaches_every_screen(portfolio, db_sessio
     ledger.total_cost_of_ownership = Decimal("78000")
     db_session.flush()
     assert get_annual_cost(ledger) == Decimal("78000.00")
+
+
+# An organisation on the lifecycle stages the portfolio import uses ("2.1 strategic", "5. decommissioned"), with
+# its costs on the application fields and in the store, as the demonstration organisation holds them.
+STAGED = {"Orders": ("2.1 strategic", Decimal("40000")), "Billing": ("2.2 tactical", Decimal("120000")),
+          "Fax Gateway": ("3. sunset", Decimal("8000")), "Alert Manager": ("5. decommissioned", Decimal("19200"))}
+CURRENT = {name: cost for name, (stage, cost) in STAGED.items() if stage != "5. decommissioned"}
+
+
+@pytest.fixture
+def staged(db_session, make_org):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.user import Permission, Role, User
+
+    org = make_org("staged")
+    org.reporting_currency = "GBP"
+    role = Role.query.filter_by(name="Administrator").first()
+    if role is None:
+        role = Role(name="Administrator", permissions=Permission.ADMINISTER)
+        db_session.add(role)
+        db_session.flush()
+    user = User(email=f"staged-{uuid.uuid4().hex[:8]}@example.com", first_name="Ada", last_name="Okafor",
+                organization_id=org.id, role=role, confirmed=True)
+    db_session.add(user)
+    apps = {name: ApplicationComponent(name=name, organization_id=org.id, lifecycle_status=stage,
+                                       total_cost_of_ownership=cost)
+            for name, (stage, cost) in STAGED.items()}
+    db_session.add_all(apps.values())
+    db_session.flush()
+    return org, user, apps
+
+
+def test_the_cost_tiers_count_every_current_application_whatever_its_stage(staged, client, login_as):
+    _, user, _ = staged
+    login_as(client, user)
+    body = client.get("/dashboard/api/tco/cost-tiers").get_json()
+    summary = body["summary"]
+    assert summary["total_portfolio"] == len(CURRENT)
+    assert summary["apps_with_tco"] == len(CURRENT)
+    assert Decimal(str(summary["total_tco"])) == sum(CURRENT.values())
+    tiers = {t["name"]: t["application_count"] for t in body["data"]}
+    assert tiers["Very Low"] == 2 and tiers["Low"] == 1, tiers
+
+
+def test_the_canvas_and_the_dashboard_count_the_same_applications(staged, tenant_ctx):
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.dashboard.services.overview_figures import _active_applications
+    from app.services.application_cost_accessor import get_cost_summary_for_org
+    from app.services.cost_view import organisation_cost
+
+    org, _, _ = staged
+    with tenant_ctx(org.id):
+        canvas = organisation_cost(org.id)
+        # The dashboard's Applications figure, read the way the overview reads it.
+        dashboard_count = len(db.session.execute(
+            _active_applications().where(ApplicationComponent.organization_id == org.id)).scalars().all())
+        summary = get_cost_summary_for_org(org.id)
+    assert "Alert Manager" not in {a["name"] for a in canvas.applications}, "a decommissioned application is not run cost"
+    assert len(canvas.applications) == dashboard_count == len(CURRENT)
+    assert canvas.total == sum(CURRENT.values())
+    assert summary["application_count"] == summary["applications_with_cost"] == len(CURRENT)
+    assert summary["total_annual_cost"] == sum(CURRENT.values())
