@@ -510,6 +510,7 @@
               '</div>';
 
         div.innerHTML = avatar + bubble;
+        if (isAi && metadata.genomeHtml) applyGenomeAnswer(div, metadata.genomeHtml);
         if (container) container.appendChild(div);
 
         // ENT-122: inject "Open in Composer" button for ArchiMate responses
@@ -658,11 +659,24 @@
        whole element and re-appended a fresh one through appendMessage, so the
        transcript flashed and jumped on every completion — at the exact moment
        the reader had started reading. */
+    /* An answer that read the organisation's model is drawn on the server: its
+       links are built from the records the model was given, never from the model's
+       text, and it carries the AI notice and the time the facts were read. It is
+       sanitised again here because it is inserted as markup. */
+    function applyGenomeAnswer(el, html) {
+        var body = el.querySelector('.message-content');
+        if (!body || !window.DOMPurify) return false;
+        body.innerHTML = DOMPurify.sanitize(html);
+        el.setAttribute('data-testid', 'genome-answer');
+        return true;
+    }
+
     function finaliseStreamedMessage(el, text, meta) {
         if (!el) return null;
         meta = meta || {};
         var body = el.querySelector('.message-content');
         if (body) body.innerHTML = renderMarkdown(text);
+        if (meta.genomeHtml) applyGenomeAnswer(el, meta.genomeHtml);
         var caret = el.querySelector('.stream-caret');
         if (caret) caret.remove();
         el.removeAttribute('aria-busy');

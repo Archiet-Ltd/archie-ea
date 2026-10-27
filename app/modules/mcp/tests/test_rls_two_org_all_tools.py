@@ -46,7 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 ALL_TOOLS = [
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "get_element", "search_elements",
-    "list_canvases", "get_canvas", "answer",
+    "list_canvases", "get_canvas", "answer", "get_genome_slice",
 ]
 
 ROLE = "pr455_rls_probe_runtime"
@@ -134,7 +134,9 @@ for eid_tag, eid in (("A", A["element"]), ("B", B["element"])):
         calls.append((f"ask_{lens}", {"element_id": eid}, eid_tag))
     calls.append(("get_element", {"element_id": eid}, eid_tag))
     calls.append(("answer", {"question": "impact", "element_id": eid}, eid_tag))
-calls += [("search_elements", {"query": "SECRET", "limit": 200}, "*"),
+calls += [("get_genome_slice", {"domain": "business"}, "A"),
+          ("get_genome_slice", {"domain": "business", "focus_ids": [B["element"]]}, "B"),
+          ("search_elements", {"query": "SECRET", "limit": 200}, "*"),
           ("list_canvases", {}, "*"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": A["bmc"]}, "A"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": B["bmc"]}, "B"),

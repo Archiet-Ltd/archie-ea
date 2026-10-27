@@ -43,6 +43,26 @@ def test_demo_coverage_is_in_the_unified_store_with_elements_on_both_ends(app, d
     assert len(slice_["capabilities"]) == 24
 
 
+def test_demo_unsupported_set_in_chat_equals_the_coverage_slice(app, db_session, make_org, tenant_ctx):
+    from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
+    from app.modules.genome.services.coverage_slice import build_coverage_slice
+
+    _seed()
+    org_id, user = _demo_org_and_user()
+    slice_ = build_coverage_slice(org_id)
+    supported_ids = {c["capability_id"] for c in slice_["cells"]}
+    expected = sorted(c["name"] for c in slice_["capabilities"] if c["id"] not in supported_ids)
+
+    with tenant_ctx(org_id):
+        result = ToolExecutor(user.id, persona="cto_founder").execute(
+            ToolCall(id="t", name="get_genome_slice", arguments={"domain": "business", "budget_tokens": 20000}))
+    assert result["success"] is True
+    caps = [n for n in result["result"]["nodes"] if n["kind"] == "cap"]
+    assert len(caps) == 24 and any(n["supported"] for n in caps)
+    assert sorted(n["name"] for n in caps if not n["supported"]) == expected
+    assert all(n["provenance"]["origin"] == "structural" for n in caps)
+
+
 def test_a_second_seed_adds_no_second_mapping(app, db_session, make_org):
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 

@@ -1,0 +1,10 @@
+A new account has not reached a first answer {{ minutes }} minutes after signing up.
+
+Account: {{ user.email }}
+Ref: {{ user.signup_ref or 'none' }}
+Source: {{ user.signup_source or 'none' }}
+Campaign: {{ user.signup_campaign or 'none' }}
+Stopped after: {{ step_label }}
+{% if next_step %}Next step they have not taken: {{ next_step }}.{% endif %}
+
+This message is sent once for this account.
