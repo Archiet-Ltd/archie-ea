@@ -58,6 +58,7 @@ if _FAST_INIT:
     from .miscellaneous import *  # noqa
     from .technology_stack import *  # noqa - TechnologyStack for fast init
     from .user import *  # noqa
+    from .models import LLMInteraction  # noqa - LLMInteraction for AI chat
     # Session registry is read on every authenticated request via
     # app/_bootstrap/session_policy.py -- must exist even under fast init.
     from .user_session import UserSession  # noqa: F401
