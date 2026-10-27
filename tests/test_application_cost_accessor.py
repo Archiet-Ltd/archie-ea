@@ -356,8 +356,10 @@ class TestTenantIsolation:
             assert summary2["applications_with_cost"] == 1
 
         # Cross-org query should not leak (tenant middleware should filter)
-        # But get_cost_summary_for_org explicitly filters by org_id
-        summary1_again = get_cost_summary_for_org(org1.id)
+        # But get_cost_summary_for_org explicitly filters by org_id. The summary reads the tenant-scoped store,
+        # so it is asked inside org1's own context (``g`` outlives the block above and would still say org2).
+        with tenant_ctx(org1.id):
+            summary1_again = get_cost_summary_for_org(org1.id)
         assert summary1_again["total_annual_cost"] == Decimal("100000")
         assert summary1_again["applications_with_cost"] == 1
 

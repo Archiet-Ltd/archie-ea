@@ -20,10 +20,19 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _app_component(db_session, org, name="Ledger", **cost_columns):
+    """An application as recorded before its cost columns reached the store: the backfill's input.
+
+    A cost column written now reaches the store in the same flush, so the facts that flush made are removed to
+    stand for a row the backfill has not yet copied.
+    """
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.cost_fact import CostFact
 
     row = ApplicationComponent(name=name, organization_id=org.id, **cost_columns)
     db_session.add(row)
+    db_session.flush()
+    CostFact.query.filter_by(organization_id=org.id, element_type="application", element_id=row.id,
+                             source="application_cost_accessor").delete()
     db_session.flush()
     return row
 
