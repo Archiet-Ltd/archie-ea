@@ -355,8 +355,13 @@ def create_vendor_product(vendor_id):
         status=data.get("status") or "active",
     )
     try:
-        db.session.add(product)
-        db.session.commit()
+        # A platform administrator adds a catalogue product: organization_id stays NULL, which is how
+        # a shared row is written, and row-level security allows that only inside the platform scope.
+        from app.jobs.tenant_safe_job import platform_scope
+
+        with platform_scope("platform administrator adds a shared vendor catalogue product"):
+            db.session.add(product)
+            db.session.commit()
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating vendor product for vendor {vendor_id}: {e}")

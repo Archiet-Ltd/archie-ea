@@ -11,7 +11,7 @@ import logging
 import os
 from datetime import datetime
 
-from flask import current_app, jsonify, request
+from flask import current_app, g, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
@@ -1432,6 +1432,8 @@ def create_elements():
                                 description=description,
                                 vendor_organization_id=target_vendor_id,
                                 product_type=element_type,
+                                # A company's own record, never a shared catalogue row.
+                                organization_id=getattr(g, "current_org_id", None),
                             )
                             db.session.add(vendor_product)
                             linked_to = {

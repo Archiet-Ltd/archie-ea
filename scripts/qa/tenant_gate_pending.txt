@@ -14,4 +14,3 @@ app/modules/solutions_strategic/v2/routes/solution_design_routes.py:runtime_comp
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:solution_embeddings:b4
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:solution_stakeholder_mappings:b4
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:technology_roadmap_initiatives:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:vendor_products:b3

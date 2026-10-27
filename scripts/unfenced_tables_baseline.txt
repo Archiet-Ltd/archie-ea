@@ -49,7 +49,6 @@ application_similarity_analysis
 application_technology_instances
 application_technology_mapping
 application_usage
-application_vendor_product_mappings
 application_versioning
 approval_workflow
 apqc_process_hierarchy
@@ -277,7 +276,6 @@ requirements_traceability_matrices
 resources
 review_decisions
 review_queue_statistics
-rfp_templates
 roadmap_audit
 roadmap_gaps
 roadmap_scenarios
@@ -332,7 +330,6 @@ system_settings
 systems
 taxonomy_mappings
 tco_benchmarks
-tco_calculations
 technical_capability_vendor_mappings
 technology_capabilities
 technology_capability
@@ -349,7 +346,6 @@ unified_application_capability_mapping
 unified_capability_application_mappings
 unified_capability_process_mapping
 unified_capability_technology_mapping
-unified_capability_vendor_organization_mappings
 unified_detection_runs
 unified_duplicate_groups
 usage_analytics
@@ -359,23 +355,13 @@ user_roles
 user_sessions
 validation_gates
 validation_violations
-vendor_archimate_templates
-vendor_comparison_criteria
 vendor_concentration_analysis
 vendor_data_sources
 vendor_integration_catalog
 vendor_organization_embeddings
 vendor_product_aliases
-vendor_product_apqc_mapping
 vendor_product_details
-vendor_product_embeddings
 vendor_product_families
-vendor_product_pricing
-vendor_products
-vendor_proof_points
-vendor_responses
-vendor_risk_assessments
-vendor_selection_reports
 viewpoint_stakeholder_mappings
 viewpoint_views
 waitlist_signups

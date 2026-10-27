@@ -21,7 +21,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import with_loader_criteria
 
 from app.extensions import db
-from app.models.mixins.core import TenantMixin
+from app.models.mixins.core import HybridTenantMixin, TenantMixin
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +230,13 @@ def install_tenant_filter(app):
         if org_id is not None:
             set_database_tenant_context(session.connection(), org_id)
         for obj in session.new:
+            if isinstance(obj, HybridTenantMixin) and getattr(obj, "organization_id", None) is None:
+                # A shared-plus-override row never takes the signed-in organisation by default (NULL
+                # means shared), but a child of a company's row belongs to that company.
+                derived = organization_from_parent(session, obj)
+                if derived is not None:
+                    obj.organization_id = derived
+                continue
             if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
                 # The row belongs to the organisation that owns the parent record it hangs from.
                 derived = organization_from_parent(session, obj, include_actors=org_id is None)

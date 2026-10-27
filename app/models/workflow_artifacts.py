@@ -206,7 +206,7 @@ class ArchitectureReviewFinding(WorkflowArtifactMixin, db.Model):
         return f"<ArchitectureReviewFinding {self.id}: {self.finding_type}/{self.severity}>"
 
 
-class VendorSelectionReport(WorkflowArtifactMixin, db.Model):
+class VendorSelectionReport(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Formal output of the Vendor Selection workflow.
 
     Produced by the VENDOR_SELECTION workflow upon board approval.
@@ -214,6 +214,7 @@ class VendorSelectionReport(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "vendor_selection_reports"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

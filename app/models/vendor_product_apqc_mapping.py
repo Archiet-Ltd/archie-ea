@@ -15,9 +15,10 @@ Enhanced for strategic portfolio-level analysis including:
 from datetime import datetime
 
 from app import db
+from app.models.mixins import HybridTenantMixin
 
 
-class VendorProductAPQCMapping(db.Model):
+class VendorProductAPQCMapping(HybridTenantMixin, db.Model):
     """
     Junction table linking vendor products to APQC processes with comprehensive
     strategic analysis capabilities.
@@ -32,6 +33,7 @@ class VendorProductAPQCMapping(db.Model):
     """
 
     __tablename__ = "vendor_product_apqc_mapping"
+    __tenant_parent__ = (("vendor_product_id", "vendor_products"),)
 
     id = db.Column(db.Integer, primary_key=True)
 

@@ -204,5 +204,11 @@ def test_every_model_in_a_batch_inherits_the_tenant_mixin(app, _schema):
             table = getattr(cls, "__tablename__", None)
             if isinstance(table, str):
                 by_table.setdefault(table, []).append(cls)
-    missing = sorted(t for t in tables if not any(issubclass(c, TenantMixin) for c in by_table.get(t, [])))
+        junctions = {t for t in tables if not by_table.get(t)}
+        bare = sorted(t for t in junctions
+                      if "organization_id" not in db.metadata.tables[t].c
+                      or db.metadata.tables[t].c.organization_id.default is None)
+    # A junction table (db.Table, no class) carries organization_id with a default taken from its parent.
+    assert not bare, f"junction table without an organization_id default: {bare}"
+    missing = sorted(t for t in tables - junctions if not any(issubclass(c, TenantMixin) for c in by_table.get(t, [])))
     assert not missing, f"model has no TenantMixin: {missing}"

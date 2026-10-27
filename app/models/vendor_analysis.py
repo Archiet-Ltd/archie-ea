@@ -422,7 +422,7 @@ class VendorOption(TenantMixin, db.Model):
         return f"<VendorOption {self.id}: {self.vendor_name} - Score: {self.total_score}>"
 
 
-class VendorComparisonCriteria(db.Model):
+class VendorComparisonCriteria(TenantMixin, db.Model):
     """
     Configurable decision criteria for vendor comparisons.
 
@@ -431,6 +431,7 @@ class VendorComparisonCriteria(db.Model):
     """
 
     __tablename__ = "vendor_comparison_criteria"
+    __tenant_parent__ = (('created_by_id', 'users'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -572,7 +573,7 @@ class AnalysisRecommendation(TenantMixin, db.Model):
 # === ENHANCED MODELS FOR IMPROVED VENDOR ANALYSIS ===
 
 
-class VendorProofPoint(db.Model):
+class VendorProofPoint(TenantMixin, db.Model):
     """
     Evidence-based validation of vendor capability claims.
 
@@ -581,6 +582,7 @@ class VendorProofPoint(db.Model):
     """
 
     __tablename__ = "vendor_proof_points"
+    __tenant_parent__ = (('vendor_option_id', 'vendor_options'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -878,7 +880,7 @@ class AnalysisAuditLog(TenantMixin, db.Model):
         return f"<AnalysisAuditLog {self.id}: {self.event_type} at {self.performed_at}>"
 
 
-class RFPTemplate(db.Model):
+class RFPTemplate(TenantMixin, db.Model):
     """
     Reusable RFP (Request for Proposal) templates for vendor questionnaires.
 
@@ -886,6 +888,7 @@ class RFPTemplate(db.Model):
     """
 
     __tablename__ = "rfp_templates"
+    __tenant_parent__ = (('capability_id', 'business_capability'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -920,7 +923,7 @@ class RFPTemplate(db.Model):
         return f"<RFPTemplate {self.id}: {self.name} v{self.version}>"
 
 
-class VendorResponse(db.Model):
+class VendorResponse(TenantMixin, db.Model):
     """
     Vendor responses to RFP questions.
 
@@ -928,6 +931,7 @@ class VendorResponse(db.Model):
     """
 
     __tablename__ = "vendor_responses"
+    __tenant_parent__ = (('vendor_option_id', 'vendor_options'),)
 
     id = db.Column(db.Integer, primary_key=True)
 

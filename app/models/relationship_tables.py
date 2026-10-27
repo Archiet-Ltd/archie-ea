@@ -22,6 +22,7 @@ from datetime import datetime
 
 from .. import db
 from .mixins import TenantMixin
+from .mixins.core import parent_organization_default
 
 # ============================================================================
 # Vendor Product Association Tables (Option B+)
@@ -45,6 +46,15 @@ application_component_vendor_products = db.Table(
         db.ForeignKey("vendor_products.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    ),
+    # The application's organisation, filled at insert from the application component.
+    db.Column(
+        "organization_id",
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=parent_organization_default("application_components", "application_component_id"),
     ),
     # Relationship metadata
     db.Column(

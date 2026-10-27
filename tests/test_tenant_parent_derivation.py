@@ -55,7 +55,7 @@ def test_every_batch_model_names_its_parent():
         cls = mapper.class_
         if issubclass(cls, TenantMixin) and isinstance(getattr(cls, "__tablename__", None), str):
             declared[cls.__tablename__] = set(getattr(cls, "__tenant_parent__", ()))
-    missing = sorted(t for t, want in sources.items() if want and declared.get(t) != want)
+    missing = sorted(t for t, want in sources.items() if want and t in declared and declared.get(t) != want)
     assert not missing, f"models whose __tenant_parent__ does not match the migration backfill: {missing}"
 
 

@@ -38,6 +38,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app import db
+from app.models.mixins import TenantMixin
 
 # ============================================================================
 # MAPPING 1: TechnicalCapability ↔ VendorProduct
@@ -250,7 +251,7 @@ class UnifiedCapabilityApplicationMapping(db.Model):
 # ============================================================================
 
 
-class UnifiedCapabilityVendorOrganizationMapping(db.Model):
+class UnifiedCapabilityVendorOrganizationMapping(TenantMixin, db.Model):
     __mapper_args__ = {
         "polymorphic_identity": "app.models.capability_to_vendor_mapping.UnifiedCapabilityVendorOrganizationMapping"
     }
@@ -271,6 +272,7 @@ class UnifiedCapabilityVendorOrganizationMapping(db.Model):
     """
 
     __tablename__ = "unified_capability_vendor_organization_mappings"
+    __tenant_parent__ = (('unified_capability_id', 'unified_capabilities'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -370,7 +372,7 @@ class UnifiedCapabilityVendorOrganizationMapping(db.Model):
 # ============================================================================
 
 
-class ApplicationVendorProductMapping(db.Model):
+class ApplicationVendorProductMapping(TenantMixin, db.Model):
     __mapper_args__ = {
         "polymorphic_identity": "app.models.capability_to_vendor_mapping.ApplicationVendorProductMapping"
     }
@@ -390,6 +392,7 @@ class ApplicationVendorProductMapping(db.Model):
     """
 
     __tablename__ = "application_vendor_product_mappings"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 

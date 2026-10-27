@@ -30,6 +30,7 @@ from sqlalchemy.orm import backref
 
 from .. import db
 from .mixins import OptimisticLockMixin, TenantMixin
+from .mixins.core import parent_organization_default
 
 # Use db.relationship instead of importing relationship
 
@@ -931,6 +932,16 @@ solution_vendor_products = db.Table(
         db.Integer,
         db.ForeignKey("vendor_products.id", ondelete="CASCADE"),
         primary_key=True,
+    ),
+    # The solution's organisation, filled at insert from the solution (the relationship inserts only
+    # the two keys); the fence's migration backfills it and switches row-level security on.
+    db.Column(
+        "organization_id",
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=parent_organization_default("solutions", "solution_id"),
     ),
     db.Column("implementation_type", db.String(50)),  # 'licensed', 'customized', 'integrated'
     db.Column("license_count", db.Integer),
