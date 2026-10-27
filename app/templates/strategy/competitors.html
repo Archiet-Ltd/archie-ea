@@ -8,6 +8,9 @@
 {% from 'components/provenance.html' import provenance_badge %}
 {% from 'strategy/_sources.html' import marks, sources_list %}
 {% block title %}Competitors{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% block content %}
 {% macro _run_form(label, variant) %}
 <form method="post" action="{{ url_for('strategy_analysis.run') }}" class="contents">
@@ -54,8 +57,8 @@
     {% else %}
 
     {% if matrix.mode == 'draft' %}
-    <div class="flex flex-wrap items-center gap-3" data-testid="competitors-draft-note">
-      <div class="min-w-0 flex-1">{{ alert('info', title='Drafts to confirm', text='These statements are drafts. Accept them to record them in your model with their sources.') }}</div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center" data-testid="competitors-draft-note">
+      <div class="min-w-0 flex-1 [&>*]:h-auto [&_span]:whitespace-normal">{{ alert('info', title='Drafts to confirm', text='These statements are drafts. Accept them to record them in your model with their sources.') }}</div>
       {% if can_write %}
       <form method="post" action="{{ url_for('strategy_analysis.accept') }}" class="contents">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}

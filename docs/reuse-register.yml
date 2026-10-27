@@ -863,3 +863,23 @@ entries:
     known_exceptions:
       - path: app/templates/components/ui_sidebar.html
         reason: the canonical parts
+
+  - id: generated-analysis
+    concept: A strategy analysis drafted from the company's profile and public sources (competitor analysis, SWOT, PESTLE, and later Porter, BCG, VRIO, Ansoff, Blue Ocean and 7S)
+    status: active
+    canonical:
+      path: app/services/strategy_draft_service.py
+      symbols: [draft_analysis, run_drafts, accept_drafts, grouped_drafts, accepted_statements]
+    reuse: >
+      One engine drafts every analysis: a numbered ledger of sources, one prompt file under app/prompts/strategy/,
+      the two-stage critique that only deletes, drafts as proposals in the approvals store, and acceptance that
+      writes cited elements through the backbone writer. A new analysis is a prompt file and an entry in ANALYSES.
+      The chat and the connector read the accepted result through the strategy slice of the genome registry; the
+      confirm step reads grouped_drafts. Do not write a second drafting engine, a second prompt loader, a second
+      critique or an analysis table.
+    must_not_create:
+      - id: second-analysis-drafter
+        regex: 'def\s+draft_(swot|pestle|competitor|porter|bcg|vrio|ansoff|blue_ocean|7s)\w*\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions: []
