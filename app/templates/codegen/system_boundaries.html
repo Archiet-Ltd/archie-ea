@@ -152,119 +152,85 @@
                 <h2 class="text-base font-semibold text-foreground mb-4" x-text="artifactsBoundary.name + ' — Artifacts'"></h2>
             </template>
 
-            <!-- Tab bar -->
-            <div class="flex border-b border-border mb-4" role="tablist">
-                <button type="button" role="tab" @click="artifactsTab = 'compose'"
-                        :class="artifactsTab === 'compose' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
-                        aria-selected="artifactsTab === 'compose'"
-                        aria-controls="panel-compose">
-                    docker-compose.yml
-                </button>
-                <button type="button" role="tab" @click="artifactsTab = 'nginx'"
-                        :class="artifactsTab === 'nginx' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
-                        aria-selected="artifactsTab === 'nginx'"
-                        aria-controls="panel-nginx">
-                    nginx.conf
-                </button>
-                <button type="button" role="tab" @click="artifactsTab = 'contracts'"
-                        :class="artifactsTab === 'contracts' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
-                        aria-selected="artifactsTab === 'contracts'"
-                        aria-controls="panel-contracts">
-                    Contracts
-                    <template x-if="artifactsBoundary && artifactsBoundary.generated_artifacts && artifactsBoundary.generated_artifacts.contracts">
-                        <span class="ml-1 text-xs text-muted-foreground" x-text="'(' + artifactsBoundary.generated_artifacts.contracts.length + ')'"></span>
-                    </template>
-                </button>
-                <button type="button" role="tab" @click="artifactsTab = 'sdks'"
-                        :class="artifactsTab === 'sdks' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
-                        aria-selected="artifactsTab === 'sdks'"
-                        aria-controls="panel-sdks">
-                    Client SDKs
-                </button>
-            </div>
+            <!-- Tab bar using tabs macro -->
+            <div x-data="{ activeTab: artifactsTab }" @activeTab.changed="artifactsTab = $event.detail.value">
+                {{ tabs(id='artifacts-tabs', default_value=artifactsTab) }}
+                    {{ tabs_list() }}
+                        {{ tabs_trigger(value='compose', click="activeTab = 'compose'", selected="activeTab === 'compose'") }}docker-compose.yml{% endcall %}
+                        {{ tabs_trigger(value='nginx', click="activeTab = 'nginx'", selected="activeTab === 'nginx'") }}nginx.conf{% endcall %}
+                        {{ tabs_trigger(value='contracts', click="activeTab = 'contracts'", selected="activeTab === 'contracts'") }}
+                            Contracts
+                            <template x-if="artifactsBoundary && artifactsBoundary.generated_artifacts && artifactsBoundary.generated_artifacts.contracts">
+                                <span class="ml-1 text-xs text-muted-foreground" x-text="'(' + artifactsBoundary.generated_artifacts.contracts.length + ')'"></span>
+                            </template>
+                        {% endcall %}
+                        {{ tabs_trigger(value='sdks', click="activeTab = 'sdks'", selected="activeTab === 'sdks'") }}Client SDKs{% endcall %}
+                    {% endcall %}
 
-            <!-- Tab content -->
-            <div class="flex-1 overflow-auto">
-                <!-- docker-compose -->
-                <div x-show="artifactsTab === 'compose'" x-cloak role="tabpanel" id="panel-compose" aria-labelledby="tab-compose">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs text-muted-foreground font-mono">docker-compose.yml</span>
-                        <button type="button" @click="copyToClipboard(artifactsBoundary?.generated_artifacts?.docker_compose)"
-                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                aria-label="Copy docker-compose">
-                            <i data-lucide="copy" class="h-3.5 w-3.5" aria-hidden="true"></i> Copy
-                        </button>
-                    </div>
-                    <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-96 whitespace-pre"
-                         x-text="artifactsBoundary?.generated_artifacts?.docker_compose || ''"></pre>
-                </div>
-
-                <!-- nginx -->
-                <div x-show="artifactsTab === 'nginx'" x-cloak role="tabpanel" id="panel-nginx" aria-labelledby="tab-nginx">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs text-muted-foreground font-mono">nginx.conf</span>
-                        <button type="button" @click="copyToClipboard(artifactsBoundary?.generated_artifacts?.nginx_conf)"
-                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                aria-label="Copy nginx config">
-                            <i data-lucide="copy" class="h-3.5 w-3.5" aria-hidden="true"></i> Copy
-                        </button>
-                    </div>
-                    <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-96 whitespace-pre"
-                         x-text="artifactsBoundary?.generated_artifacts?.nginx_conf || ''"></pre>
-                </div>
-
-                <!-- contracts -->
-                <div x-show="artifactsTab === 'contracts'" x-cloak role="tabpanel" id="panel-contracts" aria-labelledby="tab-contracts">
-                    <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || (artifactsBoundary.generated_artifacts.contracts || []).length === 0"
-                         x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
-                        No cross-service contracts detected — add ArchiMate relationships between solution elements to generate contracts.
-                    </div>
-                    <div class="space-y-2">
-                        <template x-for="(c, i) in (artifactsBoundary?.generated_artifacts?.contracts || [])" :key="i">
-                            <div class="rounded-md border border-border bg-muted/10 px-4 py-2">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info/10 text-info border border-info/20"
-                                          x-text="c.method"></span>
-                                    <span class="text-xs font-mono text-foreground" x-text="c.endpoint"></span>
-                                </div>
-                                <div class="text-xs text-muted-foreground">
-                                    <span class="text-warning-emphasis font-medium" x-text="c.consumer_name"></span>
-                                    <span class="mx-1">→</span>
-                                    <span class="text-success-emphasis font-medium" x-text="c.producer_name"></span>
-                                    <span class="mx-1">·</span>
-                                    <span x-text="c.description"></span>
-                                </div>
+                    <!-- Tab content -->
+                    <div class="flex-1 overflow-auto">
+                        {{ tabs_content(value='compose') }}
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-muted-foreground font-mono">docker-compose.yml</span>
+                                {{ button(text='Copy', variant='ghost', size='sm', icon='copy', icon_position='left', on_click="copyToClipboard(artifactsBoundary?.generated_artifacts?.docker_compose)", aria_label='Copy docker-compose') }}
                             </div>
-                        </template>
-                    </div>
-                </div>
+                            <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-96 whitespace-pre"
+                                 x-text="artifactsBoundary?.generated_artifacts?.docker_compose || ''"></pre>
+                        {% endcall %}
 
-                <!-- SDKs -->
-                <div x-show="artifactsTab === 'sdks'" x-cloak role="tabpanel" id="panel-sdks" aria-labelledby="tab-sdks">
-                    <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || Object.keys(artifactsBoundary.generated_artifacts.client_sdks || {}).length === 0"
-                         x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
-                        No client SDKs generated — SDKs require at least one cross-service contract.
-                    </div>
-                    <div class="space-y-4">
-                        <template x-for="[filename, code] in Object.entries(artifactsBoundary?.generated_artifacts?.client_sdks || {})" :key="filename">
-                            <div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs text-muted-foreground font-mono" x-text="filename"></span>
-                                    <button type="button" @click="copyToClipboard(code)"
-                                            class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                            aria-label="Copy SDK">
-                                        <i data-lucide="copy" class="h-3.5 w-3.5" aria-hidden="true"></i> Copy
-                                    </button>
-                                </div>
-                                <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-64 whitespace-pre" x-text="code"></pre>
+                        {{ tabs_content(value='nginx') }}
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-muted-foreground font-mono">nginx.conf</span>
+                                {{ button(text='Copy', variant='ghost', size='sm', icon='copy', icon_position='left', on_click="copyToClipboard(artifactsBoundary?.generated_artifacts?.nginx_conf)", aria_label='Copy nginx config') }}
                             </div>
-                        </template>
+                            <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-96 whitespace-pre"
+                                 x-text="artifactsBoundary?.generated_artifacts?.nginx_conf || ''"></pre>
+                        {% endcall %}
+
+                        {{ tabs_content(value='contracts') }}
+                            <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || (artifactsBoundary.generated_artifacts.contracts || []).length === 0"
+                                 x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
+                                No cross-service contracts detected — add ArchiMate relationships between solution elements to generate contracts.
+                            </div>
+                            <div class="space-y-2">
+                                <template x-for="(c, i) in (artifactsBoundary?.generated_artifacts?.contracts || [])" :key="i">
+                                    <div class="rounded-md border border-border bg-muted/10 px-4 py-2">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info/10 text-info border border-info/20"
+                                                  x-text="c.method"></span>
+                                            <span class="text-xs font-mono text-foreground" x-text="c.endpoint"></span>
+                                        </div>
+                                        <div class="text-xs text-muted-foreground">
+                                            <span class="text-warning-emphasis font-medium" x-text="c.consumer_name"></span>
+                                            <span class="mx-1">→</span>
+                                            <span class="text-success-emphasis font-medium" x-text="c.producer_name"></span>
+                                            <span class="mx-1">·</span>
+                                            <span x-text="c.description"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        {% endcall %}
+
+                        {{ tabs_content(value='sdks') }}
+                            <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || Object.keys(artifactsBoundary.generated_artifacts.client_sdks || {}).length === 0"
+                                 x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
+                                No client SDKs generated — SDKs require at least one cross-service contract.
+                            </div>
+                            <div class="space-y-4">
+                                <template x-for="[filename, code] in Object.entries(artifactsBoundary?.generated_artifacts?.client_sdks || {})" :key="filename">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-xs text-muted-foreground font-mono" x-text="filename"></span>
+                                            {{ button(text='Copy', variant='ghost', size='sm', icon='copy', icon_position='left', on_click="copyToClipboard(code)", aria_label='Copy SDK') }}
+                                        </div>
+                                        <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-64 whitespace-pre" x-text="code"></pre>
+                                    </div>
+                                </template>
+                            </div>
+                        {% endcall %}
                     </div>
-                </div>
+                {% endcall %}
             </div>
         </div>
     {% endcall %}
