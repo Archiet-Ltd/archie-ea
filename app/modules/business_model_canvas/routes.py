@@ -128,10 +128,8 @@ def _canvas_boxes(canvas):
                         else "not converted, an exchange rate is missing"),
                     "href": url_for("unified_applications.application_detail", id=line["id"], tab="cost"),
                 }
-                for line in lines[:8]
+                for line in lines
             ]
-            if len(lines) > 8:
-                boxes["cost-structure"].append({"text": f"and {len(lines) - 8} more applications with a recorded cost"})
     return boxes, cost_line_count, cost_total
 
 
