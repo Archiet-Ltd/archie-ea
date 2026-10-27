@@ -4,7 +4,6 @@
 # First populated by the solution-family batch (the one allowed growth); later batches remove their lines.
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:application_capability:b4
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:architecture_vision_documents:b4
-app/modules/solutions_strategic/v2/routes/solution_design_routes.py:codegen_generation_history:b2
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:compliance_scan_reports:b4
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:copilot_insights:b4
 app/modules/solutions_strategic/v2/routes/solution_design_routes.py:manufacturing_capabilities:b4
