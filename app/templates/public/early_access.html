@@ -6,7 +6,7 @@
    thanks and error. #}
 {% extends 'layouts/public_base.html' %}
 {% from 'components/button.html' import button %}
-{% from 'components/input.html' import input %}
+{% from 'components/input.html' import input, hidden_input %}
 {% from 'components/checkbox.html' import checkbox %}
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}{{ group.title }}: early access{% endblock %}
@@ -33,7 +33,7 @@
     <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
     {% endif %}
     <form method="POST" action="{{ form_action }}" class="space-y-4" data-testid="early-access-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ hidden_input('csrf_token', csrf_token()) }}
       <div>
         <label for="early-access-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
         {{ input(id='early-access-email', name='email', type='email', required=true) }}

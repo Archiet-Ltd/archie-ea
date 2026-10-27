@@ -20,7 +20,7 @@ def coming_groups() -> list[dict]:
     seen: dict[str, dict] = {}
     for entry in doc["rules"].values():
         wave, code = entry[0], entry[1]
-        if wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT"):
+        if wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
         if info and info["title"] not in seen:
