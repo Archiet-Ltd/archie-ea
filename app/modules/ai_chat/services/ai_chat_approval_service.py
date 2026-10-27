@@ -759,6 +759,14 @@ class AIChatApprovalService:
 
                 result = execute_github_proposal(approval, data_service)
 
+            elif approval.operation_type in ("vendor_detection", "vendor_architecture"):
+                # A vendor product found on the organisation's website, in its domain records or in what
+                # a person told the assistant, and the catalogue's architecture for it once it is
+                # recorded. Queued and executed by app/services/vendor_detection.py.
+                from app.services.vendor_detection import execute_vendor_proposal
+
+                result = execute_vendor_proposal(approval, data_service)
+
             elif approval.operation_type == "create":
                 if approval.entity_type == "capability":
                     result = data_service.create_capability(payload)

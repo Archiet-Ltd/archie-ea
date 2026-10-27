@@ -657,6 +657,8 @@ def crawl_organization_website(
                 stored = _store(org_id, facts.ordered(), crawl_id)
         held = {(row["field"], _row_key(row)) for row in facts.rows.values()}
         held_scalars = {row["field"] for row in facts.rows.values() if row["field"] not in _MANY}
+    if not more_only:
+        _detect_vendors(org_id, site, read["pages"])
     _tell(progress, stage="facts_ready" if stored else "working_out", pages_read=len(read["pages"]),
           limit=max_pages, current=None)
 
@@ -696,6 +698,23 @@ def crawl_organization_website(
         "rendered": read["rendered"], "skipped_by_robots": read["skipped_by_robots"], "failed": read["failed"],
         "stopped": read["stopped"], "model_errors": read["model_errors"], "proposals": stored,
     }
+
+
+def _detect_vendors(org_id: int, site: str, pages: List[Dict[str, Any]]) -> None:
+    """The vendors the pages load and the site's domain records name, proposed for a person to confirm.
+    A failure here never stops the reading of the website."""
+    from flask import current_app
+
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.services.vendor_detection import detect_for_site
+
+    resolver = None if current_app.config.get("VENDOR_DNS_LOOKUPS", True) else (lambda _name, _type: [])
+    try:
+        with tenant_scope(org_id):
+            detect_for_site(org_id, site, pages, resolver)
+    except Exception:
+        db.session.rollback()
+        logger.warning("vendor detection failed for organisation %s", org_id, exc_info=True)
 
 
 def _queue_retry(org_id: int, attempt: int) -> str:
