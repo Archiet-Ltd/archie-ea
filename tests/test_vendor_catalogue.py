@@ -283,14 +283,34 @@ def test_the_page_says_what_a_link_came_to_and_announces_it(db_session, make_org
     assert 'role="alert" data-testid="catalogue-link-message"' in body
     assert svc.NOT_YOURS in body
 
+    from app.models.capability_to_vendor_mapping import ApplicationVendorProductMapping
+    from app.models.application_portfolio import ApplicationComponent
+
+    used_by = ApplicationComponent.query.join(
+        ApplicationVendorProductMapping,
+        ApplicationVendorProductMapping.application_component_id == ApplicationComponent.id,
+    ).filter(ApplicationVendorProductMapping.vendor_product_id == vp.id).one().name
     login_as(client, editor)
     body = client.post(page + "/link", data={"vendor_product_id": vp.id}, follow_redirects=True).get_data(as_text=True)
     assert 'role="status" data-testid="catalogue-link-message"' in body
-    assert f"{vp.name} is now linked to {product.product_name}." in body
+    assert f"{product.product_name} is now linked to {used_by}." in body
 
     login_as(client, editor)
     body = client.get(page).get_data(as_text=True)
     assert 'data-testid="catalogue-link-message"' not in body, "a plain visit says nothing about a link"
+
+
+def test_an_address_alone_never_reports_a_link(db_session, make_org, client, login_as):
+    vendor, _, product = _catalogue_product(db_session)
+    _fact(db_session, product, "Certificate", publish=True)
+    org, editor = _org_user(db_session, make_org, "visitor")
+    _with_role(db_session, editor, "User")
+    vp = _uses(db_session, org, vendor)
+    page = f"/applications/vendors/catalogue/{product.catalogue_slug}"
+    for query in ("?link=refused", "?link=choose", f"?link=done&vp={vp.id}"):
+        login_as(client, editor)
+        body = client.get(page + query).get_data(as_text=True)
+        assert 'data-testid="catalogue-link-message"' not in body, query
 
 
 # ── The end-of-life sync still writes and never invents ────────────────────────

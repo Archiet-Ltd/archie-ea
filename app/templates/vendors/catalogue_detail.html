@@ -141,7 +141,7 @@
         {% endcall %}
         {% call card_content(class='space-y-4') %}
           {% if link_message %}
-            {% call alert(link_message.kind, testid='catalogue-link-message') %}{{ link_message.text }}{% endcall %}
+            {% call alert(link_message.kind, testid='catalogue-link-message') %}{{ link_message.text }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
           {% endif %}
           {% if links %}
           <ul class="space-y-1 text-sm" data-testid="catalogue-links">
