@@ -19,7 +19,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261023_integration_facts"
-down_revision = "20261022_erole_no_default"
+down_revision = "20261027_stakeholder_comm_org"
 branch_labels = None
 depends_on = None
 
