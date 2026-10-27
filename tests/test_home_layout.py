@@ -13,6 +13,7 @@ import pytest
 EXPECTED_H2 = [
     "From your website to one list of what you run.",
     "The jobs it does for you.",
+    "Coming next: an architecture team in your chat.",
     "Coming next. Join the waiting list.",
     "Priced per company, never per application.",
     "A startup is an enterprise too.",
