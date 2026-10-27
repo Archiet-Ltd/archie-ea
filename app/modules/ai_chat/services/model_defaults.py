@@ -85,7 +85,7 @@ FALLBACK_MODELS = {
 # Calls that carry only public text (a company's own website) may be answered by free providers.
 # This is the order they are tried in; a provider with no key is skipped silently. Calls that carry an
 # organisation's data never use the curated free backups below or the providers that only offer free models.
-PUBLIC_INPUT_CHAIN = ("nvidia", "openrouter", "mistral", "cerebras", "groq", "gemini")
+PUBLIC_INPUT_CHAIN = ("openrouter", "nvidia", "mistral", "cerebras", "groq", "gemini")
 PUBLIC_INPUT_MODELS = {
     "openrouter": DEFAULT_MODELS["openrouter"],
     "nvidia": DEFAULT_MODELS["nvidia"],
