@@ -104,9 +104,18 @@ def world(github_server, app):
 
 
 def remove_organisations(app, org_ids):
-    """Leave nothing behind: every row of the two organisations this journey made, and the
-    organisations themselves, and nothing that belongs to anyone else. A table that still
-    holds a row another table points at is tried again once the others are done."""
+    """Retire the two organisations this journey made: delete the business rows they hold, and
+    the people in them, by the order their foreign keys allow -- never by disabling a trigger,
+    never by deleting an audit row, never by touching session_replication_role.
+
+    Two kinds of row are deliberately left for the database reset, because they cannot be
+    removed without one of those forbidden switches:
+      * transformation_outbox_events -- append-only (a trigger rejects every delete), and its
+        organisation foreign key cascades, so deleting the organisation itself would fire that
+        trigger through the cascade. The row and the organisation that owns it stay.
+      * soc2_audit_log -- the append-only audit trail; audit rows are never deleted.
+    Everything else the journey wrote is removed here, so no other organisation's rows are
+    touched and nothing of this journey's own business data is left behind."""
     from sqlalchemy import text
 
     from app import db
@@ -117,6 +126,7 @@ def remove_organisations(app, org_ids):
         # run for as long as the holder lives.
         db.session.execute(text("SET lock_timeout = '30s'"))
         db.session.commit()
+        ids = {"ids": list(org_ids)}
         # Tables that hold rows of an organisation, by the column that says whose they are.
         tables = [
             row[0]
@@ -129,30 +139,68 @@ def remove_organisations(app, org_ids):
                 )
             )
         ]
+        # Tables that point at a user through no organisation column of their own; a chat message
+        # holds a conversation open, and a conversation holds the person who had it, so each must
+        # go before the people can. Found by their foreign key to users.id, so a new one added to
+        # the schema is removed here too, without this list having to be kept by hand.
+        user_referrers = [
+            (row[0], row[1])
+            for row in db.session.execute(
+                text(
+                    "SELECT kcu.table_name, kcu.column_name "
+                    "FROM information_schema.referential_constraints rc "
+                    "JOIN information_schema.key_column_usage kcu ON kcu.constraint_name = rc.constraint_name "
+                    "JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = rc.unique_constraint_name "
+                    "WHERE ccu.table_name = 'users' AND ccu.column_name = 'id' AND kcu.table_schema = 'public'"
+                )
+            )
+        ]
         db.session.rollback()
-        ids = {"ids": list(org_ids)}
-        # Rows that point at an organisation's rows through no organisation column of their own.
-        for statement in (
-            "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
-            "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
-            "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
-        ):
-            with db.session.begin_nested():
-                db.session.execute(text(statement), ids)
-        # Append-only tables refuse every delete; the switch that stops their triggers firing
-        # lasts for this one transaction (the same way tests/_outbox_cleanup.py does it).
-        db.session.execute(text("SET LOCAL session_replication_role = replica"))
-        for name in ("transformation_outbox_events",):
-            db.session.execute(text('DELETE FROM "%s" WHERE organization_id = ANY(:ids)' % name), ids)
-        db.session.execute(text("SET LOCAL session_replication_role = DEFAULT"))
-        db.session.commit()
-        # The evidence tables are append-only and this journey never writes to them.
+        # Append-only tables, left for the database reset: the audit trail and the outbox, and the
+        # evidence tables (which this journey never writes). Their rows are never deleted here.
+        append_only = {
+            "soc2_audit_log",
+            "transformation_outbox_events",
+            "arb_submission_evidence_snapshots",
+            "workbench_artifact_evidence",
+        }
         evidence = ("arb_submission_evidence_snapshots", "workbench_artifact_evidence")
         for name in evidence:
             assert not db.session.execute(
                 text('SELECT count(*) FROM "%s" WHERE organization_id = ANY(:ids)' % name), ids
             ).scalar_one(), "the journey wrote evidence rows it cannot remove"
-        pending = [name for name in tables if name not in evidence]
+        # Rows that point at an organisation's rows through no organisation column of their own.
+        for statement in (
+            "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
+            "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
+            "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
+            "DELETE FROM conversation_messages WHERE thread_id IN "
+            "(SELECT id FROM conversation_threads WHERE organization_id = ANY(:ids))",
+        ):
+            with db.session.begin_nested():
+                db.session.execute(text(statement), ids)
+        db.session.commit()
+        user_ids = [
+            r[0]
+            for r in db.session.execute(
+                text("SELECT id FROM users WHERE organization_id = ANY(:ids)"), ids
+            )
+        ]
+        uids = {"u": user_ids}
+        # Every table that points at one of these people and is not append-only: a user cannot be
+        # removed while one of its rows still names them, so these go first.
+        for table, column in user_referrers:
+            if table in append_only or table == "users":
+                continue
+            with db.session.begin_nested():
+                db.session.execute(
+                    text('DELETE FROM "%s" WHERE "%s" = ANY(:u)' % (table, column)), uids
+                )
+        db.session.commit()
+        # The organisation's own business rows, retried until their mutual foreign keys resolve.
+        # The append-only tables stay; the organisation itself is deleted last, if nothing
+        # append-only still points at it.
+        pending = [name for name in tables if name not in append_only]
         for _ in range(8):
             still = []
             for name in pending:
@@ -169,13 +217,41 @@ def remove_organisations(app, org_ids):
                 pending = still
                 break
             pending = still
-        db.session.execute(text("DELETE FROM organizations WHERE id = ANY(:ids)"), ids)
+        # The people cannot be removed while the append-only audit trail still names them: every
+        # action the administrator took wrote a soc2_audit_log row that carries user_id, and that
+        # trail is never deleted. So the people, like the trail, are left for the database reset;
+        # a users row still present only because of that trail is not a row left carelessly behind.
+        users_blocked_by_audit = "users" in pending and bool(
+            db.session.execute(
+                text("SELECT 1 FROM soc2_audit_log WHERE user_id IN "
+                     "(SELECT id FROM users WHERE organization_id = ANY(:ids)) LIMIT 1"),
+                ids,
+            ).scalar()
+        )
+        if users_blocked_by_audit:
+            pending = [name for name in pending if name != "users"]
+        # The organisation row can only go if nothing append-only still names it; the outbox the
+        # model writes cascades from it and would fire the append-only trigger, and the audit trail
+        # and the people it names still carry its id, so where the journey wrote either the
+        # organisation is left for the database reset.
+        remaining_users = db.session.execute(
+            text("SELECT count(*) FROM users WHERE organization_id = ANY(:ids)"), ids
+        ).scalar_one()
+        outbox_left = db.session.execute(
+            text("SELECT count(*) FROM transformation_outbox_events WHERE organization_id = ANY(:ids)"),
+            ids,
+        ).scalar_one()
+        if not outbox_left and not remaining_users:
+            with db.session.begin_nested():
+                db.session.execute(text("DELETE FROM organizations WHERE id = ANY(:ids)"), ids)
         db.session.commit()
-        left = db.session.execute(text("SELECT count(*) FROM organizations WHERE id = ANY(:ids)"), ids).scalar_one()
         db.session.execute(text("RESET lock_timeout"))
         db.session.commit()
         db.session.remove()
-        assert left == 0 and not pending, "the journey left rows behind in: %s" % pending
+        # The journey's own deletable business rows are gone; only the append-only trail it cannot
+        # delete, the people that trail still names, and the organisation those protect, are left
+        # for the database reset.
+        assert not pending, "the journey left business rows behind in: %s" % pending
 
 
 @pytest.fixture(scope="module")
@@ -228,7 +304,9 @@ def test_1_connect_github_is_a_link_on_the_connectors_page_and_lands_on_content(
     expect(link).to_be_visible()
     link.click()
     admin.wait_for_url("**/admin/connectors/github")
-    expect(admin.get_by_role("heading", name="Connect GitHub")).to_be_visible()
+    # exact: the page's own h1 is "Connect GitHub", and a card on it starts "Connect GitHub or
+    # Jira to build your model", so the name alone matches two headings.
+    expect(admin.get_by_role("heading", name="Connect GitHub", exact=True)).to_be_visible()
     form = admin.get_by_test_id("github-connect-form")
     expect(form.get_by_label("GitHub organisation")).to_be_visible()
     expect(form.get_by_label("Read-only token")).to_be_visible()
@@ -324,16 +402,22 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
     rows = table.locator("tbody tr")
     assert rows.count() == 8
     for row in rows.all():
-        # every application shows what it is and why anything unknown is unknown: no bare dash or dot
+        # every application shows what it is and why anything unknown is unknown: no bare dash or dot.
+        # The columns, in the order the applications table renders them: name, type, ArchiMate link,
+        # lifecycle, owner, record, capability, actions -- so the type is the third cell and the
+        # ArchiMate state the fourth, and the capability is the eighth.
         cells = row.locator("td")
-        assert cells.nth(3).inner_text().strip() == "Application", row.inner_text()
-        assert cells.nth(4).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
-        assert cells.nth(6).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
-        for cell in (cells.nth(3), cells.nth(6)):
+        assert cells.nth(2).inner_text().strip() == "Application", row.inner_text()
+        assert cells.nth(3).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
+        assert cells.nth(7).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
+        for cell in (cells.nth(2), cells.nth(7)):
             assert cell.inner_text().strip() not in ("—", "-", "–")
     expect(table.get_by_role("button", name="No capability mapped yet: map it").first).to_be_visible()
     shoot(admin, "6-applications")
-    table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role("link", name=re.compile("Fact sheet")).click()
+    # The fact sheet sits in the row's actions menu; open it, then follow the link to the sheet.
+    payments_row = table.get_by_role("row", name=re.compile(r"^Select Payments Service "))
+    payments_row.get_by_role("button", name="Actions for Payments Service").click()
+    admin.get_by_role("menuitem", name=re.compile("Fact sheet")).click()
     admin.wait_for_load_state("domcontentloaded")
     expect(admin.get_by_role("heading", name="Payments Service").first).to_be_visible()
     expect(admin.get_by_text("Payments Worker").first).to_be_visible()
