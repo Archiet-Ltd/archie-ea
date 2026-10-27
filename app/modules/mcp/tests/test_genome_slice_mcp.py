@@ -43,7 +43,13 @@ def test_the_connector_lists_the_genome_tool(client, db_session, login_as, app):
         headers={"Authorization": "Bearer %s" % token},
     ).get_json()
     tool = next(t for t in resp["result"]["tools"] if t["name"] == "get_genome_slice")
-    assert tool["annotations"] == {"readOnlyHint": True}
+    assert tool["annotations"] == {
+        "title": "Get genome slice",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    }
     assert "organization_id" not in json.dumps(tool["inputSchema"])
 
 

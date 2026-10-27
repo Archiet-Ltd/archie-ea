@@ -2658,6 +2658,9 @@ def api_elements_search():
 
 # ── Element Detail API (for composer detail panel) ───────────────────────────
 
+_OWNER_PROPERTY_KEYS = frozenset({"owner", "owners", "business_owner", "technical_owner", "owner_name", "element_owner"})
+
+
 @archimate_bp.route("/api/elements/<int:element_id>/detail", methods=["GET"])
 @login_required
 def api_element_detail(element_id):
@@ -2809,6 +2812,18 @@ def api_element_detail(element_id):
     except Exception:  # noqa: BLE001
         current_app.logger.debug("CMP-detail: custom_properties access failed for element %s", element_id)
 
+    # Owners come from the one owner store (the same reader the accountability and impact answers
+    # use). A property typed into custom_properties is not an owner record, so it is not shown as one.
+    cp = {k: v for k, v in dict(cp).items() if str(k).lower() not in _OWNER_PROPERTY_KEYS}
+    owners = []
+    try:
+        from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+        owners = IntelligenceQueryService.owners_for_element(element_id)
+    except Exception:  # noqa: BLE001
+        current_app.logger.debug("CMP-detail: owner lookup failed for element %s", element_id)
+        db.session.rollback()
+
     # GAP-INT-007: Interface metadata for ApplicationInterface elements
     interface_metadata = None
     if el.type == "ApplicationInterface":
@@ -2837,6 +2852,7 @@ def api_element_detail(element_id):
         "connected_elements": connected,
         "linked_requirements": linked_requirements,
         "custom_properties": cp,
+        "owners": owners,
         "interface_metadata": interface_metadata,
     })
 
