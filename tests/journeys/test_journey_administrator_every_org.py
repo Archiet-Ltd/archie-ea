@@ -58,7 +58,6 @@ def test_a_new_registrant_administers_their_company_and_sees_no_platform_label(a
     with app.app_context():
         user = User.query.filter_by(email=email).first()
         assert user is not None
-        org_id = user.organization_id
         assert user.is_admin(), "the person who registers a company is its Administrator"
         assert user.is_org_admin
         assert not user.is_platform_admin, "registration never grants platform administration"

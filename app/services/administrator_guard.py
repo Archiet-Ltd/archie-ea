@@ -160,7 +160,7 @@ def repair_missing_administrators(connection, batch_size: int = 200) -> list[dic
                 if member is None:
                     continue
                 user_id, email, prior_org_role = member
-                role_id, flag, role_name = None, None, None
+                flag, role_name = None, None
                 was = "no role"
             connection.execute(
                 text(
