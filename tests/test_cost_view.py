@@ -121,19 +121,23 @@ def test_a_total_larger_than_its_breakdown_shows_the_rest(db_session, make_org):
 def test_a_person_adds_edits_and_deletes_a_line_and_the_total_follows(db_session, make_org):
     from app.models.cost_fact import ELEMENT_APPLICATION
     from app.services.application_cost_accessor import sync_cost_fact
+    from app.models.user import User
     from app.services.cost_view import add_line, application_cost, delete_line, update_line
 
     org = make_org("a")
     _gbp(org)
+    person = User(email="cost-editor@example.com", first_name="Bola", last_name="Adeyemi", organization_id=org.id)
+    db_session.add(person)
+    db_session.flush()
     app_row = _application(db_session, org, "Ledger", total_cost_of_ownership=Decimal("1000"))
     sync_cost_fact(app_row, "total_cost_of_ownership", "GBP")
-    fact = add_line(org.id, ELEMENT_APPLICATION, app_row.id, user_id=1, category="support",
+    fact = add_line(org.id, ELEMENT_APPLICATION, app_row.id, user_id=person.id, category="support",
                     amount="250.50", currency="gbp")
     db_session.flush()
     view = application_cost(org.id, app_row.id)
     assert view.total == Decimal("1250.50")
     person = [ln for ln in view.lines if ln.fact_id == fact.id]
-    assert person and person[0].label == "Support" and person[0].source == "Added by a person"
+    assert person and person[0].label == "Support" and person[0].source == "Added by Bola Adeyemi"
 
     update_line(org.id, ELEMENT_APPLICATION, app_row.id, fact.id, category="support", amount="100",
                 currency="GBP", period="monthly")
