@@ -1127,6 +1127,10 @@
     "components/scenario_comparison_modal.html"
    ]
   },
+  "native-select": {
+   "source": "shadcn",
+   "macros": []
+  },
   "select": {
    "source": "shadcn",
    "macros": [
@@ -1538,7 +1542,7 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": "docs/buckets: solutions-rethink-v1.md, The solution record (slice 5a)",
+   "spec": "docs/design/specs/tech-radar-classify.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -39090,7 +39094,7 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": "docs/buckets: solutions-rethink-v1.md, The solution record (slice 5a)",
+   "spec": "docs/design/specs/solution-record.md",
    "states": [
     "loading",
     "empty-first-use",
