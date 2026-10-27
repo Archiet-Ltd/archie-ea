@@ -1,5 +1,13 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/form_field.html' import form_field, form_group, form_footer %}
+{% from 'components/input.html' import input, textarea, hidden_input %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_content %}
+{% from 'components/confirmation_dialog.html' import confirmation_dialog %}
+{% from 'components/alert.html' import alert %}
 {% block title %}{{ 'Edit Contract' if contract else 'New Contract' }}{% endblock %}
 
 {#
@@ -14,7 +22,7 @@
 {%- endmacro %}
 
 {% block content %}
-<div class="p-6 space-y-6 max-w-3xl mx-auto">
+<div class="p-6 space-y-6 max-w-2xl mx-auto">
 
   {{ page_header(
       title=('Edit Contract' if contract else 'New Contract'),
@@ -34,363 +42,445 @@
     from the extraction is never applied - it renders as "-" and is skipped,
     per CLAUDE.md's never-invent-data rule.
   #}
-  <div class="bg-card border border-border rounded-lg p-6 space-y-4"
-       x-data="{
-         open: false,
-         extracting: false,
-         error: null,
-         extracted: null,
-         text: '',
-         fieldLabels: {
-           contract_name: 'Contract name', contract_number: 'Contract number',
-           vendor_name: 'Vendor name', start_date: 'Start date', end_date: 'End date',
-           renewal_date: 'Renewal date', notice_period_days: 'Notice period (days)',
-           auto_renewal: 'Auto-renews', contract_value: 'Total value', currency: 'Currency',
-           payment_terms: 'Payment terms', termination_clause_summary: 'Termination clause',
-           liability_cap: 'Liability cap', risk_flags: 'Risk flags'
-         },
-         extract() {
-           const self = this;
-           if (!this.text.trim()) { return Promise.resolve(); }
-           this.extracting = true;
-           this.error = null;
-           this.extracted = null;
-           return Platform.fetch.post('{{ url_for('procurement.contract_ai_extract') }}', { text: this.text })
-             .then(function (body) {
-               self.extracted = body.extracted;
-               self.extracting = false;
-             })
-             .catch(function (err) {
-               self.extracted = null;
-               self.error = err.message || ('Extraction failed (' + (err.status || 'unknown') + ')');
-               self.extracting = false;
-             });
-         },
-         applyField(key, value) {
-           if (value === null || value === undefined || value === '') { return; }
-           if (key === 'vendor_name') {
-             // No free-text vendor input on this form - the vendor field is a
-             // picker keyed by id, and a name alone cannot be resolved to one
-             // safely here. Surfaced in the preview only.
-             return;
-           }
-           if (key === 'notice_period_days') {
-             // No dedicated notice-period input on this form yet; shown in the
-             // preview so the reviewer can factor it into the renewal date.
-             return;
-           }
-           if (key === 'auto_renewal') {
-             document.getElementById('auto_renewal').checked = !!value;
-             return;
-           }
-           if (key === 'risk_flags') { return; }
-           if (key === 'termination_clause_summary' || key === 'liability_cap' || key === 'payment_terms') {
-             const el = document.getElementById('contract_description');
-             if (el) {
-               const note = this.fieldLabels[key] + ': ' + value;
-               el.value = el.value ? (el.value + '\n\n' + note) : note;
-             }
-             return;
-           }
-           const el = document.getElementById(key);
-           if (el) { el.value = value; }
-         },
-         applyOne(key) {
-           this.applyField(key, this.extracted[key]);
-           if (window.Platform && Platform.toast) Platform.toast.success(this.fieldLabels[key] + ' applied');
-         },
-         applyAll() {
-           if (!this.extracted) { return; }
-           Object.keys(this.extracted).forEach(key => this.applyField(key, this.extracted[key]));
-           if (window.Platform && Platform.toast) Platform.toast.success('Extracted fields applied - review before saving');
+  {% call card(class='space-y-4') %}
+    <div x-data="{
+       open: false,
+       extracting: false,
+       error: null,
+       extracted: null,
+       text: '',
+       fieldLabels: {
+         contract_name: 'Contract name', contract_number: 'Contract number',
+         vendor_name: 'Vendor name', start_date: 'Start date', end_date: 'End date',
+         renewal_date: 'Renewal date', notice_period_days: 'Notice period (days)',
+         auto_renewal: 'Auto-renews', contract_value: 'Total value', currency: 'Currency',
+         payment_terms: 'Payment terms', termination_clause_summary: 'Termination clause',
+         liability_cap: 'Liability cap', risk_flags: 'Risk flags'
+       },
+       extract() {
+         const self = this;
+         if (!this.text.trim()) { return Promise.resolve(); }
+         this.extracting = true;
+         this.error = null;
+         this.extracted = null;
+         return Platform.fetch.post('{{ url_for('procurement.contract_ai_extract') }}', { text: this.text })
+           .then(function (body) {
+             self.extracted = body.extracted;
+             self.extracting = false;
+           })
+           .catch(function (err) {
+             self.extracted = null;
+             self.error = err.message || ('Extraction failed (' + (err.status || 'unknown') + ')');
+             this.extracting = false;
+           });
+       },
+       applyField(key, value) {
+         if (value === null || value === undefined || value === '') { return; }
+         if (key === 'vendor_name') {
+           return;
          }
-       }">
-    <button type="button" @click="open = !open"
-            class="w-full flex items-center justify-between text-left">
-      <span class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-        Extract from contract text (AI)
-      </span>
-      <i data-lucide="chevron-down" class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''"></i>
-    </button>
-
-    <div x-show="open" x-cloak class="space-y-4">
-      <p class="text-sm text-muted-foreground">
-        Paste the contract text below and Entelim will pull out the fields it can find.
-        Anything not stated in the text is left blank - review every applied value before saving.
-      </p>
-      <textarea aria-label="Contract text" x-model="text" rows="8" placeholder="Paste contract text here…"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
-
-      <div class="flex items-center gap-3">
-        <button type="button" @click="extract()" :disabled="extracting || !text.trim()"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-          <span x-show="extracting" class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-          <i data-lucide="sparkles" class="w-4 h-4" x-show="!extracting"></i>
-          <span x-text="extracting ? 'Extracting…' : 'Extract from text'"></span>
-        </button>
-        <span x-show="text.length > 0" class="text-xs text-muted-foreground" x-text="text.length + ' characters'"></span>
+         if (key === 'notice_period_days') {
+           return;
+         }
+         if (key === 'auto_renewal') {
+           document.getElementById('auto_renewal').checked = !!value;
+           return;
+         }
+         if (key === 'risk_flags') { return; }
+         if (key === 'termination_clause_summary' || key === 'liability_cap' || key === 'payment_terms') {
+           const el = document.getElementById('contract_description');
+           if (el) {
+             const note = this.fieldLabels[key] + ': ' + value;
+             el.value = el.value ? (el.value + '\n\n' + note) : note;
+           }
+           return;
+         }
+         const el = document.getElementById(key);
+         if (el) { el.value = value; }
+       },
+       applyOne(key) {
+         this.applyField(key, this.extracted[key]);
+         if (window.Platform && Platform.toast) Platform.toast.success(this.fieldLabels[key] + ' applied');
+       },
+       applyAll() {
+         if (!this.extracted) { return; }
+         Object.keys(this.extracted).forEach(key => this.applyField(key, this.extracted[key]));
+         if (window.Platform && Platform.toast) Platform.toast.success('Extracted fields applied - review before saving');
+       }
+     }">
+      <div role="button" tabindex="0" @click="open = !open" @keydown.space.prevent="open = !open" @keydown.enter.prevent="open = !open"
+           class="w-full flex items-center justify-between text-left cursor-pointer">
+        <span class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Extract from contract text (AI)
+        </span>
+        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''"></i>
       </div>
 
-      <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
+      <div x-show="open" x-cloak class="space-y-4">
+        <p class="text-sm text-muted-foreground">
+          Paste the contract text below and Entelim will pull out the fields it can find.
+          Anything not stated in the text is left blank - review every applied value before saving.
+        </p>
+        {{ textarea(
+            id='ai_contract_text',
+            name='ai_contract_text',
+            placeholder='Paste contract text here…',
+            rows=8,
+            class='w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y',
+            attrs_dict={'x-model': 'text', 'aria-label': 'Contract text'}
+        ) }}
 
-      <div x-show="extracted" x-cloak class="border border-border rounded-md divide-y divide-border">
-        <div class="px-3 py-2 flex items-center justify-between bg-muted/50">
-          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Extracted values</span>
-          <button type="button" @click="applyAll()"
-                  class="text-xs font-medium text-primary hover:underline">Apply all</button>
-        </div>
-        <template x-for="key in Object.keys(fieldLabels)" :key="key">
-          <div class="px-3 py-2 flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <div class="text-xs text-muted-foreground" x-text="fieldLabels[key]"></div>
-              <div class="text-sm truncate"
-                   x-text="(extracted && extracted[key] !== null && extracted[key] !== undefined && extracted[key] !== '')
-                            ? (Array.isArray(extracted[key]) ? extracted[key].join(', ') : String(extracted[key]))
-                            : '—'"></div>
-            </div>
-            <button type="button" @click="applyOne(key)"
-                    x-show="extracted && extracted[key] !== null && extracted[key] !== undefined && extracted[key] !== ''"
-                    class="shrink-0 text-xs font-medium text-primary hover:underline">Apply</button>
+        <div class="flex items-center gap-3">
+          {{ button(
+              text='Extract from text',
+              variant='outline',
+              size='default',
+              type='button',
+              icon='sparkles',
+              icon_position='left',
+              class='h-9 px-4',
+              attrs_dict={
+                  '@click': 'extract()',
+                  ':disabled': 'extracting || !text.trim()',
+                  'x-show': '!extracting'
+              }
+          ) }}
+          <div role="button" tabindex="0" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+               :disabled="extracting || !text.trim()"
+               x-show="extracting"
+               @click="extract()"
+               @keydown.space.prevent="extract()"
+               @keydown.enter.prevent="extract()">
+            <span class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
+            <span>Extracting…</span>
           </div>
-        </template>
+          <span x-show="text.length > 0" class="text-xs text-muted-foreground" x-text="text.length + ' characters'"></span>
+        </div>
+
+        <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" role="alert" x-text="error"></div>
+
+        <div x-show="extracted" x-cloak class="border border-border rounded-md divide-y divide-border">
+          <div class="px-3 py-2 flex items-center justify-between bg-muted/50">
+            <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Extracted values</span>
+            <div role="button" tabindex="0" @click="applyAll()" @keydown.space.prevent="applyAll()" @keydown.enter.prevent="applyAll()"
+                 class="text-xs font-medium text-primary hover:underline cursor-pointer">Apply all</div>
+          </div>
+          <template x-for="key in Object.keys(fieldLabels)" :key="key">
+            <div class="px-3 py-2 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-xs text-muted-foreground" x-text="fieldLabels[key]"></div>
+                <div class="text-sm truncate"
+                     x-text="(extracted && extracted[key] !== null && extracted[key] !== undefined && extracted[key] !== '')
+                              ? (Array.isArray(extracted[key]) ? extracted[key].join(', ') : String(extracted[key]))
+                              : '—'"></div>
+              </div>
+              <div role="button" tabindex="0" @click="applyOne(key)" @keydown.space.prevent="applyOne(key)" @keydown.enter.prevent="applyOne(key)"
+                   x-show="extracted && extracted[key] !== null && extracted[key] !== undefined && extracted[key] !== ''"
+                   class="shrink-0 text-xs font-medium text-primary hover:underline cursor-pointer">Apply</div>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
-  </div>
+  {% endcall %}
 
   <form method="POST"
         action="{{ url_for('procurement.contract_edit', contract_id=contract.id) if contract else url_for('procurement.contract_create') }}"
         class="space-y-6"
         x-data="{ submitting: false }"
         @submit="submitting = true">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ hidden_input('csrf_token', csrf_token()) }}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Identity</h2>
+    {% call card(class='space-y-4') %}
+      {% call card_header() %}
+        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Identity</h2>
+      {% endcall %}
+      {% call card_content(class='space-y-6') %}
+        {{ form_field(
+            id='contract_name',
+            name='contract_name',
+            label='Contract name',
+            required=true,
+            placeholder='e.g. Master Services Agreement',
+            value=current('contract_name', contract.contract_name if contract else ''),
+            maxlength=256
+        ) }}
 
-      <div>
-        <label for="contract_name" class="block text-sm font-medium text-muted-foreground mb-1">
-          Contract name <span class="text-destructive-emphasis" aria-hidden="true">*</span>
-        </label>
-        <input type="text" id="contract_name" name="contract_name" required maxlength="256"
-               value="{{ current('contract_name', contract.contract_name if contract else '') | trim }}"
-               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-      </div>
+        <div class="grid grid-cols-1 gap-4">
+          {{ form_field(
+              id='contract_number',
+              name='contract_number',
+              label='Contract number',
+              placeholder='e.g. MSA-2026-001',
+              value=current('contract_number', contract.contract_number if contract else ''),
+              maxlength=100
+          ) }}
 
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="contract_number" class="block text-sm font-medium text-muted-foreground mb-1">Contract number</label>
-          <input type="text" id="contract_number" name="contract_number" maxlength="100"
-                 value="{{ current('contract_number', contract.contract_number if contract else '') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+          {% call form_group(id='vendor_id', label='Vendor', help_text='Select the vendor for this contract') %}
+            {{ native_select(
+                id='vendor_id',
+                name='vendor_id',
+                size='sm',
+                options=[('', 'Not specified')] + [(v.id, v.name) for v in vendors],
+                selected=current('vendor_id', contract.vendor_id if contract else '')
+            ) }}
+          {% endcall %}
         </div>
-        <div>
-          <label for="vendor_id" class="block text-sm font-medium text-muted-foreground mb-1">Vendor</label>
-          <select id="vendor_id" name="vendor_id"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not specified</option>
-            {% for vendor in vendors %}
-            <option value="{{ vendor.id }}"
-              {% if form and form.get('vendor_id') is not none %}
-                {% set form_val = form.get('vendor_id') | int %}
-                {% if form_val == vendor.id %}selected{% endif %}
-              {% elif contract and contract.vendor_id == vendor.id %}
-                selected
-              {% endif %}>
-              {{ vendor.name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
 
-      <div>
-        <label for="contract_description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-        <textarea id="contract_description" name="contract_description" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none">{{ current('contract_description', contract.contract_description if contract else '') | trim }}</textarea>
-      </div>
-    </div>
+        {{ form_field(
+            id='contract_description',
+            name='contract_description',
+            label='Description',
+            input_type='textarea',
+            placeholder='Brief description of the contract scope and purpose',
+            value=current('contract_description', contract.contract_description if contract else ''),
+            rows=3
+        ) }}
+      {% endcall %}
+    {% endcall %}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Classification</h2>
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="contract_type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-          <select id="contract_type" name="contract_type"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not specified</option>
-            {% for value in contract_types %}
-            <option value="{{ value }}" {% if current('contract_type', contract.contract_type if contract else '') | trim == value %}selected{% endif %}>
-              {{ value | replace('_', ' ') | title }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label for="contract_category" class="block text-sm font-medium text-muted-foreground mb-1">Category</label>
-          <select id="contract_category" name="contract_category"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not specified</option>
-            {% for value in contract_categories %}
-            <option value="{{ value }}" {% if current('contract_category', contract.contract_category if contract else '') | trim == value %}selected{% endif %}>
-              {{ value | title }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label for="status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-          <select id="status" name="status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not specified</option>
-            {% for value in contract_statuses %}
-            <option value="{{ value }}" {% if current('status', contract.status if contract else '') | trim == value %}selected{% endif %}>
-              {{ value | replace('_', ' ') | title }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-    </div>
+    {% call card(class='space-y-4') %}
+      {% call card_header() %}
+        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Classification</h2>
+      {% endcall %}
+      {% call card_content(class='space-y-6') %}
+        <div class="grid grid-cols-1 gap-4">
+          {% call form_group(id='contract_type', label='Type') %}
+            {{ native_select(
+                id='contract_type',
+                name='contract_type',
+                size='sm',
+                options=[('', 'Not specified')] + [(v, v | replace('_', ' ') | title) for v in contract_types],
+                selected=current('contract_type', contract.contract_type if contract else '')
+            ) }}
+          {% endcall %}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Commercials</h2>
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="contract_value" class="block text-sm font-medium text-muted-foreground mb-1">Total value</label>
-          <input type="number" step="0.01" min="0" id="contract_value" name="contract_value"
-                 value="{{ current('contract_value', contract.contract_value if contract else '') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        </div>
-        <div>
-          <label for="annual_cost" class="block text-sm font-medium text-muted-foreground mb-1">Annual cost</label>
-          <input type="number" step="0.01" min="0" id="annual_cost" name="annual_cost"
-                 value="{{ current('annual_cost', contract.annual_cost if contract else '') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        </div>
-        <div>
-          <label for="currency" class="block text-sm font-medium text-muted-foreground mb-1">Currency</label>
-          <input type="text" id="currency" name="currency" maxlength="10"
-                 value="{{ current('currency', contract.currency if contract else 'USD') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        </div>
-      </div>
-    </div>
+          {% call form_group(id='contract_category', label='Category') %}
+            {{ native_select(
+                id='contract_category',
+                name='contract_category',
+                size='sm',
+                options=[('', 'Not specified')] + [(v, v | title) for v in contract_categories],
+                selected=current('contract_category', contract.contract_category if contract else '')
+            ) }}
+          {% endcall %}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Term</h2>
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="start_date" class="block text-sm font-medium text-muted-foreground mb-1">Start date</label>
-          <input type="date" id="start_date" name="start_date"
-                 value="{{ current('start_date', contract.start_date.isoformat() if contract and contract.start_date else '') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-          <p class="text-xs text-muted-foreground mt-1">Defaults to today if left blank.</p>
+          {% call form_group(id='status', label='Status') %}
+            {{ native_select(
+                id='status',
+                name='status',
+                size='sm',
+                options=[('', 'Not specified')] + [(v, v | replace('_', ' ') | title) for v in contract_statuses],
+                selected=current('status', contract.status if contract else '')
+            ) }}
+          {% endcall %}
         </div>
-        <div>
-          <label for="end_date" class="block text-sm font-medium text-muted-foreground mb-1">End date</label>
-          <input type="date" id="end_date" name="end_date"
-                 value="{{ current('end_date', contract.end_date.isoformat() if contract and contract.end_date else '') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-          <p class="text-xs text-muted-foreground mt-1">Drives the renewals dashboard.</p>
-        </div>
-        <div>
-          <label for="renewal_date" class="block text-sm font-medium text-muted-foreground mb-1">Renewal date</label>
-          <input type="date" id="renewal_date" name="renewal_date"
-                 value="{{ current('renewal_date', contract.renewal_date.isoformat() if contract and contract.renewal_date else '') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <input type="checkbox" id="auto_renewal" name="auto_renewal"
-               {% if form and form.get('auto_renewal') == 'on' %}
-                 checked
-               {% elif contract and contract.auto_renewal and not form %}
-                 checked
-               {% endif %}
-               class="rounded border-input">
-        <label for="auto_renewal" class="block text-sm font-medium text-muted-foreground mb-1">Renews automatically</label>
-      </div>
-      {# Live-search picker against /api/users (DESIGN.md entity picker rule) — the
-         "contract owner" field previously took free text, so any name (typo,
-         former employee) could be typed. The field still stores a plain string
-         (there is no owner_id FK on Contract), but the value is now populated
-         only from a real user match rather than typed blind. #}
-      <div x-data="{
-          query: '{{ current('contract_owner', contract.contract_owner if contract else '') | trim | e }}',
-          results: [],
-          showDropdown: false,
-          searching: false,
-          _searchErrorShown: false,
-          search() {
-              const self = this;
-              if (this.query.length < 2) { this.results = []; this.showDropdown = false; return Promise.resolve(); }
-              this.searching = true;
-              return Platform.fetch.get('/api/users')
-                  .then(function (data) {
-                      if (data.success) {
-                          const q = self.query.toLowerCase();
-                          self.results = data.users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)).slice(0, 5);
-                          self.showDropdown = self.results.length > 0;
-                          self._searchErrorShown = false;
-                      }
-                      self.searching = false;
-                  })
-                  .catch(function () {
-                      self.results = [];
-                      self.showDropdown = false;
-                      if (!self._searchErrorShown) {
-                          self._searchErrorShown = true;
-                          if (window.Platform && Platform.toast) Platform.toast.error('User search failed');
-                      }
-                      self.searching = false;
-                  });
-          },
-          select(user) {
-              this.query = user.name;
-              this.showDropdown = false;
-              this.results = [];
-          }
-      }" @click.outside="showDropdown = false" class="relative">
-        <label for="contract_owner" class="block text-sm font-medium text-muted-foreground mb-1">Contract owner</label>
-        <input type="text" id="contract_owner" name="contract_owner" maxlength="100"
-               x-model="query"
-               @input.debounce.300ms="search()"
-               @focus="if (query.length >= 2) search()"
-               placeholder="Search by name or email…" autocomplete="off"
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
-          <template x-for="u in results" :key="u.id">
-            <button type="button" @click="select(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
-              <span x-text="u.name" class="font-medium"></span>
-              <span x-text="u.email" class="text-xs text-muted-foreground"></span>
-            </button>
-          </template>
-        </div>
-      </div>
-    </div>
+      {% endcall %}
+    {% endcall %}
 
-    <div class="flex items-center justify-between">
-      <button type="submit" :disabled="submitting"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-        <span x-show="submitting" class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-        <i data-lucide="save" class="w-4 h-4" x-show="!submitting"></i>
-        <span x-text="submitting ? 'Saving…' : '{{ 'Save changes' if contract else 'Create contract' }}'"></span>
-      </button>
-      <a href="{{ url_for('procurement.contracts_list') }}"
-         class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
+    {% call card(class='space-y-4') %}
+      {% call card_header() %}
+        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Commercials</h2>
+      {% endcall %}
+      {% call card_content(class='space-y-6') %}
+        <div class="grid grid-cols-1 gap-4">
+          {{ form_field(
+              id='contract_value',
+              name='contract_value',
+              label='Total value',
+              type='number',
+              step='0.01',
+              min='0',
+              placeholder='0.00',
+              value=current('contract_value', contract.contract_value if contract else '')
+          ) }}
+
+          {{ form_field(
+              id='annual_cost',
+              name='annual_cost',
+              label='Annual cost',
+              type='number',
+              step='0.01',
+              min='0',
+              placeholder='0.00',
+              value=current('annual_cost', contract.annual_cost if contract else '')
+          ) }}
+
+          {{ form_field(
+              id='currency',
+              name='currency',
+              label='Currency',
+              placeholder='USD',
+              value=current('currency', contract.currency if contract else 'USD'),
+              maxlength=10
+          ) }}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    {% call card(class='space-y-4') %}
+      {% call card_header() %}
+        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Term</h2>
+      {% endcall %}
+      {% call card_content(class='space-y-6') %}
+        <div class="grid grid-cols-1 gap-4">
+          {{ form_field(
+              id='start_date',
+              name='start_date',
+              label='Start date',
+              type='date',
+              placeholder='YYYY-MM-DD',
+              value=current('start_date', contract.start_date.isoformat() if contract and contract.start_date else ''),
+              help_text='Defaults to today if left blank.'
+          ) }}
+
+          {{ form_field(
+              id='end_date',
+              name='end_date',
+              label='End date',
+              type='date',
+              placeholder='YYYY-MM-DD',
+              value=current('end_date', contract.end_date.isoformat() if contract and contract.end_date else ''),
+              help_text='Drives the renewals dashboard.'
+          ) }}
+
+          {{ form_field(
+              id='renewal_date',
+              name='renewal_date',
+              label='Renewal date',
+              type='date',
+              placeholder='YYYY-MM-DD',
+              value=current('renewal_date', contract.renewal_date.isoformat() if contract and contract.renewal_date else '')
+          ) }}
+        </div>
+
+        {% call form_group(id='auto_renewal', label='Renews automatically') %}
+          {{ checkbox(
+              id='auto_renewal',
+              name='auto_renewal',
+              value='on',
+              checked=(form and form.get('auto_renewal') == 'on') or (contract and contract.auto_renewal and not form)
+          ) }}
+        {% endcall %}
+
+        {# Live-search picker against /api/users (DESIGN.md entity picker rule) — the
+           "contract owner" field previously took free text, so any name (typo,
+           former employee) could be typed. The field still stores a plain string
+           (there is no owner_id FK on Contract), but the value is now populated
+           only from a real user match rather than typed blind. #}
+        {% call form_group(id='contract_owner', label='Contract owner', help_text='Search by name or email to select a user') %}
+          <div x-data="{
+              query: '{{ current('contract_owner', contract.contract_owner if contract else '') | trim | e }}',
+              results: [],
+              showDropdown: false,
+              searching: false,
+              _searchErrorShown: false,
+              search() {
+                  const self = this;
+                  if (this.query.length < 2) { this.results = []; this.showDropdown = false; return Promise.resolve(); }
+                  this.searching = true;
+                  return Platform.fetch.get('/api/users')
+                      .then(function (data) {
+                          if (data.success) {
+                              const q = self.query.toLowerCase();
+                              self.results = data.users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)).slice(0, 5);
+                              self.showDropdown = self.results.length > 0;
+                              self._searchErrorShown = false;
+                          }
+                          this.searching = false;
+                      })
+                      .catch(function () {
+                          self.results = [];
+                          self.showDropdown = false;
+                          if (!self._searchErrorShown) {
+                              self._searchErrorShown = true;
+                              if (window.Platform && Platform.toast) Platform.toast.error('User search failed');
+                          }
+                          this.searching = false;
+                      });
+              },
+              select(user) {
+                  this.query = user.name;
+                  this.showDropdown = false;
+                  this.results = [];
+              }
+          }" @click.outside="showDropdown = false" class="relative">
+            {{ input(
+                id='contract_owner',
+                name='contract_owner',
+                type='text',
+                placeholder='Search by name or email…',
+                autocomplete='off',
+                maxlength=100,
+                class='w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring',
+                attrs_dict={
+                    'x-model': 'query',
+                    '@input.debounce.300ms': 'search()',
+                    '@focus': 'if (query.length >= 2) search()'
+                }
+            ) }}
+            <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
+              <template x-for="u in results" :key="u.id">
+                <div role="button" tabindex="0" @click="select(u)" @keydown.space.prevent="select(u)" @keydown.enter.prevent="select(u)"
+                     class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between cursor-pointer">
+                  <span x-text="u.name" class="font-medium"></span>
+                  <span x-text="u.email" class="text-xs text-muted-foreground"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+
+    {{ form_footer(
+        submit_text=('Save changes' if contract else 'Create contract'),
+        cancel_text='Cancel',
+        cancel_attrs={'href': url_for('procurement.contracts_list')},
+        submit_attrs={'x-show': '!submitting', ':disabled': 'submitting'},
+        submit_variant='primary'
+    ) }}
+
+    {# Submit button with loading state - rendered separately since form_footer doesn't support loading spinner #}
+    <div class="flex justify-end gap-2 pt-2" x-show="submitting" x-cloak>
+      {{ button(
+          text='Saving…',
+          variant='primary',
+          size='default',
+          type='submit',
+          disabled=true,
+          icon='loader',
+          icon_position='left',
+          class='h-9 px-4',
+          attrs_dict={'x-show': 'submitting'}
+      ) }}
     </div>
   </form>
 
   {% if contract %}
   {# Separate form: nesting it inside the edit form would submit both. #}
+  {{ confirmation_dialog(
+      id='delete-contract-' ~ contract.id,
+      title='Delete this contract?',
+      message='This will delete the contract and every licence recorded under it. This cannot be undone.',
+      confirm_text='Delete contract',
+      cancel_text='Cancel',
+      variant='destructive'
+  ) }}
+
   <form method="POST" action="{{ url_for('procurement.contract_delete', contract_id=contract.id) }}"
         class="mt-8 pt-6 border-t border-border"
-        @submit.prevent="Platform.modal.confirmSubmit($event, 'Delete this contract and every licence recorded under it? This cannot be undone.')">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit"
-            class="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-destructive/40 text-destructive-emphasis text-sm hover:bg-destructive/10 transition-colors">
-      <i data-lucide="trash-2" class="w-4 h-4"></i> Delete contract
-    </button>
+        @submit.prevent="window.dispatchEvent(new CustomEvent('open-confirm-delete-contract-{{ contract.id }}', { detail: { callback: () => $el.submit() } }))">
+    {{ hidden_input('csrf_token', csrf_token()) }}
+    {{ button(
+        text='Delete contract',
+        variant='outline',
+        icon='trash-2',
+        icon_position='left',
+        class='px-3 py-2 rounded-md border-destructive/40 text-destructive-emphasis text-sm hover:bg-destructive/10 transition-colors',
+        on_click="window.dispatchEvent(new CustomEvent('open-confirm-delete-contract-{{ contract.id }}', { detail: { callback: () => $el.closest('form').submit() } }))",
+        attrs_dict={'type': 'button'}
+    ) }}
     <p class="text-xs text-muted-foreground mt-2">
       Licences recorded under this contract are deleted with it.
     </p>
