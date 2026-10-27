@@ -1,9 +1,10 @@
-"""A visitor who opens the public home sees the cited answer without scrolling.
+"""A visitor who opens the public home sees the real product without scrolling.
 
-The visitor is signed out. The proof under the headline is the answer card (the sentence, what
-depends on the system, who owns each) and its whole image must end above the bottom edge of a
-laptop screen (1440 by 900) and of a phone (375 by 812), in the light and the dark theme, with no
-empty band between the navigation bar and the headline.
+The visitor is signed out. While the first wave is live the proof under the headline is a real capture of
+the Overview of the sample company. The headline and both buttons sit in the first screen, the image starts
+inside it with enough of it showing to read (the whole image is taller than a screen, as the product is), and
+there is no empty band between the navigation bar and the headline. Run at 1440 by 900 and 375 by 812, in the
+light and the dark theme.
 """
 import pytest
 
@@ -15,12 +16,13 @@ SCREENS = {
     "1440": {"width": 1440, "height": 900},
     "375": {"width": 375, "height": 812},
 }
-MAX_BAND = 64  # pixels between the bottom of the navigation bar and the top of the headline
+MIN_SHOWING = 150  # pixels of the Overview that must show in the first screen
+MAX_BAND = 64  # pixels between the bottom of the navigation bar and the first thing in the hero (the label above the headline)
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 @pytest.mark.parametrize("screen", sorted(SCREENS))
-def test_cited_answer_is_inside_the_fold(browser, live_server, screen, theme):
+def test_overview_starts_inside_the_fold(browser, live_server, screen, theme):
     viewport = SCREENS[screen]
     context = browser.new_context(viewport=viewport)
     context.set_default_timeout(PAGE_TIMEOUT)
@@ -31,16 +33,18 @@ def test_cited_answer_is_inside_the_fold(browser, live_server, screen, theme):
         page.goto(live_server + "/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         proof = page.locator('[data-testid="home-hero-proof"]')
         assert proof.evaluate("e => e.complete && e.naturalWidth > 0")
-        # the image is the answer card: its description names the sentence, the dependents and the owners
+        # the image is the Overview: its description names it, and the caption carries the capture date
         alt = proof.get_attribute("alt")
-        assert "What breaks if" in alt and "owner" in alt
-        bottom = proof.evaluate("e => e.getBoundingClientRect().bottom")
-        assert bottom <= viewport["height"], "answer card ends at %spx, below the %spx fold" % (bottom, viewport["height"])
+        assert "overview" in alt.lower() and "who owns them" in alt.lower() and "chat" not in alt.lower()
+        assert "captured on" in page.locator('[data-testid="home-hero-figure"] figcaption').inner_text()
+        top, bottom = proof.evaluate("e => { const r = e.getBoundingClientRect(); return [r.top, r.bottom]; }")
+        showing = min(bottom, viewport["height"]) - max(top, 0)
+        assert showing >= MIN_SHOWING, "only %spx of the Overview shows in the first screen" % showing
         # no empty band under the navigation bar
         nav_bottom = page.locator("header[data-site-nav]").evaluate("e => e.getBoundingClientRect().bottom")
-        h1_top = page.locator('[data-testid="home-hero"] h1').evaluate("e => e.getBoundingClientRect().top")
-        assert h1_top - nav_bottom <= MAX_BAND, "%spx of empty space under the navigation bar" % (h1_top - nav_bottom)
-        # the headline and both buttons are still in the first screen with it
+        first_top = page.locator('[data-testid="home-hero"] > div > *').first.evaluate("e => e.getBoundingClientRect().top")
+        assert first_top - nav_bottom <= MAX_BAND, "%spx of empty space under the navigation bar" % (first_top - nav_bottom)
+        # the headline and both buttons are in the first screen with it
         for selector in ('[data-testid="home-hero"] h1', '[data-testid="home-hero-start"]', '[data-testid="home-hero-pricing"]'):
             assert page.locator(selector).evaluate("e => e.getBoundingClientRect().bottom") <= viewport["height"]
     finally:

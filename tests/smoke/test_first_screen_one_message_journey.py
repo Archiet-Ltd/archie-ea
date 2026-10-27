@@ -1,7 +1,7 @@
 """The first screen a person meets carries one message.
 
-A founder opens the public home and sees one headline, one sentence, two buttons and a real
-answer, and nothing else in the first 900 pixels. A new architect signs in to an empty workspace
+A founder opens the public home and sees one headline, one sentence, one first step, two buttons and a real
+screen of the Overview, and nothing else in the first 900 pixels. A new architect signs in to an empty workspace
 and sees one message with its action and a question box, no figures or tabs. A second architect
 signs in to a workspace that holds data and sees the question box and then the figures, with no answer on the page; asking a question lands on the chat with that question waiting.
 """
@@ -48,20 +48,21 @@ def test_public_home_fold_is_one_message(browser, live_server):
     context, page = _page(browser, FOLD)
     try:
         page.goto(live_server + "/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        assert page.title() == "Entelim — See what breaks before you change it"
+        assert page.title() == "Entelim — The company brain"
         hero = page.locator('[data-testid="home-hero"]')
         expect(hero.locator("h1")).to_have_count(1)
-        expect(hero.locator("h1")).to_have_text("See what breaks before you change it.")
-        # one sentence, two buttons
+        expect(hero.locator("h1")).to_have_text("The company brain.")
+        # one sentence, one first step, two buttons
         expect(hero.locator("p.home-lead")).to_have_count(1)
+        expect(page.locator('[data-testid="home-hero-first-step"]')).to_contain_text("Start with your website")
         buttons = hero.locator('[data-testid="home-hero-start"], [data-testid="home-hero-pricing"]')
         expect(buttons).to_have_count(2)
         expect(hero.get_by_role("link")).to_have_count(2)
-        # the proof is a real answer, loaded, and shows its subject
+        # the proof is a real capture of the Overview, loaded, and names its subject
         proof = page.locator('[data-testid="home-hero-proof"]')
         assert proof.evaluate("e => e.complete && e.naturalWidth > 0")
         assert _top(page, '[data-testid="home-hero-proof"]') < FOLD["height"]
-        assert "What breaks if" in proof.get_attribute("alt")
+        assert "overview" in proof.get_attribute("alt").lower()
         # nothing else: no licence line, and the next section starts below the fold
         assert "AGPL" not in hero.inner_text()
         assert _top(page, "section.home-section") >= FOLD["height"]

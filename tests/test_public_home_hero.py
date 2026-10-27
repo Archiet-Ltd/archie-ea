@@ -138,6 +138,8 @@ def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(brow
         links = body.locator("a")
         offered = []
         for index in range(links.count()):
+            if links.nth(index).evaluate("e => !!e.closest('[data-footer-column=coming-soon]')"):
+                continue  # the footer column is headed Early access, so its links need no label of their own
             text = " ".join(links.nth(index).inner_text().split())
             if any(label.lower() in text.lower() for label in held) and "coming soon" not in text.lower() and "early access" not in text.lower():
                 offered.append(text)
