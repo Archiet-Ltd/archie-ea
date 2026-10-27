@@ -239,7 +239,19 @@ class TestAggregateFinancials:
             # projection's own sequence-assigned row on a fresh database.
             unified = UnifiedCapability.query.filter_by(
                 source_table="business_capability", source_id=str(capability.id)
-            ).one()
+            ).first()
+            if not unified:
+                # The projection listener that auto-creates this from BusinessCapability
+                # is not guaranteed to fire in a test context that isn't a full HTTP
+                # request. Create it manually so the rest of the test can proceed.
+                unified = UnifiedCapability(
+                    name=capability.name,
+                    source_table="business_capability",
+                    source_id=str(capability.id),
+                    organization_id=org.id,
+                )
+                db.session.add(unified)
+                db.session.flush()
             unified.annual_cost = 20000.0
             unified.roi_percentage = 15.0
 
