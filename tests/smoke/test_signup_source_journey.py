@@ -77,5 +77,16 @@ def test_a_register_link_person_appears_on_the_signups_list_with_their_source_an
         narrow.goto(live_server + "/admin/signups", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(narrow.get_by_text(address)).to_be_visible()
         assert narrow.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+        # On a phone the columns that say where the person came from and how far they got can still be
+        # scrolled to and are not covered by a pinned column.
+        for shown in ("outreach", "w1-07", "Profile confirmed"):
+            cell = narrow.get_by_role("row").filter(has_text=address).get_by_text(shown).first
+            cell.scroll_into_view_if_needed()
+            assert narrow.evaluate(
+                """(el) => { const r = el.getBoundingClientRect();
+                    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                    return !!top && (top === el || el.contains(top) || top.contains(el)); }""",
+                cell.element_handle(),
+            ), "%s is covered or cut off on a 390 wide screen" % shown
     finally:
         admin.close()

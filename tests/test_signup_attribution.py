@@ -37,8 +37,14 @@ def _user(email):
 
 
 @pytest.fixture
-def founder(app, monkeypatch):
+def founder(app, db_session, monkeypatch):
+    """The founder's address is configured, and no sign-up from an earlier run on this database is in play
+    (the platform-wide check and report read every account, so earlier ones would be counted too)."""
+    from app.models.user import User
+
     monkeypatch.setitem(app.config, "FOUNDER_ALERT_EMAIL", FOUNDER)
+    User.query.filter(User.signup_at.isnot(None)).update({"signup_at": None}, synchronize_session=False)  # tenant-scoping-ok: test set-up
+    db_session.flush()
 
 
 def test_the_three_values_on_the_register_link_are_kept_on_the_new_account(app, db_session, mail_off):  # noqa: F811
@@ -200,7 +206,7 @@ def test_a_completed_a_recent_and_a_long_ago_account_raise_no_alert(
 
 
 def test_nothing_is_sent_or_marked_without_a_configured_founder_address(
-        app, db_session, mail_on, outbox, monkeypatch):  # noqa: F811
+        app, db_session, mail_on, outbox, founder, monkeypatch):  # noqa: F811
     from app.services import signup_attribution as origin
 
     monkeypatch.setitem(app.config, "FOUNDER_ALERT_EMAIL", None)
