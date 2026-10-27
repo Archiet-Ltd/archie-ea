@@ -183,6 +183,7 @@ class ArchiMateRelationshipService:
         properties: Optional[Dict] = None,
         organization_id: Optional[int] = None,
         rollback: bool = True,
+        provenance: Optional[Dict] = None,
     ) -> Optional[ArchiMateRelationship]:
         """
         Create a validated ArchiMate relationship.
@@ -213,19 +214,30 @@ class ArchiMateRelationshipService:
             return None
 
         try:
-            # Where this relationship came from: the person drawing it.
-            person_id, person_name = _signed_in_person()
-            if person_id is None and (properties or {}).get("created_by_id") is not None:
-                person_id = str((properties or {})["created_by_id"])
+            # Where this relationship came from: the person drawing it or the integration.
+            if provenance:
+                source_kind = provenance.get("source_kind", "manual")
+                source_ref = provenance.get("source_ref")
+                source_label = provenance.get("source_label")
+                source_recorded_at = provenance.get("source_recorded_at") or datetime.now(timezone.utc)
+            else:
+                person_id, person_name = _signed_in_person()
+                if person_id is None and (properties or {}).get("created_by_id") is not None:
+                    person_id = str((properties or {})["created_by_id"])
+                source_kind = "manual"
+                source_ref = person_id
+                source_label = person_name
+                source_recorded_at = datetime.now(timezone.utc)
+
             relationship = ArchiMateRelationship(
                 type=relationship_type,
                 source_id=source_element.id,
                 target_id=target_element.id,
                 architecture_id=architecture_id,
-                source_kind="manual",
-                source_ref=person_id,
-                source_label=person_name,
-                source_recorded_at=datetime.now(timezone.utc),
+                source_kind=source_kind,
+                source_ref=source_ref,
+                source_label=source_label,
+                source_recorded_at=source_recorded_at,
             )
             if organization_id is not None:
                 relationship.organization_id = organization_id

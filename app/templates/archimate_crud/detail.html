@@ -115,6 +115,14 @@
     {% endif %}
     {% set changed = element.updated_at or element.created_at %}
 
+    {% if integration_source %}
+    <div class="rounded-lg border border-border bg-background px-5 py-3 flex items-center gap-2 text-sm text-muted-foreground" data-integration-source>
+        <i data-lucide="plug" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
+        <p>From {{ integration_source.system_label }},
+            {% if integration_source.url %}<a href="{{ integration_source.url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ integration_source.item }}</a>{% else %}{{ integration_source.item }}{% endif %}{% if integration_source.read_on %}, read {{ integration_source.read_on }}{% endif %}</p>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="kpi-band">
         <div data-testid="kpi-depends-on" class="flex [&>*]:w-full">
             {% if not conn.available %}

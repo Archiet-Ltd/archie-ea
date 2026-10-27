@@ -860,6 +860,10 @@ def init_context_processors(app):
 
     app.jinja_env.filters["versioned_static"] = _filter_versioned_static
 
+    # JSON parsing filter
+    import json as _json
+    app.jinja_env.filters["from_json"] = lambda s: _json.loads(s) if s else {}
+
     # Override url_for globally so ALL static file references auto-version.
     # This covers all 132 uses across 66 templates without touching each file.
     from werkzeug.routing import BuildError
