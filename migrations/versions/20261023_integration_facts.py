@@ -9,7 +9,7 @@ created only when absent, so a second run (or a database where ``init-db`` got
 there first) is a no-op.
 
 Revision ID: 20261023_integration_facts
-Revises: 20261027_stakeholder_comm_org
+Revises: 20261025_vendor_catalogue
 Create Date: 2026-10-23
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261023_integration_facts"
-down_revision = "20261027_stakeholder_comm_org"
+down_revision = "20261025_vendor_catalogue"
 branch_labels = None
 depends_on = None
 
