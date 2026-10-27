@@ -1,5 +1,6 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/explained_value.html' import explained_value %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/badge.html' import badge %}
@@ -26,19 +27,21 @@
 
 <div class="space-y-6">
     <!-- Page Header -->
-    {{ page_header(
-        title='Data Architecture',
-        description='Manage and analyze data architecture models',
-        actions=[
-            {'text': 'Data Models', 'icon': 'database', 'href': url_for('enterprise.data_models'), 'variant': 'default'}
-        ]
-    ) }}
+    {{ page_header(title='Data Architecture', description='Manage and analyze data architecture models', actions=[
+        {'text': 'Data Models', 'icon': 'database', 'href': url_for('enterprise.data_models'), 'variant': 'default'}
+    ]) }}
 
     <!-- Metrics Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        {{ metrics_card(title='Conceptual Models', value=conceptual_count|dash, icon='brain') }}
-        {{ metrics_card(title='Logical Models', value=logical_count|dash, icon='git-branch') }}
-        {{ metrics_card(title='Physical Models', value=physical_count|dash, icon='server') }}
+        <div data-testid="conceptual-models-card">
+            {{ metrics_card(title='Conceptual Models', value=conceptual_count|dash, icon='brain', href=url_for('enterprise.data_models', model_type='conceptual') if conceptual_count > 0 else None, description='No conceptual models yet. Add one to start.' if conceptual_count == 0 else None) }}
+        </div>
+        <div data-testid="logical-models-card">
+            {{ metrics_card(title='Logical Models', value=logical_count|dash, icon='git-branch', href=url_for('enterprise.data_models', model_type='logical') if logical_count > 0 else None, description='No logical models yet. Add one to start.' if logical_count == 0 else None) }}
+        </div>
+        <div data-testid="physical-models-card">
+            {{ metrics_card(title='Physical Models', value=physical_count|dash, icon='server', href=url_for('enterprise.data_models', model_type='physical') if physical_count > 0 else None, description='No physical models yet. Add one to start.' if physical_count == 0 else None) }}
+        </div>
         {{ metrics_card(title='Data Lineage Flows', value=data_lineage_count|dash, icon='git-merge') }}
     </div>
 
