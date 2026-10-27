@@ -9,7 +9,7 @@ created only when absent, so a second run (or a database where ``init-db`` got
 there first) is a no-op.
 
 Revision ID: 20261023_integration_facts
-Revises: 20261022_erole_no_default
+Revises: 20261027_stakeholder_comm_org
 Create Date: 2026-10-23
 """
 from __future__ import annotations

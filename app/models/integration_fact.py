@@ -63,6 +63,9 @@ class IntegrationFact(TenantMixin, db.Model):
     # When applied
     applied_at = db.Column(db.DateTime, nullable=True)
     applied_element_id = db.Column(db.Integer, nullable=True)  # For element facts
+    # The link an applied relationship or team-owner fact wrote, so a citation of
+    # that link names the system and item it was read from.
+    applied_relationship_id = db.Column(db.Integer, nullable=True, index=True)
 
     # When rejected
     rejection_reason = db.Column(db.Text, nullable=True)
@@ -87,6 +90,7 @@ class IntegrationFact(TenantMixin, db.Model):
             "status": self.status.value,
             "applied_at": self.applied_at.isoformat() if self.applied_at else None,
             "applied_element_id": self.applied_element_id,
+            "applied_relationship_id": self.applied_relationship_id,
             "rejection_reason": self.rejection_reason,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

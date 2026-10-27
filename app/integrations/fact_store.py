@@ -236,6 +236,7 @@ def _apply(fact: IntegrationFact) -> bool:
         if relationship is None:
             logger.warning(f"Failed to apply relationship fact {fact.id}")
             return False
+        fact.applied_relationship_id = relationship.id
         fact.status = IntegrationFactStatus.APPLIED
         fact.applied_at = datetime.utcnow()
         logger.info(f"Applied relationship fact {fact.id}")
@@ -249,7 +250,7 @@ def _apply(fact: IntegrationFact) -> bool:
 
         if fact_data.get("is_team"):
             team = _team_element(fact, fact_data["owner_name"])
-            _assign_team(fact, team, element)
+            fact.applied_relationship_id = _assign_team(fact, team, element)
             fact.applied_element_id = team.id
             logger.info(f"Applied team owner fact {fact.id}: {fact_data['owner_name']}")
         else:
@@ -295,15 +296,16 @@ def _team_element(fact: IntegrationFact, team_name: str):
     )
 
 
-def _assign_team(fact: IntegrationFact, team, element) -> None:
-    """The team is assigned to the element it owns, unless it already is."""
+def _assign_team(fact: IntegrationFact, team, element) -> int:
+    """The team is assigned to the element it owns, unless it already is; the
+    id of that assignment."""
     from app.models.models import ArchiMateRelationship
 
     already = ArchiMateRelationship.query.filter_by(
         organization_id=fact.organization_id, type="assignment", source_id=team.id, target_id=element.id,
     ).first()
     if already is not None:
-        return
+        return already.id
     relationship = ArchiMateRelationshipService.create_relationship(
         source_element=team,
         target_element=element,
@@ -315,6 +317,7 @@ def _assign_team(fact: IntegrationFact, team, element) -> None:
     )
     if relationship is None:
         raise ValueError(f"Cannot assign team {team.name!r} to {element.name!r}")
+    return relationship.id
 
 
 def _record_person_owner(fact: IntegrationFact, fact_data: Dict[str, Any], element) -> bool:
@@ -424,3 +427,117 @@ def sources_for_elements(element_ids: Iterable[int], organization_id: int) -> Di
             "read_at": fact.source_read_at.isoformat() if fact.source_read_at else None,
         }
     return sources
+
+
+def sources_for_relationships(
+    relationship_ids: Iterable[int], organization_id: int
+) -> Dict[int, Dict[str, Optional[str]]]:
+    """Where each connector-written link came from.
+
+    ``{relationship_id: {system, item, url, read_at, ...}}`` for every link in
+    the organisation that an applied integration fact wrote, or that a
+    connector stamped with its origin when it wrote the link (``source_kind``
+    ``connector``: the repository, commit and file it was read at). A stamped
+    link also carries ``repository``, ``commit``, ``file``, ``detail``,
+    ``label`` and ``recorded_at``, and its ``url`` is the file at that commit;
+    where both exist, the stamp's details are added to the fact's. A link no
+    connector wrote is absent.
+    """
+    from app.models import ArchiMateRelationship
+
+    ids = {i for i in relationship_ids if isinstance(i, int)}
+    if not ids or organization_id is None:
+        return {}
+    sources: Dict[int, Dict[str, Optional[str]]] = {}
+    facts = (
+        IntegrationFact.query.filter(
+            IntegrationFact.organization_id == organization_id,
+            IntegrationFact.applied_relationship_id.in_(ids),
+            IntegrationFact.status == IntegrationFactStatus.APPLIED,
+        )
+        .order_by(IntegrationFact.id)
+        .all()
+    )
+    if facts:
+        primaries = {
+            (f.system, f.external_id): json.loads(f.fact_data).get("name")
+            for f in IntegrationFact.query.filter(
+                IntegrationFact.organization_id == organization_id,
+                IntegrationFact.external_id.in_({f.external_id for f in facts}),
+                IntegrationFact.fact_type == "element",
+                IntegrationFact.path == "element",
+            )
+        }
+        for fact in facts:
+            if fact.applied_relationship_id in sources:
+                continue
+            url = fact.source_url if (fact.source_url or "").lower().startswith(("https://", "http://")) else None
+            sources[fact.applied_relationship_id] = {
+                "system": fact.system,
+                "item": primaries.get((fact.system, fact.external_id)) or fact.external_id,
+                "url": url,
+                "read_at": fact.source_read_at.isoformat() if fact.source_read_at else None,
+            }
+
+    stamped = db.session.execute(
+        db.select(
+            ArchiMateRelationship.id,
+            ArchiMateRelationship.source_ref,
+            ArchiMateRelationship.source_label,
+            ArchiMateRelationship.source_recorded_at,
+        ).where(
+            ArchiMateRelationship.id.in_(ids),
+            ArchiMateRelationship.organization_id == organization_id,
+            ArchiMateRelationship.source_kind == "connector",
+        )
+    ).all()
+    for rel_id, ref, label, recorded_at in stamped:
+        origin = _stamped_origin(ref, label, recorded_at)
+        sources[rel_id] = {**sources.get(rel_id, {}), **{k: v for k, v in origin.items() if v is not None}}
+        for key in ("system", "item", "url", "read_at"):
+            sources[rel_id].setdefault(key, None)
+    return sources
+
+
+def _stamped_origin(ref: Optional[str], label: Optional[str], recorded_at) -> Dict[str, Optional[str]]:
+    """The origin a connector stamped on a link it wrote, in the citation's shape."""
+    from app.connectors.github import file_url as github_file_url
+
+    try:
+        body = json.loads(ref or "{}")
+    except ValueError:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    read_at = recorded_at.isoformat() if recorded_at else None
+    system = body.get("system")
+    return {
+        "system": system,
+        "item": body.get("repository"),
+        "url": github_file_url(body.get("repository"), body.get("commit"), body.get("file"))
+        if system == "github"
+        else None,
+        "read_at": read_at,
+        "repository": body.get("repository"),
+        "commit": body.get("commit"),
+        "file": body.get("file"),
+        "detail": body.get("detail"),
+        "label": label,
+        "recorded_at": read_at,
+    }
+
+
+def citation_sources(
+    *, relationship_ids: Iterable[int], element_ids: Iterable[int], organization_id: int
+) -> Dict[str, Dict[int, Dict[str, Optional[str]]]]:
+    """The one place a citation learns where a fact came from (ADR-002).
+
+    ``{"relationships": {id: source}, "elements": {id: source}}``: a link cites
+    its own source when a connector wrote it; anything else that rests on a
+    connector-derived element cites that element's source. Two batched reads per
+    kind, fenced to the organisation.
+    """
+    return {
+        "relationships": sources_for_relationships(relationship_ids, organization_id),
+        "elements": sources_for_elements(element_ids, organization_id),
+    }
