@@ -82,7 +82,7 @@ def test_cto_confirms_a_vendor_found_on_the_website(page, live_server, seeded):
     # The catalogue's architecture for it is the next proposal.
     page.reload(wait_until="domcontentloaded")
     page.locator("[data-testid^=approval-card-]",
-                 has_text=f"Add {seed['stripe']}'s published architecture").first.wait_for(timeout=PAGE_TIMEOUT)
+                 has_text=f"Add the published architecture of {seed['stripe']} to your model").first.wait_for(timeout=PAGE_TIMEOUT)
 
     # The vendor is now one the organisation has.
     page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)

@@ -450,7 +450,7 @@ def _propose_architecture(org_id: int, application, product):
         operation_type=OP_ARCHITECTURE,
         entity_type="archimate_fragment",
         entity_id=application.id,
-        summary=("Add %s's published architecture to your model, attached to %s: %s, each with its source "
+        summary=("Add the published architecture of %s to your model, attached to %s: %s, each with its source "
                  "in the vendor catalogue." % (product.product_name, application.name, parts))[:1000],
         operation_payload={
             "application_id": application.id,
