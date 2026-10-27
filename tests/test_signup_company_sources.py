@@ -177,7 +177,7 @@ def test_register_user_retries_when_slug_already_exists(app, db_session):
     from app.models.organization import Organization
     from app.modules.account.services.account_service import AccountService
 
-    _slug_base = "caseyfounder-%s" % uuid.uuid4().hex[:6]
+    _slug_base = "caseyfounder"
     # Create an organisation whose slug is exactly what "Casey" "Founder" would claim.
     first = Organization(name="Casey's Workspace", slug=_slug_base)
     db_session.add(first)
@@ -190,8 +190,7 @@ def test_register_user_retries_when_slug_already_exists(app, db_session):
     org = Organization.query.filter_by(id=user.organization_id).first()
     assert org is not None
     assert org.slug != _slug_base
-    assert org.slug != "caseyfounder"
-    assert org.slug.startswith("casey")
+    assert org.slug.startswith(_slug_base + "-")
 
 
 def test_zzz_concurrent_signups_both_succeed(app, db_session):

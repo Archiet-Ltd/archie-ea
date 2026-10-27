@@ -188,8 +188,8 @@ class TestBearerOnlyCallSucceedsWithCsrfEnabled:
         assert "error" not in data, data
         from app.modules.ai_chat.tools.route_read_tools import tool_released
 
-        # the eleven, and get_genome_slice, less any the wave map holds back
-        assert len(data["result"]["tools"]) == 12 - sum(not tool_released(n) for n in ("list_canvases", "get_canvas"))
+        # the eleven, get_genome_slice and ask_data_flow, less any the wave map holds back
+        assert len(data["result"]["tools"]) == 13 - sum(not tool_released(n) for n in ("list_canvases", "get_canvas"))
 
 
 class TestNoAuthGetsRealUnauthorizedNotCsrf:
