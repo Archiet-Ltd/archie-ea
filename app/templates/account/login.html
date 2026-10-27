@@ -154,7 +154,7 @@
                         </div>
                         <div class="mt-4 flex flex-col gap-2">
                             {% for provider in sso_providers %}
-                                {{ button(variant='outline', class='w-full', href=url_for('account.sso_login', provider=provider.key), text=provider.name) }}
+                                {{ button(variant='outline', class='w-full', href=url_for('account.sso_login', provider=provider.key, next=request.args.get('next')), text=provider.name) }}
                             {% endfor %}
                         </div>
                     </div>

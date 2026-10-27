@@ -266,6 +266,38 @@ def test_tenant_mixin_actually_filters_reads(app):
         "The isolation listener is not applying." % (a_id, b_id))
 
 
+def test_solution_notes_table_is_tenant_filtered(app):
+    """T-sec02: stakeholder_communications (solution notes) carries TenantMixin and filters reads."""
+    from app import db
+    from app.models.organization import Organization
+    from app.models.stakeholder_communication import CommunicationType, StakeholderCommunication
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        org_a = Organization(name="Note A %s" % marker, slug="note-a-%s" % marker)
+        org_b = Organization(name="Note B %s" % marker, slug="note-b-%s" % marker)
+        db.session.add_all([org_a, org_b])
+        db.session.commit()
+        a_id, b_id = org_a.id, org_b.id
+        db.session.add_all([
+            StakeholderCommunication(organization_id=a_id, comm_type=CommunicationType.EMAIL,
+                                     subject="A-note %s" % marker),
+            StakeholderCommunication(organization_id=b_id, comm_type=CommunicationType.EMAIL,
+                                     subject="B-note %s" % marker),
+        ])
+        db.session.commit()
+
+    with app.test_request_context():
+        from flask import g
+
+        g.current_org_id = a_id
+        seen = {n.subject for n in StakeholderCommunication.query.filter(
+            StakeholderCommunication.subject.like("%" + marker)).all()}
+
+    assert ("A-note %s" % marker) in seen
+    assert ("B-note %s" % marker) not in seen, "TENANT LEAK: a solution note crossed organisations"
+
+
 def test_bulk_delete_is_tenant_filtered(app):
     """ADR-0003 gap 1 is closed: a bulk DELETE cannot cross tenants.
 
