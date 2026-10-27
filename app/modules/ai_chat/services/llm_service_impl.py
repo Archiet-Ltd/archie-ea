@@ -130,6 +130,7 @@ _SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
 
 # OpenRouter data-policy setting sent with every request.
 OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
+OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company published on its own website
 
 
 def _scrub_prompt(prompt: str) -> str:
@@ -1608,6 +1609,7 @@ Output clean, executable test code."""
         job_id: Optional[int] = None,
         timeout: Optional[float] = None,
         public_input: bool = False,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         Generic method to generate content from any prompt with caching.
@@ -1634,7 +1636,7 @@ Output clean, executable test code."""
             Generated response text
         """
         if public_input:
-            return LLMService._call_public_chain(prompt, timeout=timeout)
+            return LLMService._call_public_chain(prompt, timeout=timeout, max_tokens=max_tokens)
 
         provider, model = LLMService._get_configured_provider()
 
@@ -1663,7 +1665,8 @@ Output clean, executable test code."""
         return response
 
     # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
-    PUBLIC_ATTEMPT_SECONDS = 25.0
+    PUBLIC_ATTEMPT_SECONDS = 45.0  # one call to one model, measured: a 25,000-character page set takes about 30 seconds
+    PUBLIC_PROVIDER_SECONDS = 90.0  # all the models of one provider together; the chain's own deadline is checked between providers
     PUBLIC_BACKOFF_SECONDS = 3.0
     PUBLIC_BACKOFF_MAX_SECONDS = 15.0
 
@@ -1696,6 +1699,14 @@ Output clean, executable test code."""
         return None
 
     @staticmethod
+    def _within(timeout: Optional[float], deadline: Optional[float]) -> Optional[float]:
+        """``timeout``, cut to what is left before ``deadline`` (a time.monotonic() value), never under one second."""
+        if deadline is None:
+            return timeout
+        left = max(1.0, deadline - time.monotonic())
+        return left if timeout is None else min(timeout, left)
+
+    @staticmethod
     def _call_public_chain(prompt: str, timeout: Optional[float] = None, max_tokens: Optional[int] = None) -> str:
         """Answer a public-input prompt: each provider in PUBLIC_INPUT_CHAIN that has a key, in order,
         until one answers. A provider with no key is skipped silently. The whole chain stays inside
@@ -1712,6 +1723,7 @@ Output clean, executable test code."""
                 if remaining <= 1.0:
                     break
                 try:
+                    provider_deadline = min(deadline, time.monotonic() + LLMService.PUBLIC_PROVIDER_SECONDS)
                     text, _interaction = LLMService._call_llm_with_failover(
                         prompt=prompt,
                         model=PUBLIC_INPUT_MODELS[provider],
@@ -1721,7 +1733,7 @@ Output clean, executable test code."""
                         # every provider is named as tried, so a failure moves on along this chain only
                         _already_tried=list(everything),
                         public_input=True,
-                        deadline=deadline,
+                        deadline=provider_deadline,
                     )
                     return text
                 except ProviderNotAllowed:
@@ -2034,8 +2046,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                                 prompt_version=prompt_version,
                                 retention_setting=retention_setting,
                             )
-                            response_text, token_input, token_output, cost = LLMService._call_nvidia(
-                                prompt, nv_model, api_key, max_tokens=max_tokens, timeout=timeout
+                            nv_call = LLMService._call_nvidia_once if public_input else LLMService._call_nvidia
+                            response_text, token_input, token_output, cost = nv_call(
+                                prompt, nv_model, api_key, max_tokens=max_tokens,
+                                timeout=LLMService._within(timeout, deadline)
                             )
                             model = nv_model
                             nv_success = True
@@ -2080,8 +2094,13 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                                 prompt_version=prompt_version,
                                 retention_setting=retention_setting,
                             )
+                            # The flag is passed only when it is True, so a call that carries
+                            # organisation data keeps the caller's original signature.
+                            or_kwargs = {"max_tokens": max_tokens, "timeout": LLMService._within(timeout, deadline)}
+                            if public_input:
+                                or_kwargs["public_input"] = True
                             response_text, token_input, token_output, cost = LLMService._call_openrouter(
-                                prompt, or_model, api_key, max_tokens=max_tokens, timeout=timeout
+                                prompt, or_model, api_key, **or_kwargs
                             )
                             model = or_model  # Update model for interaction record
                             or_success = True
@@ -2790,8 +2809,20 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         max_tokens: Optional[int] = None,
         timeout: Optional[float] = None,
     ) -> Tuple[str, int, int, float]:
+        """NVIDIA, retried on transient failures (for callers that can wait); see ``_call_nvidia_once``."""
+        return LLMService._call_nvidia_once(prompt, model, api_key, max_tokens=max_tokens, timeout=timeout)
+
+    @staticmethod
+    def _call_nvidia_once(
+        prompt: str,
+        model: str,
+        api_key: str,
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> Tuple[str, int, int, float]:
         """
-        Call NVIDIA's hosted free models with automatic retry on transient failures.
+        One attempt at NVIDIA's hosted free models, taking at most ``timeout`` seconds: the client does not retry
+        on its own, and nothing around this call does either (the public-input chain moves on to the next model).
 
         The API is OpenAI-compatible, so we can use the OpenAI client.
 
@@ -2810,7 +2841,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             # P0 wave). Bound it explicitly at the client level.
             effective_timeout = timeout if timeout is not None else 60.0
             client = OpenAI(
-                api_key=api_key, base_url="https://integrate.api.nvidia.com/v1", timeout=effective_timeout
+                api_key=api_key, base_url=os.environ.get("NVIDIA_BASE_URL") or "https://integrate.api.nvidia.com/v1",
+                timeout=effective_timeout, max_retries=0,
             )
 
             # Use model-specific optimal token limits
@@ -2836,6 +2868,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             )
 
             response_text = response.choices[0].message.content
+            if not response_text:  # a null or empty answer is no answer: the caller moves on to the next model
+                raise RuntimeError("NVIDIA model %s sent an empty answer" % model)
             token_input = response.usage.prompt_tokens
             token_output = response.usage.completion_tokens
 
@@ -3030,6 +3064,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         api_key: str,
         max_tokens: Optional[int] = 4096,
         timeout: Optional[float] = None,
+        public_input: bool = False,
     ) -> Tuple[str, int, int, float]:
         """
         Call OpenRouter API (OpenAI-compatible chat completions).
@@ -3066,8 +3101,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
             "temperature": 0.0,
-            # Only endpoints that neither train on nor log prompts.
-            "provider": OPENROUTER_PROVIDER_POLICY,
+            # Only endpoints that neither train on nor log prompts; a public page may go to any endpoint, which
+            # is the only way the free models (they all train) can read it.
+            "provider": OPENROUTER_PUBLIC_POLICY if public_input else OPENROUTER_PROVIDER_POLICY,
         }
 
         read_timeout = timeout if timeout is not None else 80
@@ -3095,7 +3131,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             if not choices:
                 raise RuntimeError(f"OpenRouter returned empty choices for {model}")
 
-            content = choices[0].get("message", {}).get("content", "")
+            content = (choices[0].get("message") or {}).get("content")
+            if not content:  # some models send "content": null; that is no answer, so the next model is tried
+                raise RuntimeError(f"OpenRouter model {model} sent an empty answer")
             usage = data.get("usage", {})
             tokens_in = usage.get("prompt_tokens", 0)
             tokens_out = usage.get("completion_tokens", 0)

@@ -27,6 +27,7 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.smoke.chat_ask import ask
+from tests.smoke.website_wait import wait_for_the_model_pass
 from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from tests.smoke.test_connect_github_to_cited_answer_journey import (
     _SITECUSTOMIZE,
@@ -98,6 +99,9 @@ def server(request, app, tmp_path_factory, provider):
             "ALLOW_EXTERNAL_API_CALLS": "true",
             "OPENAI_API_KEY": READER_KEY,
             "OPENAI_BASE_URL": "http://127.0.0.1:%d/v1" % provider.server_port,
+            # the website reading goes through the public-input chain, whose first provider with a key is NVIDIA here
+            "NVIDIA_API_KEY": READER_KEY,
+            "NVIDIA_BASE_URL": "http://127.0.0.1:%d/v1" % provider.server_port,
             "NO_PROXY": "127.0.0.1,localhost",
             "no_proxy": "127.0.0.1,localhost",
         },
@@ -596,6 +600,7 @@ def test_a_website_is_read_shown_with_its_pages_and_written_only_when_confirmed(
         facts = page.get_by_test_id("signup-facts")
         expect(facts).to_be_visible(timeout=120000)
         expect(facts).to_contain_text("What we read on " + site.url)
+        wait_for_the_model_pass(page)
         assert not _elements_of(app, email), "the model must hold nothing until the person confirms"
         name = _fact(page, "Company name")
         expect(name.locator("[data-fact-value]")).to_have_value("Acme Robotics Ltd")
