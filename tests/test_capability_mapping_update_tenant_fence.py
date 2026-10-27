@@ -40,7 +40,8 @@ def _mapping(db_session, app, capability, **fields):
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 
     mapping = UnifiedApplicationCapabilityMapping(
-        application_component_id=app.id, unified_capability_id=capability.id, **fields,
+        application_component_id=app.id, unified_capability_id=capability.id,
+        organization_id=app.organization_id, **fields,
     )
     db_session.add(mapping)
     db_session.flush()
