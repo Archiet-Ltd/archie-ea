@@ -22,7 +22,9 @@
         ],
         actions=[
              {'text': 'New Canvas', 'icon': 'plus', 'onclick': "Platform.modal.open('bmc-create-modal')", 'variant': 'default'},
-             {'text': 'Business Cases', 'icon': 'briefcase', 'href': url_for('business_case.index'), 'variant': 'outline'}
+             {'text': 'Business Cases', 'icon': 'briefcase', 'href': url_for('business_case.index'), 'variant': 'outline'},
+             {'text': 'Competitors', 'icon': 'swords', 'href': url_for('strategy_analysis.competitors'), 'variant': 'outline'},
+             {'text': 'Strategy drafts', 'icon': 'file-pen-line', 'href': url_for('strategy_analysis.drafts'), 'variant': 'outline'}
          ]
     ) }}
 

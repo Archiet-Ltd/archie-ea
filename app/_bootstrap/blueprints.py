@@ -226,6 +226,7 @@ def _register_optional_standalone(app):
         # Navigation v3: the platform administration tools, out of the customer sidebar.
         ("app.modules.admin.platform_area_routes", "platform_area_bp", "/admin"),
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
+        ("app.modules.strategy_analysis.routes", "strategy_analysis_bp", "/strategy"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),
         # The Business Architecture practice landing page — one front door to

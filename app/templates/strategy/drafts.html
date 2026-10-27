@@ -1,0 +1,103 @@
+{# design-block: record-detail #}
+{# smoke-coverage-ok: covered by tests/smoke/test_strategy_competitors_journey.py #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/input.html' import input %}
+{% from 'components/provenance.html' import provenance_badge %}
+{% from 'strategy/_sources.html' import marks, sources_list %}
+{% block title %}Strategy drafts{% endblock %}
+{% block content %}
+{% macro _run_form(label, variant) %}
+<form method="post" action="{{ url_for('strategy_analysis.run') }}" class="contents">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {{ input(type='hidden', name='next', value='drafts') }}
+  {{ ui.button(text=label, variant=variant, attrs={'type': 'submit', 'data-testid': 'drafts-run'}) }}
+</form>
+{% endmacro %}
+{% macro _actions() %}{% if can_write and drafts.can_run %}{{ _run_form('Run again', 'outline') }}{% endif %}{% endmacro %}
+<div class="flex-1 overflow-auto">
+  <div class="mx-auto max-w-6xl space-y-6 p-6">
+    {{ page_shell(
+        title='Strategy drafts',
+        subtitle=drafts.run_line or 'The SWOT and PESTLE drafted from your profile and public sources.',
+        breadcrumb=[('Home', url_for('main.index')), ('Canvases', url_for('business_model.index')), ('Strategy drafts', none)],
+        actions_caller=_actions) }}
+
+    {% if drafts.job.state == 'drafting' %}
+    <p class="text-sm text-muted-foreground" role="status" data-testid="drafts-drafting">{{ drafts.job.text }}
+      <a href="{{ url_for('strategy_analysis.drafts') }}" class="text-primary hover:underline">Show them when they are ready</a></p>
+    {% elif drafts.job.state == 'failed' %}
+    {{ alert('warning', text=drafts.job.text, testid='drafts-failed') }}
+    {% endif %}
+    {% if drafts.failed %}
+    {{ alert('warning', text='The ' ~ drafts.failed | join(' and ') ~ ' could not be drafted this time. Run the analysis again to retry.', testid='drafts-partial') }}
+    {% endif %}
+
+    {% if drafts.pending or drafts.competitor_pending %}
+    <div class="flex flex-wrap items-center gap-3" data-testid="drafts-note">
+      <div class="min-w-0 flex-1">{{ alert('info', title='Drafts to confirm', text='These statements are drafts. Accept them to record them in your model with their sources.') }}</div>
+      {% if can_write %}
+      <form method="post" action="{{ url_for('strategy_analysis.accept') }}" class="contents">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {{ input(type='hidden', name='next', value='drafts') }}
+        {{ ui.button(text='Accept drafts', attrs={'type': 'submit', 'data-testid': 'drafts-accept'}) }}
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if drafts.competitor_pending %}
+    <p class="text-sm text-muted-foreground" data-testid="drafts-competitors-note">The competitor analysis has {{ drafts.competitor_pending }} drafted statements waiting.
+      <a href="{{ url_for('strategy_analysis.competitors') }}" class="text-primary hover:underline">See the competitor comparison</a></p>
+    {% endif %}
+
+    {% if not drafts.pending and not drafts.competitor_pending %}
+    <div data-testid="drafts-empty">
+      {% if drafts.can_run %}
+      {{ empty_state('file-pen-line', 'No drafts waiting', 'Run the analysis to draft a SWOT and a PESTLE from your profile and public sources. Each statement names its source.') }}
+      {% if can_write %}<div class="flex justify-center">{{ _run_form('Run the analysis', 'default') }}</div>{% endif %}
+      {% else %}
+      {{ empty_state('file-pen-line', 'No drafts waiting', 'The drafts are written from your confirmed company profile. Confirm the profile first.', 'Open Settings > Company', url_for('account.manage')) }}
+      {% endif %}
+      <p class="mt-4 text-center text-sm text-muted-foreground">
+        {% for card in drafts.cards if card.canvas %}<a href="{{ url_for('business_model.detail', canvas_id=card.canvas.id) }}" class="text-primary hover:underline" data-testid="canvas-link-{{ card.key }}">Open your {{ card.canvas.name }}</a>{% if not loop.last %} &middot; {% endif %}{% endfor %}
+      </p>
+    </div>
+    {% endif %}
+
+    {% for card in drafts.cards if card.count %}
+    {% call ui.card(attrs={'data-testid': 'draft-card-' ~ card.key}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_title(text=card.title) }}
+        {{ ui.card_description(text=card.count ~ ' drafted statements, by box') }}
+      {% endcall %}
+      {% call ui.card_content(class='grid gap-6 md:grid-cols-2' ~ (' lg:grid-cols-3' if card.key == 'pestle' else '')) %}
+        {% for box in card.boxes %}
+        <section data-testid="draft-box-{{ box.key }}">
+          <h3 class="text-sm font-semibold">{{ box.label }}</h3>
+          <ul class="mt-2 space-y-3 text-sm">
+            {% for row in box.rows %}
+            <li data-testid="statement">{{ row.text }}{{ marks(row.marks) }} <span class="whitespace-nowrap">{{ provenance_badge('ai') }}</span>
+              <span class="text-xs text-muted-foreground">{{ row.percent }}% sure</span></li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% endfor %}
+
+    {% if drafts.sources %}
+    {% call ui.card(attrs={'data-testid': 'draft-sources-card'}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_title(text='Sources') }}
+        {{ ui.card_description(text='Each number opens to its source here. The source title links to the page it was read from.') }}
+      {% endcall %}
+      {% call ui.card_content() %}{{ sources_list(drafts.sources) }}{% endcall %}
+    {% endcall %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

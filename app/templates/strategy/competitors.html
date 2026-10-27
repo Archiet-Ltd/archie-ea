@@ -1,0 +1,126 @@
+{# design-block: record-detail #}
+{# smoke-coverage-ok: covered by tests/smoke/test_strategy_competitors_journey.py #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/input.html' import input %}
+{% from 'components/provenance.html' import provenance_badge %}
+{% from 'strategy/_sources.html' import marks, sources_list %}
+{% block title %}Competitors{% endblock %}
+{% block content %}
+{% macro _run_form(label, variant) %}
+<form method="post" action="{{ url_for('strategy_analysis.run') }}" class="contents">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {{ input(type='hidden', name='next', value='competitors') }}
+  {{ ui.button(text=label, variant=variant, attrs={'type': 'submit', 'data-testid': 'competitors-run'}) }}
+</form>
+{% endmacro %}
+{% macro _actions() %}{% if can_write and matrix.can_run and not matrix.empty %}{{ _run_form('Run again', 'outline') }}{% endif %}{% endmacro %}
+<div class="flex-1 overflow-auto">
+  <div class="mx-auto max-w-7xl space-y-6 p-6">
+    {{ page_shell(
+        title='Competitors',
+        subtitle=matrix.run_line or 'How we compare with the competitors named in your profile and public sources.',
+        breadcrumb=[('Home', url_for('main.index')), ('Canvases', url_for('business_model.index')), ('Competitors', none)],
+        actions_caller=_actions) }}
+
+    {% if matrix.job.state == 'drafting' %}
+    <p class="text-sm text-muted-foreground" role="status" data-testid="competitors-drafting">{{ matrix.job.text }}
+      <a href="{{ url_for('strategy_analysis.competitors') }}" class="text-primary hover:underline">Show them when they are ready</a></p>
+    {% elif matrix.job.state == 'failed' %}
+    {{ alert('warning', text=matrix.job.text, testid='competitors-failed') }}
+    {% endif %}
+    {% if matrix.failed %}
+    {{ alert('warning', text='The ' ~ matrix.failed | join(' and ') ~ ' could not be drafted this time. Run the analysis again to retry.', testid='competitors-partial') }}
+    {% endif %}
+
+    {% if matrix.empty %}
+    <div data-testid="competitors-empty">
+      {% if not matrix.can_run %}
+      {{ empty_state('swords', 'No competitor analysis yet',
+          'The analysis is drafted from your confirmed company profile. Confirm the profile first.',
+          'Open Settings > Company', url_for('account.manage')) }}
+      {% elif matrix.none_named %}
+      {{ empty_state('swords', 'No competitor analysis yet',
+          'No competitors are named in your company profile yet. Add them in Settings > Company, then run the analysis.',
+          'Open Settings > Company', url_for('account.manage')) }}
+      {% else %}
+      {{ empty_state('swords', 'No competitor analysis yet',
+          'The analysis compares your company with each competitor named in your profile, using public sources. Each statement names its source.') }}
+      {% if can_write %}<div class="flex justify-center">{{ _run_form('Run the analysis', 'default') }}</div>{% endif %}
+      {% endif %}
+    </div>
+    {% else %}
+
+    {% if matrix.mode == 'draft' %}
+    <div class="flex flex-wrap items-center gap-3" data-testid="competitors-draft-note">
+      <div class="min-w-0 flex-1">{{ alert('info', title='Drafts to confirm', text='These statements are drafts. Accept them to record them in your model with their sources.') }}</div>
+      {% if can_write %}
+      <form method="post" action="{{ url_for('strategy_analysis.accept') }}" class="contents">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {{ input(type='hidden', name='next', value='competitors') }}
+        {{ ui.button(text='Accept drafts', attrs={'type': 'submit', 'data-testid': 'drafts-accept'}) }}
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% call ui.card(attrs={'data-testid': 'competitor-matrix-card'}) %}
+      {% call ui.card_content(class='px-0') %}
+        {% call ui.table_container() %}{% call ui.table(attrs={'data-testid': 'competitor-matrix'}) %}
+          {% call ui.table_header() %}{% call ui.table_row() %}
+            {{ ui.table_head(text='Question', class='sticky left-0 z-10 w-36 min-w-36 bg-card pl-6') }}
+            {% for col in matrix.columns %}
+            {% call ui.table_head(class='min-w-64 whitespace-normal text-foreground', attrs={'id': col.anchor}) %}
+              {% if col.element_id %}<a href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessActor', element_id=col.element_id) }}" class="font-semibold hover:underline" data-testid="competitor-name">{{ col.name }}</a>{% else %}<span class="font-semibold" data-testid="competitor-name">{{ col.name }}</span>{% endif %}
+            {% endcall %}
+            {%- endfor %}
+          {% endcall %}{% endcall %}
+          {% call ui.table_body() %}
+            {% for key, label in matrix.rows %}
+            {% call ui.table_row(attrs={'data-row': key}) %}
+              {{ ui.table_head(text=label, class='sticky left-0 z-10 w-36 min-w-36 bg-card pl-6 align-top font-medium') }}
+              {% for col in matrix.columns %}
+              {% call ui.table_cell(class='whitespace-normal align-top') %}
+                {% set cell = col.cells[key] %}
+                {% if not cell %}
+                <span class="text-muted-foreground">{{ matrix.nothing_found }}</span>
+                {% elif key == 'threat' %}
+                {{ ui.badge(text=cell[0].text, variant=col.variant, attrs={'data-testid': 'threat-level'}) }}{{ marks(cell[0].marks) }}
+                {% if matrix.mode == 'draft' %}<span class="ml-1">{{ provenance_badge('ai') }}</span>{% endif %}
+                {% elif key == 'position' %}
+                <p>{{ cell[0].text }}{{ marks(cell[0].marks) }}</p>
+                {% if matrix.mode == 'draft' %}<p class="mt-1">{{ provenance_badge('ai') }}</p>{% endif %}
+                {% else %}
+                <ul class="list-disc space-y-2 pl-4">
+                  {% for item in cell %}
+                  <li data-testid="statement">{{ item.text }}{{ marks(item.marks) }}{% if matrix.mode == 'draft' %} {{ provenance_badge('ai') }}{% endif %}</li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+              {% endcall %}
+              {%- endfor %}
+            {% endcall %}
+            {% endfor %}
+          {% endcall %}
+        {% endcall %}{% endcall %}
+      {% endcall %}
+      {% if matrix.confirmed %}
+      {% call ui.card_footer(class='text-sm text-muted-foreground') %}
+        <p data-testid="competitors-confirmed">Confirmed{% if matrix.confirmed.by %} by {{ matrix.confirmed.by }}{% endif %}{% if matrix.confirmed.at %} on {{ matrix.confirmed.at }}{% endif %}.</p>
+      {% endcall %}
+      {% endif %}
+    {% endcall %}
+
+    {% call ui.card(attrs={'data-testid': 'competitor-sources-card'}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_title(text='Sources') }}
+        {{ ui.card_description(text='Each number in the table opens to its source here. The source title links to the page it was read from.') }}
+      {% endcall %}
+      {% call ui.card_content() %}{{ sources_list(matrix.sources) }}{% endcall %}
+    {% endcall %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{# The footnote form of a consulting report: numbered marks in the text, one Sources list under the screen. #}
+{% macro marks(items) -%}
+{%- for m in items -%}<sup class="ml-0.5"><a href="#source-{{ m.n }}" aria-label="Source {{ m.n }}" title="{{ m.title }}" class="text-primary hover:underline" data-testid="source-mark">[{{ m.n }}]</a></sup>{%- endfor -%}
+{%- endmacro %}
+
+{% macro sources_list(sources) -%}
+<ol class="space-y-3 text-sm" data-testid="sources-list">
+  {% for s in sources %}
+  <li id="source-{{ s.n }}" class="flex gap-3" data-testid="source-item">
+    <span class="w-6 shrink-0 text-muted-foreground tabular-nums">[{{ s.n }}]</span>
+    <div class="min-w-0">
+      <a href="{{ s.url }}" class="font-medium text-primary hover:underline break-words"{% if s.url.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %} data-testid="source-link">{{ s.title }}</a>
+      <p class="text-xs text-muted-foreground">{{ s.publisher }}{% if s.read_on_label %} &middot; read {{ s.read_on_label }}{% endif %} &middot; {{ s.percent }}% sure</p>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{%- endmacro %}

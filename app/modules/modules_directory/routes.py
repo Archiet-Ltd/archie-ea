@@ -191,6 +191,8 @@ _MORE_TOOLS = [
     ("Model Registry", "dynamic_dashboards.model_registry_index", "database"),
     ("Business Case", "business_case.index", "briefcase"),
     ("Business Model", "business_model.index", "layout-dashboard"),
+    ("Competitors", "strategy_analysis.competitors", "swords"),
+    ("Strategy Drafts", "strategy_analysis.drafts", "file-pen-line"),
     ("EA Workflows", "main.ea_workflows_dashboard", "git-merge"),
     ("Framework Config", "framework_config_ui.framework_config_dashboard", "settings"),
     ("Framework Management", "main.framework_management.dashboard", "settings"),

@@ -21797,6 +21797,240 @@
    "tier": "A",
    "type_changed": false
   },
+  "app/templates/strategy/competitors.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html",
+    "components/canvas/index.html"
+   ],
+   "basis": "declared",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "button",
+    "card",
+    "empty",
+    "input",
+    "page-shell",
+    "provenance"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 7,
+    "form": 5,
+    "link": 2,
+    "modal": 3,
+    "testid": 4
+   },
+   "departures": [
+    {
+     "rule": "R38",
+     "what": "A fixed comparison matrix on basecoat/table.html, not a record list: no toolbar, pagination or row menu; the hover card for a source is the link's title until the hover card is on this base."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "basecoat/index.html",
+    "strategy/_sources.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G4",
+   "inhouse_components": [],
+   "macros": [
+    "macros/page_shell.html",
+    "components/alert.html",
+    "components/input.html",
+    "components/provenance.html"
+   ],
+   "original": "gap:G-4",
+   "page_type": "record-detail",
+   "patterns": [
+    "P01-page-header",
+    "P09-form-in-dialog",
+    "P08-confirm-destructive",
+    "P23-status-badge",
+    "P29-export-share"
+   ],
+   "persona": "business_architect",
+   "reason": "Competitor comparison matrix (R38): competitors across the top, the five questions down the side, on the basecoat table.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "confirm-error",
+    "export-running",
+    "populated"
+   ],
+   "status": "implemented",
+   "tier": "C4",
+   "type_changed": true
+  },
+  "app/templates/strategy/drafts.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html",
+    "components/canvas/index.html"
+   ],
+   "basis": "declared",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "button",
+    "card",
+    "empty",
+    "input",
+    "page-shell",
+    "provenance"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 7,
+    "form": 5,
+    "link": 2,
+    "modal": 3,
+    "testid": 4
+   },
+   "departures": [
+    {
+     "rule": "R38",
+     "what": "A fixed comparison matrix on basecoat/table.html, not a record list: no toolbar, pagination or row menu; the hover card for a source is the link's title until the hover card is on this base."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "basecoat/index.html",
+    "strategy/_sources.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G4",
+   "inhouse_components": [],
+   "macros": [
+    "macros/page_shell.html",
+    "components/alert.html",
+    "components/input.html",
+    "components/provenance.html"
+   ],
+   "original": "gap:G-4",
+   "page_type": "record-detail",
+   "patterns": [
+    "P01-page-header",
+    "P09-form-in-dialog",
+    "P08-confirm-destructive",
+    "P23-status-badge",
+    "P29-export-share"
+   ],
+   "persona": "business_architect",
+   "reason": "SWOT and PESTLE drafts by box, each statement with its numbered sources; accepted into the model on one button.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "confirm-error",
+    "export-running",
+    "populated"
+   ],
+   "status": "implemented",
+   "tier": "C4",
+   "type_changed": true
+  },
   "app/templates/capabilities/capability_fact_sheet.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
