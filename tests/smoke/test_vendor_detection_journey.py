@@ -2,6 +2,8 @@
 approvals inbox from the bell, reads where each vendor was found, confirms one, and finds it on Vendors with
 its catalogue architecture proposed as the next change."""
 
+import re
+
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
@@ -75,6 +77,13 @@ def test_cto_confirms_a_vendor_found_on_the_website(page, live_server, seeded):
     assert "your website" in card.inner_text() and "js.stripe.com" in card.inner_text()
     okta = page.locator("[data-testid^=approval-card-]", has_text="okta-verification=5b2c1d")
     assert okta.count() == 1, "the DNS record is the evidence for Okta"
+    # Every card is in words: no stored code and no unknown requester; each says where it was found.
+    assert "Found by reading your website" in card.inner_text() and "Requested by: Reading your website" in card.inner_text()
+    assert "Found in your domain records" in okta.inner_text()
+    for text in page.locator("[data-testid^=approval-card-]").all_inner_texts():
+        head = text.split("View technical detail")[0]
+        assert "Unknown requester" not in head, head
+        assert not re.search(r"\b[A-Za-z]+_[A-Za-z_]+\b", head.replace("okta-verification", "")), head
 
     card.get_by_role("button", name="Approve").click()
     card.wait_for(state="detached", timeout=PAGE_TIMEOUT)

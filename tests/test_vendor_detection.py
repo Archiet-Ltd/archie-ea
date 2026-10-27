@@ -358,3 +358,57 @@ def test_the_crawl_proposes_vendors_from_the_pages_it_read(orgs, catalogue, tena
                             [{"url": "https://lanternquay.example/", "html": HOME_PAGE}])
     assert seen["org_id"] == org.id and seen["urls"] == ["https://lanternquay.example/"]
     assert seen["resolver"]("lanternquay.example", "MX") == [], "tests never look up live DNS"
+
+
+# A hostile page: every vendor address on it is a link, a javascript: or data: address, text, an address on
+# another host that only names the vendor, or a stylesheet. None of it is a product the page loads.
+HOSTILE_PAGE = """<html><head><link rel="stylesheet" href="https://widget.intercom.io/widget.css"></head><body>
+<a href="javascript:window.__xss2=1//widget.intercom.io/widget/abc">Chat with us</a>
+<a href="https://js.stripe.com/v3/">How we take payments</a>
+<p>Payments by js.stripe.com, chat by widget.intercom.io and designs at figma.com/embed.</p>
+<script src="https://evil.example/load?next=https://js.stripe.com/v3/"></script>
+<script src="https://js.stripe.com.evil.example/v3/"></script>
+<iframe src="javascript://widget.intercom.io/%0Aalert(1)"></iframe>
+<iframe src="https://www.figma.com/file/abc"></iframe>
+<form action="data:text/html,checkout.stripe.com"></form>
+</body></html>"""
+
+
+def test_only_web_addresses_a_script_frame_or_form_loads_are_evidence():
+    from app.services.vendor_detection import detect_from_pages
+
+    assert detect_from_pages([{"url": "https://lanternquay.example/", "html": HOSTILE_PAGE}]) == []
+    loaded = detect_from_pages([{"url": "https://lanternquay.example/", "html": (
+        '<script src="//widget.intercom.io/widget/abc"></script>'
+        '<iframe src="https://www.figma.com/embed?url=x"></iframe>'
+        '<form action="https://checkout.stripe.com/pay/cs_test"></form>')}])
+    assert {d.slug: d.evidence[0]["detail"] for d in loaded} == {
+        "intercom": "//widget.intercom.io/widget/abc",
+        "figma": "https://www.figma.com/embed?url=x",
+        "stripe": "https://checkout.stripe.com/pay/cs_test",
+    }
+
+
+def test_the_inbox_cards_say_what_was_found_where_and_by_whom_in_words(orgs, catalogue, tenant_ctx, client, login_as):
+    from app.services.vendor_detection import detect_for_site, propose_from_names
+
+    org, admin = orgs["a"], orgs["a_admin"]
+    with tenant_ctx(org.id):
+        detect_for_site(org.id, "https://lanternquay.example/", [
+            {"url": "https://lanternquay.example/", "html": HOME_PAGE}], recorded_resolver)
+        propose_from_names(org.id, ["Slack"], words="we use Slack", requested_by=admin.id)
+    login_as(client, admin)
+    queue = client.get("/ai-chat/approvals/queue").get_json()
+    cards = {a["arguments"]["catalogue_slug"]: a for a in queue["approvals"]
+             if a["operation_type"] == "vendor_detection"}
+    assert set(cards) >= {"stripe", "okta", "slack"}
+    words = {slug: (c["operation_label"], c["entity_label"], c["source_label"], c["requester"]["display_name"])
+             for slug, c in cards.items()}
+    assert words["stripe"] == ("Vendor found", "Vendor", "Found by reading your website", "Reading your website")
+    assert words["okta"] == ("Vendor found", "Vendor", "Found in your domain records", "Your domain records")
+    assert words["slack"] == ("Vendor found", "Vendor", "From your chat", "Ada Okafor")
+    for card in queue["approvals"]:
+        for text in (card["operation_label"], card["entity_label"], card["source_label"] or "",
+                     card["requester"]["display_name"]):
+            assert "_" not in text and "Unknown requester" not in text, card
+
