@@ -1,4 +1,5 @@
 """Vendor models package."""
+from .vendor_catalogue import VendorCatalogueFact, VendorCatalogueLink  # noqa: F401
 from .vendor_organization import (
     EnterpriseInitiative,
     VendorOrganization,

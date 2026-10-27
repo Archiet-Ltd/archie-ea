@@ -99,7 +99,7 @@
     <form method="post" action="{{ n.remove_url }}" class="inline-flex">
       {{ ui.hidden('csrf_token', csrf_token()) }}
       {{ ui.hidden('box', n.box) }}
-      {% call ui.tooltip('Remove from this canvas (stays in your model)', true) %}{% call ui.button(variant='ghost', size='icon-xs', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove from this canvas (stays in your model)', 'data-note-remove': ''}) %}{{ ui.lucide('x', 'size-3') }}{% endcall %}{% endcall %}
+      {% call ui.tooltip('Remove from this canvas (stays in your model)', true) %}{% call ui.button(variant='ghost', size='icon', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove from this canvas (stays in your model)', 'data-note-remove': ''}) %}{{ ui.lucide('x', 'size-4') }}{% endcall %}{% endcall %}
     </form>
     {% endif %}
   </span>
