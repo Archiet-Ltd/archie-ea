@@ -384,7 +384,6 @@ spec_webhooks
 sprints
 sso_configs
 staging_elements
-stakeholder_communications
 stakeholder_inputs
 strategy_resources
 structural_groupings
