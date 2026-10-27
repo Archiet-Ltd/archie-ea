@@ -47,7 +47,7 @@
         <script>
             window.boundariesData = {{ boundaries | tojson }};
         </script>
-        {% call data_table(
+        {% call(row) data_table(
             id='system-boundaries-table',
             columns=[
                 {key: 'name', label: 'Boundary', sortable: true},
@@ -77,6 +77,7 @@
                 ]}
             ]
         ) %}
+        {% endcall %}
     </div>
 
     <!-- Empty state -->
@@ -92,14 +93,14 @@
     </div>
 
     <!-- Create boundary modal -->
-    {{ dialog(
+    {% call dialog(
         trigger_text='',
         title='New System Boundary',
         description='Define a new system boundary to group related solutions.',
         open_expr='createOpen',
         close_expr='createOpen = false',
         trigger_label='Create boundary'
-    ) }}
+    ) %}
         <div class="space-y-4">
             <div>
                 {{ form_field(
@@ -123,7 +124,7 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             {{ button(text='Cancel', variant='ghost', on_click='createOpen = false') }}
-            {{ button(text='Create', variant='primary', type='submit', disabled='!newName.trim() || creating', attrs_dict={':disabled': '!newName.trim() || creating'}) }}
+            {{ button(text='Create', variant='primary', type='submit', disabled='!newName.trim() || creating', attrs_dict={'@click': 'createBoundary()', ':disabled': '!newName.trim() || creating'}) }}
         </div>
     {% endcall %}
 
@@ -138,14 +139,14 @@
     ) }}
 
     <!-- Artifacts viewer modal -->
-    {{ dialog(
+    {% call dialog(
         trigger_text='',
         title='',
         description='',
         open_expr='artifactsBoundary',
         close_expr='artifactsBoundary = null',
         trigger_label='View artifacts'
-    ) }}
+    ) %}
         <div class="w-full max-w-4xl max-h-[90vh] flex flex-col">
             <!-- Dynamic title -->
             <template x-if="artifactsBoundary">
@@ -154,22 +155,22 @@
 
             <!-- Tab bar using tabs macro -->
             <div x-data="{ activeTab: artifactsTab }" @activeTab.changed="artifactsTab = $event.detail.value">
-                {{ tabs(id='artifacts-tabs', default_value=artifactsTab) }}
-                    {{ tabs_list() }}
-                        {{ tabs_trigger(value='compose', click="activeTab = 'compose'", selected="activeTab === 'compose'") }}docker-compose.yml{% endcall %}
-                        {{ tabs_trigger(value='nginx', click="activeTab = 'nginx'", selected="activeTab === 'nginx'") }}nginx.conf{% endcall %}
-                        {{ tabs_trigger(value='contracts', click="activeTab = 'contracts'", selected="activeTab === 'contracts'") }}
+                {% call tabs(id='artifacts-tabs', default_value=artifactsTab) %}
+                    {% call tabs_list() %}
+                        {% call tabs_trigger(value='compose') %}docker-compose.yml{% endcall %}
+                        {% call tabs_trigger(value='nginx') %}nginx.conf{% endcall %}
+                        {% call tabs_trigger(value='contracts') %}
                             Contracts
                             <template x-if="artifactsBoundary && artifactsBoundary.generated_artifacts && artifactsBoundary.generated_artifacts.contracts">
                                 <span class="ml-1 text-xs text-muted-foreground" x-text="'(' + artifactsBoundary.generated_artifacts.contracts.length + ')'"></span>
                             </template>
                         {% endcall %}
-                        {{ tabs_trigger(value='sdks', click="activeTab = 'sdks'", selected="activeTab === 'sdks'") }}Client SDKs{% endcall %}
+                        {% call tabs_trigger(value='sdks') %}Client SDKs{% endcall %}
                     {% endcall %}
 
                     <!-- Tab content -->
                     <div class="flex-1 overflow-auto">
-                        {{ tabs_content(value='compose') }}
+                        {% call tabs_content(value='compose') %}
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-muted-foreground font-mono">docker-compose.yml</span>
                                 {{ button(text='Copy', variant='ghost', size='sm', icon='copy', icon_position='left', on_click="copyToClipboard(artifactsBoundary?.generated_artifacts?.docker_compose)", aria_label='Copy docker-compose') }}
@@ -178,7 +179,7 @@
                                  x-text="artifactsBoundary?.generated_artifacts?.docker_compose || ''"></pre>
                         {% endcall %}
 
-                        {{ tabs_content(value='nginx') }}
+                        {% call tabs_content(value='nginx') %}
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-muted-foreground font-mono">nginx.conf</span>
                                 {{ button(text='Copy', variant='ghost', size='sm', icon='copy', icon_position='left', on_click="copyToClipboard(artifactsBoundary?.generated_artifacts?.nginx_conf)", aria_label='Copy nginx config') }}
@@ -187,7 +188,7 @@
                                  x-text="artifactsBoundary?.generated_artifacts?.nginx_conf || ''"></pre>
                         {% endcall %}
 
-                        {{ tabs_content(value='contracts') }}
+                        {% call tabs_content(value='contracts') %}
                             <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || (artifactsBoundary.generated_artifacts.contracts || []).length === 0"
                                  x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
                                 No cross-service contracts detected — add ArchiMate relationships between solution elements to generate contracts.
@@ -212,7 +213,7 @@
                             </div>
                         {% endcall %}
 
-                        {{ tabs_content(value='sdks') }}
+                        {% call tabs_content(value='sdks') %}
                             <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || Object.keys(artifactsBoundary.generated_artifacts.client_sdks || {}).length === 0"
                                  x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
                                 No client SDKs generated — SDKs require at least one cross-service contract.
