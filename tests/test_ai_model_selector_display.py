@@ -16,6 +16,8 @@ import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 from playwright.sync_api import expect, sync_playwright
 
+from tests.render_context import app_template_context
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -38,6 +40,7 @@ def html():
         DictLoader({'layouts/admin_base.html': base}),
         FileSystemLoader(ROOT / 'app/templates')]), autoescape=True)
     return env.get_template('ai_chat/index.html').render(
+        **app_template_context(),
         llm_configured=True, domain_config={},
         persona_config={'categories': {}, 'personas': {}}, default_chat_persona='',
         chat_persona_preference_key='test-model-display', csrf_token=lambda: 'test-token',
