@@ -1,3 +1,6 @@
 # Tables that are shared reference data on purpose, excluded from the protection requirement.
 # One table per line with a reason after the hash, e.g.  apqc_process  # shared catalogue, seeded only by commands
 # A line with no reason fails the unfenced-tables gate.
+apqc_process  # the APQC process classification framework, shared reference catalogue seeded only by commands (GLOBAL_MODELS)
+technical_capabilities  # the ACM technical capability catalogue, shared reference data seeded only by commands (GLOBAL_MODELS)
+vendor_organizations  # shared vendor catalogue, facts about vendors in the world, name globally unique (ADR-0003, GLOBAL_MODELS)

@@ -137,3 +137,52 @@ def test_a_pull_request_run_reads_the_base_branch(tmp_path):
     repo = _repo_with_main(tmp_path)
     base, source, error = gate.base_table_list(repo=repo, env={"GITHUB_BASE_REF": "main"})
     assert base == {"old_things"} and source.startswith("origin/main") and error is None
+
+
+def test_a_table_on_both_the_unfenced_list_and_the_shared_list_fails(tmp_path):
+    problems = _setup(tmp_path, listed="old_things\n", baseline="old_things\n",
+                      shared="old_things  # reference data\n")
+    assert problems == ["  table is on both the unfenced list and the shared reference list: old_things"]
+
+
+def _route_tree(tmp_path, code):
+    app = tmp_path / "app"
+    (app / "models").mkdir(parents=True, exist_ok=True)
+    (app / "models" / "things.py").write_text(MODELS)
+    (app / "routes.py").write_text(code)
+    (app / "helpers.py").write_text(code)
+    return app
+
+
+READ = "from app import db\nfrom app.models.things import Old\n\n\ndef view(org):\n    return db.session.execute(db.select(Old).where(Old.organization_id == org)).all()\n"
+
+
+def test_a_changed_route_reading_an_unfenced_table_fails_even_with_a_predicate(tmp_path):
+    app = _route_tree(tmp_path, READ)
+    problems = gate.changed_route_problems(["app/routes.py"], listed={"old_things"}, shared=(set(), []),
+                                           app=app, repo=tmp_path)
+    assert len(problems) == 1
+    assert "app/routes.py" in problems[0] and "Old (old_things)" in problems[0]
+
+
+def test_a_changed_route_is_clear_when_the_table_is_shared_fenced_or_the_file_is_not_a_route(tmp_path):
+    app = _route_tree(tmp_path, READ)
+    assert gate.changed_route_problems(["app/routes.py"], listed={"old_things"},
+                                       shared=({"old_things"}, []), app=app, repo=tmp_path) == []
+    assert gate.changed_route_problems(["app/routes.py"], listed=set(), shared=(set(), []),
+                                       app=app, repo=tmp_path) == []
+    assert gate.changed_route_problems(["app/helpers.py"], listed={"old_things"}, shared=(set(), []),
+                                       app=app, repo=tmp_path) == []
+
+
+def test_an_unchanged_route_is_not_reported(tmp_path):
+    app = _route_tree(tmp_path, READ)
+    assert gate.changed_route_problems([], listed={"old_things"}, shared=(set(), []),
+                                       app=app, repo=tmp_path) == []
+
+
+def test_a_written_reason_on_the_statement_clears_a_changed_route_read(tmp_path):
+    code = READ.replace("    return db.session", "    # tenant-scoping-ok: the caller already checked the organisation\n    return db.session")
+    app = _route_tree(tmp_path, code)
+    assert gate.changed_route_problems(["app/routes.py"], listed={"old_things"}, shared=(set(), []),
+                                       app=app, repo=tmp_path) == []

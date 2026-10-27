@@ -8,10 +8,12 @@ allowing a Solution to link to N ArchiMate elements across multiple layers.
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class SolutionElement(db.Model):
+class SolutionElement(TenantMixin, db.Model):
     __tablename__ = "solution_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(

@@ -292,9 +292,10 @@ class SolutionARBReview(TenantMixin, db.Model):
         }
 
 
-class SolutionOutcomeTracking(db.Model):
+class SolutionOutcomeTracking(TenantMixin, db.Model):
     """Track actual outcomes vs predicted for learning loop."""
     __tablename__ = 'solution_outcome_tracking'
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id', ondelete='CASCADE'), nullable=False)
@@ -383,7 +384,7 @@ class SolutionOutcomeTracking(db.Model):
         }
 
 
-class SolutionAIBacktesting(db.Model):
+class SolutionAIBacktesting(TenantMixin, db.Model):
     """
     AI Backtesting Framework: Validates AI recommendations against actual project outcomes.
     
@@ -398,6 +399,7 @@ class SolutionAIBacktesting(db.Model):
     """
     
     __tablename__ = 'solution_ai_backtesting'
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     
     # Primary Key
     id = db.Column(db.Integer, primary_key=True)
@@ -478,9 +480,10 @@ class SolutionAIBacktesting(db.Model):
         }
 
 
-class SolutionNotification(db.Model):
+class SolutionNotification(TenantMixin, db.Model):
     """In-app notifications for solution lifecycle events (phase advance, ARB submission, etc.)."""
     __tablename__ = 'solution_notifications'
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id', ondelete='CASCADE'), nullable=True, index=True)
@@ -509,9 +512,10 @@ class SolutionNotification(db.Model):
         }
 
 
-class SolutionTemplate(db.Model):
+class SolutionTemplate(TenantMixin, db.Model):
     """Reusable solution architecture template (ENT-016)."""
     __tablename__ = 'solution_templates'
+    __tenant_parent__ = (('source_solution_id', 'solutions'), ('created_by_id', 'users'),)
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)

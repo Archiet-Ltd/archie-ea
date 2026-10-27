@@ -8,7 +8,8 @@ Layer 3: before_flush event auto-sets organization_id on new TenantMixin
           records when the caller didn't set it explicitly.
 
 Both layers are NO-OPs when g.current_org_id is None (CLI, migrations,
-background tasks, unauthenticated requests).
+background tasks, unauthenticated requests), except that a new row of a model that names
+``__tenant_parent__`` takes its organisation from that parent (organization_from_parent).
 """
 
 import logging
@@ -25,6 +26,29 @@ logger = logging.getLogger(__name__)
 
 
 _TENANT_CONTEXT_KEY = "archie_tenant_context_held"
+
+
+def organization_from_parent(session, obj):
+    """The organisation that owns the record ``obj`` hangs from, or None.
+
+    A model names its parents in ``__tenant_parent__``, a tuple of ``(attribute, parent_table)``
+    pairs tried in order: ``(("solution_id", "solutions"),)`` says "my organisation is my
+    solution's". Used when nothing signed in supplies one, so a background job or a seeder that
+    creates a child row cannot leave it unowned (and, once the table is fenced, cannot fail on it).
+    """
+    for attribute, parent_table in getattr(type(obj), "__tenant_parent__", ()):
+        parent_id = getattr(obj, attribute, None)
+        if parent_id is None:
+            continue
+        with session.no_autoflush:
+            found = session.execute(
+                text(f'SELECT organization_id FROM "{parent_table}" WHERE id = :id'),  # nosec B608 - literal table name from the model
+                {"id": parent_id},
+            ).scalar()
+        if found is not None:
+            return found
+    return None
+
 
 
 def set_database_tenant_context(connection, organization_id):
@@ -195,11 +219,18 @@ def install_tenant_filter(app):
 
     @db.event.listens_for(db.session, "before_flush")
     def _set_tenant_on_new(session, flush_context, instances):
-        if not hasattr(g, "current_org_id") or g.current_org_id is None:
-            return
-        set_database_tenant_context(session.connection(), g.current_org_id)
+        org_id = getattr(g, "current_org_id", None) if has_app_context() else None
+        if org_id is not None:
+            set_database_tenant_context(session.connection(), org_id)
         for obj in session.new:
             if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
-                obj.organization_id = g.current_org_id
+                if org_id is not None:
+                    obj.organization_id = org_id
+                else:
+                    # No signed-in organisation (a job, a seeder, a command): the row belongs to
+                    # whichever organisation owns the parent record it hangs from.
+                    derived = organization_from_parent(session, obj)
+                    if derived is not None:
+                        obj.organization_id = derived
 
     app.logger.info("Tenant isolation filters installed (do_orm_execute + before_flush)")

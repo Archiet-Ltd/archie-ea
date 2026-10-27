@@ -81,9 +81,10 @@ class SolutionRisk(TenantMixin, db.Model):
         }
 
 
-class SolutionTCOItem(db.Model):
+class SolutionTCOItem(TenantMixin, db.Model):
     """Total Cost of Ownership line item (TOGAF Phase E)."""
     __tablename__ = "solution_tco_items"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True)
@@ -224,9 +225,10 @@ class SolutionARBDraft(TenantMixin, db.Model):
         }
 
 
-class SolutionPlateau(db.Model):
+class SolutionPlateau(TenantMixin, db.Model):
     """Transition architecture plateau (TOGAF Phase F)."""
     __tablename__ = "solution_plateaus"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True)

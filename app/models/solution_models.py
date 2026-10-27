@@ -1057,13 +1057,14 @@ contract_vendor_products = db.Table(
 # ============================================================================
 
 
-class SolutionCapabilityMapping(db.Model):
+class SolutionCapabilityMapping(TenantMixin, db.Model):
     """
     Junction table for mapping problem definitions to business capabilities.
     DB column is problem_id (FK to solution_problem_definitions).
     """
 
     __tablename__ = "solution_capability_mappings"
+    __tenant_parent__ = (('solution_id', 'solutions'), ('problem_id', 'solution_problem_definitions'),)
 
     id = Column(db.Integer, primary_key=True)
     problem_id = Column(
@@ -1105,13 +1106,14 @@ class SolutionCapabilityMapping(db.Model):
         )
 
 
-class SolutionArchiMateElement(db.Model):
+class SolutionArchiMateElement(TenantMixin, db.Model):
     """
     Junction table for mapping solutions to ArchiMate elements across all 6 layers.
     Uses polymorphic lookup to reference elements from different layer tables.
     """
 
     __tablename__ = "solution_archimate_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = Column(db.Integer, primary_key=True)
     solution_id = Column(
@@ -1253,7 +1255,7 @@ class SolutionArchiMateElement(db.Model):
         return f"<SolutionArchiMateElement solution={self.solution_id} layer={self.layer_type} table={self.element_table}>"
 
 
-class SolutionComment(db.Model):
+class SolutionComment(TenantMixin, db.Model):
     """
     Section-level comment threads for solution design collaboration.
 
@@ -1262,6 +1264,7 @@ class SolutionComment(db.Model):
     """
 
     __tablename__ = "solution_comments"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = Column(Integer, primary_key=True)
     solution_id = Column(Integer, ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -1296,7 +1299,7 @@ class SolutionComment(db.Model):
         return f"<SolutionComment id={self.id} solution={self.solution_id} section={self.section_name}>"
 
 
-class SolutionFitGapEntry(db.Model):
+class SolutionFitGapEntry(TenantMixin, db.Model):
     """
     ERP Fit-Gap Analysis entry for SAP/Microsoft programme governance.
 
@@ -1305,6 +1308,7 @@ class SolutionFitGapEntry(db.Model):
     """
 
     __tablename__ = "solution_fit_gap_entries"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     # SAP ACTIVATE fit-gap taxonomy
     FIT_TYPES = ["standard", "configuration", "enhancement", "extension", "custom", "out_of_scope"]
