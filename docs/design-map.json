@@ -1332,6 +1332,226 @@
   "P36-compare-two-records": "Compare two records or versions"
  },
  "pages": {
+  "app/templates/applications/rationalization/gaps.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_table.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/pagination_controls.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/table.html",
+    "components/tabs.html",
+    "components/workbench_table.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "data-table",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "dropdown-menu",
+    "empty",
+    "figures",
+    "list-table",
+    "page-shell",
+    "table",
+    "tabs"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 2,
+    "link": 4,
+    "table": 1,
+    "testid": 6
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [],
+   "macros": [
+    "components/figures.html",
+    "components/list_table.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "original": "example:tasks",
+   "page_type": "data-table",
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P09-form-in-dialog",
+    "P17-empty-state",
+    "P23-status-badge"
+   ],
+   "persona": "portfolio_manager",
+   "reason": "Gap findings, one Portfolio tab: each list of gaps as a data table with a row menu.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/tech_radar/classify.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html",
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
+   ],
+   "basis": "rule",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "figures",
+    "native-select",
+    "page-shell"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 2,
+    "form": 1,
+    "testid": 4
+   },
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: Timeline/List toggle, each bar is a button named 'item, start to end, status', today marker carries text (TML-1 to TML-4)."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G4",
+   "inhouse_components": [
+    "gantt-timeline:Keep",
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "components/figures.html",
+    "macros/page_shell.html"
+   ],
+   "original": "gap:G-4",
+   "page_type": "timeline",
+   "patterns": [
+    "P01-page-header",
+    "P20-inspect-side-panel",
+    "P23-status-badge",
+    "P29-export-share"
+   ],
+   "persona": "cto",
+   "reason": "One technology on the radar: its ring and quadrant, set from a form, beside what the model knows about it.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": "docs/buckets: solutions-rethink-v1.md, The solution record (slice 5a)",
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "export-running",
+    "list-view",
+    "populated"
+   ],
+   "status": "implemented",
+   "tier": "C3",
+   "type_changed": true
+  },
   "app/templates/frameworks/gallery.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -38801,6 +39021,7 @@
    "components": [
     "element-table",
     "fact-list",
+    "figures",
     "list-table",
     "risk-matrix",
     "alert",

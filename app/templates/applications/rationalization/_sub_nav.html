@@ -1,6 +1,6 @@
 {# Portfolio's sections, shared by every Portfolio page: active_tab names the open one; planning_app, when set,
    adds the application being planned. #}
-{% from 'components/section_tabs.html' import section_tabs %}
+{% from 'components/tabs.html' import section_tabs %}
 {%- set _items = [('Dashboard', url_for('unified_applications.rationalization_dashboard'), active_tab == 'dashboard'),
                   ('Workbench', url_for('unified_applications.rationalization_workbench'), active_tab == 'workbench')] -%}
 {%- if planning_app -%}
