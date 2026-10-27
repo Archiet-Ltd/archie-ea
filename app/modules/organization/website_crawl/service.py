@@ -103,7 +103,8 @@ def default_model(timeout: float = MODEL_TIMEOUT_SECONDS) -> Callable[[str], str
 
     def ask(prompt: str) -> str:
         # the pages are public text, so free providers may read them
-        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=timeout, public_input=True)
+        # room for the answer about three pages: 4,096 tokens cut the JSON off in the middle
+        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=timeout, public_input=True, max_tokens=8192)
 
     return ask
 
@@ -706,6 +707,8 @@ def crawl_organization_website(
                            org_id, number * MODEL_PAGES_PER_CALL + 1, number * MODEL_PAGES_PER_CALL + len(chunk),
                            type(exc).__name__, str(exc)[:200], exc_info=True)
             read["model_errors"] += 1
+            if not isinstance(exc, ValueError):  # a timeout or a busy provider is tried again later; a bad answer is not
+                read["retry_later"] = True
             if number == 0:
                 break  # the providers are failing: the rest are not asked, and the pass is tried again later
     facts = _facts_from(read["pages"])
@@ -716,7 +719,7 @@ def crawl_organization_website(
         with tenant_scope(org_id):
             stored += _store(org_id, added, crawl_id, replace=False)
     retry_queued = None
-    if read["model_errors"] and retry_attempt < len(RETRY_DELAYS_SECONDS):
+    if read.get("retry_later") and retry_attempt < len(RETRY_DELAYS_SECONDS):
         retry_queued = _queue_retry(org_id, retry_attempt + 1)
     if not stored and not more_only:
         raise CrawlRefused(

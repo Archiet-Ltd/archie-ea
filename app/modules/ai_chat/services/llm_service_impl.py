@@ -1609,6 +1609,7 @@ Output clean, executable test code."""
         job_id: Optional[int] = None,
         timeout: Optional[float] = None,
         public_input: bool = False,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         Generic method to generate content from any prompt with caching.
@@ -1635,7 +1636,7 @@ Output clean, executable test code."""
             Generated response text
         """
         if public_input:
-            return LLMService._call_public_chain(prompt, timeout=timeout)
+            return LLMService._call_public_chain(prompt, timeout=timeout, max_tokens=max_tokens)
 
         provider, model = LLMService._get_configured_provider()
 

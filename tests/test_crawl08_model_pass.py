@@ -366,3 +366,35 @@ def test_a_public_page_may_go_to_the_free_models_that_keep_what_they_are_sent(pr
     seen.clear()
     impl.LLMService._call_openrouter("organisation data", "some/model:free", "key", public_input=False)
     assert seen == [{"data_collection": "deny"}]
+
+
+def test_only_a_busy_or_slow_provider_is_tried_again_later_not_an_answer_that_is_not_json(make_org, site):
+    from app.models.job import Job
+
+    def jobs_for(org_id):
+        return [j for j in Job.query.filter_by(task="website_profile_crawl_more").all() if (j.payload or {}).get("organization_id") == org_id]
+
+    org = _org(make_org, site.url)
+    summary = _crawl(org, llm=lambda prompt: "this is not JSON at all")
+    assert summary["model_errors"] >= 1 and summary["retry_queued"] is None
+    assert summary["model_error"]["type"] in ("ValueError", "JSONDecodeError")
+    assert jobs_for(org.id) == []
+
+    other = _org(make_org, site.url)
+
+    def busy(prompt):
+        raise RuntimeError("every provider is busy")
+
+    again = _crawl(other, llm=busy)
+    assert again["retry_queued"] is not None and len(jobs_for(other.id)) == 1
+
+
+def test_the_website_reading_asks_for_room_to_answer(monkeypatch):
+    from app.modules.ai_chat.services import llm_service_impl
+    from app.modules.organization.website_crawl import service
+
+    seen = {}
+    monkeypatch.setattr(llm_service_impl.LLMService, "_call_public_chain",
+                        staticmethod(lambda prompt, timeout=None, max_tokens=None: seen.update(max_tokens=max_tokens) or "{}"))
+    service.default_model(timeout=30)("a page")
+    assert seen["max_tokens"] == 8192
