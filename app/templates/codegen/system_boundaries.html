@@ -1,5 +1,18 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/form_field.html' import form_field %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/status_badge.html' import status_badge %}
+{% from 'components/confirmation_dialog.html' import confirmation_dialog %}
+{% from 'components/loading_state.html' import loading_inline %}
+{% from 'components/data_table.html' import data_table, data_table_script %}
+{# design-block: data-table #}
 {% block title %}System Boundaries — Code Workbench{% endblock %}
 
 {% block content %}
@@ -7,261 +20,211 @@
 
     <!-- Header -->
     {% macro _ps_actions() %}
-<button type="button" @click="createOpen = true"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="h-4 w-4"></i>
-            New System Boundary
-        </button>
+    {{ button(text='New System Boundary', icon='plus', on_click='createOpen = true', variant='primary') }}
     {% endmacro %}
-    {{ page_shell(title='System Boundaries', breadcrumb=[('Home', '/'), ('System Boundaries', none)], subtitle='Group solutions into microservice systems — generate docker-compose, Terraform, contracts, and client SDKs.', actions_caller=_ps_actions) }}
+    {{ page_shell(
+        title='System Boundaries',
+        breadcrumb=[('Home', '/'), ('System Boundaries', none)],
+        subtitle='Group solutions into microservice systems — generate docker-compose, Terraform, contracts, and client SDKs.',
+        actions_caller=_ps_actions
+    ) }}
 
     <!-- Success / Error banners -->
     <div x-show="successMsg" x-cloak x-transition
-         class="mb-4 flex items-start gap-3 rounded-md border border-success/40 bg-success/10 px-4 py-2 text-sm text-success-emphasis">
-        <i data-lucide="check-circle-2" class="h-4 w-4 mt-0.5 shrink-0"></i>
+         class="mb-4 flex items-start gap-3 rounded-md border border-success/40 bg-success/10 px-4 py-2 text-sm text-success-emphasis" role="alert">
+        <i data-lucide="check-circle-2" class="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true"></i>
         <span x-text="successMsg"></span>
     </div>
     <template x-for="(err, i) in errors" :key="i">
-        <div x-transition class="mb-2 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
-            <i data-lucide="x-circle" class="h-4 w-4 mt-0.5 shrink-0"></i>
+        <div x-transition class="mb-2 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis" role="alert">
+            <i data-lucide="x-circle" class="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true"></i>
             <span x-text="err"></span>
         </div>
     </template>
 
-    <!-- Empty state -->
-    <div x-show="boundaries.length === 0 && !loading" x-cloak
-         class="rounded-lg border border-border bg-card p-12 text-center">
-        <i data-lucide="layers" class="h-10 w-10 text-muted-foreground mx-auto mb-4"></i>
-        <h3 class="text-base font-semibold text-foreground mb-1">No system boundaries yet</h3>  <!-- frontend-quality-ok -->
-        <p class="text-sm text-muted-foreground mb-4">
-            Create a boundary, add 2+ solutions, then generate docker-compose and inter-service contracts.
-        </p>
-        <button type="button" @click="createOpen = true"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="h-4 w-4"></i>
-            Create First Boundary
-        </button>
+    <!-- Boundaries list - using data_table macro -->
+    <div x-show="boundaries.length > 0 || loading" x-cloak>
+        <script>
+            window.boundariesData = {{ boundaries | tojson }};
+        </script>
+        {% call data_table(
+            id='system-boundaries-table',
+            columns=[
+                {key: 'name', label: 'Boundary', sortable: true},
+                {key: 'description', label: 'Description', type: 'truncate', class: 'max-w-[400px]'},
+                {key: 'solution_count', label: 'Services', class: 'w-[100px] text-center'},
+                {key: 'has_artifacts', label: 'Status', type: 'boolean', class: 'w-[120px] text-center'},
+                {key: 'generated_at', label: 'Generated', class: 'w-[180px] text-center'},
+            ],
+            rows_expr='boundariesData',
+            searchable=true,
+            search_key='name',
+            search_placeholder='Filter boundaries...',
+            sortable=true,
+            pagination=true,
+            per_page=10,
+            row_selection=false,
+            actions=true,
+            on_edit='editBoundary(row.id)',
+            on_delete='confirmDeleteBoundary(row.id)',
+            on_view='viewArtifacts(row.id)',
+            empty_icon='layers',
+            empty_text='No system boundaries yet. Create one to get started.',
+            filters=[
+                {key: 'has_artifacts', label: 'Artifacts', options: [
+                    {value: 'true', label: 'Generated'},
+                    {value: 'false', label: 'Not generated'}
+                ]}
+            ]
+        ) %}
     </div>
 
-    <!-- Boundaries list -->
-    <div class="space-y-4">
-        <template x-for="b in boundaries" :key="b.id">
-            <div class="rounded-lg border border-border bg-card overflow-hidden">
-                <!-- Boundary header -->
-                <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-                    <div class="flex items-center gap-3">
-                        <i data-lucide="layers" class="h-5 w-5 text-primary"></i>
-                        <div>
-                            <h3 class="text-sm font-semibold text-foreground" x-text="b.name"></h3>
-                            <p class="text-xs text-muted-foreground" x-text="b.description || 'No description'"></p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-muted-foreground"
-                              x-text="(b.solution_count || 0) + ' services'"></span>
-                        <span x-show="b.has_artifacts" x-cloak
-                              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/20">
-                            <i data-lucide="check" class="h-3 w-3"></i> Generated
-                        </span>
-                        <button type="button" @click="generateArtifacts(b.id)"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                :disabled="(b.solution_count || 0) < 2"
-                                :class="(b.solution_count || 0) < 2 ? 'opacity-50 cursor-not-allowed' : ''">
-                            <i data-lucide="play" class="h-3 w-3"></i>
-                            Generate
-                        </button>
-                        <button type="button" aria-label="Delete" @click="deleteBoundary(b.id)"
-                                class="inline-flex items-center rounded-md border border-destructive/20 bg-destructive/5 p-1.5 text-destructive-emphasis hover:bg-destructive/10 transition-colors">
-                            <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Solutions in boundary -->
-                <div class="px-5 py-3">
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <template x-for="svc in (b.solutions || [])" :key="svc.id">
-                            <div class="flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-1.5">
-                                <i data-lucide="box" class="h-3.5 w-3.5 text-muted-foreground"></i>
-                                <span class="text-xs text-foreground font-medium" x-text="svc.solution_name"></span>
-                                <span class="text-xs text-muted-foreground" x-text="':' + (svc.service_port || '?')"></span>
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
-                                      :class="{
-                                          'bg-info/10 text-info-emphasis': svc.role === 'producer',
-                                          'bg-warning/10 text-warning-emphasis': svc.role === 'consumer',
-                                          'bg-muted text-muted-foreground': svc.role === 'service',
-                                      }"
-                                      x-text="svc.role"></span>
-                                <span x-show="!svc.has_codegen" x-cloak
-                                      class="text-xs text-warning-emphasis">⚠ no code</span>
-                                <button type="button" aria-label="Remove" @click="removeSolution(b.id, svc.solution_id)"
-                                        class="text-muted-foreground hover:text-destructive-emphasis transition-colors ml-0.5">
-                                    <i data-lucide="x" class="h-3 w-3"></i>
-                                </button>
-                            </div>
-                        </template>
-
-                        <!-- Add solution -->
-                        <button type="button" @click="addSolutionOpen = b.id"
-                                class="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors">
-                            <i data-lucide="plus" class="h-3.5 w-3.5"></i>
-                            Add service
-                        </button>
-                    </div>
-
-                    <!-- Add solution inline form -->
-                    <div x-show="addSolutionOpen === b.id" x-cloak
-                         class="flex items-center gap-2 mt-2 pt-2 border-t border-border">
-                        <select x-model="addSolutionId"
-                                class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Select a solution">
-                            <option value="">— Select a solution —</option>
-                            {% for sol in solutions %}
-                            <option value="{{ sol.id }}">{{ sol.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <select x-model="addSolutionRole"
-                                class="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Add Solution Role">
-                            <option value="service">service</option>
-                            <option value="producer">producer</option>
-                            <option value="consumer">consumer</option>
-                        </select>
-                        <button type="button" @click="addSolution(b.id)"
-                                :disabled="!addSolutionId"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                            Add
-                        </button>
-                        <button aria-label="Cancel adding solution" type="button" @click="addSolutionOpen = null; addSolutionId = ''"
-                                class="text-muted-foreground hover:text-foreground transition-colors">
-                            <i data-lucide="x" class="h-4 w-4"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Generated artifacts preview -->
-                <div x-show="b.has_artifacts" x-cloak class="border border-t border-border px-5 py-2 bg-muted/5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs text-muted-foreground">
-                            Generated <span x-text="b.generated_at ? new Date(b.generated_at).toLocaleString() : ''"></span>
-                        </span>
-                        <button type="button" @click="viewArtifacts(b.id)"
-                                class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                            <i data-lucide="eye" class="h-3 w-3"></i>
-                            View Artifacts
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </template>
+    <!-- Empty state -->
+    <div x-show="boundaries.length === 0 && !loading" x-cloak>
+        {{ empty_state(
+            icon='layers',
+            title='No system boundaries yet',
+            description='Create a boundary, add 2+ solutions, then generate docker-compose and inter-service contracts.',
+            cta_text='Create First Boundary',
+            cta_onclick='createOpen = true',
+            cta_icon='plus'
+        ) }}
     </div>
 
     <!-- Create boundary modal -->
-    <div x-show="createOpen" x-cloak x-transition.opacity
-         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50">
-        <div @click.away="createOpen = false"
-             class="w-full max-w-md rounded-lg border border-border bg-card p-6">
-            <h2 class="text-base font-semibold text-foreground mb-4">New System Boundary</h2>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs font-medium text-muted-foreground">Name</label>
-                    <input type="text" x-model="newName" @keydown.enter="createBoundary()"
-                           placeholder="e.g. Claims Processing Platform"
-                           class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Name">
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-muted-foreground">Description (optional)</label>
-                    <textarea x-model="newDesc" rows="2"
-                              placeholder="What system does this boundary represent?"
-                              class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Description (optional)"></textarea>
-                </div>
+    {{ dialog(
+        trigger_text='',
+        title='New System Boundary',
+        description='Define a new system boundary to group related solutions.',
+        open_expr='createOpen',
+        close_expr='createOpen = false',
+        trigger_label='Create boundary'
+    ) }}
+        <div class="space-y-4">
+            <div>
+                {{ form_field(
+                    id='newName',
+                    label='Name',
+                    required=true,
+                    placeholder='e.g. Claims Processing Platform',
+                    attrs_dict={'x-model': 'newName', '@keydown.enter': 'createBoundary()'}
+                ) }}
             </div>
-            <div class="flex items-center justify-end gap-2 mt-4">
-                <button type="button" @click="createOpen = false"
-                        class="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                    Cancel
-                </button>
-                <button type="button" @click="createBoundary()" :disabled="!newName.trim() || creating"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <svg x-show="creating" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                    </svg>
-                    <span x-text="creating ? 'Creating…' : 'Create'"></span>
-                </button>
+            <div>
+                {{ form_field(
+                    id='newDesc',
+                    label='Description (optional)',
+                    input_type='textarea',
+                    placeholder='What system does this boundary represent?',
+                    rows=3,
+                    attrs_dict={'x-model': 'newDesc'}
+                ) }}
             </div>
         </div>
-    </div>
+        <div class="mt-6 flex justify-end gap-2">
+            {{ button(text='Cancel', variant='ghost', on_click='createOpen = false') }}
+            {{ button(text='Create', variant='primary', type='submit', disabled='!newName.trim() || creating', attrs_dict={':disabled': '!newName.trim() || creating'}) }}
+        </div>
+    {% endcall %}
+
+    <!-- Delete confirmation dialog -->
+    {{ confirmation_dialog(
+        id='delete-boundary',
+        title='Delete System Boundary?',
+        message='This will permanently delete the system boundary and all its generated artifacts. This action cannot be undone.',
+        confirm_text='Delete',
+        cancel_text='Cancel',
+        variant='destructive'
+    ) }}
 
     <!-- Artifacts viewer modal -->
-    <div x-show="artifactsBoundary" x-cloak x-transition.opacity
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50">
-        <div @click.away="artifactsBoundary = null"
-             class="w-full max-w-4xl max-h-[90vh] rounded-lg border border-border bg-card flex flex-col">
-            <!-- Modal header -->
-            <div class="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-                <h2 class="text-base font-semibold text-foreground" x-text="artifactsBoundary ? artifactsBoundary.name + ' — Artifacts' : ''"></h2>
-                <button aria-label="Close artifacts panel" type="button" @click="artifactsBoundary = null" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <i data-lucide="x" class="h-4 w-4"></i>
-                </button>
-            </div>
+    {{ dialog(
+        trigger_text='',
+        title='',
+        description='',
+        open_expr='artifactsBoundary',
+        close_expr='artifactsBoundary = null',
+        trigger_label='View artifacts'
+    ) }}
+        <div class="w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <!-- Dynamic title -->
+            <template x-if="artifactsBoundary">
+                <h2 class="text-base font-semibold text-foreground mb-4" x-text="artifactsBoundary.name + ' — Artifacts'"></h2>
+            </template>
+
             <!-- Tab bar -->
-            <div class="flex border-b border-border shrink-0 px-5 gap-4">
-                <button type="button" @click="artifactsTab = 'compose'"
-                        class="py-2.5 text-sm font-medium border-b-2 transition-colors"
-                        :class="artifactsTab === 'compose' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+            <div class="flex border-b border-border mb-4" role="tablist">
+                <button type="button" role="tab" @click="artifactsTab = 'compose'"
+                        :class="artifactsTab === 'compose' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
+                        aria-selected="artifactsTab === 'compose'"
+                        aria-controls="panel-compose">
                     docker-compose.yml
                 </button>
-                <button type="button" @click="artifactsTab = 'nginx'"
-                        class="py-2.5 text-sm font-medium border-b-2 transition-colors"
-                        :class="artifactsTab === 'nginx' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <button type="button" role="tab" @click="artifactsTab = 'nginx'"
+                        :class="artifactsTab === 'nginx' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
+                        aria-selected="artifactsTab === 'nginx'"
+                        aria-controls="panel-nginx">
                     nginx.conf
                 </button>
-                <button type="button" @click="artifactsTab = 'contracts'"
-                        class="py-2.5 text-sm font-medium border-b-2 transition-colors"
-                        :class="artifactsTab === 'contracts' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <button type="button" role="tab" @click="artifactsTab = 'contracts'"
+                        :class="artifactsTab === 'contracts' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
+                        aria-selected="artifactsTab === 'contracts'"
+                        aria-controls="panel-contracts">
                     Contracts
-                    <span class="ml-1 text-xs text-muted-foreground"
-                          x-text="artifactsBoundary && artifactsBoundary.generated_artifacts ? '(' + (artifactsBoundary.generated_artifacts.contracts || []).length + ')' : ''"></span>
+                    <template x-if="artifactsBoundary && artifactsBoundary.generated_artifacts && artifactsBoundary.generated_artifacts.contracts">
+                        <span class="ml-1 text-xs text-muted-foreground" x-text="'(' + artifactsBoundary.generated_artifacts.contracts.length + ')'"></span>
+                    </template>
                 </button>
-                <button type="button" @click="artifactsTab = 'sdks'"
-                        class="py-2.5 text-sm font-medium border-b-2 transition-colors"
-                        :class="artifactsTab === 'sdks' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <button type="button" role="tab" @click="artifactsTab = 'sdks'"
+                        :class="artifactsTab === 'sdks' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                        class="py-2.5 px-3 text-sm font-medium border-b-2 transition-colors"
+                        aria-selected="artifactsTab === 'sdks'"
+                        aria-controls="panel-sdks">
                     Client SDKs
                 </button>
             </div>
+
             <!-- Tab content -->
-            <div class="flex-1 overflow-auto p-5">
+            <div class="flex-1 overflow-auto">
                 <!-- docker-compose -->
-                <div x-show="artifactsTab === 'compose'" x-cloak>
+                <div x-show="artifactsTab === 'compose'" x-cloak role="tabpanel" id="panel-compose" aria-labelledby="tab-compose">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs text-muted-foreground font-mono">docker-compose.yml</span>
-                        <button type="button" @click="copyToClipboard(artifactsBoundary.generated_artifacts.docker_compose)"
-                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                            <i data-lucide="copy" class="h-3.5 w-3.5"></i> Copy
+                        <button type="button" @click="copyToClipboard(artifactsBoundary?.generated_artifacts?.docker_compose)"
+                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Copy docker-compose">
+                            <i data-lucide="copy" class="h-3.5 w-3.5" aria-hidden="true"></i> Copy
                         </button>
                     </div>
                     <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-96 whitespace-pre"
-                         x-text="artifactsBoundary && artifactsBoundary.generated_artifacts ? artifactsBoundary.generated_artifacts.docker_compose : ''"></pre>
+                         x-text="artifactsBoundary?.generated_artifacts?.docker_compose || ''"></pre>
                 </div>
+
                 <!-- nginx -->
-                <div x-show="artifactsTab === 'nginx'" x-cloak>
+                <div x-show="artifactsTab === 'nginx'" x-cloak role="tabpanel" id="panel-nginx" aria-labelledby="tab-nginx">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs text-muted-foreground font-mono">nginx.conf</span>
-                        <button type="button" @click="copyToClipboard(artifactsBoundary.generated_artifacts.nginx_conf)"
-                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                            <i data-lucide="copy" class="h-3.5 w-3.5"></i> Copy
+                        <button type="button" @click="copyToClipboard(artifactsBoundary?.generated_artifacts?.nginx_conf)"
+                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Copy nginx config">
+                            <i data-lucide="copy" class="h-3.5 w-3.5" aria-hidden="true"></i> Copy
                         </button>
                     </div>
                     <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-96 whitespace-pre"
-                         x-text="artifactsBoundary && artifactsBoundary.generated_artifacts ? artifactsBoundary.generated_artifacts.nginx_conf : ''"></pre>
+                         x-text="artifactsBoundary?.generated_artifacts?.nginx_conf || ''"></pre>
                 </div>
+
                 <!-- contracts -->
-                <div x-show="artifactsTab === 'contracts'" x-cloak>
+                <div x-show="artifactsTab === 'contracts'" x-cloak role="tabpanel" id="panel-contracts" aria-labelledby="tab-contracts">
                     <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || (artifactsBoundary.generated_artifacts.contracts || []).length === 0"
-                         x-cloak class="text-sm text-muted-foreground italic py-4">
+                         x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
                         No cross-service contracts detected — add ArchiMate relationships between solution elements to generate contracts.
                     </div>
                     <div class="space-y-2">
-                        <template x-for="(c, i) in (artifactsBoundary && artifactsBoundary.generated_artifacts ? artifactsBoundary.generated_artifacts.contracts : [])" :key="i">
+                        <template x-for="(c, i) in (artifactsBoundary?.generated_artifacts?.contracts || [])" :key="i">
                             <div class="rounded-md border border-border bg-muted/10 px-4 py-2">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info/10 text-info border border-info/20"
@@ -279,20 +242,22 @@
                         </template>
                     </div>
                 </div>
+
                 <!-- SDKs -->
-                <div x-show="artifactsTab === 'sdks'" x-cloak>
+                <div x-show="artifactsTab === 'sdks'" x-cloak role="tabpanel" id="panel-sdks" aria-labelledby="tab-sdks">
                     <div x-show="!artifactsBoundary || !artifactsBoundary.generated_artifacts || Object.keys(artifactsBoundary.generated_artifacts.client_sdks || {}).length === 0"
-                         x-cloak class="text-sm text-muted-foreground italic py-4">
+                         x-cloak class="text-sm text-muted-foreground italic py-4" role="status">
                         No client SDKs generated — SDKs require at least one cross-service contract.
                     </div>
                     <div class="space-y-4">
-                        <template x-for="[filename, code] in Object.entries((artifactsBoundary && artifactsBoundary.generated_artifacts ? artifactsBoundary.generated_artifacts.client_sdks : {}) || {})" :key="filename">
+                        <template x-for="[filename, code] in Object.entries(artifactsBoundary?.generated_artifacts?.client_sdks || {})" :key="filename">
                             <div>
                                 <div class="flex items-center justify-between mb-2">
                                     <span class="text-xs text-muted-foreground font-mono" x-text="filename"></span>
                                     <button type="button" @click="copyToClipboard(code)"
-                                            class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                        <i data-lucide="copy" class="h-3.5 w-3.5"></i> Copy
+                                            class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                            aria-label="Copy SDK">
+                                        <i data-lucide="copy" class="h-3.5 w-3.5" aria-hidden="true"></i> Copy
                                     </button>
                                 </div>
                                 <pre class="rounded-lg bg-muted/30 border border-border p-4 text-xs font-mono text-foreground overflow-auto max-h-64 whitespace-pre" x-text="code"></pre>
@@ -302,7 +267,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    {% endcall %}
 
 </div>
 
@@ -329,12 +294,12 @@ function systemBoundaries() {
         artifactsBoundary: null,
         artifactsTab: 'compose',
 
+        // Delete confirmation
+        deleteBoundaryId: null,
+
         init() {
             // Initial boundaries already server-rendered
         },
-
-        // Platform.fetch automatically handles JSON serialization, CSRF tokens, and throws on non‑ok responses.
-        // We pass { silent: true } because this component paints its own inline error state.
 
         _setSuccess(msg) {
             this.successMsg = msg;
@@ -367,8 +332,15 @@ function systemBoundaries() {
             }
         },
 
-        async deleteBoundary(id) {
-            if (!(await Platform.modal.confirm('Delete this system boundary and all its generated artifacts?'))) return;
+        confirmDeleteBoundary(id) {
+            this.deleteBoundaryId = id;
+            window.dispatchEvent(new CustomEvent('open-confirm-delete-boundary'));
+        },
+
+        async deleteBoundary() {
+            if (!this.deleteBoundaryId) return;
+            const id = this.deleteBoundaryId;
+            this.deleteBoundaryId = null;
             try {
                 await Platform.fetch.delete(`/api/codegen/system-boundaries/${id}`, { silent: true });
                 this.boundaries = this.boundaries.filter(b => b.id !== id);
@@ -466,12 +438,6 @@ function systemBoundaries() {
             }
         },
 
-        /* The boundary-level "Generate Terraform" tab was removed: it POSTed to
-           /api/codegen/system-boundaries/<id>/generate-terraform, which does not exist.
-           Per-solution IaC is generated by codegen.generate_iac
-           (POST /solutions/<id>/codegen/generate-iac); there is no boundary-wide
-           equivalent. */
-
         copyToClipboard(text) {
             navigator.clipboard.writeText(text || '').then(() => {
                 this._setSuccess('Copied to clipboard.');
@@ -479,5 +445,19 @@ function systemBoundaries() {
         },
     };
 }
+</script>
+
+{{ data_table_script() }}
+
+{# Listen for delete confirmation #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    window.addEventListener('open-confirm-delete-boundary', function() {
+        const alpine = document.querySelector('[x-data="systemBoundaries()"]');
+        if (alpine && alpine.__x) {
+            alpine.__x.$data.deleteBoundary();
+        }
+    });
+});
 </script>
 {% endblock %}
