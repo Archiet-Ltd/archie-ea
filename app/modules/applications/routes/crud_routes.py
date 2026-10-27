@@ -8,7 +8,7 @@ api_delete_application, api_bulk_consolidate.
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import (
     current_app,
@@ -898,6 +898,19 @@ def application_edit(id):
             lifecycle_status = request.form.get("lifecycle_status")
             if lifecycle_status:
                 app.lifecycle_status = lifecycle_status
+
+            # The end-of-support date: owners are alerted when it comes within
+            # 180 days (app/services/change_rules.py). Only a submitted field is
+            # applied; an empty one clears the date.
+            end_of_support = request.form.get("end_of_life_date")
+            if end_of_support is not None:
+                if not end_of_support.strip():
+                    app.end_of_life_date = None
+                else:
+                    try:
+                        app.end_of_life_date = date.fromisoformat(end_of_support.strip())
+                    except ValueError:
+                        flash("The end-of-support date was not a date, so it was not changed.", "error")
 
             app.updated_by = current_user.id
 

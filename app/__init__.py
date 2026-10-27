@@ -109,6 +109,10 @@ def create_app(config=None):
     from app._bootstrap.activity import install_activity_record
     install_activity_record(app)
 
+    # 1d-4. Sign-up origin: utm_source, utm_campaign and ref are kept for the register step
+    from app.services.signup_attribution import install_signup_origin
+    install_signup_origin(app)
+
     # 1e. Server-side error aggregation: dedupes WARNING+ log records into
     # error_events (see app/_bootstrap/error_tracking.py) so silent
     # degradation shows up at /admin/errors instead of only in stdout.

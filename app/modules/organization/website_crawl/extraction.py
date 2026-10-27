@@ -164,6 +164,7 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
         if value not in (None, "", []):
             out.setdefault(key, {"value": value, "confidence": confidence})
 
+    out["site_name"] = meta.get("og:site_name") or ""
     put("company_name", organisation.get("name"), 1.0)
     put("company_name", meta.get("og:site_name"), 0.8)
     put("tagline", organisation.get("description"), 1.0)

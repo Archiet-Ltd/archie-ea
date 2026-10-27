@@ -1662,8 +1662,38 @@ Output clean, executable test code."""
 
         return response
 
-    # What one attempt at one provider may take.
+    # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
     PUBLIC_ATTEMPT_SECONDS = 25.0
+    PUBLIC_BACKOFF_SECONDS = 3.0
+    PUBLIC_BACKOFF_MAX_SECONDS = 15.0
+
+    @staticmethod
+    def _sleep(seconds: float) -> None:
+        time.sleep(seconds)
+
+    @staticmethod
+    def _is_rate_limited(error: BaseException) -> bool:
+        text = str(error).lower()
+        if "429" in text or "rate limit" in text:
+            return True
+        while error is not None:
+            if (getattr(error, "status_code", None) or getattr(getattr(error, "response", None), "status_code", None)) == 429:
+                return True
+            error = error.__cause__
+        return False
+
+    @staticmethod
+    def _retry_after(error: BaseException) -> Optional[float]:
+        while error is not None:  # the failover wraps the provider's own error as its cause
+            headers = getattr(getattr(error, "response", None), "headers", None) or {}
+            try:
+                value = headers.get("Retry-After") or headers.get("retry-after")
+                if value is not None:
+                    return float(value)
+            except (TypeError, ValueError):
+                pass
+            error = error.__cause__
+        return None
 
     @staticmethod
     def _call_public_chain(prompt: str, timeout: Optional[float] = None, max_tokens: Optional[int] = None) -> str:
@@ -1675,29 +1705,38 @@ Output clean, executable test code."""
         everything = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"] + list(PUBLIC_INPUT_CHAIN)
         last_error: Optional[BaseException] = None
         for provider in PUBLIC_INPUT_CHAIN:
-            remaining = deadline - time.monotonic()
-            if remaining <= 1.0:
-                break
             if not LLMService._get_all_api_keys(provider):
                 continue
-            try:
-                text, _interaction = LLMService._call_llm_with_failover(
-                    prompt=prompt,
-                    model=PUBLIC_INPUT_MODELS[provider],
-                    provider=provider,
-                    max_tokens=max_tokens,
-                    timeout=min(LLMService.PUBLIC_ATTEMPT_SECONDS, remaining),
-                    # every provider is named as tried, so a failure moves on along this chain only
-                    _already_tried=list(everything),
-                    public_input=True,
-                    deadline=deadline,
-                )
-                return text
-            except ProviderNotAllowed:
-                continue
-            except Exception as error:  # noqa: BLE001 - the next provider in the chain answers instead
-                last_error = error
-                logger.warning("public-input provider %s failed: %s", provider, str(error)[:100])
+            for attempt in (0, 1):
+                remaining = deadline - time.monotonic()
+                if remaining <= 1.0:
+                    break
+                try:
+                    text, _interaction = LLMService._call_llm_with_failover(
+                        prompt=prompt,
+                        model=PUBLIC_INPUT_MODELS[provider],
+                        provider=provider,
+                        max_tokens=max_tokens,
+                        timeout=min(LLMService.PUBLIC_ATTEMPT_SECONDS, remaining),
+                        # every provider is named as tried, so a failure moves on along this chain only
+                        _already_tried=list(everything),
+                        public_input=True,
+                        deadline=deadline,
+                    )
+                    return text
+                except ProviderNotAllowed:
+                    break
+                except Exception as error:  # noqa: BLE001 - the next provider in the chain answers instead
+                    last_error = error
+                    logger.warning("public-input provider %s failed: %s", provider, str(error)[:100])
+                    if attempt == 0 and LLMService._is_rate_limited(error):
+                        # honour Retry-After, or back off once, then try this provider one more time
+                        wait = min(LLMService._retry_after(error) or LLMService.PUBLIC_BACKOFF_SECONDS,
+                                   LLMService.PUBLIC_BACKOFF_MAX_SECONDS, max(0.0, deadline - time.monotonic() - 1.0))
+                        if wait > 0:
+                            LLMService._sleep(wait)
+                            continue
+                    break
         raise RuntimeError(
             "Every provider in the public-input chain failed: %s" % (str(last_error)[:200] if last_error else "no provider has a key"))
 
@@ -2174,7 +2213,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             f"All API keys failed for {provider} and all fallback providers. "
             f"Failed keys: {failed_keys}. "
             f"Last error: {str(last_error) if last_error else 'Unknown error'}"
-        )
+        ) from last_error
 
     @staticmethod
     @traced_model_call
