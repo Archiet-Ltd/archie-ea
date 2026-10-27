@@ -57,7 +57,13 @@ def test_every_connector_tool_is_a_catalogue_read_tool():
         assert schema["mutates"] is False
         assert tool["inputSchema"] == schema["parameters"]
         assert tool["description"] == schema["description"]
-        assert tool["annotations"] == {"readOnlyHint": True}
+        assert tool["annotations"] == {
+            "title": tool["name"].replace("_", " ").capitalize(),
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
 
 
 def test_no_catalogue_tool_marked_mcp_mutates():

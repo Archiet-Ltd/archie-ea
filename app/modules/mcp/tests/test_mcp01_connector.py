@@ -53,13 +53,11 @@ def _payload(out):
     return body.get("data", body) if isinstance(body, dict) else body
 
 
-def _owned_application(db_session, org, user, name, **element_kwargs):
+def _owned_application(db_session, org, user, name):
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
 
     element = _make_element(db_session, org.id, name)
-    for key, value in element_kwargs.items():
-        setattr(element, key, value)
     application = ApplicationComponent(name=element.name, organization_id=org.id, archimate_element_id=element.id)
     db_session.add(application)
     db_session.flush()
