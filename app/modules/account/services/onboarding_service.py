@@ -25,6 +25,7 @@ GITHUB_TASK = "onboarding_github_import"
 JIRA_TASK = "onboarding_jira_import"
 WEBSITE_TASK = "website_profile_crawl"
 MORE_FACTS_LATER = "More facts will be added when our reading service is less busy."
+MORE_FACTS_FOLLOW = "More facts follow in a few minutes, as we finish working out what your pages say."
 
 # (key, label, starter capability model). The model is the one starter set the industry picks
 # later; this round only records the choice.
@@ -350,6 +351,7 @@ _WEBSITE_REASONS = {
     "nothing_found": "We read %s but found no facts we could state with confidence.",
     "no_consent": "%s has not been agreed to be read yet.",
     "no_site": "No website is recorded yet.",
+    "interrupted": "The reading of %s was cut off by a restart on our side, so it has been queued to run again.",
 }
 _INSTEAD = " You can connect GitHub or Jira instead, or look around the sample company."
 
@@ -398,7 +400,7 @@ def website_state(org) -> Dict[str, Any]:
         facts, _completeness = confirm.proposals(org.id)
         read = result.get("pages_read", 0)
         pages = "%s %s" % (read, "page" if read == 1 else "pages")
-        later = (" " + MORE_FACTS_LATER) if result.get("more_to_come") else ""
+        later = (" " + (MORE_FACTS_FOLLOW if result.get("model_pass_queued") else MORE_FACTS_LATER)) if result.get("more_to_come") else ""
         if facts:
             return {
                 "state": "done",
