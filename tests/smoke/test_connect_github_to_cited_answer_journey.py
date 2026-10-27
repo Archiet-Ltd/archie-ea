@@ -342,6 +342,28 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
     shoot(admin, "6-application")
 
 
+def test_6b_the_element_page_says_it_was_read_from_its_repository(admin, world):
+    """The model element an approved repository became names the repository it was read from, linked
+    to it on GitHub, and when it was read: the same source the answer's citations carry."""
+    admin.goto(world["base"] + "/applications/", wait_until="domcontentloaded")
+    table = admin.get_by_role("region", name="Applications table")
+    table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role(
+        "link", name=re.compile("Fact sheet")).click()
+    admin.wait_for_load_state("domcontentloaded")
+    graph = admin.get_by_role("link", name="View impact graph").first
+    element_id = re.search(r"(\d+)/impact", graph.get_attribute("href") or "").group(1)
+    admin.goto("%s/architecture/application/ApplicationComponent/%s?ae=1" % (world["base"], element_id),
+               wait_until="domcontentloaded")
+    expect(admin.get_by_role("heading", name="Payments Service").first).to_be_visible()
+    source = admin.locator("[data-integration-source]")
+    expect(source).to_have_count(1)
+    expect(source).to_contain_text("From GitHub, acme/payments-service, read ")
+    link = source.get_by_role("link", name="acme/payments-service")
+    assert (link.get_attribute("href") or "").startswith("https://github.com/acme/payments-service"), link.get_attribute("href")
+    remember(world, admin)
+    shoot(admin, "6b-element-source")
+
+
 def ask_what_breaks_if_payments_service_fails(page, base):
     """In the AI chat, the way a person does: type the question and press Enter. Returns the
     connection cards of the answer."""

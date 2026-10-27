@@ -414,6 +414,25 @@ def test_a_changed_classification_is_honoured_by_approve_all(db_session, org_a, 
 # --------------------------------------------------------------------- #
 
 
+def test_approve_all_keeps_each_application_and_link_in_the_fact_store(db_session, org_a, approved, make_org):
+    from app.integrations.fact_store import sources_for_elements, sources_for_relationships
+    from app.models import ArchiMateRelationship
+
+    other = make_org("gh-facts-other")
+    pay = _element(org_a.id, "Payments Service")
+    source = sources_for_elements([pay.id], org_a.id)[pay.id]
+    assert (source["system"], source["item"]) == ("github", "acme/payments-service")
+    assert source["url"].startswith("https://github.com/acme/payments-service") and source["read_at"]
+    links = ArchiMateRelationship.query.filter_by(organization_id=org_a.id, source_kind="connector").all()
+    assert links
+    found = sources_for_relationships({link.id for link in links}, org_a.id)
+    assert set(found) == {link.id for link in links}
+    assert all(s["repository"].startswith("acme/") and s["url"].startswith("https://github.com/acme/") for s in found.values())
+    # another organisation is told nothing
+    assert sources_for_elements([pay.id], other.id) == {}
+    assert sources_for_relationships({link.id for link in links}, other.id) == {}
+
+
 def _origin_of(citation):
     return citation.get("source") or {}
 
