@@ -214,8 +214,22 @@ def data_architecture_dashboard():
                 "Failed to query ArchiMate element/relationship counts", exc_info=True
             )
 
+        from app.modules.architecture.services.data_architecture_service import (
+            data_flow_overview,
+            default_flow_entity,
+            flow_cascade,
+        )
+
+        overview = data_flow_overview(_current_org_id())
+        chosen = request.args.get("entity", type=int)
+        flow_entity = next(
+            (row for row in overview["entities"] if row["id"] == chosen and row["element_id"]), None
+        ) or default_flow_entity(overview)
+
         return render_template(
             "enterprise/data_architecture_dashboard.html",
+            overview=overview,
+            flow=flow_cascade(flow_entity) if flow_entity else None,
             data_stack=data_platform_stack,
             data_cap_count=len(data_caps_objs),
             conceptual_count=conceptual_count,
@@ -241,6 +255,8 @@ def data_architecture_dashboard():
             data_lineage_count=None,
             archimate_data_count=None,
             archimate_rel_count=None,
+            overview=None,
+            flow=None,
             load_error="The data architecture inventory could not be read.",
         )
 
@@ -307,6 +323,10 @@ def data_lineage_view():
         except Exception:
             logger.debug("semantic lineage suggestions unavailable", exc_info=True)
 
+    from app.modules.architecture.services.data_architecture_service import data_flow_overview
+
+    overview = data_flow_overview(_current_org_id())
+
     traced_ids = {row.archimate_element_id for row in grounded_lineage if row.archimate_element_id}
     traced_ids |= {
         row.target_archimate_element_id
@@ -325,6 +345,7 @@ def data_lineage_view():
         relationship_edges=relationship_edges,
         suggestions=suggestions,
         untraced=untraced,
+        overview=overview,
     )
 
 
@@ -363,6 +384,17 @@ def create_data_lineage():
     db.session.commit()
     flash("Lineage recorded.", "success")
     return redirect(url_for("data_architecture.data_lineage_view"))
+
+
+@data_architecture_bp.route("/api/data-flows")
+@login_required
+def api_data_flows():
+    """The organisation's data entities, the applications that use each, their
+    owner and steward, and the applications that handle personal data: the same
+    reader as the data architecture page (and the assistant's ask_data_flow)."""
+    from app.modules.architecture.services.data_architecture_service import data_flow_overview
+
+    return jsonify(data_flow_overview(_current_org_id()))
 
 
 @data_architecture_bp.route("/api/data-models")
@@ -548,6 +580,7 @@ def create_data_model():
 def data_entity_catalog():
     """Data entity catalog — browse, search, and filter data entities."""
     from app.models.process_data import DataDomain, DataEntity
+    from app.modules.architecture.services.data_architecture_service import data_flow_overview
 
     search = request.args.get("search", "").strip()
     classification = request.args.get("classification", "")
@@ -590,6 +623,9 @@ def data_entity_catalog():
         entity_type=entity_type,
         classification_dist=classification_dist,
         total_count=len(entities),
+        # The applications, steward and flow of each entity: the same reader as
+        # the data architecture page and the assistant's ask_data_flow.
+        flows={row["id"]: row for row in data_flow_overview(_current_org_id())["entities"]},
     )
 
 

@@ -502,3 +502,196 @@ def record_entity_access(entity, application, operations):
     rel.access_mode = access_mode_for(crud)
     db.session.commit()
     return rel
+
+
+# ---------------------------------------------------------------------------
+# Data flows: every entity, who uses it, and who handles personal data
+# ---------------------------------------------------------------------------
+#
+# One reader for the data architecture page, the data lineage page and the
+# assistant's ask_data_flow tool, so the three agree on every count. The flow
+# of one entity, hop by hop, is the answer service's data_flow question; this
+# is the list it starts from.
+
+
+def data_flow_overview(org_id) -> Dict:
+    """The organisation's data entities with the applications that use each, and
+    the applications that handle personal data.
+
+    ``entities``: one row per entity, by name: ``id``, ``name``, ``domain``,
+    ``element_id`` (its data object, the id the flow question takes),
+    ``personal_data``, ``classification``, ``system_of_record``, ``owner`` (the
+    unit that owns the system of record), ``steward`` (its domain's steward),
+    ``applications`` [{``name``, ``application_id``, ``access``}] and ``copies``
+    (lineage rows that copy it elsewhere). ``personal_data_applications``: every
+    application that uses an entity holding personal data, with those entities.
+    """
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_element_types import is_application_kind
+    from app.models.process_data import DataEntity
+    from app.modules.intelligence.services.query_service import _access_words, _resolve_owners_batch
+
+    entities = (
+        DataEntity.query.filter(DataEntity.organization_id == org_id)
+        .order_by(DataEntity.name, DataEntity.id)
+        .all()
+    )
+    element_ids = [e.archimate_element_id for e in entities if e.archimate_element_id]
+    rels = []
+    if element_ids:
+        rels = [
+            rel for rel in ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.target_id.in_(element_ids)
+            ).order_by(ArchiMateRelationship.id).all()
+            if _is_access(rel)
+        ]
+    apps_by_element = {}
+    if rels:
+        apps_by_element = {
+            el.id: el for el in ArchiMateElement.query.filter(
+                ArchiMateElement.id.in_({rel.source_id for rel in rels}),
+                ArchiMateElement.organization_id == org_id,
+            ).all()
+            if is_application_kind(el.type)
+        }
+    components = {}
+    if apps_by_element:
+        for comp in ApplicationComponent.query.filter(
+            ApplicationComponent.archimate_element_id.in_(list(apps_by_element))
+        ).order_by(ApplicationComponent.id).all():
+            components.setdefault(comp.archimate_element_id, comp)
+    copies = dict(
+        db.session.query(DataLineage.archimate_element_id, db.func.count(DataLineage.id))
+        .filter(DataLineage.archimate_element_id.in_(element_ids or [0]))
+        .filter(DataLineage.target_archimate_element_id.isnot(None))
+        .group_by(DataLineage.archimate_element_id)
+        .all()
+    )
+    sor_elements = {
+        e.id: e.system_of_record_application.archimate_element_id
+        for e in entities
+        if e.system_of_record_application is not None
+        and e.system_of_record_application.archimate_element_id
+    }
+    owners = _resolve_owners_batch(list(sor_elements.values()), org_id)
+
+    uses = {}
+    for rel in rels:
+        app_element = apps_by_element.get(rel.source_id)
+        if app_element is None:
+            continue
+        comp = components.get(app_element.id)
+        uses.setdefault(rel.target_id, []).append({
+            "name": comp.name if comp else app_element.name,
+            "application_id": comp.id if comp else None,
+            "access": _access_words(rel),
+        })
+
+    rows = []
+    personal = {}
+    for entity in entities:
+        applications = sorted(uses.get(entity.archimate_element_id, []), key=lambda a: a["name"].lower())
+        owner, _reason = owners.get(sor_elements.get(entity.id), (None, None))
+        domain = entity.domain
+        rows.append({
+            "id": entity.id,
+            "name": entity.name,
+            "domain": domain.name if domain else None,
+            "element_id": entity.archimate_element_id,
+            "personal_data": bool(entity.contains_pii),
+            "classification": entity.data_classification,
+            "system_of_record": (
+                entity.system_of_record_application.name if entity.system_of_record_application else None
+            ),
+            "owner": owner["name"] if owner else None,
+            "steward": ((domain.data_steward or "").strip() or None) if domain else None,
+            "applications": applications,
+            "copies": copies.get(entity.archimate_element_id, 0),
+        })
+        if entity.contains_pii:
+            for app in applications:
+                entry = personal.setdefault(app["name"], {
+                    "name": app["name"], "application_id": app["application_id"], "entities": [],
+                })
+                entry["entities"].append(entity.name)
+
+    return {
+        "entity_count": len(rows),
+        "entities": rows,
+        "personal_data_applications": sorted(personal.values(), key=lambda a: a["name"].lower()),
+    }
+
+
+def default_flow_entity(overview):
+    """The entity whose flow the data architecture page opens on: of the
+    personal-data entities something writes, the one with the most to show
+    (applications that use it, and its recorded copies, which lead on to more
+    hops); else the first entity that is used."""
+    used = [row for row in overview["entities"] if row["applications"] and row["element_id"]]
+    written = [
+        row for row in used
+        if row["personal_data"] and any(
+            set(app["access"]) & {"creates", "updates", "deletes", "writes"} for app in row["applications"]
+        )
+    ]
+    if written:
+        # max keeps the first of equals, so the order of the list breaks ties.
+        return max(written, key=lambda row: len(row["applications"]) + 2 * row["copies"])
+    return used[0] if used else None
+
+
+def flow_cascade(entity_row) -> Dict:
+    """The data-flow answer for one entity row of ``data_flow_overview``, as the
+    answer cascade draws it: one node per hop with its owner and its source.
+
+    Computed by the answer service's own walk and envelope (the same rows,
+    truth class and citations the assistant's ask_data_flow stores), without
+    storing a new answer on every page view.
+    """
+    from app.modules.intelligence.services.answer_envelope import KIND_DATA_FLOW, build_envelope
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService, _words
+
+    params = {"element_id": entity_row["element_id"], "max_depth": 4}
+    envelope = build_envelope(
+        KIND_DATA_FLOW, params, IntelligenceQueryService.data_flow(entity_row["element_id"], max_depth=4)
+    )
+    nodes = []
+    for index, row in enumerate(envelope["rows"]):
+        relation = row["relation"]
+        provenance = relation.get("provenance") or {}
+        name = (envelope["elements"].get(str(row["element_id"])) or {}).get("name") or "Unnamed"
+        owners = [o["name"] for o in row.get("owners") or [] if o.get("name")]
+        if not owners and row.get("owner"):
+            owners = [row["owner"]["name"]]
+        if owners:
+            accountable = ", ".join(owners)
+        elif row.get("steward"):
+            accountable = f"Steward: {row['steward']}"
+        else:
+            accountable = "No owner recorded"
+        if row["hop"] == "copied to":
+            label = f"Copied to {name}"
+        else:
+            label = f"{name} {_words(row['access'])} it"
+        recorded = (provenance.get("recorded_at") or "")[:10]
+        nodes.append({
+            "key": f"hop-{index}",
+            "name": label,
+            "depth": row["level"],
+            "derived": relation["kind"] == "derived",
+            "owner": accountable,
+            "sourceName": provenance.get("text") or "Recorded in the model",
+            "sourceTimestamp": f"Recorded {recorded}" if recorded else "",
+            "kindLabel": "Worked out from the model",
+            "hop": row["hop"],
+        })
+    summary = envelope["summary"]
+    return {
+        "entity": entity_row,
+        "nodes": nodes,
+        "truth_class": envelope["truth_class"],
+        "recorded": summary["explicit_count"],
+        "worked_out": summary["derived_count"],
+        "citations": len(envelope["citations"]),
+    }
