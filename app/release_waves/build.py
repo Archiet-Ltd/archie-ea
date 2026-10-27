@@ -63,6 +63,8 @@ PREFIX_OVERRIDES: tuple = (
     ("/mcp", "W1", "PG-CON", "the assistant connection (MCP): on at wave 1 for signed-in users, advertised from wave 2"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),
+    ("/admin/signups", "W6", "PG-OPS", "where sign-ups came from: the platform team only"),
+    ("/intelligence/answers/element/", "W2", "PG-ANS", "the answer for one element, beside the other answer pages"),
     ("/api/system-settings", "W6", "PG-OPS", "platform settings page data, platform administrators"),
     # Calls a wave-1 screen makes (found by walking the wave-1 preview; "$" means this address only).
     ("/api/notifications", "W1", "PG-ACC", "the notification bell in the signed-in shell"),
