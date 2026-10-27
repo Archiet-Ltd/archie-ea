@@ -177,7 +177,7 @@ def _people(facts: Iterable[CostFact]) -> Dict[int, str]:
     from app.models.user import User
 
     rows = db.session.execute(db.select(User).where(User.id.in_(ids))).scalars()
-    return {u.id: (getattr(u, "full_name", None) or getattr(u, "first_name", None) or u.email) for u in rows}
+    return {u.id: " ".join(p for p in (u.first_name, u.last_name) if p) or u.email for u in rows}
 
 
 def _line_from_fact(fact: CostFact, people, *, editable: bool) -> CostLine:

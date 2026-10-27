@@ -133,7 +133,7 @@ def test_a_person_adds_edits_and_deletes_a_line_and_the_total_follows(db_session
     view = application_cost(org.id, app_row.id)
     assert view.total == Decimal("1250.50")
     person = [ln for ln in view.lines if ln.fact_id == fact.id]
-    assert person and person[0].label == "Support" and person[0].source.startswith("Added by")
+    assert person and person[0].label == "Support" and person[0].source == "Added by a person"
 
     update_line(org.id, ELEMENT_APPLICATION, app_row.id, fact.id, category="support", amount="100",
                 currency="GBP", period="monthly")
@@ -143,6 +143,22 @@ def test_a_person_adds_edits_and_deletes_a_line_and_the_total_follows(db_session
     delete_line(org.id, ELEMENT_APPLICATION, app_row.id, fact.id)
     db_session.flush()
     assert application_cost(org.id, app_row.id).total == Decimal("1000.00")
+
+
+def test_a_line_names_the_person_who_added_it(db_session, make_org):
+    from app.models.cost_fact import ELEMENT_APPLICATION
+    from app.models.user import User
+    from app.services.cost_view import add_line, application_cost
+
+    org = make_org("a")
+    person = User(email="cost-person@example.com", first_name="Ada", last_name="Okafor", organization_id=org.id)
+    db_session.add(person)
+    db_session.flush()
+    app_row = _application(db_session, org, "Ledger")
+    add_line(org.id, ELEMENT_APPLICATION, app_row.id, user_id=person.id, category="support", amount="5",
+             currency="GBP")
+    db_session.flush()
+    assert application_cost(org.id, app_row.id).lines[0].source == "Added by Ada Okafor"
 
 
 def test_a_budget_is_shown_but_not_counted(db_session, make_org):
