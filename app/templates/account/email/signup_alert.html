@@ -1,7 +1,4 @@
-{# shell-ok: an e-mail message, not a page #}
-<!DOCTYPE html>
-<html>
-<body>
+{# smoke-coverage-ok: email template, not a rendered browser page #}
 <p>A new account has not reached a first answer {{ minutes }} minutes after signing up.</p>
 <ul>
 <li>Account: {{ user.email }}</li>
@@ -12,5 +9,3 @@
 </ul>
 {% if next_step %}<p>Next step they have not taken: {{ next_step }}.</p>{% endif %}
 <p>This message is sent once for this account.</p>
-</body>
-</html>
