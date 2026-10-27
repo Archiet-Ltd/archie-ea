@@ -203,7 +203,7 @@
             required=true,
             placeholder='e.g. Master Services Agreement',
             value=current('contract_name', contract.contract_name if contract else ''),
-            maxlength=256
+            attrs_dict={'maxlength': '256'}
         ) }}
 
         <div class="grid grid-cols-1 gap-4">
@@ -213,7 +213,7 @@
               label='Contract number',
               placeholder='e.g. MSA-2026-001',
               value=current('contract_number', contract.contract_number if contract else ''),
-              maxlength=100
+              attrs_dict={'maxlength': '100'}
           ) }}
 
           {% call form_group(id='vendor_id', label='Vendor', help_text='Select the vendor for this contract') %}
@@ -221,9 +221,12 @@
                 id='vendor_id',
                 name='vendor_id',
                 size='sm',
-                options=[('', 'Not specified')] + [(v.id, v.name) for v in vendors],
+                options=[('', 'Not specified')],
                 selected=current('vendor_id', contract.vendor_id if contract else '')
             ) }}
+            {% for v in vendors %}
+            <option value="{{ v.id }}">{{ v.name }}</option>
+            {% endfor %}
           {% endcall %}
         </div>
 
@@ -250,9 +253,12 @@
                 id='contract_type',
                 name='contract_type',
                 size='sm',
-                options=[('', 'Not specified')] + [(v, v | replace('_', ' ') | title) for v in contract_types],
+                options=[('', 'Not specified')],
                 selected=current('contract_type', contract.contract_type if contract else '')
             ) }}
+            {% for v in contract_types %}
+            <option value="{{ v }}">{{ v | replace('_', ' ') | title }}</option>
+            {% endfor %}
           {% endcall %}
 
           {% call form_group(id='contract_category', label='Category') %}
@@ -260,9 +266,12 @@
                 id='contract_category',
                 name='contract_category',
                 size='sm',
-                options=[('', 'Not specified')] + [(v, v | title) for v in contract_categories],
+                options=[('', 'Not specified')],
                 selected=current('contract_category', contract.contract_category if contract else '')
             ) }}
+            {% for v in contract_categories %}
+            <option value="{{ v }}">{{ v | title }}</option>
+            {% endfor %}
           {% endcall %}
 
           {% call form_group(id='status', label='Status') %}
@@ -270,9 +279,12 @@
                 id='status',
                 name='status',
                 size='sm',
-                options=[('', 'Not specified')] + [(v, v | replace('_', ' ') | title) for v in contract_statuses],
+                options=[('', 'Not specified')],
                 selected=current('status', contract.status if contract else '')
             ) }}
+            {% for v in contract_statuses %}
+            <option value="{{ v }}">{{ v | replace('_', ' ') | title }}</option>
+            {% endfor %}
           {% endcall %}
         </div>
       {% endcall %}
@@ -289,10 +301,9 @@
               name='contract_value',
               label='Total value',
               type='number',
-              step='0.01',
-              min='0',
               placeholder='0.00',
-              value=current('contract_value', contract.contract_value if contract else '')
+              value=current('contract_value', contract.contract_value if contract else ''),
+              attrs_dict={'step': '0.01', 'min': '0'}
           ) }}
 
           {{ form_field(
@@ -300,10 +311,9 @@
               name='annual_cost',
               label='Annual cost',
               type='number',
-              step='0.01',
-              min='0',
               placeholder='0.00',
-              value=current('annual_cost', contract.annual_cost if contract else '')
+              value=current('annual_cost', contract.annual_cost if contract else ''),
+              attrs_dict={'step': '0.01', 'min': '0'}
           ) }}
 
           {{ form_field(
@@ -312,7 +322,7 @@
               label='Currency',
               placeholder='USD',
               value=current('currency', contract.currency if contract else 'USD'),
-              maxlength=10
+              attrs_dict={'maxlength': '10'}
           ) }}
         </div>
       {% endcall %}
