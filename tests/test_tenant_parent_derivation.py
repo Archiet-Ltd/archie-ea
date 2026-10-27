@@ -95,3 +95,26 @@ def test_a_row_whose_parent_cannot_be_found_is_left_unowned_and_refused(app, wor
         with pytest.raises(IntegrityError):
             db.session.commit()
         db.session.rollback()
+
+
+def test_a_signed_in_organisation_cannot_hang_a_row_from_another_organisations_parent(app, world):
+    """Two organisations: A is signed in and names B's solution. The write is refused, never
+    stamped with A's organisation (which would link A's row to B's record)."""
+    from flask import g
+    from sqlalchemy import text
+
+    from app import db
+    from app.middleware.tenant_isolation import TenantParentMismatch
+    from app.models.solution_sad_models import SolutionQualityAttribute
+
+    with app.test_request_context():
+        g.current_org_id = world["org_a"]
+        db.session.add(SolutionQualityAttribute(solution_id=world["sol_b"], attribute_name="planted"))
+        with pytest.raises(TenantParentMismatch):
+            db.session.flush()
+        db.session.rollback()
+        left = db.session.execute(
+            text("SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s"),
+            {"s": world["sol_b"]},
+        ).scalar()
+    assert left == 0

@@ -9,7 +9,8 @@ Layer 3: before_flush event auto-sets organization_id on new TenantMixin
 
 Both layers are NO-OPs when g.current_org_id is None (CLI, migrations,
 background tasks, unauthenticated requests), except that a new row of a model that names
-``__tenant_parent__`` takes its organisation from that parent (organization_from_parent).
+``__tenant_parent__`` takes its organisation from that parent (organization_from_parent), and is
+refused (TenantParentMismatch) when a signed-in organisation differs from the parent's.
 """
 
 import logging
@@ -26,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 _TENANT_CONTEXT_KEY = "archie_tenant_context_held"
+
+
+class TenantParentMismatch(ValueError):
+    """A new row would link to a parent record owned by a different organisation."""
 
 
 def organization_from_parent(session, obj):
@@ -224,13 +229,19 @@ def install_tenant_filter(app):
             set_database_tenant_context(session.connection(), org_id)
         for obj in session.new:
             if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
+                # The row belongs to the organisation that owns the parent record it hangs from.
+                derived = organization_from_parent(session, obj)
                 if org_id is not None:
+                    if derived is not None and derived != org_id:
+                        # Never let the signed-in organisation win over a parent that belongs to
+                        # another company: the child would link to a record that is not theirs.
+                        raise TenantParentMismatch(
+                            f"{type(obj).__name__} hangs from a record of organisation {derived}, "
+                            f"but the signed-in organisation is {org_id}"
+                        )
                     obj.organization_id = org_id
-                else:
-                    # No signed-in organisation (a job, a seeder, a command): the row belongs to
-                    # whichever organisation owns the parent record it hangs from.
-                    derived = organization_from_parent(session, obj)
-                    if derived is not None:
-                        obj.organization_id = derived
+                elif derived is not None:
+                    # No signed-in organisation (a job, a seeder, a command).
+                    obj.organization_id = derived
 
     app.logger.info("Tenant isolation filters installed (do_orm_execute + before_flush)")
