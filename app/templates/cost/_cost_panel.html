@@ -1,0 +1,160 @@
+{#- One element's cost: the total and how it is worked out, its lines with their source and date, and adding,
+    editing or deleting a line in a dialog. Shared by the application's Cost tab and a technology's element page so
+    the two read and look the same.
+
+    Expects: cost (a CostView), cost_rule (the rule in words), cost_add_url, cost_line_url (prefix, the line id is
+    appended), cost_can_edit, cost_categories, cost_periods, cost_kinds. -#}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/input.html' import input, hidden_input %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+
+{% macro _money(amount, currency) -%}
+{{ '{:,.2f}'.format(amount) }} {{ currency }}
+{%- endmacro %}
+
+{% macro _day(value) -%}
+{% if value %}{{ value.day }} {{ value.strftime('%B %Y') }}{% endif %}
+{%- endmacro %}
+
+{% macro _fields(prefix, line=none) %}
+<div class="space-y-4">
+  {% call form_group(id=prefix ~ 'category', label='What it is for') %}
+    {{ native_select(id=prefix ~ 'category', name='category', options=cost_categories, selected=(line.category if line else none), class='w-full') }}
+  {% endcall %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {% call form_group(id=prefix ~ 'amount', label='Amount') %}
+      {{ input(id=prefix ~ 'amount', name='amount', inputmode='decimal', required=true, value=('{:f}'.format(line.entered_amount) if line else ''), placeholder='1200.00') }}
+    {% endcall %}
+    {% call form_group(id=prefix ~ 'currency', label='Currency') %}
+      {{ input(id=prefix ~ 'currency', name='currency', required=true, maxlength='3', value=(line.currency if line else cost.currency), autocomplete='off') }}
+    {% endcall %}
+  </div>
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {% call form_group(id=prefix ~ 'period', label='The amount is for') %}
+      {{ native_select(id=prefix ~ 'period', name='period', options=cost_periods, selected=(line.period if line else 'annual'), class='w-full') }}
+    {% endcall %}
+    {% call form_group(id=prefix ~ 'kind', label='Kind') %}
+      {{ native_select(id=prefix ~ 'kind', name='kind', options=cost_kinds, selected=(line.kind if line else 'actual'), class='w-full') }}
+    {% endcall %}
+  </div>
+</div>
+{% endmacro %}
+
+<div class="space-y-6" data-testid="cost-panel">
+  {% call card() %}
+    {% call card_header() %}
+      {% call card_title(class='text-base') %}Annual cost{% endcall %}
+      {% call card_description() %}{{ cost_rule }}{% endcall %}
+    {% endcall %}
+    {% call card_content() %}
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <dt class="text-sm text-muted-foreground">Total a year</dt>
+          <dd class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="cost-total">
+            {% if cost.total is not none %}{{ _money(cost.total, cost.currency) }}{% elif cost.missing %}Not worked out{% else %}None recorded{% endif %}
+          </dd>
+          {% if cost.missing %}
+          <p class="mt-1 text-sm text-muted-foreground" data-testid="cost-missing-rate">
+            No exchange rate is on file from {% for currency, on in cost.missing %}{{ currency }} to {{ cost.currency }}{% if on %} for {{ _day(on) }}{% endif %}{{ ', ' if not loop.last }}{% endfor %}, so the lines are not converted or added up.
+          </p>
+          {% endif %}
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Lines counted</dt>
+          <dd class="mt-1 text-2xl font-semibold tabular-nums text-foreground">{{ cost.counted_lines|length }}</dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">As of</dt>
+          <dd class="mt-1 text-2xl font-semibold text-foreground">{% if cost.as_of %}{{ _day(cost.as_of) }}{% else %}Nothing recorded{% endif %}</dd>
+        </div>
+      </dl>
+    {% endcall %}
+  {% endcall %}
+
+  {% call card() %}
+    {% call card_header() %}
+      <div class="flex items-center justify-between gap-2">
+      {% call card_title(class='text-base') %}Cost lines{% endcall %}
+      {% if cost_can_edit %}
+      <div x-data="{ addOpen: false }">
+        {{ button(text='Add cost', variant='outline', size='sm', icon='plus', on_click='addOpen = true', testid='cost-add') }}
+        {% call dialog(title='Add cost', description='A line you add counts towards this total. Its source is you.', open_expr='addOpen', close_expr='addOpen = false', start_hidden=false) %}
+          <form method="post" action="{{ cost_add_url }}" class="space-y-4" data-testid="cost-add-form">
+            {{ hidden_input('csrf_token', csrf_token()) }}
+            {{ _fields('cost-new-') }}
+            <div class="flex justify-end gap-2">
+              {{ button(text='Cancel', variant='ghost', on_click='addOpen = false') }}
+              {{ button(text='Add cost', type='submit', testid='cost-add-submit') }}
+            </div>
+          </form>
+        {% endcall %}
+      </div>
+      {% endif %}
+      </div>
+    {% endcall %}
+    {% call card_content() %}
+      {% if cost.has_lines %}
+        {% call table(label='Cost lines') %}
+          {% call table_header() %}
+            {% call table_row() %}
+              {% call table_head() %}What it is for{% endcall %}
+              {% call table_head(class='text-right') %}A year{% endcall %}
+              {% call table_head(class='hidden sm:table-cell') %}Source{% endcall %}
+              {% if cost_can_edit %}{% call table_head(class='w-px') %}<span class="sr-only">Actions</span>{% endcall %}{% endif %}
+            {% endcall %}
+          {% endcall %}
+          {% call table_body() %}
+            {% for line in cost.lines %}
+            {% call table_row(attrs_dict={'data-testid': 'cost-line'}) %}
+              {% call table_cell() %}
+                <span class="font-medium text-foreground">{{ line.label }}</span>
+                {% if line.note %}<span class="block text-xs text-muted-foreground">{{ line.note }}</span>{% endif %}
+                <span class="mt-1 block text-xs text-muted-foreground sm:hidden">{{ line.source }}{% if line.as_of %}, {{ _day(line.as_of) }}{% endif %}</span>
+                {% if line.application_id %}
+                <a href="{{ url_for('unified_applications.application_detail', id=line.application_id, tab='cost') }}" class="mt-1 block text-sm text-primary underline-offset-4 hover:underline" data-testid="cost-line-source">Open {{ line.source_name }}'s cost</a>
+                {% endif %}
+              {% endcall %}
+              {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ _money(line.amount, line.currency) }}{% endcall %}
+              {% call table_cell(class='hidden text-sm text-muted-foreground sm:table-cell') %}
+                {{ line.source }}{% if line.as_of %}, {{ _day(line.as_of) }}{% endif %}
+              {% endcall %}
+              {% if cost_can_edit %}
+              {% call table_cell(class='text-right') %}
+                {% if line.fact_id %}
+                <div x-data="{ editOpen: false }">
+                  {{ button(text='Edit', variant='ghost', size='sm', on_click='editOpen = true', aria_label='Edit ' ~ line.label ~ ' line', testid='cost-edit') }}
+                  {% call dialog(title='Edit cost line', open_expr='editOpen', close_expr='editOpen = false', start_hidden=false) %}
+                    <form method="post" action="{{ cost_line_url }}{{ line.fact_id }}" class="space-y-4 text-left">
+                      {{ hidden_input('csrf_token', csrf_token()) }}
+                      {{ _fields('cost-' ~ line.fact_id ~ '-', line) }}
+                      <div class="flex justify-end gap-2">
+                        {{ button(text='Cancel', variant='ghost', on_click='editOpen = false') }}
+                        {{ button(text='Save', type='submit', testid='cost-edit-submit') }}
+                      </div>
+                    </form>
+                    <form method="post" action="{{ cost_line_url }}{{ line.fact_id }}/delete" class="mt-4 border-t border-border pt-4 text-left">
+                      {{ hidden_input('csrf_token', csrf_token()) }}
+                      {{ button(text='Delete this line', variant='destructive', type='submit', testid='cost-delete') }}
+                    </form>
+                  {% endcall %}
+                </div>
+                {% endif %}
+              {% endcall %}
+              {% endif %}
+            {% endcall %}
+            {% endfor %}
+          {% endcall %}
+        {% endcall %}
+      {% else %}
+        <div class="py-6 text-center" role="status" data-testid="cost-empty">
+          <p class="text-sm font-medium text-foreground">No cost recorded yet</p>
+          <p class="mt-1 text-sm text-muted-foreground">{{ 'Add the first line with Add cost.' if cost_can_edit else 'Nothing is recorded or shared here yet.' }}</p>
+        </div>
+      {% endif %}
+    {% endcall %}
+  {% endcall %}
+</div>

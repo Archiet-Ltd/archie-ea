@@ -259,9 +259,7 @@
 {% if app.monitoring_enabled or app.sla_availability_percentage %}
   {% set _ = tabs.append({'id': 'health', 'label': 'Health & Quality', 'count': none}) %}
 {% endif %}
-{% if app.total_cost_of_ownership or app.license_cost_annual %}
-  {% set _ = tabs.append({'id': 'cost', 'label': 'Cost', 'count': none}) %}
-{% endif %}
+{% set _ = tabs.append({'id': 'cost', 'label': 'Cost', 'count': (cost.lines|length if cost is defined and cost.has_lines else none)}) %}
 
 <div x-data="{ activeTab: '{{ resolved_tab }}' }">
 {% call pill_tabs(tabs, active_tab_id=resolved_tab, app_id=app.id) %}
@@ -1751,44 +1749,12 @@
      TAB: COST
   ═══════════════════════════════════════════════════════════════════════════ #}
   {% call tab_panel('cost', active=(resolved_tab == 'cost')) %}
-  <div class="space-y-6">
-    <div class="flex justify-end">
-      {% if can('edit', 'application') %}
-      <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-        <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Cost Details
-      </a>
-      {% endif %}
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-      {% macro cost_card(label, value, symbol='£') %}
-      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ label }}</p>
-        <p class="mt-1 text-2xl font-bold text-foreground">
-          {{ symbol }}{{ '{:,.0f}'.format(value) }}
-        </p>
-      </div>
-      {% endmacro %}
-
-      {{ cost_card('Annual Licence Cost', cost_breakdown.license_annual, currency_symbol) }}
-      {{ cost_card('Monthly Infrastructure', cost_breakdown.infrastructure_monthly, currency_symbol) }}
-      {{ cost_card('Annual Infrastructure', cost_breakdown.infrastructure_annual, currency_symbol) }}
-      {{ cost_card('Annual Development', cost_breakdown.development_annual, currency_symbol) }}
-      {{ cost_card('Annual Maintenance', cost_breakdown.maintenance_annual, currency_symbol) }}
-      {{ cost_card('Total Cost of Ownership', cost_breakdown.total_tco, currency_symbol) }}
-
-    </div>
-
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <div class="flex items-center justify-between">
-        <p class="text-sm font-medium text-muted-foreground">Calculated Total (Licence + Infrastructure + Development + Maintenance)</p>
-        <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}</p>
-      </div>
-    </div>
-
-  </div>
+  {% with cost_rule='The sum of the lines counted below, converted to ' ~ cost.currency ~ '. Infrastructure and hosting are shared with the technologies this application runs on, and stay part of this total.',
+          cost_add_url=url_for('unified_applications.application_cost_add', id=app.id),
+          cost_line_url=url_for('unified_applications.application_cost_add', id=app.id) ~ '/',
+          cost_can_edit=can('edit', 'application') %}
+    {% include 'cost/_cost_panel.html' %}
+  {% endwith %}
   {% endcall %}{# /tab_panel cost #}
 
   {# ═══════════════════════════════════════════════════════════════════════════

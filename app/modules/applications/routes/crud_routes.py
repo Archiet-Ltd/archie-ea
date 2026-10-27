@@ -1472,3 +1472,72 @@ def accept_capability_suggestion(id):
         "mapping_id": mapping.id,
         "message": f"Mapped to capability #{cap_id}",
     })
+
+
+def _cost_line_form():
+    form = request.form
+    return {
+        "category": form.get("category", ""),
+        "amount": form.get("amount", ""),
+        "currency": form.get("currency", ""),
+        "period": form.get("period", "annual"),
+        "kind": form.get("kind", "actual"),
+    }
+
+
+def _save_cost_line(app_id, write, done):
+    """Run one cost-line write for an application of this organisation and return to its Cost tab."""
+    from flask import abort
+
+    from app.services.cost_view import CostLineError
+
+    try:
+        write()
+        db.session.commit()
+        flash(done, "success")
+    except CostLineError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+    except LookupError:
+        db.session.rollback()
+        abort(404)
+    return redirect(url_for("unified_applications.application_detail", id=app_id, tab="cost"))
+
+
+@unified_applications_bp.route("/<int:id>/costs", methods=["POST"])
+@login_required
+@require_permission("edit", "application")
+@audit_log("application_cost_add")
+def application_cost_add(id):
+    """Add a cost line a person typed to an application."""
+    from app.models.cost_fact import ELEMENT_APPLICATION
+    from app.services import cost_view
+
+    return _save_cost_line(id, lambda: cost_view.add_line(
+        g.current_org_id, ELEMENT_APPLICATION, id, user_id=current_user.id, **_cost_line_form()), "Cost line added.")
+
+
+@unified_applications_bp.route("/<int:id>/costs/<int:fact_id>", methods=["POST"])
+@login_required
+@require_permission("edit", "application")
+@audit_log("application_cost_edit")
+def application_cost_edit(id, fact_id):
+    """Change a cost line a person added to an application."""
+    from app.models.cost_fact import ELEMENT_APPLICATION
+    from app.services import cost_view
+
+    return _save_cost_line(id, lambda: cost_view.update_line(
+        g.current_org_id, ELEMENT_APPLICATION, id, fact_id, **_cost_line_form()), "Cost line saved.")
+
+
+@unified_applications_bp.route("/<int:id>/costs/<int:fact_id>/delete", methods=["POST"])
+@login_required
+@require_permission("edit", "application")
+@audit_log("application_cost_delete")
+def application_cost_delete(id, fact_id):
+    """Delete a cost line a person added to an application."""
+    from app.models.cost_fact import ELEMENT_APPLICATION
+    from app.services import cost_view
+
+    return _save_cost_line(id, lambda: cost_view.delete_line(
+        g.current_org_id, ELEMENT_APPLICATION, id, fact_id), "Cost line deleted.")

@@ -2414,6 +2414,7 @@ def render_application_detail(id):
         dependencies_downstream=[],
         dependency_graph_data={},
         cost_breakdown=cost_breakdown,
+        **_cost_context(app_obj),
         health_metrics=health_metrics,
         quality_metrics=quality_metrics,
         integration_mappings=[],
@@ -2429,3 +2430,15 @@ def render_application_detail(id):
         archimate_info=archimate_info,
         archimate_relationships=archimate_relationships,
     )
+
+
+def _cost_context(app_obj):
+    """The application's Cost tab: its lines and total from the one cost view, and the choices for a new line."""
+    from app.services import cost_view
+
+    return {
+        "cost": cost_view.application_cost(app_obj.organization_id, app_obj.id),
+        "cost_categories": cost_view.PERSON_CATEGORIES,
+        "cost_periods": cost_view.PERIODS,
+        "cost_kinds": tuple(cost_view.KIND_WORDS.items()),
+    }
