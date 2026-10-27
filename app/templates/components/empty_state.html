@@ -49,16 +49,16 @@
     heading_testid=None,
     description_testid=None,
     class='',
-    padding='py-12',
+    padding='py-4 md:py-8',
     compact=False
 ) %}
 {#- compact: for an empty box inside a card or canvas box. No icon disc, a small title and description, and a call to action that wraps. Default output is unchanged. -#}
 {%- set cta_fit = ' !h-auto !whitespace-normal !px-3 !py-1.5 !text-xs' if compact else '' -%}
 <div class="text-center {{ padding }} px-4 {{ class }}" role="status">
     <!-- Icon -->
-    {% if not compact %}<div class="mx-auto mb-4 flex size-10 items-center justify-center rounded-lg bg-muted text-primary">
+    {% if not compact %}<div class="mx-auto mb-4 flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
         {#- drawn on the server when it knows the icon: the browser set is older and lacks some names -#}
-        {% if has_lucide is defined and has_lucide(icon) %}{{ lucide(icon, 'size-4') }}{% else %}<i data-lucide="{{ icon }}" class="size-4" aria-hidden="true"></i>{% endif %}
+        {% if has_lucide is defined and has_lucide(icon) %}{{ lucide(icon, 'size-6') }}{% else %}<i data-lucide="{{ icon }}" class="size-6" aria-hidden="true"></i>{% endif %}
     </div>{% endif %}
 
     <!-- Title -->
