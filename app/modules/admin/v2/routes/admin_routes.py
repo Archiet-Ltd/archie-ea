@@ -3349,7 +3349,7 @@ def api_bulk_delete_users():
         return jsonify({"error": "ids list required"}), 400
     safe_ids = [i for i in ids if i != current_user.id]
     try:
-        ensure_keeps_administrator(g.current_org_id, safe_ids)
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
     except LastAdministratorError as exc:
         return jsonify({"error": exc.message}), 409
     deleted = User.query.filter(
@@ -5782,7 +5782,7 @@ def remove_user_from_org(org_id, user_id):
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
     try:
-        ensure_keeps_administrator(org_id, [user_id])
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
     except LastAdministratorError as exc:
         flash(exc.message, "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))

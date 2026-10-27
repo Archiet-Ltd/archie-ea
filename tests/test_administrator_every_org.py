@@ -186,6 +186,23 @@ def test_the_last_administrator_rule(app):
         with pytest.raises(LastAdministratorError):
             ensure_keeps_administrator(org.id, [sole.id, other.id])
 
+        # Removing people (rather than demoting them) from an organisation they are
+        # the only members of leaves it empty: allowed. While another member remains, refused.
+        alone = _org(db, "rulealone")
+        only = _user(db, alone, "onlyone", "Administrator")
+        db.session.commit()
+        ensure_keeps_administrator(alone.id, [only.id], leaving=True)
+        with pytest.raises(LastAdministratorError):
+            ensure_keeps_administrator(alone.id, [only.id])  # demoting the only member's role
+
+        with pytest.raises(LastAdministratorError):
+            ensure_keeps_administrator(org.id, [sole.id, other.id], leaving=False)
+        third = _user(db, org, "third", "Viewer")
+        db.session.commit()
+        with pytest.raises(LastAdministratorError):
+            ensure_keeps_administrator(org.id, [sole.id, other.id], leaving=True)  # third remains
+        ensure_keeps_administrator(org.id, [sole.id, other.id, third.id], leaving=True)  # nobody remains
+
         headless = _org(db, "rulenone")
         _user(db, headless, "nobody", "Viewer")
         db.session.commit()

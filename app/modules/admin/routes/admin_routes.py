@@ -2315,7 +2315,7 @@ def api_bulk_delete_users():
     if not safe_ids:
         return jsonify({"deleted": 0})
     try:
-        ensure_keeps_administrator(g.current_org_id, safe_ids)
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
     except LastAdministratorError as exc:
         return jsonify({"error": exc.message}), 409
 

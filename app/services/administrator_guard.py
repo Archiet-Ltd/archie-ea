@@ -227,9 +227,25 @@ def administrator_ids(org_id: int) -> set[int]:
     return {uid for uid, user in people.items() if rbac_service.is_org_admin(user, org_id)}
 
 
-def ensure_keeps_administrator(org_id: int, losing_ids) -> None:
+def member_ids(org_id: int) -> set[int]:
+    """Ids of everyone who belongs to ``org_id``: its own people and anyone invited in."""
+    from app.models.org_role import OrgRole
+    from app.models.user import User
+
+    # tenant-scoping-ok: one organisation's own members, by its id
+    ids = {u.id for u in User.query.filter(User.organization_id == org_id).all() if not u.is_service_user}
+    ids.update(row.user_id for row in OrgRole.query.filter_by(organization_id=org_id).all())
+    return ids
+
+
+def ensure_keeps_administrator(org_id: int, losing_ids, leaving: bool = False) -> None:
     """Raise ``LastAdministratorError`` when removing or demoting ``losing_ids``
     would leave ``org_id`` without an Administrator it has now.
+
+    ``leaving`` says the people are being removed from the organisation (deleted,
+    or taken out of it) rather than demoted. An organisation they were the only
+    members of is left empty, and an empty organisation has no one to be without
+    an Administrator, so that is allowed.
 
     An organisation that already has none is not this function's concern (the
     repair and the verification check own that), so it never blocks a change there.
@@ -237,8 +253,11 @@ def ensure_keeps_administrator(org_id: int, losing_ids) -> None:
     from app.extensions import db
     from app.models.user import User
 
+    asked = {int(i) for i in losing_ids if i is not None}
+    if leaving and not (member_ids(org_id) - asked):
+        return
     losing = set()
-    for uid in {int(i) for i in losing_ids if i is not None}:
+    for uid in asked:
         user = db.session.get(User, uid)
         # A platform administrator keeps the Administrator role through any
         # organisation-scoped revoke (User.revoke_org_admin is a no-op for them),

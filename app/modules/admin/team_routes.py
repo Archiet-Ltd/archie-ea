@@ -423,7 +423,7 @@ def team_remove_member(user_id):
         return jsonify({"error": "Cannot remove yourself from the org"}), 400
 
     try:
-        ensure_keeps_administrator(org_id, [user_id])
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
     except LastAdministratorError as exc:
         return jsonify({"error": exc.message}), 409
 
