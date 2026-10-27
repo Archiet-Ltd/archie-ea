@@ -7,13 +7,15 @@ import logging
 from datetime import datetime
 
 from app.extensions import db
+from app.models.mixins import TenantMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ScenarioResult(db.Model):
+class ScenarioResult(TenantMixin, db.Model):
     """BA scenario test result. migration-exempt — db.create_all()"""
     __tablename__ = "codegen_scenario_results"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, nullable=False, index=True)

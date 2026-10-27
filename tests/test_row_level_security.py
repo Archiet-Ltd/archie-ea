@@ -1003,10 +1003,10 @@ def test_streaming_code_edit_generators_read_their_own_organisations_api_setting
         ).scalar_one()
         connection.execute(
             text(
-                "INSERT INTO codegen_generations (solution_id, version, download_count, generated_files) "
-                "VALUES (:s, 1, 0, CAST(:f AS json))"
+                "INSERT INTO codegen_generations (solution_id, organization_id, version, download_count, generated_files) "
+                "VALUES (:s, :o, 1, 0, CAST(:f AS json))"
             ),
-            {"s": solution_id, "f": json.dumps({"app/models/order.py": "class Order: pass\n"})},
+            {"s": solution_id, "o": a, "f": json.dumps({"app/models/order.py": "class Order: pass\n"})},
         )
     world.extra_deletes.append(("codegen_generations", "solution_id", [solution_id]))
     world.extra_deletes.append(("solutions", "id", [solution_id]))

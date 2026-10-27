@@ -26,13 +26,15 @@ from app.modules.codegen.services.credential_encryption import (
     rotate_org_encryption_key,
     get_org_key_version,
 )
+from app.models.mixins import TenantMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ConnectorCredential(db.Model):
+class ConnectorCredential(TenantMixin, db.Model):
     """Encrypted credential storage. migration-exempt — db.create_all()"""
     __tablename__ = "codegen_connector_credentials"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, nullable=False, index=True)

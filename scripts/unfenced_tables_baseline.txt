@@ -125,23 +125,6 @@ cobit_domains
 cobit_processes
 code_artifacts
 code_quality_metrics
-codegen_chat_messages
-codegen_connector_credentials
-codegen_data_imports
-codegen_drift_reports
-codegen_generation_history
-codegen_generations
-codegen_scenario_results
-codegen_solution_connectors
-codegen_solution_instances
-codegen_solution_rules
-codegen_system_boundaries
-codegen_system_boundary_solutions
-codegen_template_files
-codegen_template_sets
-codegen_test_run_steps
-codegen_test_runs
-codegen_workflow_designs
 compliance_checks
 compliance_controls
 compliance_gaps
@@ -159,7 +142,6 @@ contract_applications
 conversation_messages
 conversation_threads
 copilot_insights
-cross_layer_relationships
 custom_field_definitions
 dashboard_edits
 decision_authority
@@ -187,7 +169,6 @@ equipment
 error_events
 exchange_rates
 exception_process
-experience_elements
 external_systems
 extraction_feedback
 feature_flags
@@ -327,7 +308,6 @@ solution_code_bundles
 solution_cost_comparisons
 solution_cost_yearly_projections
 solution_embeddings
-solution_layer_elements
 solution_scoring_configs
 solution_session_versions
 solution_stakeholder_concerns

@@ -5,14 +5,16 @@ migration-exempt — all tables created via db.create_all() per migration-freeze
 import logging
 from datetime import datetime
 from app.extensions import db
+from app.models.mixins import TenantMixin
 
 logger = logging.getLogger(__name__)
 
 
-class CodegenGeneration(db.Model):
+class CodegenGeneration(TenantMixin, db.Model):
     """Stores the state of a code generation session for a solution."""
 
     __tablename__ = "codegen_generations"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -45,10 +47,11 @@ class CodegenGeneration(db.Model):
         return f"<CodegenGeneration solution={self.solution_id} v={self.version}>"
 
 
-class CodegenDriftReport(db.Model):
+class CodegenDriftReport(TenantMixin, db.Model):
     """Stores a point-in-time drift scan result comparing GitHub repo against generated baseline."""
 
     __tablename__ = "codegen_drift_reports"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -68,10 +71,11 @@ class CodegenDriftReport(db.Model):
         return f"<CodegenDriftReport solution={self.solution_id} status={self.status} files={self.drift_file_count}>"
 
 
-class CodegenGenerationHistory(db.Model):
+class CodegenGenerationHistory(TenantMixin, db.Model):
     """Records each code generation run for diffing and audit (GAP-04)."""
 
     __tablename__ = "codegen_generation_history"
+    __tenant_parent__ = (('codegen_generation_id', 'codegen_generations'),)
 
     id = db.Column(db.Integer, primary_key=True)
     codegen_generation_id = db.Column(
@@ -96,7 +100,7 @@ class CodegenGenerationHistory(db.Model):
         return f"<CodegenGenerationHistory gen={self.codegen_generation_id} v={self.version_label}>"
 
 
-class CodegenSystemBoundary(db.Model):
+class CodegenSystemBoundary(TenantMixin, db.Model):
     """Groups multiple solutions into a logical system boundary for multi-service composition (Feature 2).
 
     Named CodegenSystemBoundary (not SystemBoundary) to avoid SQLAlchemy registry conflict
@@ -105,6 +109,7 @@ class CodegenSystemBoundary(db.Model):
     """
 
     __tablename__ = "codegen_system_boundaries"
+    __tenant_parent__ = (('created_by_id', 'users'),)
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
@@ -124,10 +129,11 @@ class CodegenSystemBoundary(db.Model):
         return f"<CodegenSystemBoundary id={self.id} name={self.name!r}>"
 
 
-class SystemBoundarySolution(db.Model):
+class SystemBoundarySolution(TenantMixin, db.Model):
     """Junction: which solutions participate in a system boundary and in what role."""
 
     __tablename__ = "codegen_system_boundary_solutions"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     boundary_id = db.Column(
@@ -148,13 +154,14 @@ class SystemBoundarySolution(db.Model):
         return f"<SystemBoundarySolution boundary={self.boundary_id} solution={self.solution_id} role={self.role}>"
 
 
-class CodegenChatMessage(db.Model):
+class CodegenChatMessage(TenantMixin, db.Model):
     """Persists chat messages for the NL code editing panel.
 
     migration-exempt — created via db.create_all().
     """
 
     __tablename__ = "codegen_chat_messages"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id"), nullable=False, index=True)
@@ -174,13 +181,14 @@ class CodegenChatMessage(db.Model):
         return f"<CodegenChatMessage sol={self.solution_id} role={self.role}>"
 
 
-class CodegenTemplateSet(db.Model):
+class CodegenTemplateSet(TenantMixin, db.Model):
     """Named collection of Jinja2 template overrides (Feature 6: Template Marketplace).
 
     migration-exempt — created via db.create_all().
     """
 
     __tablename__ = "codegen_template_sets"
+    __tenant_parent__ = (('created_by_id', 'users'),)
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
@@ -198,13 +206,14 @@ class CodegenTemplateSet(db.Model):
         return f"<CodegenTemplateSet id={self.id} name={self.name!r} lang={self.language}>"
 
 
-class CodegenTemplateFile(db.Model):
+class CodegenTemplateFile(TenantMixin, db.Model):
     """Single Jinja2 template file override within a CodegenTemplateSet.
 
     migration-exempt — created via db.create_all().
     """
 
     __tablename__ = "codegen_template_files"
+    __tenant_parent__ = (('set_id', 'codegen_template_sets'),)
 
     id = db.Column(db.Integer, primary_key=True)
     set_id = db.Column(
@@ -223,7 +232,7 @@ class CodegenTemplateFile(db.Model):
         return f"<CodegenTemplateFile set={self.set_id} template={self.template_name!r}>"
 
 
-class SolutionInstance(db.Model):
+class SolutionInstance(TenantMixin, db.Model):
     """Tracks a running deployment of a generated solution on Coolify.
 
     migration-exempt — table created via db.create_all()
@@ -234,6 +243,7 @@ class SolutionInstance(db.Model):
     """
 
     __tablename__ = "codegen_solution_instances"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -277,7 +287,7 @@ class SolutionInstance(db.Model):
         return f"<SolutionInstance solution={self.solution_id} v{self.version} [{self.health_status}]>"
 
 
-class SolutionRule(db.Model):
+class SolutionRule(TenantMixin, db.Model):
     """Tracks a business rule defined by the BA for a generated solution.
 
     Rules flow: BA input (template params, NL text, or workflow JSON)
@@ -287,6 +297,7 @@ class SolutionRule(db.Model):
     """
 
     __tablename__ = "codegen_solution_rules"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -308,7 +319,7 @@ class SolutionRule(db.Model):
         return f"<SolutionRule id={self.id} solution={self.solution_id} name={self.name!r}>"
 
 
-class SolutionLayerElement(db.Model):
+class SolutionLayerElement(TenantMixin, db.Model):
     """Layer 2 (Solution) element — formalizes what codegen produces implicitly.
 
     Element types: use_case, component, data_model, behavior, deployment_node.
@@ -318,6 +329,7 @@ class SolutionLayerElement(db.Model):
     """
 
     __tablename__ = "solution_layer_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -345,7 +357,7 @@ class SolutionLayerElement(db.Model):
         return f"<SolutionLayerElement id={self.id} type={self.element_type} name={self.name!r}>"
 
 
-class ExperienceElement(db.Model):
+class ExperienceElement(TenantMixin, db.Model):
     """Layer 3 (Experience) element — UI/UX model tied to solution layer.
 
     Element types: persona, journey, screen, ui_component, design_token.
@@ -355,6 +367,7 @@ class ExperienceElement(db.Model):
     """
 
     __tablename__ = "experience_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -380,7 +393,7 @@ class ExperienceElement(db.Model):
         return f"<ExperienceElement id={self.id} type={self.element_type} name={self.name!r}>"
 
 
-class CrossLayerRelationship(db.Model):
+class CrossLayerRelationship(TenantMixin, db.Model):
     """Traceability link between elements across layers (ArchiMate ↔ Solution ↔ Experience).
 
     Relationship types: realizes, decomposes, implements, binds_to, constrains, verifies.
@@ -390,6 +403,7 @@ class CrossLayerRelationship(db.Model):
     """
 
     __tablename__ = "cross_layer_relationships"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     relationship_type = db.Column(db.String(30), nullable=False)
@@ -421,11 +435,12 @@ class CrossLayerRelationship(db.Model):
         )
 
 
-class SolutionConnector(db.Model):
+class SolutionConnector(TenantMixin, db.Model):
     """Tracks an active integration connector for a deployed solution.
     migration-exempt — table created via db.create_all()
     """
     __tablename__ = "codegen_solution_connectors"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id"), nullable=False, index=True)
@@ -482,7 +497,7 @@ class SolutionVersion(db.Model):
         return f"<SolutionVersion solution={self.solution_id} v{self.version_number} [{self.status}]>"
 
 
-class DataImport(db.Model):
+class DataImport(TenantMixin, db.Model):
     """Tracks a spreadsheet data import session for a deployed solution.
 
     Lifecycle: pending -> importing -> completed | failed
@@ -492,6 +507,7 @@ class DataImport(db.Model):
     """
 
     __tablename__ = "codegen_data_imports"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -517,7 +533,7 @@ class DataImport(db.Model):
         return f"<DataImport id={self.id} solution={self.solution_id} file={self.filename!r} [{self.status}]>"
 
 
-class WorkflowDesign(db.Model):
+class WorkflowDesign(TenantMixin, db.Model):
     """Visual workflow definition created in the drag-drop designer.
 
     Stores the JointJS graph JSON (workflow_definition) and the compiled
@@ -527,6 +543,7 @@ class WorkflowDesign(db.Model):
     """
 
     __tablename__ = "codegen_workflow_designs"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -548,7 +565,7 @@ class WorkflowDesign(db.Model):
         return f"<WorkflowDesign id={self.id} solution={self.solution_id} name={self.name!r}>"
 
 
-class TestRun(db.Model):
+class TestRun(TenantMixin, db.Model):
     """Records a complete test execution run against a deployed solution.
 
     Each run contains multiple steps (TestRunStep). Runs are triggered by
@@ -558,6 +575,7 @@ class TestRun(db.Model):
     """
 
     __tablename__ = "codegen_test_runs"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(
@@ -578,13 +596,14 @@ class TestRun(db.Model):
         return f"<TestRun id={self.id} solution={self.solution_id} status={self.status}>"
 
 
-class TestRunStep(db.Model):
+class TestRunStep(TenantMixin, db.Model):
     """Individual step result within a TestRun.
 
     migration-exempt -- created via db.create_all() per migration-freeze policy.
     """
 
     __tablename__ = "codegen_test_run_steps"
+    __tenant_parent__ = (('test_run_id', 'codegen_test_runs'),)
 
     id = db.Column(db.Integer, primary_key=True)
     test_run_id = db.Column(
