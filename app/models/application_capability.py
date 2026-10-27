@@ -504,19 +504,25 @@ class CapabilityTaxonomyViolation(db.Model):
 # Idempotent: a pair already in the unified table is left as it is. A capability
 # with no unified record (an un-migrated database) is skipped, not failed.
 # ---------------------------------------------------------------------------
+# The unified mapping is tenant-fenced: the mirrored row takes the organisation of the
+# application component it maps, the same owner the fence backfill derives for this table.
+# raw-sql-tenancy-writes-ok: organization_id is written from the source application's own
+# column, the canonical owner of the mapped row, not from request data.
 _MIRROR_MAPPING_SQL = """
 INSERT INTO unified_application_capability_mapping
-    (unified_capability_id, application_component_id, support_level, coverage_percentage,
+    (unified_capability_id, application_component_id, organization_id, support_level, coverage_percentage,
      support_quality, relationship_type, relationship_strength, dependency_level,
      gap_status, is_active, is_strategic, created_at, updated_at)
-SELECT uc.id, :app_id, :support_level, :coverage, 3, :relationship_type, 3, 'medium',
+SELECT uc.id, ac.id, ac.organization_id, :support_level, :coverage, 3, :relationship_type, 3, 'medium',
        COALESCE(:gap_status, 'unknown'), COALESCE(:is_active, TRUE), FALSE, NOW(), NOW()
   FROM unified_capabilities AS uc
+  JOIN application_components AS ac ON ac.id = :app_id
  WHERE uc.source_table = 'business_capability'
    AND uc.source_id = CAST(:bc_id AS VARCHAR)
+   AND ac.organization_id IS NOT NULL
    AND NOT EXISTS (
         SELECT 1 FROM unified_application_capability_mapping AS m
-         WHERE m.unified_capability_id = uc.id AND m.application_component_id = :app_id)
+         WHERE m.unified_capability_id = uc.id AND m.application_component_id = ac.id)
 """
 
 

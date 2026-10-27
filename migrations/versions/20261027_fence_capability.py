@@ -71,7 +71,6 @@ BACKFILL = (
     ('requirements_traceability_matrices', (('ea_workflow_instances', 'workflow_instance_id'),)),
     ('saved_diagram_elements', (('saved_diagrams', 'diagram_id'),)),
     ('saved_diagram_relationships', (('saved_diagrams', 'diagram_id'),)),
-    ('scoring_configurations', (('users', 'created_by_id'),)),
     ('service_dependency', (('business_services', 'dependent_service_id'),)),
     ('service_realization', (('business_processes', 'process_id'),)),
     ('software_dependencies', (('archimate_elements', 'archimate_element_id'),)),

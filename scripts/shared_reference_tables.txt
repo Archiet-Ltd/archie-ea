@@ -8,3 +8,4 @@ vendor_catalogue_facts  # the public vendor catalogue (ADR-0021): the same for e
 users  # tenant root: accounts are looked up by id or email at sign-in before any organisation is known, and each row carries its own organization_id; read through the organisation and role checks, not a tenant filter
 archimate_patterns  # shared ArchiMate pattern library seeded for every organisation
 archimate_viewpoint_templates  # shared ArchiMate viewpoint template library seeded for every organisation
+scoring_configurations  # platform-wide application-rationalisation scoring weights; the one default row is the fallback every organisation reads, written only by a platform administrator

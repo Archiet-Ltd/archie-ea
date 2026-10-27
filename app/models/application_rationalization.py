@@ -1311,7 +1311,7 @@ class ReplacementPlan(TenantMixin, db.Model):
 # ============================================================================
 
 
-class ScoringConfiguration(TenantMixin, db.Model):
+class ScoringConfiguration(db.Model):
     """
     Configurable scoring weights for application rationalization.
 
@@ -1332,7 +1332,6 @@ class ScoringConfiguration(TenantMixin, db.Model):
     """
 
     __tablename__ = "scoring_configurations"
-    __tenant_parent__ = (('created_by_id', 'users'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
