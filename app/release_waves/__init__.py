@@ -172,6 +172,8 @@ def install_hook(app) -> None:
 
 def register_routes(app) -> None:
     """Register the early-access pages (after the rate limiter is installed)."""
+    from app.release_waves.hook import point_closed_links_at_early_access
     from app.release_waves.routes import early_access_bp
 
     app.register_blueprint(early_access_bp)
+    app.after_request(point_closed_links_at_early_access)

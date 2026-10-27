@@ -110,3 +110,52 @@ def enforce():
     ))
     out.headers["X-Robots-Tag"] = "noindex"
     return out
+
+
+_ANCHOR = re.compile(r"""(<a\b[^>]*?\bhref=)(["'])(/[^"'#?]*)([^"']*)\2""")
+
+
+def early_access_target(path: str) -> str | None:
+    """The early-access address for a closed page, or None when the address is open, unknown or not a page."""
+    from flask import current_app
+
+    wave = configured_wave()
+    if wave is None or path.startswith(("/early-access", "/static/", "/api/", "/oauth", "/mcp", "/.well-known")):
+        return None
+    cache = current_app.extensions.setdefault("release_waves_link_targets", {})
+    key = (path, wave)
+    if key in cache:
+        return cache[key]
+    target = None
+    try:
+        rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
+        entry = entry_for(rule.rule, rule.endpoint)
+        if state_for(entry, wave) in (CLOSED, REDIRECT):
+            code, _info = group_for(entry)
+            target = f"/early-access/{code_slug(code)}"
+    except Exception:  # noqa: BLE001 - an address the router cannot read is left as written
+        target = None
+    cache[key] = target
+    return target
+
+
+def point_closed_links_at_early_access(response):
+    """Under RELEASE_WAVE, a link to a page the wave closes leads to that capability's early-access page.
+
+    Applied to every HTML page, so no template has to know which wave is released."""
+    if configured_wave() is None or response.status_code != 200 or response.direct_passthrough:
+        return response
+    if response.mimetype != "text/html" or response.headers.get("Content-Encoding"):
+        return response
+    html = response.get_data(as_text=True)
+
+    def swap(match):
+        target = early_access_target(match.group(3))
+        if target is None:
+            return match.group(0)
+        return f"{match.group(1)}{match.group(2)}{target}{match.group(2)}"
+
+    rewritten = _ANCHOR.sub(swap, html)
+    if rewritten != html:
+        response.set_data(rewritten)
+    return response
