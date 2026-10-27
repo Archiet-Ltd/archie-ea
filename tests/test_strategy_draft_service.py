@@ -335,7 +335,6 @@ def test_drafting_needs_a_confirmed_profile(make_org):
 
 
 def test_drafting_is_a_job_queued_for_the_organisation_never_run_inline(company):
-    from app.models.job import Job
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval
     from app.services import strategy_draft_service as engine
 
@@ -343,7 +342,9 @@ def test_drafting_is_a_job_queued_for_the_organisation_never_run_inline(company)
     job = engine.queue_drafts(org_id, user_id)
     assert job.task == "strategy_drafts" and job.payload["organization_id"] == org_id and job.status == "pending"
     assert AIChatCRUDApproval.query.filter_by(organization_id=org_id, source_table="strategy_draft").count() == 0
-    assert Job.query.filter_by(task="strategy_drafts").count() == 1
+    from app.services.job_queue_service import get_job_queue_service
+
+    assert len(get_job_queue_service().list_jobs(org_id, task="strategy_drafts")) == 1
 
 
 def test_the_job_body_runs_the_drafting_and_returns_counts_only(company, monkeypatch):
