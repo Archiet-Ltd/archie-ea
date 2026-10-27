@@ -1,32 +1,45 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/canvas_box.html' import canvas_box_entries, canvas_unclassified %}
-{% import 'components/card.html' as card %}
+{% from 'components/card.html' import card %}
+{% from 'components/form_field.html' import form_field, form_group, form_footer %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/status_badge.html' import status_badge %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/inline_hint.html' import inline_hint %}
 
 {% macro draft_with_ai(section_key, label) %}
-<button type="button" @click="draftSection('{{ section_key }}')" :disabled="draftingSection === '{{ section_key }}'"
-        data-testid="bc-draft-ai-{{ section_key }}"
-        class="inline-flex items-center gap-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 px-2 py-1 disabled:opacity-50 disabled:pointer-events-none"
-        aria-label="Draft {{ label }} with AI">
-  <span x-show="draftingSection === '{{ section_key }}'" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-  <i data-lucide="sparkles" class="h-3 w-3" aria-hidden="true" x-show="draftingSection !== '{{ section_key }}'"></i>
-  <span>Draft with AI</span>
-</button>
+{{ button(
+    text='Draft with AI',
+    variant='outline',
+    size='sm',
+    icon='sparkles',
+    icon_position='left',
+    type='button',
+    attrs_dict={
+        '@click': "draftSection('" ~ section_key ~ "')",
+        ':disabled': "draftingSection === '" ~ section_key ~ "'",
+        'data-testid': "bc-draft-ai-" ~ section_key,
+        'aria-label': "Draft " ~ label ~ " with AI"
+    }
+) }}
 {% endmacro %}
 
 {% macro draft_ai_error(section_key) %}
-<div x-show="draftError === '{{ section_key }}'" x-cloak class="mt-1 text-xs text-destructive-emphasis bg-destructive/10 border border-destructive/30 rounded px-2 py-1" x-text="draftErrorMessage"></div>
+<div x-show="draftError === '{{ section_key }}'" x-cloak
+     class="mt-1 text-xs text-destructive-emphasis bg-destructive/10 border border-destructive/30 rounded px-2 py-1"
+     x-text="draftErrorMessage"
+     role="alert"></div>
 {% endmacro %}
 
 {% block title %}{{ business_case.title or 'Business Case' }}{% endblock %}
-
-{% set _status_badge = {
-    'draft':     'bg-muted text-muted-foreground border-border',
-    'submitted': 'bg-info/10 text-info border-info/30',
-    'approved':  'bg-success/10 text-success border-success/30',
-    'rejected':  'bg-destructive/10 text-destructive border-destructive/30'
-} %}
 
 {% block content %}
 <div class="flex-1 overflow-auto" x-data='businessCaseDetail({
@@ -76,12 +89,16 @@
       <div class="flex flex-wrap items-center gap-3">
         <div class="flex items-center gap-2">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</span>
-          <select x-model="status" @change="saveMeta()" data-testid="bc-status-select"
-            class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Status">
-            {% for s in statuses %}
-            <option value="{{ s }}">{{ s | capitalize }}</option>
-            {% endfor %}
-          </select>
+          {% call form_group(id='bc-status-select', label='', class='w-auto') %}
+            {{ native_select(
+                id='bc-status-select',
+                name='status',
+                size='sm',
+                attrs_dict={'x-model': 'status', '@change': 'saveMeta()'},
+                options=statuses | map(attribute=0) | list | zip(statuses | map(attribute=1) | list) | list,
+                selected=status
+            ) }}
+          {% endcall %}
         </div>
         <span x-show="savingMeta" x-cloak class="text-xs text-muted-foreground inline-flex items-center gap-1">
           <i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…
@@ -90,65 +107,76 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label for="bc-link-capability" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Capability</label>
-          <select id="bc-link-capability" x-model="capabilityId" @change="saveMeta()" data-testid="bc-link-capability"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">Not linked</option>
-            {% for cap in capabilities %}
-            <option value="{{ cap.id }}">{{ cap.name }}</option>
-            {% endfor %}
-          </select>
+          {% call form_group(id='bc-link-capability', label='Linked Capability') %}
+            {{ native_select(
+                id='bc-link-capability',
+                name='capability_id',
+                attrs_dict={'x-model': 'capabilityId', '@change': 'saveMeta()'},
+                options=capabilities | map(attribute='id') | list | zip(capabilities | map(attribute='name') | list) | list,
+                selected=capabilityId
+            ) }}
+          {% endcall %}
         </div>
         <div>
-          <label for="bc-link-initiative" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Strategic Initiative</label>
-          <select id="bc-link-initiative" x-model="strategicInitiativeId" @change="saveMeta()" data-testid="bc-link-initiative"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">Not linked</option>
-            {% for init in initiatives %}
-            <option value="{{ init.id }}">{{ init.name }}</option>
-            {% endfor %}
-          </select>
+          {% call form_group(id='bc-link-initiative', label='Linked Strategic Initiative') %}
+            {{ native_select(
+                id='bc-link-initiative',
+                name='strategic_initiative_id',
+                attrs_dict={'x-model': 'strategicInitiativeId', '@change': 'saveMeta()'},
+                options=initiatives | map(attribute='id') | list | zip(initiatives | map(attribute='name') | list) | list,
+                selected=strategicInitiativeId
+            ) }}
+          {% endcall %}
         </div>
         <div>
-          <label for="bc-link-solution" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Solution</label>
-          <select id="bc-link-solution" x-model="solutionId" @change="saveMeta()" data-testid="bc-link-solution"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">Not linked</option>
-            {% for sol in solutions %}
-            <option value="{{ sol.id }}">{{ sol.name }}</option>
-            {% endfor %}
-          </select>
+          {% call form_group(id='bc-link-solution', label='Linked Solution') %}
+            {{ native_select(
+                id='bc-link-solution',
+                name='solution_id',
+                attrs_dict={'x-model': 'solutionId', '@change': 'saveMeta()'},
+                options=solutions | map(attribute='id') | list | zip(solutions | map(attribute='name') | list) | list,
+                selected=solutionId
+            ) }}
+          {% endcall %}
         </div>
       </div>
     </div>
 
-    {# ── Export & share — image through the existing ExportManager over the
-       rendered section content (the reason line of every empty box is
-       already in that DOM, so it is already in the image); the saved-
-       viewpoint formats over the record's saved diagram; share is the
-       existing in-tenant saved-diagram link, only offered once one exists. ── #}
+    {# ── Export & share ── #}
     <div class="rounded-lg border border-border bg-card p-4 flex flex-wrap items-center gap-3" data-testid="bc-export-share-panel">
       <div class="flex items-center gap-2 shrink-0">
         <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-        <span class="text-sm font-medium text-foreground">Export &amp; share</span>
+        <span class="text-sm font-medium text-foreground">Export & share</span>
       </div>
-      <button type="button" @click="exportImage()" data-testid="bc-export-image"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
-      </button>
-      <select aria-label="File export format" x-model="exportFormat" data-testid="bc-export-format"
-        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm">
-        <option value="mermaid">Mermaid (.mmd)</option>
-        <option value="lucid">Lucidchart (.lucid)</option>
-        <option value="archi">Archi (.archimate)</option>
-      </select>
+      {{ button(
+          text='Export as image',
+          variant='outline',
+          size='default',
+          icon='image',
+          icon_position='left',
+          type='button',
+          attrs_dict={
+              '@click': 'exportImage()',
+              'data-testid': 'bc-export-image',
+              ':disabled': 'pullingFinancials'
+          }
+      ) }}
+      {% call form_group(id='bc-export-format', label='File export format', class='w-auto') %}
+        {{ native_select(
+            id='bc-export-format',
+            name='export_format',
+            size='default',
+            attrs_dict={'x-model': 'exportFormat'},
+            options=[('mermaid', 'Mermaid (.mmd)'), ('lucid', 'Lucidchart (.lucid)'), ('archi', 'Archi (.archimate)')]
+        ) }}
+      {% endcall %}
       <a :href="exportFileUrl" data-testid="bc-export-file"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
       </a>
       <template x-if="shareUrl">
         <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bc-share-link"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
         </a>
       </template>
@@ -157,17 +185,11 @@
       </span>
     </div>
 
-    {# ── The business case as a canvas: one section per box, in record
-       order, word for word the same order at 360px, since this section is
-       a single column at every width (no lg:grid-cols-2 here — a section
-       list, not a grid). Non-box panels (Recommendation; the Costs,
-       Benefits & ROI figures) sit beside the box they relate to and are
-       unchanged from today. #}
+    {# ── The business case as a canvas ── #}
     <div id="bc-canvas-content">
 
-    {# 1. Executive summary — composed from the sections below; nothing to
-       derive until a projection exists. #}
-    {% call card.card() %}
+    {# 1. Executive summary ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="file-text" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Executive summary
@@ -178,8 +200,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 2. Reasons (strategic context) — problem_statement, unchanged. #}
-    {% call card.card() %}
+    {# 2. Reasons (strategic context) ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="alert-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Reasons (strategic context)
@@ -188,9 +210,20 @@
       {% endcall %}
       {% call card.card_content() %}
         {{ canvas_box_entries(canvas_zones['problem_statement']) }}
-        <textarea x-model="fields.problem_statement" @blur="saveField('problem_statement')"
-          data-testid="bc-textarea-problem_statement" rows="5" placeholder="What business problem or opportunity is driving this case?"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
+        {{ form_field(
+            id='bc-textarea-problem_statement',
+            label='What business problem or opportunity is driving this case?',
+            name='problem_statement',
+            input_type='textarea',
+            placeholder='What business problem or opportunity is driving this case?',
+            value=fields.problem_statement,
+            rows=5,
+            attrs_dict={
+                'x-model': 'fields.problem_statement',
+                '@blur': "saveField('problem_statement')",
+                'data-testid': 'bc-textarea-problem_statement'
+            }
+        ) }}
         {{ draft_ai_error('problem_statement') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'problem_statement'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -199,9 +232,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 3. Business options — options_considered, unchanged; the existing
-       Recommendation panel follows it, also unchanged. #}
-    {% call card.card() %}
+    {# 3. Business options ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Business options
@@ -210,9 +242,20 @@
       {% endcall %}
       {% call card.card_content() %}
         {{ canvas_box_entries(canvas_zones['options_considered']) }}
-        <textarea x-model="fields.options_considered" @blur="saveField('options_considered')"
-          data-testid="bc-textarea-options_considered" rows="5" placeholder="What alternatives were evaluated (including do-nothing)?"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
+        {{ form_field(
+            id='bc-textarea-options_considered',
+            label='What alternatives were evaluated (including do-nothing)?',
+            name='options_considered',
+            input_type='textarea',
+            placeholder='What alternatives were evaluated (including do-nothing)?',
+            value=fields.options_considered,
+            rows=5,
+            attrs_dict={
+                'x-model': 'fields.options_considered',
+                '@blur': "saveField('options_considered')",
+                'data-testid': 'bc-textarea-options_considered'
+            }
+        ) }}
         {{ draft_ai_error('options_considered') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'options_considered'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -221,7 +264,8 @@
       {% endcall %}
     {% endcall %}
 
-    {% call card.card(class='border-primary/30') %}
+    {# 4. Recommendation ── #}
+    {% call card(class='border-primary/30') %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="target" class="h-4 w-4 text-primary" aria-hidden="true"></i> Recommendation
@@ -229,9 +273,20 @@
         {% call card.card_action() %}{{ draft_with_ai('recommended_option', 'Recommendation') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        <textarea x-model="fields.recommended_option" @blur="saveField('recommended_option')"
-          data-testid="bc-textarea-recommended_option" rows="4" placeholder="Which option is recommended, and why?"
-          class="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Which option is recommended, and why?"></textarea>
+        {{ form_field(
+            id='bc-textarea-recommended_option',
+            label='Which option is recommended, and why?',
+            name='recommended_option',
+            input_type='textarea',
+            placeholder='Which option is recommended, and why?',
+            value=fields.recommended_option,
+            rows=4,
+            attrs_dict={
+                'x-model': 'fields.recommended_option',
+                '@blur': "saveField('recommended_option')",
+                'data-testid': 'bc-textarea-recommended_option'
+            }
+        ) }}
         {{ draft_ai_error('recommended_option') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'recommended_option'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -240,8 +295,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 4. Expected benefits — expected_benefits, unchanged. #}
-    {% call card.card() %}
+    {# 5. Expected benefits ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="trending-up" class="h-4 w-4 text-success" aria-hidden="true"></i> Expected benefits
@@ -250,9 +305,20 @@
       {% endcall %}
       {% call card.card_content() %}
         {{ canvas_box_entries(canvas_zones['expected_benefits']) }}
-        <textarea x-model="fields.expected_benefits" @blur="saveField('expected_benefits')"
-          data-testid="bc-textarea-expected_benefits" rows="5" placeholder="Quantified and qualitative benefits expected"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>
+        {{ form_field(
+            id='bc-textarea-expected_benefits',
+            label='Quantified and qualitative benefits expected',
+            name='expected_benefits',
+            input_type='textarea',
+            placeholder='Quantified and qualitative benefits expected',
+            value=fields.expected_benefits,
+            rows=5,
+            attrs_dict={
+                'x-model': 'fields.expected_benefits',
+                '@blur': "saveField('expected_benefits')",
+                'data-testid': 'bc-textarea-expected_benefits'
+            }
+        ) }}
         {{ draft_ai_error('expected_benefits') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'expected_benefits'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -261,9 +327,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 5. Expected dis-benefits — no existing field; polarity is the profile,
-       not a number. #}
-    {% call card.card() %}
+    {# 6. Expected dis-benefits ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="trending-down" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Expected dis-benefits
@@ -274,9 +339,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 6. Timescale — no existing field; dates come from the unified work
-       package once it is wired. #}
-    {% call card.card() %}
+    {# 7. Timescale ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="calendar-clock" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Timescale
@@ -287,10 +351,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 7. Costs — no existing field as a canvas box (items shown verbatim,
-       never a default amount); the existing Costs, Benefits & ROI figures
-       panel follows it, unchanged. #}
-    {% call card.card() %}
+    {# 8. Costs ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="coins" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs
@@ -301,10 +363,11 @@
       {% endcall %}
     {% endcall %}
 
-    {% call card.card() %}
+    {# 9. Costs, Benefits & ROI ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
-          <i data-lucide="calculator" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs, Benefits &amp; ROI
+          <i data-lucide="calculator" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs, Benefits & ROI
         {% endcall %}
         {% call card.card_description() %}
           Pull figures from the linked capability cost allocation, strategic initiative budget, and solution — blank fields are pre-populated, filled-in fields are cross-checked.
@@ -312,51 +375,107 @@
       {% endcall %}
       {% call card.card_content() %}
         <div class="flex justify-end mb-4">
-          <button type="button" @click="pullFinancials()" :disabled="pullingFinancials" data-testid="bc-pull-financials"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            <span x-show="pullingFinancials" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
-            <i data-lucide="download-cloud" class="h-4 w-4 mr-2" aria-hidden="true" x-show="!pullingFinancials"></i>
-            Pull financials from links
-          </button>
+          {{ button(
+              text='Pull financials from links',
+              variant='outline',
+              size='default',
+              icon='download-cloud',
+              icon_position='left',
+              type='button',
+              attrs_dict={
+                  '@click': 'pullFinancials()',
+                  ':disabled': 'pullingFinancials',
+                  'data-testid': 'bc-pull-financials'
+              }
+          ) }}
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {{ form_field(
+              id='bc-capex',
+              label='Capex',
+              name='capex',
+              type='number',
+              placeholder='',
+              value=fields.capex,
+              attrs_dict={
+                  'x-model': 'fields.capex',
+                  '@blur': "saveField('capex')",
+                  'data-testid': 'bc-input-capex',
+                  'step': '0.01'
+              }
+          ) }}
+          {{ form_field(
+              id='bc-opex',
+              label='Opex (annual)',
+              name='opex_annual',
+              type='number',
+              placeholder='',
+              value=fields.opex_annual,
+              attrs_dict={
+                  'x-model': 'fields.opex_annual',
+                  '@blur': "saveField('opex_annual')",
+                  'data-testid': 'bc-input-opex_annual',
+                  'step': '0.01'
+              }
+          ) }}
+          {{ form_field(
+              id='bc-tco',
+              label='3yr TCO',
+              name='tco_3yr',
+              type='number',
+              placeholder='',
+              value=fields.tco_3yr,
+              attrs_dict={
+                  'x-model': 'fields.tco_3yr',
+                  '@blur': "saveField('tco_3yr')",
+                  'data-testid': 'bc-input-tco_3yr',
+                  'step': '0.01'
+              }
+          ) }}
+          {{ form_field(
+              id='bc-benefit',
+              label='Annual Financial Benefit',
+              name='financial_benefit_annual',
+              type='number',
+              placeholder='',
+              value=fields.financial_benefit_annual,
+              attrs_dict={
+                  'x-model': 'fields.financial_benefit_annual',
+                  '@blur': "saveField('financial_benefit_annual')",
+                  'data-testid': 'bc-input-financial_benefit_annual',
+                  'step': '0.01'
+              }
+          ) }}
+          {{ form_field(
+              id='bc-roi',
+              label='ROI %',
+              name='roi_percentage',
+              type='number',
+              placeholder='',
+              value=fields.roi_percentage,
+              attrs_dict={
+                  'x-model': 'fields.roi_percentage',
+                  '@blur': "saveField('roi_percentage')",
+                  'data-testid': 'bc-input-roi_percentage',
+                  'step': '0.01'
+              }
+          ) }}
+          {{ form_field(
+              id='bc-payback',
+              label='Payback (months)',
+              name='payback_months',
+              type='number',
+              placeholder='',
+              value=fields.payback_months,
+              attrs_dict={
+                  'x-model': 'fields.payback_months',
+                  '@blur': "saveField('payback_months')",
+                  'data-testid': 'bc-input-payback_months',
+                  'step': '1'
+              }
+          ) }}
           <div>
-            <label for="bc-capex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Capex</label>
-            <input id="bc-capex" type="number" step="0.01" x-model="fields.capex" @blur="saveField('capex')" data-testid="bc-input-capex"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          </div>
-          <div>
-            <label for="bc-opex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Opex (annual)</label>
-            <input id="bc-opex" type="number" step="0.01" x-model="fields.opex_annual" @blur="saveField('opex_annual')" data-testid="bc-input-opex_annual"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          </div>
-          <div>
-            <label for="bc-tco" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">3yr TCO</label>
-            <input id="bc-tco" type="number" step="0.01" x-model="fields.tco_3yr" @blur="saveField('tco_3yr')" data-testid="bc-input-tco_3yr"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          </div>
-          <div>
-            <label for="bc-benefit" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Annual Financial Benefit</label>
-            <input id="bc-benefit" type="number" step="0.01" x-model="fields.financial_benefit_annual" @blur="saveField('financial_benefit_annual')" data-testid="bc-input-financial_benefit_annual"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          </div>
-          <div>
-            <label for="bc-roi" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">ROI %</label>
-            <input id="bc-roi" type="number" step="0.01" x-model="fields.roi_percentage" @blur="saveField('roi_percentage')" data-testid="bc-input-roi_percentage"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          </div>
-          <div>
-            <label for="bc-payback" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Payback (months)</label>
-            <input id="bc-payback" type="number" step="1" x-model="fields.payback_months" @blur="saveField('payback_months')" data-testid="bc-input-payback_months"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          </div>
-          <div>
-            {# NPV (2 Sep 2026): computed, not editable — it derives from capex/opex/
-               benefit above, so an input here would let a user type a number that
-               contradicts the fields it's supposed to summarise. Server value
-               (business_case.npv) renders on load; the Alpine getter keeps it live
-               as those three fields are edited, before the next save/reload. #}
             <label for="bc-npv" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
               NPV <span class="normal-case font-normal">(3yr, 10% discount)</span>
             </label>
@@ -369,10 +488,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 8. Investment appraisal — composed from Costs and Expected benefits;
-       the record's own capex/opex/TCO/ROI/NPV figures stay exactly as they
-       are — this box never computes an appraisal of its own. #}
-    {% call card.card() %}
+    {# 10. Investment appraisal ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="scale" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Investment appraisal
@@ -383,9 +500,8 @@
       {% endcall %}
     {% endcall %}
 
-    {# 9. Major risks — key_risks, unchanged; reads from the risk register
-       once a projection exists, never duplicated. #}
-    {% call card.card() %}
+    {# 11. Major risks ── #}
+    {% call card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
           <i data-lucide="shield-alert" class="h-4 w-4 text-destructive" aria-hidden="true"></i> Major risks
@@ -394,9 +510,20 @@
       {% endcall %}
       {% call card.card_content() %}
         {{ canvas_box_entries(canvas_zones['key_risks']) }}
-        <textarea x-model="fields.key_risks" @blur="saveField('key_risks')"
-          data-testid="bc-textarea-key_risks" rows="5" placeholder="Delivery, adoption, financial and technical risks"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>
+        {{ form_field(
+            id='bc-textarea-key_risks',
+            label='Delivery, adoption, financial and technical risks',
+            name='key_risks',
+            input_type='textarea',
+            placeholder='Delivery, adoption, financial and technical risks',
+            value=fields.key_risks,
+            rows=5,
+            attrs_dict={
+                'x-model': 'fields.key_risks',
+                '@blur': "saveField('key_risks')",
+                'data-testid': 'bc-textarea-key_risks'
+            }
+        ) }}
         {{ draft_ai_error('key_risks') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'key_risks'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -414,14 +541,20 @@
 <form method="POST" action="{{ url_for('business_case.delete', business_case_id=business_case.id) }}" data-testid="bc-delete-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="flex justify-end gap-3 pt-2">
-    <button type="button" data-modal-close="bc-delete-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-      Cancel
-    </button>
-    <button type="submit" data-testid="bc-delete-submit"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-      Delete
-    </button>
+    {{ button(
+        text='Cancel',
+        variant='ghost',
+        size='default',
+        type='button',
+        attrs_dict={'data-modal-close': 'bc-delete-modal'}
+    ) }}
+    {{ button(
+        text='Delete',
+        variant='destructive',
+        size='default',
+        type='submit',
+        attrs_dict={'data-testid': 'bc-delete-submit'}
+    ) }}
   </div>
 </form>
 {% endcall %}
