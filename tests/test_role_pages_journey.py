@@ -174,10 +174,13 @@ def test_roles_hub_links_every_role_that_has_a_page_and_no_link_is_a_404(browser
                 continue
             response = page.request.get(site_url + path)
             assert response.status == 200, f"/roles links to {href}, which answers {response.status}"
-        # a role without a page is listed by name, and is not a link to a page that does not exist
-        catalogue = page.locator("[data-role-catalogue]")
-        assert catalogue.locator("li", has_text="Chief Financial Officer").count() == 1
-        assert catalogue.get_by_role("link", name="Chief Financial Officer").count() == 0
+        # the hub offers only roles that have a page (the registry's rule, since the roles page became cards):
+        # one card per page, each a link to a page that exists, and a role without a page is not offered at all
+        cards = hub.locator("[data-role-card]")
+        card_hrefs = [cards.nth(i).get_attribute("href") for i in range(cards.count())]
+        assert len(card_hrefs) == len(set(card_hrefs)), f"a role page is offered twice: {card_hrefs}"
+        assert {f"/roles/{slug}" for slug in ROLE_PAGES} <= set(card_hrefs), card_hrefs
+        assert hub.get_by_role("link", name="Chief Financial Officer").count() == 0
     finally:
         context.close()
 
