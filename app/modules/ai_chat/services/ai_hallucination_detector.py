@@ -432,6 +432,11 @@ class Grounding:
         self.context_counts: set = set()  # counts the injected context states
         self.rows_returned = 0
         self.subject_names: set = set()   # records the question itself was about
+        # Genome slices read this turn (ADR-genome-01 decision 3): every node id
+        # a slice returned, with the node, and each slice's domain, hash and
+        # completeness. Nodes a slice dropped to fit its budget are not here.
+        self.genome_nodes: Dict[str, dict] = {}
+        self.genome_slices: List[dict] = []
 
     def add_context(self, value) -> None:
         """Structured context the system injected (live data blocks): a dict
@@ -461,6 +466,7 @@ class Grounding:
             if name and phrase_key(name):
                 self.receipt_names.add(phrase_key(name))
             return
+        self._add_genome_slice(result.get("result"))
         facts = _facts_of(result)
         self.results.append(facts)
         self.names.update(facts.names)
@@ -469,6 +475,36 @@ class Grounding:
         self.subject_names.update(facts.subjects)
         for ident, names in facts.ref_names.items():
             self.ref_names.setdefault(ident, set()).update(names)
+
+
+    def _add_genome_slice(self, top) -> None:
+        """Put a genome slice's node ids, and the element ids they carry, in the
+        turn's ledger so a sentence may cite them."""
+        if not (isinstance(top, dict) and isinstance(top.get("nodes"), list)
+                and top.get("domain") and top.get("spec_hash") is not None):
+            return
+        self.genome_slices.append({
+            "domain": top["domain"],
+            "spec_hash": top["spec_hash"],
+            "complete": bool(top.get("complete", True)),
+            "nodes_dropped": int((top.get("truncated") or {}).get("nodes_dropped") or 0),
+            "as_of": top.get("as_of"),
+        })
+        for node in top["nodes"]:
+            ident = node.get("id") if isinstance(node, dict) else None
+            if not isinstance(ident, str):
+                continue
+            self.genome_nodes[ident] = node
+            self.refs.add(ident)
+            name = node.get("name")
+            if isinstance(name, str) and phrase_key(name):
+                self.ref_names.setdefault(ident, set()).add(phrase_key(name))
+            element_id = (node.get("provenance") or {}).get("archimate_element_id")
+            if _is_int(element_id):
+                self.refs.add(str(element_id))
+                self.genome_nodes.setdefault(str(element_id), node)
+                if isinstance(name, str) and phrase_key(name):
+                    self.ref_names.setdefault(str(element_id), set()).add(phrase_key(name))
 
 
 def _count_value(token: str):
@@ -879,3 +915,59 @@ def find_uncited_claims(
         if missing:
             uncited.append({"claim": sentence[:300], "unsupported": missing})
     return uncited
+
+
+# --------------------------------------------------------------------------- #
+# The genome citation post-check (ADR-genome-01 decision 3, LG-2)              #
+# --------------------------------------------------------------------------- #
+#
+# Run on an answer whose turn read a genome slice, before it is shown. It only
+# removes: a sentence that cites an id outside this turn's ledger is dropped
+# whole (its id came from another organisation, an earlier turn or nowhere), and
+# a model-written address or image is stripped, because every link the person
+# sees is built by the server from a cited id. It never adds or rewrites a fact.
+# If no cited sentence survives, the answer is the plain "not recorded" line
+# naming the parts of the model that were searched.
+
+_MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_MD_LINK = re.compile(r"\[([^\]]+)\]\((?:[^)]*)\)")
+_BARE_URL = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
+NOT_RECORDED_YET = "Your model does not record enough to answer this yet."
+
+
+def _strip_model_links(line: str) -> str:
+    line = _MD_IMAGE.sub("", line)
+    line = _MD_LINK.sub(lambda m: m.group(1), line)
+    return _BARE_URL.sub("", line)
+
+
+def genome_post_check(response_text: str, grounding: Grounding) -> Dict:
+    """``{"text", "removed", "cited"}``: *response_text* with every sentence that
+    cites an id outside the turn's ledger removed. ``removed`` lists the ids that
+    were outside it (never shown); ``cited`` the ledger ids the kept text cites."""
+    ledger = set(grounding.refs)
+    removed: List[str] = []
+    cited: List[str] = []
+    out_lines: List[str] = []
+    for raw_line in (response_text or "").split("\n"):
+        line = _strip_model_links(raw_line)
+        if not line.strip():
+            out_lines.append("")
+            continue
+        kept = []
+        for sentence in _sentences(line):
+            ids = [m.group(1) for m in REF_MARKER.finditer(sentence)]
+            outside = [i for i in ids if i not in ledger]
+            if outside:
+                removed.extend(outside)
+                continue
+            cited.extend(i for i in ids if i not in cited)
+            kept.append(sentence)
+        if kept:
+            lead = raw_line[: len(raw_line) - len(raw_line.lstrip())]
+            out_lines.append(lead + " ".join(kept))
+    text = "\n".join(out_lines).strip()
+    if not cited:
+        searched = ", ".join(sorted({s["domain"] for s in grounding.genome_slices})) or "none"
+        text = "%s Searched: %s." % (NOT_RECORDED_YET, searched)
+    return {"text": text, "removed": removed, "cited": cited}

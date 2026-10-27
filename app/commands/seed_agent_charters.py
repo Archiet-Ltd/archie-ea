@@ -191,22 +191,35 @@ def seed_charters(organization_id):
     created = 0
     skipped = 0
     for org in orgs:
-        for persona in ARCHITECT_PERSONAS:
-            # Skip if already exists
-            existing = AgentCharter.query.filter_by(
-                persona=persona, version=1, organization_id=org.id
-            ).first()
-            if existing:
-                skipped += 1
-                continue
-            fields = default_charter_fields(persona)
-            if fields is None:
-                continue
-            charter = AgentCharter(organization_id=org.id, persona=persona, version=1, **fields)
-            db.session.add(charter)
-            created += 1
+        made, kept = ensure_charters(org.id)
+        created += made
+        skipped += kept
     db.session.commit()
     click.echo(f"Seeded {created} charter(s) across {len(orgs)} organisation(s), skipped {skipped}.")
+
+
+def ensure_charters(organization_id):
+    """Give one organisation the default version-1 charter of every persona it lacks.
+
+    Idempotent: a persona that already has its version-1 charter is left as it is.
+    Adds to the session and flushes; the caller commits. Returns (created, skipped).
+    """
+    created = 0
+    skipped = 0
+    for persona in ARCHITECT_PERSONAS:
+        existing = AgentCharter.query.filter_by(
+            persona=persona, version=1, organization_id=organization_id
+        ).first()
+        if existing:
+            skipped += 1
+            continue
+        fields = default_charter_fields(persona)
+        if fields is None:
+            continue
+        db.session.add(AgentCharter(organization_id=organization_id, persona=persona, version=1, **fields))
+        created += 1
+    db.session.flush()
+    return created, skipped
 
 
 def register_seed_charters(app):

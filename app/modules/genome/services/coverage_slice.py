@@ -1,18 +1,26 @@
 """Business-layer genome slice: Capability -> Application coverage.
 
 A minimal, DETERMINISTIC, zero-LLM genome slice builder. It reads directly
-from the populated business-layer stores for ONE organization:
+from the canonical business-layer stores for ONE organization:
 
-    business_capability            (BusinessCapability, TenantMixin)
-    application_components         (ApplicationComponent, TenantMixin)
-    application_capability_mapping (ApplicationCapabilityMapping)
+    unified_capabilities                   (UnifiedCapability, the capability record;
+                                            the organisation's own live rows)
+    application_components                 (ApplicationComponent, TenantMixin)
+    unified_application_capability_mapping (UnifiedApplicationCapabilityMapping,
+                                            the coverage authority)
+
+The capability record and the coverage mapping are the stores the reuse
+register names (capability-record); the older business_capability and
+application_capability_mapping pair is not read here, so the coverage page,
+the chat and the roadmap's work packages (whose capability_id points at
+unified_capabilities) name the same capabilities by the same ids.
 
 and each store's `archimate_element_id` link, and assembles a validated dict:
 
     {
       "slice_version": "1.0.0",
       "organization_id": int,
-      "capability_source": "business_capability",   # ADR 0008: named, single store
+      "capability_source": "unified_capabilities",  # ADR 0008: named, single store
       "capabilities": [ {id, name, code, archimate_element_id}, ... ],
       "applications":  [ {id, name, archimate_element_id}, ... ],
       "cells": [ {capability_id, application_id, mapping,
@@ -38,7 +46,7 @@ import json
 from app.extensions import db
 
 SLICE_VERSION = "1.0.0"
-CAPABILITY_SOURCE = "business_capability"
+CAPABILITY_SOURCE = "unified_capabilities"
 
 
 class SliceProvenanceError(ValueError):
@@ -77,15 +85,20 @@ def build_coverage_slice(org_id: int) -> dict:
         SliceProvenanceError: if any populated cell lacks a resolvable element id
             on either the capability or the application end.
     """
-    from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_application_capability_mapping import (
+        UnifiedApplicationCapabilityMapping,
+    )
+    from app.models.unified_capability import UnifiedCapability
 
     # --- Read the three stores, org-scoped and deterministically ordered. ---
+    # The organisation's own capability records; a record retired into another
+    # is no longer a capability of the organisation.
     caps = (
-        db.session.query(BusinessCapability)
-        .filter(BusinessCapability.organization_id == org_id)
-        .order_by(BusinessCapability.id.asc())
+        db.session.query(UnifiedCapability)
+        .filter(UnifiedCapability.organization_id == org_id)
+        .filter(UnifiedCapability.retired_into_id.is_(None))
+        .order_by(UnifiedCapability.id.asc())
         .all()
     )
     apps = (
@@ -94,10 +107,17 @@ def build_coverage_slice(org_id: int) -> dict:
         .order_by(ApplicationComponent.id.asc())
         .all()
     )
+    # The mapping table carries no organisation column: it is fenced through
+    # its application, which must be this organisation's.
     mappings = (
-        db.session.query(ApplicationCapabilityMapping)
-        .filter(ApplicationCapabilityMapping.organization_id == org_id)
-        .order_by(ApplicationCapabilityMapping.id.asc())
+        db.session.query(UnifiedApplicationCapabilityMapping)
+        .join(
+            ApplicationComponent,
+            ApplicationComponent.id
+            == UnifiedApplicationCapabilityMapping.application_component_id,
+        )
+        .filter(ApplicationComponent.organization_id == org_id)
+        .order_by(UnifiedApplicationCapabilityMapping.id.asc())
         .all()
     )
 
@@ -127,7 +147,7 @@ def build_coverage_slice(org_id: int) -> dict:
     cells = []
     seen = set()
     for m in mappings:
-        cap = cap_by_id.get(m.business_capability_id)
+        cap = cap_by_id.get(m.unified_capability_id)
         app = app_by_id.get(m.application_component_id)
         # A mapping whose endpoints are not in this org's caps/apps is out of
         # scope for the slice (defence against cross-store drift).
@@ -166,7 +186,7 @@ def build_coverage_slice(org_id: int) -> dict:
                     "support_level": m.support_level,
                     "coverage_percentage": m.coverage_percentage,
                     "relationship_type": m.relationship_type,
-                    "is_primary_enabler": bool(m.is_primary_enabler),
+                    "is_strategic": bool(m.is_strategic),
                 },
                 "provenance": {
                     "capability_archimate_element_id": cap_elem,
