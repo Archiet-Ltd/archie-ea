@@ -13,7 +13,7 @@ import json
 import logging
 import time
 
-from flask import Blueprint, Response, jsonify, request, stream_with_context
+from flask import Blueprint, Response, jsonify, request, stream_with_context, url_for
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import secure_filename
@@ -22,6 +22,7 @@ from app import db
 from app.models.audit_log import AuditLog
 from app.models.batch_import import BatchImportJob, BatchJobStatus
 from app.services.batch_approval_service import BatchApprovalService
+from app.modules.import_batch.services.batch_import_service import ActiveJobExists, ImportRefused
 from app.services.batch_import_service import BatchImportService
 from app.services.import_audit_service import log_batch_approval  # dead-code-ok
 from app.services.batch_processor_service import BatchProcessorService
@@ -207,6 +208,17 @@ def create_job():
             }
         )
 
+    except ActiveJobExists as e:
+        return jsonify(
+            {
+                "success": False,
+                "error": str(e),
+                "existing_job_id": e.job_id,
+                "existing_job_url": url_for("batch_import_view.job_detail", job_id=e.job_id),
+            }
+        ), 409
+    except ImportRefused as e:
+        return jsonify({"success": False, "error": str(e)}), 400
     except ValueError as e:
         ErrorSanitizer.log_sanitized_warning(
             error=e,

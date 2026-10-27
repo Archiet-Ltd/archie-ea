@@ -17,7 +17,7 @@
 {% block extra_css %}
 <style>
 /* ── Work Package Timeline Gantt ── */
-.rdm-gantt-wrap{margin:1.5rem 0;border:1px solid var(--border);border-radius:.5rem;overflow:hidden;background:var(--card)}
+.rdm-gantt-wrap{margin:1.5rem 0;border:1px solid var(--border);border-radius:.5rem;overflow-x:auto;background:var(--card)}
 .rdm-gantt-hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:.875rem 1.25rem}
 .rdm-gantt-hdr-title{font-size:.9375rem;font-weight:600;color:var(--foreground)}
 .rdm-gantt-legend{display:flex;align-items:center;gap:1rem;font-size:.75rem;color:var(--muted-foreground)}
@@ -26,7 +26,7 @@
 .rdm-gantt-col-hdr{display:grid;grid-template-columns:300px 80px 1fr;border-bottom:1px solid var(--border);background:var(--muted);position:sticky;top:0;z-index:10}
 .rdm-gantt-col-hdr div{padding:.625rem 1rem;font-size:.8125rem;font-weight:600;color:var(--muted-foreground)}
 .rdm-gantt-col-hdr .rdm-gantt-dur-hdr{padding:.625rem .5rem}
-.rdm-gantt-months-hdr{padding:.625rem 1rem;overflow-x:auto}
+.rdm-gantt-months-hdr{padding:.625rem 1rem}
 .rdm-gantt-months-row{display:flex}
 .rdm-gantt-month{flex:0 0 120px;text-align:center;font-size:.75rem;font-weight:600;color:var(--muted-foreground)}
 .rdm-gantt-section{border-bottom:1px solid var(--border)}
@@ -38,7 +38,7 @@
 .rdm-gantt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .rdm-gantt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--foreground)}
 .rdm-gantt-dur-cell{padding:.625rem .5rem;font-size:.75rem;color:var(--muted-foreground);display:flex;align-items:center}
-.rdm-gantt-timeline-cell{padding:.625rem 1rem;overflow-x:auto;display:flex;align-items:center;min-width:0}
+.rdm-gantt-timeline-cell{padding:.625rem 1rem;display:flex;align-items:center}
 .rdm-gantt-track{position:relative;height:28px;display:flex}
 .rdm-gantt-cell{flex:0 0 120px;height:100%;border-right:1px solid var(--border)}
 .rdm-gantt-legend-ip{background:#2563EB}.rdm-gantt-legend-done{background:#15803D}.rdm-gantt-legend-hold{background:#B45309}.rdm-gantt-legend-plan{background:#64748B}
@@ -1136,7 +1136,7 @@
     });
 
     container.innerHTML = `
-      <div class="rdm-gantt-wrap">
+      <div class="rdm-gantt-wrap" tabindex="0" role="region" aria-label="Work package timeline">
         <div class="rdm-gantt-hdr">
           <span class="rdm-gantt-hdr-title">Work Package Timeline</span>
           <div class="rdm-gantt-legend">

@@ -461,7 +461,17 @@ def _name_from_title(title: str, url: str, site_name: Optional[str] = None) -> O
     return None
 
 
-def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _unmatched_cap(value: str, confidence: Optional[float], url: str, site_name: Optional[str] = None) -> Optional[float]:
+    """A name that is not the site's address is at most TITLE_FIRST_PART_CONFIDENCE sure, whatever the page says
+    about itself (structured data and og:site_name both say "Ifiok" on archiet.dev, and neither is the address)."""
+    known = _domain_names(url)
+    mine = _alnum(value)
+    if mine in known or any(mine.startswith(k) and len(k) >= 3 for k in known):
+        return confidence
+    return min(TITLE_FIRST_PART_CONFIDENCE, confidence if confidence is not None else TITLE_FIRST_PART_CONFIDENCE)
+
+
+def _read_home_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """The company name from the home page: ``og:site_name``, organisation name in JSON-LD,
     or the page title, with the suffix after a separator (|, -, —, etc.) dropped.
 
@@ -474,7 +484,8 @@ def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, An
     if name:
         value = _HOME_NAME_BREAK.sub("", str(name["value"]).strip()).strip()
         if value:
-            return {"value": value, "confidence": name["confidence"], "basis": "page"}
+            return {"value": value, "basis": "page",
+                    "confidence": _unmatched_cap(value, name["confidence"], first_page.get("url") or "", static.get("site_name"))}
     # title as fallback
     title = static.get("title") or ""
     if title.strip():
@@ -492,8 +503,19 @@ def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, An
         value = _HOME_NAME_BREAK.sub("", model_name).strip()
         if value:
             confidences = analysis.get("field_confidence") if isinstance(analysis.get("field_confidence"), dict) else {}
-            return {"value": value, "confidence": _number(confidences.get("company_name")), "basis": "model"}
+            return {"value": value, "basis": "model",
+                    "confidence": _unmatched_cap(value, _number(confidences.get("company_name")), first_page.get("url") or "",
+                                                 static.get("site_name"))}
     return None
+
+
+def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The company name of the home page, from whichever part of it gave one, never more than 0.7 sure unless it is
+    the site's own address. This is the one place the proposal's confidence is settled."""
+    got = _read_home_name(first_page)
+    if got and got["confidence"] is not None:
+        got["confidence"] = _unmatched_cap(got["value"], got["confidence"], first_page.get("url") or "")
+    return got
 
 
 def _replace_company_name(facts: _Facts, name: str, url: str, at: str, confidence: Optional[float],
