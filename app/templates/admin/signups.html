@@ -2,15 +2,15 @@
 {# smoke-coverage-ok: covered by the sign-up source browser journey in tests/smoke #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Sign-ups{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell with context %}
 
 {% block content %}
-{{ page_header(
+{{ page_shell(
     title='Sign-ups',
-    description='Everyone who created an account themselves, newest first: where they came from, how far they got, and how long they took to their first answer.',
-    breadcrumbs=[{'label': 'Home', 'href': url_for('dashboard.overview')}, {'label': 'Platform admin', 'href': url_for('platform_area.index')}, {'label': 'Sign-ups'}]
+    subtitle='Everyone who created an account themselves, newest first: where they came from, how far they got, and how long they took to their first answer.',
+    breadcrumb=[('Home', url_for('dashboard.overview')), ('Platform admin', url_for('platform_area.index')), ('Sign-ups', none)]
 ) }}
 
 <div class="rounded-lg border border-border bg-card">

@@ -9805,7 +9805,7 @@
     "components/input.html",
     "components/loading_state.html",
     "components/modal.html",
-    "components/page_header.html",
+    "macros/page_shell.html",
     "components/pagination_controls.html",
     "components/provenance.html",
     "components/search_bar.html",
@@ -9824,7 +9824,7 @@
     "badge",
     "breadcrumb",
     "empty",
-    "page-header",
+    "page-shell",
     "table"
    ],
    "confidence": "high",
@@ -9844,11 +9844,11 @@
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
-    "page-header:Replace"
+    "page-shell:Replace"
    ],
    "macros": [
     "components/badge.html",
-    "components/page_header.html",
+    "macros/page_shell.html",
     "components/table.html"
    ],
    "original": "example:tasks",
