@@ -2094,9 +2094,13 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                                 prompt_version=prompt_version,
                                 retention_setting=retention_setting,
                             )
+                            # The flag is passed only when it is True, so a call that carries
+                            # organisation data keeps the caller's original signature.
+                            or_kwargs = {"max_tokens": max_tokens, "timeout": LLMService._within(timeout, deadline)}
+                            if public_input:
+                                or_kwargs["public_input"] = True
                             response_text, token_input, token_output, cost = LLMService._call_openrouter(
-                                prompt, or_model, api_key, max_tokens=max_tokens,
-                                timeout=LLMService._within(timeout, deadline), public_input=public_input
+                                prompt, or_model, api_key, **or_kwargs
                             )
                             model = or_model  # Update model for interaction record
                             or_success = True
