@@ -124,6 +124,19 @@ GROUP_FALLBACK = {
 }
 
 
+# What a customer reads for a group: plain capability names, never plan wording. Applied last, to every group.
+GROUP_TEXT_OVERRIDES: dict = {
+    "PG-CON": ("Connectors and integrations", None),
+    "PG-ELE": (None, "Open any element and see what depends on it."),
+    "PG-EA": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
+    "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
+    "PG-RTP": ("This page", "This address has moved and the page it moves to opens in a later release."),
+    "PG-NEW": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
+    "PG-PUB": ("This page", "This page opens in a later release."),
+    "PG-OPS": ("Platform tools", "Tools for the platform team."),
+}
+
+
 def _title_of(code: str, text: str) -> tuple[str, str]:
     head, _, tail = text.partition(":")
     if not tail:
@@ -262,6 +275,16 @@ def build(rules: list[tuple[str, str]]) -> dict:
             "title": _humanise(blueprint),
             "blurb": "Entelim is building this. Join the waiting list and we will tell you the day it opens.",
         })
+
+    for code, (title, blurb) in GROUP_TEXT_OVERRIDES.items():
+        if code in groups:
+            if title is not None:
+                groups[code]["title"] = title
+            if blurb is not None:
+                groups[code]["blurb"] = blurb
+    for code in groups:
+        if code.startswith("BP:"):
+            groups[code]["title"] = "This capability"
 
     # a group a rule uses must exist
     for entry in entries.values():

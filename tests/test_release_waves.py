@@ -321,3 +321,21 @@ def test_a_use_case_page_of_a_later_wave_answers_early_access_and_a_first_wave_p
     role = client.get("/roles/chief-architects")
     assert b"early-access-page" in role.data
     assert b"early-access-page" not in client.get("/roles/startup-founder").data
+
+
+def test_no_early_access_group_title_or_blurb_carries_plan_wording(wave1):
+    """A customer reads plain capability names: no wave, screen, rebuild, redirect, operator or admin-pages wording."""
+    banned = re.compile(r"wave|screen|rebuild|redirect|operator|admin pages", re.I)
+    from app.release_waves.routes import coming_groups
+
+    groups = coming_groups()
+    assert len(groups) >= 10
+    for g in groups:
+        assert not banned.search(g["title"]), g["title"]
+        assert not banned.search(g["blurb"] or ""), g["blurb"]
+    html = wave1.test_client().get("/early-access").get_data(as_text=True)
+    assert "Connectors and integrations" in html
+    # every group a closed address can answer with reads the same way
+    for code, info in wave_map()["groups"].items():
+        assert not banned.search(info["title"]), (code, info["title"])
+        assert not banned.search(info["blurb"] or ""), (code, info["blurb"])

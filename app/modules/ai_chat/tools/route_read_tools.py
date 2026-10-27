@@ -285,6 +285,24 @@ def _is_connector_tool(schema: dict) -> bool:
     )
 
 
+# The addresses a route-backed tool reads. When the release switch holds any of them back, the tool
+# is not offered and a direct call is refused (nothing is offered that cannot answer).
+TOOL_ROUTE_PATHS: dict[str, tuple[str, ...]] = {
+    "list_canvases": ("/business-model/api/list", "/business-case/api/list"),
+    "get_canvas": ("/business-model/api/1", "/business-case/api/1"),
+}
+
+
+def tool_released(name: str) -> bool:
+    """True when every route the tool reads is open in the released waves (always true with the switch off)."""
+    paths = TOOL_ROUTE_PATHS.get(CONNECTOR_ALIASES.get(name, name))
+    if not paths:
+        return True
+    from app.release_waves import is_released_path
+
+    return all(is_released_path(path) for path in paths)
+
+
 def connector_tools() -> list[dict]:
     """The tools the connector publishes, in its wire format, sorted by name.
 
@@ -294,7 +312,7 @@ def connector_tools() -> list[dict]:
     """
     tools = []
     for schema in TOOL_SCHEMAS:
-        if _is_connector_tool(schema):
+        if _is_connector_tool(schema) and tool_released(schema["name"]):
             tools.append({
                 "name": schema["name"],
                 "description": schema["description"],
