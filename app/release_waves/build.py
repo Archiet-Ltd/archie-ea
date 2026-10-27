@@ -65,6 +65,18 @@ PREFIX_OVERRIDES: tuple = (
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),
     ("/admin/signups", "W6", "PG-OPS", "where sign-ups came from: the platform team only"),
     ("/intelligence/answers/element/", "W2", "PG-ANS", "the answer for one element, beside the other answer pages"),
+    # Reads the assistant connection and token clients make (all GET): the connector is on at wave 1.
+    ("/api/v1/elements", "W1", "PG-CON", "element reads for token clients and the assistant connection"),
+    ("/archimate/api/elements/search$", "W1", "PG-CON", "element search the assistant connection calls"),
+    ("/archimate/api/elements/<int:element_id>/detail$", "W1", "PG-CON", "element detail the assistant connection calls"),
+    ("/api/v1/intelligence/accountability/", "W1", "PG-CON", "the accountability answer the assistant connection calls"),
+    ("/api/v1/intelligence/compliance/", "W1", "PG-CON", "the compliance answer the assistant connection calls"),
+    ("/api/v1/intelligence/data/", "W1", "PG-CON", "the data answer the assistant connection calls"),
+    ("/api/v1/intelligence/impact/", "W1", "PG-CON", "the impact answer the assistant connection calls"),
+    ("/api/v1/intelligence/portfolio/", "W1", "PG-CON", "the portfolio answer the assistant connection calls"),
+    ("/api/v1/intelligence/programme/", "W1", "PG-CON", "the programme answer the assistant connection calls"),
+    ("/api/v1/intelligence/risk/", "W1", "PG-CON", "the risk answer the assistant connection calls"),
+    ("/api/v1/intelligence/strategy/", "W1", "PG-CON", "the strategy answer the assistant connection calls"),
     ("/api/system-settings", "W6", "PG-OPS", "platform settings page data, platform administrators"),
     # Calls a wave-1 screen makes (found by walking the wave-1 preview; "$" means this address only).
     ("/api/notifications", "W1", "PG-ACC", "the notification bell in the signed-in shell"),
