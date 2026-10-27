@@ -160,7 +160,7 @@ READ = "from app import db\nfrom app.models.things import Old\n\n\ndef view(org)
 def test_a_changed_route_reading_an_unfenced_table_fails_even_with_a_predicate(tmp_path):
     app = _route_tree(tmp_path, READ)
     problems = gate.changed_route_problems(["app/routes.py"], listed={"old_things"}, shared=(set(), []),
-                                           app=app, repo=tmp_path)
+                                           app=app, repo=tmp_path, pending={})
     assert len(problems) == 1
     assert "app/routes.py" in problems[0] and "Old (old_things)" in problems[0]
 
@@ -168,21 +168,63 @@ def test_a_changed_route_reading_an_unfenced_table_fails_even_with_a_predicate(t
 def test_a_changed_route_is_clear_when_the_table_is_shared_fenced_or_the_file_is_not_a_route(tmp_path):
     app = _route_tree(tmp_path, READ)
     assert gate.changed_route_problems(["app/routes.py"], listed={"old_things"},
-                                       shared=({"old_things"}, []), app=app, repo=tmp_path) == []
+                                       shared=({"old_things"}, []), app=app, repo=tmp_path, pending={}) == []
     assert gate.changed_route_problems(["app/routes.py"], listed=set(), shared=(set(), []),
-                                       app=app, repo=tmp_path) == []
+                                       app=app, repo=tmp_path, pending={}) == []
     assert gate.changed_route_problems(["app/helpers.py"], listed={"old_things"}, shared=(set(), []),
-                                       app=app, repo=tmp_path) == []
+                                       app=app, repo=tmp_path, pending={}) == []
 
 
 def test_an_unchanged_route_is_not_reported(tmp_path):
     app = _route_tree(tmp_path, READ)
     assert gate.changed_route_problems([], listed={"old_things"}, shared=(set(), []),
-                                       app=app, repo=tmp_path) == []
+                                       app=app, repo=tmp_path, pending={}) == []
 
 
 def test_a_written_reason_on_the_statement_clears_a_changed_route_read(tmp_path):
     code = READ.replace("    return db.session", "    # tenant-scoping-ok: the caller already checked the organisation\n    return db.session")
     app = _route_tree(tmp_path, code)
     assert gate.changed_route_problems(["app/routes.py"], listed={"old_things"}, shared=(set(), []),
-                                       app=app, repo=tmp_path) == []
+                                       app=app, repo=tmp_path, pending={}) == []
+
+
+def test_a_listed_pending_read_passes_and_an_unlisted_one_fails(tmp_path):
+    app = _route_tree(tmp_path, READ)
+    listed = {"old_things"}
+    clear = gate.changed_route_problems(["app/routes.py"], listed=listed, shared=(set(), []), app=app,
+                                        repo=tmp_path, pending={("app/routes.py", "old_things"): "b9"})
+    assert clear == []
+    failing = gate.changed_route_problems(["app/routes.py"], listed=listed, shared=(set(), []), app=app,
+                                          repo=tmp_path, pending={})
+    assert len(failing) == 1 and "tenant_gate_pending.txt" in failing[0]
+
+
+def test_a_pending_line_for_a_table_that_is_now_fenced_or_shared_must_be_removed(tmp_path):
+    app = _route_tree(tmp_path, READ)
+    stale = gate.changed_route_problems(["app/routes.py"], listed=set(), shared=(set(), []), app=app,
+                                        repo=tmp_path, pending={("app/routes.py", "old_things"): "b9"})
+    assert len(stale) == 1 and "no longer needed" in stale[0]
+    shared = gate.changed_route_problems(["app/routes.py"], listed={"old_things"}, shared=({"old_things"}, []),
+                                         app=app, repo=tmp_path, pending={("app/routes.py", "old_things"): "b9"})
+    assert len(shared) == 1 and "no longer needed" in shared[0]
+
+
+def test_a_pending_line_for_a_changed_route_that_no_longer_reads_the_table_must_be_removed(tmp_path):
+    app = _route_tree(tmp_path, "def view():\n    return 1\n")
+    stale = gate.changed_route_problems(["app/routes.py"], listed={"old_things"}, shared=(set(), []), app=app,
+                                        repo=tmp_path, pending={("app/routes.py", "old_things"): "b9"})
+    assert len(stale) == 1 and "does not read it" in stale[0]
+
+
+def test_the_pending_list_cannot_grow_but_the_first_population_is_allowed():
+    current = {("a.py", "t1"): "b3", ("a.py", "t2"): "b3", ("b.py", "t3"): "b4"}
+    assert gate.pending_growth_problems(current, None) == []
+    assert gate.pending_growth_problems(current, "a.py:t1:b3\na.py:t2:b3\nb.py:t3:b4\n") == []
+    assert gate.pending_growth_problems(current, "a.py:t1:b3\n# note\nb.py:t3:b4\n") != []
+    assert gate.pending_growth_problems({}, "a.py:t1:b3\n") == []
+
+
+def test_the_committed_pending_list_names_only_unfenced_unshared_tables():
+    listed, shared = gate.listed_tables(), gate.shared_reference_tables()[0]
+    stale = [k for k in gate.pending_entries() if k[1] not in listed or k[1] in shared]
+    assert stale == []
