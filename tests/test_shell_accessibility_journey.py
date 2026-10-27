@@ -65,6 +65,10 @@ PAGES = {
     "/genome/ai-systems": ["scrollable-region-focusable"],
     "/archimate/traceability": ["color-contrast"],
     "/ai-chat/entity-matching": ["scrollable-region-focusable"],
+    # polish01: what QA still found after a11y03
+    "/ea-workflows/deliverables/vision": ["link-in-text-block"],
+    "/integration/": ["scrollable-region-focusable"],
+    "/capability-roadmap": ["scrollable-region-focusable"],
 }
 RUN = """async () => { const r = await axe.run(document, {runOnly: {type: 'tag',
   values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}, resultTypes: ['violations']});

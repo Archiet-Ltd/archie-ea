@@ -487,6 +487,39 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # The alerts a date raises without an edit (a support date within 180
+        # days, an overdue review condition), once a day per organisation,
+        # before the 07:30 email so that day's email carries them.
+        def run_date_alerts():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+                from app.services.date_alerts import scan_date_alerts
+
+                log = logging.getLogger(__name__)
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "date alerts failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(app, "date-alerts", scan_date_alerts, on_result=_log_result)
+                except Exception as exc:
+                    log.error("APScheduler date-alerts error: %s", exc)
+
+        scheduler.add_job(
+            func=run_date_alerts,
+            trigger=CronTrigger(hour=7, minute=0),
+            id="date_alerts",
+            name="Date Alerts",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # An approval past its 15-minute review-by time stays pending and
         # actionable (never auto-expires) but must not go unseen —
         # this notifies each affected organisation's administrators once per

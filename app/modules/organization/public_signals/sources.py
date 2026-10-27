@@ -100,8 +100,17 @@ def _norm(text: str) -> str:
 
 
 def names_company(text: str, company: str) -> bool:
-    """True when the company's name stands in the text as whole words ("Go" is not found in "Google")."""
-    return bool(_norm(company)) and (" %s " % _norm(company)) in (" %s " % _norm(text))
+    """True when the company's name stands in the text as whole words ("Go" is not found in "Google", and
+    "Linear" is not found in "non-linear", where a hyphen joins it to another word)."""
+    wanted = _norm(company)
+    if not wanted:
+        return False
+    for hit in re.finditer(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(wanted).replace(r"\ ", r"[^a-z0-9]+"), (text or "").lower()):
+        before, after = (text or "").lower()[:hit.start()], (text or "").lower()[hit.end():]
+        if before.endswith("-") and before[:-1][-1:].isalnum() or after.startswith("-") and after[1:2].isalnum():
+            continue  # joined to another word by a hyphen: "non-linear", "linear-algebra"
+        return True
+    return False
 
 
 _LEGAL_ENDINGS = {"inc", "incorporated", "ltd", "limited", "llc", "llp", "plc", "corp", "corporation", "gmbh", "ag", "bv", "sa", "co"}
@@ -214,13 +223,33 @@ def counts_as_news(title: str, company: str, domain: Optional[str] = None, link:
     or the name is in the title as the company and not as a comparison, with company context around it."""
     if link_is_on(link, domain):
         return True
+    if is_integration_target(title, company, domain, link):
+        return False
     host = (domain or "").strip().lower()
     host = host[4:] if host.startswith("www.") else host
     if names_domain(title, host) and _named_as_subject(title, host) and _norm(host) not in name_variants(company):
         return True  # its web address, written in the title, when that address is not also the name others reuse (cal.com)
     if not is_single_name(company):  # a name of two words or more says which company it is
         return is_about(title, company)
-    return is_about(title, company) and has_company_context(title, company, words)
+    return is_about(title, company) and has_company_context(title, company, words) \
+        and not is_integration_target(title, company, domain, link)
+
+
+_INTEGRATION_TARGET = re.compile(r"\b(?:to|with|for|into|from|on)\s+(?:sync|integrat\w*)?\s*", re.I)
+
+
+def is_integration_target(title: str, company: str, domain: Optional[str], link: Optional[str]) -> bool:
+    """True for a launch post by someone else (its own address is not the company's) that names the company as the thing
+    it connects to: "Synclinear.com to Sync Linear.app with GitHub", "Show HN: Sync X with Linear"."""
+    if link_is_on(link, domain) or not link:
+        return False
+    text = " ".join(re.findall(r"[a-z0-9.]+", (title or "").lower()))
+    for v in name_variants(company):
+        shape = r"\s+".join(re.escape(w) for w in v.split())
+        if re.search(r"\b(?:sync|syncs|syncing|connect|connects|import|imports|export|exports|integrat\w*|plugin|extension|bridge|bot)\b.*\b%s\b" % shape, text) \
+                or re.search(r"\b(?:to|with|into|for)\s+(?:sync\s+)?%s(?:\.\w+)?\b" % shape, text) and re.search(r"\bsync\w*\b", text):
+            return True
+    return False
 
 
 def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None) -> bool:
