@@ -112,7 +112,7 @@ def test_business_architect_fills_and_follows_the_canvas(browser, live_server, s
             assert text.split(":")[0].strip() in response.text(), f"{href} does not show {text}"
 
         # The cost box shows the recorded cost, and revenue shows the recorded price.
-        expect(page.locator('[data-canvas-notes="cost-structure"]')).to_contain_text("Journey Billing Platform: 120,000 GBP a year")
+        expect(page.locator('[data-canvas-notes="cost-structure"]')).to_contain_text("Journey Billing Platform: 120,000.00 GBP a year")
         expect(page.locator('[data-canvas-notes="revenue-streams"]')).to_contain_text("1,850.00 GBP per use")
         expect(page.get_by_test_id("bmc-vision")).to_contain_text("Recover every sensor assembly for reuse")
 

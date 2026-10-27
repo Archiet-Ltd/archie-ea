@@ -18,7 +18,6 @@ from app import db
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.archimate_core import ArchiMateElement, SavedDiagram, SavedDiagramElement
 from app.models.price_plan import BILLING_PERIODS, PRICING_MECHANISMS, PricePlan
-from app.services import cost_fact_store
 from app.services.archimate_backbone import create_backbone_element
 
 TEMPLATE_KEY = "business_model_canvas"
@@ -293,29 +292,16 @@ def remove_price_plan(canvas, plan_id):
     db.session.commit()
 
 
-def cost_lines(canvas):
-    """Recorded annual actual costs of the organisation's applications,
-    largest first, from the one cost fact store."""
-    from app.models.application_portfolio import ApplicationComponent
+def cost_summary(canvas):
+    """The organisation's annual cost from the one cost view: the same totals the application pages show."""
+    from app.services.cost_view import organisation_cost
 
-    facts = cost_fact_store.list_facts(
-        canvas.organization_id, element_type="application", kind="actual", period="annual"
-    )
-    names = {
-        a.id: a.name
-        for a in ApplicationComponent.query.filter(
-            ApplicationComponent.id.in_({f.element_id for f in facts} or {0}),
-            ApplicationComponent.organization_id == canvas.organization_id,
-        ).all()
-    }
-    totals = {}
-    for f in facts:
-        if f.element_id in names:
-            key = (f.element_id, f.currency)
-            totals[key] = totals.get(key, Decimal(0)) + f.amount
-    lines = [
-        {"id": app_id, "name": names[app_id], "amount": amount, "currency": currency}
-        for (app_id, currency), amount in totals.items()
+    return organisation_cost(canvas.organization_id)
+
+
+def cost_lines(canvas):
+    """Each application's annual total, largest first, in the organisation's reporting currency."""
+    return [
+        {"id": row["id"], "name": row["name"], "amount": row["total"], "currency": row["currency"]}
+        for row in cost_summary(canvas).applications
     ]
-    lines.sort(key=lambda r: r["amount"], reverse=True)
-    return lines

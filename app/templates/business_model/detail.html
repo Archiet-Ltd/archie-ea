@@ -97,6 +97,9 @@
          'boxes': boxes,
          'editable': can_edit,
        }) }}
+    {% if cost_total %}
+    <p class="text-sm text-muted-foreground" data-testid="bmc-cost-total">{{ cost_total }}. Each application's line opens its Cost tab.</p>
+    {% endif %}
     {% endif %}
   </div>
 </div>

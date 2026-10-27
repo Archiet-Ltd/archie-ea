@@ -101,6 +101,7 @@ def _canvas_boxes(canvas):
     boxes = {key.replace("_", "-"): [_note_entry(canvas, key, el, editable) for el in model_service.entries(canvas, key)]
              for key in model_service.element_boxes(canvas)}
     cost_line_count = 0
+    cost_total = None
     priceable = model_service.priceable_box(canvas)
     if model_service.PRICE_BOX in zones and priceable:
         elements = {el.id: el for el in model_service.entries(canvas, priceable)}
@@ -115,16 +116,35 @@ def _canvas_boxes(canvas):
             for plan in model_service.price_plans(canvas) if plan.element_id in elements
         ]
     if model_service.COST_BOX in zones:
-        lines = model_service.cost_lines(canvas)
+        summary = model_service.cost_summary(canvas)
+        lines = summary.applications
         cost_line_count = len(lines)
-        boxes["cost-structure"] = [
-            {
-                "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
-                "href": url_for("unified_applications.application_detail", id=line["id"]),
-            }
-            for line in lines[:8]
-        ]
-    return boxes, cost_line_count
+        if lines:
+            cost_total = _cost_total_words(summary)
+            boxes["cost-structure"] = [
+                {
+                    "text": f"{line['name']}: " + (
+                        f"{line['total']:,.2f} {line['currency']} a year" if line["total"] is not None
+                        else "not converted, an exchange rate is missing"),
+                    "href": url_for("unified_applications.application_detail", id=line["id"], tab="cost"),
+                }
+                for line in lines[:8]
+            ]
+            if len(lines) > 8:
+                boxes["cost-structure"].append({"text": f"and {len(lines) - 8} more applications with a recorded cost"})
+    return boxes, cost_line_count, cost_total
+
+
+def _cost_total_words(summary):
+    """The organisation total under the canvas: what it covers, the figure and its date."""
+    count = len(summary.applications)
+    covers = f"{count} application{'s' if count != 1 else ''}"
+    as_of = f", as of {summary.as_of.day} {summary.as_of:%B %Y}" if summary.as_of else ""
+    if summary.total is None:
+        missing = ", ".join(sorted({currency for currency, _ in summary.missing}))
+        return (f"Cost Structure total across {covers}: not worked out, no exchange rate from {missing} "
+                f"to {summary.currency}{as_of}")
+    return f"Cost Structure total across {covers}: {summary.total:,.2f} {summary.currency} a year{as_of}"
 
 
 @business_model_bp.route("/<int:canvas_id>")
@@ -136,7 +156,7 @@ def detail(canvas_id):
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
 
     key = model_service.template_key(canvas)
-    boxes, cost_line_count = _canvas_boxes(canvas)
+    boxes, cost_line_count, cost_total = _canvas_boxes(canvas)
     zones = model_service.zones(canvas)
     pickers = {
         box: [{"id": el.id, "name": el.name, "type": el.type} for el in model_service.candidates(canvas, box)]
@@ -159,6 +179,7 @@ def detail(canvas_id):
         zones=zones,
         pickers=pickers,
         cost_line_count=cost_line_count,
+        cost_total=cost_total,
         vision=vision,
         vision_href=model_service.element_href(vision) if vision else None,
         can_edit=_can_edit(),

@@ -155,7 +155,7 @@ def test_the_demonstration_company_overview_is_full_and_its_figures_agree_with_t
         page.wait_for_url(re.compile(r"/business-model/\d+"), timeout=PAGE_TIMEOUT)
         cost_box = page.locator('[data-canvas-notes="cost-structure"]')
         expect(cost_box).to_contain_text(names[one])
-        assert re.search(r"%s: [\d,]+ GBP a year" % re.escape(names[one]), cost_box.inner_text())
+        assert re.search(r"%s: [\d,]+\.\d{2} GBP a year" % re.escape(names[one]), cost_box.inner_text())
     finally:
         context.close()
 
