@@ -16,12 +16,12 @@
 <form method="post" action="{{ url_for('strategy_analysis.run') }}" class="contents">
   {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
   {{ input(type='hidden', name='next', value='drafts') }}
-  {{ ui.button(text=label, variant=variant, attrs={'type': 'submit', 'data-testid': 'drafts-run'}) }}
+  {{ ui.button(text=label, variant=variant, class=('border border-input bg-background text-foreground px-4' if variant == 'outline' else 'bg-primary text-primary-foreground hover:bg-primary/90 px-4'), attrs={'type': 'submit', 'data-testid': 'drafts-run'}) }}
 </form>
 {% endmacro %}
 {% macro _actions() %}{% if can_write and drafts.can_run %}{{ _run_form('Run again', 'outline') }}{% endif %}{% endmacro %}
 <div class="flex-1 overflow-auto">
-  <div class="mx-auto max-w-6xl space-y-6 p-6">
+  <div class="style-vega mx-auto max-w-6xl space-y-6 p-6">
     {{ page_shell(
         title='Strategy drafts',
         subtitle=drafts.run_line or 'The SWOT and PESTLE drafted from your profile and public sources.',
@@ -45,7 +45,7 @@
       <form method="post" action="{{ url_for('strategy_analysis.accept') }}" class="contents">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {{ input(type='hidden', name='next', value='drafts') }}
-        {{ ui.button(text='Accept drafts', attrs={'type': 'submit', 'data-testid': 'drafts-accept'}) }}
+        {{ ui.button(text='Accept drafts', class='bg-primary text-primary-foreground hover:bg-primary/90 px-4', attrs={'type': 'submit', 'data-testid': 'drafts-accept'}) }}
       </form>
       {% endif %}
     </div>
