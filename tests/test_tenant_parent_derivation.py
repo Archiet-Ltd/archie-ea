@@ -118,3 +118,26 @@ def test_a_signed_in_organisation_cannot_hang_a_row_from_another_organisations_p
             {"s": world["sol_b"]},
         ).scalar()
     assert left == 0
+
+
+def test_a_creator_from_another_organisation_does_not_block_the_signed_in_organisation(app, world):
+    """A user named as creator is an actor, not a parent: a platform admin working inside
+    organisation A creates a row under A even though their own account sits in B."""
+    from flask import g
+
+    from app import db
+    from app.models.solution_governance import SolutionTemplate
+    from app.models.user import User
+
+    with app.test_request_context():
+        admin = User(email="par-%s@example.test" % uuid.uuid4().hex[:8], first_name="P", last_name="A",
+                     organization_id=world["org_b"], confirmed=True)
+        admin.password = uuid.uuid4().hex
+        db.session.add(admin)
+        db.session.flush()
+        g.current_org_id = world["org_a"]
+        row = SolutionTemplate(name="T", template_json="{}", created_by_id=admin.id)
+        db.session.add(row)
+        db.session.flush()
+        assert row.organization_id == world["org_a"]
+        db.session.rollback()

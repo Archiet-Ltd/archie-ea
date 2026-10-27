@@ -33,7 +33,7 @@ class TenantParentMismatch(ValueError):
     """A new row would link to a parent record owned by a different organisation."""
 
 
-def organization_from_parent(session, obj):
+def organization_from_parent(session, obj, include_actors=True):
     """The organisation that owns the record ``obj`` hangs from, or None.
 
     A model names its parents in ``__tenant_parent__``, a tuple of ``(attribute, parent_table)``
@@ -42,6 +42,8 @@ def organization_from_parent(session, obj):
     creates a child row cannot leave it unowned (and, once the table is fenced, cannot fail on it).
     """
     for attribute, parent_table in getattr(type(obj), "__tenant_parent__", ()):
+        if parent_table == "users" and not include_actors:
+            continue  # a creator is an actor, not a parent: it is not evidence of a cross-company link
         parent_id = getattr(obj, attribute, None)
         if parent_id is None:
             continue
@@ -230,7 +232,7 @@ def install_tenant_filter(app):
         for obj in session.new:
             if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
                 # The row belongs to the organisation that owns the parent record it hangs from.
-                derived = organization_from_parent(session, obj)
+                derived = organization_from_parent(session, obj, include_actors=org_id is None)
                 if org_id is not None:
                     if derived is not None and derived != org_id:
                         # Never let the signed-in organisation win over a parent that belongs to
