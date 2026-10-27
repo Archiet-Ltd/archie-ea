@@ -499,6 +499,11 @@ else:
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401
 
+    # Every relationship written under a declared source records its origin as it is written.
+    from app.services.relationship_origin import register as _register_relationship_origin
+
+    _register_relationship_origin()
+
     # Cited public signals per organisation. Imported at boot so create_all()/reconcile-schema
     # know about the table; before this the tests that read it ran on a database without it.
     from .organization_signal import OrganizationSignal  # noqa: F401

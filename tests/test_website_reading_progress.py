@@ -148,7 +148,8 @@ def test_a_real_reading_reports_each_page_and_ends_with_a_next_step_and_a_bell(a
         facts, _ = confirm.proposals(org.id)
     assert state["state"] == "done"
     # the figure on the sources step is the number of facts on the confirm screen
-    assert state["text"] == "Read %d pages; %d facts wait for you to confirm in the next step." % (result["pages_read"], len(facts))
+    assert state["text"] == ("Read %d pages; %d facts wait for you to confirm in the next step. "
+                             "More facts follow in a few minutes, as we finish working out what your pages say.") % (result["pages_read"], len(facts))
     assert state["next"] == {"label": "Confirm what we read", "url": "/account/welcome?step=3"}
 
     bell = Notification.query.filter_by(user_id=user_id, event_type="website_read").all()

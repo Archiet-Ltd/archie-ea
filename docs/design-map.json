@@ -44597,6 +44597,181 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/vendors/catalogue_detail.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "record-detail",
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "empty",
+    "input",
+    "page-header",
+    "select",
+    "table",
+    "tabs"
+   ],
+   "controls": {
+    "button": 2,
+    "form": 1,
+    "link": 4,
+    "table": 3,
+    "testid": 8
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "macros": [
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/dense_table.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/select.html"
+   ],
+   "persona": "procurement",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "tier": "B",
+   "extra_macros": [
+    "components/table.html"
+   ],
+   "note": "Fact tables use the table macro, not the legacy dense_table."
+  },
+  "app/templates/vendors/catalogue_list.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_table.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/pagination_controls.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/table.html",
+    "components/tabs.html",
+    "components/workbench_table.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "data-table",
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "empty",
+    "field",
+    "input",
+    "page-header",
+    "pagination",
+    "select",
+    "table"
+   ],
+   "controls": {
+    "button": 1,
+    "form": 1,
+    "link": 1,
+    "table": 1,
+    "testid": 1
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "macros": [
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/table.html"
+   ],
+   "persona": "procurement",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "tier": "B"
+  },
   "app/templates/vendors/create_simple.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
