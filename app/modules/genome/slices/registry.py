@@ -9,6 +9,7 @@ live and moves nothing:
     implementation  app/modules/genome/services/roadmap_slice.py
     security        app/modules/enterprise_genome/services/security_slice.py
     ai_systems      app/modules/enterprise_genome/services/ai_systems_slice.py
+    strategy        app/modules/genome/services/strategy_slice.py
 
 Each builder keeps its own output and ``spec_hash``. The registry turns that
 output into one envelope with a flat ``nodes`` list and an ``edges`` list, in
@@ -228,6 +229,42 @@ def _ai_systems_nodes(raw: dict) -> tuple:
     return nodes, []
 
 
+def _strategy_nodes(raw: dict) -> tuple:
+    """Competitors (one record each, the five answers of the comparison matrix) and the accepted SWOT and PESTLE
+    statements, each with the sources it rests on."""
+    nodes = []
+    competitors_page = _path("strategy_analysis.competitors")
+    for c in raw.get("competitors", []):
+        prov = _structural(c["element_id"], "BusinessActor")
+        nodes.append({
+            "id": node_id("strategy", "competitor", c["element_id"]),
+            "kind": "competitor",
+            "name": c["name"],
+            "threat": (c.get("threat") or {}).get("text"),
+            "position": c.get("position"),
+            "strengths": c["strengths"],
+            "weaknesses": c["weaknesses"],
+            "differences": c["differences"],
+            "sources": c["sources"],
+            "provenance": prov,
+            "link": ("%s#competitor-%s" % (competitors_page, c["element_id"])) if competitors_page else None,
+        })
+    for f in raw.get("frameworks", []):
+        prov = _structural(f["element_id"], "Assessment" if f["analysis"] == "swot" else "Driver")
+        canvas_id = (raw.get("canvases") or {}).get(f["analysis"])
+        nodes.append({
+            "id": node_id("strategy", f["analysis"], f["element_id"]),
+            "kind": f["analysis"],
+            "name": f["statement"]["text"],
+            "box": f["box"],
+            "statement": f["statement"],
+            "sources": f["sources"],
+            "provenance": prov,
+            "link": _path("business_model.detail", canvas_id=canvas_id) if canvas_id else _path("strategy_analysis.drafts"),
+        })
+    return nodes, []
+
+
 # --------------------------------------------------------------------------- #
 # Builders, called where they live                                             #
 # --------------------------------------------------------------------------- #
@@ -255,6 +292,12 @@ def _build_ai_systems(org_id, session):
     from app.modules.enterprise_genome.services.ai_systems_slice import build_ai_systems_slice
 
     return build_ai_systems_slice(org_id, session)
+
+
+def _build_strategy(org_id, session):
+    from app.modules.genome.services.strategy_slice import build_strategy_slice
+
+    return build_strategy_slice(org_id)
 
 
 SLICES: Dict[str, SliceSpec] = {
@@ -297,6 +340,16 @@ SLICES: Dict[str, SliceSpec] = {
         rank_key="name",
         optional_fields=("release_state",),
         empty_reason="Your model records no AI systems yet.",
+    ),
+    "strategy": SliceSpec(
+        domain="strategy",
+        store="archimate_elements",
+        builder=_build_strategy,
+        to_nodes=_strategy_nodes,
+        filter_keys=("kind", "box"),
+        rank_key="name",
+        optional_fields=("sources", "differences", "weaknesses", "strengths", "statement"),
+        empty_reason="No competitor analysis, SWOT or PESTLE has been accepted into your model yet.",
     ),
 }
 

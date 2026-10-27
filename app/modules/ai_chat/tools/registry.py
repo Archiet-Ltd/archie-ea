@@ -802,7 +802,9 @@ TOOL_SCHEMAS = [
             "(capabilities, the applications that support each, and which capabilities "
             "nothing supports), 'implementation' (plateaus and work packages, with the "
             "capability each work package changes), 'security' (controls bound to "
-            "requirements) or 'ai_systems'. The same facts the Capability Coverage page "
+            "requirements), 'ai_systems', or 'strategy' (the competitors the company "
+            "compares itself with and how it differs from each, and its SWOT and PESTLE, each "
+            "statement with the public sources it rests on). The same facts the Capability Coverage page "
             "and the roadmap show. Every node has an id such as business:cap:7; cite each "
             "record you state as [ref:<node id>] and the page shows its name as a link. "
             "State only what the nodes say. Read-only."
@@ -812,7 +814,7 @@ TOOL_SCHEMAS = [
             "properties": {
                 "domain": {
                     "type": "string",
-                    "enum": ["business", "implementation", "security", "ai_systems"],
+                    "enum": ["business", "implementation", "security", "ai_systems", "strategy"],
                     "description": "Which domain of the model to read",
                 },
                 "focus_ids": {

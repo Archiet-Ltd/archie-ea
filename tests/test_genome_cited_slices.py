@@ -82,7 +82,7 @@ def _call(user, org_id, tenant_ctx, **arguments):
 def test_every_registered_builder_returns_the_envelope_with_provenance(two_orgs, tenant_ctx):
     from app.modules.genome.slices.registry import SLICES, get_slice
 
-    assert set(SLICES) == {"business", "implementation", "security", "ai_systems"}
+    assert set(SLICES) == {"business", "implementation", "security", "ai_systems", "strategy"}
     org_id = two_orgs["a"].id
     with tenant_ctx(org_id):
         for domain in SLICES:
@@ -156,7 +156,7 @@ def test_the_tool_is_one_read_only_entry_on_chat_and_mcp():
 def test_an_unregistered_domain_returns_the_registered_domains(two_orgs, tenant_ctx):
     result = _call(two_orgs["user_a"], two_orgs["a"].id, tenant_ctx, domain="finance")
     assert result["success"] is True
-    assert result["result"]["registered_domains"] == ["ai_systems", "business", "implementation", "security"]
+    assert result["result"]["registered_domains"] == ["ai_systems", "business", "implementation", "security", "strategy"]
 
 
 def test_coverage_figures_equal_the_capability_coverage_page(two_orgs, client, login_as, tenant_ctx):

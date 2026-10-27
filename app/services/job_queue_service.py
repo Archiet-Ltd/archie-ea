@@ -248,6 +248,10 @@ class JobQueueService:
             from app.modules.organization.public_signals import run_signals_job
 
             return run_signals_job(payload)
+        elif task == "strategy_drafts":
+            from app.services.strategy_draft_service import run_drafts_job
+
+            return run_drafts_job(payload)
         elif task in ("onboarding_github_import", "onboarding_jira_import"):
             return self._execute_onboarding_import(task, payload)
         else:

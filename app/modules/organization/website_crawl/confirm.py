@@ -38,7 +38,7 @@ _GOAL_KEYS = {key for key, _label in GOALS}
 # the company, so it is shown as a line and never offered as a fact.
 _NOT_A_FACT = {"completeness_score"}
 _LISTS = {"key_person", "social_profile", "technology", "product", "value_proposition", "competitive_advantage",
-          "compliance", "integration_partner", "case_study"}
+          "compliance", "integration_partner", "case_study", "competitor"}
 
 # field -> (ArchiMate type, layer) for the facts the model holds
 _ELEMENTS = {

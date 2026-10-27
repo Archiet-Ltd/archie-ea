@@ -63,10 +63,10 @@ PROFILE_FIELDS: Dict[str, str] = {
     "technology": "Technology", "product": "Product", "value_proposition": "Value proposition",
     "competitive_advantage": "Competitive advantage", "market_position": "Market position",
     "compliance": "Compliance mention", "integration_partner": "Integration partner", "case_study": "Case study",
-    "completeness_score": "Completeness of what was read",
+    "competitor": "Competitor", "completeness_score": "Completeness of what was read",
 }
 _MANY = {"key_person", "social_profile", "technology", "product", "value_proposition", "competitive_advantage",
-         "compliance", "integration_partner", "case_study"}
+         "compliance", "integration_partner", "case_study", "competitor"}
 
 ADDENDUM = """
 
@@ -154,6 +154,7 @@ Use only what each page states. Give a page you learned nothing from an empty ob
 - "company_stage": {"stage": "", "confidence": 0.0-1.0}
 - "technology_stack": {"<kind, e.g. frontend>": ["names"]}
 - "competitive_positioning": {"value_proposition": "", "competitive_advantages": [""], "market_position": ""}
+- "potential_competitors": ["competitors the pages name, or compare the company with"]
 - "data_quality": {"completeness_score": 0.0-1.0, "reliability_score": 0.0-1.0}
 """
 
@@ -377,6 +378,8 @@ def _from_inference(facts: _Facts, url: str, at: str, inferred: Dict[str, Any]) 
     for advantage in position.get("competitive_advantages") or []:
         facts.add("competitive_advantage", _text(advantage), url, at, reliability, "reliability")
     facts.add("market_position", _text(position.get("market_position")), url, at, reliability, "reliability")
+    for rival in inferred.get("potential_competitors") or []:
+        facts.add("competitor", _text(rival), url, at, reliability, "reliability")
     score = _number(quality.get("completeness_score"))
     if score is not None:
         facts.add("completeness_score", score, url, at, reliability, "reliability")
