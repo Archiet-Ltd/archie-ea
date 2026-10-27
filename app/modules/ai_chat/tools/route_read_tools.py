@@ -15,6 +15,8 @@ stack (tenant context, tenant isolation, login) with the caller already resolved
 
 from __future__ import annotations
 
+import re
+
 from typing import Any, Callable
 
 from app.utils.internal_api import call_internal_api
@@ -166,6 +168,45 @@ def _data_flow(args: dict) -> dict:
 # carries free text (element names, reasons, messages), so on the connector it
 # is fenced like every route tool's payload. Chat does not go through here.
 ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact", "ask_data_flow"})
+
+
+_URL_KEYS = ("url", "link", "href")
+_OPEN_AT = re.compile(r"(open at )(/[^\s)\]\"']*)")
+
+
+def absolutise_connector_urls(result: Any, base: str) -> Any:
+    """Make every address the connector returns absolute, built from the public base URL.
+
+    A client outside the product (an assistant in another app) cannot open a path such as
+    /intelligence/answers/<id>. Only values under a url/link/href key, and the 'open at <path>'
+    phrase in a message, are changed: a name that happens to start with a slash is never touched.
+    """
+    base = (base or "").rstrip("/")
+    if not base:
+        return result
+
+    def fix(value):
+        if isinstance(value, str) and value.startswith("/") and not value.startswith("//"):
+            return base + value
+        return value
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in list(node.items()):
+                if isinstance(value, str):
+                    lowered = key.lower()
+                    if lowered in _URL_KEYS or lowered.endswith(("_url", "_link", "_href")):
+                        node[key] = fix(value)
+                    elif lowered == "message":
+                        node[key] = _OPEN_AT.sub(lambda m: m.group(1) + base + m.group(2), value)
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(result)
+    return result
 
 
 def fence_connector_result(tool_name: str, result: Any) -> Any:
@@ -324,7 +365,13 @@ def connector_tools() -> list[dict]:
                 "name": schema["name"],
                 "description": schema["description"],
                 "inputSchema": schema["parameters"],
-                "annotations": {"readOnlyHint": True},
+                "annotations": {
+                    "title": schema["name"].replace("_", " ").capitalize(),
+                    "readOnlyHint": True,
+                    "destructiveHint": False,
+                    "idempotentHint": True,
+                    "openWorldHint": False,
+                },
             })
     for alias, target in CONNECTOR_ALIASES.items():
         for tool in list(tools):

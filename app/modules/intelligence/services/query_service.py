@@ -2696,6 +2696,16 @@ class IntelligenceQueryService:
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
 
     @staticmethod
+    def owners_for_element(element_id: int) -> List[Dict[str, str]]:
+        """The element's own recorded owners ([{name, role}]), from the one owner store.
+
+        The same reader accountability_for_element and the impact rows use, so every surface
+        that names an owner for an element names the same one."""
+        org_id = current_org_id()
+        elements = _resolve_elements_batch([element_id], org_id)
+        return _resolve_application_owners_batch([element_id], org_id, elements).get(element_id, [])
+
+    @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
 
