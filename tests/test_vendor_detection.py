@@ -56,16 +56,25 @@ def _catalogue(db_session, slug, product_name, vendor_name):
         product = VendorProductDetail(family_id=family.id, product_name=product_name, catalogue_slug=slug)
         db_session.add(product)
         db_session.flush()
+    else:
+        # A database that has had the reviewed catalogue loaded holds this product already: within this test's
+        # transaction it reads as the test's own product, its earlier facts no longer published.
+        product.product_name = product_name
+        for fact in VendorCatalogueFact.query.filter_by(product_detail_id=product.id, review_state="published"):
+            fact.review_state = "draft"
+        db_session.flush()
     published = VendorCatalogueFact.query.filter_by(product_detail_id=product.id, review_state="published")
     if published.filter(VendorCatalogueFact.archimate_type.isnot(None)).count() == 0:
         for kind, name, atype in (("summary", "What it does", None),
                                   ("component", "Admin console", "ApplicationComponent"),
                                   ("interface", "REST API", "ApplicationInterface"),
                                   ("service", "Single sign-on", "ApplicationService")):
-            fact = VendorCatalogueFact(product_detail_id=product.id, kind=kind, name=name, archimate_type=atype,
-                                       detail=f"{product_name}: {name}", source_url=f"https://example.com/{slug}",
-                                       checked_on=date(2026, 10, 25), evidence=name.lower())
-            db_session.add(fact)
+            fact = VendorCatalogueFact.query.filter_by(product_detail_id=product.id, kind=kind, name=name).first()
+            if fact is None:
+                fact = VendorCatalogueFact(product_detail_id=product.id, kind=kind, name=name)
+                db_session.add(fact)
+            fact.archimate_type, fact.detail, fact.evidence = atype, f"{product_name}: {name}", name.lower()
+            fact.source_url, fact.checked_on = f"https://example.com/{slug}", date(2026, 10, 25)
             db_session.flush()
             fact.publish("Catalogue review")
         db_session.flush()
