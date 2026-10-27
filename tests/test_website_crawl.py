@@ -365,6 +365,23 @@ def test_a_private_address_is_refused_outside_development(app, make_org, site):
     assert site.hits == []
 
 
+@pytest.mark.parametrize("allowed", [True, False])
+def test_the_job_path_reads_the_same_setting_as_the_first_job(app, make_org, site, allowed):
+    """The job body, the one a worker thread runs, refuses a private address unless the setting allows it."""
+    from app.modules.organization import website_crawl
+
+    app.config["ALLOW_INTERNAL_WEBHOOK_TARGETS"] = allowed
+    org = _org(make_org, site.url)
+    if allowed:
+        website_crawl.service._consented_site(org.id)
+    else:
+        result = website_crawl.run_website_crawl_job({"organization_id": org.id})
+        assert result["success"] is False and result["reason"] == "blocked"
+        result = website_crawl.run_website_retry_job({"organization_id": org.id, "retry_attempt": 1})
+        assert result["success"] is False and result["reason"] == "blocked"
+    assert site.hits == []
+
+
 def test_nothing_reaches_the_model_until_a_person_confirms(make_org, site):
     from app import db
     from app.models import ArchiMateElement
