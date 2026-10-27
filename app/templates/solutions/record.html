@@ -4,6 +4,7 @@
    Requirements, Options and decision, Risks, Review and Delivery.
    Context: app/modules/solutions_strategic/v2/services/solution_record_service.py #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/section_tabs.html' import section_tabs %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
@@ -92,17 +93,7 @@
   {{ page_shell(solution.name, breadcrumb=[('Solutions', '/solutions/'), (solution.name, None)], stack_actions=True, meta_caller=_meta, actions_caller=_actions) }}
 
   {# Seven tabs. On a phone the strip scrolls sideways instead of wrapping or overflowing the page. #}
-  <nav aria-label="Solution record sections" class="-mt-2 mb-6 overflow-x-auto" data-testid="record-tabs">
-    <ul class="flex min-w-max items-center gap-1 border-b border-border text-sm">
-      {% for label, href, active in tabs %}
-      <li>
-        <a href="{{ href }}"
-           class="inline-flex items-center whitespace-nowrap px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}"
-           {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
-      </li>
-      {% endfor %}
-    </ul>
-  </nav>
+  {{ section_tabs(tabs, label='Solution record sections', testid='record-tabs', class='-mt-2 mb-6') }}
 
   <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 

@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/section_tabs.html' import section_tabs %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'components/figures.html' import state_badge, section %}
@@ -17,12 +18,9 @@
 {{ page_shell(title='Team', subtitle='Who belongs to this organisation, what role each person has, and who is still to accept an invitation',
               breadcrumb=[('Admin', url_for('admin.index')), ('Team', none)]) }}
 
-<nav class="inline-flex h-9 w-fit items-center rounded-lg bg-muted p-1 text-sm text-muted-foreground" aria-label="Team sections" data-testid="team-tabs">
-  {% for key, label, href in [('members', 'Members', url_for('team.team')), ('permissions', 'Permissions', url_for('team.team', tab='permissions'))] %}
-  {% set active = (tab == 'permissions') == (key == 'permissions') %}
-  <a href="{{ href }}" data-testid="team-tab-{{ key }}" class="inline-flex h-full items-center rounded-md px-3 font-medium transition-colors {{ 'bg-background text-foreground' if active else 'hover:text-foreground' }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
-  {% endfor %}
-</nav>
+{{ section_tabs([('Members', url_for('team.team'), tab != 'permissions', 'team-tab-members'),
+                 ('Permissions', url_for('team.team', tab='permissions'), tab == 'permissions', 'team-tab-permissions')],
+                label='Team sections', testid='team-tabs') }}
 
 {% if tab == 'permissions' %}
 {% include 'admin/_team_permissions.html' %}
