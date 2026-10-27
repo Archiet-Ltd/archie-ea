@@ -21857,12 +21857,7 @@
     "modal": 3,
     "testid": 4
    },
-   "departures": [
-    {
-     "rule": "R38",
-     "what": "A fixed comparison matrix on basecoat/table.html, not a record list: no toolbar, pagination or row menu; the hover card for a source is the link's title until the hover card is on this base."
-    }
-   ],
+   "departures": [],
    "extends": [
     "layouts/admin_base.html"
    ],
@@ -21910,7 +21905,7 @@
     "export-running",
     "populated"
    ],
-   "status": "implemented",
+   "status": "mapped",
    "tier": "C4",
    "type_changed": true
   },
@@ -21974,12 +21969,7 @@
     "modal": 3,
     "testid": 4
    },
-   "departures": [
-    {
-     "rule": "R38",
-     "what": "A fixed comparison matrix on basecoat/table.html, not a record list: no toolbar, pagination or row menu; the hover card for a source is the link's title until the hover card is on this base."
-    }
-   ],
+   "departures": [],
    "extends": [
     "layouts/admin_base.html"
    ],
@@ -22027,7 +22017,7 @@
     "export-running",
     "populated"
    ],
-   "status": "implemented",
+   "status": "mapped",
    "tier": "C4",
    "type_changed": true
   },
