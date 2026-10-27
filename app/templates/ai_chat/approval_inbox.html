@@ -1,3 +1,4 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 
@@ -47,7 +48,7 @@
                 <!-- Top row: operation badge + entity type + created -->
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium capitalize"
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
                               :class="{
                                 'bg-success/10 text-success-emphasis border border-success/30': item.operation_type === 'create',
                                 'bg-warning/10 text-warning-emphasis border border-warning/30': item.operation_type === 'update',
@@ -56,11 +57,11 @@
                                 'bg-primary/10 text-primary-emphasis border border-primary/30': item.operation_type === 'link',
                                 'bg-muted/10 text-muted-foreground border border-muted/30': !['create','update','delete','tool_use','link'].includes(item.operation_type)
                               }"
-                              x-text="item.operation_type"></span>
-                        <span class="text-sm font-medium text-foreground capitalize" x-text="item.entity_type"></span>
-                        <template x-if="item.source_table">
+                              x-text="item.operation_label"></span>
+                        <span class="text-sm font-medium text-foreground" x-text="item.entity_label"></span>
+                        <template x-if="item.source_label">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-muted-foreground bg-muted/50 border border-border"
-                                  x-text="'Source: ' + item.source_table + (item.source_id ? ' #' + item.source_id : '')"></span>
+                                  data-testid="approval-source" x-text="item.source_label"></span>
                         </template>
                     </div>
                     <span class="text-xs text-muted-foreground whitespace-nowrap" x-text="formatDate(item.created_at)"></span>
@@ -71,7 +72,7 @@
 
                 <!-- Requester -->
                 <p class="text-xs text-muted-foreground">
-                    Requested by: <span class="text-foreground" x-text="item.requester?.display_name || 'System / backfilled'"></span>
+                    Requested by: <span class="text-foreground" x-text="item.requester?.display_name"></span>
                 </p>
 
                 <!-- Expiry / Overdue -->

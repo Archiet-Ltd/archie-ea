@@ -92,7 +92,12 @@ SIGNATURES: Dict[str, Dict[str, tuple]] = {
     "grafana-cloud": {"page": (), "dns": (), "names": ("grafana", "grafana cloud")},
 }
 
-_ADDRESS = re.compile(r"""(?:src|href|action|data-src)\s*=\s*["']([^"']+)["']""", re.I)
+# What a page loads: the address of a script, a frame or a form, and only a web address (http, https or
+# protocol-relative). A link, a javascript: address or text that names a vendor's domain loads nothing.
+_ADDRESS = re.compile(
+    r"""<(?:script|iframe|form)\b[^>]*?\s(?:src|action|data-src)\s*=\s*["']\s*((?:https?:)?//[^"'\s]+)\s*["']""",
+    re.I,
+)
 DNS_RECORD_TYPES = ("MX", "TXT", "NS")
 
 
@@ -106,15 +111,25 @@ class Detection:
 # ----------------------------------------------------------------------------- detecting
 
 
+def _served_from(address: str, needle: str) -> bool:
+    """Whether the address is on the vendor's own host (and path, when the signature names one)."""
+    parsed = urlparse("https:" + address if address.startswith("//") else address)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    want_host, _, want_path = needle.lower().partition("/")
+    if host != want_host and not host.endswith("." + want_host):
+        return False
+    return not want_path or parsed.path.lower().lstrip("/").startswith(want_path)
+
+
 def detect_from_pages(pages: Iterable[Dict[str, Any]]) -> List[Detection]:
-    """Catalogue products the pages load: a script, frame, form or link address of the vendor's own."""
+    """Catalogue products the pages load: the web address of a script, frame or form on the vendor's own host."""
     found: Dict[str, Detection] = {}
     for page in pages:
         html = page.get("html") or ""
         addresses = {a.strip() for a in _ADDRESS.findall(html)}
         for slug, sig in SIGNATURES.items():
             for needle in sig["page"]:
-                hit = next((a for a in sorted(addresses) if needle in a.lower()), None)
+                hit = next((a for a in sorted(addresses) if _served_from(a, needle)), None)
                 if hit is None:
                     continue
                 det = found.setdefault(slug, Detection(slug, "website"))
@@ -248,6 +263,37 @@ def _summary(product, det: Detection) -> str:
         how = "you said “%s”" % first.get("detail")
     return "%s by %s, found in %s: %s" % (product.product_name, _vendor_name(product),
                                           SOURCE_LABELS[det.source], how)
+
+
+# The words an inbox card uses for a vendor proposal: what it is, where it was found and who asked.
+KIND_LABELS = {OP_DETECTION: "Vendor found", OP_ARCHITECTURE: "Vendor architecture"}
+ENTITY_LABELS = {"vendor": "Vendor", "archimate_fragment": "Model change"}
+FOUND_BY = {
+    "website": "Found by reading your website",
+    "dns": "Found in your domain records",
+    "chat": "From your chat",
+}
+ASKED_BY = {"website": "Reading your website", "dns": "Your domain records", "chat": "Your chat"}
+_EVIDENCE_SOURCE = {"page": "website", "dns": "dns", "chat": "chat"}
+
+
+def card_words(approval, payload: Dict[str, Any], people: Dict[int, str]) -> Dict[str, str]:
+    """The inbox card's words for one vendor proposal; ``people`` names the organisation's users by id."""
+    if approval.operation_type == OP_ARCHITECTURE:
+        return {"operation": KIND_LABELS[OP_ARCHITECTURE], "entity": ENTITY_LABELS["archimate_fragment"],
+                "source": "From the vendor catalogue", "requester": "The vendor catalogue"}
+    sources = [payload.get("source")] + [_EVIDENCE_SOURCE.get(e.get("kind")) for e in payload.get("evidence") or []
+                                         if isinstance(e, dict)]
+    sources = [s for s in dict.fromkeys(sources) if s in FOUND_BY]
+    first = sources[0] if sources else "website"
+    found = FOUND_BY[first]
+    if "website" in sources and "dns" in sources:
+        found = "Found by reading your website and your domain records"
+    requester = ASKED_BY[first]
+    if first == "chat" and people.get(payload.get("requested_by")):
+        requester = people[payload["requested_by"]]
+    return {"operation": KIND_LABELS.get(approval.operation_type, KIND_LABELS[OP_DETECTION]),
+            "entity": ENTITY_LABELS.get(approval.entity_type, "Vendor"), "source": found, "requester": requester}
 
 
 def propose(org_id: int, detections: Iterable[Detection], *, requested_by: Optional[int] = None) -> Dict[str, list]:
