@@ -253,14 +253,14 @@
                 {% if has_owner_field %}
                 {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = legacy_owner_text %}{% set assign_link = owner_assign_link %}
                 {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
-                <dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
+                <div><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
                 <dd class="font-medium">
                     {% include 'partials/owner_step.html' with context %}
-                </dd>
+                </dd></div>
                 {% endif %}
                 {% for field in display_fields if field.label not in flag_help %}
-                <dt class="text-muted-foreground">{{ field.label }}</dt>
-                <dd class="break-words font-medium">{{ field.value }}</dd>
+                <div><dt class="text-muted-foreground">{{ field.label }}</dt>
+                <dd class="break-words font-medium">{{ field.value }}</dd></div>
                 {% endfor %}
             </dl>
 
@@ -270,11 +270,11 @@
                 <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Flags</h3>
                 <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 mt-3 text-sm">
                     {% for field in flags %}
-                    <dt class="font-medium text-foreground">{{ field.label }}</dt>
+                    <div><dt class="font-medium text-foreground">{{ field.label }}</dt>
                     <dd class="flex items-start justify-between gap-4">
                         <span class="text-xs text-muted-foreground min-w-0">{{ flag_help[field.label] }}</span>
                         <span class="shrink-0 font-medium">{{ field.value }}</span>
-                    </dd>
+                    </dd></div>
                     {% endfor %}
                 </dl>
             </div>
@@ -284,34 +284,34 @@
         <section class="space-y-4 rounded-lg border border-border bg-card p-6" aria-labelledby="record-heading" data-testid="record-card">
             <h2 id="record-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Record</h2>
             <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
-                <dt class="text-muted-foreground">Type</dt>
-                <dd class="text-right font-medium" title="ArchiMate type: {{ element_type }}">{{ type_label }}</dd>
-                <dt class="text-muted-foreground">Layer</dt>
-                <dd class="text-right font-medium">{{ layer_label }}</dd>
-                {% if element.scope %}<dt class="text-muted-foreground">Scope</dt><dd class="text-right font-medium">{{ element.scope | title }}</dd>{% endif %}
-                {% if element.building_block_type %}<dt class="text-muted-foreground">Building block</dt><dd class="text-right font-medium">{{ element.building_block_type }}</dd>{% endif %}
-                {% if element.status %}<dt class="text-muted-foreground">Status</dt><dd class="text-right font-medium">{{ element.status | replace('_', ' ') | capitalize }}</dd>{% endif %}
-                {% if page.state %}<dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd>{% endif %}
+                <div><dt class="text-muted-foreground">Type</dt>
+                <dd class="text-right font-medium" title="ArchiMate type: {{ element_type }}">{{ type_label }}</dd></div>
+                <div><dt class="text-muted-foreground">Layer</dt>
+                <dd class="text-right font-medium">{{ layer_label }}</dd></div>
+                {% if element.scope %}<div><dt class="text-muted-foreground">Scope</dt><dd class="text-right font-medium">{{ element.scope | title }}</dd></div>{% endif %}
+                {% if element.building_block_type %}<div><dt class="text-muted-foreground">Building block</dt><dd class="text-right font-medium">{{ element.building_block_type }}</dd></div>{% endif %}
+                {% if element.status %}<div><dt class="text-muted-foreground">Status</dt><dd class="text-right font-medium">{{ element.status | replace('_', ' ') | capitalize }}</dd></div>{% endif %}
+                {% if page.state %}<div><dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd></div>{% endif %}
                 {% if page.plateau_link %}
-                <dt class="text-muted-foreground">Stage</dt>
-                <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd>
+                <div><dt class="text-muted-foreground">Stage</dt>
+                <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% if page.stage %}
-                <dt class="text-muted-foreground">Order on the roadmap</dt>
-                <dd class="text-right font-medium">{{ 'Stage ' ~ page.stage.order if page.stage.order else 'Not set' }}</dd>
-                {% if page.stage.target_date %}<dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd>{% endif %}
+                <div><dt class="text-muted-foreground">Order on the roadmap</dt>
+                <dd class="text-right font-medium">{{ 'Stage ' ~ page.stage.order if page.stage.order else 'Not set' }}</dd></div>
+                {% if page.stage.target_date %}<div><dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if page.stage.follows %}
-                <dt class="text-muted-foreground">Follows</dt>
-                <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd>
+                <div><dt class="text-muted-foreground">Follows</dt>
+                <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% endif %}
-                {% if element.created_at %}<dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd>{% endif %}
-                {% if element.updated_at %}<dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd>{% endif %}
-                {% if element.last_reviewed_date %}<dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd>{% endif %}
-                {% if element.architecture_review_status %}<dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd>{% endif %}
+                {% if element.created_at %}<div><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.updated_at %}<div><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.last_reviewed_date %}<div><dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.architecture_review_status %}<div><dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd></div>{% endif %}
                 {% if external_links %}
-                <dt class="text-muted-foreground">Source system</dt>
-                <dd class="text-right font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd>
+                <div><dt class="text-muted-foreground">Source system</dt>
+                <dd class="text-right font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd></div>
                 {% endif %}
             </dl>
 
@@ -323,11 +323,11 @@
             <details class="border-t border-border pt-3 text-sm" data-testid="technical-details">
                 <summary class="cursor-pointer text-muted-foreground">Technical details</summary>
                 <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 mt-2">
-                    <dt class="text-muted-foreground">Element ID</dt>
-                    <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd>
+                    <div><dt class="text-muted-foreground">Element ID</dt>
+                    <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd></div>
                     {% for field in technical_fields %}
-                    <dt class="text-muted-foreground">{{ field.label }}</dt>
-                    <dd class="font-mono text-xs text-muted-foreground">{{ field.value }}</dd>
+                    <div><dt class="text-muted-foreground">{{ field.label }}</dt>
+                    <dd class="font-mono text-xs text-muted-foreground">{{ field.value }}</dd></div>
                     {% endfor %}
                 </dl>
             </details>
