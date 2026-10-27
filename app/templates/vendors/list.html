@@ -78,8 +78,6 @@
             class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       Mapping{% if vp and vp.unmapped_count %} <span class="ml-2 rounded-full bg-primary/10 px-2 text-xs text-primary">{{ vp.unmapped_count }}</span>{% endif %}
     </button>
-    <a href="{{ url_for('unified_applications.vendor_catalogue') }}" data-testid="vendors-tab-catalogue"
-       class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Catalogue</a>
   </div>
 
   <div id="panel-mapping" role="tabpanel" aria-labelledby="tab-mapping" x-show="tab === 'mapping'" x-cloak>

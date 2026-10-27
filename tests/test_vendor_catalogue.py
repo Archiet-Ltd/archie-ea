@@ -222,6 +222,77 @@ def test_two_organisations_see_the_same_catalogue_and_only_their_own_links(db_se
     assert product.id in seen_a and seen_a == seen_b
 
 
+# ── Linking: who sees the form, and what the page says afterwards ─────────────
+
+
+def _with_role(db_session, user, role_name):
+    from app.models.user import Role
+
+    user.role_id = Role.query.filter_by(name=role_name).one().id
+    db_session.flush()
+    return user
+
+
+def test_a_viewer_reads_the_catalogue_but_is_not_offered_the_link_form(db_session, make_org, client, login_as):
+    vendor, _, product = _catalogue_product(db_session)
+    _fact(db_session, product, "Certificate", publish=True)
+    org, viewer = _org_user(db_session, make_org, "viewer")
+    _with_role(db_session, viewer, "Viewer")
+    vp = _uses(db_session, org, vendor)
+    page = f"/applications/vendors/catalogue/{product.catalogue_slug}"
+
+    login_as(client, viewer)
+    body = client.get(page).get_data(as_text=True)
+    assert "Certificate" in body
+    assert 'data-testid="catalogue-link-form"' not in body
+    assert "Linking needs permission to edit applications." in body
+    login_as(client, viewer)
+    assert client.post(page + "/link", data={"vendor_product_id": vp.id}).status_code == 403
+    assert VendorCatalogueLink.query.filter_by(vendor_product_id=vp.id).count() == 0
+
+
+def test_a_person_who_edits_applications_is_offered_the_link_form(db_session, make_org, client, login_as):
+    vendor, _, product = _catalogue_product(db_session)
+    _fact(db_session, product, "Certificate", publish=True)
+    org, editor = _org_user(db_session, make_org, "editor")
+    _with_role(db_session, editor, "User")
+    vp = _uses(db_session, org, vendor)
+
+    login_as(client, editor)
+    body = client.get(f"/applications/vendors/catalogue/{product.catalogue_slug}").get_data(as_text=True)
+    assert 'data-testid="catalogue-link-form"' in body
+    assert vp.name in body
+    assert "Linking needs permission to edit applications." not in body
+
+
+def test_the_page_says_what_a_link_came_to_and_announces_it(db_session, make_org, client, login_as):
+    from app.services import vendor_catalogue_service as svc
+
+    vendor, _, product = _catalogue_product(db_session)
+    _fact(db_session, product, "Certificate", publish=True)
+    org, editor = _org_user(db_session, make_org, "linker")
+    _with_role(db_session, editor, "User")
+    other, _ = _org_user(db_session, make_org, "other")
+    vp = _uses(db_session, org, vendor)
+    theirs = _uses(db_session, other, vendor)
+    page = f"/applications/vendors/catalogue/{product.catalogue_slug}"
+
+    login_as(client, editor)
+    done = client.post(page + "/link", data={"vendor_product_id": theirs.id}, follow_redirects=True)
+    body = done.get_data(as_text=True)
+    assert 'role="alert" data-testid="catalogue-link-message"' in body
+    assert svc.NOT_YOURS in body
+
+    login_as(client, editor)
+    body = client.post(page + "/link", data={"vendor_product_id": vp.id}, follow_redirects=True).get_data(as_text=True)
+    assert 'role="status" data-testid="catalogue-link-message"' in body
+    assert f"{vp.name} is now linked to {product.product_name}." in body
+
+    login_as(client, editor)
+    body = client.get(page).get_data(as_text=True)
+    assert 'data-testid="catalogue-link-message"' not in body, "a plain visit says nothing about a link"
+
+
 # ── The end-of-life sync still writes and never invents ────────────────────────
 
 

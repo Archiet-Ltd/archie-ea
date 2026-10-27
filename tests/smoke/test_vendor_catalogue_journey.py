@@ -35,8 +35,11 @@ def _seed(seeded):
         db.session.add(app_row)
         db.session.flush()
         db.session.add(ApplicationVendorProductMapping(application_component_id=app_row.id, vendor_product_id=vp.id))
+        # A vendor product no application or contract of the organisation names.
+        not_used = VendorProduct(vendor_organization_id=okta.id, name=f"Okta elsewhere {uuid.uuid4().hex[:6]}")
+        db.session.add(not_used)
         db.session.commit()
-        return {"vendor_product": vp.name, "cto_role": cto.enterprise_role,
+        return {"vendor_product": vp.name, "not_used": not_used.id, "cto_role": cto.enterprise_role,
                 "cto_admin": bool(cto.is_platform_admin or cto.is_org_admin)}
 
 
@@ -56,9 +59,13 @@ def test_startup_cto_reads_okta_in_the_catalogue_and_links_it(page, live_server,
 
     _login(page, live_server, seeded["emails"]["cto"])
     page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_test_id("vendors-tab-catalogue").click()
+    # The sidebar's Spend group offers the catalogue beside Vendors.
+    page.locator("nav a[href$='/applications/vendors/catalogue']").first.click()
     page.wait_for_selector("[data-testid=catalogue-table]", timeout=PAGE_TIMEOUT)
-    assert page.get_by_test_id("vendors-tab-catalogue").get_attribute("aria-current") == "page"
+    # The section links mark this page as the current one and lead back to the organisation's own vendors.
+    assert page.locator("main a[aria-current=page]", has_text="Catalogue").count() == 1
+    assert page.locator("main a[href$='/applications/vendors']", has_text="Vendors").count() >= 1
+    assert page.locator("main [role=tab]").count() == 0
     assert page.locator("[data-testid^=catalogue-row-]").count() >= 20
 
     page.get_by_test_id("catalogue-row-okta").get_by_role("link", name="Okta Workforce Identity").click()
@@ -85,7 +92,17 @@ def test_startup_cto_reads_okta_in_the_catalogue_and_links_it(page, live_server,
     lifecycle = page.get_by_test_id("catalogue-lifecycle")
     assert lifecycle.locator("a[href='https://endoflife.date/']").count() == 1
 
+    # A product the organisation does not use is refused, and the page says so out loud.
+    page.locator("#vendor_product_id option").first.evaluate("(o, v) => { o.value = String(v); }", seed["not_used"])
+    page.select_option("#vendor_product_id", index=0)
+    page.get_by_test_id("catalogue-link-submit").click()
+    refused = page.get_by_role("alert").filter(has_text="That vendor product is not one your organisation uses.")
+    refused.wait_for(timeout=PAGE_TIMEOUT)
+    assert refused.get_attribute("data-testid") == "catalogue-link-message"
+
     page.select_option("#vendor_product_id", label=seed["vendor_product"])
     page.get_by_test_id("catalogue-link-submit").click()
     page.wait_for_selector("[data-testid=catalogue-links]", timeout=PAGE_TIMEOUT)
     assert page.get_by_test_id("catalogue-links").get_by_text(seed["vendor_product"]).count() == 1
+    done = page.get_by_role("status").filter(has_text=f"{seed['vendor_product']} is now linked to Okta Workforce Identity.")
+    assert done.count() == 1 and done.is_visible()

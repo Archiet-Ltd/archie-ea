@@ -161,6 +161,8 @@ WORK: tuple = (
               aliases=("Cost", "Spend analytics", "Spend", "Procurement overview", "Vendor spend")),
            _l("vendors", "Vendors", "unified_applications.vendors", job="3", requires="spend_pages",
               aliases=("Suppliers", "Vendor list")),
+           _l("vendor_catalogue", "Vendor catalogue", "unified_applications.vendor_catalogue", job="3",
+              requires="spend_pages", aliases=("Catalogue", "Vendor products", "Product catalogue")),
            # Finance may open licences but not contracts: it is offered the licences page.
            _l("contracts", "Contracts and licences", "procurement.contracts_list", job="3", requires="costs",
               aliases=("Contracts", "Vendor contracts", "Licences", "Licenses", "Software licences"),
@@ -171,8 +173,8 @@ WORK: tuple = (
            _l("investments", "Investments", "enterprise.investment_matrix", job="3",
               aliases=("Investment", "Investment matrix", "Investment priorities", "Investment analysis")),
        ),
-       owns=("procurement.", "formula_register.", "unified_applications.vendor_catalogue",
-             "unified_applications.vendor_catalogue_product", "unified_applications.vendor_catalogue_link")),
+       owns=("procurement.", "formula_register.", "unified_applications.vendor_catalogue_product",
+             "unified_applications.vendor_catalogue_link")),
     _l("compliance", "Compliance", "policy_monitoring.policy_dashboard", "shield-check", job="5", toggle=True,
        group="work",
        children=(

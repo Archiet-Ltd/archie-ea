@@ -213,6 +213,9 @@ def link_for_vendor_product(vendor_product_id: int) -> Optional[VendorCatalogueL
     ).first()
 
 
+NOT_YOURS = "That vendor product is not one your organisation uses."
+
+
 class LinkRefused(ValueError):
     pass
 
@@ -224,7 +227,7 @@ def link_vendor_product(vendor_product_id: int, product: VendorProductDetail, us
     organisation cannot attach links to products it has nothing to do with."""
     allowed = {vp.id for vp in organisation_vendor_products()}
     if vendor_product_id not in allowed:
-        raise LinkRefused("That vendor product is not one your organisation uses.")
+        raise LinkRefused(NOT_YOURS)
     org_id = current_org_id()
     # Read before a new link joins the session: a product expired by an earlier commit reloads here, and
     # the reload's autoflush must not meet a link without its product.

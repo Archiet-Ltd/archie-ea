@@ -10,12 +10,34 @@ to it. The only write is an organisation's own link from a vendor product it
 uses to a catalogue product, scoped to that organisation.
 """
 
-from flask import abort, flash, redirect, render_template, request, url_for
+from flask import abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app.models.user import Permission
 from app.services import vendor_catalogue_service as catalogue
 
 from . import unified_applications_bp
+
+CHOOSE = "Choose one of your vendor products to link."
+
+
+def _link_message(product, links):
+    """What the last link attempt came to, from the redirect's query string: shown in the card and announced."""
+    outcome = request.args.get("link")
+    if outcome == "done":
+        try:
+            linked = int(request.args.get("vp", ""))
+        except ValueError:
+            return None
+        names = [link.vendor_product.name for link in links if link.vendor_product_id == linked]
+        if names:
+            return {"kind": "success", "text": f"{names[0]} is now linked to {product.product_name}."}
+        return None
+    if outcome == "refused":
+        return {"kind": "danger", "text": catalogue.NOT_YOURS}
+    if outcome == "choose":
+        return {"kind": "danger", "text": CHOOSE}
+    return None
 
 
 @unified_applications_bp.route("/vendors/catalogue")
@@ -36,6 +58,7 @@ def vendor_catalogue_product(slug):
     if not any(grouped.values()):
         abort(404)
     family = product.product_family
+    links = catalogue.organisation_links_to(product)
     return render_template(
         "vendors/catalogue_detail.html",
         product=product,
@@ -46,7 +69,9 @@ def vendor_catalogue_product(slug):
         related=catalogue.related_slug_names(grouped),
         lifecycle=catalogue.lifecycle(product),
         org_options=[(vp.id, vp.name) for vp in catalogue.organisation_vendor_products()],
-        links=catalogue.organisation_links_to(product),
+        links=links,
+        can_link=current_user.can(Permission.GENERAL),
+        link_message=_link_message(product, links),
     )
 
 
@@ -59,12 +84,10 @@ def vendor_catalogue_link(slug):
     try:
         vendor_product_id = int(request.form.get("vendor_product_id", ""))
     except ValueError:
-        flash("Choose one of your vendor products to link.", "error")
-        return redirect(url_for("unified_applications.vendor_catalogue_product", slug=slug))
+        return redirect(url_for("unified_applications.vendor_catalogue_product", slug=slug, link="choose"))
     try:
         link = catalogue.link_vendor_product(vendor_product_id, product, current_user.id)
-    except catalogue.LinkRefused as exc:
-        flash(str(exc), "error")
-        return redirect(url_for("unified_applications.vendor_catalogue_product", slug=slug))
-    flash(f"{link.vendor_product.name} is now linked to {product.product_name}.", "success")
-    return redirect(url_for("unified_applications.vendor_catalogue_product", slug=slug))
+    except catalogue.LinkRefused:
+        return redirect(url_for("unified_applications.vendor_catalogue_product", slug=slug, link="refused"))
+    return redirect(url_for("unified_applications.vendor_catalogue_product", slug=slug, link="done",
+                            vp=link.vendor_product_id))

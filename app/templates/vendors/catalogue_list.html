@@ -5,7 +5,6 @@
 {% from "components/badge.html" import badge %}
 {% from "components/input.html" import input %}
 {% from "components/button.html" import button %}
-{% from "vendors/_catalogue_tabs.html" import vendor_tabs with context %}
 
 {% block title %}Vendor catalogue{% endblock %}
 
@@ -14,10 +13,9 @@
   {{ page_shell(
       title='Vendor catalogue',
       subtitle='Known architectures of common products: what each one is made of, what it connects to, where it holds data and what it costs. Every fact links to the public page it came from.',
-      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', None)]
+      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', None)],
+      tabs=[('Vendors', url_for('unified_applications.vendors'), False), ('Mapping', url_for('unified_applications.vendors', tab='mapping'), False), ('Catalogue', url_for('unified_applications.vendor_catalogue'), True)]
   ) }}
-
-  {{ vendor_tabs('catalogue') }}
 
   <form method="get" action="{{ url_for('unified_applications.vendor_catalogue') }}" class="flex flex-col gap-2 sm:flex-row sm:items-center" role="search">
     {{ input(id='catalogue-search', name='search', type='search', placeholder='Search products, vendors or categories', value=search, class='sm:max-w-sm', aria_label='Search the catalogue') }}
