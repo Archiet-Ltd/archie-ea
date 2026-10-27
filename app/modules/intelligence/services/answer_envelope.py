@@ -386,6 +386,26 @@ def build_envelope(
 # --------------------------------------------------------------------------- #
 
 
+def _name_the_element_asked_about(result: Dict[str, Any], element_id: int) -> None:
+    """Add the asked-about element to the answer's names when no row named it.
+
+    The walk's identity map holds only what its rows name, so an element nothing
+    depends on yet would be stored without its own name and the answer would
+    read "What breaks if — fails". The name is read through the walk's own
+    tenant-fenced resolver.
+    """
+    from app.modules.intelligence.services.query_service import _resolve_elements_batch
+
+    elements = dict(result.get("elements") or {})
+    if str(element_id) in elements:
+        return
+    org_id = current_org_id()
+    if org_id is None:
+        return
+    elements.update(_resolve_elements_batch([element_id], org_id))
+    result["elements"] = elements
+
+
 def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
     if kind == KIND_IMPACT:
         result = IntelligenceQueryService.cross_layer_impact(
@@ -398,6 +418,7 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
         )
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):
             raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+        _name_the_element_asked_about(result, params["element_id"])
         if result.get("next_cursor") is not None:
             result["truncated"] = True
             result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]

@@ -45,7 +45,7 @@
         {% endif %}
         
         {% if has_clear %}
-        {% call button(type='button', variant='secondary', size='sm', attrs={'@click': "clearFilters('" ~ context_id ~ "')", 'aria-label': 'Filter'}) %}
+        {% call button(type='button', variant='secondary', size='sm', attrs={'@click': "clearFilters('" ~ context_id ~ "')"}) %}
             <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
             Clear
         {% endcall %}
@@ -982,7 +982,7 @@
                                 <label for="acm-gap-search-filter" class="block text-sm font-medium text-muted-foreground mb-1">Search capabilities</label>
                                 {{ input(type='text', id='acm-gap-search-filter', placeholder='Search capabilities...', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48', attrs={'@input': 'filterACMGapTable()'}) }}
                             </div>
-                            {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearACMGapFilters()', 'aria-label': 'Filter'}) %}
+                            {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearACMGapFilters()'}) %}
                                 <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                 Clear
                             {% endcall %}
@@ -1262,7 +1262,7 @@
                             <label for="process-search-filter" class="block text-sm font-medium text-muted-foreground mb-1">Search processes</label>
                             {{ input(type='text', id='process-search-filter', placeholder='Search processes...', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@input': 'filterProcessGapTable()'}) }}
                         </div>
-                        {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearProcessGapFilters()', 'aria-label': 'Filter'}) %}
+                        {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearProcessGapFilters()'}) %}
                             <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                             Clear
                         {% endcall %}

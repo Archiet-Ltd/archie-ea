@@ -173,6 +173,9 @@ class AccountService:
                 _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
         if org is None:
             raise RuntimeError("could not find a free organisation address after five tries")
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
 
         user = User(
             first_name=first_name,

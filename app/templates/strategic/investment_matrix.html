@@ -72,7 +72,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
             <button type="button" @click="generate()" :disabled="loading"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                aria-label="Generate AI priority suggestions">
+                title="Generate AI priority suggestions">
                 <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -148,7 +148,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
 
             <!-- Bulk Actions Bar -->
-            <div id="bulk-action-bar" data-testid="bulk-action-bar" x-show="selectedIds.length > 0" x-cloak x-transition
+            <div id="bulk-action-bar" data-testid="bulk-action-bar" x-show="selectedIds.length > 0" x-cloak
                  class="flex items-center gap-4 p-3 mb-4 bg-muted/30 border rounded-lg">
                 <span class="text-sm font-medium" x-text="selectedIds.length + ' selected'"></span>
                 <button type="button" @click="bulkSubmitToARB()"
@@ -360,8 +360,8 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
 </div>
 
 <script>
-function investmentMatrix() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('investmentMatrix', () => ({
         capabilities: INVESTMENT_CAPABILITIES,
         search: '',
         priorityFilter: '',
@@ -484,15 +484,15 @@ function investmentMatrix() {
             a.click();
             URL.revokeObjectURL(url);
         }
-    };
-}
+    }));
+});
 
 /* AI priority suggestions panel (CTO advisory). Calls
    POST /architecture/api/investment-priorities/ai-suggest, which reads this
    page's own investment analysis and writes nothing back — the result is
    rendered here only. */
-function investmentSuggestionsPanel() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('investmentSuggestionsPanel', () => ({
         loading: false,
         error: null,
         suggestions: null,
@@ -519,69 +519,81 @@ function investmentSuggestionsPanel() {
                 if (window.lucide) lucide.createIcons();
             }
         }
-    };
-}
+    }));
+});
 </script>
 
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script>
 // Priority Distribution Chart
-const priorityCtx = document.getElementById('priorityChart').getContext('2d');
-new Chart(priorityCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Critical', 'High', 'Medium', 'Low'],
-        datasets: [{
-            data: [
-                {{ critical_investments|length }},
-                {{ high_investments|length }},
-                {{ medium_investments|length }},
-                {{ low_investments|length }}
-            ],
-            backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom'
-            }
-        }
-    }
-});
-
-// Investment Allocation Chart
-const investmentCtx = document.getElementById('investmentChart').getContext('2d');
-new Chart(investmentCtx, {
-    type: 'bar',
-    data: {
-        labels: ['Critical', 'High', 'Medium', 'Low'],
-        datasets: [{
-            label: 'Investment ($k)',
-            data: [
-                {{ "%.1f"|format(portfolio_metrics.critical_investment/1000) }},
-                {{ "%.1f"|format(portfolio_metrics.high_investment/1000) }},
-                {{ "%.1f"|format((portfolio_metrics.total_estimated_investment - portfolio_metrics.critical_investment - portfolio_metrics.high_investment)/1000) }},
-                {{ "%.1f"|format(0) }}
-            ],
-            backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true,
-                title: {
-                    display: true,
-                    text: 'Investment ($k)'
+const priorityCanvas = document.getElementById('priorityChart');
+if (priorityCanvas) {
+    const priorityCtx = priorityCanvas.getContext('2d');
+    if (priorityCtx) {
+        new Chart(priorityCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    data: [
+                        {{ critical_investments|length }},
+                        {{ high_investments|length }},
+                        {{ medium_investments|length }},
+                        {{ low_investments|length }}
+                    ],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
                 }
             }
-        }
+        });
     }
-});
+}
+
+// Investment Allocation Chart
+const investmentCanvas = document.getElementById('investmentChart');
+if (investmentCanvas) {
+    const investmentCtx = investmentCanvas.getContext('2d');
+    if (investmentCtx) {
+        new Chart(investmentCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    label: 'Investment ($k)',
+                    data: [
+                        {{ "%.1f"|format(portfolio_metrics.critical_investment/1000) }},
+                        {{ "%.1f"|format(portfolio_metrics.high_investment/1000) }},
+                        {{ "%.1f"|format((portfolio_metrics.total_estimated_investment - portfolio_metrics.critical_investment - portfolio_metrics.high_investment)/1000) }},
+                        {{ "%.1f"|format(0) }}
+                    ],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Investment ($k)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
 </script>
+
+</div>
 
 <!-- ROI Calculator Utilities -->
 <script src="{{ url_for('static', filename='js/roi_calculator.js') }}"></script>

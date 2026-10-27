@@ -89,7 +89,16 @@ from app.services.core.cache_service import cache_service
 CACHE_TTL_SECONDS = 3600  # fabricated-ok: named config constant (cache TTL), not displayed data
 DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (token cost multiplier), not displayed data
 
-from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS, fallback_models_for
+from app.modules.ai_chat.services.model_defaults import (
+    DEFAULT_MODELS,
+    FREE_ONLY_PROVIDERS,
+    MISTRAL_CHAT_URL,
+    OPENAI_COMPATIBLE_BASE_URLS,
+    PUBLIC_INPUT_CHAIN,
+    PUBLIC_INPUT_MODELS,
+    fallback_models_for,
+    is_free_model,
+)
 
 # Fallback in-memory cache if Redis is not available
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
@@ -1598,9 +1607,14 @@ Output clean, executable test code."""
         expected_schema: Optional[str] = None,
         job_id: Optional[int] = None,
         timeout: Optional[float] = None,
+        public_input: bool = False,
     ) -> str:
         """
         Generic method to generate content from any prompt with caching.
+
+        ``public_input=True`` marks a prompt that carries only public text (a company's own website):
+        it is answered through the public-input chain (free providers first, Gemini Flash last) and is
+        never cached. Never set it for a prompt carrying an organisation's data.
 
         Args:
             prompt: The prompt to send to the LLM
@@ -1619,6 +1633,9 @@ Output clean, executable test code."""
         Returns:
             Generated response text
         """
+        if public_input:
+            return LLMService._call_public_chain(prompt, timeout=timeout)
+
         provider, model = LLMService._get_configured_provider()
 
         # Check cache first
@@ -1644,6 +1661,131 @@ Output clean, executable test code."""
             LLMService._cache_response(cache_key, response, cache_ttl)
 
         return response
+
+    # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
+    PUBLIC_ATTEMPT_SECONDS = 25.0
+    PUBLIC_BACKOFF_SECONDS = 3.0
+    PUBLIC_BACKOFF_MAX_SECONDS = 15.0
+
+    @staticmethod
+    def _sleep(seconds: float) -> None:
+        time.sleep(seconds)
+
+    @staticmethod
+    def _is_rate_limited(error: BaseException) -> bool:
+        text = str(error).lower()
+        if "429" in text or "rate limit" in text:
+            return True
+        while error is not None:
+            if (getattr(error, "status_code", None) or getattr(getattr(error, "response", None), "status_code", None)) == 429:
+                return True
+            error = error.__cause__
+        return False
+
+    @staticmethod
+    def _retry_after(error: BaseException) -> Optional[float]:
+        while error is not None:  # the failover wraps the provider's own error as its cause
+            headers = getattr(getattr(error, "response", None), "headers", None) or {}
+            try:
+                value = headers.get("Retry-After") or headers.get("retry-after")
+                if value is not None:
+                    return float(value)
+            except (TypeError, ValueError):
+                pass
+            error = error.__cause__
+        return None
+
+    @staticmethod
+    def _call_public_chain(prompt: str, timeout: Optional[float] = None, max_tokens: Optional[int] = None) -> str:
+        """Answer a public-input prompt: each provider in PUBLIC_INPUT_CHAIN that has a key, in order,
+        until one answers. A provider with no key is skipped silently. The whole chain stays inside
+        ``timeout`` seconds and each attempt is short."""
+        prompt = _scrub_prompt(prompt)
+        deadline = time.monotonic() + (float(timeout) if timeout else 120.0)
+        everything = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"] + list(PUBLIC_INPUT_CHAIN)
+        last_error: Optional[BaseException] = None
+        for provider in PUBLIC_INPUT_CHAIN:
+            if not LLMService._get_all_api_keys(provider):
+                continue
+            for attempt in (0, 1):
+                remaining = deadline - time.monotonic()
+                if remaining <= 1.0:
+                    break
+                try:
+                    text, _interaction = LLMService._call_llm_with_failover(
+                        prompt=prompt,
+                        model=PUBLIC_INPUT_MODELS[provider],
+                        provider=provider,
+                        max_tokens=max_tokens,
+                        timeout=min(LLMService.PUBLIC_ATTEMPT_SECONDS, remaining),
+                        # every provider is named as tried, so a failure moves on along this chain only
+                        _already_tried=list(everything),
+                        public_input=True,
+                        deadline=deadline,
+                    )
+                    return text
+                except ProviderNotAllowed:
+                    break
+                except Exception as error:  # noqa: BLE001 - the next provider in the chain answers instead
+                    last_error = error
+                    logger.warning("public-input provider %s failed: %s", provider, str(error)[:100])
+                    if attempt == 0 and LLMService._is_rate_limited(error):
+                        # honour Retry-After, or back off once, then try this provider one more time
+                        wait = min(LLMService._retry_after(error) or LLMService.PUBLIC_BACKOFF_SECONDS,
+                                   LLMService.PUBLIC_BACKOFF_MAX_SECONDS, max(0.0, deadline - time.monotonic() - 1.0))
+                        if wait > 0:
+                            LLMService._sleep(wait)
+                            continue
+                    break
+        raise RuntimeError(
+            "Every provider in the public-input chain failed: %s" % (str(last_error)[:200] if last_error else "no provider has a key"))
+
+    @staticmethod
+    def _call_openai_compatible(
+        base_url: str, prompt: str, model: str, api_key: str,
+        max_tokens: Optional[int] = None, timeout: Optional[float] = None,
+    ) -> Tuple[str, int, int, float]:
+        """One chat completion from a provider that speaks the OpenAI chat protocol (free tier: no cost)."""
+        from openai import OpenAI
+
+        effective_timeout = timeout if timeout is not None else 60.0
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=effective_timeout, max_retries=0)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=min(max_tokens or 4096, 8192),
+            timeout=effective_timeout,
+        )
+        usage = response.usage
+        return (response.choices[0].message.content or "",
+                getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0, 0.0)
+
+    @staticmethod
+    def _call_cerebras(prompt, model, api_key, max_tokens=None, timeout=None):
+        return LLMService._call_openai_compatible(
+            OPENAI_COMPATIBLE_BASE_URLS["cerebras"], prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
+    def _call_groq(prompt, model, api_key, max_tokens=None, timeout=None):
+        return LLMService._call_openai_compatible(
+            OPENAI_COMPATIBLE_BASE_URLS["groq"], prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
+    def _call_mistral(prompt, model, api_key, max_tokens=None, timeout=None):
+        """Mistral's own chat completions endpoint."""
+        response = requests.post(
+            MISTRAL_CHAT_URL,
+            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.0, "max_tokens": min(max_tokens or 4096, 8192)},
+            timeout=timeout if timeout is not None else 60.0,
+        )
+        response.raise_for_status()
+        body = response.json()
+        usage = body.get("usage") or {}
+        return (body["choices"][0]["message"]["content"] or "",
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), 0.0)
 
     @staticmethod
     def review_code(
@@ -1796,9 +1938,16 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         organization_id: Optional[int] = None,
         prompt_version: Optional[str] = None,
         retention_setting: Optional[str] = None,
+        public_input: bool = False,
+        deadline: Optional[float] = None,
     ) -> Tuple[str, LLMInteraction]:
         """
         Call LLM with automatic API key failover.
+
+        ``public_input`` marks a call that carries only public text (a company's own website). Only such
+        a call may use the free-only providers and the curated free backup models; a call carrying an
+        organisation's data is refused them. ``deadline`` is a time.monotonic() value after which no
+        further model is tried.
 
         Tries multiple API keys in sequence until one succeeds.
         This ensures elements are not lost due to API key issues.
@@ -1826,6 +1975,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             prompt_version=prompt_version,
             retention_setting=retention_setting,
         )
+        if not public_input and provider in FREE_ONLY_PROVIDERS:
+            raise ProviderNotAllowed(
+                f"Provider '{provider}' reads public input only and is refused for a call carrying organisation data."
+            )
 
         # Track providers already tried across recursive fallback calls to prevent looping
         if _already_tried is None:
@@ -1866,10 +2019,12 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
                 elif provider == "nvidia":
-                    nv_models = fallback_models_for("nvidia", model)
+                    nv_models = fallback_models_for("nvidia", model) if public_input else [model]
                     nv_success = False
                     nv_last_error = None
                     for nv_model in nv_models:
+                        if deadline is not None and time.monotonic() > deadline and nv_model != nv_models[0]:
+                            break
                         try:
                             _, nv_model, _ = LLMService._guard_provider_call(
                                 provider,
@@ -1895,6 +2050,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                             continue
                     if not nv_success:
                         raise nv_last_error or RuntimeError("All NVIDIA models failed")
+                elif provider in ("mistral", "cerebras", "groq"):
+                    response_text, token_input, token_output, cost = getattr(LLMService, "_call_" + provider)(
+                        prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
+                    )
                 elif provider == "huggingface":
                     response_text, token_input, token_output, cost = LLMService._call_huggingface(
                         prompt, model, api_key, max_tokens=max_tokens
@@ -1903,10 +2062,15 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     # OpenRouter supports multiple backup models (comma-separated in default_model
                     # plus the curated free-tier fallback list in model_defaults.FALLBACK_MODELS).
                     # Try each model in sequence before failing the key.
-                    or_models = fallback_models_for("openrouter", model)
+                    if public_input:
+                        or_models = fallback_models_for("openrouter", model)
+                    else:
+                        or_models = [m.strip() for m in model.split(",") if m.strip()] or [model]
                     or_success = False
                     or_last_error = None
                     for or_model in or_models:
+                        if deadline is not None and time.monotonic() > deadline and or_model != or_models[0]:
+                            break
                         try:
                             _, or_model, _ = LLMService._guard_provider_call(
                                 provider,
@@ -2017,6 +2181,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             if not fb_model:
                 continue
+            if not public_input and is_free_model(fallback_provider, fb_model):
+                continue  # an organisation's data never falls over to a free model
 
             logger.info(f"🔄 Cross-provider fallback: trying {fallback_provider} ({fb_model})")
             try:
@@ -2031,6 +2197,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     organization_id=organization_id,
                     prompt_version=prompt_version,
                     retention_setting=retention_setting,
+                    public_input=public_input,
+                    deadline=deadline,
                 )
             except ProviderNotAllowed:
                 logger.info(
@@ -2045,7 +2213,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             f"All API keys failed for {provider} and all fallback providers. "
             f"Failed keys: {failed_keys}. "
             f"Last error: {str(last_error) if last_error else 'Unknown error'}"
-        )
+        ) from last_error
 
     @staticmethod
     @traced_model_call

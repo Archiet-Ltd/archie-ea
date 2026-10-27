@@ -47,6 +47,28 @@ PAGES = {
     "/solutions/portfolio": ["label-content-name-mismatch", "color-contrast"],
     "/stakeholders/map": ["label-content-name-mismatch", "color-contrast"],
     "/enterprise/policy-monitoring": ["label-content-name-mismatch", "color-contrast"],
+    # a11y03: the failures left after the shell and the dashboards
+    "/batch-import/new": ["link-name"],
+    "/capability-map/trees": ["link-name"],
+    "/capability-map": ["button-name", "label-content-name-mismatch"],
+    "/adm-kanban/": ["label-content-name-mismatch"],
+    "/consolidation-list/": ["label-content-name-mismatch"],
+    "/solutions/templates": ["label-content-name-mismatch"],
+    "/market-intelligence/": ["label-content-name-mismatch"],
+    "/code-generation/dashboard": ["label-content-name-mismatch"],
+    "/architecture/": ["label-content-name-mismatch"],
+    "/duplicate-detection/dashboard": ["label-content-name-mismatch", "scrollable-region-focusable"],
+    "/capability-maturity/batch-update": ["scrollable-region-focusable"],
+    "/usage-analytics/dashboard": ["scrollable-region-focusable"],
+    "/portfolio/demands": ["scrollable-region-focusable"],
+    "/strategic/process-optimization": ["scrollable-region-focusable"],
+    "/genome/ai-systems": ["scrollable-region-focusable"],
+    "/archimate/traceability": ["color-contrast"],
+    "/ai-chat/entity-matching": ["scrollable-region-focusable"],
+    # polish01: what QA still found after a11y03
+    "/ea-workflows/deliverables/vision": ["link-in-text-block"],
+    "/integration/": ["scrollable-region-focusable"],
+    "/capability-roadmap": ["scrollable-region-focusable"],
 }
 RUN = """async () => { const r = await axe.run(document, {runOnly: {type: 'tag',
   values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}, resultTypes: ['violations']});

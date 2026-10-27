@@ -4,6 +4,7 @@ from .service import (  # noqa: F401
     OP_PROFILE_FACT,
     PROFILE_FIELDS,
     PROPOSAL_SOURCE,
+    WEBSITE_RETRY_TASK,
     WEBSITE_TASK,
     CrawlRefused,
     crawl_organization_website,
@@ -11,4 +12,5 @@ from .service import (  # noqa: F401
     pending_website_proposals,
     queue_website_crawl,
     run_website_crawl_job,
+    run_website_retry_job,
 )

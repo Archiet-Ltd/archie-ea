@@ -57,6 +57,7 @@ def add_routes(bp, access) -> None:
             size_bands=confirm.SIZE_BANDS,
             goals=confirm.GOALS,
             facts=facts,
+            more_coming=onboarding.more_facts_coming(org) if step == 3 else None,
             completeness=completeness,
             suggested=onboarding.suggested_frameworks(
                 onboarding.choices(org).get("kind"), confirm.asked(org.settings).get("goal")),
@@ -141,6 +142,7 @@ def add_routes(bp, access) -> None:
             return _problem(str(exc))
         from app.modules.organization.public_signals import queue_signals_refresh
 
+        onboarding.mark_profile_confirmed(org)
         queue_signals_refresh(org.id)  # the public sources, read for the company just confirmed
         return jsonify({"ok": True, **result})
 

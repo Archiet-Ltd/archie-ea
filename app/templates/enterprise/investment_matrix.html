@@ -116,7 +116,9 @@
 // importance rating are plotted, so nothing is placed on a default it was never given.
 window.__investmentBubbleData = [
     {% for cap in rated %}
-    {% set gap = cap.maturity_gap if cap.maturity_gap is not none else ((cap.target_maturity_level|default(3, true)) - (cap.current_maturity_level|default(1, true))) %}
+    {% set current_m = cap.current_maturity_level %}
+    {% set target_m = cap.target_maturity_level %}
+    {% set gap = cap.maturity_gap if cap.maturity_gap is not none else ((target_m if target_m is not none else 3) - (current_m if current_m is not none else 1)) %}
     {
         name: {{ cap.name|default('Unnamed capability', true)|tojson }},
         strategic_importance: {{ cap.strategic_importance|lower|tojson }},

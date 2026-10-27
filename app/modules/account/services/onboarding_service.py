@@ -24,6 +24,7 @@ _log = logging.getLogger(__name__)
 GITHUB_TASK = "onboarding_github_import"
 JIRA_TASK = "onboarding_jira_import"
 WEBSITE_TASK = "website_profile_crawl"
+MORE_FACTS_LATER = "More facts will be added when our reading service is less busy."
 
 # (key, label, starter capability model). The model is the one starter set the industry picks
 # later; this round only records the choice.
@@ -188,6 +189,22 @@ def mark_finished(org) -> None:
     state.setdefault("finished_at", datetime.utcnow().isoformat())
     _write(org, "onboarding", state)
     db.session.commit()
+
+
+def mark_profile_confirmed(org) -> None:
+    """Record that the person went through the company-profile step (the website reading's confirm step)."""
+    state = _onboarding(org)
+    state.setdefault("profile_confirmed_at", datetime.utcnow().isoformat())
+    _write(org, "onboarding", state)
+    db.session.commit()
+
+
+def profile_confirmed_at(org):
+    raw = _onboarding(org).get("profile_confirmed_at")
+    try:
+        return datetime.fromisoformat(raw) if raw else None
+    except ValueError:
+        return None
 
 
 def skipped_sources(org) -> bool:
@@ -381,15 +398,16 @@ def website_state(org) -> Dict[str, Any]:
         facts, _completeness = confirm.proposals(org.id)
         read = result.get("pages_read", 0)
         pages = "%s %s" % (read, "page" if read == 1 else "pages")
+        later = (" " + MORE_FACTS_LATER) if result.get("more_to_come") else ""
         if facts:
             return {
                 "state": "done",
-                "text": "Read %s; %s %s for you to confirm in the next step." % (
-                    pages, len(facts), "fact waits" if len(facts) == 1 else "facts wait"),
+                "text": "Read %s; %s %s for you to confirm in the next step.%s" % (
+                    pages, len(facts), "fact waits" if len(facts) == 1 else "facts wait", later),
                 "next": {"label": "Confirm what we read", "url": url_for("account.welcome", step=3)},
                 "progress": {"read": read, "limit": read, "percent": 100},
             }
-        return {"state": "done", "text": "Read %s. What was found is confirmed and in your profile." % pages}
+        return {"state": "done", "text": "Read %s. What was found is confirmed and in your profile.%s" % (pages, later)}
     if job.status in (JobStatus.FAILED.value, JobStatus.CANCELLED.value) or result.get("success") is False:
         reason = result.get("reason")
         if reason in _WEBSITE_REASONS:
@@ -404,7 +422,17 @@ def website_state(org) -> Dict[str, Any]:
         limit = int(progress.get("limit") or 30)
         read = int(progress.get("pages_read") or 0)
         percent = min(100, int(round(100.0 * read / limit))) if limit else 0
-        if progress.get("stage") == "working_out":
+        if progress.get("stage") == "facts_ready":
+            facts, _completeness = confirm.proposals(org.id)
+            if facts:
+                return {
+                    "state": "reading", "facts_ready": True,
+                    "text": "Read %d of up to %d pages. %d %s ready for you to confirm in the next step; "
+                            "more are still being worked out." % (read, limit, len(facts), "fact is" if len(facts) == 1 else "facts are"),
+                    "next": {"label": "Confirm what we read", "url": url_for("account.welcome", step=3)},
+                    "progress": {"read": read, "limit": limit, "percent": percent},
+                }
+        if progress.get("stage") in ("working_out", "facts_ready"):
             text = "Read %d of up to %d pages. Working out what they say; this takes a minute." % (read, limit)
         elif read == 0:
             text = "Opening %s. Up to %d pages will be read." % (_address(progress.get("current")) or host, limit)
@@ -412,6 +440,17 @@ def website_state(org) -> Dict[str, Any]:
             text = "Read %d of up to %d pages. Reading now: %s." % (read, limit, _address(progress.get("current")))
         return {"state": "reading", "text": text, "progress": {"read": read, "limit": limit, "percent": percent}}
     return {"state": "waiting", "text": "Company website is connected. Reading starts in a moment; carry on."}
+
+
+def more_facts_coming(org) -> Optional[str]:
+    """The sentence to show when the model pass found every provider busy and a retry is queued."""
+    from app.models.job import JobStatus
+    from app.services.job_queue_service import get_job_queue_service
+
+    jobs = get_job_queue_service().list_jobs(org.id, limit=1, task=WEBSITE_TASK)
+    if jobs and jobs[0].status == JobStatus.COMPLETED.value and (jobs[0].result or {}).get("more_to_come"):
+        return MORE_FACTS_LATER
+    return None
 
 
 def any_source_given(org) -> bool:

@@ -41,7 +41,7 @@
   {%- call ui.dropdown_menu_content(align='end', class='w-[220px]') -%}
     {{ ui.dropdown_menu_item(text='Open', href=_gap_url(gap)) }}
     {{ ui.dropdown_menu_item(text='Convert to a work package', tag='button', type='button', class='w-full',
-                             attrs={'aria-label': 'Convert this gap to a work package', 'data-convert-gap': gap.id, 'data-gap-name': _unprefixed(gap.name) or 'this gap',
+                             attrs={'title': 'Convert this gap to a work package', 'data-convert-gap': gap.id, 'data-gap-name': _unprefixed(gap.name) or 'this gap',
                                     'data-convert-url': '/capability-map/api/roadmap/gaps/' ~ gap.id ~ '/work-packages', 'data-wp-url': url_for('implementation_planning.work_package_detail', work_package_id=0)}) }}
   {%- endcall -%}
 {%- endcall -%}

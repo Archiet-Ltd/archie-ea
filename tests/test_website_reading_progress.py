@@ -140,7 +140,7 @@ def test_a_real_reading_reports_each_page_and_ends_with_a_next_step_and_a_bell(a
     reading = [s for s in seen if s["stage"] == "reading"]
     assert [s["pages_read"] for s in reading][0] == 0 and max(s["pages_read"] for s in reading) >= 5
     assert {s["limit"] for s in seen} == {30}
-    assert any(s["stage"] == "working_out" for s in seen)
+    assert any(s["stage"] == "facts_ready" for s in seen)
     assert any(s["current"] and s["current"].endswith("/about") for s in reading)
 
     with app.test_request_context():

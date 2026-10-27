@@ -5532,6 +5532,9 @@ def organization_create():
         db.session.add(org)
         db.session.flush()
         set_contract_plan(org, plan_key, seats)
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         db.session.commit()
         flash(f'Organization "{name}" created.', "success")
         return redirect(url_for("admin.organizations_list"))
