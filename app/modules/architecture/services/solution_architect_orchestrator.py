@@ -24,6 +24,7 @@ from app.models import ApplicationComponent, BusinessCapability, VendorProduct  
 from app.modules.architecture.services.options_analysis_service import (
     OptionsAnalysisService as ArchimateOptionsService,
 )
+from app.services.application_cost_accessor import get_annual_cost_float
 from app.services.unified_duplicate_service import UnifiedDuplicateService
 from app.services.vendor_analysis.options_analysis_service import (
     OptionsAnalysisService as VendorOptionsService,
@@ -201,7 +202,7 @@ class SolutionArchitectOrchestrator:
                             "relevance_score": round(score, 1),
                             "status": app.lifecycle_status or app.deployment_status,
                             "vendor": app.vendor_name or "Internal",
-                            "annual_cost": float(app.annual_cost or 0),
+                            "annual_cost": get_annual_cost_float(app) or 0,
                             "users": app.user_count or 0,
                         }
                     )

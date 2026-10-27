@@ -7133,9 +7133,12 @@ def api_composer_element_metrics():
         if el_type in app_types:
             ac = app_lookup.get(name_lower)
             if ac:
-                # Cost: total_cost_of_ownership from ApplicationComponent
-                if ac.total_cost_of_ownership is not None:
-                    entry["cost"] = round(ac.total_cost_of_ownership, 0)
+                # Cost: the application's annual cost, as its Cost tab shows it
+                from app.services.application_cost_accessor import get_annual_cost
+
+                annual = get_annual_cost(ac)
+                if annual is not None:
+                    entry["cost"] = round(float(annual), 0)
                 # Lifecycle: lifecycle_status
                 entry["lifecycle"] = ac.lifecycle_status or None
                 # Risk: vendor_risk field

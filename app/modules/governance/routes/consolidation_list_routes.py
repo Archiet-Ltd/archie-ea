@@ -20,7 +20,7 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from app.decorators import audit_log
-from app.services.application_cost_accessor import set_annual_cost
+from app.services.application_cost_accessor import get_annual_cost_float, set_annual_cost
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -219,10 +219,8 @@ def get_entries():
             "by_status": by_status,
             "by_action": by_action,
             "portfolio_annual_cost": sum(
-                float(getattr(e.application, "license_cost", 0) or 0)
-                + float(getattr(e.application, "support_cost", 0) or 0)
-                + float(getattr(e.application, "infrastructure_cost", 0) or 0)
-                for e in summary_entries if e.application
+                get_annual_cost_float(application) or 0
+                for application in {e.application_id: e.application for e in summary_entries if e.application}.values()
             ),
             "savings_verified_total": sum(
                 float(e.estimated_savings or 0)
@@ -274,12 +272,20 @@ def get_entries():
                 if r.rationalization_action == "MIGRATE"
                 or (r.disposition_action or "").lower() == "consolidate"
             )
-            rat_tco_total = sum(
-                float(r.total_cost_of_ownership or 0) for r in rat_candidates
-            )
+            rat_apps = {
+                a.id: a for a in ApplicationComponent.query.filter(
+                    ApplicationComponent.id.in_({r.application_component_id for r in rat_candidates} or {0})
+                )
+            }
+
+            def _rat_cost(r):
+                application = rat_apps.get(r.application_component_id)
+                return (get_annual_cost_float(application) or 0) if application else 0
+
+            rat_tco_total = sum(_rat_cost(r) for r in rat_candidates)
             # Estimated savings: apply a conservative 60% of TCO for ELIMINATE actions
             rat_savings_estimate = sum(
-                float(r.total_cost_of_ownership or 0) * 0.6
+                _rat_cost(r) * 0.6
                 for r in rat_candidates if r.rationalization_action == "ELIMINATE"
             )
             summary["rationalization_candidates"] = len(rat_candidates)
@@ -369,8 +375,8 @@ def add_to_list():
 
                 # Calculate estimated savings if available
                 estimated_savings = None
-                if hasattr(app, "total_cost_of_ownership") and app.total_cost_of_ownership:
-                    estimated_savings = app.total_cost_of_ownership
+                if get_annual_cost_float(app):
+                    estimated_savings = get_annual_cost_float(app)
                 elif hasattr(app, "maintenance_cost_annual") and app.maintenance_cost_annual:
                     estimated_savings = app.maintenance_cost_annual
 
@@ -431,7 +437,7 @@ def get_entry_detail(entry_id):
         support_cost = float(getattr(app, "support_cost", 0) or 0) if app else 0
         infrastructure_cost = float(getattr(app, "infrastructure_cost", 0) or 0) if app else 0
         maintenance_cost = float(getattr(app, "maintenance_cost", 0) or 0) if app else 0
-        total_annual = license_cost + support_cost + infrastructure_cost + maintenance_cost
+        total_annual = (get_annual_cost_float(app) or 0) if app else 0
         migration = float(entry.migration_cost or 0)
         est_savings = float(entry.estimated_savings or 0)
         payback = (migration / est_savings * 12) if est_savings > 0 else None
@@ -887,7 +893,7 @@ def recalculate_savings():
             cost_source = "baseline"
             cost_breakdown = {}
 
-            tco = float(app.total_cost_of_ownership or 0)
+            tco = get_annual_cost_float(app) or 0
             infra = float(app.infrastructure_cost or 0)
             support = float(app.support_cost or 0)
             maint = float(app.maintenance_cost or 0)
@@ -1139,7 +1145,7 @@ def score_all_entries():
 
             # Cost Efficiency (25%)
             cost_score = 50
-            tco = float(app.total_cost_of_ownership or 0)
+            tco = get_annual_cost_float(app) or 0
             if tco > 0:
                 cost_per_user = tco / max(user_count, 1)
                 if cost_per_user > 5000:

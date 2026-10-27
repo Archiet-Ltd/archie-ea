@@ -12,7 +12,7 @@ from app import db
 from app.decorators import audit_log, require_roles
 from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
-from app.services.application_cost_accessor import set_annual_cost
+from app.services.application_cost_accessor import get_annual_cost_float, set_annual_cost
 from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
@@ -2809,9 +2809,7 @@ def rationalization_decision_dossier(app_id):
             "estimated_investment_needed": (
                 float(score.estimated_investment_needed) if score.estimated_investment_needed else None
             ),
-            "total_cost_of_ownership": (
-                float(score.total_cost_of_ownership) if score.total_cost_of_ownership else None
-            ),
+            "total_cost_of_ownership": get_annual_cost_float(app_obj),
         }
 
         return jsonify({"success": True, **dossier})

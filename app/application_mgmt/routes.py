@@ -2216,6 +2216,8 @@ def render_application_detail(id):
     }
 
     # --- Financial metrics ---
+    from app.services.application_cost_accessor import get_annual_cost
+
     def _f(attr):
         return float(getattr(app_obj, attr, None) or 0)
 
@@ -2225,7 +2227,7 @@ def render_application_detail(id):
         "infrastructure_annual": _f("infrastructure_cost_monthly") * 12,
         "development_annual": _f("development_cost_annual"),
         "maintenance_annual": _f("maintenance_cost"),
-        "total_tco": _f("total_cost_of_ownership"),
+        "total_tco": float(get_annual_cost(app_obj) or 0),
         "calculated_total": (
             _f("license_cost_annual")
             + _f("infrastructure_cost_monthly") * 12

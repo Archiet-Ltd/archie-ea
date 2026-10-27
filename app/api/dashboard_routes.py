@@ -717,8 +717,6 @@ def get_tco_cost_tiers():
     """Get TCO cost range tiers for executive reporting."""
     try:
         from app.models import ApplicationComponent
-        from app import db
-        from sqlalchemy import func, case
 
         # Define cost tiers
         tiers = [
@@ -759,52 +757,26 @@ def get_tco_cost_tiers():
             },
         ]
 
-        # Use total_cost_of_ownership for annual TCO
-        cost_col = ApplicationComponent.total_cost_of_ownership
+        # Each in-scope application's annual cost, as its Cost tab shows it (the query is the organisation's own)
+        from app.services.application_cost_accessor import get_annual_costs
 
-        # Portfolio-level counts for data completeness
         scope_filter = ApplicationComponent.lifecycle_status.in_(
             ["operational", "testing", "development", "deprecated"]
         )
-        total_portfolio = db.session.query(func.count(ApplicationComponent.id)).filter(scope_filter).scalar() or 0
-        apps_with_tco = db.session.query(func.count(ApplicationComponent.id)).filter(
-            scope_filter, cost_col.isnot(None)
-        ).scalar() or 0
-        portfolio_tco = db.session.query(func.sum(cost_col)).filter(
-            scope_filter, cost_col.isnot(None)
-        ).scalar() or 0
+        in_scope = ApplicationComponent.query.filter(scope_filter).all()
+        costs = {}
+        for org_id in {a.organization_id for a in in_scope}:
+            costs.update(get_annual_costs(org_id, [a for a in in_scope if a.organization_id == org_id]))
+        values = [float(v) for v in costs.values() if v is not None]
+        total_portfolio = len(in_scope)
+        apps_with_tco = len(values)
+        portfolio_tco = sum(values)
 
-        # Optimized: Single query with CASE statements instead of 5 separate queries
-        tier_cases = []
-        for i, tier in enumerate(tiers):
-            if tier["max"]:
-                condition = db.and_(cost_col >= tier["min"], cost_col < tier["max"])
-            else:
-                condition = cost_col >= tier["min"]
-            tier_cases.append(
-                func.sum(case((condition, 1), else_=0)).label(f"tier_{i}")
-            )
-
-        # Execute single query with all counts — only apps with cost data
-        counts_result = (
-            db.session.query(*tier_cases)
-            .filter(cost_col.isnot(None))
-            .first()
-        )
-
-        # Build results from single query
         results = []
-        for i, tier in enumerate(tiers):
-            count = (getattr(counts_result, f"tier_{i}", 0) or 0) if counts_result else 0
-            results.append(
-                {
-                    **tier,
-                    "application_count": count,
-                    "percentage": 0,  # Will calculate after getting total
-                }
-            )
+        for tier in tiers:
+            count = sum(1 for v in values if v >= tier["min"] and (not tier["max"] or v < tier["max"]))
+            results.append({**tier, "application_count": count, "percentage": None})
 
-        # Calculate percentages
         apps_in_tiers = sum(r["application_count"] for r in results)
         if apps_in_tiers > 0:
             for r in results:

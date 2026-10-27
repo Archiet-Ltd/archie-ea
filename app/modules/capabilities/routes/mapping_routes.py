@@ -96,6 +96,7 @@ def api_applications():
     """API endpoint to get application mappings"""
     try:
         from app.models.application_layer import ApplicationComponent
+        from app.services.application_cost_accessor import get_annual_cost_float
 
         applications = ApplicationComponent.query.order_by(ApplicationComponent.name).all()
 
@@ -111,8 +112,8 @@ def api_applications():
                     "owner": app.business_owner or "Not specified",
                     "department": app.business_domain or "Not specified",
                     "status": app.lifecycle_status or "Unknown",
-                    "total_cost_of_ownership": float(app.total_cost_of_ownership)
-                    if app.total_cost_of_ownership
+                    "total_cost_of_ownership": get_annual_cost_float(app)
+                    if get_annual_cost_float(app) is not None
                     else None,
                 }
             )
