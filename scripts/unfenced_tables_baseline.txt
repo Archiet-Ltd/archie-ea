@@ -357,7 +357,6 @@ usage_events
 user_preferences
 user_roles
 user_sessions
-users
 validation_gates
 validation_violations
 vendor_archimate_templates
