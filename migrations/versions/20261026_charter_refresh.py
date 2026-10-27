@@ -12,7 +12,7 @@ Old versions are never deleted or rewritten. Idempotent: a second run adds nothi
 defaults and the decision come from app.commands.seed_agent_charters (one copy).
 
 Revision ID: 20261026_charter_refresh
-Revises: 20261026_signup_origin
+Revises: 20261025_vendor_catalogue
 Create Date: 2026-10-26
 """
 import json
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261026_charter_refresh"
-down_revision = "20261026_signup_origin"
+down_revision = "20261025_vendor_catalogue"
 branch_labels = None
 depends_on = None
 
