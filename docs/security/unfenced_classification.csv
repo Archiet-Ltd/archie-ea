@@ -1,0 +1,469 @@
+table,model,class_,parent_or_column,reason_or_join_path,confirm,unpredicated_reads,route_file_reads,route_files,reader_files,definition_file,module
+acceptance_criteria,AcceptanceCriteria,via-parent,requirement_id>requirements,requirement_id>requirements,,2,0,0,53,app/models/models.py,models
+acm_cross_domain_rules,AcmCrossDomainRule,shared,-,ACM rule and domain template catalogue seeded by commands; no row belongs to one organisation,,3,0,0,2,app/models/acm_cross_domain_rule.py,acm_cross_domain_rule
+acm_domain_templates,AcmDomainTemplate,shared,-,ACM rule and domain template catalogue seeded by commands; no row belongs to one organisation,,7,0,0,4,app/models/acm_domain_template.py,acm_domain_template
+acm_property_templates,AcmPropertyTemplate,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,0,0,6,app/models/acm_property_template.py,acm_property_template
+adm_audit_logs,ADMAuditLog,via-parent,kanban_boards,board_id / actor_id,,4,0,0,2,app/models/adm_audit_log.py,adm_audit_log
+adm_audit_summaries,ADMAuditSummary,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_audit_log.py,adm_audit_log
+adm_board_portfolio_links,ADMBoardPortfolioLink,via-parent,portfolio_id>adm_board_portfolios,portfolio_id>adm_board_portfolios,,0,0,0,2,app/models/adm_portfolio.py,adm_portfolio
+adm_compliance_checkpoints,ADMComplianceCheckpoint,via-parent,approval_id>adm_phase_approvals,approval_id>adm_phase_approvals,,4,0,0,5,app/models/adm_phase_approval.py,adm_phase_approval
+adm_data_retention_policies,ADMDataRetentionPolicy,shared,-,"platform-wide audit retention configuration, unique by name, no organisation column",,0,0,0,0,app/models/adm_audit_log.py,adm_audit_log
+adm_deliverables,ADMDeliverable,shared,-,"TOGAF ADM method reference (phases, steps, deliverable catalogue), same for every organisation",,3,0,0,8,app/models/adm_deliverable.py,adm_deliverable
+adm_phase_steps,ADMPhaseStep,shared,-,"TOGAF ADM method reference (phases, steps, deliverable catalogue), same for every organisation",,0,0,0,0,app/models/adm_kanban.py,adm_kanban
+adm_phases,ADMPhase,shared,-,"TOGAF ADM method reference (phases, steps, deliverable catalogue), same for every organisation",,22,10,3,20,app/models/adm_kanban.py,adm_kanban
+adm_stakeholder_concurrences,ADMStakeholderConcurrence,via-parent,approval_id>adm_phase_approvals,approval_id>adm_phase_approvals,,3,0,0,5,app/models/adm_phase_approval.py,adm_phase_approval
+adr_capability_links,ADRCapabilityLink,via-parent,adr_id>architecture_decision_records,adr_id>architecture_decision_records,,0,0,0,1,app/models/adr.py,adr
+adr_process_links,ADRProcessLink,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adr.py,adr
+agent_charters,AgentCharter,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,8,app/models/agent_charter.py,agent_charter
+agent_configurations,AgentConfiguration,via-parent,updated_by_id>users,updated_by_id>users -> organization_id>organizations,confirm,4,3,1,2,app/models/agentic_gaps.py,agentic_gaps
+agent_execution_history,AgentExecutionHistory,via-parent,reviewed_by_id>users,reviewed_by_id>users -> organization_id>organizations,confirm,9,0,0,2,app/models/agentic_gaps.py,agentic_gaps
+agent_run_records,AgentRunRecord,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,2,app/models/agent_run_record.py,agent_run_record
+agent_schedules,AgentSchedule,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,2,2,1,1,app/models/agentic_gaps.py,agentic_gaps
+ai_audit_logs,AIAuditLog,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,1,app/models/ai_audit_log.py,ai_audit_log
+ai_chat_approval_audit_log,AIChatApprovalAuditLog,via-parent,approval_id>ai_chat_crud_approvals,approval_id>ai_chat_crud_approvals,,0,0,0,2,app/models/ai_chat_crud_approval.py,ai_chat_crud_approval
+ai_chat_audit_logs,AIChatAuditLog,via-parent,approval_id>ai_chat_crud_approvals,approval_id>ai_chat_crud_approvals,,0,0,0,5,app/models/ai_chat_audit_log.py,ai_chat_audit_log
+ai_interaction_logs,AIInteractionLog,via-parent,user_id>users,user_id>users -> organization_id>organizations,,0,0,0,4,app/models/ai_service.py,ai_service
+ai_prompt_template_versions,AIPromptTemplateVersion,shared,-,platform prompt templates and LLM provider configuration edited by platform admins,,5,4,2,3,app/models/ai_service.py,ai_service
+ai_prompt_templates,AIPromptTemplate,shared,-,platform prompt templates and LLM provider configuration edited by platform admins,,19,10,4,16,app/models/ai_service.py,ai_service
+ai_recommendations,AIRecommendation,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,5,2,1,10,app/models/ai_recommendations.py,ai_recommendations
+ai_service_configs,AIServiceConfig,shared,-,platform prompt templates and LLM provider configuration edited by platform admins,,1,0,0,1,app/models/ai_service.py,ai_service
+ai_suggestions,AISuggestion,via-parent,reviewed_by_id>users,reviewed_by_id>users -> organization_id>organizations,confirm,11,1,1,6,app/models/ai_suggestion.py,ai_suggestion
+application_business_actor_mapping,ApplicationBusinessActorMapping,via-parent,application_component_id>application_components,application_component_id>application_components,,3,3,3,6,app/models/relationship_tables.py,relationship_tables
+application_business_metrics,ApplicationBusinessMetric,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/enterprise_intelligence.py,enterprise_intelligence
+application_capability,ApplicationCapability,via-parent,business_capability_id>business_capability,business_capability_id>business_capability,,2,1,1,11,app/models/missing_capability_models.py,missing_capability_models
+application_capability_coverage,ApplicationCapabilityCoverage,via-parent,application_component_id>application_components,application_component_id>application_components,,22,14,7,10,app/models/business_capabilities.py,business_capabilities
+application_capability_mapping,ApplicationCapabilityMapping,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,4,3,3,72,app/models/application_capability.py,application_capability
+application_collaborations,ApplicationCollaboration,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,39,app/models/application_layer.py,application_layer
+application_component_embeddings,ApplicationComponentEmbedding,via-parent,application_component_id>application_components,application_component_id>application_components,,0,0,0,5,app/models/vector_embeddings.py,vector_embeddings
+application_costs,ApplicationCost,via-parent,application_id>application_components,application_id>application_components,,1,0,0,9,app/models/enterprise_intelligence.py,enterprise_intelligence
+application_documents,ApplicationDocument,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,9,9,6,8,app/models/miscellaneous.py,miscellaneous
+application_duplication_reports,ApplicationDuplicationReport,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/application_consolidation.py,application_consolidation
+application_interactions,ApplicationInteraction,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,37,app/models/application_layer.py,application_layer
+application_interface_mapping,ApplicationInterfaceMapping,via-parent,application_component_id>application_components,application_component_id>application_components,,0,0,0,2,app/models/relationship_tables.py,relationship_tables
+application_interface_metadata,ApplicationInterfaceMetadata,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,3,1,1,4,app/models/integration_metadata.py,integration_metadata
+application_metrics_snapshots,ApplicationMetricsSnapshot,no-parent,-,portfolio counts snapshot; needs organization_id with a decided backfill,,0,0,0,2,app/models/metrics.py,metrics
+application_owners,ApplicationOwner,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,0,0,60,app/models/application_owner.py,application_owner
+application_performance_metrics,ApplicationPerformanceMetrics,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,2,app/models/application_lifecycle.py,application_lifecycle
+application_portfolio_summary,ApplicationPortfolio,no-parent,-,portfolio summary counts; needs organization_id with a decided backfill,,1,0,0,1,app/models/application_portfolio.py,application_portfolio
+application_process_support,ApplicationProcessSupport,via-parent,application_component_id>application_components,application_component_id>application_components,,18,16,6,14,app/models/relationship_tables.py,relationship_tables
+application_requirement_mapping,ApplicationRequirementMapping,via-parent,application_component_id>application_components,application_component_id>application_components,,1,0,0,6,app/models/relationship_tables.py,relationship_tables
+application_roi,ApplicationROI,via-parent,application_id>application_components,application_id>application_components,,0,0,0,3,app/models/enterprise_intelligence.py,enterprise_intelligence
+application_services,ApplicationService,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,143,app/models/application_layer.py,application_layer
+application_similarity_analysis,ApplicationSimilarityAnalysis,via-parent,app_1_id>application_components,app_1_id>application_components,,4,1,1,3,app/models/application_consolidation.py,application_consolidation
+application_technology_instances,ApplicationTechnologyInstance,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/application_portfolio.py,application_portfolio
+application_technology_mapping,ApplicationTechnologyMapping,via-parent,application_component_id>application_components,application_component_id>application_components,,4,0,0,6,app/models/relationship_tables.py,relationship_tables
+application_usage,ApplicationUsage,via-parent,application_id>application_components,application_id>application_components,,0,0,0,10,app/models/enterprise_intelligence.py,enterprise_intelligence
+application_vendor_product_mappings,ApplicationVendorProductMapping,via-parent,application_component_id>application_components,application_component_id>application_components,,4,1,1,4,app/models/capability_to_vendor_mapping.py,capability_to_vendor_mapping
+application_versioning,ApplicationVersioning,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,4,app/models/application_lifecycle.py,application_lifecycle
+approval_workflow,ApprovalWorkflow,via-parent,decision_id>capability_governance_decision,decision_id>capability_governance_decision,,0,0,0,2,app/models/capability_governance.py,capability_governance
+apqc_process,APQCProcess,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,63,app/models/apqc_process.py,apqc_process
+apqc_process_hierarchy,ApqcProcessHierarchy,shared,-,APQC process classification catalogue seeded by commands (APQCProcess is already in GLOBAL_MODELS),,4,0,0,3,app/models/models.py,models
+arb_adversarial_reviews,ARBAdversarialReview,via-parent,review_item_id>arb_review_items,review_item_id>arb_review_items,,10,0,0,2,app/services/arb_workflow_service.py,app/services
+arb_change_requests,ChangeRequest,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,3,app/models/architecture_review_board.py,architecture_review_board
+arb_compliance_checks,ARBComplianceCheck,via-parent,review_item_id>arb_review_items,review_item_id>arb_review_items,,2,0,0,2,app/services/arb_workflow_service.py,app/services
+arb_derogations,Derogation,via-parent,arb_review_item_id>arb_review_items,arb_review_item_id>arb_review_items,,2,1,1,3,app/models/architecture_review_board.py,architecture_review_board
+arb_governance_standards,ARBGovernanceStandard,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,11,1,1,13,app/models/architecture_review_board.py,architecture_review_board
+arb_submission_packs,ARBSubmissionPack,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,4,app/models/workflow_artifacts.py,workflow_artifacts
+arb_waiver_expiry_checkpoints,ARBWaiverExpiryCheckpoint,shared,-,"platform job cursor over all organisations, holds no company content",,1,0,0,3,app/models/arb_decision_event.py,arb_decision_event
+arb_workflow_stages,ARBWorkflowStage,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,14,0,0,4,app/models/architecture_review_board.py,architecture_review_board
+archimate_audit_logs,ArchimateAuditLog,via-parent,user_id>users,user_id>users -> organization_id>organizations,,1,1,1,6,app/models/archimate_viewpoint.py,archimate_viewpoint
+archimate_capabilities,ArchiMateCapability,via-parent,business_capability_id>business_capability,business_capability_id>business_capability,,0,0,0,6,app/models/capabilities.py,capabilities
+archimate_capability_mapping,ArchiMateCapabilityMapping,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capabilities.py,capabilities
+archimate_element_comments,ArchimateElementComment,via-parent,element_id>archimate_elements,element_id>archimate_elements,,1,1,1,3,app/models/archimate_viewpoint.py,archimate_viewpoint
+archimate_metamodel_violations,MetamodelViolation,no-parent,-,no link found,confirm,3,0,0,2,app/models/archimate_metamodel.py,archimate_metamodel
+archimate_patterns,ArchimatePattern,shared,-,"framework element templates, patterns and viewpoints: library content created by platform users",confirm,2,2,1,3,app/models/archimate_viewpoint.py,archimate_viewpoint
+archimate_relationship_rules,ArchiMateRelationshipRule,shared,-,"ArchiMate 3.2 relationship rule table, specification data",,7,0,0,2,app/models/archimate_metamodel.py,archimate_metamodel
+archimate_viewpoint_snapshots,ArchimateViewpointSnapshot,via-parent,viewpoint_id>saved_diagrams,viewpoint_id>saved_diagrams,,3,3,1,1,app/models/archimate_viewpoint.py,archimate_viewpoint
+archimate_viewpoint_templates,ArchimateViewpointTemplate,shared,-,"framework element templates, patterns and viewpoints: library content created by platform users",confirm,2,2,1,3,app/models/archimate_viewpoint.py,archimate_viewpoint
+architecture_change_notices,ArchitectureChangeNotice,via-parent,change_request_id>architecture_change_requests,change_request_id>architecture_change_requests,,0,0,0,1,app/models/architecture_decision.py,architecture_decision
+architecture_documents,ArchitectureDocument,via-parent,application_id>application_components,application_id>application_components,,3,3,1,3,app/models/miscellaneous.py,miscellaneous
+architecture_elements,ArchitectureElement,no-parent,-,element with no owner link anywhere; needs organization_id with a decided backfill,,27,13,2,14,app/models/archimate.py,archimate
+architecture_generation_runs,ArchitectureGenerationRun,via-parent,solution_id>solutions,solution_id>solutions,,0,0,0,1,app/models/architecture_generation_run.py,architecture_generation_run
+architecture_inference_relationship,ArchitectureInferenceRelationship,via-parent,architecture_models,architecture_id,,16,7,2,7,app/models/architecture_inference_relationship.py,architecture_inference_relationship
+architecture_relationships,Relationship,via-parent,architecture_elements,source_id (parent itself unowned),,12,8,1,120,app/models/archimate.py,archimate
+architecture_review_findings,ArchitectureReviewFinding,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,0,0,6,app/models/workflow_artifacts.py,workflow_artifacts
+architecture_vision_documents,ArchitectureVisionDocument,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,2,2,2,6,app/models/workflow_artifacts.py,workflow_artifacts
+artefact_share_links,ArtefactShareLink,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,1,1,1,app/models/artefact_share.py,artefact_share
+audit_events,AuditEvent,via-parent,users,"user_id (no FK); append-only, keep audit triggers",,2,0,0,1,app/security/audit.py,app/security
+audit_trail,AuditTrail,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,0,0,0,29,app/models/capability_governance.py,capability_governance
+autogen_override,AutoGenOverride,shared,-,"framework/domain generation rules, platform configuration",,2,0,0,1,app/models/autogen.py,autogen
+batch_import_application,BatchImportApplication,via-parent,committed_application_id>application_components,committed_application_id>application_components,,5,2,2,6,app/models/batch_import.py,batch_import
+batch_import_batch,BatchImportBatch,via-parent,job_id>batch_import_job,job_id>batch_import_job -> user_id>users -> organization_id>organizations,,26,16,2,8,app/models/batch_import.py,batch_import
+batch_import_checkpoint,BatchImportCheckpoint,via-parent,batch_id>batch_import_batch,batch_id>batch_import_batch -> job_id>batch_import_job -> user_id>users -> organization_id>organizations,,1,0,0,3,app/models/batch_import.py,batch_import
+batch_import_element,BatchImportElement,via-parent,batch_id>batch_import_batch,batch_id>batch_import_batch -> job_id>batch_import_job -> user_id>users -> organization_id>organizations,,20,4,1,6,app/models/batch_import.py,batch_import
+batch_import_job,BatchImportJob,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,24,11,3,11,app/models/batch_import.py,batch_import
+batch_job_checkpoints,BatchJobCheckpoint,via-parent,batch_job_id>batch_jobs,batch_job_id>batch_jobs -> created_by_id>users -> organization_id>organizations,,2,1,1,2,app/models/batch_processing.py,batch_processing
+batch_job_errors,BatchJobError,via-parent,batch_job_id>batch_jobs,batch_job_id>batch_jobs -> created_by_id>users -> organization_id>organizations,,2,1,1,4,app/models/batch_processing.py,batch_processing
+batch_job_items,BatchJobItem,via-parent,batch_job_id>batch_jobs,batch_job_id>batch_jobs -> created_by_id>users -> organization_id>organizations,,5,1,1,2,app/models/batch_processing.py,batch_processing
+batch_job_statistics,BatchJobStatistics,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/batch_processing.py,batch_processing
+batch_jobs,BatchJob,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,13,2,2,5,app/models/batch_processing.py,batch_processing
+business_capability_embeddings,BusinessCapabilityEmbedding,via-parent,business_capability_id>business_capability,business_capability_id>business_capability,,2,1,1,6,app/models/vector_embeddings.py,vector_embeddings
+business_domains,BusinessDomain,no-parent,-,"domain_owner, strategic weights: company data, no link; needs organization_id with a decided backfill",,24,12,5,32,app/models/unified_capability.py,unified_capability
+business_initiatives,BusinessInitiative,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+business_interactions,BusinessInteraction,via-parent,model_id>architecture_models,model_id>architecture_models,,2,2,1,34,app/models/archimate_business.py,archimate_business
+capability_actor_raci,CapabilityActorRaci,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/relationship_tables.py,relationship_tables
+capability_archimate_classifications,CapabilityArchiMateClassification,via-parent,capability_id>business_capability,capability_id>business_capability,,3,3,1,6,app/models/capability_archimate_mapping.py,capability_archimate_mapping
+capability_domain_definitions,CapabilityDomainDefinition,shared,-,capability domain reference definitions with a platform default set,confirm,2,1,1,3,app/models/application_capability.py,application_capability
+capability_gap_dashboard,CapabilityGapDashboard,no-parent,-,dashboard configuration; needs organization_id with a decided backfill,,0,0,0,1,app/models/capability_gap_analysis.py,capability_gap_analysis
+capability_gap_details,CapabilityGapDetail,via-parent,analysis_id>capability_gap_analysis,analysis_id>capability_gap_analysis,,8,0,0,7,app/models/capability_gap_analysis.py,capability_gap_analysis
+capability_investment_plans,CapabilityInvestmentPlan,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,4,app/models/workflow_artifacts.py,workflow_artifacts
+capability_level_definitions,CapabilityLevelDefinition,shared,-,"capability model reference definitions (levels, maturity, taxonomy rules)",,2,1,1,2,app/models/application_capability.py,application_capability
+capability_maturity_level,CapabilityMaturityLevel,shared,-,"capability model reference definitions (levels, maturity, taxonomy rules)",,0,0,0,0,app/models/missing_capability_models.py,missing_capability_models
+capability_prioritization,CapabilityPrioritization,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/missing_capability_models.py,missing_capability_models
+capability_process_mapping,CapabilityProcessMapping,via-parent,capability_id>business_capability,capability_id>business_capability,,12,6,2,12,app/models/apqc_process.py,apqc_process
+capability_sets,CapabilitySet,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,2,2,1,3,app/models/capability_set.py,capability_set
+capability_tag_associations,CapabilityTagAssociation,via-parent,capability_id>unified_capabilities,capability_id>unified_capabilities,,3,0,0,1,app/models/capability_tagging.py,capability_tagging
+capability_taxonomy_audit,CapabilityTaxonomyAudit,via-parent,capability_id>unified_capabilities,capability_id>unified_capabilities,,2,1,1,4,app/models/application_capability.py,application_capability
+capability_taxonomy_rules,CapabilityTaxonomyRule,shared,-,"capability model reference definitions (levels, maturity, taxonomy rules)",,3,0,0,1,app/models/application_capability.py,application_capability
+capability_taxonomy_violations,CapabilityTaxonomyViolation,via-parent,capability_id>unified_capabilities,capability_id>unified_capabilities,,5,0,0,1,app/models/application_capability.py,application_capability
+capability_vendor_product_mapping,CapabilityVendorProductMapping,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capability_to_vendor_mapping.py,capability_to_vendor_mapping
+card_applications,CardApplication,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+card_archimate_elements,CardArchiMateElement,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+card_capabilities,CardCapability,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+card_dependencies,CardDependency,via-parent,source_card_id>kanban_cards,source_card_id>kanban_cards,,1,0,0,1,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+card_initiatives,CardInitiative,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+card_systems,CardSystem,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+change_impact_assessments,ChangeImpactAssessment,via-parent,change_request_id>architecture_change_requests,change_request_id>architecture_change_requests,,2,2,1,1,app/models/architecture_decision.py,architecture_decision
+change_management_records,ChangeManagementRecord,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,0,0,0,4,app/models/workflow_artifacts.py,workflow_artifacts
+chat_message_embeddings,ChatMessageEmbedding,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,12,0,0,13,app/models/vector_embeddings.py,vector_embeddings
+cobit_capability_mapping,COBITCapabilityMapping,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capabilities.py,capabilities
+cobit_domains,COBITDomain,shared,-,COBIT and ITIL framework catalogues,,1,0,0,3,app/models/capabilities.py,capabilities
+cobit_processes,COBITProcess,shared,-,COBIT and ITIL framework catalogues,,4,0,0,8,app/models/capabilities.py,capabilities
+code_artifacts,CodeArtifact,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,0,0,0,9,app/models/models.py,models
+code_quality_metrics,CodeQualityMetrics,via-parent,software_module_id>software_modules,software_module_id>software_modules -> archimate_element_id>archimate_elements,,0,0,0,2,app/models/software_quality.py,software_quality
+codegen_chat_messages,CodegenChatMessage,via-parent,solution_id>solutions,solution_id>solutions,,0,0,0,2,app/modules/codegen/models.py,modules/codegen
+codegen_connector_credentials,ConnectorCredential,via-parent,solutions,solution_id (no FK); holds encrypted credentials,,3,0,0,1,app/modules/codegen/services/credential_vault.py,modules/codegen
+codegen_data_imports,DataImport,via-parent,solution_id>solutions,solution_id>solutions,,0,0,0,3,app/modules/codegen/models.py,modules/codegen
+codegen_drift_reports,CodegenDriftReport,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,2,app/modules/codegen/models.py,modules/codegen
+codegen_generation_history,CodegenGenerationHistory,via-parent,codegen_generation_id>codegen_generations,codegen_generation_id>codegen_generations -> solution_id>solutions,,15,14,5,10,app/modules/codegen/models.py,modules/codegen
+codegen_generations,CodegenGeneration,via-parent,solution_id>solutions,solution_id>solutions,,90,84,15,25,app/modules/codegen/models.py,modules/codegen
+codegen_scenario_results,ScenarioResult,via-parent,solutions,solution_id (no FK),,1,0,0,0,app/modules/codegen/services/scenario_tracker.py,modules/codegen
+codegen_solution_connectors,SolutionConnector,via-parent,solution_id>solutions,solution_id>solutions,,8,8,1,3,app/modules/codegen/models.py,modules/codegen
+codegen_solution_instances,SolutionInstance,via-parent,solution_id>solutions,solution_id>solutions,,13,2,1,8,app/modules/codegen/models.py,modules/codegen
+codegen_solution_rules,SolutionRule,via-parent,solution_id>solutions,solution_id>solutions,,9,8,3,5,app/modules/codegen/models.py,modules/codegen
+codegen_system_boundaries,CodegenSystemBoundary,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,0,0,0,5,app/modules/codegen/models.py,modules/codegen
+codegen_system_boundary_solutions,SystemBoundarySolution,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,3,app/modules/codegen/models.py,modules/codegen
+codegen_template_files,CodegenTemplateFile,via-parent,set_id>codegen_template_sets,set_id>codegen_template_sets -> created_by_id>users -> organization_id>organizations,confirm,4,3,1,4,app/modules/codegen/models.py,modules/codegen
+codegen_template_sets,CodegenTemplateSet,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,8,8,2,6,app/modules/codegen/models.py,modules/codegen
+codegen_test_run_steps,TestRunStep,via-parent,test_run_id>codegen_test_runs,test_run_id>codegen_test_runs -> solution_id>solutions,,0,0,0,1,app/modules/codegen/models.py,modules/codegen
+codegen_test_runs,TestRun,via-parent,solution_id>solutions,solution_id>solutions,,3,0,0,2,app/modules/codegen/models.py,modules/codegen
+codegen_workflow_designs,WorkflowDesign,via-parent,solution_id>solutions,solution_id>solutions,,2,1,1,2,app/modules/codegen/models.py,modules/codegen
+compliance_checks,ComplianceCheck,via-parent,requirement_id>requirements,requirement_id>requirements,,2,2,1,6,app/models/models.py,models
+compliance_controls,ComplianceControl,shared,-,regulatory framework and control library seeded for all organisations (created_by is the seeding user),confirm,12,2,1,16,app/models/compliance_models.py,compliance_models
+compliance_gaps,ComplianceGap,via-parent,compliance_requirement_id>compliance_requirements,compliance_requirement_id>compliance_requirements,,4,0,0,17,app/models/compliance_models.py,compliance_models
+compliance_governance_reports,ComplianceGovernanceReport,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,0,0,0,5,app/models/workflow_artifacts.py,workflow_artifacts
+compliance_requirements_model,ComplianceRequirementModel,no-parent,-,requirements model; needs organization_id with a decided backfill,,0,0,0,1,app/models/compliance_models.py,compliance_models
+compliance_scan_reports,ComplianceScanReport,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,3,3,2,6,app/models/workflow_artifacts.py,workflow_artifacts
+composite_structures,CompositeStructure,via-parent,parent_element_id>archimate_elements,parent_element_id>archimate_elements,,0,0,0,2,app/models/archimate_core.py,archimate_core
+confidence_thresholds,ConfidenceThreshold,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,5,5,1,4,app/models/confidence_review.py,confidence_review
+consolidation_candidates,ConsolidationCandidate,via-parent,primary_application_id>application_components,primary_application_id>application_components,,6,0,0,6,app/models/consolidation.py,consolidation
+consolidation_list_entries,ConsolidationListEntry,via-parent,application_id>application_components,application_id>application_components,,14,14,8,9,app/models/consolidation_list.py,consolidation_list
+consolidation_opportunities,ConsolidationOpportunity,via-parent,target_application_id>application_components,target_application_id>application_components,,11,0,0,6,app/models/consolidation.py,consolidation
+consolidation_recommendations,ConsolidationRecommendation,via-parent,target_application_id>application_components,target_application_id>application_components,,0,0,0,3,app/models/application_duplicate_detection.py,application_duplicate_detection
+constraints,ConstraintElement,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,114,app/models/models.py,models
+consulting_partners,ConsultingPartner,shared,-,consulting partner reference directory,confirm,0,0,0,1,app/models/consulting_partner.py,consulting_partner
+contract_applications,ContractApplication,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,2,app/models/contract_application.py,contract_application
+conversation_messages,ConversationMessageRecord,via-parent,thread_id>conversation_threads,thread_id>conversation_threads -> organization_id>organizations,,0,0,0,5,app/models/conversation.py,conversation
+conversation_threads,ConversationThreadRecord,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,3,app/models/conversation.py,conversation
+copilot_insights,CopilotInsight,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,3,app/models/copilot_insight.py,copilot_insight
+cross_layer_relationships,CrossLayerRelationship,via-parent,solution_id>solutions,solution_id>solutions,,1,0,0,5,app/modules/codegen/models.py,modules/codegen
+custom_field_definitions,CustomFieldDefinition,via-parent,created_by>users,created_by>users -> organization_id>organizations,confirm,7,7,1,3,app/models/custom_fields.py,custom_fields
+dashboard_edits,DashboardEdit,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/dashboard_edit.py,dashboard_edit
+decision_authority,DecisionAuthority,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,0,0,0,14,app/models/capability_governance.py,capability_governance
+decision_capability_links,DecisionCapabilityLink,via-parent,decision_id>architecture_decisions,decision_id>architecture_decisions,,6,6,1,1,app/models/architecture_decision.py,architecture_decision
+decision_ledger,DecisionLedger,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,3,app/models/decision_ledger.py,decision_ledger
+decommission_plans,DecommissionPlan,via-parent,application_id>application_components,application_id>application_components,,2,2,1,1,app/models/application_rationalization.py,application_rationalization
+deliverables,Deliverable,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,129,app/models/implementation_migration.py,implementation_migration
+deployment_pipelines,DeploymentPipeline,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,4,app/models/application_lifecycle.py,application_lifecycle
+design_patterns,DesignPattern,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,2,2,2,8,app/models/software_architecture.py,software_architecture
+detection_schedules,DetectionSchedule,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/unified_duplicate_detection.py,unified_duplicate_detection
+devops_connector_configs,DevOpsConnectorConfig,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,2,app/models/connector_config.py,connector_config
+document_analyses,DocumentAnalysis,via-parent,analyzed_by_id>users,analyzed_by_id>users -> organization_id>organizations,,10,5,4,8,app/models/document_analysis.py,document_analysis
+document_analysis_edits,DocumentAnalysisEdit,via-parent,analysis_id>document_analyses,analysis_id>document_analyses -> analyzed_by_id>users -> organization_id>organizations,,0,0,0,2,app/models/document_analysis.py,document_analysis
+dod_checks,DoDCheck,via-parent,requirements,requirement_id (no FK),,2,0,0,1,app/models/dod_template.py,dod_template
+dod_templates,DoDTemplate,no-parent,-,definition-of-done templates per company; needs organization_id with a decided backfill,,5,0,0,1,app/models/dod_template.py,dod_template
+duplicate_analyses,DuplicateAnalysis,via-parent,application_1_id>application_components,application_1_id>application_components,,2,0,0,4,app/models/application_duplicate_detection.py,application_duplicate_detection
+duplicate_app_process_mapping,ApplicationProcessMapping,via-parent,application_id>application_components,application_id>application_components,,5,0,0,1,app/models/application_duplicate_detection.py,application_duplicate_detection
+duplicate_detection_runs,DuplicateDetectionRun,no-parent,-,detection run over a company portfolio; needs organization_id with a decided backfill,,7,6,2,5,app/models/application_duplicate_detection.py,application_duplicate_detection
+duplicate_groups,DuplicateGroup,via-parent,primary_business_process_id>business_processes,primary_business_process_id>business_processes,,17,15,2,16,app/models/application_duplicate_detection.py,application_duplicate_detection
+dynamics_metadata,DynamicsMetadata,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/platform_models.py,platform_models
+ea_workflow_definitions,EAWorkflowDefinition,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,10,1,1,11,app/models/workflow_models.py,workflow_models
+element_template_recommendations,ElementTemplateRecommendation,shared,-,"framework element templates, patterns and viewpoints: library content created by platform users",confirm,0,0,0,3,app/models/element_templates.py,element_templates
+element_template_usage,ElementTemplateUsage,via-parent,application_id>application_components,application_id>application_components,,6,3,1,5,app/models/element_templates.py,element_templates
+element_templates,ElementTemplate,shared,-,"framework element templates, patterns and viewpoints: library content created by platform users",confirm,33,20,2,10,app/models/element_templates.py,element_templates
+enterprise_capabilities,EnterpriseCapability,via-parent,business_capability_id>business_capability,business_capability_id>business_capability,,0,0,0,6,app/models/capabilities.py,capabilities
+equipment,Equipment,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,74,app/models/manufacturing_domain.py,manufacturing_domain
+error_events,ErrorEvent,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,1,1,15,app/models/error_event.py,error_event
+exception_process,ExceptionProcess,via-parent,approver_id>users,approver_id>users -> organization_id>organizations,confirm,0,0,0,2,app/models/capability_governance.py,capability_governance
+exchange_rates,ExchangeRate,shared,-,"global currency rates, not company data",,0,0,0,1,app/models/cost_fact.py,cost_fact
+experience_elements,ExperienceElement,via-parent,solution_id>solutions,solution_id>solutions,,0,0,0,1,app/modules/codegen/models.py,modules/codegen
+external_systems,ExternalSystem,via-parent,updated_by_id>users,updated_by_id>users -> organization_id>organizations,confirm,36,28,3,11,app/models/models.py,models
+extraction_feedback,ExtractionFeedback,via-parent,users,user_id (no FK),,7,1,1,3,app/modules/architecture/services/feedback_learning_service.py,modules/architecture
+feature_flags,FeatureFlag,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,36,30,4,28,app/models/feature_flags.py,feature_flags
+frontend_configuration,FrontendConfiguration,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,0,app/models/frontend_configuration.py,frontend_configuration
+functional_requirement,FunctionalRequirement,via-parent,function_id>business_function,function_id>business_function,,0,0,0,2,app/models/business_capabilities.py,business_capabilities
+gap_analysis_recommendations,GapAnalysisRecommendation,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capability_gap_analysis.py,capability_gap_analysis
+gap_remediation_reports,GapRemediationReport,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,4,app/models/workflow_artifacts.py,workflow_artifacts
+gap_solution_options,GapSolutionOption,via-parent,gap_detail_id>capability_gap_details,gap_detail_id>capability_gap_details -> analysis_id>capability_gap_analysis,,4,1,1,5,app/models/capability_gap_analysis.py,capability_gap_analysis
+generation_event,GenerationEvent,no-parent,-,"generation events with target_type/target_id, no link; needs organization_id with a decided backfill",,1,0,0,1,app/models/autogen.py,autogen
+generation_pipelines,GenerationPipeline,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,2,0,0,8,app/models/models.py,models
+governance_capability_links,GovernanceCapabilityLink,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capability_governance.py,capability_governance
+governance_system_links,GovernanceSystemLink,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capability_governance.py,capability_governance
+governance_workflows,GovernanceWorkflow,via-parent,capability_id>unified_capabilities,capability_id>unified_capabilities,,0,0,0,2,app/models/capability_governance.py,capability_governance
+impact_analysis_results,ImpactAnalysisResult,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,4,0,0,8,app/models/traceability.py,traceability
+implementation_gaps,ImplementationGap,via-parent,retired_into_id>gaps,retired_into_id>gaps,,34,20,3,14,app/models/implementation_planning.py,implementation_planning
+implementation_plateaus,ImplementationPlateau,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,27,7,2,8,app/models/implementation_planning.py,implementation_planning
+implementation_work_packages,ImplementationWorkPackage,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,58,10,1,16,app/models/implementation_planning.py,implementation_planning
+import_audit_log,ImportSessionLog,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,7,app/models/import_audit.py,import_audit
+import_audit_logs,ImportAuditLog,via-parent,users,user_id (no FK),,3,2,1,3,app/models/batch_import.py,batch_import
+import_checkpoints,ImportCheckpoint,via-parent,import_session_id>import_sessions,import_session_id>import_sessions -> user_id>users -> organization_id>organizations,,0,0,0,1,app/models/import_session.py,import_session
+import_history,ImportHistory,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,0,0,0,6,app/models/import_history.py,import_history
+import_sessions,ImportSession,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,3,0,0,3,app/models/import_session.py,import_session
+initiative_success_metrics,InitiativeSuccessMetric,via-parent,initiative_id>portfolio_initiatives,initiative_id>portfolio_initiatives,,0,0,0,1,app/models/enterprise_intelligence.py,enterprise_intelligence
+integration_contracts,IntegrationContract,via-parent,application_id>application_components,application_id>application_components,,3,2,2,6,app/models/integration_contract.py,integration_contract
+integration_impact_registers,IntegrationImpactRegister,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,4,app/models/workflow_artifacts.py,workflow_artifacts
+integration_patterns,IntegrationPattern,shared,-,integration pattern catalogue (codegen targets) with platform approval status,confirm,8,3,1,22,app/models/integration_pattern.py,integration_pattern
+interface_consumer,InterfaceConsumer,via-parent,interface_id>application_interfaces,interface_id>application_interfaces,,2,0,0,2,app/models/relationship_tables.py,relationship_tables
+itil_capability_mapping,ITILCapabilityMapping,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capabilities.py,capabilities
+itil_practices,ITILPractice,shared,-,COBIT and ITIL framework catalogues,,2,0,0,3,app/models/capabilities.py,capabilities
+jira_issues,JiraIssue,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,0,0,0,4,app/models/models.py,models
+jira_projects,JiraProject,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,0,0,0,3,app/models/models.py,models
+jira_sync_tracking,JiraSyncTracking,via-parent,application_id>application_components,application_id>application_components,,2,0,0,1,app/models/jira_sync_tracking.py,jira_sync_tracking
+jobs,Job,no-parent,-,"background job payloads, no link; needs organization_id with a decided backfill",,10,5,2,34,app/models/job.py,job
+kanban_card_attachments,KanbanCardAttachment,via-parent,card_id>kanban_cards,card_id>kanban_cards,,0,0,0,2,app/models/adm_kanban.py,adm_kanban
+kanban_card_comments,KanbanCardComment,via-parent,card_id>kanban_cards,card_id>kanban_cards,,0,0,0,2,app/models/adm_kanban.py,adm_kanban
+kanban_card_history,KanbanCardHistory,via-parent,card_id>kanban_cards,card_id>kanban_cards,,0,0,0,1,app/models/kanban_card_history.py,kanban_card_history
+llm_interactions,LLMInteraction,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,2,0,0,19,app/models/models.py,models
+llm_metrics,LLMMetrics,shared,-,platform latency metrics; no user or organisation column,confirm,1,1,1,0,app/modules/ai_chat/services/llm_router.py,modules/ai_chat
+llm_prompt_version,LLMPromptVersion,shared,-,platform prompt templates and LLM provider configuration edited by platform admins,,0,0,0,0,app/models/llm_prompt_version.py,llm_prompt_version
+llm_requests,LLMRequest,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/modules/ai_chat/services/llm_router.py,modules/ai_chat
+llm_responses,LLMResponse,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/modules/ai_chat/services/llm_router.py,modules/ai_chat
+lucidchart_connector_configs,LucidchartConnectorConfig,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,1,app/models/connector_config.py,connector_config
+manufacturing_benchmarks,ManufacturingBenchmark,shared,-,manufacturing benchmark and domain reference data,confirm,0,0,0,0,app/models/manufacturing_capability.py,manufacturing_capability
+manufacturing_capabilities,ManufacturingCapability,via-parent,unified_capability_id>unified_capabilities,unified_capability_id>unified_capabilities,,7,6,5,12,app/models/manufacturing_capability.py,manufacturing_capability
+manufacturing_domain_hierarchy,ManufacturingDomainHierarchy,shared,-,manufacturing benchmark and domain reference data,confirm,6,0,0,4,app/models/manufacturing_capability.py,manufacturing_capability
+manufacturing_improvement_initiatives,ManufacturingImprovementInitiative,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/manufacturing_capability.py,manufacturing_capability
+manufacturing_plants,ManufacturingPlant,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,2,app/models/manufacturing_domain.py,manufacturing_domain
+manufacturing_processes,ManufacturingProcess,no-parent,-,manufacturing process model; needs organization_id with a decided backfill,,0,0,0,1,app/models/manufacturing_capability.py,manufacturing_capability
+manufacturing_value_stream_stages,ManufacturingValueStreamStage,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/manufacturing_capability.py,manufacturing_capability
+manufacturing_value_streams,ManufacturingValueStream,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/manufacturing_capability.py,manufacturing_capability
+mapping_metrics,MappingMetric,via-parent,application_components,application_id (no FK),,0,0,0,3,app/models/mapping_metrics.py,mapping_metrics
+migration_plan_documents,MigrationPlanDocument,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,6,app/models/workflow_artifacts.py,workflow_artifacts
+milestones,Milestone,via-parent,project_id>projects,project_id>projects,,0,0,0,31,app/models/project_models.py,project_models
+model_providers,ModelProvider,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,2,app/models/model_provider.py,model_provider
+motivation_assessments,MotivationAssessment,via-parent,model_id>architecture_models,model_id>architecture_models,,1,1,1,1,app/models/archimate_motivation.py,archimate_motivation
+motivation_constraints,MotivationConstraint,via-parent,model_id>architecture_models,model_id>architecture_models,,1,1,1,2,app/models/archimate_motivation.py,archimate_motivation
+motivation_drivers,MotivationDriver,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,3,app/models/models.py,models
+motivation_meanings,MotivationMeaning,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/archimate_motivation.py,archimate_motivation
+motivation_outcomes,MotivationOutcome,via-parent,model_id>architecture_models,model_id>architecture_models,,1,0,0,2,app/models/archimate_motivation.py,archimate_motivation
+motivation_stakeholders,MotivationStakeholder,via-parent,model_id>architecture_models,model_id>architecture_models,,1,1,1,2,app/models/archimate_motivation.py,archimate_motivation
+motivation_values,MotivationValue,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/archimate_motivation.py,archimate_motivation
+non_functional_requirement,NonFunctionalRequirement,via-parent,capability_id>business_capability,capability_id>business_capability,,0,0,0,2,app/models/business_capabilities.py,business_capabilities
+notifications,Notification,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,0,0,53,app/models/models.py,models
+oauth_authorization_codes,OAuthAuthorizationCode,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,0,0,4,app/modules/oauth_provider/models.py,modules/oauth_provider
+oauth_clients,OAuthClient,via-parent,users,service_user_id (no FK),,5,1,1,16,app/modules/oauth_provider/models.py,modules/oauth_provider
+oauth_tokens,OAuthToken,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,4,0,0,13,app/modules/oauth_provider/models.py,modules/oauth_provider
+optimization_runs,OptimizationRun,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/optimization.py,optimization
+options_analysis,OptionsAnalysis,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,28,app/models/vendor_analysis.py,vendor_analysis
+org_connector_configs,OrgConnectorConfig,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,3,app/models/connector_config.py,connector_config
+org_roles,OrgRole,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,3,0,0,13,app/models/org_role.py,org_role
+organizations,Organization,tenant-root,-,"tenant root: the row is the company; fence by id = organization, not by a column",,40,18,8,167,app/models/organization.py,organization
+other_relationships,OtherRelationship,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/archimate_core.py,archimate_core
+pending_invitations,PendingInvitation,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,2,0,0,2,app/models/pending_invitation.py,pending_invitation
+permissions,Permission,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,74,app/models/permission.py,permission
+pipeline_stages,PipelineStage,via-parent,pipeline_id>generation_pipelines,pipeline_id>generation_pipelines -> architecture_id>architecture_models,,0,0,0,5,app/models/models.py,models
+planning_deliverables,PlanningDeliverable,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,0,0,0,7,app/models/implementation_planning.py,implementation_planning
+platform_ai_interactions,PlatformAIInteraction,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/platform_models.py,platform_models
+platform_capabilities,PlatformCapability,via-parent,technology_stack_id>technology_stacks,technology_stack_id>technology_stacks -> vendor_template_id>vendor_stack_templates,confirm,1,0,0,2,app/models/models.py,models
+platform_configurations,PlatformConfiguration,direct-column,org_id,has org_id but no TenantMixin or row-level security,,3,0,0,9,app/models/platform_models.py,platform_models
+platform_migration_scopes,PlatformMigrationScope,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,4,app/models/workflow_artifacts.py,workflow_artifacts
+platform_types,PlatformType,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,4,app/models/platform_models.py,platform_models
+policy_enforcement,PolicyEnforcement,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/capability_governance.py,capability_governance
+policy_exemptions,PolicyExemption,via-parent,violation_id>policy_violations,violation_id>policy_violations,,8,0,0,4,app/models/policy_monitoring.py,policy_monitoring
+process_actor_raci,ProcessActorRaci,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/relationship_tables.py,relationship_tables
+process_application_mapping,ProcessApplicationMapping,via-parent,application_components,application_id (no FK),,17,5,2,18,app/models/apqc_process.py,apqc_process
+process_embeddings,ProcessEmbedding,via-parent,process_id>industry_apqc_process,process_id>industry_apqc_process,,0,0,0,6,app/models/vector_embeddings.py,vector_embeddings
+process_role_raci,ProcessRoleRaci,via-parent,process_id>business_processes,process_id>business_processes,,0,0,0,1,app/models/relationship_tables.py,relationship_tables
+product_inquiries,ProductInquiry,shared,-,captured before any organisation exists (public site forms and visitor counts),,2,2,1,1,app/models/product_inquiry.py,product_inquiry
+product_taxonomy,ProductTaxonomy,shared,-,"canonical vendor product taxonomy and name matching, same nature as the shared vendor catalogue (ADR-0003)",,4,1,1,4,app/models/vendor_taxonomy.py,vendor_taxonomy
+production_lines,ProductionLine,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,2,app/models/manufacturing_domain.py,manufacturing_domain
+production_orders,ProductionOrder,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/manufacturing_domain.py,manufacturing_domain
+project_constraints,ProjectConstraint,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,1,0,0,7,app/models/compliance_models.py,compliance_models
+project_notes,ProjectNote,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/project_models.py,project_models
+project_resources,ProjectResource,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/project_models.py,project_models
+public_visitor_events,PublicVisitorEvent,shared,-,captured before any organisation exists (public site forms and visitor counts),,0,0,0,1,app/models/public_visitor_event.py,public_visitor_event
+published_api_specs,PublishedAPISpec,via-parent,solution_id>solutions,solution_id>solutions,,12,9,2,7,app/models/published_api_spec.py,published_api_spec
+quality_attributes,QualityAttribute,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,20,app/models/compliance_models.py,compliance_models
+rag_metrics,RAGMetrics,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/services/rag_engine.py,app/services
+rag_queries,RAGQuery,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/services/rag_engine.py,app/services
+rag_results,RAGResult,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/services/rag_engine.py,app/services
+rationalization_audit_entries,RationalizationAuditEntry,via-parent,application_id>application_components,application_id>application_components,,1,1,1,6,app/models/application_rationalization.py,application_rationalization
+rationalization_benefits,RationalizationBenefitsTracker,via-parent,application_id>application_components,application_id>application_components,,4,3,1,3,app/models/application_rationalization.py,application_rationalization
+rationalization_policies,RationalizationPolicy,no-parent,-,rationalisation thresholds per company; needs organization_id with a decided backfill,,2,1,1,2,app/models/application_rationalization.py,application_rationalization
+refactoring_tracking,RefactoringTracking,via-parent,application_component_id>application_components,application_component_id>application_components,,0,0,0,4,app/models/software_quality.py,software_quality
+reference_number_counters,ReferenceNumberCounter,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,1,app/models/reference_number_counter.py,reference_number_counter
+regulatory_frameworks,RegulatoryFramework,shared,-,regulatory framework and control library seeded for all organisations (created_by is the seeding user),confirm,13,4,3,30,app/models/compliance_models.py,compliance_models
+relationship_suggestions,RelationshipSuggestion,via-parent,source_element_id>archimate_elements,source_element_id>archimate_elements,,4,1,1,15,app/models/archimate_core.py,archimate_core
+replacement_plans,ReplacementPlan,via-parent,source_app_id>application_components,source_app_id>application_components,,3,3,2,2,app/models/application_rationalization.py,application_rationalization
+requirement_change_log,RequirementChangeLog,via-parent,req_id>solution_requirements,req_id>solution_requirements,,1,1,1,1,app/models/solution_architect_models.py,solution_architect_models
+requirement_dependencies,RequirementDependency,via-parent,req_id>solution_requirements,req_id>solution_requirements,,4,4,1,1,app/models/solution_architect_models.py,solution_architect_models
+requirement_template,RequirementTemplate,shared,-,"system requirement templates (is_system), platform content",,8,8,1,3,app/models/requirement_template.py,requirement_template
+requirements_traceability_matrices,RequirementsTraceabilityMatrix,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,0,0,0,4,app/models/workflow_artifacts.py,workflow_artifacts
+resources,RoadmapResource,no-parent,-,"roadmap resource (name, email, rate); needs organization_id with a decided backfill",,0,0,0,42,app/models/roadmap_models.py,roadmap_models
+review_decisions,ReviewDecision,via-parent,review_item_id>review_queue_items,review_item_id>review_queue_items,,1,1,1,4,app/models/confidence_review.py,confidence_review
+review_queue_statistics,ReviewQueueStatistics,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/confidence_review.py,confidence_review
+rfp_templates,RFPTemplate,via-parent,capability_id>business_capability,capability_id>business_capability,,0,0,0,2,app/models/vendor_analysis.py,vendor_analysis
+roadmap_audit,RoadmapAudit,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,0,0,0,4,app/models/roadmap_models.py,roadmap_models
+roadmap_gaps,RoadmapGap,via-parent,source_capability_id>unified_capabilities,source_capability_id>unified_capabilities,,0,0,0,6,app/models/roadmap_models.py,roadmap_models
+roadmap_scenarios,RoadmapScenario,via-parent,created_by>users,created_by>users -> organization_id>organizations,confirm,0,0,0,2,app/models/roadmap_models.py,roadmap_models
+roadmap_work_packages,RoadmapWorkPackage,via-parent,created_by>users,created_by>users -> organization_id>organizations,confirm,11,7,2,23,app/models/roadmap_models.py,roadmap_models
+role_permissions,RolePermission,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,0,app/models/permission.py,permission
+roles,Role,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,41,19,7,144,app/models/user.py,user
+runtime_compliance_checks,RuntimeComplianceCheck,via-parent,solution_id>solutions,solution_id>solutions,,2,1,1,6,app/models/compliance_check.py,compliance_check
+salesforce_config_metadata,SalesforceConfigMetadata,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/platform_models.py,platform_models
+sap_metadata,SAPMetadata,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/platform_models.py,platform_models
+saved_diagram_elements,SavedDiagramElement,via-parent,diagram_id>saved_diagrams,diagram_id>saved_diagrams,,9,5,3,12,app/models/archimate_core.py,archimate_core
+saved_diagram_relationships,SavedDiagramRelationship,via-parent,diagram_id>saved_diagrams,diagram_id>saved_diagrams,,5,4,1,3,app/models/archimate_core.py,archimate_core
+savings_realizations,SavingsRealization,via-parent,opportunity_id>consolidation_opportunities,opportunity_id>consolidation_opportunities -> target_application_id>application_components,,3,0,0,4,app/models/consolidation.py,consolidation
+scoring_configs,ScoringConfig,shared,-,platform default scoring weights keyed by category and metric,confirm,6,0,0,1,app/models/scoring_config.py,scoring_config
+scoring_configurations,ScoringConfiguration,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,11,6,3,9,app/models/application_rationalization.py,application_rationalization
+security_scans,SecurityScan,via-parent,pipeline_id>generation_pipelines,pipeline_id>generation_pipelines -> architecture_id>architecture_models,,1,0,0,1,app/models/models.py,models
+service_dependency,ServiceDependency,via-parent,dependent_service_id>business_services,dependent_service_id>business_services,,2,0,0,2,app/models/relationship_tables.py,relationship_tables
+service_incidents,ServiceIncident,shared,-,platform status incidents shown to all organisations,,3,0,0,1,app/models/service_incident.py,service_incident
+service_level_agreements,ServiceLevelAgreement,via-parent,contract_id>vendor_contracts,contract_id>vendor_contracts,,0,0,0,4,app/models/cost_intelligence.py,cost_intelligence
+service_realization,ServiceRealization,via-parent,process_id>business_processes,process_id>business_processes,,2,0,0,14,app/models/relationship_tables.py,relationship_tables
+sidebar_menu_items,SidebarMenuItem,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,14,10,2,4,app/models/sidebar_menu.py,sidebar_menu
+simple_detection_runs,SimpleDetectionRun,no-parent,-,detection run over a company portfolio; needs organization_id with a decided backfill,,2,0,0,1,app/models/simple_duplicate_detection.py,simple_duplicate_detection
+simple_duplicate_groups,SimpleDuplicateGroup,no-parent,-,duplicate groups from a company portfolio; needs organization_id with a decided backfill,,7,0,0,2,app/models/simple_duplicate_detection.py,simple_duplicate_detection
+sla_violations,SLAViolation,via-parent,sla_id>service_level_agreements,sla_id>service_level_agreements -> contract_id>vendor_contracts,,0,0,0,3,app/models/cost_intelligence.py,cost_intelligence
+soc2_audit_log,AuditLog,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,4,1,1,36,app/models/audit_log.py,audit_log
+software_dependencies,SoftwareDependency,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,3,3,2,8,app/models/software_architecture.py,software_architecture
+software_modules,SoftwareModule,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,3,3,2,12,app/models/software_architecture.py,software_architecture
+solution_adr_direct,SolutionADRDirect,via-parent,solution_id>solutions,solution_id>solutions,,6,6,3,6,app/models/solution_sad_models.py,solution_sad_models
+solution_ai_backtesting,SolutionAIBacktesting,via-parent,solution_id>solutions,solution_id>solutions,,4,3,1,3,app/models/solution_governance.py,solution_governance
+solution_ai_reasoning_states,SolutionAIReasoningState,via-parent,solution_id>solutions,solution_id>solutions,,16,10,4,8,app/models/solution_reasoning.py,solution_reasoning
+solution_app_elements,SolutionAppElement,via-parent,solution_id>solutions,solution_id>solutions,,9,6,2,7,app/models/solution_sad_models.py,solution_sad_models
+solution_apqc_processes,SolutionAPQCProcess,via-parent,solution_id>solutions,solution_id>solutions,,9,7,3,8,app/models/solution_sad_models.py,solution_sad_models
+solution_archimate_elements,SolutionArchiMateElement,via-parent,solution_id>solutions,solution_id>solutions,,184,108,26,77,app/models/solution_models.py,solution_models
+solution_assessments_sad,SolutionAssessmentSAD,via-parent,solution_id>solutions,solution_id>solutions,,2,2,2,4,app/models/solution_sad_models.py,solution_sad_models
+solution_benefit_realizations,SolutionBenefitRealization,via-parent,solution_id>solutions,solution_id>solutions,,4,2,1,7,app/models/solution_sad_models.py,solution_sad_models
+solution_business_elements,SolutionBusinessElement,via-parent,solution_id>solutions,solution_id>solutions,,5,4,2,6,app/models/solution_sad_models.py,solution_sad_models
+solution_capability_mappings,SolutionCapabilityMapping,via-parent,problem_id>solution_problem_definitions,problem_id>solution_problem_definitions,,56,26,8,31,app/models/solution_models.py,solution_models
+solution_change_requests,SolutionChangeRequest,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,4,app/models/solution_sad_models.py,solution_sad_models
+solution_code_bundles,SolutionCodeBundle,via-parent,solution_id>solutions,solution_id>solutions,,6,6,1,1,app/modules/solutions_product/models.py,modules/solutions_product
+solution_comments,SolutionComment,via-parent,solution_id>solutions,solution_id>solutions,,6,6,2,4,app/models/solution_models.py,solution_models
+solution_compliance_mappings,SolutionComplianceMapping,via-parent,solution_id>solutions,solution_id>solutions,,3,3,2,9,app/models/solution_sad_models.py,solution_sad_models
+solution_compositions,SolutionComposition,via-parent,solution_id>solutions,solution_id>solutions,,3,2,1,5,app/models/solution_sad_models.py,solution_sad_models
+solution_cost_comparisons,SolutionCostComparison,via-parent,session_id>solution_analysis_sessions,session_id>solution_analysis_sessions,,0,0,0,3,app/models/solution_cost_model.py,solution_cost_model
+solution_cost_yearly_projections,SolutionCostYearlyProjection,via-parent,cost_model_id>solution_cost_models,cost_model_id>solution_cost_models,,2,0,0,2,app/models/solution_cost_model.py,solution_cost_model
+solution_elements,SolutionElement,via-parent,solution_id>solutions,solution_id>solutions,,11,10,4,11,app/models/solution_element.py,solution_element
+solution_embeddings,SolutionEmbedding,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,7,app/models/vector_embeddings.py,vector_embeddings
+solution_feasibility_reviews,SolutionFeasibilityReview,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,6,app/models/solution_sad_models.py,solution_sad_models
+solution_fit_gap_entries,SolutionFitGapEntry,via-parent,solution_id>solutions,solution_id>solutions,,9,6,2,6,app/models/solution_models.py,solution_models
+solution_governance_exceptions,SolutionGovernanceException,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,6,app/models/solution_sad_models.py,solution_sad_models
+solution_integration_flows,SolutionIntegrationFlow,via-parent,solution_id>solutions,solution_id>solutions,,13,10,6,16,app/models/solution_sad_models.py,solution_sad_models
+solution_investment_phases,SolutionInvestmentPhase,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,4,app/models/solution_sad_models.py,solution_sad_models
+solution_layer_elements,SolutionLayerElement,via-parent,solution_id>solutions,solution_id>solutions,,1,0,0,1,app/modules/codegen/models.py,modules/codegen
+solution_lessons_learned,SolutionLessonLearned,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,4,app/models/solution_sad_models.py,solution_sad_models
+solution_migration_dependencies,MigrationDependency,via-parent,solution_id>solutions,solution_id>solutions,,2,1,1,5,app/models/solution_sad_models.py,solution_sad_models
+solution_notifications,SolutionNotification,via-parent,solution_id>solutions,solution_id>solutions,,3,3,1,5,app/models/solution_governance.py,solution_governance
+solution_org_impacts,SolutionOrgImpact,via-parent,solution_id>solutions,solution_id>solutions,,2,2,1,6,app/models/solution_sad_models.py,solution_sad_models
+solution_outcome_tracking,SolutionOutcomeTracking,via-parent,solution_id>solutions,solution_id>solutions,,11,0,0,4,app/models/solution_governance.py,solution_governance
+solution_plateaus,SolutionPlateau,via-parent,solution_id>solutions,solution_id>solutions,,10,6,3,14,app/models/solution_lifecycle_models.py,solution_lifecycle_models
+solution_principles_sad,SolutionPrincipleSAD,via-parent,solution_id>solutions,solution_id>solutions,,2,2,2,4,app/models/solution_sad_models.py,solution_sad_models
+solution_quality_attributes,SolutionQualityAttribute,via-parent,solution_id>solutions,solution_id>solutions,,9,6,3,12,app/models/solution_sad_models.py,solution_sad_models
+solution_risk_snapshots,RiskSnapshot,via-parent,solution_id>solutions,solution_id>solutions,,3,3,2,9,app/models/solution_sad_models.py,solution_sad_models
+solution_scoring_configs,SolutionScoringConfig,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,2,app/models/solution_scoring_config.py,solution_scoring_config
+solution_session_versions,SolutionSessionVersion,via-parent,session_id>solution_analysis_sessions,session_id>solution_analysis_sessions,,3,0,0,3,app/models/solution_architect_models.py,solution_architect_models
+solution_slas,SolutionSLA,via-parent,solution_id>solutions,solution_id>solutions,,12,9,4,12,app/models/solution_sad_models.py,solution_sad_models
+solution_stakeholder_concerns,SolutionStakeholderConcern,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/solution_stakeholder.py,solution_stakeholder
+solution_stakeholder_mappings,SolutionStakeholderMapping,via-parent,stakeholder_id>solution_stakeholders,stakeholder_id>solution_stakeholders,,7,3,3,8,app/models/solution_stakeholder.py,solution_stakeholder
+solution_stakeholders_sad,SolutionStakeholderSAD,via-parent,solution_id>solutions,solution_id>solutions,,4,4,2,5,app/models/solution_sad_models.py,solution_sad_models
+solution_tco_items,SolutionTCOItem,via-parent,solution_id>solutions,solution_id>solutions,,9,9,2,6,app/models/solution_lifecycle_models.py,solution_lifecycle_models
+solution_tech_elements,SolutionTechElement,via-parent,solution_id>solutions,solution_id>solutions,,6,5,2,6,app/models/solution_sad_models.py,solution_sad_models
+solution_templates,SolutionTemplate,via-parent,source_solution_id>solutions,source_solution_id>solutions,,4,4,2,2,app/models/solution_governance.py,solution_governance
+solution_workflow_tasks,SolutionWorkflowTask,via-parent,workflow_id>solution_workflows,workflow_id>solution_workflows,,0,0,0,2,app/models/solution_workflow.py,solution_workflow
+spec_webhooks,SpecWebhook,via-parent,solution_id>solutions,solution_id>solutions,,5,4,1,2,app/models/spec_webhook.py,spec_webhook
+sprints,Sprint,via-parent,board_id>kanban_boards,board_id>kanban_boards,,6,0,0,18,app/models/sprint.py,sprint
+sso_configs,SSOConfig,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,2,0,0,3,app/models/sso_config.py,sso_config
+staging_elements,StagingElement,via-parent,import_session_id>import_sessions,import_session_id>import_sessions -> user_id>users -> organization_id>organizations,,1,0,0,1,app/models/import_session.py,import_session
+stakeholder_communications,StakeholderCommunication,via-parent,solutions,solution_id; already fenced on ui/sec02 e576da9d7,,2,0,0,1,app/models/stakeholder_communication.py,stakeholder_communication
+stakeholder_inputs,StakeholderInput,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,5,app/models/vendor_analysis.py,vendor_analysis
+strategy_resources,StrategyResource,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,8,app/models/strategy_layer.py,strategy_layer
+structural_groupings,Grouping,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,25,app/models/structural_elements.py,structural_elements
+structural_junctions,Junction,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,23,app/models/structural_elements.py,structural_elements
+structural_locations,Location,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,50,app/models/structural_elements.py,structural_elements
+subscriptions,Subscription,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,1,0,0,17,app/models/subscription.py,subscription
+suggestion_feedback,SuggestionFeedback,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/ai_suggestion.py,ai_suggestion
+sync_logs,SyncLog|SyncLog,via-parent,connector_id>connector_configs,connector_id>connector_configs,,8,6,1,3,app/modules/admin/v2/services/connector_framework_v2.py,modules/admin
+system_dependencies,SystemDependency,via-parent,source_system_id>archimate_elements,source_system_id>archimate_elements,,4,0,0,4,app/models/integration_metadata.py,integration_metadata
+system_deployments,SystemDeployment,via-parent,system_id>archimate_elements,system_id>archimate_elements,,0,0,0,4,app/models/system_architecture.py,system_architecture
+system_hierarchies,SystemHierarchy,via-parent,parent_system_id>archimate_elements,parent_system_id>archimate_elements,,0,0,0,4,app/models/system_architecture.py,system_architecture
+system_interfaces,SystemInterface,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,6,app/models/system_architecture.py,system_architecture
+system_lifecycles,SystemLifecycle,via-parent,system_id>archimate_elements,system_id>archimate_elements,,0,0,0,6,app/models/system_architecture.py,system_architecture
+system_settings,SystemSetting,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,1,app/models/system_setting.py,system_setting
+systems,System,no-parent,-,systems list; needs organization_id with a decided backfill,,0,0,0,185,app/models/adm_kanban_junctions.py,adm_kanban_junctions
+taxonomy_mappings,TaxonomyMapping,shared,-,"canonical vendor product taxonomy and name matching, same nature as the shared vendor catalogue (ADR-0003)",,3,1,1,2,app/models/vendor_taxonomy.py,vendor_taxonomy
+tco_benchmarks,TCOBenchmark,shared,-,"published TCO benchmark data, not company data",,2,0,0,1,app/models/vendor_analysis.py,vendor_analysis
+tco_calculations,TCOCalculation,via-parent,vendor_product_id>vendor_products,vendor_product_id>vendor_products -> archimate_product_element_id>archimate_elements,confirm,7,3,1,7,app/models/vendor/vendor_organization.py,vendor_organization
+technical_capabilities,TechnicalCapability,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,53,app/models/technical_capability.py,technical_capability
+technical_capability_vendor_mappings,TechnicalCapabilityVendorMapping,shared,-,"technology capability catalogue and its vendor mapping, seeded reference data",confirm,8,6,2,9,app/models/capability_to_vendor_mapping.py,capability_to_vendor_mapping
+technical_debt,TechnicalDebt,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,16,app/models/software_quality.py,software_quality
+technology_capabilities,TechnologyCapability,shared,-,"technology capability catalogue and its vendor mapping, seeded reference data",confirm,0,0,0,4,app/models/unified_capability.py,unified_capability
+technology_capability,TechnologyCapabilityMapping,via-parent,business_capability_id>business_capability,business_capability_id>business_capability,,0,0,0,1,app/models/capability_models.py,capability_models
+technology_roadmap_initiatives,TechnologyRoadmapInitiative,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,6,3,2,13,app/models/implementation_migration.py,implementation_migration
+technology_stacks,TechnologyStack|TechnologyStack,via-parent,vendor_template_id>vendor_stack_templates,vendor_template_id>vendor_stack_templates,,4,0,0,33,app/models/technology_stack.py,technology_stack
+test_cases,TestCase,via-parent,requirement_id>requirements,requirement_id>requirements,,0,0,0,5,app/models/models.py,models
+threshold_configurations,ThresholdConfiguration,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,0,0,0,2,app/models/confidence_review.py,confidence_review
+traceability_links,TraceabilityLink,via-parent,source_archimate_element_id>archimate_elements,source_archimate_element_id>archimate_elements,,4,4,2,7,app/models/traceability.py,traceability
+uml_attributes,UMLAttribute,via-parent,uml_element_id>uml_elements,uml_element_id>uml_elements -> archimate_element_id>archimate_elements,,1,0,0,1,app/models/models.py,models
+uml_elements,UMLElement,via-parent,archimate_element_id>archimate_elements,archimate_element_id>archimate_elements,,0,0,0,7,app/models/models.py,models
+uml_methods,UMLMethod,via-parent,uml_element_id>uml_elements,uml_element_id>uml_elements -> archimate_element_id>archimate_elements,,1,0,0,1,app/models/models.py,models
+uml_models,UMLModel,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/models.py,models
+unified_application_capability_mapping,UnifiedApplicationCapabilityMapping,via-parent,unified_capability_id>unified_capabilities,unified_capability_id>unified_capabilities,,50,23,10,47,app/models/unified_application_capability_mapping.py,unified_application_capability_mapping
+unified_capability_application_mappings,UnifiedCapabilityApplicationMapping,via-parent,unified_capability_id>unified_capabilities,unified_capability_id>unified_capabilities,,3,2,2,5,app/models/capability_to_vendor_mapping.py,capability_to_vendor_mapping
+unified_capability_process_mapping,UnifiedCapabilityProcessMapping,via-parent,capability_id>unified_capabilities,capability_id>unified_capabilities,,0,0,0,3,app/models/unified_capability.py,unified_capability
+unified_capability_technology_mapping,CapabilityTechnologyMapping,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/unified_capability.py,unified_capability
+unified_capability_vendor_organization_mappings,UnifiedCapabilityVendorOrganizationMapping,via-parent,unified_capability_id>unified_capabilities,unified_capability_id>unified_capabilities,,2,1,1,4,app/models/capability_to_vendor_mapping.py,capability_to_vendor_mapping
+unified_detection_runs,UnifiedDetectionRun,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,14,9,4,8,app/models/unified_duplicate_detection.py,unified_duplicate_detection
+unified_duplicate_groups,UnifiedDuplicateGroup,via-parent,detection_run_id>unified_detection_runs,detection_run_id>unified_detection_runs -> user_id>users -> organization_id>organizations,,35,23,4,9,app/models/unified_duplicate_detection.py,unified_duplicate_detection
+unified_work_packages,UnifiedWorkPackage,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,45,app/models/unified_work_package.py,unified_work_package
+usage_analytics,UsageAnalytics,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,2,2,1,8,app/models/usage_analytics.py,usage_analytics
+usage_events,UsageEvent,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,0,0,0,5,app/models/usage_event.py,usage_event
+user_preferences,UserPreference,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,2,0,0,4,app/models/ai_suggestion.py,ai_suggestion
+user_roles,UserRole,via-parent,user_id>users,user_id>users -> organization_id>organizations,confirm,0,0,0,6,app/models/permission.py,permission
+user_sessions,UserSession,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,5,0,0,2,app/models/user_session.py,user_session
+users,User,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,37,13,11,629,app/models/user.py,user
+validation_gates,ValidationGate,via-parent,pipeline_stages,pipeline_stage_id (no FK),,0,0,0,1,app/models/models.py,models
+validation_violations,ValidationViolation,via-parent,resolved_by_id>users,resolved_by_id>users -> organization_id>organizations,,0,0,0,5,app/models/models.py,models
+vendor_archimate_templates,VendorArchiMateTemplate,via-parent,element_id>archimate_elements,element_id>archimate_elements,,3,1,1,5,app/models/vendor/vendor_organization.py,vendor_organization
+vendor_comparison_criteria,VendorComparisonCriteria,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,0,0,0,2,app/models/vendor_analysis.py,vendor_analysis
+vendor_concentration_analysis,VendorConcentrationAnalysis,via-parent,application_components,application_ids (json list),,4,0,0,2,app/models/application_rationalization.py,application_rationalization
+vendor_data_sources,VendorDataSource,shared,-,"children of the shared vendor catalogue (VendorOrganization, ADR-0003): facts about vendors in the world",,0,0,0,2,app/models/vendor/vendor_organization.py,vendor_organization
+vendor_integration_catalog,VendorIntegrationCatalog,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/vendor_stack_hierarchy.py,vendor_stack_hierarchy
+vendor_organization_embeddings,VendorOrganizationEmbedding,shared,-,"children of the shared vendor catalogue (VendorOrganization, ADR-0003): facts about vendors in the world",,0,0,0,5,app/models/vector_embeddings.py,vector_embeddings
+vendor_organizations,VendorOrganization,stale-listed,-,model already inherits a tenant mixin (or is in GLOBAL_MODELS); the list entry is stale,,0,0,0,152,app/models/vendor/vendor_organization.py,vendor_organization
+vendor_product_aliases,VendorProductAlias,shared,-,"children of the shared vendor catalogue (VendorOrganization, ADR-0003): facts about vendors in the world",,0,0,0,0,app/models/vendor/vendor_product.py,vendor_product
+vendor_product_apqc_mapping,VendorProductAPQCMapping,via-parent,vendor_product_id>vendor_products,vendor_product_id>vendor_products -> archimate_product_element_id>archimate_elements,confirm,11,4,1,8,app/models/vendor_product_apqc_mapping.py,vendor_product_apqc_mapping
+vendor_product_details,VendorProductDetail,shared,-,"children of the shared vendor catalogue (VendorOrganization, ADR-0003): facts about vendors in the world",,2,0,0,5,app/models/vendor/vendor_product.py,vendor_product
+vendor_product_embeddings,VendorProductEmbedding,via-parent,vendor_product_id>vendor_products,vendor_product_id>vendor_products -> archimate_product_element_id>archimate_elements,confirm,1,0,0,6,app/models/vector_embeddings.py,vector_embeddings
+vendor_product_families,VendorProductFamily,shared,-,"children of the shared vendor catalogue (VendorOrganization, ADR-0003): facts about vendors in the world",,11,0,0,6,app/models/vendor/vendor_product.py,vendor_product
+vendor_product_pricing,VendorProductPricing,direct-column,organization_id,has organization_id but no TenantMixin or row-level security,,4,2,2,13,app/models/vendor/vendor_organization.py,vendor_organization
+vendor_products,VendorProduct,via-parent,archimate_product_element_id>archimate_elements,archimate_product_element_id>archimate_elements,,162,52,24,178,app/models/vendor/vendor_organization.py,vendor_organization
+vendor_proof_points,VendorProofPoint,via-parent,vendor_option_id>vendor_options,vendor_option_id>vendor_options,,0,0,0,2,app/models/vendor_analysis.py,vendor_analysis
+vendor_responses,VendorResponse,via-parent,vendor_option_id>vendor_options,vendor_option_id>vendor_options,,0,0,0,2,app/models/vendor_analysis.py,vendor_analysis
+vendor_risk_assessments,VendorRiskAssessment,via-parent,vendor_product_id>vendor_products,vendor_product_id>vendor_products -> archimate_product_element_id>archimate_elements,confirm,5,0,0,6,app/models/vendor/vendor_organization.py,vendor_organization
+vendor_selection_reports,VendorSelectionReport,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,1,1,5,app/models/workflow_artifacts.py,workflow_artifacts
+viewpoint_stakeholder_mappings,ViewpointStakeholderMapping,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/archimate_viewpoint.py,archimate_viewpoint
+viewpoint_views,ViewpointView,via-parent,viewpoint_id>archimate_viewpoints,viewpoint_id>archimate_viewpoints,,0,0,0,2,app/models/archimate_viewpoint.py,archimate_viewpoint
+waitlist_signups,WaitlistSignup,shared,-,captured before any organisation exists (public site forms and visitor counts),,2,2,1,1,app/models/waitlist_signup.py,waitlist_signup
+workflow_cleanup_nodes,WorkflowCleanupNode,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/workflow_models.py,workflow_models
+workflow_completion_summaries,WorkflowCompletionSummary,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,1,0,0,4,app/models/workflow_artifacts.py,workflow_artifacts
+workflow_edges,WorkflowEdge,dead,-,no reader or writer outside the model file and tests,,0,0,0,0,app/models/workflow_models.py,workflow_models
+workflow_executions,WorkflowExecution,via-parent,pipeline_id>workflow_pipelines,pipeline_id>workflow_pipelines -> architecture_id>architecture_models,,0,0,0,2,app/models/workflow_models.py,workflow_models
+workflow_instance_archimate_elements,WorkflowInstanceArchiMateElement,via-parent,instance_id>ea_workflow_instances,instance_id>ea_workflow_instances,,0,0,0,1,app/models/models.py,models
+workflow_node_types,WorkflowNodeType,shared,-,"platform configuration or RBAC definitions, one set for all organisations",,0,0,0,0,app/models/workflow_models.py,workflow_models
+workflow_nodes,WorkflowNode,via-parent,pipeline_id>workflow_pipelines,pipeline_id>workflow_pipelines -> architecture_id>architecture_models,,0,0,0,2,app/models/workflow_models.py,workflow_models
+workflow_pipelines,WorkflowPipeline,via-parent,architecture_id>architecture_models,architecture_id>architecture_models,,0,0,0,5,app/models/workflow_models.py,workflow_models
+workflow_run_watchers,WorkflowRunWatcher,via-parent,workflow_instance_id>ea_workflow_instances,workflow_instance_id>ea_workflow_instances,,4,3,1,4,app/models/workflow_models.py,workflow_models
+workflow_templates,WorkflowTemplate,via-parent,created_by_id>users,created_by_id>users -> organization_id>organizations,confirm,5,0,0,6,app/models/workflow_models.py,workflow_models
