@@ -75,7 +75,10 @@ def test_a_charter_that_lets_a_persona_read_never_lets_it_read_another_organisat
     seed_b = seed_cited_model(db_session, org_b, suffix=" B")
     # a charter is the organisation's own: B's charter grants nothing in A
     assert AgentCharter.tool_allowed("solutions_architect", "get_genome_slice", org_a) is True
-    assert AgentCharter.tool_allowed("solutions_architect", "get_genome_slice", 999999999) is False
+    # an organisation with no stored charter is given the persona's default (never another organisation's), so
+    # a read is allowed and a forbidden tool is still refused; what a read returns is fenced by the session
+    assert AgentCharter.tool_allowed("solutions_architect", "get_genome_slice", 999999999) is True
+    assert AgentCharter.tool_allowed("solutions_architect", "create_programme", 999999999) is False
 
     seen = _call(user_a, org_a, tenant_ctx, "solutions_architect", "get_genome_slice", domain="business")
     names = {n["name"] for n in seen["result"]["nodes"]}
