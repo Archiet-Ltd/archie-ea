@@ -4,7 +4,7 @@ Provides:
     GET /api/solutions/<solution_id>/completeness  — JSON report
     GET /solutions/<solution_id>/completeness      — HTML page
 """
-from flask import redirect, url_for, Blueprint, jsonify, render_template
+from flask import redirect, url_for, Blueprint, jsonify
 from flask_login import login_required
 
 completeness_bp = Blueprint("completeness", __name__)
@@ -30,7 +30,6 @@ def api_completeness(solution_id: int):
 def completeness_page(solution_id: int):
     """Render the completeness dashboard page."""
     from app.models.solution_models import Solution
-    from app.services.solution_completeness_service import check_completeness
     from app.utils.route_guards import require_entity
 
     require_entity(Solution, solution_id, description="Solution not found")

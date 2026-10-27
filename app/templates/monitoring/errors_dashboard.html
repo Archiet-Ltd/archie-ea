@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
@@ -67,12 +68,9 @@
     document.addEventListener('click', async function (e) {
         var item = e.target.closest('[data-resolve-urls]');
         if (!item) return;
-        var meta = document.querySelector('meta[name=csrf-token]');
-        var headers = { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': meta ? meta.content : '' };
         try {
             for (var id of item.dataset.resolveUrls.split(',')) {
-                var r = await fetch(base.replace('/0/', '/' + id + '/'), { method: 'POST', headers: headers, credentials: 'same-origin' });
-                if (!r.ok) throw new Error('status ' + r.status);
+                await Platform.fetch(base.replace('/0/', '/' + id + '/'), { method: 'POST', silent: true });
             }
             location.reload();
         } catch (err) {

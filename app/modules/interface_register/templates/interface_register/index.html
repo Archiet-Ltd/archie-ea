@@ -1,3 +1,4 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
@@ -55,6 +56,7 @@
   {% endif %}
 
 {% else %}
+{# duplicate-breadcrumb-ok: the two trails sit in the two branches of one if; only one renders per request #}
 {{ page_shell(title='Interface register', subtitle='Interfaces for ' ~ initiative.name,
               breadcrumb=[('Home', url_for('main.index')), ('Interface register', url_for('interface_register.index')), (initiative.name, none)],
               actions_caller=_actions) }}

@@ -8,7 +8,7 @@ Endpoints:
 
 import logging
 
-from flask import Blueprint, jsonify, redirect, render_template, request
+from flask import Blueprint, jsonify, redirect, request
 
 from app.services import communication_log_service
 from flask_login import login_required

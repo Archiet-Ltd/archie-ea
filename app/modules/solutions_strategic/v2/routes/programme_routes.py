@@ -62,9 +62,6 @@ def programmes_list():
 def solution_review_packet(solution_id):
     """Board-ready packet: conformance + decision + readiness for one solution."""
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.chief_architect_service import (
-        ChiefArchitectService,
-    )
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
@@ -296,9 +293,6 @@ def data_stewardship_classify():
 def solution_conformance(solution_id):
     """AI Technical Architect: conformance review against technical policy."""
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.conformance_reviewer import (
-        ConformanceReviewer,
-    )
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:

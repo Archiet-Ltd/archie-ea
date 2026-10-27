@@ -60,6 +60,7 @@
 {{ page_shell(title='Systems without a vendor', subtitle='Pick or type the vendor for each system; it is saved straight away',
               breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Systems without a vendor', none)]) }}
 {% else %}
+{# duplicate-breadcrumb-ok: the two trails sit in the two branches of one if; only one renders per request #}
 {{ page_shell(title='Vendors', subtitle='The vendors your systems and contracts name, what they cost and when they renew',
               breadcrumb=[('Home', url_for('main.index')), ('Vendors', none)], actions_caller=_actions) }}
 {% endif %}
