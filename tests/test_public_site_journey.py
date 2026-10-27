@@ -198,6 +198,11 @@ def test_the_main_action_reaches_sign_up_and_the_home_page_shows_what_is_early_a
                 assert "get a cited answer" not in text
             else:
                 assert later not in text, later
+        # Seven jobs: building the first model and knowing what you have are open; the other five are coming next.
+        assert page.locator("[data-testid=home-job-today]").count() == 2
+        assert page.locator("[data-testid=home-job-next]").count() == 5
+        expect(page.locator("[data-job=first-model]")).to_contain_text("We read your website and build your first model in minutes")
+        expect(page.locator("[data-job=first-model]").get_by_text("Available today")).to_be_visible()
         team = page.get_by_test_id("home-architecture-team")
         expect(team).to_contain_text("Coming next: an architecture team in your chat.")
         expect(team).to_contain_text("You approve every change.")

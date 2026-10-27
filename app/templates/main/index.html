@@ -102,10 +102,17 @@
     <div class="max-w-3xl">
       <p class="home-eyebrow">What it does</p>
       <h2 class="home-h2">The jobs it does for you.</h2>
-      <p class="home-section-lead">The first is open today. The rest are coming next: join the waiting list for the ones you want.</p>
+      <p class="home-section-lead">Seven jobs, from your first model to asking it anything. The first two are open today. The rest are coming next: join the waiting list for the ones you want.</p>
     </div>
     <ul class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" role="list">
-      <li class="public-card" data-testid="home-job-today" data-availability="live">
+      <li class="public-card" data-testid="home-job-today" data-availability="live" data-job="first-model">
+        {% call badge('secondary') %}Available today{% endcall %}
+        <h3 class="public-card-title mt-3">Build your first model</h3>
+        <p class="public-card-body">We read your website and build your first model in minutes. You confirm what we found before anything is recorded.</p>
+        <p class="mt-4">{{ button(text='See how it works', href='/features#company-profile', variant='outline') }}</p>
+        <p class="public-card-body mt-3">Connecting GitHub or Jira is coming next. <a href="/modules/connect-github-or-jira" class="public-link" data-testid="home-job-connect">Join the waiting list</a>.</p>
+      </li>
+      <li class="public-card" data-testid="home-job-today" data-availability="live" data-job="what-you-have">
         {% call badge('secondary') %}Available today{% endcall %}
         <h3 class="public-card-title mt-3">What you have and who owns it</h3>
         <p class="public-card-body">One list of your applications with an owner on each, and one overview and health page that show what is missing.</p>
