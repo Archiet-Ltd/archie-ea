@@ -22,6 +22,25 @@
   {{ form.get(field) if form and form.get(field) is not none else (fallback if fallback is not none else '') }}
 {%- endmacro %}
 
+{#
+  The value to mark selected in each native_select. native_select compares
+  `selected == value` with no coercion, so the type has to match the option
+  value exactly: vendor option values are the integer VendorContract.vendor_id,
+  while a re-submitted form carries it as a string, so a submitted vendor is
+  cast back to int here. A blank submitted vendor ('') leaves it unselected.
+  The three classification fields are strings on both sides and are trimmed to
+  match the stored vocabulary. In every case the user's rejected submission
+  wins over the stored value, which wins over nothing.
+#}
+{% set vendor_submitted = form.get('vendor_id') if form else none %}
+{% set vendor_selected = (vendor_submitted | int) if vendor_submitted else (contract.vendor_id if contract else none) %}
+{% set type_submitted = form.get('contract_type') if form else none %}
+{% set type_selected = (type_submitted | trim) if type_submitted is not none else (contract.contract_type if contract else none) %}
+{% set category_submitted = form.get('contract_category') if form else none %}
+{% set category_selected = (category_submitted | trim) if category_submitted is not none else (contract.contract_category if contract else none) %}
+{% set status_submitted = form.get('status') if form else none %}
+{% set status_selected = (status_submitted | trim) if status_submitted is not none else (contract.status if contract else none) %}
+
 {% block content %}
 <div class="p-6 space-y-6 max-w-2xl mx-auto">
 
@@ -217,17 +236,18 @@
               attrs_dict={'maxlength': '100'}
           ) }}
 
+          {% set ns = namespace(vendor_options=[('', 'Not specified')]) %}
+          {% for v in vendors %}
+            {% set ns.vendor_options = ns.vendor_options + [(v.id, v.name)] %}
+          {% endfor %}
           {% call form_group(id='vendor_id', label='Vendor', help_text='Select the vendor for this contract') %}
             {{ native_select(
                 id='vendor_id',
                 name='vendor_id',
                 size='sm',
-                options=[('', 'Not specified')],
-                selected=current('vendor_id', contract.vendor_id if contract else '')
+                options=ns.vendor_options,
+                selected=vendor_selected
             ) }}
-            {% for v in vendors %}
-            <option value="{{ v.id }}">{{ v.name }}</option>
-            {% endfor %}
           {% endcall %}
         </div>
 
@@ -249,43 +269,46 @@
       {% endcall %}
       {% call card_content(class='space-y-6') %}
         <div class="grid grid-cols-1 gap-4">
+          {% set ns = namespace(type_options=[('', 'Not specified')]) %}
+          {% for v in contract_types %}
+            {% set ns.type_options = ns.type_options + [(v, v | replace('_', ' ') | title)] %}
+          {% endfor %}
           {% call form_group(id='contract_type', label='Type') %}
             {{ native_select(
                 id='contract_type',
                 name='contract_type',
                 size='sm',
-                options=[('', 'Not specified')],
-                selected=current('contract_type', contract.contract_type if contract else '')
+                options=ns.type_options,
+                selected=type_selected
             ) }}
-            {% for v in contract_types %}
-            <option value="{{ v }}">{{ v | replace('_', ' ') | title }}</option>
-            {% endfor %}
           {% endcall %}
 
+          {% set ns = namespace(category_options=[('', 'Not specified')]) %}
+          {% for v in contract_categories %}
+            {% set ns.category_options = ns.category_options + [(v, v | title)] %}
+          {% endfor %}
           {% call form_group(id='contract_category', label='Category') %}
             {{ native_select(
                 id='contract_category',
                 name='contract_category',
                 size='sm',
-                options=[('', 'Not specified')],
-                selected=current('contract_category', contract.contract_category if contract else '')
+                options=ns.category_options,
+                selected=category_selected
             ) }}
-            {% for v in contract_categories %}
-            <option value="{{ v }}">{{ v | title }}</option>
-            {% endfor %}
           {% endcall %}
 
+          {% set ns = namespace(status_options=[('', 'Not specified')]) %}
+          {% for v in contract_statuses %}
+            {% set ns.status_options = ns.status_options + [(v, v | replace('_', ' ') | title)] %}
+          {% endfor %}
           {% call form_group(id='status', label='Status') %}
             {{ native_select(
                 id='status',
                 name='status',
                 size='sm',
-                options=[('', 'Not specified')],
-                selected=current('status', contract.status if contract else '')
+                options=ns.status_options,
+                selected=status_selected
             ) }}
-            {% for v in contract_statuses %}
-            <option value="{{ v }}">{{ v | replace('_', ' ') | title }}</option>
-            {% endfor %}
           {% endcall %}
         </div>
       {% endcall %}
