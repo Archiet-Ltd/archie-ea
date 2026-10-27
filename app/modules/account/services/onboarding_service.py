@@ -25,6 +25,7 @@ GITHUB_TASK = "onboarding_github_import"
 JIRA_TASK = "onboarding_jira_import"
 WEBSITE_TASK = "website_profile_crawl"
 MORE_FACTS_LATER = "More facts will be added when our reading service is less busy."
+MORE_FACTS_FOLLOW = "More facts follow in a few minutes, as we finish working out what your pages say."
 
 # (key, label, starter capability model). The model is the one starter set the industry picks
 # later; this round only records the choice.
@@ -350,6 +351,7 @@ _WEBSITE_REASONS = {
     "nothing_found": "We read %s but found no facts we could state with confidence.",
     "no_consent": "%s has not been agreed to be read yet.",
     "no_site": "No website is recorded yet.",
+    "interrupted": "The reading of %s was cut off by a restart on our side, so it has been queued to run again.",
 }
 _INSTEAD = " You can connect GitHub or Jira instead, or look around the sample company."
 
@@ -398,7 +400,7 @@ def website_state(org) -> Dict[str, Any]:
         facts, _completeness = confirm.proposals(org.id)
         read = result.get("pages_read", 0)
         pages = "%s %s" % (read, "page" if read == 1 else "pages")
-        later = (" " + MORE_FACTS_LATER) if result.get("more_to_come") else ""
+        later = (" " + _more_to_come(org, result)) if _more_to_come(org, result) else ""
         if facts:
             return {
                 "state": "done",
@@ -442,14 +444,39 @@ def website_state(org) -> Dict[str, Any]:
     return {"state": "waiting", "text": "Company website is connected. Reading starts in a moment; carry on."}
 
 
+def _more_to_come(org, result: Dict[str, Any]) -> Optional[str]:
+    """What to say about the facts still on their way after the first read: the model pass is working them out
+    (it runs as its own job), or it found every provider busy and a retry is queued; nothing when it is done."""
+    from app.models.job import JobStatus
+    from app.services.job_queue_service import get_job_queue_service
+
+    if not result.get("more_to_come"):
+        return None
+    if not result.get("model_pass_queued"):
+        return MORE_FACTS_LATER
+    latest = get_job_queue_service().list_jobs(org.id, limit=1, task="website_profile_crawl_more")
+    if not latest:
+        return MORE_FACTS_FOLLOW
+    job = latest[0]
+    waiting_for_later = bool((job.payload or {}).get("not_before"))
+    if job.status == JobStatus.COMPLETED.value and not (job.result or {}).get("retry_queued"):
+        return None  # the pass has finished: everything it found is already in the list
+    if job.status in (JobStatus.FAILED.value, JobStatus.CANCELLED.value):
+        return None
+    if waiting_for_later or (job.result or {}).get("retry_queued"):
+        return MORE_FACTS_LATER
+    return MORE_FACTS_FOLLOW
+
+
 def more_facts_coming(org) -> Optional[str]:
-    """The sentence to show when the model pass found every provider busy and a retry is queued."""
+    """The sentence to show when more facts are on their way: a pass still being worked out, or a retry queued
+    because every provider was busy."""
     from app.models.job import JobStatus
     from app.services.job_queue_service import get_job_queue_service
 
     jobs = get_job_queue_service().list_jobs(org.id, limit=1, task=WEBSITE_TASK)
-    if jobs and jobs[0].status == JobStatus.COMPLETED.value and (jobs[0].result or {}).get("more_to_come"):
-        return MORE_FACTS_LATER
+    if jobs and jobs[0].status == JobStatus.COMPLETED.value:
+        return _more_to_come(org, jobs[0].result or {})
     return None
 
 
