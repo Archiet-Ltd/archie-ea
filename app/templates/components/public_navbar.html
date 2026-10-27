@@ -18,7 +18,7 @@
 {% set reg = site_registry() %}
 {% set trigger_class = 'flex h-11 w-full items-center justify-between rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:w-auto lg:justify-start lg:gap-1 lg:text-muted-foreground lg:hover:text-foreground' %}
 {% set link_class = 'flex h-11 w-full items-center rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:w-auto lg:text-muted-foreground lg:hover:text-foreground' %}
-{% set panel_class = 'static block [&[hidden]]:hidden w-full md:static md:w-full lg:absolute lg:inset-x-0 lg:top-full lg:left-0 lg:right-0 lg:w-auto lg:border-b lg:border-border lg:bg-popover' %}
+{% set panel_class = 'static block [&[hidden]]:hidden w-full md:static md:w-full lg:absolute lg:inset-x-0 lg:top-full lg:left-0 lg:right-0 lg:w-auto lg:max-h-screen lg:overflow-y-auto lg:border-b lg:border-border lg:bg-popover' %}
 <header class="sticky top-0 z-40 h-16 border-b border-border bg-background" data-site-nav>
   <div class="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
     <a href="{{ url_for('main.index') }}" class="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
@@ -57,7 +57,7 @@
               {{ entry.label }}<i data-lucide="chevron-down" class="h-4 w-4 transition-transform" aria-hidden="true" data-chevron></i>
             {% endcall %}
             {% call navigation_menu_content(id='menu-' ~ entry.id, class=panel_class, attrs={'hidden': true, 'data-menu-panel': ''}) %}
-              <div class="mx-auto max-w-7xl px-3 pb-3 pt-2 lg:px-6 lg:py-6">
+              <div class="mx-auto max-w-7xl px-3 pb-3 pt-2 lg:px-6 lg:pb-20 lg:pt-6">
                 {% if entry.id == 'product' %}
                 <div class="grid gap-6 lg:grid-cols-3 xl:grid-cols-5">
                   {% for column in reg.product.columns %}
