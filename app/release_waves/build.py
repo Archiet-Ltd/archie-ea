@@ -58,12 +58,18 @@ PREFIX_OVERRIDES: tuple = (
     ("/api/client-error", "A", "infra", "browser error reports"),
     ("/csp-report", "A", "infra", "browser security reports"),
     ("/early-access", "A", "infra", "the early-access pages themselves"),
-    ("/oauth/", "W4", "PG-CON", "assistant sign-in and consent (NP-14)"),
-    ("/.well-known/", "W4", "PG-CON", "assistant discovery documents"),
-    ("/mcp", "W4", "PG-CON", "the assistant connection (MCP); closed as a whole until the connect wave"),
+    ("/oauth/", "W1", "PG-CON", "assistant sign-in, consent, token and registration: the connector stays on at wave 1 for signed-in users (lead, 26 Oct)"),
+    ("/.well-known/", "W1", "PG-CON", "assistant discovery documents (connector stays on at wave 1)"),
+    ("/mcp", "W1", "PG-CON", "the assistant connection (MCP): on at wave 1 for signed-in users, advertised from wave 2"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),
     ("/api/system-settings", "W6", "PG-OPS", "platform settings page data, platform administrators"),
+    # Calls a wave-1 screen makes (found by walking the wave-1 preview; "$" means this address only).
+    ("/api/notifications", "W1", "PG-ACC", "the notification bell in the signed-in shell"),
+    ("/api/bu-scope$", "W1", "PG-ACC", "business-unit scope read by the signed-in shell"),
+    ("/api/archimate/viewpoints/<viewpoint_key>/diagram$", "W1", "PG-APP", "the application cooperation diagram on the applications page"),
+    ("/dashboard/api/archimate-elements/<int:element_id>/correct$", "W1", "PG-APP", "correct an element's type from the application page"),
+    ("/api/ea-workflows/instances$", "W1", "PG-APP", "workflow list shown on the application page"),
     ("/offers/inquire", "W1", "PG-PUB", "public enquiry and waiting-list form"),
     ("/t/plan-click", "W1", "PG-PUB", "public plan click counter"),
     ("/signup", "W1", "PG-ACC", "sign-up address"),
@@ -85,6 +91,9 @@ ENDPOINT_OVERRIDES: dict = {
 }
 
 # Plan pages whose title names the screen, not an address: the address is in the table.
+# Plan pages moved to another wave by the lead: NP-13 connected assistants and NP-14 the consent page stay on at wave 1.
+PAGE_WAVE_OVERRIDES: dict = {"NP-13": "W1", "NP-14": "W1"}
+
 PAGE_ADDRESS_OVERRIDES: dict = {
     "NP-05": "/account/welcome",
     "NP-06": "/architecture/sample-company/load",
@@ -163,7 +172,7 @@ def build(rules: list[tuple[str, str]]) -> dict:
         return best
 
     def from_item(item: dict, basis: str, inherit: bool = False) -> list:
-        wave = item["wave"]
+        wave = PAGE_WAVE_OVERRIDES.get(item["id"], item["wave"])
         to = item.get("to") if not inherit else None
         ships = item.get("ships") if not inherit else None
         group = item["reason"]
@@ -202,7 +211,11 @@ def build(rules: list[tuple[str, str]]) -> dict:
             continue
         hit = None
         for prefix, wave, group, _why in PREFIX_OVERRIDES:
-            if rule == prefix or rule.startswith(prefix.rstrip("/") + "/"):
+            if prefix.endswith("$"):
+                matched = rule == prefix[:-1]
+            else:
+                matched = rule == prefix or rule.startswith(prefix.rstrip("/") + "/")
+            if matched:
                 hit = (wave, group)
                 break
         if hit:

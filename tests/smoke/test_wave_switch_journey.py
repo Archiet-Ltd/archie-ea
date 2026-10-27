@@ -175,3 +175,49 @@ def test_a_write_to_a_later_release_route_answers_404_and_stores_nothing(browser
             assert SavedDiagram.query.count() == before
     finally:
         page.close()
+
+
+def test_no_first_release_page_triggers_an_early_access_404(browser, wave_server, org):
+    """The calls a wave-1 screen makes must be wave-1 routes too: open each first-release page signed in, press
+    its controls, and fail on any request that answers with the early-access message. The routes found this way
+    (notification bell, business-unit scope, workflow list, application diagram, element correction) are
+    overrides in app/release_waves/build.py."""
+    if SWITCH == "":
+        pytest.skip("the switch is off, nothing answers early access")
+    page = browser.new_page()
+    refused = []
+
+    def on_response(resp):
+        if resp.status in (404, 405) and "/static/" not in resp.url:
+            try:
+                body = resp.text()
+            except Exception:  # noqa: BLE001
+                body = ""
+            if "early_access" in body or "early-access-page" in body:
+                refused.append("%s %s on %s" % (resp.request.method, resp.url.replace(wave_server, ""), page.url.replace(wave_server, "")))
+
+    try:
+        page.on("response", on_response)
+        _login(page, wave_server, org["emails"]["cto"])
+        pages = ["/dashboard/overview", "/applications/", "/applications/?owner=me", "/dashboard/health",
+                 "/account/manage", "/account/manage/connected-assistants", "/admin/billing/", "/admin/team", "/batch-import/new"]
+        page.goto(wave_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        detail = [h for h in page.eval_on_selector_all("a[href]", "els => els.map(e => e.getAttribute('href'))")
+                  if h and re.match(r"^/applications/[0-9]+/?$", h)]
+        assert detail, "the seeded organisation must show at least one application to open"
+        pages += [detail[0], detail[0].rstrip("/") + "/edit"]
+        for path in pages:
+            page.goto(wave_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(2500)
+            buttons = page.locator("main button")
+            for i in range(min(buttons.count(), 12)):
+                try:
+                    if buttons.nth(i).is_visible():
+                        buttons.nth(i).click(timeout=2500)
+                        page.wait_for_timeout(400)
+                except Exception:  # noqa: BLE001
+                    pass
+                page.goto(wave_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert not refused, "a first-release screen called a route that is not in the first release:\n" + "\n".join(sorted(set(refused)))
+    finally:
+        page.close()
