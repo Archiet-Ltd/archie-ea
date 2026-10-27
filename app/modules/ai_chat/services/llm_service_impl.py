@@ -2837,8 +2837,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             # P0 wave). Bound it explicitly at the client level.
             effective_timeout = timeout if timeout is not None else 60.0
             client = OpenAI(
-                api_key=api_key, base_url="https://integrate.api.nvidia.com/v1", timeout=effective_timeout,
-                max_retries=0,
+                api_key=api_key, base_url=os.environ.get("NVIDIA_BASE_URL") or "https://integrate.api.nvidia.com/v1",
+                timeout=effective_timeout, max_retries=0,
             )
 
             # Use model-specific optimal token limits
