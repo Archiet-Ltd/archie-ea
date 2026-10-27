@@ -142,6 +142,7 @@ def add_routes(bp, access) -> None:
             return _problem(str(exc))
         from app.modules.organization.public_signals import queue_signals_refresh
 
+        onboarding.mark_profile_confirmed(org)
         queue_signals_refresh(org.id)  # the public sources, read for the company just confirmed
         return jsonify({"ok": True, **result})
 
