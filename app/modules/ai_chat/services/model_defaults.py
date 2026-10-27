@@ -74,10 +74,10 @@ FALLBACK_MODELS = {
     ),
     "nvidia": (
         "nvidia/nemotron-3-ultra-550b-a55b",
-        "meta/llama-3.3-70b-instruct",
-        "qwen/qwen2.5-72b-instruct",
-        "deepseek-ai/deepseek-r1",
-        "mistralai/mistral-nemotron",
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+        "openai/gpt-oss-20b",
+        "google/gemma-4-31b-it",
     ),
 }
 

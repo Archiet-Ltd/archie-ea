@@ -130,6 +130,7 @@ _SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
 
 # OpenRouter data-policy setting sent with every request.
 OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
+OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company published on its own website
 
 
 def _scrub_prompt(prompt: str) -> str:
@@ -1663,8 +1664,8 @@ Output clean, executable test code."""
         return response
 
     # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
-    PUBLIC_ATTEMPT_SECONDS = 25.0
-    PUBLIC_PROVIDER_SECONDS = 45.0  # all the models of one provider together; the chain's own deadline is checked between providers
+    PUBLIC_ATTEMPT_SECONDS = 45.0  # one call to one model, measured: a 25,000-character page set takes about 30 seconds
+    PUBLIC_PROVIDER_SECONDS = 90.0  # all the models of one provider together; the chain's own deadline is checked between providers
     PUBLIC_BACKOFF_SECONDS = 3.0
     PUBLIC_BACKOFF_MAX_SECONDS = 15.0
 
@@ -2094,7 +2095,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                             )
                             response_text, token_input, token_output, cost = LLMService._call_openrouter(
                                 prompt, or_model, api_key, max_tokens=max_tokens,
-                                timeout=LLMService._within(timeout, deadline)
+                                timeout=LLMService._within(timeout, deadline), public_input=public_input
                             )
                             model = or_model  # Update model for interaction record
                             or_success = True
@@ -3058,6 +3059,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         api_key: str,
         max_tokens: Optional[int] = 4096,
         timeout: Optional[float] = None,
+        public_input: bool = False,
     ) -> Tuple[str, int, int, float]:
         """
         Call OpenRouter API (OpenAI-compatible chat completions).
@@ -3094,8 +3096,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
             "temperature": 0.0,
-            # Only endpoints that neither train on nor log prompts.
-            "provider": OPENROUTER_PROVIDER_POLICY,
+            # Only endpoints that neither train on nor log prompts; a public page may go to any endpoint, which
+            # is the only way the free models (they all train) can read it.
+            "provider": OPENROUTER_PUBLIC_POLICY if public_input else OPENROUTER_PROVIDER_POLICY,
         }
 
         read_timeout = timeout if timeout is not None else 80
