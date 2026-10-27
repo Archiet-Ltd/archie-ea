@@ -18,6 +18,7 @@ def log_communication(
     outcome: str = None,
     action_items: list = None,
     logged_by: int = None,
+    organization_id: int = None,
 ) -> StakeholderCommunication:
     """Create and persist a communication log entry."""
     entry = StakeholderCommunication(
@@ -30,15 +31,18 @@ def log_communication(
         action_items=action_items or [],
         logged_at=datetime.utcnow(),
         logged_by=logged_by,
+        organization_id=organization_id,
     )
     db.session.add(entry)
     db.session.commit()
     return entry
 
 
-def get_communication_log(solution_id: int, stakeholder_id: int = None) -> list:
+def get_communication_log(solution_id: int, stakeholder_id: int = None, organization_id: int = None) -> list:
     """Return chronological log entries for a solution, optionally filtered by stakeholder."""
     query = StakeholderCommunication.query.filter_by(solution_id=solution_id)
+    if organization_id is not None:
+        query = query.filter_by(organization_id=organization_id)
     if stakeholder_id is not None:
         query = query.filter_by(stakeholder_id=stakeholder_id)
     entries = query.order_by(StakeholderCommunication.logged_at.asc()).all()
