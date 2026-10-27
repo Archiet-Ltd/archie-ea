@@ -20,6 +20,10 @@ Rules (each a count; scripts/verify.py ratchets them, `declared` at zero):
     python scripts/check_data_types.py                     # summary of every rule
     python scripts/check_data_types.py --rule declared --list
     python scripts/check_data_types.py --rule undecided --count
+
+Proven-against: the risks table test id renamed on the solution record (risk-row to risk-line in
+solutions/record.html, which the design map declares for its risks) -- declared went from 0 to 1 and
+the check exited 1, 27 Oct 2026.
 """
 from __future__ import annotations
 
