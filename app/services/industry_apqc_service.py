@@ -210,7 +210,7 @@ class IndustryAPQCService:
 
         codes_before_seeding = {fw.industry_code for fw in self.get_all_frameworks(active_only=False)}
         try:
-            _, newly_added_codes = load_default_frameworks(db.session)
+            _, newly_added_codes = load_default_frameworks(db.session.connection())
             db.session.commit()
             db.session.remove()
         except Exception as e:
