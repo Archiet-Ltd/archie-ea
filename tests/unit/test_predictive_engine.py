@@ -103,7 +103,7 @@ def _make_cost_fact(db_session, org_id, element_id, element_type, amount, period
         period_end=period_end,
         kind=kind,
         currency=currency,
-        source=source,
+        source=f"{source}-{period_start.isoformat()}-{element_id}",
     )
     db_session.add(cf)
     db_session.flush()
@@ -123,6 +123,190 @@ def _make_application_owner(db_session, org_id, user_id, element_type, element_i
     db_session.add(owner)
     db_session.flush()
     return owner
+
+
+class TestPredictiveEngine:
+    """Predictive engine tests."""
+
+    def test_unfunded_objective(self, db_session, make_org):
+        """Test unfunded objective."""
+        org = make_org("unfunded")
+        goal = _make_element(db_session, org.id, "Goal", type_="Goal", layer="motivation")
+        db_session.commit()
+
+        alerts = check_unfunded_objectives(org.id)
+
+        assert len(alerts) == 1
+        alert = alerts[0]
+        assert alert.prediction_type == "UNFUNDED_OBJECTIVE"
+
+    def test_zombie_project(self, db_session, make_org):
+        """Test zombie project."""
+        org = make_org("zombie")
+        from app.models.business_capabilities import BusinessCapability
+        from app.models import ArchiMateElement
+
+        cap_element = ArchiMateElement(name="Cap", type="Capability", layer="strategy", organization_id=org.id)
+        db_session.add(cap_element)
+        db_session.flush()
+
+        capability = BusinessCapability(name="Cap", organization_id=org.id, archimate_element_id=cap_element.id)
+        db_session.add(capability)
+        db_session.flush()
+
+        wp = _make_element(db_session, org.id, "WP", type_="WorkPackage", layer="implementation")
+        _make_relationship(db_session, org.id, wp.id, cap_element.id, type_="Realization")
+
+        from app.models.strategic import StrategicInitiative
+        initiative = StrategicInitiative(
+            name="Zombie Initiative",
+            organization_id=org.id,
+            target_completion_date=date.today() - timedelta(days=200),
+            status="in_progress",
+        )
+        db_session.add(initiative)
+        db_session.flush()
+
+        bc = _make_business_case(db_session, org.id, "Zombie BC", capability_id=capability.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
+        app = _make_element(db_session, org.id, "App", type_="ApplicationComponent", layer="application")
+        _make_cost_fact(db_session, org.id, app.id, "application", 2000, date.today() - timedelta(days=365), date.today())
+        db_session.commit()
+
+        alerts = check_zombie_projects(org.id)
+
+        assert len(alerts) == 1
+        alert = alerts[0]
+        assert alert.prediction_type == "ZOMBIE_PROJECT"
+
+    def test_bus_factor(self, db_session, make_org):
+        """Test bus factor."""
+        org = make_org("busfactor")
+        user = _make_user(db_session, org, "busfactor@example.com")
+
+        for i in range(6):
+            app = _make_element(db_session, org.id, f"App {i}", type_="ApplicationComponent", layer="application")
+            from app.models.application_portfolio import ApplicationComponent
+            ac = ApplicationComponent.query.get(app.id)
+            if ac:
+                ac.criticality = "critical"
+            _make_application_owner(db_session, org.id, user.id, "application", app.id, "primary")
+
+        db_session.commit()
+
+        alerts = check_bus_factor(org.id)
+
+        assert len(alerts) == 1
+        alert = alerts[0]
+        assert alert.prediction_type == "BUS_FACTOR"
+
+    def test_domino_effect(self, db_session, make_org):
+        """Test domino effect."""
+        org = make_org("domino")
+        internet_iface = _make_element(db_session, org.id, "API", type_="ApplicationInterface", layer="application")
+        internet_iface.acm_properties = {"exposure": "internet"}
+        db_session.add(internet_iface)
+        data_obj = _make_element(db_session, org.id, "PII Data", type_="DataObject", layer="application")
+        data_obj.acm_properties = {"classification": "personal data"}
+        db_session.add(data_obj)
+        _make_relationship(db_session, org.id, internet_iface.id, data_obj.id, type_="Flow")
+        db_session.commit()
+
+        alerts = check_domino_effect(org.id)
+
+        assert len(alerts) == 1
+        alert = alerts[0]
+        assert alert.prediction_type == "DOMINO_EFFECT"
+
+    def test_cost_to_serve(self, db_session, make_org):
+        """Test cost to serve."""
+        org = make_org("costtoserve")
+        svc = _make_element(db_session, org.id, "Svc", type_="ApplicationService", layer="application")
+        app2 = _make_element(db_session, org.id, "App2", type_="ApplicationComponent", layer="application")
+        _make_relationship(db_session, org.id, app2.id, svc.id, type_="Realization")
+        _make_cost_fact(db_session, org.id, app2.id, "application", 100000, date.today() - timedelta(days=730), date.today() - timedelta(days=365))
+        _make_cost_fact(db_session, org.id, app2.id, "application", 120000, date.today() - timedelta(days=365), date.today())
+        db_session.commit()
+
+        alerts = check_cost_to_serve(org.id)
+
+        assert len(alerts) == 1
+        alert = alerts[0]
+        assert alert.prediction_type == "COST_TO_SERVE"
+
+    def test_organisation_isolation(self, db_session, make_org):
+        """Test organisation isolation."""
+        org_a = make_org("iso-a")
+        org_b = make_org("iso-b")
+
+        # Create zombie project in org B
+        from app.models.business_capabilities import BusinessCapability
+        from app.models import ArchiMateElement
+
+        cap_element_b = ArchiMateElement(name="Cap B", type="Capability", layer="strategy", organization_id=org_b.id)
+        db_session.add(cap_element_b)
+        db_session.flush()
+
+        cap_b = BusinessCapability(name="Cap B", organization_id=org_b.id, archimate_element_id=cap_element_b.id)
+        db_session.add(cap_b)
+        db_session.flush()
+
+        wp_b = _make_element(db_session, org_b.id, "WP B", type_="WorkPackage", layer="implementation")
+        _make_relationship(db_session, org_b.id, wp_b.id, cap_element_b.id, type_="Realization")
+
+        from app.models.strategic import StrategicInitiative
+        initiative_b = StrategicInitiative(
+            name="Zombie Initiative B",
+            organization_id=org_b.id,
+            target_completion_date=date.today() - timedelta(days=200),
+            status="in_progress",
+        )
+        db_session.add(initiative_b)
+        db_session.flush()
+
+        bc_b = _make_business_case(db_session, org_b.id, "Zombie B", capability_id=cap_b.id, strategic_initiative_id=initiative_b.id, financial_benefit_annual=1000)
+        app_b = _make_element(db_session, org_b.id, "App B", type_="ApplicationComponent", layer="application")
+        _make_cost_fact(db_session, org_b.id, app_b.id, "application", 2000, date.today() - timedelta(days=365), date.today())
+
+        # Create healthy project in org A
+        cap_element_a = ArchiMateElement(name="Cap A", type="Capability", layer="strategy", organization_id=org_a.id)
+        db_session.add(cap_element_a)
+        db_session.flush()
+
+        cap_a = BusinessCapability(name="Cap A", organization_id=org_a.id, archimate_element_id=cap_element_a.id)
+        db_session.add(cap_a)
+        db_session.flush()
+
+        wp_a = _make_element(db_session, org_a.id, "WP A", type_="WorkPackage", layer="implementation")
+        _make_relationship(db_session, org_a.id, wp_a.id, cap_element_a.id, type_="Realization")
+
+        initiative_a = StrategicInitiative(
+            name="Healthy Initiative A",
+            organization_id=org_a.id,
+            target_completion_date=date.today() + timedelta(days=180),
+            status="in_progress",
+        )
+        db_session.add(initiative_a)
+        db_session.flush()
+
+        bc_a = _make_business_case(db_session, org_a.id, "Healthy A", capability_id=cap_a.id, strategic_initiative_id=initiative_a.id, financial_benefit_annual=5000)
+        app_a = _make_element(db_session, org_a.id, "App A", type_="ApplicationComponent", layer="application")
+        _make_cost_fact(db_session, org_a.id, app_a.id, "application", 1000, date.today() - timedelta(days=365), date.today())
+
+        db_session.commit()
+
+        # Run checks for org A
+        alerts_a = run_all_checks(org_a.id, topic="financial")
+
+        # Should only see org A's elements (healthy -> no zombie alert)
+        zombie_alerts = [a for a in alerts_a if a.prediction_type == "ZOMBIE_PROJECT"]
+        assert len(zombie_alerts) == 0
+
+        # Run checks for org B
+        alerts_b = run_all_checks(org_b.id, topic="financial")
+
+        # Should see org B's zombie project
+        zombie_alerts_b = [a for a in alerts_b if a.prediction_type == "ZOMBIE_PROJECT"]
+        assert len(zombie_alerts_b) == 1
 
 
 # --------------------------------------------------------------------------- #
@@ -643,7 +827,6 @@ class TestTopicRouting:
 
         assert len(alerts) == 1
         assert alerts[0].prediction_type == "BUS_FACTOR"
-
     def test_topic_security_returns_domino_effect(self, db_session, make_org):
         """topic='security' returns check 4 only."""
         org = make_org("topic-security")

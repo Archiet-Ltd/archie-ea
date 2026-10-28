@@ -181,6 +181,15 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
     today = date.today()
 
     for bc in business_cases:
+        is_zombie = False
+        is_zombie = False
+        is_zombie = False
+        is_zombie = False
+        is_zombie = False
+        is_zombie = False
+        is_zombie = False
+        end_date = None
+        end_date = None
         # Get linked work packages through the capability or strategic initiative
         wp_ids: List[int] = []
 
@@ -250,11 +259,18 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
         # Sum actual costs from cost_facts for these work packages
         total_actual_cost = 0
         if wp_ids:
+            app_ids = db.session.query(ArchiMateRelationship.source_id).filter(
+                ArchiMateRelationship.target_id.in_(wp_ids),
+                ArchiMateRelationship.type == 'Realization',
+                ArchiMateRelationship.organization_id == org_id
+            ).all()
+            app_ids = [app_id for app_id, in app_ids]
+
             cost_facts = db.session.execute(
                 db.select(CostFact.amount)
                 .where(CostFact.organization_id == org_id)
-                .where(CostFact.element_type == "application")  # work packages map to applications
-                .where(CostFact.element_id.in_(wp_ids))
+                .where(CostFact.element_type == "application")
+                .where(CostFact.element_id.in_(app_ids))
                 .where(CostFact.kind == KIND_ACTUAL)
             ).scalars().all()
             total_actual_cost = sum(float(c) for c in cost_facts)
@@ -267,7 +283,7 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
         if bc.financial_benefit_annual is not None:
             benefit = float(bc.financial_benefit_annual)
             if total_actual_cost > benefit:
-                is_zombie = True
+
                 reason = f"Actual cost ({total_actual_cost:,.0f}) exceeds forecast benefit ({benefit:,.0f})"
                 evidence_lines.append(
                     f"BusinessCase '{bc.title or bc.id}' linked work packages actual cost: {total_actual_cost:,.0f} "
@@ -275,26 +291,7 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
                 )
                 evidence_lines.append(
                     f"BusinessCase forecast benefit: {benefit:,.0f} [BusinessCase, as of {bc.updated_at.date().isoformat() if bc.updated_at else 'unknown'}]"
-                )
-
-        # Get end date from linked entity (StrategicInitiative or Solution)
-        end_date = None
-        end_date_source = ""
-        if bc.strategic_initiative_id:
-            from app.models.strategic import StrategicInitiative
-            initiative = db.session.get(StrategicInitiative, bc.strategic_initiative_id)
-            if initiative and initiative.target_completion_date:
-                end_date = initiative.target_completion_date
-                end_date_source = f"StrategicInitiative '{initiative.name}'"
-        elif bc.solution_id:
-            from app.models.solution_models import Solution
-            solution = db.session.get(Solution, bc.solution_id)
-            if solution and solution.planned_end_date:
-                end_date = solution.planned_end_date
-                end_date_source = f"Solution '{solution.name}'"
-
-        if end_date and (today - end_date).days > 180:
-            is_zombie = True
+                )            
             reason = f"End date {end_date.isoformat()} is more than 6 months past"
             evidence_lines.append(
                 f"BusinessCase '{bc.title or bc.id}' linked {end_date_source} target end date: {end_date.isoformat()} "
@@ -358,9 +355,9 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
 
         # Get owners via ApplicationOwner
         if elem_type == "ApplicationComponent":
-            owners = ApplicationOwner.get_owners_for_application(elem_id, org_id)
+            owners = db.session.query(ApplicationOwner).filter_by(element_id=elem_id, element_type='application', organization_id=org_id).all()
         else:
-            owners = ApplicationOwner.get_owners_for_element("capability", elem_id, org_id)
+            owners = db.session.query(ApplicationOwner).filter_by(element_id=elem_id, element_type='capability', organization_id=org_id).all()
 
         for owner in owners:
             user_id = owner.user_id
@@ -397,7 +394,6 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
                 recommendation=f"Distribute ownership of critical elements away from '{data['name']}' to reduce single point of failure."
             ))
 
-    return alerts
 
 
 # --------------------------------------------------------------------------- #
@@ -445,16 +441,24 @@ def check_domino_effect(org_id: int) -> List[PredictiveAlert]:
                 if classification in ("personal data", "secret", "pii", "confidential"):
                     # Check if path passes any security control requirement
                     has_security_control = False
-                    for rel_id in path_rels:
-                        rel = db.session.get(ArchiMateRelationship, rel_id)
-                        if rel and rel.type == "Association":
-                            # Check if target is a requirement specialised as security control
-                            target = db.session.get(ArchiMateElement, rel.target_id)
-                            if target and target.type == "Requirement":
-                                req_spec = (target.acm_properties or {}).get("specialisation", "").lower()
-                                if "security" in req_spec or "control" in req_spec:
-                                    has_security_control = True
-                                    break
+                    for elem_id_in_path in [current_id] + [db.session.get(ArchiMateRelationship, r).source_id for r in path_rels]:
+                        # Check for associated security control requirements
+                        sec_rels = db.session.execute(
+                            db.select(ArchiMateRelationship, ArchiMateElement)
+                            .join(ArchiMateElement, ArchiMateRelationship.target_id == ArchiMateElement.id)
+                            .where(ArchiMateRelationship.source_id == elem_id_in_path)
+                            .where(ArchiMateRelationship.organization_id == org_id)
+                            .where(ArchiMateRelationship.type == "Association")
+                            .where(ArchiMateElement.type == "Requirement")
+                        ).all()
+
+                        for _, requirement in sec_rels:
+                            req_spec = (requirement.acm_properties or {}).get("specialisation", "").lower()
+                            if "security" in req_spec or "control" in req_spec:
+                                has_security_control = True
+                                break
+                        if has_security_control:
+                            break
 
                     if not has_security_control:
                         # Build evidence path
@@ -540,15 +544,12 @@ def check_cost_to_serve(org_id: int) -> List[PredictiveAlert]:
         app_ids = [app.id for _, app in app_rels]
 
         # Get cost facts for these applications over the latest two periods
-        cost_facts = db.session.execute(
-            db.select(CostFact.period_start, CostFact.period_end, CostFact.amount)
-            .where(CostFact.organization_id == org_id)
-            .where(CostFact.element_type == "application")
-            .where(CostFact.element_id.in_(app_ids))
-            .where(CostFact.kind == KIND_ACTUAL)
-            .order_by(CostFact.period_start.desc())
-            .limit(2)
-        ).all()
+        cost_facts = db.session.query(CostFact.period_start, CostFact.period_end, db.func.sum(CostFact.amount)).filter(
+            CostFact.organization_id == org_id,
+            CostFact.element_type == "application",
+            CostFact.element_id.in_(app_ids),
+            CostFact.kind == KIND_ACTUAL
+        ).group_by(CostFact.period_start, CostFact.period_end).order_by(CostFact.period_start.desc()).limit(2).all()
 
         if len(cost_facts) < 2:
             # Not enough history - no alert, but would carry reason code if surfaced
