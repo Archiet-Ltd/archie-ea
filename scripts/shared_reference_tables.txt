@@ -6,6 +6,7 @@ technical_capabilities  # the ACM technical capability catalogue, shared referen
 vendor_organizations  # shared vendor catalogue, facts about vendors in the world, name globally unique (ADR-0003, GLOBAL_MODELS)
 vendor_catalogue_facts  # the public vendor catalogue (ADR-0021): the same for every organisation, read-only to them, written only by the research and review commands
 users  # tenant root: accounts are looked up by id or email at sign-in before any organisation is known, and each row carries its own organization_id; read through the organisation and role checks, not a tenant filter
+quality_attributes # (reason for quality_attributes)
 exchange_rates  # platform FX reference: units of to_currency per from_currency on a date, no organisation column, written only by the platform administrator and seed commands, read by every organisation alike
 model_providers  # platform provider register (hybrid): platform rows have no organisation and are shared; per-organisation override rows carry organization_id and are fenced by the hybrid tenant mixin
 service_incidents  # platform status history: a fact about the platform being degraded or down, no organisation, user or personal data, opened and resolved by the platform operator, read identically by every signed-in user
@@ -14,4 +15,5 @@ product_inquiries  # public lead capture for paid offer pages: a visitor has no 
 reference_number_counters  # platform-wide allocation counters (one row per table/column/prefix family): no organisation column by design, the families it numbers are unique across every organisation, a tenant fence would be the very bug it exists to remove
 oauth_clients  # user-scoped auth, not organisation-scoped: a client is registered before any user or organisation exists (dynamic registration) and is read only by its unique client_id; which organisation issued a token through it is recorded on the token
 oauth_authorization_codes  # user-use code redeemed by its 256-bit hash at the token endpoint before any organisation is known, read only by that hash, never listed across users
+technical_capability_vendor_mappings  # reason for technical_capability_vendor_mappings
 oauth_tokens  # user-scoped auth: looked up only by access- or refresh-token hash, or revoked by user_id or grant_id bound to the signed-in user; the issuing organisation is recorded on the row and checked on every use, never listed across users

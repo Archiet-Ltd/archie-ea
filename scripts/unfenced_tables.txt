@@ -277,7 +277,7 @@ project_constraints
 project_notes
 project_resources
 published_api_specs
-quality_attributes
+
 rag_metrics
 rag_queries
 rag_results
@@ -351,7 +351,7 @@ systems
 taxonomy_mappings
 tco_benchmarks
 tco_calculations
-technical_capability_vendor_mappings
+
 technology_capabilities
 technology_capability
 technology_roadmap_initiatives
