@@ -460,29 +460,39 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     )
     db.session.flush()
     _write_facts(element, _facts_from_payload(payload))
-    _assign_owner_from_payload(org_id, row, payload.get("owners") or [], assigned_by)
+    _assign_owner_from_payload(org_id, row, payload, assigned_by)
 
 
-def _assign_owner_from_payload(org_id, row, owners, assigned_by) -> None:
+def _assign_owner_from_payload(org_id, row, payload, assigned_by) -> None:
     """Make the one person a code owner names the primary owner of a new application."""
     from app.models.application_owner import ApplicationOwner
+    from app.models.user import User
 
+    owners = payload.get("owners") or []
     user = _person_in_org(org_id, owners)
-    if user is None:
-        return
-    if ApplicationOwner.query.filter_by(application_id=row.id, organization_id=org_id, ownership_type="primary").first():
-        return
-    db.session.add(
-        ApplicationOwner(
-            application_id=row.id,
-            user_id=user.id,
-            organization_id=org_id,
-            ownership_type="primary",
-            assigned_by=assigned_by,
-            source_table=PROPOSAL_SOURCE,
+    if user:
+        if ApplicationOwner.query.filter_by(application_id=row.id, organization_id=org_id, ownership_type="primary").first():
+            return
+        db.session.add(
+            ApplicationOwner(
+                application_id=row.id,
+                user_id=user.id,
+                organization_id=org_id,
+                ownership_type="primary",
+                assigned_by=assigned_by,
+                source_table=PROPOSAL_SOURCE,
+            )
         )
-    )
-    db.session.flush()
+        db.session.flush()
+    elif owners:
+        row.github_code_owner_unmatched = {
+            "login": owners[0],
+            "source": {
+                "repository": payload.get("repository"),
+                "file": payload.get("evidence_file"),
+                "commit": payload.get("commit"),
+            },
+        }
 
 
 def _create_component(approval, payload) -> Dict[str, Any]:

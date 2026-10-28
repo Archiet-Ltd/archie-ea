@@ -1,0 +1,32 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card %}
+{% from 'components/select.html' import native_select %}
+
+{% block title %}Assign Owner for {{ app.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  {% call card() %}
+    <h1 class="text-xl font-semibold mb-4">Assign Owner for {{ app.name }}</h1>
+    <p class="mb-4 text-sm text-muted-foreground">
+      The GitHub code owner for this application, <strong>@{{ app.github_code_owner_unmatched.login }}</strong>, could not be matched to a user in your organization.
+    </p>
+    <form method="POST">
+      <div class="mb-4">
+        <label for="user_id" class="block text-sm font-medium text-gray-700 mb-1">Select a user to assign as owner:</label>
+        {% call native_select(id='user_id', name='user_id', class='w-full') %}
+          <option value="">-- Select a user --</option>
+          {% for user in users %}
+            <option value="{{ user.id }}">{{ user.full_name }} ({{ user.email }})</option>
+          {% endfor %}
+        {% endcall %}
+      </div>
+      <div class="flex justify-end gap-2">
+        <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="btn btn-secondary">Cancel</a>
+        {{ button(text='Assign Owner', type='submit') }}
+      </div>
+    </form>
+  {% endcall %}
+</div>
+{% endblock %}

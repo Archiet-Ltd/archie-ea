@@ -434,6 +434,7 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     assessment_notes = Column(db.Text)
     notes = Column(db.Text)  # General notes field for functional capabilities etc.
     tags = Column(db.JSON, default=list)  # migration-exempt — PLT-022: user-defined labels e.g. ["Cloud Migration Wave 2", "Legacy"]
+    github_code_owner_unmatched = Column(db.JSON, nullable=True, comment="GitHub code owner login that could not be matched to a user in the organisation.")
 
     # Import fields for auto-mapping functionality
     imported_capabilities = Column(db.Text)  # JSON: [{name, description, level}]
