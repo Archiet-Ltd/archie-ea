@@ -1720,6 +1720,21 @@ def gate_csrf_coverage() -> Result:
     return Result("csrf-coverage", PASS if proc.returncode == 0 else FAIL, "\n".join(tail))
 
 
+def gate_org_administrators() -> Result:
+    """Every organisation that has members has an Administrator.
+
+    An organisation with members and none cannot open its own settings or members
+    pages and nobody inside it can fix that. Reads the database through
+    ``scripts/check_org_administrators.py`` (the rule is shared with the repair
+    migration), so a gate and the repair can never disagree.
+    """
+    proc = _run([sys.executable, "scripts/check_org_administrators.py"])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode == 0:
+        return Result("org-administrators", PASS, output[-300:])
+    return Result("org-administrators", FAIL, output[-2000:])
+
+
 def gate_schema_drift() -> Result:
     """No column or table drift between the ORM models and the live database.
 
@@ -2440,6 +2455,10 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_csrf_coverage.py; justify the exemption in "
                          "app/_bootstrap/csrf_coverage.py or remove it",
              tags=["static", "security", "runtime"]),
+        Gate("org-administrators", "Every organisation with members has an Administrator", "command",
+             gate_org_administrators, needs_db=True,
+             remediation="run: flask --app manage db upgrade (migration 20261027_admin_every_org "
+                         "makes the earliest member Administrator)", tags=["runtime", "db", "security"]),
         Gate("schema-drift", "Live DB matches the ORM models", "command",
              gate_schema_drift, needs_db=True,
              remediation="run: flask --app manage reconcile-schema", tags=["runtime", "db"]),

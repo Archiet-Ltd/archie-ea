@@ -61,6 +61,7 @@ from werkzeug.exceptions import HTTPException
 from app import csrf
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 from app.services import solution_prompt_override_service
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
@@ -593,7 +594,12 @@ def change_account_type(user_id):
     # so POST behaviour is unchanged.
     form = ChangeAccountTypeForm(obj=user)
     if form.validate_on_submit():
-        _svc.change_user_role(user, form.role.data)
+        try:
+            _svc.change_user_role(user, form.role.data)
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return render_template("admin/manage_user.html", user=user, form=form)
         role_name = user.role.name if user.role else "No Role"
         flash(
             "Role for user {} successfully changed to {}.".format(
@@ -685,6 +691,10 @@ def delete_user(user_id):
                 ip_address=request.remote_addr,
                 description=f"admin_user_delete via {request.path}",
             )
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return redirect(url_for("admin.user_info", user_id=user_id))
         except IntegrityError:
             db.session.rollback()
             flash(
@@ -3338,6 +3348,10 @@ def api_bulk_delete_users():
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "ids list required"}), 400
     safe_ids = [i for i in ids if i != current_user.id]
+    try:
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
     deleted = User.query.filter(
         User.id.in_(safe_ids), User.organization_id == g.current_org_id
     ).delete(synchronize_session=False)
@@ -5695,6 +5709,11 @@ def toggle_org_admin(org_id, user_id):
     # (checked above), so this is always a grant/revoke in their own
     # organisation.
     if user.is_admin():
+        try:
+            ensure_keeps_administrator(org_id, [user_id])
+        except LastAdministratorError as exc:
+            flash(exc.message, "error")
+            return redirect(url_for("admin.organization_detail", org_id=org_id))
         user.revoke_org_admin()
         OrgRole.query.filter_by(
             organization_id=org_id, user_id=user_id
@@ -5768,6 +5787,12 @@ def remove_user_from_org(org_id, user_id):
     default_org = Organization.query.filter_by(slug="default").first()
     if not default_org or default_org.id == org_id:
         flash("Cannot remove user — no other organization to move them to.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
+
+    try:
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
+    except LastAdministratorError as exc:
+        flash(exc.message, "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
     user.organization_id = default_org.id

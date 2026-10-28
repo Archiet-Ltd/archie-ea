@@ -44,8 +44,8 @@
   {% call ui.card(id='approval-' ~ item.id, class=('ring-2 ring-ring/50' if focused else ''), attrs={'data-testid': 'approval-card-' ~ item.id}) %}
     {% call ui.card_header() %}
       {% call ui.card_title(class='flex flex-wrap items-center gap-2') %}
-        {{ state_badge(op[0], tone=op[1]) }}
-        <span>{{ (item.entity_type or 'Record')|replace('_', ' ')|capitalize }}</span>
+        {{ state_badge(item.operation_label or op[0], tone=op[1]) }}
+        <span>{{ item.entity_label or ((item.entity_type or 'Record')|replace('_', ' ')|capitalize) }}</span>
       {% endcall %}
       {{ ui.card_description(text=item.summary or 'No summary was given for this proposal.') }}
       {% if item.created %}{% call ui.card_action() %}<span class="text-sm text-muted-foreground whitespace-nowrap tabular-nums">{{ item.created.strftime('%d %b %Y, %H:%M') }}</span>{% endcall %}{% endif %}
@@ -57,7 +57,7 @@
           {% if item.overdue %}{{ state_badge('Overdue', tone='negative') }}{% endif %}
           <span>Expires: <span class="text-foreground">{{ item.expires|format_date if item.expires else 'No expiry date' }}</span></span>
         </span>
-        {% if item.source_table %}<span>From {{ item.source_table|replace('_', ' ') }}{% if item.source_id %} number {{ item.source_id }}{% endif %}</span>{% endif %}
+        {% if item.source_label %}<span data-testid="approval-source">{{ item.source_label }}</span>{% elif item.source_table %}<span data-testid="approval-source">From {{ item.source_table|replace('_', ' ') }}{% if item.source_id %} number {{ item.source_id }}{% endif %}</span>{% endif %}
       </div>
 
       {# What approving this would affect, worked out for the one proposal the person opens #}

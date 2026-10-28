@@ -23,6 +23,10 @@
                  ('Permissions', url_for('team.team', tab='permissions'), tab == 'permissions', 'team-tab-permissions')],
                 label='Team sections', testid='team-tabs') }}
 
+{% if member_error %}
+{% call ui.alert(variant='destructive', class='max-w-2xl', attrs={'data-team-member-error': '', 'data-testid': 'team-member-error', 'role': 'alert'}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=member_error) }}{% endcall %}
+{% endif %}
+
 {% if tab == 'permissions' %}
 {% include 'admin/_team_permissions.html' %}
 {% else %}
