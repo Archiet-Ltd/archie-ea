@@ -509,6 +509,30 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
         from app.services.application_fact_sheet import compute_completeness
         return compute_completeness(self)["missing"]
 
+    @property
+    def archimate_element(self):
+        """The linked ArchiMate element (singular), or None."""
+        if not self.archimate_element_id:
+            return None
+        from app.models.archimate_core import ArchiMateElement
+        return db.session.get(ArchiMateElement, self.archimate_element_id)
+
+    @property
+    def acm_properties(self):
+        """The ACM properties from the linked ArchiMate element, or empty dict."""
+        element = self.archimate_element
+        return element.acm_properties if element else {}
+
+    @property
+    def github_code_owner_unmatched(self):
+        """The unmatched GitHub code owner, if any, from ACM properties."""
+        props = self.acm_properties or {}
+        unmatched = props.get("github_code_owner_unmatched", {})
+        value = unmatched.get("value") if isinstance(unmatched, dict) else unmatched
+        if isinstance(value, dict) and value.get("login"):
+            return value
+        return None
+
     # Relationships
     capability_mappings = relationship(
         "ApplicationCapabilityMapping",

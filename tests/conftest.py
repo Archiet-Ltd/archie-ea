@@ -219,6 +219,35 @@ def client(app):
 
 
 @pytest.fixture
+def test_client(client):
+    """Alias for client fixture for backwards compatibility."""
+    return client
+
+
+@pytest.fixture
+def test_user(db_session, make_org):
+    """Create a test user with Architect role."""
+    from app.models.user import User, Role
+
+    org = make_org()
+    architect_role = Role.query.filter_by(name="Architect").first()
+    user = User(
+        first_name="Test",
+        last_name="Architect",
+        email=f"architect_{org.id}@test.example",
+        organization_id=org.id,
+        enterprise_role="Architect",
+        confirmed=True,
+    )
+    if architect_role:
+        user.role = architect_role
+    user.password = "TestPassword123!"
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
 def login_as(app):
     """Log a client in as ``user``, defeating flask_login's ``g`` cache.
 
