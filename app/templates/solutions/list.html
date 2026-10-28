@@ -201,7 +201,7 @@
 {%- if _shared %}<span data-testid="solutions-shared-facts">{{ (_shared|join('; ') ~ ' on this page.')|capitalize }}</span>{% endif -%}
 {%- endmacro %}
 {#- At 1440 the table shows selection, solution, status, readiness, created and the row menu; stage, review and next step join at 2xl. -#}
-{%- set columns = [{'label': _select_all(), 'class': 'w-10'}, {'label': 'Solution', 'sortable': true}, {'label': 'Stage', 'class': 'hidden 2xl:table-cell'},
+{%- set columns = [{'label': _select_all(), 'class': 'w-10', 'sortable': false}, {'label': 'Solution', 'sortable': true}, {'label': 'Stage', 'class': 'hidden 2xl:table-cell'},
                    {'label': 'Status', 'sortable': true}, {'label': 'Review', 'class': 'hidden 2xl:table-cell'},
                    {'label': 'Readiness', 'align': 'right', 'sortable': true}, {'label': 'Next step', 'class': 'hidden 2xl:table-cell'},
                    {'label': 'Created', 'sortable': true, 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}] -%}
