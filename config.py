@@ -103,6 +103,8 @@ else:
 
 
 class Config:
+    # Vendor detection reads the public DNS records of an organisation's own website domain.
+    VENDOR_DNS_LOOKUPS = True
     # Webhook and compliance-check URLs may point at loopback/private hosts only
     # where this is True. It is False everywhere by default; Development and
     # Testing can opt in with the environment variable of the same name. No
@@ -582,6 +584,8 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    # Tests use recorded DNS answers, never live lookups.
+    VENDOR_DNS_LOOKUPS = False
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
         "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
     ).lower() in ("1", "true", "yes")
