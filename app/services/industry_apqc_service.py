@@ -212,6 +212,7 @@ class IndustryAPQCService:
         try:
             _, newly_added_codes = load_default_frameworks(db.session.connection())
             db.session.commit()
+            db.session.remove()
         except Exception as e:
             current_app.logger.error(f"Error seeding default frameworks: {e}")
             raise
