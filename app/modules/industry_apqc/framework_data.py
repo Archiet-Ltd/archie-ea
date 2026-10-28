@@ -290,4 +290,8 @@ def load_default_frameworks(connection):
             ))
         connection.execute(sa.insert(processes), batch)
         added += 1
-    return added
+    newly_added_codes = []
+    return added, newly_added_codes
+
+
+
