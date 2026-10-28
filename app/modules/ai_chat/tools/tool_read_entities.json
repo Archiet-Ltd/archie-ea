@@ -21,6 +21,9 @@
     "ask_impact": [
       "archimate_element"
     ],
+    "ask_data_flow": [
+      "archimate_element"
+    ],
     "ask_portfolio": [
       "application"
     ],
