@@ -214,7 +214,6 @@ class IndustryAPQCService:
             db.session.commit()
             db.session.remove()
             db.session.remove()
-            db.session.remove()
         except Exception as e:
             current_app.logger.error(f"Error seeding default frameworks: {e}")
             raise
