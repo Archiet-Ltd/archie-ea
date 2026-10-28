@@ -606,8 +606,11 @@ class TestingConfig(Config):
     # design (it must not silently store a credential in plaintext). Generated
     # at import time rather than a literal, so nothing here reads as a real key.
     from cryptography.fernet import Fernet as _Fernet
-    CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
-    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
+    # A key set in the environment wins, so a preview server and the scripts
+    # that connect a source to it (or several worker processes) share one
+    # vault key; without one, each process gets its own generated key.
+    CREDENTIAL_ENCRYPTION_KEY = os.environ.get("CREDENTIAL_ENCRYPTION_KEY") or _Fernet.generate_key().decode()
+    ORG_ENCRYPTION_MASTER_KEY = os.environ.get("ORG_ENCRYPTION_MASTER_KEY") or _Fernet.generate_key().decode()
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per
