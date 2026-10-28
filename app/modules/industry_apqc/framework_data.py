@@ -291,9 +291,6 @@ def load_default_frameworks(connection):
         connection.execute(sa.insert(processes), batch)
         added += 1
     newly_added_codes = []
-    for fw in FRAMEWORKS:
-        if fw["industry_code"] not in have:
-            newly_added_codes.append(fw["industry_code"])
     return added, newly_added_codes
 
 
