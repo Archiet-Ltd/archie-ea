@@ -301,7 +301,6 @@ roadmap_gaps
 roadmap_scenarios
 roadmap_work_packages
 role_permissions
-roles
 runtime_compliance_checks
 salesforce_config_metadata
 sap_metadata
@@ -371,7 +370,7 @@ unified_capability_vendor_organization_mappings
 unified_detection_runs
 unified_duplicate_groups
 usage_analytics
-usage_events
+
 user_preferences
 user_roles
 user_sessions

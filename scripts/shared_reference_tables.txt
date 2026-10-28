@@ -15,5 +15,7 @@ product_inquiries  # public lead capture for paid offer pages: a visitor has no 
 reference_number_counters  # platform-wide allocation counters (one row per table/column/prefix family): no organisation column by design, the families it numbers are unique across every organisation, a tenant fence would be the very bug it exists to remove
 oauth_clients  # user-scoped auth, not organisation-scoped: a client is registered before any user or organisation exists (dynamic registration) and is read only by its unique client_id; which organisation issued a token through it is recorded on the token
 oauth_authorization_codes  # user-use code redeemed by its 256-bit hash at the token endpoint before any organisation is known, read only by that hash, never listed across users
-technical_capability_vendor_mappings  # reason for technical_capability_vendor_mappings
 oauth_tokens  # user-scoped auth: looked up only by access- or refresh-token hash, or revoked by user_id or grant_id bound to the signed-in user; the issuing organisation is recorded on the row and checked on every use, never listed across users
+technical_capability_vendor_mappings  # reason for technical_capability_vendor_mappings
+roles # Roles are critical for authentication and authorization and are not tenant-specific in their core definition.
+usage_events # User usage events are cross-cutting concerns and are not tenant-specific.
