@@ -1276,6 +1276,40 @@ TOOL_SCHEMAS = [
         "tier": "auto",
     },
     {
+        # Vendor detection: the products a person names are proposed into the approvals inbox, one per
+        # catalogue product, with their words as the evidence. Proposing writes no vendor, product or
+        # application; approving a proposal does (app/services/vendor_detection.py).
+        "name": "propose_vendors",
+        "surfaces": ["chat"],
+        "route": "vendor_detection.propose_from_names",
+        "fenced_fields": [],
+        "risk_class": "propose",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Propose the vendor products the user says the organisation uses (for example 'we use Okta, "
+            "Slack and Datadog'). Pass each product name as the user wrote it. Each one in the vendor "
+            "catalogue is queued in the approvals inbox for a person to confirm; nothing is recorded until "
+            "it is approved. Names not in the catalogue are returned so you can say so."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "The product names the user gave, e.g. ['Okta', 'Slack', 'Datadog'].",
+                },
+                "request": {
+                    "type": "string",
+                    "description": "The user's words, kept as the evidence for each proposal.",
+                },
+            },
+            "required": ["names"],
+        },
+        "tier": "auto",
+    },
+    {
         # ADR 0009 / 0010 — genome-as-substrate. The copilot proposes a
         # schema-validated, provenance-bearing PATCH to the enterprise genome
         # instead of doing direct CRUD. Proposing only QUEUES the patch for

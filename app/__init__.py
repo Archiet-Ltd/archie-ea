@@ -188,6 +188,10 @@ def create_app(config=None):
     except Exception as _adm_exc:  # noqa: BLE001 — never block boot
         app.logger.warning("admin password reconciliation skipped: %s", _adm_exc)
 
+    # 10c. The background job worker begins last, when every model and screen is loaded.
+    from app._bootstrap.services import start_job_worker
+    start_job_worker(app, config_name)
+
     # 11. Global session teardown — prevent InFailedSqlTransaction cascading across requests
     @app.teardown_appcontext
     def shutdown_session(exception=None):

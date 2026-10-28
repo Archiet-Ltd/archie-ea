@@ -68,6 +68,7 @@ from app.models.organization import Organization
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
 from app.services.llm_service import test_api_key
 from app.services.rbac_service import rbac_service
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 from app.utils.sidebar_parser import SidebarSubmenu, parse_sidebar_template
 from ..services.admin_user_service import AdminUserService
 
@@ -302,7 +303,12 @@ def change_account_type(user_id):
     user = _svc.get_user_or_404(user_id)
     form = ChangeAccountTypeForm()
     if form.validate_on_submit():
-        _svc.change_user_role(user, form.role.data)
+        try:
+            _svc.change_user_role(user, form.role.data)
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return render_template("admin/manage_user.html", user=user, form=form)
         role_name = user.role.name if user.role else "No Role"
         flash(
             "Role for user {} successfully changed to {}.".format(
@@ -368,6 +374,10 @@ def delete_user(user_id):
                 ip_address=request.remote_addr,
                 description=f"admin_user_delete via {request.path}",
             )
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return redirect(url_for("admin.user_info", user_id=user_id))
         except IntegrityError:
             db.session.rollback()
             flash(
@@ -2304,6 +2314,10 @@ def api_bulk_delete_users():
     safe_ids = [int(i) for i in ids if int(i) != cu.id]
     if not safe_ids:
         return jsonify({"deleted": 0})
+    try:
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
 
     # Tables where rows BELONG to the user → delete them entirely
     _DELETE_OWNED = [
