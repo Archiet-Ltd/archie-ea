@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
-    <div class="bg-popover dark:bg-popover shadow rounded-lg p-6">
+    {% call ui.card(class='max-w-2xl') %}
         <h1 class="text-xl font-semibold mb-4">Assign Owner for {{ app.name }}</h1>
         <p class="mb-4 text-sm text-muted-foreground">
             The GitHub code owner for this application, <strong>@{{ unmatched_login }}</strong>, could not be matched to a user in your organization.
@@ -20,6 +20,6 @@
                 {{ ui.button(text='Assign Owner', type='submit') }}
             </div>
         </form>
-    </div>
+    {% endcall %}
 </div>
 {% endblock %}
