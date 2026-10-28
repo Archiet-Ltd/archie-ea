@@ -460,10 +460,10 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     )
     db.session.flush()
     _write_facts(element, _facts_from_payload(payload))
-    _assign_owner_from_payload(org_id, row, payload, assigned_by)
+    _assign_owner_from_payload(org_id, row, element, payload, assigned_by)
 
 
-def _assign_owner_from_payload(org_id, row, payload, assigned_by) -> None:
+def _assign_owner_from_payload(org_id, row, element, payload, assigned_by) -> None:
     """Make the one person a code owner names the primary owner of a new application."""
     from app.models.application_owner import ApplicationOwner
     from app.models.user import User
@@ -485,14 +485,17 @@ def _assign_owner_from_payload(org_id, row, payload, assigned_by) -> None:
         )
         db.session.flush()
     elif owners:
-        row.github_code_owner_unmatched = {
-            "login": owners[0],
-            "source": {
-                "repository": payload.get("repository"),
-                "file": payload.get("evidence_file"),
-                "commit": payload.get("commit"),
-            },
+        facts = {
+            "github_code_owner_unmatched": {
+                "login": owners[0],
+                "source": {
+                    "repository": payload.get("repository"),
+                    "file": payload.get("evidence_file"),
+                    "commit": payload.get("commit"),
+                },
+            }
         }
+        _write_facts(element, facts)
 
 
 def _create_component(approval, payload) -> Dict[str, Any]:

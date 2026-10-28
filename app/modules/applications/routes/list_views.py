@@ -432,8 +432,9 @@ def application_list():
         owner_names_by_app = {}
         for listed in pagination.items:
             if listed.id not in owned_ids:
-                if listed.github_code_owner_unmatched and 'login' in listed.github_code_owner_unmatched:
-                    owner_names_by_app[listed.id] = [f"Code owner on GitHub: @{listed.github_code_owner_unmatched['login']}, not yet matched to a person"]
+                unmatched = (listed.acm_properties or {}).get("github_code_owner_unmatched", {}).get("value")
+                if isinstance(unmatched, dict) and unmatched.get("login"):
+                    owner_names_by_app[listed.id] = [f"Code owner on GitHub: @{unmatched['login']}, not yet matched to a person"]
                 continue
             names = [
                 o["user_name"]
