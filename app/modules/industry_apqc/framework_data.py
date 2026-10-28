@@ -261,6 +261,7 @@ def load_default_frameworks(connection):
     }
     rows, label = _hierarchy_rows()
     added = 0
+    newly_added_codes = []
     for fw in FRAMEWORKS:
         if fw["industry_code"] in have:
             continue
@@ -290,7 +291,7 @@ def load_default_frameworks(connection):
             ))
         connection.execute(sa.insert(processes), batch)
         added += 1
-    newly_added_codes = []
+        newly_added_codes.append(fw["industry_code"])
     return added, newly_added_codes
 
 
