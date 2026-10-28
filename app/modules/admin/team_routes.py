@@ -43,6 +43,7 @@ from app.models.user import ROLE_DISPLAY_NAMES, User
 from app.models.org_role import OrgRole, VALID_ORG_ROLES
 from app.services.rate_limiter import rate_limit
 from app.services.rbac_service import rbac_service
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ def _permission_context(org_id, members):
     }
 
 
-def _render_team(org_id, error=None, status=200, tab=None):
+def _render_team(org_id, error=None, status=200, tab=None, member_error=None):
     from app.modules.account.services import invitation_service
 
     invitations = invitation_service.invitations_for(org_id)
@@ -136,6 +137,7 @@ def _render_team(org_id, error=None, status=200, tab=None):
         personas=[(p, ROLE_DISPLAY_NAMES.get(p, p)) for p in invitation_service.INVITABLE_PERSONAS],
         mail_is_available=mail_available(),
         invite_error=error,
+        member_error=member_error,
     ), status
 
 
@@ -284,6 +286,18 @@ def team_change_role():
     if user is None or user.organization_id != org_id:
         abort(404)
 
+    if role != "org_admin":
+        # Demoting the only Administrator would leave the organisation without
+        # anyone who can open its settings or members pages.
+        try:
+            ensure_keeps_administrator(org_id, [user_id])
+        except LastAdministratorError as exc:
+            if request.is_json or request.accept_mimetypes.best == "application/json":
+                return jsonify({"error": exc.message}), 409
+            db.session.rollback()
+            # Said once, at the top of the members list; nothing is changed.
+            return _render_team(org_id, member_error=exc.message, status=409)
+
     OrgRole.set_role(org_id, user_id, role, granted_by_id=current_user.id)
     # Keep the User.role (Permission.ADMINISTER authority) in step with the
     # OrgRole grant so every surface that answers "is this user an org admin"
@@ -407,6 +421,11 @@ def team_remove_member(user_id):
     # Prevent org_admin from removing themselves
     if user_id == current_user.id:
         return jsonify({"error": "Cannot remove yourself from the org"}), 400
+
+    try:
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
 
     record = OrgRole.query.filter_by(
         organization_id=org_id, user_id=user_id

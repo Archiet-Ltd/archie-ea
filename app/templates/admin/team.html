@@ -1,3 +1,4 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 
@@ -25,6 +26,11 @@
             </div>
         {% endif %}
     {% endwith %}
+
+    {% if member_error %}
+    <div role="alert" data-team-member-error data-testid="team-member-error"
+         class="mb-6 rounded-md p-4 bg-destructive/5 text-destructive-emphasis">{{ member_error }}</div>
+    {% endif %}
 
     <nav class="flex gap-4 border-b border-border mb-6" aria-label="Team sections" data-testid="team-tabs">
         <a href="{{ url_for('team.team') }}" data-testid="team-tab-members"
