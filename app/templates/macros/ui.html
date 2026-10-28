@@ -18,9 +18,7 @@
 {% import 'components/dialog.html' as dialog %}
 {% import 'components/toast-container.html' as toast %}
 {% import 'components/avatar.html' as avatar %}
-{% import 'components/separator.html' as separator %}
 {% import 'components/skeleton.html' as skeleton %}
-{% import 'components/tooltip.html' as tooltip %}
 {% import 'components/popover.html' as popover %}
 {% import 'components/radio_group.html' as radio_group %}
 {% import 'components/switch.html' as switch %}
@@ -178,16 +176,8 @@
     {{ avatar.avatar(src=src, alt=alt, fallback=fallback, size=size, class=class, attrs_dict=attrs_dict) }}
 {% endmacro %}
 
-{% macro separator(orientation='horizontal', class='') %}
-    {{ separator.separator(orientation=orientation, class=class) }}
-{% endmacro %}
-
 {% macro skeleton(variant='text', width=none, height=none, class='', count=1) %}
     {{ skeleton.skeleton(variant=variant, width=width, height=height, class=class, count=count) }}
-{% endmacro %}
-
-{% macro tooltip(content='', side='top', align='center', class='', attrs_dict={}) %}
-    {{ tooltip.tooltip(content=content, side=side, align=align, class=class, attrs_dict=attrs_dict) }}
 {% endmacro %}
 
 {% macro popover(trigger=none, content='', side='top', align='center', class='', attrs_dict={}) %}

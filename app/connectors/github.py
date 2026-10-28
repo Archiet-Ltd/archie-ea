@@ -466,7 +466,6 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
 def _assign_owner_from_payload(org_id, row, element, payload, assigned_by) -> None:
     """Make the one person a code owner names the primary owner of a new application."""
     from app.models.application_owner import ApplicationOwner
-    from app.models.user import User
 
     owners = payload.get("owners") or []
     user = _person_in_org(org_id, owners)

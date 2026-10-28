@@ -1,25 +1,31 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'macros/ui.html' import ui %}
 
 {% block title %}Assign Owner for {{ app.name }}{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
-    {% call ui.card(class='max-w-2xl') %}
-        <h1 class="text-xl font-semibold mb-4">Assign Owner for {{ app.name }}</h1>
-        <p class="mb-4 text-sm text-muted-foreground">
-            The GitHub code owner for this application, <strong>@{{ unmatched_login }}</strong>, could not be matched to a user in your organization.
-        </p>
-        <form method="POST">
-            <div class="mb-4">
-                {{ ui.field(label='Select a user to assign as owner', name='user_id', help='The user who will become the primary owner of this application.') }}
-                {{ ui.select(id='user_id', name='user_id', options=[(' ', '-- Select a User --')] + [(u.id, u.full_name + ' (' + u.email + ')') for u in users], required=True) }}
-            </div>
-            <div class="flex justify-end gap-2">
-                {{ ui.button(text='Cancel', href=url_for('unified_applications.application_detail', id=app.id), intent='secondary') }}
-                {{ ui.button(text='Assign Owner', type='submit') }}
-            </div>
-        </form>
-    {% endcall %}
+    {{ page_shell(
+        title='Assign Owner for ' ~ app.name,
+        subtitle='The GitHub code owner for this application, <strong>@' ~ unmatched_login ~ '</strong>, could not be matched to a user in your organization.',
+        breadcrumb=[
+            ('Applications', url_for('unified_applications.application_list')),
+            (app.name, url_for('unified_applications.application_detail', id=app.id)),
+            ('Assign Owner', None)
+        ]
+    ) }}
+    {%- set user_options = [(' ', '-- Select a User --')] -%}
+    {%- for u in users -%}{%- set _ = user_options.append((u.id, u.full_name + ' (' + u.email + ')')) -%}{%- endfor -%}
+    <form method="POST">
+        <div class="mb-4">
+            {{ ui.field(label='Select a user to assign as owner', name='user_id', help='The user who will become the primary owner of this application.') }}
+            {{ ui.select(id='user_id', name='user_id', options=user_options, required=True) }}
+        </div>
+        <div class="flex justify-end gap-2">
+            {{ ui.button(text='Cancel', href=url_for('unified_applications.application_detail', id=app.id), intent='secondary') }}
+            {{ ui.button(text='Assign Owner', type='submit') }}
+        </div>
+    </form>
 </div>
 {% endblock %}
