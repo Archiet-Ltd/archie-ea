@@ -11,11 +11,9 @@ Public pages need no organisation data: the navbar and footer are the same for
 every signed-out visitor. The signed-in variant is covered in
 tests/test_public_site_registry.py.
 """
-import threading
 
 import pytest
 from playwright.sync_api import expect, sync_playwright
-from werkzeug.serving import make_server
 
 DESKTOP = {"width": 1440, "height": 900}
 PHONE = {"width": 390, "height": 844}
@@ -28,19 +26,6 @@ LINKS_JS = """
 
 
 @pytest.fixture(scope="module")
-def base_url(app):
-    server = make_server("127.0.0.1", 0, app, threaded=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
-
-
-@pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
@@ -49,24 +34,24 @@ def browser():
 
 
 @pytest.fixture
-def desktop(browser, base_url):
+def desktop(browser, site_url):
     context = browser.new_context(viewport=DESKTOP)
     page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(base_url + "/")
+    page.goto(site_url + "/")
     yield page
     assert errors == [], f"the page raised script errors: {errors}"
     context.close()
 
 
 @pytest.fixture
-def phone(browser, base_url):
+def phone(browser, site_url):
     context = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True)
     page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(base_url + "/")
+    page.goto(site_url + "/")
     yield page
     assert errors == [], f"the page raised script errors: {errors}"
     context.close()
@@ -82,7 +67,7 @@ def _panel_hrefs(page, name):
     return [href for href, _ in panel.evaluate("(el) => Array.from(el.querySelectorAll('a')).map(a => [a.getAttribute('href'), a.textContent])")]
 
 
-def test_every_menu_opens_and_every_item_lands_on_a_page_with_content(desktop, base_url):
+def test_every_menu_opens_and_every_item_lands_on_a_page_with_content(desktop, site_url):
     """The visitor opens each menu, then follows every item and every footer link.
     Each lands on the page it names (no redirect), with a heading and real content,
     never a sign-in page, and an anchor link finds its place on the page."""
@@ -112,12 +97,12 @@ def test_every_menu_opens_and_every_item_lands_on_a_page_with_content(desktop, b
 
     problems = []
     for path, uses in sorted(by_path.items()):
-        response = page.goto(base_url + path, wait_until="domcontentloaded")
+        response = page.goto(site_url + path, wait_until="domcontentloaded")
         label = uses[0][0]
         if response.status != 200:
             problems.append(f"{label!r} -> {path} answers {response.status}")
             continue
-        if page.url.split("#")[0] != base_url + path:
+        if page.url.split("#")[0] != site_url + path:
             problems.append(f"{label!r} -> {path} redirects to {page.url}")
             continue
         if "/account/login" in page.url:
@@ -134,14 +119,14 @@ def test_every_menu_opens_and_every_item_lands_on_a_page_with_content(desktop, b
     assert problems == []
 
 
-def test_a_visitor_follows_the_product_menu_to_the_twin_map(desktop, base_url):
+def test_a_visitor_follows_the_product_menu_to_the_twin_map(desktop, site_url):
     page = desktop
     _trigger(page, "Product").click()
     panel = page.locator("#menu-product")
     expect(panel.get_by_text("Ask anything")).to_be_visible()
     expect(panel.get_by_text("Pick a system and see the applications and services that depend on it.")).to_be_visible()
     panel.get_by_role("link", name="Twin map").click()
-    expect(page).to_have_url(base_url + "/modules/digital-twin")
+    expect(page).to_have_url(site_url + "/modules/digital-twin")
     expect(page.locator("h1").first).to_be_visible()
     assert "dependenc" in page.locator("main").inner_text().lower() or "twin" in page.locator("main").inner_text().lower()
 
@@ -160,7 +145,7 @@ def test_navbar_and_footer_carry_the_same_items(desktop):
     assert footer_headings == ["Product", "Solutions", "Roles", "Compare", "Resources", "Company", "Legal", "Coming soon"]
 
 
-def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base_url):
+def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site_url):
     page = desktop
     _trigger(page, "Product").click()
     soon = page.locator("#menu-product [data-menu-group='coming-soon']")
@@ -175,7 +160,7 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base
     assert not any("Coming soon:" in label for label in live_labels)
 
     soon.get_by_role("link", name="Scenarios").click()
-    expect(page).to_have_url(base_url + "/modules/scenario-modelling")
+    expect(page).to_have_url(site_url + "/modules/scenario-modelling")
     form = page.get_by_test_id("feature-interest-form")
     expect(form).to_be_visible()
     # the page's own content: the site footer sits inside <main> and carries the logo and the account links
@@ -193,11 +178,11 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, base
     expect(page.get_by_test_id("feature-interest-thanks")).to_be_visible()
 
 
-def test_everything_coming_soon_lands_on_the_features_list(desktop, base_url):
+def test_everything_coming_soon_lands_on_the_features_list(desktop, site_url):
     page = desktop
     _trigger(page, "Product").click()
     page.locator("#menu-product").get_by_role("link", name="Everything coming soon").click()
-    expect(page).to_have_url(base_url + "/features#coming-soon")
+    expect(page).to_have_url(site_url + "/features#coming-soon")
     section = page.locator("#coming-soon")
     expect(section).to_be_visible()
     for text in ("Scenarios", "Software and tool discovery"):
@@ -258,7 +243,7 @@ def test_tabbing_out_of_an_open_menu_closes_it_and_opening_one_closes_another(de
     expect(page.locator("#menu-solutions")).to_be_hidden()
 
 
-def test_on_a_phone_the_menu_button_opens_a_sheet_and_every_item_is_reachable(phone, base_url):
+def test_on_a_phone_the_menu_button_opens_a_sheet_and_every_item_is_reachable(phone, site_url):
     page = phone
     assert page.evaluate("document.documentElement.scrollWidth") <= PHONE["width"]
     menu_button = page.get_by_role("button", name="Menu", exact=True)
@@ -299,21 +284,21 @@ def test_on_a_phone_the_menu_button_opens_a_sheet_and_every_item_is_reachable(ph
     assert page.evaluate("document.activeElement.getAttribute('aria-label')") == "Menu"
 
 
-def test_on_a_phone_a_menu_item_leads_to_its_page(phone, base_url):
+def test_on_a_phone_a_menu_item_leads_to_its_page(phone, site_url):
     page = phone
     page.get_by_role("button", name="Menu", exact=True).click()
     _trigger(page, "Product").click()
     page.locator("#menu-product").get_by_role("link", name="Risk register").click()
-    expect(page).to_have_url(base_url + "/modules/risk-register")
+    expect(page).to_have_url(site_url + "/modules/risk-register")
     assert page.evaluate("document.documentElement.scrollWidth") <= PHONE["width"]
     expect(page.locator("h1").first).to_be_visible()
 
 
 @pytest.mark.parametrize("path", ["/", "/pricing", "/modules/risk-register"])
-def test_no_sideways_scroll_at_390_on_the_pages_a_visitor_lands_on(browser, base_url, path):
+def test_no_sideways_scroll_at_390_on_the_pages_a_visitor_lands_on(browser, site_url, path):
     context = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True)
     page = context.new_page()
-    page.goto(base_url + path)
+    page.goto(site_url + path)
     width = page.evaluate("document.documentElement.scrollWidth")
     context.close()
     assert width <= PHONE["width"], f"{path} is {width}px wide on a {PHONE['width']}px screen"

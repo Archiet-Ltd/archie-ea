@@ -175,6 +175,41 @@ def default_charter_fields(persona):
     }
 
 
+# A charter written through the agent registry always carries these rules in forbidden_actions;
+# a seeded default never does. It marks a charter an organisation authored, which is never replaced.
+_AUTHORED_MARKERS = ("no_fabrication", "cite_source", "propose_dont_dispose", "governance_wins")
+_COMPARED_FIELDS = ("purpose", "readable_entities", "proposable_actions", "forbidden_actions", "charter_text")
+
+
+def plan_charter_row(persona, rows):
+    """What one organisation needs for one persona: (version, fields) to append, or None.
+
+    rows are the organisation's existing charters for the persona (objects or dicts with
+    version and the compared fields). Nothing is ever deleted or rewritten: the answer is
+    always a new version on top.
+      - no charter: the default as version 1;
+      - the latest is a seeded version 1 that differs from today's default: the default as version 2;
+      - anything else (already current, edited by the organisation, authored through the registry): nothing.
+    """
+    fields = default_charter_fields(persona)
+    if fields is None:
+        return None
+    if not rows:
+        return 1, fields
+
+    def _get(row, name):
+        return row[name] if isinstance(row, dict) else getattr(row, name)
+
+    latest = max(rows, key=lambda r: _get(r, "version"))
+    if _get(latest, "version") != 1:
+        return None
+    if any(m in (_get(latest, "forbidden_actions") or []) for m in _AUTHORED_MARKERS):
+        return None
+    if all(_get(latest, f) == fields[f] for f in _COMPARED_FIELDS):
+        return None
+    return 2, fields
+
+
 @click.command("seed-charters")
 @click.option("--organization-id", type=int, default=None, help="Seed only this organisation. Default: all.")
 @with_appcontext
