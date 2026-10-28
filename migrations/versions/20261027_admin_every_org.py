@@ -19,7 +19,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "20261027_admin_every_org"
-down_revision = "20261025_vendor_catalogue"
+down_revision = "20261026_charter_refresh"
 branch_labels = None
 depends_on = None
 
