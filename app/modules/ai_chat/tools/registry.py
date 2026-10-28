@@ -1943,6 +1943,41 @@ TOOL_SCHEMAS = [
         },
         "tier": "approve",
     },
+    # ------------------------------------------------------------------ #
+    # Predictive Engine tools                                             #
+    # ------------------------------------------------------------------ #
+    {
+        "name": "get_predictive_insights",
+        "surfaces": ["chat", "mcp"],
+        "route": "app.services.predictive_engine.get_predictive_insights",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Run the Predictive Engine's five heuristic checks over the organisation's "
+            "model and return alerts with evidence. Checks: UNFUNDED_OBJECTIVE (goals "
+            "with no capability or work package link), ZOMBIE_PROJECT (business cases "
+            "where actual cost exceeds benefit or end date >6 months past), BUS_FACTOR "
+            "(one person owning >5 critical elements), DOMINO_EFFECT (internet-facing "
+            "path to personal/secret data without security control), COST_TO_SERVE "
+            "(service cost up >10% over two periods with flat work packages and revenue). "
+            "Topic routing: financial=checks 2&5, hr=check 3, security=check 4, "
+            "omit=all five (top 5 by severity). Read-only."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "enum": ["financial", "hr", "security"],
+                    "description": "Filter checks by topic. Omit for all five checks (returns top 5 by severity)."
+                }
+            },
+            "additionalProperties": False,
+        },
+        "tier": "auto",
+    },
 ]
 
 # ---------------------------------------------------------------------------

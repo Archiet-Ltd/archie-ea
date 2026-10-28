@@ -118,6 +118,15 @@
       "plateau",
       "gap",
       "work_package"
+    ],
+    "get_predictive_insights": [
+      "archimate_element",
+      "application",
+      "capability",
+      "business_case",
+      "cost_fact",
+      "application_owner",
+      "user"
     ]
   }
 }
