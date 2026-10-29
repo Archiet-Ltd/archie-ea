@@ -25,6 +25,7 @@ from flask import url_for
 from app.extensions import db
 from app.models.archimate_core import ArchiMateElement
 from app.models.audit_log import AuditLog
+from app.services.archimate_backbone import create_backbone_element
 
 #: The one category this file actually saves a decision for.
 SUPPORTED_CATEGORY = "archimate_elements"
@@ -121,19 +122,28 @@ def confirm_match(
 
 def import_entity(data: dict | None, user_id: int | None, organization_id: int | None) -> dict[str, Any]:
     """Create the new element the document described. Minimal, honest
-    defaults -- no field is guessed beyond what the document actually gave."""
+    defaults -- no field is guessed beyond what the document actually gave.
+
+    Goes through the one element writer (``archimate_backbone.
+    create_backbone_element``) rather than constructing ``ArchiMateElement``
+    directly, so organisation, layer and provenance are set in the one place
+    every other creator of a backbone element already uses (ADR 0008).
+    """
     data = data or {}
     name = str(data.get("name") or "").strip()
     if not name:
         return {"success": False, "message": "This suggestion has no name to import."}
+    if not organization_id:
+        return {"success": False, "message": "No organisation is signed in to import into."}
 
-    element = ArchiMateElement(
-        name=name[:500],
-        type=str(data.get("type") or "ApplicationComponent")[:50],
+    element = create_backbone_element(
+        element_type=str(data.get("type") or "ApplicationComponent")[:50],
         layer=str(data.get("layer") or "Application")[:30],
+        name=name,
         description=(str(data["description"])[:_DESCRIPTION_LIMIT] if data.get("description") else None),
+        organization_id=organization_id,
+        provenance={"source_model": "ai_chat_entity_matching"},
     )
-    db.session.add(element)
     db.session.commit()
     _record(
         "archimate_elements", element.id, "create", None, _snapshot(element),
