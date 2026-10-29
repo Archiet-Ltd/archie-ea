@@ -397,6 +397,23 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
 
 
 # --------------------------------------------------------------------------- #
+# Property reads: typed entry ({"value": ..., "source": ...}) or plain string
+# --------------------------------------------------------------------------- #
+
+def _property_value(props: Any, key: str) -> Any:
+    """Read one property from acm_properties, whether stored typed or as a plain string."""
+    entry = (props or {}).get(key)
+    if isinstance(entry, dict):
+        return entry.get("value")
+    return entry
+
+
+def _property_text(column: Any, key: str) -> Any:
+    """SQL form of _property_value for a JSON column: typed value, else the plain string."""
+    return db.func.coalesce(column.op('->')(key).op('->>')('value'), column.op('->>')(key))
+
+
+# --------------------------------------------------------------------------- #
 # Check 4: Domino Effect
 # --------------------------------------------------------------------------- #
 
@@ -413,8 +430,8 @@ def check_domino_effect(org_id: int) -> List[PredictiveAlert]:
         .where(ArchiMateElement.organization_id == org_id)
         .where(
             db.or_(
-                ArchiMateElement.acm_properties.op('->>')('exposure') == 'internet',
-                ArchiMateElement.acm_properties.op('->>')('location') == 'internet',
+                _property_text(ArchiMateElement.acm_properties, 'exposure') == 'internet',
+                _property_text(ArchiMateElement.acm_properties, 'location') == 'internet',
                 ArchiMateElement.type == "ApplicationInterface",
             )
         )
@@ -437,7 +454,7 @@ def check_domino_effect(org_id: int) -> List[PredictiveAlert]:
 
             # Check if this is a data object with personal/secret classification
             if current_elem.layer == "application" and current_elem.type == "DataObject":
-                classification = (current_elem.acm_properties or {}).get("classification", "").lower()
+                classification = (_property_value(current_elem.acm_properties, "classification") or "").lower()
                 if classification in ("personal data", "secret", "pii", "confidential"):
                     # Check if path passes any security control requirement
                     has_security_control = False
@@ -453,7 +470,7 @@ def check_domino_effect(org_id: int) -> List[PredictiveAlert]:
                         ).all()
 
                         for _, requirement in sec_rels:
-                            req_spec = (requirement.acm_properties or {}).get("specialisation", "").lower()
+                            req_spec = (_property_value(requirement.acm_properties, "specialisation") or "").lower()
                             if "security" in req_spec or "control" in req_spec:
                                 has_security_control = True
                                 break

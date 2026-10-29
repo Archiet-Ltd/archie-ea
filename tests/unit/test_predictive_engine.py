@@ -674,6 +674,63 @@ class TestDominoEffect:
         assert len(data_alerts) == 0
 
 
+def _set_property(db_session, element, key, value, shape):
+    """Store one property either through the property service (typed) or as a plain string row."""
+    import json
+
+    from app.extensions import db
+    from app.modules.architecture_assistant.property_service import PropertyService
+
+    if shape == "typed":
+        PropertyService().set_element_property(element, key, value)
+        return
+    # Raw row written in SQL: older rows hold the bare string, and no product path writes them now.
+    db_session.execute(
+        db.text("UPDATE archimate_elements SET acm_properties = CAST(:p AS json) WHERE id = :i"),
+        {"p": json.dumps({key: value}), "i": element.id},
+    )
+    db_session.expire(element)
+
+
+def _domino_scenario(db_session, org, exposure_shape, classification_shape):
+    """Internet-exposed node -> service -> personal data object, no security control."""
+    node = _make_element(db_session, org.id, "Edge Gateway", type_="Node", layer="technology")
+    _set_property(db_session, node, "exposure", "internet", exposure_shape)
+    svc = _make_element(db_session, org.id, "Customer Service", type_="ApplicationService", layer="application")
+    _make_relationship(db_session, org.id, node.id, svc.id, type_="Serving")
+    data = _make_element(db_session, org.id, "Customer PII Data", type_="DataObject", layer="application")
+    _set_property(db_session, data, "classification", "personal data", classification_shape)
+    _make_relationship(db_session, org.id, svc.id, data.id, type_="Flow")
+    db_session.commit()
+    return check_domino_effect(org.id)
+
+
+def _prediction(alerts):
+    return [(a.prediction_type, a.severity, a.target_element, tuple(a.evidence), a.recommendation) for a in alerts]
+
+
+class TestDominoPropertyShapes:
+    """The domino check reads a property whether stored typed ({"value": ...}) or as a plain string."""
+
+    def test_exposure_read_same_prediction_from_both_shapes(self, db_session, make_org):
+        typed = _domino_scenario(db_session, make_org("domino-exposure-typed"), "typed", "plain")
+        plain = _domino_scenario(db_session, make_org("domino-exposure-plain"), "plain", "plain")
+
+        assert len(typed) == 1
+        assert typed[0].prediction_type == "DOMINO_EFFECT"
+        assert "Customer PII Data" in typed[0].target_element
+        assert _prediction(typed) == _prediction(plain)
+
+    def test_classification_read_same_prediction_from_both_shapes(self, db_session, make_org):
+        typed = _domino_scenario(db_session, make_org("domino-class-typed"), "plain", "typed")
+        plain = _domino_scenario(db_session, make_org("domino-class-plain"), "plain", "plain")
+
+        assert len(typed) == 1
+        assert typed[0].prediction_type == "DOMINO_EFFECT"
+        assert "classification: personal data" in typed[0].evidence[-2]
+        assert _prediction(typed) == _prediction(plain)
+
+
 # --------------------------------------------------------------------------- #
 # Check 5: Cost to Serve
 # --------------------------------------------------------------------------- #

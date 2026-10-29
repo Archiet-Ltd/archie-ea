@@ -265,12 +265,13 @@ def test_get_predictive_insights_topic_security(client, db_session, make_org, lo
     user = _make_user(db_session, org, "predictive-sec@example.com")
 
     from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.modules.architecture_assistant.property_service import PropertyService
 
     internet_iface = ArchiMateElement(name="API", type="ApplicationInterface", layer="application", organization_id=org.id)
-    internet_iface.acm_properties = {"exposure": "internet"}
+    PropertyService().set_element_property(internet_iface, "exposure", "internet")
     db_session.add(internet_iface)
     data_obj = ArchiMateElement(name="PII Data", type="DataObject", layer="application", organization_id=org.id)
-    data_obj.acm_properties = {"classification": "personal data"}
+    PropertyService().set_element_property(data_obj, "classification", "personal data")
     db_session.add(data_obj)
     db_session.flush()
     db_session.add(ArchiMateRelationship(source_id=internet_iface.id, target_id=data_obj.id, type="Flow", organization_id=org.id))
@@ -300,6 +301,7 @@ def test_get_predictive_insights_topic_none(client, db_session, make_org, login_
     from app.models.cost_fact import CostFact
     from app.models.application_portfolio import ApplicationComponent
     from app.models.application_owner import ApplicationOwner
+    from app.modules.architecture_assistant.property_service import PropertyService
     from datetime import date, timedelta
 
     # 1. Unfunded objective
@@ -340,10 +342,10 @@ def test_get_predictive_insights_topic_none(client, db_session, make_org, login_
 
     # 4. Domino effect
     iface = ArchiMateElement(name="Iface", type="ApplicationInterface", layer="application", organization_id=org.id)
-    iface.acm_properties = {"exposure": "internet"}
+    PropertyService().set_element_property(iface, "exposure", "internet")
     db_session.add(iface)
     data = ArchiMateElement(name="Data", type="DataObject", layer="application", organization_id=org.id)
-    data.acm_properties = {"classification": "personal data"}
+    PropertyService().set_element_property(data, "classification", "personal data")
     db_session.add(data)
     db_session.flush()
     db_session.add(ArchiMateRelationship(source_id=iface.id, target_id=data.id, type="Flow", organization_id=org.id))
