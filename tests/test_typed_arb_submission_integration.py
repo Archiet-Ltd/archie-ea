@@ -147,39 +147,35 @@ def adr_scope(app, _schema):
             yield scope
         finally:
             db.session.remove()
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            own_id = scope.organization_id
+            foreign_id = scope.foreign_actor.organization_id
             with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks two append-only rings the deletion service cannot — arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles each mutually reference the other; neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted.
                 for table_name in (
+                    "arb_condition_evidence_records",
                     "arb_canonical_conditions",
-                    "arb_decision_events",
-                    "arb_submission_events",
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
+                    "arb_submission_evidence_snapshots",
                     "arb_review_items",
                     "arb_review_cycles",
-                    "arb_subject_evidence_snapshots",
-                    "architecture_decisions",
-                    "users",
                 ):
                     connection.execute(
                         text(
                             f'DELETE FROM "{table_name}" '
                             "WHERE organization_id IN (:organization_id, :foreign_id)"
                         ),
-                        {
-                            "organization_id": scope.organization_id,
-                            "foreign_id": scope.foreign_actor.organization_id,
-                        },
+                        {"organization_id": own_id, "foreign_id": foreign_id},
                     )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id IN (:own, :foreign)"),
-                    {
-                        "own": scope.organization_id,
-                        "foreign": scope.foreign_actor.organization_id,
-                    },
-                )
+                connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
+            # The foreign organisation first: it may deliberately cite the primary
+            # organisation's rows, so the citing side must be gone before the cited
+            # organisation is deleted.
+            for org_id in (foreign_id, own_id):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
 
 
 @pytest.fixture
@@ -280,40 +276,15 @@ def solution_scope(app, _schema):
             yield scope
         finally:
             db.session.remove()
-            raw = raw_psycopg2_connection(db.engine)
-            try:
-                with raw.cursor() as cursor:
-                    cursor.execute("SET LOCAL session_replication_role = replica")
-                    cursor.execute(
-                        "DELETE FROM workbench_artifact_evidence "
-                        "WHERE organization_id = %s",
-                        (scope.organization_id,),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_submission_evidence_snapshots "
-                        "WHERE organization_id = %s",
-                        (scope.organization_id,),
-                    )
-                raw.commit()
-            finally:
-                raw.close()
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
             with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles append-only ring the deletion service cannot — each mutually references the other and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report)
                 for table_name in (
-                    "arb_submission_events",
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
+                    "arb_submission_evidence_snapshots",
                     "arb_review_items",
                     "arb_review_cycles",
-                    "solution_risks",
-                    "solution_goals",
-                    "solution_drivers",
-                    "solutions",
-                    "solution_problem_definitions",
-                    "solution_analysis_sessions",
-                    "users",
                 ):
                     connection.execute(
                         text(
@@ -322,10 +293,10 @@ def solution_scope(app, _schema):
                         ),
                         {"organization_id": scope.organization_id},
                     )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id = :organization_id"),
-                    {"organization_id": scope.organization_id},
-                )
+                connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
+            if db.session.get(Organization, scope.organization_id) is not None:
+                OrganizationDeletionService.delete_organization(scope.organization_id)
+            db.session.remove()
 
 
 def _submit(scope, command_key):

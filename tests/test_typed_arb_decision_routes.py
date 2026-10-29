@@ -91,37 +91,68 @@ def db_session(app, _schema):
             db.session.remove()
             if not organization_ids:
                 return
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
             raw = db.engine.raw_connection()
             try:
                 with raw.cursor() as cursor:
-                    cursor.execute("SHOW session_replication_role")
-                    original_role = cursor.fetchone()[0]
-                    cursor.execute("SET session_replication_role = replica")
-                    try:
-                        for table in _CLEANUP_TABLES:
-                            cursor.execute(
-                                f'DELETE FROM "{table}" '  # nosec B608 -- fixed table allowlist
-                                "WHERE organization_id = ANY(%s)",
-                                (list(organization_ids),),
-                            )
-                        if role_ids:
-                            cursor.execute(
-                                "DELETE FROM roles WHERE id = ANY(%s)",
-                                (list(role_ids),),
-                            )
+                    # archie_command_claim_challenges carries organization_id with no
+                    # foreign key to organizations (a deliberate, trigger-free,
+                    # TTL-cleaned table), so the deletion service never reaches it.
+                    cursor.execute(
+                        "DELETE FROM archie_command_claim_challenges "
+                        "WHERE organization_id = ANY(%s)",
+                        (list(organization_ids),),
+                    )
+                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks two append-only rings the deletion service cannot — arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles each mutually reference the other; neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report)
+                    cursor.execute(
+                        "DELETE FROM arb_condition_evidence_records "
+                        "WHERE organization_id = ANY(%s)",
+                        (list(organization_ids),),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_canonical_conditions "
+                        "WHERE organization_id = ANY(%s)",
+                        (list(organization_ids),),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_submission_evidence_snapshots "
+                        "WHERE organization_id = ANY(%s)",
+                        (list(organization_ids),),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_review_items "
+                        "WHERE organization_id = ANY(%s)",
+                        (list(organization_ids),),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_review_cycles "
+                        "WHERE organization_id = ANY(%s)",
+                        (list(organization_ids),),
+                    )
+                    cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
+                    raw.commit()
+            finally:
+                raw.close()
+            for org_id in organization_ids:
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
+            if role_ids:
+                raw = db.engine.raw_connection()
+                try:
+                    with raw.cursor() as cursor:
                         cursor.execute(
-                            "DELETE FROM organizations WHERE id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                    except Exception:
-                        raw.rollback()
-                        cursor.execute(
-                            f"SET session_replication_role = {original_role}"
+                            "DELETE FROM roles WHERE id = ANY(%s)",
+                            (list(role_ids),),
                         )
                         raw.commit()
-                        raise
-                    cursor.execute(f"SET session_replication_role = {original_role}")
-                    raw.commit()
+                finally:
+                    raw.close()
+            raw = db.engine.raw_connection()
+            try:
+                with raw.cursor() as cursor:
                     residual = {}
                     for table in _CLEANUP_TABLES:
                         cursor.execute(
@@ -1139,106 +1170,77 @@ def route_scope(app, _schema, request):
         if scope.organization_id is None:
             return
         with app.app_context():
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
             db.session.remove()
+            org_ids = [
+                org_id
+                for org_id in (scope.organization_id, scope.foreign_organization_id)
+                if org_id is not None
+            ]
             raw = db.engine.raw_connection()
             try:
                 with raw.cursor() as cursor:
-                    cursor.execute("SET LOCAL session_replication_role = replica")
-                    for table_name in (
-                        "arb_condition_events",
-                        "arb_canonical_conditions",
-                        "arb_condition_evidence_records",
-                        "workbench_artifact_evidence",
-                        "arb_submission_evidence_snapshots",
-                    ):
-                        cursor.execute(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id IN (%s, %s)",
-                            (scope.organization_id, scope.foreign_organization_id),
-                        )
-                raw.commit()
+                    # archie_command_claim_challenges carries organization_id with no
+                    # foreign key to organizations, so the deletion service never
+                    # reaches it; no guard sits on it, so a plain delete needs no marker.
+                    cursor.execute(
+                        "DELETE FROM archie_command_claim_challenges "
+                        "WHERE organization_id = ANY(%s)",
+                        (org_ids,),
+                    )
+                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks two append-only rings the deletion service cannot — arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles each mutually reference the other; neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted, so the own/foreign citation order below never has to break this specific cycle.
+                    cursor.execute(
+                        "DELETE FROM arb_condition_evidence_records "
+                        "WHERE organization_id = ANY(%s)",
+                        (org_ids,),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_canonical_conditions "
+                        "WHERE organization_id = ANY(%s)",
+                        (org_ids,),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_submission_evidence_snapshots "
+                        "WHERE organization_id = ANY(%s)",
+                        (org_ids,),
+                    )
+                    # arb_conditions (the legacy ARBCondition model, a distinct table from
+                    # arb_canonical_conditions) has no organisation column of its own and
+                    # is not append-only, but it is a NOT NULL child of arb_review_items;
+                    # the generic service would normally cascade through it on its own,
+                    # but arb_review_items is force-deleted here outside that mechanism,
+                    # so its legacy children need the same explicit pre-clean this fixture
+                    # always gave them.
+                    cursor.execute(
+                        "DELETE FROM arb_conditions WHERE review_item_id IN ("
+                        "SELECT id FROM arb_review_items WHERE organization_id = ANY(%s))",
+                        (org_ids,),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_review_items "
+                        "WHERE organization_id = ANY(%s)",
+                        (org_ids,),
+                    )
+                    cursor.execute(
+                        "DELETE FROM arb_review_cycles "
+                        "WHERE organization_id = ANY(%s)",
+                        (org_ids,),
+                    )
+                    cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
+                    raw.commit()
             finally:
                 raw.close()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                connection.execute(
-                    db.text(
-                        "DELETE FROM arb_conditions WHERE review_item_id IN ("
-                        "SELECT id FROM arb_review_items "
-                        "WHERE organization_id IN (:own, :foreign))"
-                    ),
-                    {
-                        "own": scope.organization_id,
-                        "foreign": scope.foreign_organization_id,
-                    },
-                )
-                for table_name in (
-                    "arb_decision_events",
-                    "arb_submission_events",
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "arb_review_items",
-                    "arb_review_cycles",
-                    "solution_arb_reviews",
-                    "arb_subject_evidence_snapshots",
-                    "solution_risks",
-                    "solution_goals",
-                    "solution_drivers",
-                    "solutions",
-                    "solution_problem_definitions",
-                    "solution_analysis_sessions",
-                    "architecture_decisions",
-                ):
-                    connection.execute(
-                        db.text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id IN (:own, :foreign)"
-                        ),
-                        {
-                            "own": scope.organization_id,
-                            "foreign": scope.foreign_organization_id,
-                        },
-                    )
-                for table_name in ("soc2_audit_log", "solution_notifications"):
-                    connection.execute(
-                        db.text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE user_id IN (SELECT id FROM users "
-                            "WHERE organization_id IN (:own, :foreign))"
-                        ),
-                        {
-                            "own": scope.organization_id,
-                            "foreign": scope.foreign_organization_id,
-                        },
-                    )
-                connection.execute(
-                    db.text(
-                        "DELETE FROM subscriptions WHERE organization_id IN (:own, :foreign)"
-                    ),
-                    {
-                        "own": scope.organization_id,
-                        "foreign": scope.foreign_organization_id,
-                    },
-                )
-                connection.execute(
-                    db.text(
-                        "DELETE FROM users WHERE organization_id IN (:own, :foreign)"
-                    ),
-                    {
-                        "own": scope.organization_id,
-                        "foreign": scope.foreign_organization_id,
-                    },
-                )
-                connection.execute(
-                    db.text("DELETE FROM organizations WHERE id IN (:own, :foreign)"),
-                    {
-                        "own": scope.organization_id,
-                        "foreign": scope.foreign_organization_id,
-                    },
-                )
-                if scope.role_id is not None:
+            # The foreign organisation first: it may deliberately cite the primary
+            # organisation's rows (a cross-tenant probe), so the citing side must be
+            # gone before the cited organisation is deleted.
+            for org_id in (scope.foreign_organization_id, scope.organization_id):
+                if org_id is not None and db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
+            if scope.role_id is not None:
+                with db.engine.begin() as connection:
                     connection.execute(
                         db.text("DELETE FROM roles WHERE id = :role_id"),
                         {"role_id": scope.role_id},

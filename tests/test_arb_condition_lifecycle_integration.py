@@ -58,6 +58,74 @@ def db_session(app, _schema):
                                 "WHERE scope_key = ANY(%s)",
                                 (list(checkpoint_keys),),
                             )
+                        # archie_command_claim_challenges carries organization_id with no
+                        # foreign key to organizations (a deliberate, trigger-free,
+                        # TTL-cleaned table — see transformation_db_guards.py), so the
+                        # deletion service's foreign-key-driven plan never reaches it and
+                        # an un-expired nonce for this organisation outlives it. No guard
+                        # sits on this table, so a plain delete needs no marker and no
+                        # escape hatch.
+                        cursor.execute(
+                            "DELETE FROM archie_command_claim_challenges "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        raw.commit()
+                finally:
+                    raw.close()
+                raw = db.engine.raw_connection()
+                try:
+                    with raw.cursor() as cursor:
+                        # session-replication-role-ok: arb_canonical_conditions and
+                        # arb_condition_evidence_records are mutually append-only, each
+                        # pointing at the other (a fulfilled condition's
+                        # fulfilment_evidence_id, an evidence row's own condition_id); no
+                        # row order or admitted UPDATE breaks that cycle, since neither
+                        # guard admits an UPDATE at all. Closing this for real needs a
+                        # lifecycle-aware admission this brief did not design — left for
+                        # the lead/founder to decide. Pre-clearing it here, before the
+                        # deletion service runs, is the narrowest fix that does not touch
+                        # any other append-only table's guard.
+                        #
+                        # session-replication-role-ok: arb_submission_evidence_snapshots,
+                        # arb_review_items and arb_review_cycles form a second, separate
+                        # three-way append-only ring (a snapshot names its review item, the
+                        # item names its cycle, the cycle names back to its own solution
+                        # evidence snapshot) with the same property: every guard on these
+                        # three tables admits a DELETE, never an UPDATE, so no column can be
+                        # nulled to break the ring first. This is a second instance of the
+                        # same architectural gap ADR-org-deletion-01 already names for
+                        # arb_canonical_conditions, found while wiring this file's teardown
+                        # onto OrganizationDeletionService — see the deletion-order report
+                        # for the full account. Pre-clearing it here is the same narrowest
+                        # fix, touching only these three tables' rows for this organisation.
+                        cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the two append-only rings above (arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles); neither guard admits the UPDATE a column-null would need
+                        cursor.execute(
+                            "DELETE FROM arb_condition_evidence_records "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        cursor.execute(
+                            "DELETE FROM arb_canonical_conditions "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        cursor.execute(
+                            "DELETE FROM arb_submission_evidence_snapshots "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        cursor.execute(
+                            "DELETE FROM arb_review_items "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        cursor.execute(
+                            "DELETE FROM arb_review_cycles "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
                         raw.commit()
                 finally:
                     raw.close()
@@ -238,7 +306,7 @@ def test_submit_verify_and_projection_commit_under_real_guards(
     ).scalar_one()
     db_session.commit()
     assert db_session.execute(
-        db.text("SHOW session_replication_role")
+        db.text("SHOW session_replication_role")  # session-replication-role-ok: read-only check that the replica mode set above was scoped to its own transaction and already reverted
     ).scalar_one() == "origin"
     mutated_provenance = {
         "classification": "pre_c3_fulfilment",
