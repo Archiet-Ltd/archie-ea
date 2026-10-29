@@ -678,22 +678,33 @@ def test_rejection_reason_is_recorded_and_still_shown_after_reload(app, db_sessi
     assert client.get("/ai-chat/approvals/decided").get_json()["decisions"] == []
 
 
-def test_inbox_page_has_the_impact_and_decided_regions(app, db_session, make_org, login_as):
+def test_inbox_page_has_the_impact_and_decided_regions(app, db_session, make_org, tenant_ctx, login_as):
+    """The inbox is rendered on the server: each proposal offers "What does this
+    affect?", which reopens the page with that proposal's impact worked out, and
+    the Recently decided region is always there (empty until something is decided).
+    It used to be an empty shell filled by a script the layout never output."""
     org = make_org("prev-page")
+    requester = _user(db_session, org, "requester")
     reviewer = _user(db_session, org, "reviewer")
+    approval_id = _propose(
+        tenant_ctx, org, requester,
+        operation_type="create", entity_type="capability", payload={"name": "n"}, summary="Create capability n",
+    )
     client = app.test_client()
     login_as(client, reviewer)
 
     html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
 
-    assert "approval-impact-toggle-" in html
+    assert 'data-testid="approval-card-%s"' % approval_id in html
+    assert 'data-testid="approval-impact-toggle-%s"' % approval_id in html
+    assert "/ai-chat/approvals/inbox?approval=%s#approval-%s" % (approval_id, approval_id) in html
     assert 'data-testid="approval-decided"' in html
     assert 'data-testid="approval-decided-empty"' in html
-    # The page script must actually be rendered: it sat in a block the layout
-    # never outputs, so the inbox was an empty shell in a browser.
-    assert "function approvalInbox()" in html
-    assert "/ai-chat/approvals/decided" in html
-    assert "/impact" in html
+
+    # Opening the toggle renders that proposal's impact region.
+    login_as(client, reviewer)
+    html = client.get("/ai-chat/approvals/inbox?approval=%s" % approval_id).get_data(as_text=True)
+    assert 'data-testid="approval-impact-%s"' % approval_id in html
 
 
 # ---------------------------------------------------------------------------

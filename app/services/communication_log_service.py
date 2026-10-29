@@ -20,7 +20,20 @@ def log_communication(
     logged_by: int = None,
     organization_id: int = None,
 ) -> StakeholderCommunication:
-    """Create and persist a communication log entry."""
+    """Create and persist a communication log entry.
+
+    The entry belongs to the solution's organisation, read from the solution itself, so a
+    caller outside a request (a seed, a job) still writes a fenced row. A caller that names
+    a different organisation is refused rather than filing the note under the wrong one."""
+    if solution_id is not None:
+        from app.models.solution_models import Solution
+
+        solution = db.session.get(Solution, solution_id)
+        if solution is None:
+            raise ValueError("Solution %s not found" % solution_id)
+        if organization_id is not None and organization_id != solution.organization_id:
+            raise ValueError("Solution %s belongs to another organisation" % solution_id)
+        organization_id = solution.organization_id
     entry = StakeholderCommunication(
         solution_id=solution_id,
         stakeholder_id=stakeholder_id,
