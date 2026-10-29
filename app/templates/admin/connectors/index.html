@@ -2,6 +2,9 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connectors{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/badge.html' import badge %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -112,102 +115,47 @@
 
         <!-- Connector list -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-lg border border-input bg-card">
-                <div class="overflow-x-auto">
-                    <table class="dense-table min-w-full divide-y divide-border">
-                        <thead>
-                            <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                <th class="px-4 py-3">Connector</th>
-                                <th class="px-4 py-3">Health</th>
-                                <th class="px-4 py-3">Credential</th>
-                                <th class="px-4 py-3">Last synchronisation</th>
-                                <th class="px-4 py-3">Schedule</th>
-                                <th class="px-4 py-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
-                            {% for connector in connectors %}
-                                <tr>
-                                    <td class="px-4 py-3">
-                                        <div class="text-sm font-medium text-foreground">
-                                            {{ connector.name }}
-                                            {% if connector.is_proposal %}
-                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent text-muted-foreground">queued</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="text-xs text-muted-foreground">{{ connector.connector_type_label }}</div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                            {% if connector.health == 'active' %}bg-success/10 text-success-emphasis
-                                            {% elif connector.health == 'error' %}bg-destructive/10 text-destructive-emphasis
-                                            {% elif connector.health == 'pending_review' %}bg-warning/10 text-warning-emphasis
-                                            {% else %}bg-muted text-muted-foreground{% endif %}">
-                                            {{ connector.health }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        {% if connector.credential_masked %}
-                                            <span class="text-sm font-mono text-muted-foreground">{{ connector.credential_masked }}</span>
-                                        {% else %}
-                                            <span class="text-xs text-muted-foreground">None</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="px-4 py-3 text-sm text-foreground">
-                                        {% if connector.is_proposal %}
-                                            <span class="text-xs text-muted-foreground">Awaiting approval</span>
-                                        {% elif connector.last_sync %}
-                                            {{ connector.last_sync.strftime('%Y-%m-%d %H:%M') }} UTC
-                                            {% if connector.last_sync_status %}
-                                                <span class="text-xs text-muted-foreground">({{ connector.last_sync_status }})</span>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-xs text-muted-foreground">Never</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="px-4 py-3 text-sm text-foreground">
-                                        {{ connector.sync_schedule or 'Not scheduled' }}
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        {% if connector.is_proposal %}
-                                            <a href="{{ inbox_url }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                                                In approval queue
-                                            </a>
-                                        {% else %}
-                                        <div class="flex gap-2">
-                                            <form method="POST" action="{{ url_for('m365_connector.connectors_sync', connector_id=connector.id) }}">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit"
-                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                                                    Sync
-                                                </button>
-                                            </form>
-                                            <form method="POST" action="{{ url_for('m365_connector.connectors_delete', connector_id=connector.id) }}"
-                                                data-confirm="Remove this connector? Its stored credentials are deleted with it.">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit"
-                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                                                    Delete
-                                                </button>
-                                            </form>
-                                        </div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="6" class="px-4 py-10 text-center">
-                                        <p class="text-sm text-muted-foreground">No connectors configured for this organisation yet.</p>
-                                        <p class="text-xs text-muted-foreground mt-1">
-                                            Add one with the form, then approve it in the approval inbox.
-                                        </p>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            {% call(connector) list_table(rows=connectors, columns=[('Connector', ''), ('Health', ''), ('Credential', ''), ('Last synchronisation', ''), ('Schedule', ''), {'label': '', 'class': 'w-12'}],
+                                  caption='Connectors', testid='connectors-table', row_testid='connector-row', search_placeholder='Filter connectors...',
+                                  empty_message='No connectors configured for this organisation yet. Add one with the form, then approve it in the approval inbox.') %}
+              {% call table_cell() %}
+                <div class="text-sm font-medium text-foreground">
+                    {{ connector.name }}
+                    {% if connector.is_proposal %}{% call badge(variant='neutral', class='ml-2') %}queued{% endcall %}{% endif %}
                 </div>
-            </div>
+                <div class="text-xs text-muted-foreground">{{ connector.connector_type_label }}</div>
+              {% endcall %}
+              {% call table_cell() %}
+                {% if connector.health == 'active' %}{% call badge(variant='success') %}{{ connector.health }}{% endcall %}
+                {% elif connector.health == 'error' %}{% call badge(variant='destructive') %}{{ connector.health }}{% endcall %}
+                {% elif connector.health == 'pending_review' %}{% call badge(variant='warning') %}{{ connector.health }}{% endcall %}
+                {% else %}{% call badge(variant='neutral') %}{{ connector.health }}{% endcall %}{% endif %}
+              {% endcall %}
+              {% call table_cell() %}
+                {% if connector.credential_masked %}<span class="text-sm font-mono text-muted-foreground">{{ connector.credential_masked }}</span>
+                {% else %}<span class="text-xs text-muted-foreground">None</span>{% endif %}
+              {% endcall %}
+              {% call table_cell(class='text-sm text-foreground whitespace-nowrap') %}
+                {% if connector.is_proposal %}<span class="text-xs text-muted-foreground">Awaiting approval</span>
+                {% elif connector.last_sync %}
+                    {{ connector.last_sync.strftime('%Y-%m-%d %H:%M') }} UTC
+                    {% if connector.last_sync_status %}<span class="text-xs text-muted-foreground">({{ connector.last_sync_status }})</span>{% endif %}
+                {% else %}<span class="text-xs text-muted-foreground">Never</span>{% endif %}
+              {% endcall %}
+              {% call table_cell(class='text-sm text-foreground') %}{{ connector.sync_schedule or 'Not scheduled' }}{% endcall %}
+              {% call table_cell(class='w-12 text-right') %}
+                {% if connector.is_proposal %}
+                  {% call row_actions('Actions for ' ~ connector.name) %}
+                    {{ row_action('In approval queue', href=inbox_url) }}
+                  {% endcall %}
+                {% else %}
+                  {% call row_actions('Actions for ' ~ connector.name) %}
+                    {{ row_action('Sync', action=url_for('m365_connector.connectors_sync', connector_id=connector.id)) }}
+                    {{ row_action('Delete', action=url_for('m365_connector.connectors_delete', connector_id=connector.id), destructive=true, confirm='Remove this connector? Its stored credentials are deleted with it.', separator_before=true) }}
+                  {% endcall %}
+                {% endif %}
+              {% endcall %}
+            {% endcall %}
         </div>
     </div>
 </div>
