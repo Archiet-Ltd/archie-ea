@@ -6,8 +6,12 @@
 
 {% block title %}Assign Owner for {{ app.name }}{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="style-vega max-w-2xl mx-auto">
     {{ page_shell(
         title='Assign Owner for ' ~ app.name,
         subtitle=(unmatched_text or '') ~ '. Choose the person in your organization who owns it.',
@@ -22,7 +26,7 @@
         {% call ui.card() %}
             {% call ui.card_content(class='space-y-6') %}
                 {% call form_group(id='user_id', label='Owner', required=true, help_text='The person who becomes the primary owner of this application.') %}
-                    {% call ui.native_select(id='user_id', name='user_id', required=true) %}
+                    {% call ui.native_select(id='user_id', name='user_id', required=true, class='border border-input px-3') %}
                         <option value="">Select a person</option>
                         {% for u in users %}
                         <option value="{{ u.id }}">{{ u.full_name() }} ({{ u.email }})</option>
@@ -31,8 +35,8 @@
                 {% endcall %}
             {% endcall %}
             {% call ui.card_footer(class='justify-end gap-2') %}
-                {{ ui.button(text='Cancel', variant='secondary', href=url_for('unified_applications.application_detail', id=app.id)) }}
-                {{ ui.button(text='Assign owner', type='submit') }}
+                {{ ui.button(text='Cancel', variant='secondary', class='px-4', href=url_for('unified_applications.application_detail', id=app.id)) }}
+                {{ ui.button(text='Assign owner', type='submit', class='bg-primary text-primary-foreground px-4') }}
             {% endcall %}
         {% endcall %}
     </form>
