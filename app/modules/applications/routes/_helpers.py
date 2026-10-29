@@ -596,7 +596,6 @@ def _vendors_impl(
         from app.models.application_portfolio import VendorContract
 
         acv_row = db.session.query(
-            db.func.sum(VendorContract.annual_cost).label("total_acv"),
             db.func.count(
                 db.case(
                     (
@@ -613,10 +612,8 @@ def _vendors_impl(
             VendorContract.vendor_id.isnot(None),
         ).one()
 
-        total_acv = float(acv_row.total_acv or 0)
         renewals_due = int(acv_row.renewals_due or 0)
     except Exception:
-        total_acv = 0
         renewals_due = 0
 
     stats = {
@@ -625,7 +622,6 @@ def _vendors_impl(
         "strategic": strategic_vendors,
         "total_products": total_products,
         "domain_distribution": {d[0] or "other": d[1] for d in domain_distribution},
-        "total_acv": total_acv,
         "renewals_due": renewals_due,
     }
 
@@ -658,6 +654,18 @@ def _vendors_impl(
         db.session.rollback()
         register_rows = []
 
+    # One rule decides who reads any vendor cost on this page, the Costs page's,
+    # applied to every row before the contract figures are read, so a row's cost
+    # stays hidden even when those figures cannot be.
+    from flask_login import current_user as _viewer
+    from app.decorators.requires_role import may_see_spend_pages
+
+    cost_visible = may_see_spend_pages(_viewer)
+    for r in register_rows:
+        r["cost_visible"] = cost_visible
+        if not cost_visible:
+            r["annual_cost"] = None
+
     # Each vendor's active contracts and their stated annual cost, read through
     # the same functions the Costs page totals with, so both pages agree.
     try:
@@ -673,19 +681,10 @@ def _vendors_impl(
                 VendorContract.vendor_id.in_([r["id"] for r in register_rows]),
             ).all():
                 by_vendor.setdefault(c.vendor_id, []).append(get_contract_amounts(c)["annual_cost"])
-        # The contract cost per vendor is the figure the Costs page shows, so it
-        # follows that page's rule for who may read it.
-        from flask_login import current_user as _viewer
-        from app.decorators.requires_role import may_see_spend_pages
-
-        cost_visible = may_see_spend_pages(_viewer)
         for r in register_rows:
             costs = by_vendor.get(r["id"], [])
             r["contract_count"] = len(costs)
             r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
-            r["cost_visible"] = cost_visible
-            if not cost_visible:
-                r["annual_cost"] = None
     except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
         db.session.rollback()
         logging.getLogger(__name__).exception("Vendor contract figures could not be read")
