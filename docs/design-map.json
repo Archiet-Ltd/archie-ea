@@ -1481,6 +1481,81 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/applications/assign_owner.html": {
+    "allowed_macros": [
+     "components/accessibility_helpers.html",
+     "components/alert.html",
+     "components/badge.html",
+     "components/breadcrumb.html",
+     "components/breadcrumb_nav.html",
+     "components/button.html",
+     "components/card.html",
+     "components/confirmation_dialog.html",
+     "components/dialog.html",
+     "components/dropdown_menu.html",
+     "components/empty_state.html",
+     "components/error_boundary.html",
+     "components/form_field.html",
+     "components/inline_hint.html",
+     "components/input.html",
+     "components/loading_state.html",
+     "components/modal.html",
+     "components/page_header.html",
+     "components/provenance.html",
+     "components/select.html",
+     "components/skeleton.html",
+     "components/status_badge.html",
+     "macros/page_shell.html"
+    ],
+    "basis": "rule",
+    "block": "form",
+    "charts": [],
+    "components": [
+     "alert",
+     "badge",
+     "breadcrumb",
+     "button",
+     "empty",
+     "field",
+     "input",
+     "page-header",
+     "select"
+    ],
+    "confidence": "high",
+    "controls": {},
+    "departures": [],
+    "extends": [
+     "layouts/admin_base.html"
+    ],
+    "frame": "dashboard-01",
+    "grid": "G1",
+    "inhouse_components": [],
+    "macros": [],
+    "original": "forms",
+    "page_type": "form",
+    "patterns": [
+     "P01-page-header",
+     "P10-sectioned-form"
+    ],
+    "persona": "application_manager",
+    "reason": "A form to assign an owner to an application.",
+    "reference": {
+     "shadcn": {
+      "name": "shadcn examples: forms",
+      "url": "https://ui.shadcn.com/examples/forms"
+     }
+    },
+    "spec": null,
+    "states": [
+     "loading",
+     "empty-no-permission",
+     "error-page",
+     "populated"
+    ],
+    "status": "mapped",
+    "tier": "A",
+    "type_changed": false
+   },
   "app/modules/architecture_assistant/templates/metamodel/property_detail.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
