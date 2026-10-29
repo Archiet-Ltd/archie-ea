@@ -1,0 +1,25 @@
+{# input-otp: port of shadcn/ui input-otp.tsx (pinned in compliance/upstream). Macros: input_otp, input_otp_group, input_otp_slot, input_otp_separator #}
+
+{#- InputOTP -#}
+{% macro input_otp(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('input-otp', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- InputOTPGroup -#}
+{% macro input_otp_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('input-otp-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- InputOTPSlot -#}
+{% macro input_otp_slot(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('input-otp-slot', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- InputOTPSeparator -#}
+{% macro input_otp_separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('input-otp-separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

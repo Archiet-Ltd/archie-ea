@@ -28,6 +28,45 @@
         {% endif %}
     {% endwith %}
 
+    {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+    {% if spend_ledger %}
+    <div class="mb-6" data-testid="llm-spend-ledger">
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title('text-lg') %}Answer spend this month{% endcall %}
+                {% call card_description() %}The providers the platform pays for, in the order they answer, each with its ceiling. A provider at its ceiling is skipped; when every one is, answers are paused until the month turns or the ceiling is raised.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                <dl class="grid gap-4 sm:grid-cols-2">
+                    {% for row in spend_ledger %}
+                    <div class="rounded-md border p-4" data-testid="llm-spend-row" data-provider="{{ row.provider }}">
+                        <dt class="flex items-center justify-between gap-2 text-sm font-medium">
+                            <span>{{ loop.index }}. {{ row.label }}</span>
+                            {%- set _state = 'Not configured' if not row.configured else ('Answering' if row.open else 'Paused') -%}
+                            <span class="text-xs {% if _state == 'Paused' %}text-destructive{% else %}text-muted-foreground{% endif %}" data-testid="llm-spend-state">{{ _state }}</span>
+                        </dt>
+                        <dd class="mt-2 space-y-1 text-sm text-muted-foreground">
+                            {% if row.priced %}
+                                <p>Month to date: <span class="tabular-nums text-foreground" data-testid="llm-spend-usd">USD {{ '%.4f' % row.usd_spent }}</span> over {{ row.requests }} request{{ '' if row.requests == 1 else 's' }}.</p>
+                                {% if row.ceiling_usd %}
+                                    <p>Ceiling: <span class="tabular-nums">USD {{ '%.2f' % row.ceiling_usd }}</span>; remaining <span class="tabular-nums" data-testid="llm-spend-remaining">USD {{ '%.4f' % row.remaining_usd }}</span>.</p>
+                                {% else %}
+                                    <p>No spend ceiling is configured, so this provider is never called.</p>
+                                {% endif %}
+                            {% else %}
+                                <p>Free provider: <span class="tabular-nums text-foreground">{{ row.requests }}</span> request{{ '' if row.requests == 1 else 's' }} this month{% if row.request_ceiling %} of {{ row.request_ceiling }} allowed; remaining {{ row.remaining_requests }}{% else %}; no request ceiling is set{% endif %}.</p>
+                            {% endif %}
+                            {% if not row.configured %}<p>No key is stored for this provider, so it answers nothing until one is set.</p>
+                            {% elif not row.open %}<p class="text-destructive">{{ row.reason }}.</p>{% endif %}
+                        </dd>
+                    </div>
+                    {% endfor %}
+                </dl>
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+
     <!-- Load from .env Button -->
     <div class="mb-6">
         <button type="button" id="load-env-btn"
