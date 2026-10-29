@@ -183,6 +183,7 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             "country": v.headquarters_location,
             "description": v.description,
             "status": v.status,
+            "contract_status": v.contract_status,
             "systems": [{"id": s.id, "name": s.name} for s in systems],
             "system_count": len(systems),
             "annual_cost": annual_cost(systems),

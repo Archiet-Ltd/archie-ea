@@ -57,11 +57,14 @@
             Visit Website
         </a>
         {% endif %}
+        {% if is_platform_administrator() %}
         <a href="{{ url_for('unified_vendors.edit_vendor', vendor_id=vendor.id) }}"
+           data-testid="vendor-detail-edit"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="pencil" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            Edit Vendor
+            Edit catalogue entry
         </a>
+        {% endif %}
         <!-- ENT-045: Ask AI anchor for vendor context -->
         <a href="{{ url_for('unified_ai_chat.index') }}?element_id={{ vendor.id }}&amp;context_type=vendor&amp;domain=vendor_intelligence"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">

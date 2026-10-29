@@ -83,6 +83,7 @@ def vendors():
             vendor_type_filter=vendor_type_filter,
             domain_filter=domain_filter,
             contract_status_filter=contract_status_filter,
+            contract_status_filter_options=[],
             search_query=search_query,
             pagination=None,
             per_page=per_page,

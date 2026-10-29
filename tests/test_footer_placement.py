@@ -115,7 +115,11 @@ def test_footer_ends_the_page_content_on_every_sidebar_page(
     ]
     for role, url in extra:
         login_as(client, users[role])
-        response = client.get(url)
+        # follow_redirects: "/dashboard/applications/vendors" is a permanent
+        # redirect to the canonical Vendors page (T-vendor-list-01); this
+        # loop checks the footer on the screen the sidebar actually reaches,
+        # same as every other entry here.
+        response = client.get(url, follow_redirects=True)
         assert response.status_code == 200, (url, response.status_code)
         parser = _Nesting()
         parser.feed(response.get_data(as_text=True))

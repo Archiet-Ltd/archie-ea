@@ -625,25 +625,6 @@ def _vendors_impl(
         "renewals_due": renewals_due,
     }
 
-    # Populate the Type filter from the vendor types actually stored, so the
-    # dropdown offers values that match rows (D12: it used to hard-code
-    # Cloud/Enterprise/Hybrid, none of which are real vendor_type values).
-    vendor_type_options = [
-        r[0]
-        for r in db.session.query(VendorOrganization.vendor_type)
-        .filter(
-            VendorOrganization.vendor_type.isnot(None),
-            VendorOrganization.vendor_type != "",
-        )
-        .distinct()
-        .order_by(VendorOrganization.vendor_type)
-        .all()
-    ]
-
-    vendor_type_filter_options = [
-        {"value": vt, "label": vt} for vt in vendor_type_options
-    ]
-
     # The table lists the organisation's vendor register (the same rows the
     # register API serves), rendered on the server.
     from app.services import vendor_register
@@ -653,6 +634,33 @@ def _vendors_impl(
     except Exception:  # noqa: BLE001 - the page says the list could not be read
         db.session.rollback()
         register_rows = []
+
+    # T-vendor-list-01: the Type and Contract status facets offer only values
+    # the organisation's own vendors actually carry (never the whole shared
+    # catalogue's types), computed before either filter narrows the rows so
+    # the dropdown keeps every option while only the table narrows.
+    # "catalog" means "not yet a contracted vendor of this organisation" --
+    # it describes a catalogue row, not a fact about this org's register, so
+    # it is dropped as a contract-status facet value here (CLAUDE.md
+    # ADR-0008: a copy declares itself; this is the one register already
+    # scoped to the organisation, filtered by the organisation's own data).
+    CATALOGUE_ONLY_CONTRACT_STATUS = "catalog"
+    vendor_type_filter_options = [
+        {"value": vt, "label": vt}
+        for vt in sorted({r["vendor_type"] for r in register_rows if r.get("vendor_type")})
+    ]
+    contract_status_filter_options = [
+        {"value": cs, "label": cs.replace("_", " ").capitalize()}
+        for cs in sorted({
+            r["contract_status"] for r in register_rows
+            if r.get("contract_status") and r["contract_status"] != CATALOGUE_ONLY_CONTRACT_STATUS
+        })
+    ]
+
+    if vendor_type_filter != "all":
+        register_rows = [r for r in register_rows if r.get("vendor_type") == vendor_type_filter]
+    if contract_status_filter != "all":
+        register_rows = [r for r in register_rows if r.get("contract_status") == contract_status_filter]
 
     # One rule decides who reads any vendor cost on this page, the Costs page's,
     # applied to every row before the contract figures are read, so a row's cost
@@ -727,6 +735,7 @@ def _vendors_impl(
         vendor_type_filter=vendor_type_filter,
         domain_filter=domain_filter,
         contract_status_filter=contract_status_filter,
+        contract_status_filter_options=contract_status_filter_options,
         search_query=search_query,
         pagination=pagination,
         per_page=per_page,
