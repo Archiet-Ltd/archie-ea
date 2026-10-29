@@ -116,9 +116,10 @@ def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
     )
 
 
-def get_renewal_summary() -> Dict[str, int]:
-    """Get summary counts by renewal urgency."""
-    contracts = VendorContract.query.filter(VendorContract.status == "active").all()
+def get_renewal_summary(organization_id: int) -> Dict[str, int]:
+    """Summary counts by renewal urgency, for one organisation's active contracts."""
+    contracts = VendorContract.query.filter(
+        VendorContract.organization_id == organization_id, VendorContract.status == "active").all()
 
     summary = {
         "critical": 0,  # <30 days
@@ -163,15 +164,17 @@ def total_of_stated(amounts) -> Tuple[Optional[float], int]:
     return (sum(stated) if stated else None), len(amounts) - len(stated)
 
 
-def get_spend_summary() -> Dict[str, any]:
-    """Get spend analytics summary.
+def get_spend_summary(organization_id: int) -> Dict[str, any]:
+    """Spend analytics summary for one organisation.
 
-    Totals add only the amounts that were stated. total_value and
-    total_annual_cost are None when no active contract states one, and
-    contracts_without_value / contracts_without_annual_cost count the active
-    contracts each total leaves out.
+    Every figure (the totals, the counts, the vendors and the types) is computed
+    from that organisation's active contracts and no other's. Totals add only
+    the amounts that were stated. total_value and total_annual_cost are None
+    when no active contract states one, and contracts_without_value /
+    contracts_without_annual_cost count the active contracts each total leaves out.
     """
-    contracts = VendorContract.query.filter(VendorContract.status == "active").all()
+    contracts = VendorContract.query.filter(
+        VendorContract.organization_id == organization_id, VendorContract.status == "active").all()
     amounts = [(c, get_contract_amounts(c)) for c in contracts]
 
     total_value, without_value = total_of_stated(a["contract_value"] for _, a in amounts)
