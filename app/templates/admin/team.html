@@ -79,9 +79,9 @@
     {% if inv.delivery_status == 'sent' %}
       {{ state_badge('Sent ' ~ inv.delivered_at.strftime('%d %b %Y'), tone='positive') }}
     {% elif inv.delivery_status == 'failed' %}
-      <span title="{{ inv.delivery_error or '' }}">{{ state_badge('Not sent', tone='negative') }}</span>
+      <span class="text-sm text-destructive-emphasis" data-testid="invitation-not-sent">Not sent: {{ inv.delivery_error or 'no reason was given' }}</span>
     {% elif not inv.token_hash %}
-      {{ state_badge('Not e-mailed', tone='neutral') }}
+      <span class="text-sm text-muted-foreground">Not e-mailed</span>
     {% else %}
       {{ state_badge('Waiting to send', tone='caution') }}
     {% endif %}
