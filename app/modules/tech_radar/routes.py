@@ -30,6 +30,26 @@ logger = logging.getLogger(__name__)
 tech_radar_bp = Blueprint("tech_radar", __name__, url_prefix="/technology/radar")
 
 
+_PERMISSION_DENIED_MESSAGE = (
+    "Only an architect or an administrator may place a technology on the "
+    "radar. Ask your organisation administrator to give you the architect "
+    "role."
+)
+
+
+@tech_radar_bp.errorhandler(403)
+def _permission_denied(_exc):
+    """The radar's own refusal: the link that reaches here stays visible to
+    everyone (nothing hidden), but a person without the architect or
+    administrator platform role is sent back to the radar and told plainly,
+    there, who may place a technology and how to ask -- instead of the
+    app-wide generic 403 page. A JSON caller still gets a JSON refusal."""
+    if _wants_json():
+        return jsonify({"success": False, "error": _PERMISSION_DENIED_MESSAGE}), 403
+    flash(_PERMISSION_DENIED_MESSAGE, "error")
+    return redirect(url_for("tech_radar.index"))
+
+
 @tech_radar_bp.route("/")
 @login_required
 def index():

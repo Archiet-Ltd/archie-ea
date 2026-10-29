@@ -396,7 +396,12 @@ def rationalization_tracking():
 
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
-@platform_admin_required
+# Not @platform_admin_required: this is a same-organisation, rate-limited,
+# audited write over the caller's own portfolio -- the same bar its sibling
+# write action (bulk-score, below) already holds to, via the blueprint's own
+# Permission.GENERAL floor (_default_deny_unauthorized_writes). An
+# organisation's own architect runs detection the same way they score the
+# portfolio; cross-tenant platform authority is not what this route needs.
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():
@@ -3742,11 +3747,14 @@ def rationalization_bulk_score():
                 .distinct()
                 .all()
             ]
+            from sqlalchemy import func as _func
+
             from app.services.rationalization_scoring_service import (
                 RationalizationScoringService as _RSS,
             )
-            base_filter = ApplicationComponent.lifecycle_status.in_(
-                _RSS.SCOREABLE_LIFECYCLE_VALUES
+            # Matched case-insensitively -- see calculate_portfolio_scores.
+            base_filter = _func.lower(ApplicationComponent.lifecycle_status).in_(
+                [v.lower() for v in _RSS.SCOREABLE_LIFECYCLE_VALUES]
             )
             query = ApplicationComponent.query.filter(base_filter)
             if scored_ids:

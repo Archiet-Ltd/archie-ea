@@ -3102,14 +3102,21 @@ class RationalizationScoringService:
             Summary statistics and processing results
         """
         try:
-            # Get all active applications — RATA-001: include Abacus lifecycle codes
-            # Production data uses codes like "2.1 STRATEGIC", "5. DECOMMISSIONED"
-            scoreable = RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES
+            from sqlalchemy import func as _func
+
+            # Get all active applications — RATA-001: include Abacus lifecycle codes.
+            # Production data uses codes like "2.1 STRATEGIC", "5. DECOMMISSIONED",
+            # but other writers (the demo seed among them) record the same codes
+            # lower-cased, the same way the dashboard's own decommissioned-count
+            # query already compares case-insensitively -- matched the same way
+            # here so a real organisation's casing never decides whether an
+            # application is scoreable.
+            scoreable_lower = [v.lower() for v in RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES]
             apps = ApplicationComponent.query.options(
                 joinedload(ApplicationComponent.vendor_products)
             ).filter(
                 db.or_(
-                    ApplicationComponent.lifecycle_status.in_(scoreable),
+                    _func.lower(ApplicationComponent.lifecycle_status).in_(scoreable_lower),
                     db.and_(
                         ApplicationComponent.lifecycle_status.is_(None),
                         ApplicationComponent.deployment_status.isnot(None),
@@ -3232,6 +3239,8 @@ class RationalizationScoringService:
             List of application summaries with rationalization data
         """
         try:
+            from sqlalchemy import func
+
             candidates = (
                 db.session.query(ApplicationRationalizationScore, ApplicationComponent)
                 .join(
@@ -3244,9 +3253,10 @@ class RationalizationScoringService:
                         ApplicationRationalizationScore.rationalization_action == "ELIMINATE",
                         ApplicationRationalizationScore.overall_health_score < min_score_threshold,
                     ),
-                    # RATA-001: include Abacus lifecycle codes for active apps
-                    ApplicationComponent.lifecycle_status.in_(
-                        RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES
+                    # RATA-001: include Abacus lifecycle codes for active apps,
+                    # matched case-insensitively -- see calculate_portfolio_scores.
+                    func.lower(ApplicationComponent.lifecycle_status).in_(
+                        [v.lower() for v in RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES]
                     ),
                 )
                 .order_by(ApplicationRationalizationScore.overall_health_score.asc())
