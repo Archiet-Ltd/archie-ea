@@ -746,6 +746,10 @@ def api_settings():
     edit_id = request.args.get("edit", type=int)
     edit_settings = APISettings.query.get(edit_id) if edit_id else None
     form = APISettingsForm()
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    # What the platform has spent on answers this month, per provider in its order, with ceilings.
+    spend_ledger = LLMService.spend_ledger_rows()
 
     if form.validate_on_submit():
         provider = form.provider.data
@@ -783,6 +787,7 @@ def api_settings():
                     all_settings=all_settings,
                     edit_id=edit_id,
                     edit_settings=edit_settings,
+                    spend_ledger=spend_ledger,
                 )
 
             settings = APISettings(
@@ -857,6 +862,7 @@ def api_settings():
         all_settings=all_settings,
         edit_id=edit_id,
         edit_settings=edit_settings,
+        spend_ledger=spend_ledger,
     )
 
 
