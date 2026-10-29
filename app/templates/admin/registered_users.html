@@ -1,9 +1,8 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/table.html' import table %}
 {% block title %}Registered Users{% endblock %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/filter_bar.html" import filter_bar %}
-{% from "components/card.html" import card, card_content %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block content %}
 <div class="space-y-6">
@@ -18,115 +17,24 @@
         ]
     ) }}
 
-    {% set ns = namespace(role_opts=[]) %}
-    {% for r in roles|default([]) %}
-        {% set ns.role_opts = ns.role_opts + [{'value': r.name, 'label': r.name ~ 's'}] %}
-    {% endfor %}
-
-    {% call card() %}
-        {% call card_content() %}
-            {{ filter_bar(
-                search_id='search-users',
-                search_placeholder='Search users...',
-                filters=[
-                    {'id': 'role-filter', 'label': 'Account Type', 'options': ns.role_opts}
-                ]
-            ) }}
+    {% call(u) list_table(rows=users, columns=[('First name', ''), ('Last name', ''), ('Email address', ''), ('Account type', ''), {'label': '', 'class': 'w-12'}],
+                          caption='Registered users', testid='registered-users-table', row_testid='user-row',
+                          search_placeholder='Search users...',
+                          empty_message='No registered users found.') %}
+      {% call table_cell(class='font-medium') %}{{ u.first_name or '' }}{% endcall %}
+      {% call table_cell() %}{{ u.last_name or '' }}{% endcall %}
+      {% call table_cell() %}{{ u.email }}{% endcall %}
+      {% call table_cell() %}{{ u.role.name if u.role else 'No Role' }}{% endcall %}
+      {% call table_cell(class='w-12 text-right') %}
+        {% call row_actions('Actions for ' ~ (u.first_name or u.email)) %}
+            {{ row_action('View', href=url_for('admin.user_info', user_id=u.id)) }}
+            {{ row_action('Edit', href=url_for('admin.change_account_type', user_id=u.id)) }}
+            {{ row_action('Set password', href=url_for('admin.set_user_password', user_id=u.id)) }}
+            {% if current_user.id != u.id %}
+            {{ row_action('Delete', href=url_for('admin.delete_user_request', user_id=u.id), destructive=true, separator_before=true) }}
+            {% endif %}
         {% endcall %}
-    {% endcall %}
-
-    {% call card() %}
-        {% call card_content(class='p-0') %}
-            <div class="overflow-x-auto">
-                {% call table(class="dense-table w-full text-sm border-collapse") %}
-                    <thead>
-                        <tr class="bg-muted/50 border-b">
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">First name</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Last name</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Email address</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Account type</th>
-                            <th class="h-10 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                    {% for u in users %}
-                        <tr class="hover:bg-muted/50 transition-colors cursor-pointer user-row"
-                            data-role="{{ u.role.name if u.role else '' }}"
-                            @click="window.location.href = '{{ url_for('admin.user_info', user_id=u.id) }}'">
-                            <td class="p-4 align-middle font-medium user-data">{{ u.first_name or '' }}</td>
-                            <td class="p-4 align-middle user-data">{{ u.last_name or '' }}</td>
-                            <td class="p-4 align-middle user-data">{{ u.email }}</td>
-                            <td class="p-4 align-middle user-role">{{ u.role.name if u.role else 'No Role' }}</td>
-                            <td class="p-4 align-middle max-w-44 sm:max-w-none">
-                                <div class="flex flex-wrap items-center justify-end gap-2" @click.stop>
-                                    <a href="{{ url_for('admin.user_info', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                        View
-                                    </a>
-                                    <a href="{{ url_for('admin.change_account_type', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                        Edit
-                                    </a>
-                                    <a href="{{ url_for('admin.set_user_password', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                        Set password
-                                    </a>
-                                    <a href="{{ url_for('admin.delete_user_request', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-emphasis hover:bg-destructive/20 transition-colors {% if current_user.id == u.id %}pointer-events-none opacity-50{% endif %}"
-                                       aria-disabled="{{ 'true' if current_user.id == u.id else 'false' }}">
-                                        Delete
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="5" class="p-6 text-center text-sm text-muted-foreground">No registered users found.</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                {% endcall %}
-            </div>
-        {% endcall %}
+      {% endcall %}
     {% endcall %}
 </div>
-
-<script>
-    if (typeof lucide !== 'undefined') { lucide.createIcons(); }
-
-    const searchInput = document.getElementById('search-users');
-    const roleFilter = document.getElementById('role-filter');
-    const userRows = document.querySelectorAll('.user-row');
-
-    function filterUsers() {
-        const searchText = searchInput.value.toLowerCase();
-        const roleValue = roleFilter.value;
-
-        userRows.forEach(row => {
-            const role = row.dataset.role;
-            const matchesRole = !roleValue || role === roleValue;
-
-            if (!matchesRole) {
-                row.style.display = 'none';
-                return;
-            }
-
-            if (searchText.length > 0) {
-                const cells = row.querySelectorAll('.user-data, .user-role');
-                let found = false;
-                cells.forEach(cell => {
-                    if (cell.textContent.toLowerCase().includes(searchText)) {
-                        found = true;
-                    }
-                });
-                row.style.display = found ? '' : 'none';
-            } else {
-                row.style.display = '';
-            }
-        });
-    }
-
-    searchInput.addEventListener('input', filterUsers);
-    roleFilter.addEventListener('change', filterUsers);
-</script>
 {% endblock %}
