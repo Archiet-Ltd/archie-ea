@@ -302,7 +302,7 @@ def _conformance(today: date) -> List[Dict[str, Any]]:
                 "date": today,
                 "score": review["score"],
                 "flagged": flagged,
-                "href": f"/solutions/{solution.id}/review-packet",
+                "href": f"/solutions/{solution.id}?tab=review",
             }
         )
     items.sort(key=lambda i: (i["score"], i["title"]))
