@@ -6,14 +6,37 @@ person reads it: the application's fact sheet and the applications list.
 """
 
 import json
+import os
 
 import pytest
 from playwright.sync_api import expect
 
-from tests.smoke.conftest import PAGE_TIMEOUT
+from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
 from tests.smoke.fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+@pytest.fixture(scope="module")
+def csrf_server(request, ai_protocol_stub, app, tmp_path_factory):
+    """A live server with CSRF protection on, the way production runs.
+
+    TestingConfig switches CSRF off, which hides any form that forgot its token. The hook
+    below turns it on for this server's process only, before the app is created.
+    """
+    hook = tmp_path_factory.mktemp("csrf_on")
+    (hook / "sitecustomize.py").write_text(
+        "import sys\n"
+        "sys.path.insert(0, %r)\n"
+        "import config\n"
+        "config.SmokeTestingConfig.WTF_CSRF_ENABLED = True\n" % REPO_ROOT
+    )
+    inherited = os.environ.get("PYTHONPATH")
+    path = os.pathsep.join([str(hook)] + ([inherited] if inherited else []))
+    return boot_live_server(request, ai_protocol_stub, app, extra_env={"PYTHONPATH": path})
 
 
 def _propose(org_id, name, repository, owners):
@@ -58,11 +81,12 @@ def _application_id(org_id, name):
         return found
 
 
-def test_github_code_owner_becomes_application_owner(browser, live_server):
+def test_github_code_owner_becomes_application_owner(browser, csrf_server):
+    live_server = csrf_server
     org = create_fresh_org("solution_architect", org_admin=True, extra_roles=("cto",))
     owner_email = org["emails"]["cto"]
     _propose(org["org_id"], "Journey Matched App", "journey-org/matched", [owner_email])
-    _propose(org["org_id"], "Journey Unmatched App", "journey-org/unmatched", ["nobodyhere"])
+    _propose(org["org_id"], "Journey Unmatched App", "journey-org/unmatched", ["@octocat"])
 
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
@@ -90,13 +114,33 @@ def test_github_code_owner_becomes_application_owner(browser, live_server):
         expect(page.get_by_text("Journey Matched App").first).to_be_visible()
         expect(page.get_by_text("Journey Unmatched App").first).to_be_visible()
         expect(page.locator("[data-testid=app-owner-%d]" % matched_id)).to_have_text("Launch cto")
-        expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_contain_text("Code owner on GitHub: @nobodyhere")
+        expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_have_text(
+            "Code owner on GitHub: @octocat, not yet matched to a person"
+        )
 
-        # Assign the unmatched owner on the assign-owner page (no screen links to it yet, so it is opened by address).
-        page.goto("%s/applications/%d/assign-owner" % (live_server, unmatched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        # The detail page offers the same next step.
+        page.goto("%s/applications/%d" % (live_server, unmatched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("application-assign-owner")).to_be_visible()
+
+        # From the list, the editor clicks the link and lands on a page that names the owner and offers people.
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("app-assign-owner-%d" % unmatched_id).click()
+        page.wait_for_url("**/applications/%d/assign-owner" % unmatched_id, timeout=PAGE_TIMEOUT)
+        expect(page.locator("#main-content")).to_contain_text("Code owner on GitHub: @octocat, not yet matched to a person")
+        expect(page.locator("#main-content")).not_to_contain_text("<strong>")
+        expect(page.locator("#main-content")).not_to_contain_text("@@")
+
+        # The empty choice is stopped in the browser; a person is chosen and the form is sent with CSRF on.
+        assert page.locator("select[name=user_id] option").first.get_attribute("value") == ""
+        page.locator("button[type=submit]", has_text="Assign owner").click()
+        assert "/assign-owner" in page.url, "the empty choice must not be submitted"
         page.select_option("select[name=user_id]", str(org["user_ids"]["cto"]))
-        page.locator("button[type=submit]").last.click()
-        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator("button[type=submit]", has_text="Assign owner").click()
+        page.wait_for_url("**/applications/%d" % unmatched_id, timeout=PAGE_TIMEOUT)
+
+        # The owner is on the fact sheet and the list.
+        page.goto("%s/applications/%d/fact-sheet" % (live_server, unmatched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Launch cto").first).to_be_visible()
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_have_text("Launch cto")
     finally:
