@@ -74,7 +74,10 @@
   {% endcall %}
 
 {% elif tab == 'mapping' %}
-<div data-testid="mapping-answer">
+<div data-testid="mapping-answer" class="space-y-4">
+  {% if sc.unmapped_count %}
+  <p class="text-sm text-muted-foreground"><strong class="font-medium text-foreground">{{ sc.unmapped_count }}</strong> of your systems have no vendor recorded. Pick the vendor for each; it is saved straight away.</p>
+  {% endif %}
   {% call(system) list_table(rows=sc.unmapped, columns=[('System', ''), {'label': 'Lifecycle', 'class': 'hidden md:table-cell'}, {'label': 'Vendor', 'class': 'w-[340px]'}],
                              caption='Systems with no vendor recorded', testid='mapping-list', row_testid='mapping-row',
                              search_placeholder='Filter systems...',
@@ -90,9 +93,13 @@
       <div x-data="vendorMapRow({{ system.id }})" class="flex flex-col gap-1">
         <div class="flex gap-2">
           {{ ui.input(type='text', autocomplete='off', class='h-8', placeholder='Search or type a vendor',
-                      attrs={'aria-label': 'Vendor for ' ~ system.name, 'list': 'vendor-choices-' ~ system.id, 'x-model': 'query', '@input': 'search', '@keydown.enter.prevent': 'saveTyped'}) }}
-          <datalist id="vendor-choices-{{ system.id }}"><template x-for="vendor in choices" :key="vendor.id"><option :value="vendor.name"></option></template></datalist>
+                      attrs={'aria-label': 'Vendor for ' ~ system.name, 'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': 'open', 'x-model': 'query', '@input': 'search', '@focus': 'search', '@keydown.escape': 'open = false', '@keydown.enter.prevent': 'saveTyped'}) }}
           {{ ui.button(text='Save', type='button', size='sm', attrs={'@click': 'saveTyped', ':disabled': 'saving', 'aria-label': 'Save the vendor for ' ~ system.name}) }}
+        </div>
+        <div x-show="open && choices.length" x-cloak role="listbox" aria-label="Vendors for {{ system.name }}" class="flex max-h-48 flex-col overflow-y-auto rounded-md border border-border bg-popover p-1">
+          <template x-for="vendor in choices" :key="vendor.id">
+            {{ ui.button(type='button', variant='ghost', size='sm', class='justify-start', attrs={'role': 'option', '@click': 'choose(vendor)', 'x-text': 'vendor.name'}) }}
+          </template>
         </div>
         <p x-show="error" x-cloak class="text-xs text-destructive" x-text="error" role="alert"></p>
       </div>
@@ -113,11 +120,41 @@
 
   {%- set columns = [{'label': 'Vendor', 'sortable': true}] -%}
   {%- if any_contracts %}{% set _ = columns.append({'label': 'Active contracts', 'align': 'right', 'sortable': true}) %}{% endif -%}
-  {%- if cost_col %}{% set _ = columns.append({'label': 'Annual cost', 'align': 'right', 'sortable': true}) %}{% endif -%}
+  {%- if any_systems %}{% set _ = columns.append({'label': 'Annual cost', 'align': 'right', 'sortable': true}) %}{% endif -%}
+  {%- if cost_col %}{% set _ = columns.append({'label': 'Contract cost a year', 'align': 'right', 'sortable': true}) %}{% endif -%}
   {%- if any_systems %}{% set _ = columns.append({'label': 'Systems', 'align': 'right', 'sortable': true}) %}{% endif -%}
   {%- if has_renewal %}{% set _ = columns.append({'label': 'Next renewal', 'sortable': true}) %}{% endif -%}
   {%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
-  <div data-testid="{{ 'vendors-answer' if rows else 'vendors-true-empty-state' }}">
+  {# The answer first: one sentence from the same register the table below lists. #}
+  {% call ui.card(attrs={'data-testid': 'vendors-answer', 'role': 'status'}) %}
+    {% call ui.card_content() %}
+    <p class="text-base font-medium">
+      {% if vp.vendor_count %}
+        {{ vp.vendor_count }} vendor{{ '' if vp.vendor_count == 1 else 's' }} supply
+        {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
+        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}None renew within 90 days.{% endif %}
+      {% elif vp.total_systems %}
+        None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.
+      {% else %}
+        You have no systems yet, so there are no vendors to list.
+      {% endif %}
+    </p>
+    <p class="mt-1 text-sm text-muted-foreground">
+      {% if vp.unmapped_count %}
+        {{ vp.unmapped_count }} of your systems have no vendor recorded.
+        <a href="{{ url_for('unified_applications.vendors', tab='mapping') }}" class="text-primary underline underline-offset-2">Set the vendor</a>.
+      {% elif vp.total_systems %}
+        Every system has a vendor recorded.
+      {% else %}
+        <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline">Add your first system</a> and name its vendor.
+      {% endif %}
+      {% if vp.annual_cost is not none %}
+        Annual cost across vendors: {{ vp.annual_cost|currency }}.
+      {% endif %}
+    </p>
+    {% endcall %}
+  {% endcall %}
+  <div{% if not rows %} data-testid="vendors-true-empty-state"{% endif %}>
   {% call(row) list_table(rows=rows, columns=columns, caption='Vendors your systems and contracts name', testid='vendors-table', row_testid='vendor-row',
                           search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_set_vendors, notice=notice,
                           empty_message=('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
@@ -129,22 +166,27 @@
     {% if any_contracts %}
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{{ row.contract_count or 0 }}{% endcall %}
     {% endif %}
+    {% if any_systems %}
+    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.annual_cost if row.annual_cost is not none else -1}) %}
+      {% if row.annual_cost is not none %}{{ row.annual_cost|currency }}{% else %}<span class="text-muted-foreground">{{ 'Not shown for your role' if row.cost_visible is sameas false else 'No cost recorded' }}</span>{% endif %}
+    {% endcall %}
+    {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
-      {% if row.contract_annual_cost is not none %}{{ money_short(row.contract_annual_cost) }}{% else %}<span class="text-muted-foreground">{{ 'No contract' if not row.contract_count else 'Not stated' }}</span>{% endif %}
+      {% if row.contract_annual_cost is not none %}{{ row.contract_annual_cost|currency }}{% else %}<span class="text-muted-foreground">{{ 'No contract' if not row.contract_count else 'Not stated' }}</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if any_systems %}
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
       {% if row.system_count %}
-      <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }}</a>
+      <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }} system{{ '' if row.system_count == 1 else 's' }}</a>
       {% else %}<span class="text-muted-foreground">0</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if has_renewal %}
     {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': row.next_renewal or '9999'}) %}
       {% if row.next_renewal %}
-        <span class="inline-flex items-center gap-2">{{ _date(row.next_renewal) }}{% if row.renewal_due %}{{ state_badge('Due soon', tone='caution') }}{% endif %}</span>
+        <span class="inline-flex items-center gap-2">{{ _date(row.next_renewal) }}{% if row.renewal_due %}{{ state_badge('Due within 90 days', tone='caution') }}{% endif %}</span>
       {% else %}{{ value_or_unset(none, 'No renewal ahead') }}{% endif %}
     {% endcall %}
     {% endif %}

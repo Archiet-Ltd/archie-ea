@@ -93,8 +93,8 @@ def test_page_answer_table_and_vendor_page_agree(client, login_as, db_session, t
     systems_link = rows[f"Salesforce {tag}"].select_one('a[href$="#vendor-systems"]')
     assert systems_link is not None and systems_link.get_text(strip=True) == "2"
     # exactly one renewal is due, and it is the monitoring contract's vendor
-    assert "Due soon" in rows[f"Datadog {tag}"].get_text(" ", strip=True)
-    assert sum("Due soon" in r.get_text(" ", strip=True) for r in rows.values()) == 1
+    assert "Due within 90 days" in rows[f"Datadog {tag}"].get_text(" ", strip=True)
+    assert sum("Due within 90 days" in r.get_text(" ", strip=True) for r in rows.values()) == 1
     assert f"Their CRM {tag}" not in page and f"OnlyTheirs {tag}" not in page
 
     detail = client.get(f"/applications/vendors/{sf['id']}").get_data(as_text=True)

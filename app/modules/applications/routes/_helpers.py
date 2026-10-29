@@ -683,6 +683,9 @@ def _vendors_impl(
             costs = by_vendor.get(r["id"], [])
             r["contract_count"] = len(costs)
             r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
+            r["cost_visible"] = cost_visible
+            if not cost_visible:
+                r["annual_cost"] = None
     except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
         db.session.rollback()
         logging.getLogger(__name__).exception("Vendor contract figures could not be read")
