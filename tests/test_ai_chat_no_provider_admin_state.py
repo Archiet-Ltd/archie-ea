@@ -163,8 +163,13 @@ def test_client_only_classifies_an_explicit_chat_provider_configuration_fault():
 def test_model_catalogue_includes_the_environment_provider_for_a_tenant_without_rows(
     client, login_as, chat_user, monkeypatch
 ):
-    """The picker and the runtime must resolve the same usable provider."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    """The picker and the runtime must resolve the same usable provider.
+
+    OpenAI stands in as the environment-configured provider: DeepSeek left the provider set on
+    24 Oct 2026, so a DeepSeek key configures nothing and the test asserted a provider that no
+    longer exists.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     login_as(client, chat_user)
 
     response = client.get("/ai-chat/models")
@@ -172,10 +177,10 @@ def test_model_catalogue_includes_the_environment_provider_for_a_tenant_without_
     assert response.status_code == 200
     body = response.get_json()
     assert body["success"] is True
-    assert body["current_provider"] == "deepseek"
-    assert body["current_model"] == "deepseek-chat"
+    assert body["current_provider"] == "openai"
+    assert body["current_model"] == "gpt-4o"
     assert any(
-        model["provider"] == "deepseek" and model["model"] == "deepseek-chat"
+        model["provider"] == "openai" and model["model"] == "gpt-4o"
         for model in body["models"]
     )
 
@@ -184,7 +189,7 @@ def test_chat_page_does_not_claim_an_environment_provider_is_unavailable(
     client, login_as, chat_user, monkeypatch
 ):
     """The first painted health state must use the runtime provider resolver."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     login_as(client, chat_user)
 
     response = client.get("/ai-chat/")

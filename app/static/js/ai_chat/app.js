@@ -485,7 +485,9 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
+                // A configuration fault is not transient: the server's sentence names the
+                // remedy and the settings link is the way out; a Retry could only reproduce it.
+                appendError(_streamErr.message, null, { adminLink: true });
                 return;
             }
             /* fall through to non-streaming */
@@ -575,7 +577,7 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
+                    appendError(errorMessage || fullError, null, { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
                     appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
@@ -949,6 +951,11 @@
             </div>
         `;
 
+        /* The Query panel lives in the Chat options sheet, a modal whose backdrop sits above
+           everything else on the page; a panel opened from one of its results would sit under
+           that backdrop and take no click. The person's attention has moved to the entity, so
+           the sheet closes and the panel stands alone. */
+        window.dispatchEvent(new CustomEvent('close-drawer-chat-options'));
         document.body.appendChild(modal);
         lucide.createIcons();
     }
