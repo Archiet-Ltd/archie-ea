@@ -25,7 +25,8 @@
             </a>
         </div>
     {% endmacro %}
-    {{ page_shell(title='Architecture Governance', subtitle='Central governance oversight — ARB reviews, compliance, and decision records', actions_caller=_ps_actions) }}
+    {{ page_shell(title='Architecture Governance', subtitle='Central governance oversight — ARB reviews, compliance, and decision records', actions_caller=_ps_actions,
+                  breadcrumb=[('Home', url_for('main.index')), ('Governance', none)]) }}
 
     <!-- Load failure is surfaced, never swallowed into zeros/empty tables -->
     <div x-show="loadError" x-cloak

@@ -80,7 +80,8 @@
       </button>
     </div>
   {% endmacro %}
-  {{ page_shell(title='Application Rationalization', subtitle='Identify duplicates, consolidate applications, and optimize your portfolio', actions_caller=_ps_actions) }}
+  {{ page_shell(title='Application Rationalization', subtitle='Identify duplicates, consolidate applications, and optimize your portfolio', actions_caller=_ps_actions,
+                breadcrumb=[('Home', url_for('main.index')), ('Applications', url_for('unified_applications.application_list')), ('Rationalization', none)]) }}
 
   <!-- ── RAT-126: End-to-End Workflow Progress ── -->
   <div class="bg-background rounded-lg border border-border p-4 mb-6" x-data="workflowProgress()">

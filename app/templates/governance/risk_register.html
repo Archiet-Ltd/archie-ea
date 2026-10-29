@@ -9,6 +9,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% from 'macros/page_shell.html' import page_shell %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% block title %}Risk Register{% endblock %}

@@ -14,7 +14,8 @@
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to restore points
         </a>
     {% endmacro %}
-    {{ page_shell(title='Review restore', subtitle='This restores your organisation to how it stood before the import on ' ~ (preview.restore_point.started_at[:16] | replace('T', ' ')) ~ '. Nothing changes until you confirm.', actions_caller=_ps_actions) }}
+    {{ page_shell(title='Review restore', subtitle='This restores your organisation to how it stood before the import on ' ~ (preview.restore_point.started_at[:16] | replace('T', ' ')) ~ '. Nothing changes until you confirm.', actions_caller=_ps_actions,
+                  breadcrumb=[('Home', url_for('main.index')), ('Import model file', url_for('architect_ui.import_oef')), ('Restore before an import', url_for('architect_ui.import_restore_points')), ('Review restore', none)]) }}
 
     <div class="rounded-lg border border-border bg-card p-6 space-y-4" data-testid="restore-summary">
         <h2 class="text-lg font-semibold">What the restore will do</h2>

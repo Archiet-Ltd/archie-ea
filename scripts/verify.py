@@ -1083,6 +1083,28 @@ def gate_duplicate_breadcrumb(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+def gate_page_shell_breadcrumb_block(baseline: int) -> Result:
+    """No page calls page_shell( and ALSO defines its own {% block breadcrumb %}.
+
+    R34 (design lead, 29 Oct 2026): the page header's breadcrumb already follows the
+    sidebar through page_trail(); a template's own block is the second, disagreeing
+    row (QA-134, QA-122). T-crumb-01 found and closed 32 such pages by deleting the
+    block, carrying any record crumb the block named through
+    page_shell(breadcrumb=[...]) instead. Ratchet at 0, not an escape hatch: unlike
+    the broader duplicate-breadcrumb gate above, this narrower pattern has no
+    legitimate exception -- a 'the two are mutually exclusive at runtime' comment on
+    one of the 32 did not change that the template declared two breadcrumb sources."""
+    proc = _run([sys.executable, "scripts/check_duplicate_breadcrumb.py", "--page-shell-block-count", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("page-shell-breadcrumb-block", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_duplicate_breadcrumb.py --page-shell-block-count to list them"
+    return Result("page-shell-breadcrumb-block", PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
 def gate_raw_html_escaping(baseline: int) -> Result:
     """No NEW unescaped interpolation into hand-built (non-Jinja) HTML.
 
@@ -2377,6 +2399,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              "ratchet", lambda: gate_duplicate_breadcrumb(baseline.get("duplicate_breadcrumb", 17)),
              remediation="keep the one wired-up breadcrumb and delete the rest; "
                          "run scripts/check_duplicate_breadcrumb.py; else mark 'duplicate-breadcrumb-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("page-shell-breadcrumb-block", "no page calls page_shell( and also fills {% block breadcrumb %}",
+             "ratchet", lambda: gate_page_shell_breadcrumb_block(baseline.get("page_shell_breadcrumb_block", 0)),
+             remediation="delete the template's {% block breadcrumb %}, carrying any record crumb it named "
+                         "through page_shell(breadcrumb=[...]) instead; "
+                         "run scripts/check_duplicate_breadcrumb.py --page-shell-block-count",
              tags=["static", "ui"]),
         Gate("raw-html-escaping", "no NEW unescaped interpolation into hand-built (non-Jinja) HTML",
              "ratchet", lambda: gate_raw_html_escaping(baseline.get("raw_html_escaping", 0)),

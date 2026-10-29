@@ -8,6 +8,7 @@
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}
 

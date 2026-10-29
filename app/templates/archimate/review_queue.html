@@ -3,6 +3,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block title %}ArchiMate Relationship Review Queue{% endblock %}
 

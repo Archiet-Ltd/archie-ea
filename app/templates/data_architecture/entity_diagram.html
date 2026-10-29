@@ -15,6 +15,7 @@
 {% from 'components/diagram/finder.html' import diagram_finder with context %}
 {% from 'components/diagram/legend.html' import diagram_legend with context %}
 {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}
 

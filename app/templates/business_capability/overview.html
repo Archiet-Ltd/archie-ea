@@ -40,7 +40,8 @@
                 </a>
             </div>
         {% endmacro %}
-        {{ page_shell(title='Business Capabilities', subtitle='Manage and organize business capability taxonomy', actions_caller=_ps_actions) }}
+        {{ page_shell(title='Business Capabilities', subtitle='Manage and organize business capability taxonomy', actions_caller=_ps_actions,
+                      breadcrumb=[('Home', url_for('main.index')), ('Business Layer', url_for('archimate_crud.dashboard') + '#business'), ('Capability Overview', none)]) }}
     </div>
 
     <!-- Quick Actions -->

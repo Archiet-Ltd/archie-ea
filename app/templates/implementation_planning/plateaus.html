@@ -1,5 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block title %}Implementation Plateaus{% endblock %}
 

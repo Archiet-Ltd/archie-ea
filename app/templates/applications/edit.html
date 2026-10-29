@@ -4,6 +4,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'macros/page_shell.html' import page_shell %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 {% block title %}Edit — {{ application.name }}{% endblock %}
 
 

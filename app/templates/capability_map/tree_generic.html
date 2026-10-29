@@ -1,7 +1,7 @@
 {# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% import 'components/breadcrumb.html' as breadcrumb %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block title %}{{ tree_label }} Tree{% endblock %}
 
@@ -31,21 +31,6 @@
 <div class="space-y-6"
      x-data='genericTree("{{ api_url }}", {{ tree_fields | tojson }})'
      x-init="init()">
-
-    <!-- Breadcrumb -->
-    {% call breadcrumb.breadcrumb() %}
-        {% call breadcrumb.breadcrumb_item(href=home_url()) %}
-            <i data-lucide="home" class="h-4 w-4"></i><span class="sr-only">Home</span>
-        {% endcall %}
-        {{ breadcrumb.breadcrumb_separator() }}
-        {% call breadcrumb.breadcrumb_item(href=url_for('capability_map.index')) %}
-            Capability Map
-        {% endcall %}
-        {{ breadcrumb.breadcrumb_separator() }}
-        {% call breadcrumb.breadcrumb_item(active=true) %}
-            {{ tree_label }}
-        {% endcall %}
-    {% endcall %}
 
     <!-- Header -->
     {% macro _ps_sub() %}<span x-text="`${visibleCount} of ${nodeCount} shown`"></span>{% endmacro %}

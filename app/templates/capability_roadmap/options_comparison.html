@@ -5,7 +5,8 @@
 
 {% block content %}
 <div class="p-6 space-y-6">
-  {{ page_shell(title='Options Comparison') }}
+  {{ page_shell(title='Options Comparison',
+                breadcrumb=[('Home', url_for('main.index')), ('Business Layer', url_for('archimate_crud.dashboard') + '#business'), ('Capabilities', url_for('capability_map.index')), ('Options Comparison', none)]) }}
   <div class="max-w-2xl mx-auto py-12 text-center">
   <p class="text-muted-foreground mb-6">This feature is being built. Check back soon.</p>
   <a href="{{ url_for('dashboard.overview') }}"

@@ -271,7 +271,9 @@ MODEL: tuple = tuple(
 )
 
 # Not drawn in the sidebar: the entry the model pages sit under for the breadcrumb trail.
-_MODEL_ROOT = _l("archimate_model", "Model", "archimate_crud.dashboard", "network", job="1",
+# group="model" so entry_for_endpoint's prefix match (below) ranks it behind a Work or
+# admin owner even when its own prefix is the longer string (R34).
+_MODEL_ROOT = _l("archimate_model", "Model", "archimate_crud.dashboard", "network", job="1", group="model",
                  aliases=("ArchiMate model", "Architecture", "Architecture model", "Elements", "Catalogue",
                           "Catalogues", "Repository", "Layers"),
                  owns=("archimate_crud.", "archimate_layers.", "value_stream."))
@@ -470,14 +472,19 @@ def entry_for_endpoint(endpoint: str | None) -> NavLink | None:
             return link
     if any(endpoint == tool.endpoint for tool in PLATFORM_ADMIN_TOOLS):
         return _by_key("platform_admin")
-    # ... then the longest matching prefix owner.
-    best, best_len = None, 0
-    for link in ALL_ENTRIES:
-        for owned in link.owns:
-            if owned.endswith((".", "_")) and endpoint.startswith(owned) and len(owned) > best_len:
-                best, best_len = link, len(owned)
-    if best is not None:
-        return best
+    # ... then the longest matching prefix owner, a Work or admin entry before a Model layer
+    # even when the Model layer's own prefix is the longer string (R34): a page reachable from
+    # two places is filed under the one a person actually clicks, not the model that backs it.
+    for exclude_model in (True, False):
+        best, best_len = None, 0
+        for link in ALL_ENTRIES:
+            if exclude_model and link.group == "model":
+                continue
+            for owned in link.owns:
+                if owned.endswith((".", "_")) and endpoint.startswith(owned) and len(owned) > best_len:
+                    best, best_len = link, len(owned)
+        if best is not None:
+            return best
     for prefix, key in _CATALOGUE_HOME:
         if endpoint.startswith(prefix):
             return _by_key(key)

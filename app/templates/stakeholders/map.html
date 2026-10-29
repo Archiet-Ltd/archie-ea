@@ -2,6 +2,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% from 'components/modal.html' import modal %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 {% block title %}Stakeholder Map{% endblock %}
 
 

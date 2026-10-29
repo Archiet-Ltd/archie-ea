@@ -5,6 +5,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card %}
 {% from 'components/dense_table.html' import dense_table %}
+{# breadcrumb-ok: page_shell's own breadcrumb is supplied by the sidebar registry (page_trail) at runtime from this page's section and title; this static scan has no way to see that. #}
 
 {% block title %}{{ entity.name }} — Data Entity — {{ config.APP_NAME }}{% endblock %}
 
