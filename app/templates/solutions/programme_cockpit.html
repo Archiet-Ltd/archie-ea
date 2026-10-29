@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 
@@ -87,7 +88,7 @@
                 <div class="flex items-center justify-between">
                     <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Conformance</p>
                     {% if import_review.conformance %}
-                    <a href="{{ url_for('solution_design.solution_review_packet', solution_id=import_review.conformance.solution_id) }}"
+                    <a href="{{ url_for('solution_design.view_solution', solution_id=import_review.conformance.solution_id, tab='review') }}"
                        class="text-xs text-primary hover:underline">Review packet →</a>
                     {% endif %}
                 </div>

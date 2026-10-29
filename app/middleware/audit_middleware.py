@@ -17,6 +17,7 @@ Call ``install_audit_logging(app)`` once in ``app/__init__.py``.
 
 import importlib
 import logging
+import re
 
 from sqlalchemy import event, inspect
 
@@ -51,6 +52,20 @@ _BOOKKEEPING_COLUMNS = frozenset(
 _EXCLUDED_COLUMNS = frozenset(
     ["password_hash", "token", "secret", "api_key", "fernet_key"]
 )
+
+# A plain word for a table whose rows carry no ``type`` column of their own.
+_TABLE_KIND_DEFAULT = {
+    "solution": "solution",
+    "application_component": "application",
+    "architecture_review_board": "review",
+    "user": "user",
+    "archimate_elements": "record",
+    "archimate_relationships": "relationship",
+    "application_owners": "owner",
+    "application_ownership": "ownership",
+    "unified_capabilities": "capability",
+    "business_capability": "capability",
+}
 
 
 def _get_request_context():
@@ -115,6 +130,24 @@ def _label_of(connection, target):
     return None
 
 
+def _kind_of(table_label, target):
+    """A plain word for what kind of record this is.
+
+    Prefers the record's own ``type`` (an ArchiMate type such as
+    ``DataObject``, split into plain words: "data object"), so the word
+    survives even when the change that touched the row left ``type`` out of
+    what was written -- the label is read from the live target, never from a
+    diff of changed columns. Falls back to a word for the table itself when
+    the record carries no ``type`` of its own.
+    """
+    type_value = getattr(target, "type", None) if target is not None else None
+    if type_value:
+        words = re.findall(r"[A-Z][a-z0-9]*|[a-z0-9]+", str(type_value))
+        if words:
+            return " ".join(word.lower() for word in words)
+    return _TABLE_KIND_DEFAULT.get(table_label)
+
+
 def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None, target=None,
                  recorded_at=None):
     """Insert one audit row using the flush's own connection.
@@ -138,6 +171,7 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
     if owner_org is not None:
         org_id = owner_org
     label = _label_of(connection, target)
+    kind = _kind_of(table_label, target)
     # Sealed into the organisation's integrity chain like every other entry.
     # A date is given only by a demonstration or sample load, as the record's first version is written.
     dated = {"created_at": recorded_at} if recorded_at is not None else {}
@@ -157,6 +191,7 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
             "source": context["source"],
             "correlation_id": context["correlation_id"],
             "label": _json_safe(label),
+            "kind": _json_safe(kind),
         },
     )
 

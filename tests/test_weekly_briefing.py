@@ -174,7 +174,9 @@ def test_briefing_has_all_four_sections_with_linked_dated_items(
     assert "Billing Service" in text
     assert f"/arb/reviews/{seeded_org['reviews'][0].id}" in html
     assert f"/risks/{seeded_org['risks'][0].id}" in html
-    assert f"/solutions/{seeded_org['solution'].id}/review-packet" in html
+    # The conformance item links the solution record's Review tab directly
+    # (brief03b): the old /review-packet path now only redirects there.
+    assert f"/solutions/{seeded_org['solution'].id}?tab=review" in html
     today = datetime.utcnow().strftime("%-d %b %Y")
     assert text.count(today) >= 5
     for banned in ("not available", "Not available", "Ask ", "Measured", "—"):

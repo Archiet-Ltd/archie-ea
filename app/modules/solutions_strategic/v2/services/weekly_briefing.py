@@ -66,7 +66,14 @@ def _section(key, heading, items, empty_text, page_label, page_href, more_label)
 
 
 def _changes(org_id, start: datetime, end: datetime) -> List[Dict[str, Any]]:
-    """Elements added or changed in the week, newest first."""
+    """Elements added or changed in the week, newest first.
+
+    The record's name and kind come from the change history entry itself
+    (written once, at write time, from the live record -- never re-derived
+    here from an update's diff of changed columns, which is why a changed
+    owner with an unchanged name used to read as the generic word
+    "element": the diff for that change carries no name at all).
+    """
     from app.models.archimate_core import ArchiMateElement
     from app.modules.intelligence.services.history_service import HistoryService
 
@@ -95,13 +102,15 @@ def _changes(org_id, start: datetime, end: datetime) -> List[Dict[str, Any]]:
     for record_id, change in latest.items():
         if record_id not in existing:
             continue
-        snapshot = change.snapshot or {}
+        kind = change.record_kind or "record"
+        name = change.label
         verb = "Added" if change.action == "insert" else "Changed"
-        kind = snapshot.get("type") or "element"
+        title = name if name else f"A {kind} record"
+        detail = f"{verb} ({kind})" if name else verb
         items.append(
             {
-                "title": snapshot.get("name") or kind,
-                "detail": f"{verb} {kind}",
+                "title": title,
+                "detail": detail,
                 "date": change.valid_from.date(),
                 "sort": change.valid_from,
                 "href": f"/architecture/elements/{record_id}",
@@ -293,7 +302,7 @@ def _conformance(today: date) -> List[Dict[str, Any]]:
                 "date": today,
                 "score": review["score"],
                 "flagged": flagged,
-                "href": f"/solutions/{solution.id}/review-packet",
+                "href": f"/solutions/{solution.id}?tab=review",
             }
         )
     items.sort(key=lambda i: (i["score"], i["title"]))

@@ -97,6 +97,10 @@ class ChangeEntry:
     correlation_id: str | None = None
     label: str | None = None
     kind: str | None = None
+    #: A plain word for what the record itself is (e.g. "data object"),
+    #: from the writer at write time -- never re-derived from a diff of
+    #: changed columns. None for a row written before this field existed.
+    record_kind: str | None = None
 
 
 @dataclass(frozen=True)
@@ -291,6 +295,7 @@ class HistoryService:
                 correlation_id=extra.get("correlation_id"),
                 label=label,
                 kind=AUDITED_TABLES.get(row.table_name),
+                record_kind=extra.get("kind"),
             ))
         changes.sort(key=lambda c: c.recorded_at, reverse=True)
         return DifferenceResult(from_date=from_date, to_date=to_date, changes=changes)
