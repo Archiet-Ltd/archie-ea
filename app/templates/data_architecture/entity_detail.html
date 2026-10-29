@@ -8,15 +8,7 @@
 
 {% block title %}{{ entity.name }} — Data Entity — {{ config.APP_NAME }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Entity Catalog', 'href': url_for('data_architecture.data_entity_catalog')},
-    {'text': entity.name, 'current': true}
-]) }}
-{% endblock %}
+
 
 {% set crud_labels = [('C', 'Create'), ('R', 'Read'), ('U', 'Update'), ('D', 'Delete')] %}
 

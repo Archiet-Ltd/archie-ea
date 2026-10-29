@@ -47,17 +47,7 @@
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-{% call breadcrumb() %}
-  {% call breadcrumb_item(href=url_for('main.index')) %}Home{% endcall %}
-  {{ breadcrumb_separator() }}
-  {% call breadcrumb_item(href=url_for('archimate_crud.dashboard') + '#business') %}Business Layer{% endcall %}
-  {{ breadcrumb_separator() }}
-  {% call breadcrumb_item(href=url_for('capability_map.index')) %}Capabilities{% endcall %}
-  {{ breadcrumb_separator() }}
-  {% call breadcrumb_item(active=true) %}Capability Roadmap{% endcall %}
-{% endcall %}
-{% endblock %}
+
 
 {% block content %}
 <div id="capability-roadmap-app"

@@ -3,15 +3,7 @@
 
 {% block title %}Review restore{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Import model file', 'href': url_for('architect_ui.import_oef')},
-    {'text': 'Restore before an import', 'href': url_for('architect_ui.import_restore_points')},
-    {'text': 'Review restore', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 {% set c = preview.counts %}

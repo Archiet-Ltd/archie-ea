@@ -4,14 +4,7 @@
 
 {% block title %}Enterprise Architecture{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture'},
-    {'text': 'Enterprise Dashboard', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 <div class="space-y-8">

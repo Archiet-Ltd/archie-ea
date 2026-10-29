@@ -2,13 +2,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Framework Management{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Framework Management', 'current': true}
-]) }}
-{% endblock %}
+
 {% block content %}
 <div class="space-y-6 p-6">
   {{ page_shell(title='Framework Management', subtitle='Manage capability frameworks, extensions, and deployment templates.') }}

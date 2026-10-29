@@ -3,14 +3,7 @@
 
 {% block title %}Application Rationalization{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Applications', 'href': url_for('unified_applications.application_list')},
-    {'text': 'Rationalization', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block extra_css %}
 <style>

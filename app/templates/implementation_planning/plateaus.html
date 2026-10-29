@@ -3,14 +3,7 @@
 
 {% block title %}Implementation Plateaus{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Implementation & Migration'},
-    {'text': 'Plateaus', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

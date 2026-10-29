@@ -3,14 +3,7 @@
 
 {% block title %}{{ initiative.name }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Portfolio', 'href': url_for('portfolio.index')},
-    {'text': initiative.name, 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that

@@ -4,15 +4,7 @@
 
 {% block title %}Capability Hierarchy - Capability Map{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business Layer', 'href': url_for('archimate_crud.dashboard') + '#business'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Hierarchy View', 'current': true}
-]) }}
-{% endblock %}
+
 {% block content %}
 <div class="space-y-6" x-data="hierarchyView()">
     <!-- Page Header -->

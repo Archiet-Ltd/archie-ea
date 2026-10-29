@@ -11,14 +11,7 @@
 <meta name="shadcn-nearest" content="dashboard-01">
 {% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Architecture Elements', 'href': url_for('archimate_crud.dashboard')},
-    {'text': 'Review Queue', 'current': true}
-]) }}
-{% endblock %}
+
 {% block content %}
 <div x-data="reviewQueue()">
     {% macro _ps_actions() %}

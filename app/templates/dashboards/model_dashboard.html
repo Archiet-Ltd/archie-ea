@@ -2,14 +2,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Model Dashboard{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Dashboards'},
-    {'text': 'Model Dashboard', 'current': true}
-]) }}
-{% endblock %}
+
 {% block content %}
 <div class="p-6 space-y-6">
   {{ page_shell(title='Model Dashboard') }}

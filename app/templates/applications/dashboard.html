@@ -18,15 +18,7 @@
    a defect flagged in the shell-overhaul design review. Only the portfolio
    dashboard (no app) still uses this block. #}
 {# duplicate-breadcrumb-ok: mutually exclusive with page_shell's breadcrumb arg below -- each side is guarded by the inverse of `app is defined and app`, so only one ever renders per request; the static checker can't see the runtime branch. #}
-{% block breadcrumb %}
-{% if not (app is defined and app) %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Applications Dashboard', 'current': true}
-]) }}
-{% endif %}
-{% endblock %}
+
 
 {# ─────────────────────────────────────────────────────────────────────────────
    Mermaid.js — only loaded on this page, not in admin_base.html

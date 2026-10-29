@@ -3,13 +3,7 @@
 
 {% block title %}Portfolio{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Portfolio', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto">

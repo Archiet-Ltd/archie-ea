@@ -5,15 +5,7 @@
 
 {% block title %}{{ tree_label }} Tree{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business Layer', 'href': url_for('archimate_crud.dashboard') + '#business'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Tree View', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block extra_css %}
 <style>

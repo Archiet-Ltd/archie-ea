@@ -13,14 +13,7 @@
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% block title %}Risk Register{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Governance', 'href': url_for('capability_governance.governance_dashboard')},
-    {'text': 'Risk Register', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 {#

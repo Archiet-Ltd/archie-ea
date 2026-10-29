@@ -18,15 +18,7 @@
 
 {% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data objects', 'href': url_for('data_architecture.data_entity_catalog')},
-    {'text': 'Diagram', 'current': true}
-]) }}
-{% endblock %}
+
 
 {% block content %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), false), ('Diagram', url_for('data_architecture.data_entity_diagram'), true)] %}
