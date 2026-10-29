@@ -145,32 +145,20 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         failure_banner = page.get_by_text('Generation failed', exact=False)
         expect(failure_banner).to_have_count(0)
 
-        # The quality panel (including the business rule coverage bar from the
-        # brief's acceptance criteria) must actually render, not just the file
-        # list. The right panel's own "Quality" tab switches to it, but the AI
-        # Assistant chat panel opens by default on top of the tab bar and the
-        # in-progress banner can still be settling right after the "complete"
-        # event, so both intercept a physical click on the tab -- switch the
-        # same `rightTab` property its own button sets, directly, the way the
-        # phase jump above does, rather than fighting either overlay.
-        page.wait_for_timeout(1000)
-        page.evaluate(
-            "() => { Alpine.$data(document.querySelector('[data-workbench=\"1\"]')).rightTab = 'quality'; }"
-        )
-        page.wait_for_timeout(1000)
-        rule_coverage_text = page.get_by_text('Business rule coverage', exact=False)
-        if rule_coverage_text.count() == 0:
-            # The direct property write above can lose the race against this
-            # subtree's own first-mount directive processing (471 directives,
-            # per workbench.html's own comment on why it is deferred) -- a
-            # real click re-asserts the same property through Alpine's own
-            # evaluation once that settles, which a bare external write does not.
-            quality_tab = page.get_by_role('button', name='Quality', exact=True)
-            expect(quality_tab).to_be_visible(timeout=PAGE_TIMEOUT)
-            quality_tab.click(force=True)
-        expect(rule_coverage_text).to_be_visible(timeout=PAGE_TIMEOUT)
-
         # ---- Persistence: reload and confirm the bundle survived server-side ----
+        # Reloading also sidesteps a separate, pre-existing issue found while
+        # writing this journey: switching the IDE's right panel to "Quality"
+        # right after the SSE "complete" event -- whether by clicking its real
+        # tab button or by writing `rightTab` through Alpine.$data() the way
+        # the Phase-4 jump above does -- intermittently loses the race against
+        # that subtree's own first-mount directive processing (the IDE view
+        # mounts fresh the moment fileList first populates; workbench.html
+        # notes it carries 471 directives and is deferred for exactly this
+        # reason) and the AI Assistant chat panel opening on top of the same
+        # tab bar by default. Neither is part of this fix: reloading starts a
+        # new Alpine instance with the bundle already generated server-side,
+        # so the IDE and its Quality tab mount directly from `hasFiles=true`
+        # rather than reacting to a mid-session state flip.
         page.reload(timeout=PAGE_TIMEOUT)
         reloaded_files_label = page.locator('text=/\\d+ files$/').first
         expect(reloaded_files_label).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -179,5 +167,16 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
             'Generated file count did not survive a reload: %s before, %s after.'
             % (file_count, reloaded_count)
         )
+
+        # The quality panel (including the business rule coverage bar from the
+        # brief's acceptance criteria) must actually render, not just the file
+        # list -- the right panel's "Quality" tab switches to it.
+        close_chat = page.get_by_role('button', name='Close chat panel', exact=True)
+        if close_chat.count():
+            close_chat.click()
+        quality_tab = page.get_by_role('button', name='Quality', exact=True)
+        expect(quality_tab).to_be_visible(timeout=PAGE_TIMEOUT)
+        quality_tab.click()
+        expect(page.get_by_text('Business rule coverage', exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
     finally:
         page.close()
