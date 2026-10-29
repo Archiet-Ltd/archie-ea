@@ -47,6 +47,10 @@
 {%- set tab = 'mapping' if request.args.get('tab') == 'mapping' else 'vendors' -%}
 {#- System counts follow the Overview's definition of an application (not decommissioned); the view supplies them. -#}
 {%- set sc = system_counts if (system_counts is defined and system_counts) else vp -%}
+{#- The answer sentence counts the same systems as the data-quality line: one count, the Overview's. -#}
+{%- if vp and system_counts is defined and system_counts -%}
+{%- set vp = dict(vp, total_systems=sc.total_systems, supplied_count=sc.supplied_count, unmapped_count=sc.unmapped_count, unmapped=sc.unmapped) -%}
+{%- endif -%}
 {%- set unmapped_n = sc.unmapped_count if sc else 0 -%}
 {%- set any_systems = (rows|selectattr('system_count')|list|length) > 0 -%}
 {%- set any_contracts = (rows|selectattr('contract_count')|list|length) > 0 -%}

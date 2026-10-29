@@ -63,6 +63,11 @@ def test_page_answer_table_and_vendor_page_agree(client, login_as, db_session, t
     world, tag = two_orgs, two_orgs["tag"]
     user = _user(db_session, world["mine"], "procurement")
     login_as(client, user)
+    # A decommissioned system is not one of "your systems" anywhere on the page: the
+    # answer sentence and the data-quality line must count the same systems.
+    db_session.add(ApplicationComponent(name=f"Retired {tag}", organization_id=world["mine"].id,
+                                        lifecycle_status="5. Decommissioned"))
+    db_session.flush()
 
     api = client.get("/api/vendors/register").get_json()
     names = [v["name"] for v in api["vendors"]]
@@ -90,6 +95,13 @@ def test_page_answer_table_and_vendor_page_agree(client, login_as, db_session, t
     # three vendors supply three of this organisation's four systems: the
     # table says what is left over, and Salesforce's own row counts its two
     assert "1 of your 4 systems do not name their vendor yet" in text
+    answer = re.search(r"supply (\d+) of your (\d+) systems", text)
+    quality = re.search(r"(\d+) of your (\d+) systems do not name their vendor yet", text)
+    assert answer and quality, text[:400]
+    supplied, total = int(answer.group(1)), int(answer.group(2))
+    unmapped, total_again = int(quality.group(1)), int(quality.group(2))
+    assert total == total_again == 4, "the answer and the data-quality line count the same systems"
+    assert supplied + unmapped == total
     systems_link = rows[f"Salesforce {tag}"].select_one('a[href$="#vendor-systems"]')
     assert systems_link is not None and systems_link.get_text(strip=True) == "2 systems"
     # exactly one renewal is due, and it is the monitoring contract's vendor
