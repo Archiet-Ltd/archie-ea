@@ -9,6 +9,7 @@ Signed in as an organisation's own non-admin architect, at 1440 wide in light
 and 390 wide in dark.
 """
 
+import io
 import uuid
 
 import pytest
@@ -50,6 +51,7 @@ def test_export_menu_lists_the_formats_and_pdf_downloads(
         owner_email = owner.email
         business_case, _figures, _links = _seed_financed_case(db, org, owner, suffix)
         case_id = business_case.id
+        business_case_title = business_case.title
 
     base = str(live_server)
     context = browser.new_context(
@@ -74,14 +76,40 @@ def test_export_menu_lists_the_formats_and_pdf_downloads(
             expect(menu.get_by_text(name, exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
         page.screenshot(path=f"/tmp/bcase01b-export-menu-{width}-{scheme}.png")
 
-        with context.expect_event(
-            "response", predicate=lambda r: "format=pdf" in r.url, timeout=PAGE_TIMEOUT
-        ) as response_info:
-            menu.get_by_text("PDF document", exact=False).click()
-        response = response_info.value
-        assert response.status == 200, f"PDF export answered {response.status}"
-        assert "application/pdf" in response.headers.get("content-type", ""), (
-            f"PDF export content type was {response.headers.get('content-type')}"
+        case_title = business_case_title
+        documents = {}
+        for label, query, mime, magic in (
+            ("Word document", "format=docx",
+             "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b"PK"),
+            ("PDF document", "format=pdf", "application/pdf", b"%PDF"),
+        ):
+            if not menu.is_visible():
+                page.get_by_role("button", name="Export", exact=True).click()
+            with context.expect_event(
+                "response", predicate=lambda r, q=query: q in r.url, timeout=PAGE_TIMEOUT
+            ) as response_info:
+                menu.get_by_text(label, exact=False).click()
+            response = response_info.value
+            assert response.status == 200, f"{label} export answered {response.status}"
+            assert mime in response.headers.get("content-type", ""), (
+                f"{label} export content type was {response.headers.get('content-type')}"
+            )
+            # The download tab closes once the attachment arrives, so read the
+            # body again through the signed-in context.
+            body = context.request.get(response.url).body()
+            assert body.startswith(magic), f"{label} body does not start with {magic!r}"
+            documents[query] = body
+
+        from docx import Document
+        from pypdf import PdfReader
+
+        word_text = "\n".join(
+            p.text for p in Document(io.BytesIO(documents["format=docx"])).paragraphs
         )
+        pdf_text = " ".join(
+            pg.extract_text() for pg in PdfReader(io.BytesIO(documents["format=pdf"])).pages
+        )
+        assert case_title in word_text, "Word export does not carry the case title"
+        assert case_title in " ".join(pdf_text.split()), "PDF export does not carry the case title"
     finally:
         context.close()
