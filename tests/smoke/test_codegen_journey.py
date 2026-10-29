@@ -142,6 +142,17 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         expect(setup_button).to_be_visible(timeout=PAGE_TIMEOUT)
         setup_button.evaluate("el => el.click()")
         page.wait_for_timeout(300)
+        force_result = page.evaluate(
+            "() => { const root = document.querySelector('[data-workbench=\"1\"]'); "
+            "const d = Alpine.$data(root); "
+            "const before = d.ideShowSetup; "
+            "d.ideShowSetup = false; "
+            "d.ideShowSetup = true; "
+            "const after = d.ideShowSetup; "
+            "const h2 = [...document.querySelectorAll('h2')].find(h => h.textContent.includes('Phase 3')); "
+            "return {before, after, h2FoundAfterForce: !!h2, sameRoot: Alpine.$data(root) === d}; }"
+        )
+        print('FORCE TOGGLE RESULT:', force_result)
         alpine_state = page.evaluate(
             "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
             "const h2 = [...document.querySelectorAll('h2')].find(h => h.textContent.includes('Phase 3')); "
