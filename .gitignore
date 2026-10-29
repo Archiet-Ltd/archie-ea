@@ -342,3 +342,6 @@ route_verification.accum.json
 # compiled Python caches never belong in the repository
 __pycache__/
 *.pyc
+
+# a local run's guardrail activity log, not a committed artifact
+docs/guardrail_audit_log.jsonl
