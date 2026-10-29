@@ -732,6 +732,30 @@ entries:
       - path: scripts/check_macro_kwargs.py
         reason: provides collect_signatures() for macro signatures (reused by component_inventory.py)
 
+  - id: forms-submit-scan
+    concept: Forms with no way to submit (static template scan and ratchet; a fourth class of control that
+      looks live and does nothing)
+    status: active
+    canonical:
+      path: scripts/qa/forms_submit_scan.py
+      symbols: [offenders, main]
+    reuse: >
+      A form counts as submitting when scripts/qa/forms_submit_scan.py says so (a type="submit" control, the
+      form_footer macro, a button naming the form, an @submit / hx-post / data-autosubmit handler, a
+      submit-on-change control or a script that submits the form by id). Extend offenders() there when a new
+      submit idiom appears; do not write a second template scan for forms, buttons or submit controls. Dead
+      click handlers, silent fetches and unconsumed data-action values stay in scripts/check_dead_interactions.py;
+      scripts/verify.py runs both (gates forms-submit and dead-interactions) and the count in
+      scripts/forms_submit_baseline.json can only fall.
+    must_not_create:
+      - id: second-forms-submit-scan
+        regex: 'forms_submit_baseline|no way to submit|forms?_without_submit'
+        scope: [scripts]
+        suffixes: [.py]
+    known_exceptions:
+      - path: scripts/verify.py
+        reason: the gate that runs the canonical scan and reads its baseline
+
   - id: application-kind
     concept: Whether an element type is an application (Application or ApplicationComponent)
     status: active
