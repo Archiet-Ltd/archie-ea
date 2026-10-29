@@ -6,6 +6,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/provenance.html' import provenance_badge %}
+{% from 'components/input.html' import hidden_input %}
 
 {% block title %}Impact Analysis{% endblock %}
 
@@ -75,9 +76,9 @@
             </form>
             {% if selected_element_type and selected_element_id %}
             <form method="POST" action="{{ url_for('enterprise.impact_analysis_run') }}" class="mt-4 border-t border-border pt-4">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="element_type" value="{{ selected_element_type }}">
-                <input type="hidden" name="element_id" value="{{ selected_element_id }}">
+                {{ hidden_input('csrf_token', csrf_token()) }}
+                {{ hidden_input('element_type', selected_element_type) }}
+                {{ hidden_input('element_id', selected_element_id) }}
                 {{ button(text='Run Analysis', variant='default', type='submit', icon='play', testid='run-impact-analysis') }}
             </form>
             {% endif %}
