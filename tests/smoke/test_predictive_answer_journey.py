@@ -30,7 +30,7 @@ def _load_sample(page, base):
 
 
 @pytest.mark.parametrize("width", [1440])
-def test_predictive_answer_journey(browser, live_server, seeded, width):
+def test_predictive_answer_journey(browser, live_server, seeded, ai_protocol_stub, width):
     email = seeded["emails"]["enterprise_architect"]
     context = browser.new_context(viewport={"width": width, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)
