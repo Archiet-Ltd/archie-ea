@@ -2,6 +2,9 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Microsoft 365 Integration{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/checkbox.html' import checkbox %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -27,7 +30,7 @@
     {% endwith %}
 
     <form method="POST" action="{{ url_for('m365_connector.m365_config_save') }}" class="space-y-6">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(type="hidden", name="csrf_token", value=csrf_token()) }}
 
         <!-- Azure App Registration -->
         <div data-slot="card" class="rounded-lg border border-input bg-card">
@@ -41,36 +44,15 @@
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
                     <label for="tenant_id" class="block text-sm font-medium text-muted-foreground mb-1">Tenant ID</label>
-                    <input
-                        type="text"
-                        id="tenant_id"
-                        name="tenant_id"
-                        value="{{ cfg.get('tenant_id', '') }}"
-                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                    >
+                    {{ input(type='text', id='tenant_id', name='tenant_id', value=cfg.get('tenant_id', ''), placeholder='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', class='font-mono') }}
                 </div>
                 <div>
                     <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">Client ID (Application ID)</label>
-                    <input
-                        type="text"
-                        id="client_id"
-                        name="client_id"
-                        value="{{ cfg.get('client_id', '') }}"
-                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                    >
+                    {{ input(type='text', id='client_id', name='client_id', value=cfg.get('client_id', ''), placeholder='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', class='font-mono') }}
                 </div>
                 <div>
                     <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">Client Secret</label>
-                    <input
-                        type="password"
-                        id="client_secret"
-                        name="client_secret"
-                        placeholder="{{ '••••••••' if has_secret else 'Enter client secret' }}"
-                        autocomplete="new-password"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
+                    {{ input(type='password', id='client_secret', name='client_secret', placeholder=('••••••••' if has_secret else 'Enter client secret'), autocomplete='new-password') }}
                     {% if has_secret %}
                         <p class="text-xs text-muted-foreground mt-1">Leave blank to keep the existing secret.</p>
                     {% endif %}
@@ -89,28 +71,14 @@
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
                     <label for="sharepoint_site_id" class="block text-sm font-medium text-muted-foreground mb-1">SharePoint Site ID</label>
-                    <input
-                        type="text"
-                        id="sharepoint_site_id"
-                        name="sharepoint_site_id"
-                        value="{{ cfg.get('site_id', '') }}"
-                        placeholder="contoso.sharepoint.com,site-guid,web-guid"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                    >
+                    {{ input(type='text', id='sharepoint_site_id', name='sharepoint_site_id', value=cfg.get('site_id', ''), placeholder='contoso.sharepoint.com,site-guid,web-guid', class='font-mono') }}
                     <p class="text-xs text-muted-foreground mt-1">
                         Find it at: <code class="font-mono">GET https://graph.microsoft.com/v1.0/sites/{hostname}:/sites/{sitename}</code>
                     </p>
                 </div>
                 <div>
                     <label for="sharepoint_folder_path" class="block text-sm font-medium text-muted-foreground mb-1">Folder Path</label>
-                    <input
-                        type="text"
-                        id="sharepoint_folder_path"
-                        name="sharepoint_folder_path"
-                        value="{{ cfg.get('folder_path', 'Architecture Blueprints') }}"
-                        placeholder="Architecture Blueprints"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
+                    {{ input(type='text', id='sharepoint_folder_path', name='sharepoint_folder_path', value=cfg.get('folder_path', 'Architecture Blueprints'), placeholder='Architecture Blueprints') }}
                 </div>
             </div>
         </div>
@@ -125,14 +93,7 @@
             </div>
             <div class="p-4 sm:p-6">
                 <label for="teams_webhook_url" class="block text-sm font-medium text-muted-foreground mb-1">Incoming Webhook URL</label>
-                <input
-                    type="url"
-                    id="teams_webhook_url"
-                    name="teams_webhook_url"
-                    value="{{ cfg.get('teams_webhook_url', '') }}"
-                    placeholder="https://your-org.webhook.office.com/webhookb2/..."
-                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                >
+                {{ input(type='url', id='teams_webhook_url', name='teams_webhook_url', value=cfg.get('teams_webhook_url', ''), placeholder='https://your-org.webhook.office.com/webhookb2/...', class='font-mono') }}
                 <p class="text-xs text-muted-foreground mt-1">
                     In Teams: channel → ··· → Connectors → Incoming Webhook → Configure.
                 </p>
@@ -143,29 +104,16 @@
         <div data-slot="card" class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 flex items-center justify-between gap-4 flex-wrap">
                 <label class="flex items-center gap-3 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        name="enabled"
-                        value="1"
-                        {% if cfg.get('enabled') == True or cfg.get('enabled') == 1 or cfg.get('enabled')|string|lower in ['1', 'true'] %}checked{% endif %}
-                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring"
-                    >
+                    {{ checkbox(name='enabled', value='1', checked=(cfg.get('enabled') == True or cfg.get('enabled') == 1 or cfg.get('enabled')|string|lower in ['1', 'true'])) }}
                     <span class="text-sm font-medium">Enable M365 Integration</span>
                 </label>
                 <div class="flex items-center gap-3">
-                    <button
-                        type="button"
-                        id="btn-test-auth"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                    >
+                    {% call button(type='button', variant='outline', id='btn-test-auth') %}
                         Test Auth
-                    </button>
-                    <button
-                        type="submit"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                    >
+                    {% endcall %}
+                    {% call button(type='submit', variant='default') %}
                         Save Configuration
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
             <div id="test-result" class="hidden px-4 sm:px-6 pb-4 text-sm"></div>

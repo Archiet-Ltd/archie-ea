@@ -204,7 +204,9 @@ def test_an_invited_person_joins_through_the_e_mail_and_is_signed_in(browser, ma
         page.select_option("#role", "architect")
         page.get_by_role("button", name="Send invitation").click()
         page.wait_for_url("**/admin/team", timeout=PAGE_TIMEOUT)
-        row = page.locator('[data-invitation-email="%s"]' % invitee)
+        # The e-mail cell names the invitation; its delivery state is a sibling cell in the same row.
+        row = page.locator('[data-testid="invitation-row"]').filter(
+            has=page.locator('[data-invitation-email="%s"]' % invitee))
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
         assert row.locator('[data-invitation-delivery="sent"]').count() == 1
         message = smtp_sink.text_to(invitee)

@@ -1,0 +1,25 @@
+{# scroll-area: port of shadcn/ui scroll-area.tsx (pinned in compliance/upstream). Macros: scroll_area, scroll_area_viewport, scroll_area_scrollbar, scroll_area_thumb #}
+
+{#- ScrollArea -#}
+{% macro scroll_area(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('scroll-area', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ScrollArea -#}
+{% macro scroll_area_viewport(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('scroll-area-viewport', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ScrollBar -#}
+{% macro scroll_area_scrollbar(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('scroll-area-scrollbar', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ScrollBar -#}
+{% macro scroll_area_thumb(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('scroll-area-thumb', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

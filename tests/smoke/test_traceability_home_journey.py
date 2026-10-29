@@ -119,9 +119,9 @@ def test_enterprise_architect_starts_from_the_broken_chains(page, live_server, s
 
     page.goto(live_server + "/intelligence/traceability", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert page.url.endswith("/architecture/traceability"), page.url
-    expect(page.locator("h1")).to_contain_text("Cross-Layer Traceability Matrix")
+    expect(page.locator("h1")).to_contain_text("Traceability")
 
-    rows = page.locator('[data-testid="broken-chains"] > li')
+    rows = page.locator('[data-testid="broken-chains"] [data-testid="broken-chain-row"]')
     count = int(page.locator('[data-testid="broken-count"]').inner_text())
     assert count == rows.count() and count >= 2
     component_row = rows.filter(has_text=chains["component_name"])
@@ -139,8 +139,10 @@ def test_enterprise_architect_starts_from_the_broken_chains(page, live_server, s
 
     # Trace narrows the page to that element and explains where the chain stops.
     page.goto(live_server + "/architecture/traceability", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.locator('[data-testid="broken-chains"] > li', has_text=chains["component_name"]) \
-        .get_by_role("link", name="Trace").click()
+    # Trace sits in the row's menu.
+    page.locator('[data-testid="broken-chains"] [data-testid="broken-chain-row"]', has_text=chains["component_name"]) \
+        .get_by_role("button", name="Actions for").click()
+    page.get_by_test_id("broken-trace-%d" % chains["component"]).click()
     page.wait_for_url(lambda url: "element=%d" % chains["component"] in url, timeout=PAGE_TIMEOUT)
     expect(page.locator('[data-testid="trace-up"]')).to_have_attribute("data-complete", "false")
     expect(page.locator('[data-testid="trace-up"]')).to_contain_text("Stops at %s Invoicing" % chains["noun"])
@@ -149,7 +151,7 @@ def test_enterprise_architect_starts_from_the_broken_chains(page, live_server, s
     # Clearing the filter returns to the list, never a blank page.
     page.get_by_role("link", name="Show broken chains").click()
     page.wait_for_url(lambda url: "element=" not in url, timeout=PAGE_TIMEOUT)
-    expect(page.locator('[data-testid="broken-chains"] > li').first).to_be_visible()
+    expect(page.locator('[data-testid="broken-chains"] [data-testid="broken-chain-row"]').first).to_be_visible()
 
 
 def test_trace_from_the_application_and_capability_records(page, live_server, seeded, chains):

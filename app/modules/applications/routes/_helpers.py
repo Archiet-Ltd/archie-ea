@@ -648,9 +648,81 @@ def _vendors_impl(
         {"value": vt, "label": vt} for vt in vendor_type_options
     ]
 
+    # The table lists the organisation's vendor register (the same rows the
+    # register API serves), rendered on the server.
+    from app.services import vendor_register
+
+    try:
+        register_rows = vendor_register.register()
+    except Exception:  # noqa: BLE001 - the page says the list could not be read
+        db.session.rollback()
+        register_rows = []
+
+    # Each vendor's active contracts and their stated annual cost, read through
+    # the same functions the Costs page totals with, so both pages agree.
+    try:
+        from app.models.application_portfolio import VendorContract
+        from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+        reg_org = vendor_register._org(None)
+        by_vendor = {}
+        if reg_org is not None and register_rows:
+            for c in VendorContract.query.filter(
+                VendorContract.organization_id == reg_org,
+                VendorContract.status == "active",
+                VendorContract.vendor_id.in_([r["id"] for r in register_rows]),
+            ).all():
+                by_vendor.setdefault(c.vendor_id, []).append(get_contract_amounts(c)["annual_cost"])
+        # The contract cost per vendor is the figure the Costs page shows, so it
+        # follows that page's rule for who may read it.
+        from flask_login import current_user as _viewer
+        from app.decorators.requires_role import may_see_spend_pages
+
+        cost_visible = may_see_spend_pages(_viewer)
+        for r in register_rows:
+            costs = by_vendor.get(r["id"], [])
+            r["contract_count"] = len(costs)
+            r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
+            r["cost_visible"] = cost_visible
+            if not cost_visible:
+                r["annual_cost"] = None
+    except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor contract figures could not be read")
+
+    # System counts use the Overview's definition of an application (not
+    # decommissioned), through the Overview's own query, so both pages agree.
+    system_counts = None
+    try:
+        from app.models.application_portfolio import ApplicationComponent
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        org_id = vendor_register._org(None)
+        if org_id is not None:
+            active = _active_applications().where(ApplicationComponent.organization_id == org_id)
+            total_systems = db.session.execute(
+                db.select(func.count()).select_from(active.with_only_columns(ApplicationComponent.id).subquery())
+            ).scalar_one()
+            unmapped = db.session.execute(
+                active.where(vendor_register._app_vendor_expr().is_(None)).order_by(
+                    func.lower(ApplicationComponent.name), ApplicationComponent.id)
+            ).scalars().all()
+            system_counts = {
+                "total_systems": total_systems,
+                "supplied_count": total_systems - len(unmapped),
+                "unmapped_count": len(unmapped),
+                "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status}
+                             for a in unmapped[:200]],
+            }
+    except Exception:  # noqa: BLE001 - fall back to the register's own counts
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor page system counts could not be read")
+
     return render_template(
         "vendors/list.html",
         vendors=vendors,
+        register_rows=register_rows,
+        system_counts=system_counts,
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,
