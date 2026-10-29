@@ -3,7 +3,8 @@
 {% block title %}Review what GitHub showed{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/alert.html' import alert as quiet_alert %}
-{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% macro evidence(item) -%}
     {{ item.repository }}{% if item.path %}/{{ item.path }}{% endif %}{% if item.short_commit %} @ {{ item.short_commit }}{% endif %}{% if item.evidence_file %} ({{ item.evidence_file }}){% endif %}
@@ -72,16 +73,14 @@
     {% for section in review.applications %}
     <section class="mb-8" aria-labelledby="group-{{ loop.index }}">
         <h2 id="group-{{ loop.index }}" class="text-sm font-semibold mb-2">{{ section.group }}</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Application', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), ('', 'text-right')], rows=section['items']|length, caption='Applications in ' ~ section.group) %}
-        {% for item in section['items'] %}
-        <tr class="group h-12 transition-colors hover:bg-muted/50">
-            <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
-            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">GitHub code owner: </span>{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ evidence(item) }}</td>
-            <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
-        </tr>
-        {% endfor %}
+        {% call(item) list_table(rows=section['items'], columns=[('Application', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), {'label': '', 'class': 'text-right'}],
+                              caption='Applications in ' ~ section.group, testid='github-review-applications-' ~ loop.index, row_testid='github-review-row', search_placeholder='Filter applications...',
+                              empty_message='Nothing here yet.') %}
+          {% call table_cell(class='font-medium text-foreground') %}{{ item.name }}{% endcall %}
+          {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.reason }}{% endcall %}
+          {% call table_cell(class='text-xs') %}{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}{% endcall %}
+          {% call table_cell(class='text-xs font-mono text-muted-foreground break-words') %}{{ evidence(item) }}{% endcall %}
+          {% call table_cell(class='text-right') %}{{ item_controls(item, classifications) }}{% endcall %}
         {% endcall %}
     </section>
     {% endfor %}
@@ -89,17 +88,15 @@
     {% if review.parts %}
     <section class="mb-8" aria-labelledby="parts-heading">
         <h2 id="parts-heading" class="text-sm font-semibold mb-2">Parts of applications</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), ('', 'text-right')], rows=review.parts|length, caption='Parts of applications') %}
-        {% for item in review.parts %}
-        <tr class="group h-12 transition-colors hover:bg-muted/50">
-            <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
-            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Belongs to: </span>{{ item.parent_name }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
-            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">GitHub code owner: </span>{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ evidence(item) }}</td>
-            <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
-        </tr>
-        {% endfor %}
+        {% call(item) list_table(rows=review.parts, columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), {'label': '', 'class': 'text-right'}],
+                              caption='Parts of applications', testid='github-review-parts', row_testid='github-review-part-row', search_placeholder='Filter parts...',
+                              empty_message='Nothing here yet.') %}
+          {% call table_cell(class='font-medium text-foreground') %}{{ item.name }}{% endcall %}
+          {% call table_cell(class='text-xs') %}{{ item.parent_name }}{% endcall %}
+          {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.reason }}{% endcall %}
+          {% call table_cell(class='text-xs') %}{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}{% endcall %}
+          {% call table_cell(class='text-xs font-mono text-muted-foreground break-words') %}{{ evidence(item) }}{% endcall %}
+          {% call table_cell(class='text-right') %}{{ item_controls(item, classifications) }}{% endcall %}
         {% endcall %}
     </section>
     {% endif %}
@@ -107,20 +104,18 @@
     {% if review.links %}
     <section class="mb-8" aria-labelledby="links-heading">
         <h2 id="links-heading" class="text-sm font-semibold mb-2">Links between them</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), ('', 'text-right')], rows=review.links|length, caption='Links between applications') %}
-        {% for item in review.links %}
-        <tr class="group h-12 transition-colors hover:bg-muted/50">
-            <td class="px-2 align-middle font-medium text-foreground">{{ item.source_name }} {{ 'serves' if item.relationship_type == 'Serving' else 'is linked to' }} {{ item.target_name }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">What the code says: </span>{{ item.detail }}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }})</td>
-            <td class="px-2 align-middle">
-                <form method="POST" action="{{ url_for('m365_connector.github_review_skip', approval_id=item.id) }}" class="flex justify-end">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted/50">Skip</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
+        {% call(item) list_table(rows=review.links, columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), {'label': '', 'class': 'text-right'}],
+                              caption='Links between applications', testid='github-review-links', row_testid='github-review-link-row', search_placeholder='Filter links...',
+                              empty_message='Nothing here yet.') %}
+          {% call table_cell(class='font-medium text-foreground') %}{{ item.source_name }} {{ 'serves' if item.relationship_type == 'Serving' else 'is linked to' }} {{ item.target_name }}{% endcall %}
+          {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.detail }}{% endcall %}
+          {% call table_cell(class='text-xs font-mono text-muted-foreground break-words') %}{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }}){% endcall %}
+          {% call table_cell(class='text-right') %}
+            <form method="POST" action="{{ url_for('m365_connector.github_review_skip', approval_id=item.id) }}" class="flex justify-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted/50">Skip</button>
+            </form>
+          {% endcall %}
         {% endcall %}
     </section>
     {% endif %}
@@ -128,15 +123,13 @@
     {% if review.others %}
     <section class="mb-8" aria-labelledby="others-heading">
         <h2 id="others-heading" class="text-sm font-semibold mb-2">Not added to the model</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Repository', ''), ('Looks like', ''), ('Why', ''), ('', 'text-right')], rows=review.others|length, caption='Repositories that are not added to the model') %}
-        {% for item in review.others %}
-        <tr class="group h-12 transition-colors hover:bg-muted/50">
-            <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
-            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Looks like: </span>{{ item.classification|capitalize }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
-            <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
-        </tr>
-        {% endfor %}
+        {% call(item) list_table(rows=review.others, columns=[('Repository', ''), ('Looks like', ''), ('Why', ''), {'label': '', 'class': 'text-right'}],
+                              caption='Repositories that are not added to the model', testid='github-review-others', row_testid='github-review-other-row', search_placeholder='Filter repositories...',
+                              empty_message='Nothing here yet.') %}
+          {% call table_cell(class='font-medium text-foreground') %}{{ item.name }}{% endcall %}
+          {% call table_cell(class='text-xs') %}{{ item.classification|capitalize }}{% endcall %}
+          {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.reason }}{% endcall %}
+          {% call table_cell(class='text-right') %}{{ item_controls(item, classifications) }}{% endcall %}
         {% endcall %}
     </section>
     {% endif %}
@@ -145,10 +138,10 @@
     {% if review.owner_changes %}
     <section class="mb-8" aria-labelledby="owners-heading">
         <h2 id="owners-heading" class="text-sm font-semibold mb-2">Owner changes to decide one by one</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Proposal', '')], rows=review.owner_changes|length, caption='Owner changes') %}
-        {% for item in review.owner_changes %}
-        <tr class="h-12"><td class="px-2 align-middle text-xs">{{ item.user_email }} is named as code owner of {{ item.repository }}.</td></tr>
-        {% endfor %}
+        {% call(item) list_table(rows=review.owner_changes, columns=[('Proposal', '')],
+                              caption='Owner changes', testid='github-review-owner-changes', row_testid='github-review-owner-row',
+                              toolbar=false, empty_message='Nothing here yet.') %}
+          {% call table_cell(class='text-xs') %}{{ item.user_email }} is named as code owner of {{ item.repository }}.{% endcall %}
         {% endcall %}
         <p class="mt-2 text-xs text-muted-foreground">These would replace an owner a person recorded, so they are decided one at a time in the <a class="underline" href="{{ url_for('unified_ai_chat.approval_inbox') }}">approval inbox</a>.</p>
     </section>
