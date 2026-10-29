@@ -127,7 +127,7 @@ def gap_data(app, seeded):
 def _open(page, base, email, theme=None):
     _login(page, base, email)
     if theme:
-        page.evaluate("document.documentElement.setAttribute('data-theme', '%s')" % theme)
+        page.evaluate("localStorage.setItem('theme', '%s')" % theme)
     page.goto(base + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
 
@@ -145,6 +145,8 @@ def test_gap_analysis_list_table(browser, live_server, seeded, gap_data, viewpor
     page = context.new_page()
     try:
         _open(page, live_server, email, theme)
+        is_dark = page.evaluate("document.documentElement.classList.contains('dark')")
+        assert is_dark == (theme == "dark"), "the page did not apply the %s theme" % theme
         table = page.locator('[data-testid="gaps-table"]')
         pager = page.locator('[data-testid="gaps-table-pager"]')
 
