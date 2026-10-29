@@ -917,6 +917,24 @@ def gate_public_repo_hygiene() -> Result:
     return Result("public-repo-hygiene", PASS if count == 0 else FAIL, detail, count, 0)
 
 
+def gate_forms_submit() -> Result:
+    """A <form> with no submit control posts nothing: the button macro renders
+    type="button" unless told otherwise. Ratchet: the count in
+    scripts/forms_submit_baseline.json can only fall. See scripts/qa/forms_submit_scan.py.
+    """
+    proc = _run([sys.executable, "scripts/qa/forms_submit_scan.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+        baseline = json.loads((REPO_ROOT / "scripts" / "forms_submit_baseline.json")
+                              .read_text())["forms_without_submit"]
+    except (ValueError, IndexError, OSError, KeyError):
+        return Result("forms-submit", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else _run(
+        [sys.executable, "scripts/qa/forms_submit_scan.py"]).stdout[-1800:]
+    return Result("forms-submit", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_unregistered_checks(baseline: int) -> Result:
     """A scripts/check_*.py file with no Gate(...) entry in build_gates() never
     runs, regardless of what any doc says it enforces. See F500-008 and
@@ -1957,6 +1975,12 @@ def build_gates(baseline: dict) -> list[Gate]:
                  baseline.get("interface_contract_unimplemented", 0)),
              remediation="implement the missing route, or remove the operation from the "
                          "subset's PUBLISHED_GROUPS",
+             tags=["static"]),
+        Gate("forms-submit", "a <form> whose controls cannot submit it",
+             "ratchet", gate_forms_submit,
+             remediation="give the primary button type='submit' (button() defaults to "
+                         "type='button'), or mark a script-submitted form with "
+                         "{# forms-submit-ok: <reason> #}",
              tags=["static"]),
         Gate("compile", "Every module bytecode-compiles", "command", gate_compile,
              remediation="fix the reported SyntaxError", tags=["static", "fast"]),
