@@ -304,7 +304,7 @@ def _condition(db_session, org, responsible, *, due, status="pending", **lifecyc
     db_session.flush()
     # The decision and cycle rows are not what this rule reads; skip their
     # foreign keys for this transaction only.
-    db_session.execute(db.text("SET LOCAL session_replication_role = replica"))
+    db_session.execute(db.text("SET LOCAL session_replication_role = replica"))  # session-replication-role-ok: decision_event_id and review_cycle_id name rows this rule never reads (only due_date/status/responsible_id matter here); no real caller writes a condition without a real decision and cycle, so building one is not worth a full typed ARB graph in every alert-rule test
     condition = ARBCondition(
         organization_id=org.id, decision_event_id=999999, review_cycle_id=review.id,
         review_item_id=review.id, condition_number="C-1",
@@ -313,7 +313,7 @@ def _condition(db_session, org, responsible, *, due, status="pending", **lifecyc
     )
     db_session.add(condition)
     db_session.flush()
-    db_session.execute(db.text("SET LOCAL session_replication_role = origin"))
+    db_session.execute(db.text("SET LOCAL session_replication_role = origin"))  # session-replication-role-ok: restores the switch flipped above
     db_session.commit()
     return review, condition
 

@@ -1512,6 +1512,40 @@ def _purge_concurrency_test_organizations(connection, organization_ids, app):
     with app.app_context():
         from app import db
 
+        # The race this test deliberately provokes can leave a decision brief
+        # retenanted to one organisation while its own version/citation rows
+        # keep the organisation_id they were written under — a parent/child
+        # mismatch the deletion service's per-table organisation_id scoping
+        # cannot see (it looks for each table's OWN rows naming the
+        # organisation, not rows whose parent now belongs to it). Clear the
+        # versions by their real parent — the brief, whichever organisation
+        # either row claims — before the generic per-organisation delete.
+        raw = db.engine.raw_connection()
+        try:
+            with raw.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id FROM decision_briefs WHERE organization_id = ANY(%s)",
+                    (organization_ids,),
+                )
+                brief_ids = [row[0] for row in cursor.fetchall()]
+                if brief_ids:
+                    for org_id in organization_ids:
+                        cursor.execute(
+                            "SELECT set_config('archie.deleting_organisation', %s, true)",
+                            (str(org_id),),
+                        )
+                        cursor.execute(
+                            "DELETE FROM decision_brief_versions "
+                            "WHERE brief_id = ANY(%s) AND organization_id = %s",
+                            (brief_ids, org_id),
+                        )
+                    cursor.execute(
+                        "DELETE FROM decision_briefs WHERE id = ANY(%s)",
+                        (brief_ids,),
+                    )
+                raw.commit()
+        finally:
+            raw.close()
         for org_id in organization_ids:
             if db.session.get(Organization, org_id) is not None:
                 OrganizationDeletionService.delete_organization(org_id)

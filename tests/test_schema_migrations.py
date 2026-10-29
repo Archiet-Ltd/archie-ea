@@ -445,7 +445,7 @@ def _seed(url, rows):
     """Insert fixture rows with foreign keys and triggers off (superuser session)."""
     engine = create_engine(url)
     with engine.begin() as conn:
-        conn.execute(text("SET LOCAL session_replication_role = replica"))
+        conn.execute(text("SET LOCAL session_replication_role = replica"))  # session-replication-role-ok: seeds generic schema-drift fixture rows across many tables in no particular dependency order; this exercises column/type reconciliation, not domain FK or business-rule shape, so no real caller writes this way
         for table, values in rows:
             _insert(conn, table, values)
     engine.dispose()

@@ -488,7 +488,7 @@ def test_task7_guards_install_and_repair_inside_the_active_non_public_schema(
 
             # Seed the pre-existing row as the bootstrap superuser, then restore
             # production trigger enforcement before exercising append-only repair.
-            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: seeds a row shaped like it was written before the guard trigger existed, to prove the guard then refuses to mutate it; no real caller can reach this pre-trigger shape today
             receipt_id = connection.scalar(
                 text(
                     "INSERT INTO command_idempotency_records "
@@ -513,7 +513,7 @@ def test_task7_guards_install_and_repair_inside_the_active_non_public_schema(
                 ),
                 {"digest": "d" * 64, "receipt_id": receipt_id},
             )
-            connection.exec_driver_sql("SET LOCAL session_replication_role = origin")
+            connection.exec_driver_sql("SET LOCAL session_replication_role = origin")  # session-replication-role-ok: restores the switch flipped above
             with pytest.raises(Exception, match="append-only"):
                 with connection.begin_nested():
                     connection.execute(

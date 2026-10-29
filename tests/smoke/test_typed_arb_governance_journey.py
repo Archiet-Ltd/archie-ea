@@ -615,7 +615,7 @@ def governed(_app, seeded, live_server):
         from app.models.architecture_review_board import ARBReviewCycle, ARBReviewItem
         from app.models.transformation_decision import ARBSubjectEvidenceSnapshot
 
-        db.session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        db.session.execute(db.text("SET LOCAL session_replication_role = replica"))  # session-replication-role-ok: builds two deliberately non-happy read states (historical/failed) directly, bypassing the command services, which commit through their own sessions invisible to this browser-server fixture; no real caller writes these two rows in one transaction this way
 
         def _read_state_graph(adr_key, *, historical=False):
             adr_id = out[adr_key]
@@ -675,7 +675,7 @@ def governed(_app, seeded, live_server):
 
         _read_state_graph("adr_historical", historical=True)
         _read_state_graph("adr_failed")
-        db.session.execute(db.text("SET LOCAL session_replication_role = origin"))
+        db.session.execute(db.text("SET LOCAL session_replication_role = origin"))  # session-replication-role-ok: restores the switch flipped above
         db.session.commit()
 
         out["org_id"] = org_id
@@ -799,9 +799,9 @@ def _cleanup(db, out):
     raw = db.engine.raw_connection()
     try:
         with raw.cursor() as cursor:
-            cursor.execute("SHOW session_replication_role")
+            cursor.execute("SHOW session_replication_role")  # session-replication-role-ok: reads the role to restore below, not to use it
             original = cursor.fetchone()[0]
-            cursor.execute("SET session_replication_role = replica")
+            cursor.execute("SET session_replication_role = replica")  # session-replication-role-ok: two shapes in one pass — a full foreign-tenant teardown (org-scoped) and a surgical removal of only this module's rows from the shared home tenant other smoke modules keep using, keyed by ADR/solution id rather than organisation_id; neither is the single-organisation-delete shape OrganizationDeletionService covers, and the home tenant must survive the module
             try:
                 org_ids = list(out["cleanup_org_ids"])
                 if org_ids:
@@ -871,7 +871,7 @@ def _cleanup(db, out):
                     cursor.execute("DELETE FROM solution_analysis_sessions WHERE id = %s",
                                    (out["solution_workspace"],))
             finally:
-                cursor.execute("SET session_replication_role = %s" % original)
+                cursor.execute("SET session_replication_role = %s" % original)  # session-replication-role-ok: restores the switch flipped above
             raw.commit()
     finally:
         raw.close()

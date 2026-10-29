@@ -77,48 +77,11 @@ def committed_solution_endpoint_scope(app):
             yield scope
         finally:
             db.session.remove()
-            raw = db.engine.raw_connection()
-            try:
-                with raw.cursor() as cursor:
-                    cursor.execute("SET LOCAL session_replication_role = replica")
-                    cursor.execute(
-                        "DELETE FROM arb_submission_evidence_snapshots "
-                        "WHERE organization_id = %s",
-                        (scope["organization_id"],),
-                    )
-                raw.commit()
-            finally:
-                raw.close()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "arb_submission_events",
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "arb_review_items",
-                    "arb_review_cycles",
-                    "solution_risks",
-                    "solution_goals",
-                    "solution_drivers",
-                    "solution_problem_definitions",
-                    "solutions",
-                    "solution_analysis_sessions",
-                    "soc2_audit_log",
-                    "users",
-                ):
-                    connection.execute(
-                        db.text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id = :organization_id"
-                        ),
-                        {"organization_id": scope["organization_id"]},
-                    )
-                connection.execute(
-                    db.text("DELETE FROM organizations WHERE id = :organization_id"),
-                    {"organization_id": scope["organization_id"]},
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            if db.session.get(Organization, scope["organization_id"]) is not None:
+                OrganizationDeletionService.delete_organization(scope["organization_id"])
+            db.session.remove()
 
 
 def test_manual_arb_creation_rejects_solution_identity_before_legacy_service():

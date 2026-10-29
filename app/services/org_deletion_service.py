@@ -50,7 +50,7 @@ _FOREIGN_KEYS = text(
     """
     SELECT child.relname AS child_table, child_col.attname AS child_column,
            parent.relname AS parent_table, parent_col.attname AS parent_column,
-           child_col.attnotnull AS not_null
+           child_col.attnotnull AS not_null, (c.condeferrable AND c.condeferred) AS deferred
     FROM pg_constraint c
     JOIN pg_class child ON child.oid = c.conrelid
     JOIN pg_namespace ns ON ns.oid = child.relnamespace
@@ -74,11 +74,12 @@ class _Plan:
     """The foreign-key graph of the current schema, read once per deletion."""
 
     def __init__(self, sess):
-        # parent table -> [(child table, child column, parent column, child column is NOT NULL)]
+        # parent table -> [(child table, child column, parent column, child column is NOT NULL,
+        #                    the constraint is INITIALLY DEFERRED)]
         self.referrers = defaultdict(list)
         self.org_columns = defaultdict(list)  # table -> columns that point at organizations.id
-        for child, child_col, parent, parent_col, not_null in sess.execute(_FOREIGN_KEYS):
-            self.referrers[parent].append((child, child_col, parent_col, not_null))
+        for child, child_col, parent, parent_col, not_null, deferred in sess.execute(_FOREIGN_KEYS):
+            self.referrers[parent].append((child, child_col, parent_col, not_null, deferred))
             if parent == "organizations" and parent_col == "id" and child != "organizations":
                 self.org_columns[child].append(child_col)
 
@@ -87,19 +88,29 @@ class _Plan:
 
         A real foreign-key cycle (two tables each pointing at the other, such as an
         ArchiMate element and the application component it mirrors) has no row order
-        that satisfies every constraint at once. Each such cycle is resolved by
-        clearing the fewest possible nullable columns — never a column on one of the
-        delete-refusing append-only tables, whose guard admits a DELETE but never an
-        UPDATE — so the remaining edges are acyclic and every table, cycle members
-        included, still gets its real dependency order. A cycle with no edge safe to
-        clear this way (every column on its append-only side) is left for the
-        database's own refusal to name.
+        that satisfies every constraint at once. Each such cycle is resolved, preferring
+        in order:
+
+        1. An edge whose constraint is INITIALLY DEFERRED (such as
+           arb_submission_evidence_snapshots.review_item_id -> arb_review_items.id):
+           Postgres checks it only at commit, and by commit every row on both sides of
+           the cycle is gone, so that edge's ordering requirement can simply be dropped
+           -- no UPDATE needed at all, and this is the only way to resolve a cycle where
+           every table is append-only (archie_guard_arb_cycle_history and
+           reject_archie_evidence_mutation admit the DELETE; nothing ever needs to
+           admit an UPDATE here).
+        2. An edge whose child side may still be deleted on its own (the table isn't
+           append-only) and whose column is nullable: clearing it, never a column on
+           one of the delete-refusing append-only tables, whose guard admits a DELETE
+           but never an UPDATE.
+
+        A cycle with neither kind of edge is left for the database's own refusal to name.
         """
         tables = set(self.org_columns) - {PEOPLE}
         graph = nx.DiGraph()
         graph.add_nodes_from(tables)
         for parent in tables:
-            for child, _, _, _ in self.referrers[parent]:
+            for child, _, _, _, _ in self.referrers[parent]:
                 if child in tables and child != parent:
                     # child must be deleted before parent: an edge in deletion order.
                     graph.add_edge(child, parent)
@@ -110,9 +121,22 @@ class _Plan:
             sub = graph.subgraph(members).copy()
             while not nx.is_directed_acyclic_graph(sub):
                 cycle_edges = [(u, v) for u, v in nx.find_cycle(sub)]
-                # Prefer breaking at an edge whose child side may still be deleted on
-                # its own (the table isn't append-only) and whose column is nullable.
                 removed = False
+                # First pass: an edge whose constraint is itself deferred to commit
+                # needs no NULL at all -- drop its ordering requirement outright.
+                for u, v in cycle_edges:
+                    if any(
+                        child == u and deferred
+                        for child, _, _, _, deferred in self.referrers[v]
+                    ):
+                        sub.remove_edge(u, v)
+                        graph.remove_edge(u, v)
+                        removed = True
+                        break
+                if removed:
+                    continue
+                # Second pass: an edge whose child side may still be deleted on its own
+                # (the table isn't append-only) and whose column is nullable.
                 for u, v in cycle_edges:
                     # A DiGraph collapses every (u, v) pair to one edge even when several
                     # of u's columns point at v (as arb_canonical_conditions does, with
@@ -124,7 +148,7 @@ class _Plan:
                         continue
                     columns = [
                         child_col
-                        for child, child_col, _, not_null in self.referrers[v]
+                        for child, child_col, _, not_null, _ in self.referrers[v]
                         if child == u and not not_null
                     ]
                     if not columns:
@@ -178,7 +202,7 @@ def _delete(sess, table, where, params, counts=None):
 
 def _remove_pointing_rows(sess, plan, table, where, params, path, counts=None):
     """Remove the rows of tables with no organisation column that point at ``table``'s rows in ``where``."""
-    for child, child_col, parent_col, _ in plan.referrers[table]:
+    for child, child_col, parent_col, _, _ in plan.referrers[table]:
         if child == table or child in path or child == PEOPLE or child in plan.org_columns:
             continue
         child_where = "%s IN (SELECT %s FROM %s WHERE %s)" % (_q(child_col), _q(parent_col), _q(table), where)
@@ -197,7 +221,7 @@ def _remove_people(sess, plan, people_ids):
     if not people_ids:
         return
     params = {"people": list(people_ids)}
-    for child, child_col, parent_col, not_null in plan.referrers[PEOPLE]:
+    for child, child_col, parent_col, not_null, _ in plan.referrers[PEOPLE]:
         if parent_col != "id" or child == PEOPLE:
             continue
         where = "%s = ANY(:people)" % _q(child_col)
