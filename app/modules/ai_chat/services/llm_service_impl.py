@@ -415,10 +415,16 @@ class LLMService:
         return LLMService.headroom(provider)[0]
 
     @staticmethod
-    def ceiling_reached(provider: str) -> Tuple[bool, str]:
-        """A configured ceiling the provider has reached (the stop at the point of call)."""
-        open_now, reason = LLMService.headroom(provider, require_ceiling=False)
-        return (not open_now), reason
+    def platform_call_allowed(provider: str) -> Tuple[bool, str]:
+        """The stop at the point of call for a key the platform pays for, whoever named the provider.
+
+        A priced provider is called only when it is in the configured order and under its spend ceiling
+        (no ceiling means never); a free provider only within its request ceiling when one is set.
+        """
+        provider = (provider or "").lower()
+        if LLMService.is_priced(provider) and provider not in LLMService.provider_order():
+            return False, "%s is not in the provider order, so the platform never calls it" % provider
+        return LLMService.headroom(provider)
 
     @staticmethod
     def _keys_are_platform(provider: str) -> bool:
@@ -2264,8 +2270,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # The platform's own key stops at its configured ceiling; an organisation's own key is its own money.
         platform_funded = LLMService._keys_are_platform(provider)
         if platform_funded:
-            reached, reason = LLMService.ceiling_reached(provider)
-            if reached:
+            allowed, reason = LLMService.platform_call_allowed(provider)
+            if not allowed:
                 raise AnswersPaused(reason)
 
         logger.info(f"Attempting LLM call with {len(api_keys)} API key(s) available for {provider}")

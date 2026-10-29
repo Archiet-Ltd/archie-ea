@@ -245,3 +245,20 @@ def test_the_built_in_gemini_prices_apply_when_none_are_configured(monkeypatch):
     assert LLMService.price_per_mtok("gemini", "gemini-2.5-pro") == (3.5, 10.5)
     assert LLMService.price_per_mtok("nvidia", "nvidia/nemotron-3-ultra-550b-a55b") == (0.0, 0.0)
     assert LLMService.is_priced("gemini") and not LLMService.is_priced("nvidia")
+
+
+def test_a_priced_key_outside_the_order_is_refused_at_the_point_of_call(app, platform):
+    """A caller that names the provider itself still never reaches a card-billed key: the order and the
+    ceilings are enforced where the call is made, not only where the provider is chosen."""
+    with app.app_context(), pytest.raises(AnswersPaused) as refused:
+        LLMService._call_llm_with_failover("hello", "gpt-4o-mini", provider="openai")
+    assert "openai is not in the provider order" in str(refused.value)
+    assert platform.openai_compatible_calls == [] and platform.gemini_calls == []
+
+
+def test_a_priced_provider_in_the_order_with_no_ceiling_is_refused_at_the_point_of_call(app, platform, monkeypatch):
+    monkeypatch.delenv("LLM_SPEND_CEILING_USD_GEMINI")
+    with app.app_context(), pytest.raises(AnswersPaused) as refused:
+        LLMService._call_llm_with_failover("hello", DEFAULT_MODELS["gemini"], provider="gemini")
+    assert "no spend ceiling" in str(refused.value)
+    assert platform.gemini_calls == []

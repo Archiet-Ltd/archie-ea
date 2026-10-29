@@ -1197,8 +1197,8 @@ class AgentRunner:
         if platform_funded:
             from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService
 
-            reached, reason = LLMService.ceiling_reached(provider)
-            if reached:
+            allowed, reason = LLMService.platform_call_allowed(provider)
+            if not allowed:
                 raise AnswersPaused(reason)
         if provider == "anthropic":
             if stream:
