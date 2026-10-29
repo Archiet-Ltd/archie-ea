@@ -37,11 +37,11 @@ def test_predictive_answer_journey(browser, live_server, seeded, width):
     page = context.new_page()
     try:
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
-        _login(page, live_server.url, email)
-        _load_sample(page, live_server.url)
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
 
         # Go to chat
-        page.goto(live_server.url + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # Ask the question
         box = page.locator("#user-input")
