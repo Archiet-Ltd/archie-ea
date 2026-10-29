@@ -37,9 +37,39 @@ document.addEventListener('alpine:init', () => {
       return document.querySelector('meta[name=csrf-token]')?.content || '';
     },
 
-    exportFile(format) {
-      const url = this.exportApiUrl + '?format=' + encodeURIComponent(format);
-      window.open(url, '_blank');
+    exporting: false,
+    caseTitle: config.caseTitle || '',
+
+    // Downloads the file for one export format. The trigger shows the loader
+    // and refuses a second click while the file is being made; a refusal or a
+    // network failure shows a plain sentence, never the server's own text.
+    async exportFile(format) {
+      if (this.exporting) return;
+      const labels = {
+        docx: ['Word document', 'docx'], pdf: ['PDF', 'pdf'], mermaid: ['Mermaid file', 'mmd'],
+        lucid: ['Lucidchart file', 'lucid'], archi: ['Archi file', 'archimate']
+      };
+      const [label, ext] = labels[format] || [format, format];
+      this.exporting = true;
+      try {
+        const response = await fetch(this.exportApiUrl + '?format=' + encodeURIComponent(format), { // raw-fetch-ok: downloads a blob and needs the raw Response; failures get their own plain toast
+          credentials: 'same-origin'
+        });
+        if (!response.ok) throw new Error('export answered ' + response.status);
+        const blob = await response.blob();
+        const stem = (this.caseTitle || 'business-case').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 80) || 'business-case';
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = stem + '.' + ext;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      } catch (e) {
+        Platform.toast.error('The ' + label + ' could not be made. Nothing was downloaded.');
+      } finally {
+        this.exporting = false;
+      }
     },
 
     // The existing in-tenant saved-diagram share: opening this URL re-derives

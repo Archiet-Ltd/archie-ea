@@ -16,6 +16,42 @@
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% macro _case_actions() %}
+{% set export_items = [
+    {'header': 'Document'},
+    {'text': 'Word document (.docx)', 'icon': 'file-text', 'onclick': "exportFile('docx')", 'testid': 'bc-export-docx'},
+    {'text': 'PDF document (.pdf)', 'icon': 'file', 'onclick': "exportFile('pdf')", 'testid': 'bc-export-pdf'},
+    {'header': 'Send to a diagram tool'},
+    {'text': 'Mermaid (.mmd)', 'icon': 'workflow', 'onclick': "exportFile('mermaid')", 'testid': 'bc-export-mermaid'},
+    {'text': 'Lucidchart (.lucid)', 'icon': 'share-2', 'onclick': "exportFile('lucid')", 'testid': 'bc-export-lucid'},
+    {'text': 'Archi (.archimate)', 'icon': 'network', 'onclick': "exportFile('archi')", 'testid': 'bc-export-archi'}
+] %}
+{% call dropdown_menu(
+    id='bc-export-menu',
+    trigger_text='Export',
+    trigger_variant='outline',
+    trigger_icon='download',
+    trigger_size='sm',
+    trigger_testid='bc-export',
+    menu_width='w-64',
+    trigger_attrs_dict={':disabled': 'exporting', ':aria-busy': 'exporting'},
+    items=export_items
+) %}
+<span x-show="!exporting" class="inline-flex items-center"><i data-lucide="download" class="mr-2 h-4 w-4" aria-hidden="true"></i></span>
+<span x-show="exporting" x-cloak class="inline-flex items-center"><i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" aria-hidden="true"></i></span>
+Export
+<i data-lucide="chevron-down" class="ml-2 h-4 w-4" aria-hidden="true"></i>
+{% endcall %}
+{% if canvas_saved_diagram_id %}
+{{ button(
+    text='Share',
+    variant='outline',
+    size='sm',
+    icon='link',
+    href='/archimate/composer?viewpoint_id=' ~ canvas_saved_diagram_id,
+    testid='bc-share-link',
+    attrs_dict={'target': '_blank', 'rel': 'noopener'}
+) }}
+{% endif %}
 {{ button(
     text='Delete',
     variant='destructive',
@@ -76,6 +112,7 @@
     pullFinancialsApiUrl: {{ url_for('business_case.pull_financials', business_case_id=business_case.id) | tojson }},
     draftSectionApiUrl: {{ url_for('business_case.ai_draft_section', business_case_id=business_case.id) | tojson }},
     exportApiUrl: {{ url_for('business_case.export_canvas', business_case_id=business_case.id) | tojson }},
+    caseTitle: {{ (business_case.title or 'business-case') | tojson }},
     savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
@@ -156,39 +193,6 @@
           ) }}
         {% endcall %}
       </div>
-    </div>
-
-    {# ── Export & share ── #}
-    <div class="rounded-lg border border-border bg-card p-4 flex flex-wrap items-center gap-3" data-testid="bc-export-share-panel">
-      <div class="flex items-center gap-2 shrink-0">
-        <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-        <span class="text-sm font-medium text-foreground">Export & share</span>
-      </div>
-
-      {% set export_items = [
-          {'text': 'Word document (.docx)', 'onclick': "exportFile('docx')"},
-          {'text': 'PDF document (.pdf)', 'onclick': "exportFile('pdf')"},
-          {'divider': true},
-          {'text': 'Mermaid (.mmd)', 'onclick': "exportFile('mermaid')"},
-          {'text': 'Lucidchart (.lucid)', 'onclick': "exportFile('lucid')"},
-          {'text': 'Archi (.archimate)', 'onclick': "exportFile('archi')"}
-      ] %}
-      {{ dropdown_menu(
-          trigger_text='Export',
-          trigger_variant='outline',
-          trigger_icon='download',
-          items=export_items
-      ) }}
-
-      <template x-if="shareUrl">
-        <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bc-share-link"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-          <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
-        </a>
-      </template>
-      <span class="text-xs text-muted-foreground" data-testid="bc-export-hint">
-        Download the case as Word or PDF, or send it to Mermaid, Lucidchart or Archi.
-      </span>
     </div>
 
     {# ── The business case as a canvas ── #}
