@@ -35,7 +35,9 @@
 
 {% macro plans_created_here(id, kind, button_text) %}
 {% set plans = initiative_plans(kind) %}
-{% call ui.card(attrs={'data-testid': 'plans-created-here', 'data-plans-card': id}) %}
+{# The library's component rules (css/basecoat_components.css, linked by the page) read the style-vega scope. #}
+<div class="style-vega" data-plans-card="{{ id }}">
+{% call ui.card(attrs={'data-testid': 'plans-created-here'}) %}
     {% call ui.card_header() %}
         {{ ui.card_title(text='Plans created here') }}
         {{ ui.card_description(text='The plans your organisation has created from this page, newest first.') }}
@@ -69,6 +71,7 @@
         {% endif %}
     {% endcall %}
 {% endcall %}
+</div>
 {% endmacro %}
 
 {% macro initiative_modal(
@@ -156,7 +159,7 @@
 
     {# The create button is this form's submit button: Enter submits, and the browser checks
        the required fields before the submit handler runs. #}
-    <form id="initiative-{{ id }}-form" @submit.prevent="submitInitiativeForm" class="space-y-4" data-testid="initiative-form">
+    <form id="initiative-{{ id }}-form" @submit.prevent="submitInitiativeForm" class="style-vega space-y-4" data-testid="initiative-form">
 
         {% for field in fields %}
             {% set field_id = id ~ '-' ~ field.name %}
@@ -204,8 +207,10 @@
         {% endfor %}
 
         <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-border">
-            {{ ui.button(text='Cancel', variant='outline', type='button', attrs={'@click': "Platform.modal.close('initiative-" ~ id ~ "')"}) }}
-            {% call ui.button(type='submit', attrs={':disabled': 'loading', 'data-testid': 'initiative-create'}) %}
+            {# The page's base button reset is unlayered and outranks the library's layered button rules on a
+               <button>, so the variant's surface is restated with token utilities, as the Overview does. #}
+            {{ ui.button(text='Cancel', variant='outline', type='button', class='border border-input bg-background px-2.5 text-foreground hover:bg-accent', attrs={'@click': "Platform.modal.close('initiative-" ~ id ~ "')"}) }}
+            {% call ui.button(type='submit', class='bg-primary px-2.5 text-primary-foreground hover:bg-primary/90', attrs={':disabled': 'loading', 'data-testid': 'initiative-create'}) %}
                 <span x-show="!loading">Create</span>
                 <span x-show="loading" x-cloak class="inline-flex items-center gap-1">
                     <i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i>
