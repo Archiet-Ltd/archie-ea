@@ -14,7 +14,9 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
-from .test_sign_up_first_screen_journey import SIZES, _assert_persona, _sign_up
+from .test_signup_brings_the_company_in_journey import assert_is_a_startup_cto_not_an_administrator as _assert_persona
+from .test_sign_up_first_screen_journey import SIZES
+from .test_signup_brings_the_company_in_journey import sign_up as _sign_up
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
