@@ -235,7 +235,7 @@
       <p class="mt-1 text-sm text-muted-foreground">Not available yet. Join the waiting list.</p>
       <ul class="mt-4 grid gap-2 sm:grid-cols-3" aria-labelledby="home-coming-soon-heading">
         {% for item in home_coming_soon_items %}
-        <li><a href="{{ item.href }}" class="public-link text-foreground" data-availability="early_access">{{ item.label }}</a></li>
+        <li><a href="{{ item.href }}" class="public-link text-foreground" data-availability="early_access">{{ item.label }} (coming soon)</a></li>
         {% endfor %}
       </ul>
     </div>

@@ -23,8 +23,33 @@ Covers:
 from __future__ import annotations
 
 import pytest
+from bs4 import BeautifulSoup
 
 from app.services.public_pages import load_all_pages
+
+# The ruling for round site14 (the lead, acting as product-manager, 29 Oct 2026;
+# CLAUDE.md section 20): waiting-list copy and forms are allowed only inside the
+# navbar's coming-soon group, the home page's coming-soon block, and the
+# early-access module pages listed in the registry's coming_soon group. The
+# content sweep below already skips those module pages via ``_is_held``; these
+# two markers are the other two allowed containers, stripped from the rendered
+# page before any waiting-list-copy assertion so the check still bites on every
+# other container.
+_ALLOWED_WAITING_LIST_CONTAINERS = (
+    {"data-menu-group": "coming-soon"},  # the navbar's coming-soon group (public_menu.html)
+    {"data-testid": "home-coming-soon"},  # the home page's own coming-soon block
+)
+
+
+def _without_allowed_waiting_list_containers(html: str) -> str:
+    """The rendered page with the ruling's three allowed containers removed,
+    so a waiting-list-copy assertion on what remains still catches a leak
+    anywhere else on the page."""
+    soup = BeautifulSoup(html, "html.parser")
+    for attrs in _ALLOWED_WAITING_LIST_CONTAINERS:
+        for element in soup.find_all(attrs=attrs):
+            element.decompose()
+    return str(soup)
 
 # The one content-level signal shared by every function-per-segment page
 # the SEO/GEO audit marks HOLD because the feature is not built yet. Pages
@@ -70,8 +95,12 @@ def test_home_page_has_no_waiting_list_form_or_copy(app):
     with app.test_client() as client:
         rv = client.get("/")
         html = rv.data.decode()
+    # The ruling allows waiting-list copy inside the navbar's own coming-soon
+    # group and the home page's own coming-soon block; everywhere else on the
+    # home page must still have none.
+    outside = _without_allowed_waiting_list_containers(html)
 
-    assert "waiting list" not in html.lower()
+    assert "waiting list" not in outside.lower()
     assert 'id="waitlist"' not in html
     # The removed form's own fields -- a stronger signal than the heading
     # text alone that the form itself is gone, not just relabelled.
@@ -107,6 +136,10 @@ def test_no_live_page_renders_waiting_list_copy(app):
     which factually describes what happens to data submitted through a
     waiting-list form elsewhere -- that is a disclosure, not a call to
     action, and is correctly left alone.
+
+    The ruling allows waiting-list copy in the navbar's own coming-soon
+    group, which renders on every page -- stripped below before the
+    assertion, so the check still bites on the rest of each page.
     """
     pages = load_all_pages()
     live_pages = [p for p in pages if not _is_held(p)]
@@ -119,7 +152,7 @@ def test_no_live_page_renders_waiting_list_copy(app):
                 f"{page.url}: live page still carries cta: waiting_list"
             )
             rv = client.get(page.url)
-            html = rv.data.decode()
+            html = _without_allowed_waiting_list_containers(rv.data.decode())
             assert "Join the waiting list" not in html, (
                 f"{page.url}: live page still renders the waiting-list call to action"
             )
@@ -220,4 +253,8 @@ def test_docs_page_held_for_unpublished_documentation_has_no_dead_waitlist_link(
         assert rv.status_code == 200
         html = rv.data.decode()
     assert "/#waitlist" not in html, "/docs still links to the removed home-page waitlist anchor"
-    assert "join the waiting list" not in html.lower()
+    # /docs itself carries no waiting-list copy; the navbar's own coming-soon
+    # group renders on every page, including this one, and is allowed by the
+    # ruling -- stripped below before the assertion.
+    outside = _without_allowed_waiting_list_containers(html)
+    assert "join the waiting list" not in outside.lower()
