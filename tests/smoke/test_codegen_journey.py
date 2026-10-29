@@ -140,7 +140,7 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
 
         setup_button = page.get_by_role('button', name='Setup', exact=True).first
         expect(setup_button).to_be_visible(timeout=PAGE_TIMEOUT)
-        setup_button.click()
+        setup_button.evaluate("el => el.click()")
         page.wait_for_timeout(300)
         alpine_state = page.evaluate(
             "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
