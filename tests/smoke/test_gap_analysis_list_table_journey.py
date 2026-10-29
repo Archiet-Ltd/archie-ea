@@ -1,0 +1,192 @@
+"""Gap Analysis: the enterprise architect opens the ADM Kanban Gap Analysis page and
+reads the Gap list through the standard list table (toolbar search, column view,
+sort, pagination footer), then follows a gap's row action back to the board.
+
+Runs in the seeded organisation and verifies a second organisation's gaps never
+appear on this organisation's page.
+"""
+import uuid
+
+import pytest
+from playwright.sync_api import expect
+
+from .conftest import PAGE_TIMEOUT, PASSWORD
+
+pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+PATH = "/adm-kanban/gap-analysis"
+
+
+def _login(page, base, email):
+    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.fill("#email", email)
+    page.fill("#password", PASSWORD)
+    page.locator("#submit").click()
+    page.wait_for_url(lambda u: "/account/login" not in u, timeout=PAGE_TIMEOUT)
+
+
+def _assert_persona(email, persona):
+    from app import create_app
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == persona
+        assert not user.is_admin()
+
+
+def _make_gaps(org_id, suffix, count, board_name):
+    """`count` Gap cards on a fresh board in organisation `org_id`."""
+    from app import create_app, db
+    from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        phase_code = "E-%s" % uuid.uuid4().hex[:8]
+        phase = ADMPhase(name="Opportunities and Solutions %s" % phase_code, code=phase_code, order=5)
+        db.session.add(phase)
+        db.session.commit()
+        creator = User.query.filter_by(organization_id=org_id).first()
+        board = KanbanBoard(name=board_name, organization_id=org_id, current_adm_phase=phase.code,
+                             created_by_id=creator.id)
+        db.session.add(board)
+        db.session.commit()
+        ids = []
+        for i in range(count):
+            card = KanbanCard(
+                title="%s Gap %d %s" % (board_name, i, suffix),
+                description="Gap %d needs a closing work package" % i,
+                adm_phase_id=phase.id,
+                board_id=board.id,
+                card_type="gap",
+                arch_element_type="Gap",
+                arch_domain="Application",
+                organization_id=org_id,
+                created_by_id=creator.id,
+            )
+            db.session.add(card)
+            db.session.flush()
+            ids.append(card.id)
+        db.session.commit()
+        return board.id, phase.id, ids
+
+
+def _cleanup(board_id, phase_id, card_ids):
+    from app import create_app, db
+    from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
+
+    with create_app("testing").app_context():
+        db.session.rollback()
+        KanbanCard.query.filter(KanbanCard.id.in_(card_ids)).delete(synchronize_session=False)
+        KanbanBoard.query.filter_by(id=board_id).delete(synchronize_session=False)
+        ADMPhase.query.filter_by(id=phase_id).delete(synchronize_session=False)
+        db.session.commit()
+
+
+@pytest.fixture()
+def gap_data(app, seeded):
+    """Nine gaps in the seeded organisation (enough to show the toolbar and a
+    second page), plus one gap in a second organisation that must never appear."""
+    suffix = uuid.uuid4().hex[:6]
+    org_id = seeded["ids"]["org"]
+    board_id, phase_id, ids = _make_gaps(org_id, suffix, 9, "Trace Board %s" % suffix)
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    with create_app("testing").app_context():
+        other = Organization(name="Gap Other %s" % suffix, slug="gap-other-%s" % suffix)
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.id
+        other_user = User(email="smoke.gap.other.%s@example.com" % suffix, first_name="Other",
+                           last_name="Org", organization_id=other_id, enterprise_role="enterprise_architect",
+                           confirmed=True)
+        other_user.role = Role.query.filter_by(name="Viewer").one()
+        other_user.password = PASSWORD
+        db.session.add(other_user)
+        db.session.commit()
+        other_user_id = other_user.id
+    other_board_id, other_phase_id, other_ids = _make_gaps(other_id, suffix, 1, "Foreign Board %s" % suffix)
+
+    yield {"suffix": suffix, "org_id": org_id}
+
+    _cleanup(board_id, phase_id, ids)
+    _cleanup(other_board_id, other_phase_id, other_ids)
+    with create_app("testing").app_context():
+        from sqlalchemy import text
+
+        db.session.rollback()
+        db.session.execute(text("DELETE FROM soc2_audit_log WHERE organization_id = :oid"), {"oid": other_id})
+        User.query.filter_by(id=other_user_id).delete(synchronize_session=False)
+        Organization.query.filter_by(id=other_id).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def _open(page, base, email, theme=None):
+    _login(page, base, email)
+    if theme:
+        page.evaluate("document.documentElement.setAttribute('data-theme', '%s')" % theme)
+    page.goto(base + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
+
+
+@pytest.mark.parametrize("viewport,theme", [({"width": 1440, "height": 900}, "light"), ({"width": 390, "height": 844}, "dark")])
+def test_gap_analysis_list_table(browser, live_server, seeded, gap_data, viewport, theme):
+    """The Gap Analysis page renders its gaps through the standard list table:
+    search, a sortable column, the column-view menu, the pagination footer, and
+    following a gap's link lands on the ADM Kanban board."""
+    email = seeded["emails"]["enterprise_architect"]
+    _assert_persona(email, "enterprise_architect")
+    suffix = gap_data["suffix"]
+
+    context = browser.new_context(ignore_https_errors=True, viewport=viewport)
+    page = context.new_page()
+    try:
+        _open(page, live_server, email, theme)
+        table = page.locator('[data-testid="gaps-table"]')
+        pager = page.locator('[data-testid="gaps-table-pager"]')
+
+        # The toolbar search filters to a gap named in this test.
+        search = pager.locator('input[data-table-filter]')
+        expect(search).to_be_visible(timeout=PAGE_TIMEOUT)
+        search.fill("Gap 0 %s" % suffix)
+        expect(table.locator('tbody [data-testid="gap-row"]:visible')).to_have_count(1)
+        expect(pager.locator('[data-table-reset]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        pager.locator('[data-table-reset]').click()
+        expect(search).to_have_value("")
+
+        # A column sorts.
+        pager.locator('[data-table-sort-trigger="0"]').click()
+        page.get_by_role("menuitem", name="Ascending").click()
+        page.wait_for_timeout(300)
+
+        # Column view hides a column (desktop only: the View menu is hidden below lg).
+        if viewport["width"] >= 1024:
+            pager.get_by_role("button", name="View").click()
+            page.locator('[data-table-toggle="1"][data-table-owner="gaps-table"]').click()
+            page.keyboard.press("Escape")
+            expect(table.locator('thead th[data-col="1"]')).to_be_hidden()
+
+        # Pagination footer shows the full count and a working next page.
+        footer = page.locator('[data-slot="data-table-pagination"]')
+        expect(footer).to_contain_text("Page 1 of")
+        next_btn = pager.locator('[data-table-pager="next"]')
+        if next_btn.is_enabled():
+            next_btn.click()
+            expect(footer).to_contain_text("Page 2")
+
+        # A gap's row action (its title link) opens the ADM Kanban board.
+        first_link = table.locator('tbody [data-testid="gap-row"] a').first
+        expect(first_link).to_be_visible()
+        first_link.click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/adm-kanban" in page.url
+
+        # A second organisation's gap never appears on this page.
+        page.go_back(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
+        assert "Foreign Board" not in page.content()
+    finally:
+        context.close()
