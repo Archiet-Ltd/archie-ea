@@ -17,13 +17,13 @@ document.addEventListener('alpine:init', () => {
     capabilityId: config.capabilityId ?? '',
     strategicInitiativeId: config.strategicInitiativeId ?? '',
     solutionId: config.solutionId ?? '',
+    showDeleteModal: false,
     fieldApiUrl: config.fieldApiUrl,
     updateApiUrl: config.updateApiUrl,
     pullFinancialsApiUrl: config.pullFinancialsApiUrl,
     draftSectionApiUrl: config.draftSectionApiUrl,
     exportApiUrl: config.exportApiUrl,
     savedDiagramId: config.savedDiagramId || null,
-    exportFormat: 'mermaid',
 
     savingField: null,
     savedField: null,
@@ -37,8 +37,9 @@ document.addEventListener('alpine:init', () => {
       return document.querySelector('meta[name=csrf-token]')?.content || '';
     },
 
-    get exportFileUrl() {
-      return this.exportApiUrl + '?format=' + encodeURIComponent(this.exportFormat);
+    exportFile(format) {
+      const url = this.exportApiUrl + '?format=' + encodeURIComponent(format);
+      window.open(url, '_blank');
     },
 
     // The existing in-tenant saved-diagram share: opening this URL re-derives

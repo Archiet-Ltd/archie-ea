@@ -1,7 +1,6 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/modal.html' import modal %}
+
 {% from 'components/canvas_box.html' import canvas_box_entries, canvas_unclassified %}
 {% import 'components/card.html' as card %}
 {% from 'components/form_field.html' import form_field, form_group, form_footer %}
@@ -26,8 +25,7 @@
     attrs_dict={
         '@click': "draftSection('" ~ section_key ~ "')",
         ':disabled': "draftingSection === '" ~ section_key ~ "'",
-        'data-testid': "bc-draft-ai-" ~ section_key,
-        'aria-label': "Draft " ~ label ~ " with AI"
+        'data-testid': "bc-draft-ai-" ~ section_key
     }
 ) }}
 {% endmacro %}
@@ -69,18 +67,21 @@
     savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
-  {{ page_header(
-      title=business_case.title or 'Untitled Business Case',
-      description=business_case.description,
-      breadcrumbs=[
-          {'label': 'Home', 'href': url_for('main.index')},
-          {'label': 'Business Cases', 'href': url_for('business_case.index')},
-          {'label': business_case.title or 'Business Case'}
-      ],
-      actions=[
-          {'text': 'Delete', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bc-delete-modal')", 'variant': 'outline'}
-      ]
-  ) }}
+  <div>
+    <h1 class="text-2xl font-bold">{{ business_case.title or 'Untitled Business Case' }}</h1>
+    <p class="text-muted-foreground">{{ business_case.description }}</p>
+    <div class="flex justify-end">
+      {{ button(
+          text='Delete',
+          variant='destructive',
+          size='sm',
+          icon='trash-2',
+          attrs_dict={
+              '@click': 'showDeleteModal = true'
+          }
+      ) }}
+    </div>
+  </div>
 
   <div class="p-6 space-y-6">
 
@@ -88,12 +89,11 @@
     <div class="rounded-lg border border-border bg-card p-4 space-y-4" data-testid="bc-meta-panel">
       <div class="flex flex-wrap items-center gap-3">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</span>
           {% set status_options = [] %}
           {% for s in statuses %}
             {% set _ = status_options.append((s, s|replace('_', ' ')|title)) %}
           {% endfor %}
-          {% call form_group(id='bc-status-select', label='', class='w-auto') %}
+          {% call form_group(id='bc-status-select', label='Status', class='w-auto') %}
             {{ native_select(
                 id='bc-status-select',
                 name='status',
@@ -110,51 +110,45 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          {% call form_group(id='bc-link-capability', label='Linked Capability') %}
-            {% set capability_options = [('', 'Not linked')] %}
-            {% for c in capabilities %}
-              {% set _ = capability_options.append((c.id|string, c.name)) %}
-            {% endfor %}
-            {{ native_select(
-                id='bc-link-capability',
-                name='capability_id',
-                attrs_dict={'x-model': 'capabilityId', '@change': 'saveMeta()'},
-                options=capability_options,
-                selected=capabilityId
-            ) }}
-          {% endcall %}
-        </div>
-        <div>
-          {% call form_group(id='bc-link-initiative', label='Linked Strategic Initiative') %}
-            {% set initiative_options = [('', 'Not linked')] %}
-            {% for i in initiatives %}
-              {% set _ = initiative_options.append((i.id|string, i.name)) %}
-            {% endfor %}
-            {{ native_select(
-                id='bc-link-initiative',
-                name='strategic_initiative_id',
-                attrs_dict={'x-model': 'strategicInitiativeId', '@change': 'saveMeta()'},
-                options=initiative_options,
-                selected=strategicInitiativeId
-            ) }}
-          {% endcall %}
-        </div>
-        <div>
-          {% call form_group(id='bc-link-solution', label='Linked Solution') %}
-            {% set solution_options = [('', 'Not linked')] %}
-            {% for s in solutions %}
-              {% set _ = solution_options.append((s.id|string, s.name)) %}
-            {% endfor %}
-            {{ native_select(
-                id='bc-link-solution',
-                name='solution_id',
-                attrs_dict={'x-model': 'solutionId', '@change': 'saveMeta()'},
-                options=solution_options,
-                selected=solutionId
-            ) }}
-          {% endcall %}
-        </div>
+        {% call form_group(id='bc-link-capability', label='Linked Capability') %}
+          {% set capability_options = [('', 'Not linked')] %}
+          {% for c in capabilities %}
+            {% set _ = capability_options.append((c.id|string, c.name)) %}
+          {% endfor %}
+          {{ native_select(
+              id='bc-link-capability',
+              name='capability_id',
+              attrs_dict={'x-model': 'capabilityId', '@change': 'saveMeta()'},
+              options=capability_options,
+              selected=capabilityId
+          ) }}
+        {% endcall %}
+        {% call form_group(id='bc-link-initiative', label='Linked Strategic Initiative') %}
+          {% set initiative_options = [('', 'Not linked')] %}
+          {% for i in initiatives %}
+            {% set _ = initiative_options.append((i.id|string, i.name)) %}
+          {% endfor %}
+          {{ native_select(
+              id='bc-link-initiative',
+              name='strategic_initiative_id',
+              attrs_dict={'x-model': 'strategicInitiativeId', '@change': 'saveMeta()'},
+              options=initiative_options,
+              selected=strategicInitiativeId
+          ) }}
+        {% endcall %}
+        {% call form_group(id='bc-link-solution', label='Linked Solution') %}
+          {% set solution_options = [('', 'Not linked')] %}
+          {% for s in solutions %}
+            {% set _ = solution_options.append((s.id|string, s.name)) %}
+          {% endfor %}
+          {{ native_select(
+              id='bc-link-solution',
+              name='solution_id',
+              attrs_dict={'x-model': 'solutionId', '@change': 'saveMeta()'},
+              options=solution_options,
+              selected=solutionId
+          ) }}
+        {% endcall %}
       </div>
     </div>
 
@@ -164,32 +158,22 @@
         <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
         <span class="text-sm font-medium text-foreground">Export & share</span>
       </div>
-      {{ button(
-          text='Export as image',
-          variant='outline',
-          size='default',
-          icon='image',
-          icon_position='left',
-          type='button',
-          attrs_dict={
-              '@click': 'exportImage()',
-              'data-testid': 'bc-export-image',
-              ':disabled': 'pullingFinancials'
-          }
+
+      {% set export_items = [
+          {'type': 'item', 'label': 'Word document (.docx)', 'attrs_dict': {'@click': 'exportFile("docx")'}},
+          {'type': 'item', 'label': 'PDF document (.pdf)', 'attrs_dict': {'@click': 'exportFile("pdf")'}},
+          {'type': 'separator'},
+          {'type': 'item', 'label': 'Mermaid (.mmd)', 'attrs_dict': {'@click': 'exportFile("mermaid")'}},
+          {'type': 'item', 'label': 'Lucidchart (.lucid)', 'attrs_dict': {'@click': 'exportFile("lucid")'}},
+          {'type': 'item', 'label': 'Archi (.archimate)', 'attrs_dict': {'@click': 'exportFile("archi")'}}
+      ] %}
+      {{ dropdown_menu(
+          trigger_text='Export',
+          trigger_variant='outline',
+          trigger_icon='download',
+          items=export_items
       ) }}
-      {% call form_group(id='bc-export-format', label='File export format', class='w-auto') %}
-        {{ native_select(
-            id='bc-export-format',
-            name='export_format',
-            size='default',
-            attrs_dict={'x-model': 'exportFormat'},
-            options=[('mermaid', 'Mermaid (.mmd)'), ('lucid', 'Lucidchart (.lucid)'), ('archi', 'Archi (.archimate)')]
-        ) }}
-      {% endcall %}
-      <a :href="exportFileUrl" data-testid="bc-export-file"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
-      </a>
+
       <template x-if="shareUrl">
         <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bc-share-link"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
@@ -553,7 +537,9 @@
   </div>
 </div>
 
-{% call modal(id='bc-delete-modal', title='Delete this business case?', description='This cannot be undone.', size='sm') %}
+{% from 'components/dialog.html' import dialog %}
+
+{% call dialog(title='Delete this business case?', description='This cannot be undone.', open_expr='showDeleteModal', close_expr='showDeleteModal = false') %}
 <form method="POST" action="{{ url_for('business_case.delete', business_case_id=business_case.id) }}" data-testid="bc-delete-form">
   {{ hidden_input('csrf_token', csrf_token()) }}
   <div class="flex justify-end gap-3 pt-2">
