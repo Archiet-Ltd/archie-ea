@@ -585,11 +585,11 @@
        3.30 on its own tint (DESIGN.md). */
     /* `opts.adminLink` adds the route to the remedy for failures an ordinary
        user cannot retry their way out of — chiefly the no-provider 503 from
-       FeatureFlagService.require_ai_for_route, where the server says "LLM
-       provider must be configured" and Retry can only fail again forever.
-       Offering Retry there is worse than offering nothing: it implies the
-       failure is transient. Callers pass a link INSTEAD of a retry for
-       configuration faults, and a retry for transient ones. */
+       FeatureFlagService.require_ai_for_route, where the server reports the
+       organisation has not set up an AI provider and Retry can only fail
+       again forever. Offering Retry there is worse than offering nothing: it
+       implies the failure is transient. Callers pass a link INSTEAD of a
+       retry for configuration faults, and a retry for transient ones. */
     function appendError(message, onRetry, opts) {
         var o = opts || {};
         var div = document.createElement('div');

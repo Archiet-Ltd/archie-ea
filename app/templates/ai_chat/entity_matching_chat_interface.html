@@ -843,12 +843,25 @@ function entityMatchingChat() {
         }
         
       } catch (error) {
-        // Platform.fetch throws on network errors or non-ok HTTP responses
-        // We need to show this error to the user
-        // The global toast will be shown by Platform.fetch, but we also want to show it in the chat
-        // We'll add a message to the chat, but we don't need to show another toast
-        // The error message from Platform.fetch is in error.message
-        this.addMessage('assistant', `Sorry, I encountered an error while processing your request: ${error.message}`);
+        // Platform.fetch throws on network errors or non-ok HTTP responses.
+        // error.data is the parsed JSON body (see core/03-fetch.js), which
+        // carries the plain "not set up yet" sentence and, for an
+        // organisation administrator only, the link that fixes it -- shown
+        // as the whole reply rather than tacked onto a generic
+        // "I encountered an error" line, which is what a person actually
+        // needs to read when the feature has never been configured.
+        const detail = error && error.data;
+        if (detail && detail.code === 'LLM_NOT_CONFIGURED') {
+          let notice = detail.error || error.message;
+          if (detail.cta_href) {
+            notice += ' <a href="' + detail.cta_href + '" class="text-primary underline hover:no-underline">' +
+              (detail.cta_text || 'AI settings') + '</a>';
+          }
+          this.addMessage('assistant', notice);
+        } else {
+          // The error message from Platform.fetch is in error.message
+          this.addMessage('assistant', `Sorry, I encountered an error while processing your request: ${error.message}`);
+        }
       } finally {
         this.isTyping = false;
         this.isProcessing = false;

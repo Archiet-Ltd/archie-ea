@@ -36,9 +36,14 @@ def _feature_guard(require_llm=True):
     # provider for read/clear. Generation must still check configuration even
     # when AI_CHAT_ENABLED=True overrides automatic feature detection.
     if require_llm and not FeatureFlagService._is_llm_configured():
+        from app.modules.ai_chat.services.failure_messages import (
+            ai_unavailable_message,
+        )
+
+        is_admin = bool(getattr(current_user, "is_org_admin", False))
         return jsonify({
             "error": "service_unavailable",
-            "message": "AI feature 'chat' is not available. LLM provider must be configured.",
+            "message": ai_unavailable_message(FeatureFlagService.FEATURE_CHAT, is_admin),
             "feature": FeatureFlagService.FEATURE_CHAT,
         }), 503
     return None

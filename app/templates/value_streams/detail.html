@@ -206,14 +206,19 @@
                     {% call card.card_title(class='text-sm') %}AI Mapping Suggestions{% endcall %}
                     {{ status_badge('AI-suggested draft', 'info') }}
                 </div>
+                {% if ai_suggestions_available %}
                 {% call button(variant='default', aria_label='Suggest capability mappings', on_click='suggestMappings()',
                                attrs_dict={':disabled': 'aiLoading'}) %}
                     <span x-show="aiLoading" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                     <span x-text="aiLoading ? 'Suggesting…' : (aiSuggestions.length ? 'Regenerate suggestions' : 'Suggest mappings')"></span>
+                {% endcall %}
+                {% else %}
+                {% call button(variant='default', aria_label='Suggest capability mappings') %}Suggest mappings{% endcall %}
+                {% endif %}
             </div>
                 {% endcall %}
-            {% endcall %}
             {% call card.card_content(class='pt-4') %}
+                {% if ai_suggestions_available %}
                 <p class="text-xs text-muted-foreground">
                     AI-suggested capability &times; stage pairs from this stream's real stages and the org capability
                     catalog. Advisory only — nothing is mapped until you click Apply, which writes through the same
@@ -243,6 +248,19 @@
                         </li>
                     </template>
                 </ul>
+                {% else %}
+                {{ empty_state(
+                    icon='sparkles',
+                    title=ai_suggestions_notice.intro,
+                    description=ai_suggestions_notice.description,
+                    cta_text=ai_suggestions_notice.cta_text,
+                    cta_href=ai_suggestions_notice.cta_href,
+                    cta_icon='key',
+                    compact=True,
+                    heading_testid='ai-suggestions-unavailable-title',
+                    description_testid='ai-suggestions-unavailable-description'
+                ) }}
+                {% endif %}
             {% endcall %}
         {% endcall %}
 
