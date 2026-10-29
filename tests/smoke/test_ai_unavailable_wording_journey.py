@@ -120,7 +120,7 @@ def test_enterprise_architect_reads_the_plain_sentence(browser, live_server, see
             page.get_by_role("button", name="Send message").click()
         assert resp.value.status == 503, resp.value.text()
 
-        reply = page.locator(".message.assistant").last
+        reply = page.locator(".message.assistant .message-content").last
         reply.wait_for(state="visible", timeout=PAGE_TIMEOUT)
         reply_text = reply.inner_text()
         assert "Entity matching is not set up for your organisation yet." in reply_text
@@ -185,7 +185,7 @@ def test_organisation_administrator_gets_a_working_settings_link(browser, live_s
             page.get_by_role("button", name="Send message").click()
         assert resp.value.status == 503, resp.value.text()
 
-        reply = page.locator(".message.assistant").last
+        reply = page.locator(".message.assistant .message-content").last
         reply.wait_for(state="visible", timeout=PAGE_TIMEOUT)
         reply_text = reply.inner_text()
         assert "Entity matching is not set up for your organisation yet." in reply_text
