@@ -178,6 +178,13 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         quality_tab = page.get_by_role('button', name='Quality', exact=True)
         expect(quality_tab).to_be_visible(timeout=PAGE_TIMEOUT)
         quality_tab.click(force=True)
+        page.wait_for_timeout(2000)
+        qd = page.evaluate(
+            "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
+            "return {rightTab: d.rightTab, qualityDetailsKeys: d.qualityDetails ? Object.keys(d.qualityDetails) : null, "
+            "ruleCoverage: d.qualityDetails ? d.qualityDetails.rule_coverage : null, qualityScore: d.qualityScore}; }"
+        )
+        print('QUALITY DIAGNOSTIC:', qd)
         expect(page.get_by_text('Business rule coverage', exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
     finally:
         page.close()
