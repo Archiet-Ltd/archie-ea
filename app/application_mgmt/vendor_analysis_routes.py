@@ -23,6 +23,16 @@ VALID_WEIGHT_KEYS = frozenset(
 )
 
 
+def _vendor_catalogue_url():
+    """The vendor catalogue page's URL, or None if that blueprint has not
+    registered. Blueprints register non-fatally (see CLAUDE.md), so a cross-
+    module url_for() is guarded rather than left to BuildError the page.
+    """
+    if "unified_applications.vendors" in current_app.view_functions:
+        return url_for("unified_applications.vendors")
+    return None
+
+
 def _resolve_vendor_name(vendor_option):
     """Extract display name from a VendorOption, checking org and product relationships."""
     if vendor_option.vendor_organization:
@@ -161,7 +171,10 @@ def vendor_analysis_list():
 @login_required
 def vendor_analysis_new():
     """Create a new vendor analysis — redirects to detail page with id=0 (wizard mode)."""
-    return render_template("application_mgmt/vendor_analysis_detail.html", analysis_id=0)
+    return render_template(
+        "application_mgmt/vendor_analysis_detail.html",
+        analysis_id=0, vendor_catalogue_url=_vendor_catalogue_url(),
+    )
 
 
 @application_mgmt.route("/vendor-analysis/<int:analysis_id>", methods=["GET"])
@@ -180,7 +193,8 @@ def vendor_analysis_detail(analysis_id):
     if analysis.created_by_id != current_user.id and not is_active_org_admin(current_user):
         abort(403)
     return render_template(
-        "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id
+        "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id,
+        vendor_catalogue_url=_vendor_catalogue_url(),
     )
 
 
@@ -1686,38 +1700,39 @@ def api_get_business_domains():
 @application_mgmt.route("/api/value-streams", methods=["GET"])
 @login_required
 def api_get_value_streams():
-    """Get value streams for a specific business domain."""
+    """Get the signed-in organisation's value streams.
+
+    Used to return a hard-coded "standard" list per business domain (a
+    handful of generic names such as "Customer Acquisition", with string ids
+    like "vs1" naming no real row) once a domain was chosen -- so a
+    selection here could never resolve to a mapped capability or a vendor,
+    whatever discovery route read it. ValueStream carries no real link to a
+    business domain (the picker's `domains` list is UnifiedCapability's, a
+    separate concept), so the domain lookup below is kept only to preserve
+    its existing contract (no domain filter is the honest empty state;
+    an unknown domain_id/domain_code still 404s, pinned by
+    tests/test_value_streams_dropdown_api.py) -- once a domain resolves,
+    every value stream in the organisation is returned, not a per-domain
+    fake list.
+    """
     try:
         domain_id = request.args.get("domain_id", type=int)
         domain_code = request.args.get("domain_code", type=str)
-        current_app.logger.info(
-            f"Value streams requested - domain_id: {domain_id}, domain_code: {domain_code}"
-        )
 
         if not domain_id and not domain_code:
-            # No domain filter chosen yet (e.g. the page's initial load,
-            # before the caller narrows by domain) — this is the honest
-            # empty state, not a lookup failure. It used to fall through to
-            # the "domain not found" branch below and answer 404 for a
-            # request that named no domain at all, which is what every one
-            # of this page's own initial loads did.
-            current_app.logger.info("Value streams requested with no domain filter — returning []")
+            # No domain filter chosen yet (e.g. the page's initial load) --
+            # the honest empty state, not a lookup failure.
             return jsonify([])
 
-        from app.models.unified_capability import BusinessDomain
+        from app.models.unified_capability import BusinessDomain, ValueStream
 
-        # Try to find domain by ID first, then by code
         domain = None
         if domain_id:
             domain = db.session.get(BusinessDomain, domain_id)
-
         if not domain and domain_code:
             domain = BusinessDomain.query.filter_by(code=domain_code).first()
 
         if not domain:
-            current_app.logger.error(
-                f"Domain not found - tried ID: {domain_id}, Code: {domain_code}"
-            )
             return (
                 jsonify(
                     {
@@ -1727,14 +1742,8 @@ def api_get_value_streams():
                 404,
             )
 
-        current_app.logger.info(f"Found domain: {domain.code} - {domain.name}")
-
-        # For now, return standard value streams based on domain
-        # In a full implementation, this would query actual value stream data
-        value_streams = get_standard_value_streams(domain.code)
-        current_app.logger.info(f"Returning {len(value_streams)} value streams for {domain.code}")
-
-        return jsonify(value_streams)
+        streams = ValueStream.query.order_by(ValueStream.name).all()
+        return jsonify([{"id": vs.id, "name": vs.name} for vs in streams])
 
     except HTTPException:
 
@@ -1742,9 +1751,6 @@ def api_get_value_streams():
 
     except Exception as e:
         current_app.logger.error(f"Error getting value streams: {str(e)}")
-        import traceback
-
-        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "An internal error occurred"}), 500
 
 
@@ -1831,65 +1837,6 @@ def api_get_related_capabilities():
 
         current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "An internal error occurred"}), 500
-
-
-def get_standard_value_streams(domain_code):
-    """Get standard value streams for a business domain."""
-    # Standard value streams mapped to business domains
-    value_stream_map = {
-        "CUST": [
-            {"id": "vs1", "name": "Customer Acquisition"},
-            {"id": "vs2", "name": "Customer Onboarding"},
-            {"id": "vs3", "name": "Customer Service"},
-            {"id": "vs4", "name": "Customer Retention"},
-        ],
-        "PROD": [
-            {"id": "vs5", "name": "Product Development"},
-            {"id": "vs6", "name": "Product Manufacturing"},
-            {"id": "vs7", "name": "Quality Management"},
-            {"id": "vs8", "name": "Product Delivery"},
-        ],
-        "OPER": [
-            {"id": "vs9", "name": "Supply Chain Management"},
-            {"id": "vs10", "name": "Operations Planning"},
-            {"id": "vs11", "name": "Process Optimization"},
-            {"id": "vs12", "name": "Resource Management"},
-        ],
-        "TECH": [
-            {"id": "vs13", "name": "Technology Strategy"},
-            {"id": "vs14", "name": "Digital Transformation"},
-            {"id": "vs15", "name": "IT Operations"},
-            {"id": "vs16", "name": "Innovation Management"},
-        ],
-        "DATA": [
-            {"id": "vs17", "name": "Data Strategy"},
-            {"id": "vs18", "name": "Analytics & Insights"},
-            {"id": "vs19", "name": "Data Governance"},
-            {"id": "vs20", "name": "Information Management"},
-        ],
-        "FIN": [
-            {"id": "vs21", "name": "Financial Planning"},
-            {"id": "vs22", "name": "Risk Management"},
-            {"id": "vs23", "name": "Compliance Management"},
-            {"id": "vs24", "name": "Investment Management"},
-        ],
-        "RISK": [
-            {"id": "vs25", "name": "Risk Assessment"},
-            {"id": "vs26", "name": "Compliance Monitoring"},
-            {"id": "vs27", "name": "Internal Controls"},
-            {"id": "vs28", "name": "Audit Management"},
-        ],
-    }
-
-    return value_stream_map.get(
-        domain_code,
-        [
-            {"id": "vs_default1", "name": "Strategic Planning"},
-            {"id": "vs_default2", "name": "Operational Excellence"},
-            {"id": "vs_default3", "name": "Performance Management"},
-            {"id": "vs_default4", "name": "Continuous Improvement"},
-        ],
-    )
 
 
 @application_mgmt.route("/api/unified-capabilities", methods=["GET"])
