@@ -5,12 +5,12 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
-from .ai_protocol_stub import GUIDE
+from .ai_protocol_stub import CHAT
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 WALK = os.environ.get("ASKCHAT_WALK_DIR")
-QUESTION = GUIDE['prompt']
+QUESTION = CHAT['prompt']
 
 
 def _shot(page, name, width, theme="light"):
@@ -45,7 +45,7 @@ def test_predictive_answer_journey(browser, live_server, seeded, ai_protocol_stu
         box.press("Enter")
 
         # Check for answer
-        answer = page.get_by_text(GUIDE['reply'])
+        answer = page.get_by_text(CHAT['reply'])
         expect(answer).to_be_visible(timeout=PAGE_TIMEOUT)
 
     finally:
