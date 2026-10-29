@@ -1,7 +1,7 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/empty_state.html' import empty_state as render_empty_state %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/status_badge.html' import status_badge %}
 {% from 'components/button.html' import button %}
@@ -185,14 +185,16 @@
                     </div>
                 </div>
                 {% else %}
-                {{ render_empty_state(
-                    icon='layers',
-                    title='No stages defined',
-                    description='Add the sequential stages that make up this value stream.',
-                    cta_text='Add Stage',
-                    cta_onclick="Platform.modal.open('stage-create-modal')",
-                    cta_icon='plus'
-                ) }}
+                {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'value-stream-stages-empty', 'role': 'status'}) %}
+                  {% call ui.empty_header() %}
+                    {% call ui.empty_icon(variant='icon') %}{{ lucide('layers') }}{% endcall %}
+                    {{ ui.empty_title(text='No stages defined') }}
+                    {{ ui.empty_description(text='Add the sequential stages that make up this value stream.') }}
+                  {% endcall %}
+                  {% call ui.empty_content() %}
+                    {% call ui.button(type='button', attrs={'data-modal-open': 'stage-create-modal'}) %}{{ lucide('plus') }}Add Stage{% endcall %}
+                  {% endcall %}
+                {% endcall %}
                 {% endif %}
             {% endcall %}
         {% endcall %}
@@ -249,17 +251,18 @@
                     </template>
                 </ul>
                 {% else %}
-                {{ render_empty_state(
-                    icon='sparkles',
-                    title=ai_suggestions_notice.intro,
-                    description=ai_suggestions_notice.description,
-                    cta_text=ai_suggestions_notice.cta_text,
-                    cta_href=ai_suggestions_notice.cta_href,
-                    cta_icon='key',
-                    compact=True,
-                    heading_testid='ai-suggestions-unavailable-title',
-                    description_testid='ai-suggestions-unavailable-description'
-                ) }}
+                {% call ui.empty(class='p-6', attrs={'data-testid': 'ai-suggestions-unavailable', 'role': 'status'}) %}
+                  {% call ui.empty_header() %}
+                    {% call ui.empty_icon(variant='icon') %}{{ lucide('sparkles') }}{% endcall %}
+                    {{ ui.empty_title(text=ai_suggestions_notice.intro, attrs={'data-testid': 'ai-suggestions-unavailable-title'}) }}
+                    {{ ui.empty_description(text=ai_suggestions_notice.description, attrs={'data-testid': 'ai-suggestions-unavailable-description'}) }}
+                  {% endcall %}
+                  {% if ai_suggestions_notice.cta_text %}
+                  {% call ui.empty_content() %}
+                    {% call ui.button(href=ai_suggestions_notice.cta_href, variant='outline') %}{{ lucide('key') }}{{ ai_suggestions_notice.cta_text }}{% endcall %}
+                  {% endcall %}
+                  {% endif %}
+                {% endcall %}
                 {% endif %}
             {% endcall %}
         {% endcall %}
