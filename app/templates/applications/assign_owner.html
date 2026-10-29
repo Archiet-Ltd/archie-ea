@@ -7,10 +7,10 @@
 {% block title %}Assign Owner for {{ app.name }}{% endblock %}
 
 {% block content %}
-<div class="p-6 space-y-6">
+<div class="space-y-6">
     {{ page_shell(
         title='Assign Owner for ' ~ app.name,
-        subtitle=(unmatched_text or '') ~ '. Choose the person in your organization who owns it.',
+        subtitle=(unmatched_text ~ '. ' if unmatched_text else '') ~ 'Choose the person in your organization who owns it.',
         breadcrumb=[
             ('Applications', url_for('unified_applications.application_list')),
             (app.name, url_for('unified_applications.application_detail', id=app.id)),
