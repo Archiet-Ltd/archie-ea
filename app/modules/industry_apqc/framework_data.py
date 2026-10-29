@@ -265,6 +265,7 @@ def load_default_frameworks(connection):
     for fw in FRAMEWORKS:
         if fw["industry_code"] in have:
             continue
+        newly_added_codes.append(fw["industry_code"])
         values = dict(fw)
         values.update(
             release_date=date(2024, 1, 1), is_active=True,
@@ -291,7 +292,6 @@ def load_default_frameworks(connection):
             ))
         connection.execute(sa.insert(processes), batch)
         added += 1
-        newly_added_codes.append(fw["industry_code"])
     return added, newly_added_codes
 
 
