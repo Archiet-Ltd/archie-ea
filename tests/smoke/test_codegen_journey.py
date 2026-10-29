@@ -145,6 +145,12 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         failure_banner = page.get_by_text('Generation failed', exact=False)
         expect(failure_banner).to_have_count(0)
 
+        # The AI Assistant chat panel opens by default and overlaps the tab bar,
+        # intercepting clicks meant for it -- close it before switching tabs.
+        close_chat = page.get_by_role('button', name='Close chat panel', exact=True)
+        if close_chat.count():
+            close_chat.click()
+
         # The quality panel (including the business rule coverage bar from the
         # brief's acceptance criteria) must actually render, not just the file
         # list -- the right panel's "Quality" tab switches to it.
