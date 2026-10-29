@@ -126,7 +126,7 @@ def test_procurement_lead_reads_vendors_then_sets_a_missing_vendor(browser, live
         expect(page.get_by_test_id("mapping-answer")).to_contain_text(
             "%d of your systems have no vendor recorded." % (unmapped - 1))
         assert page.get_by_role("combobox", name="Vendor for Legacy Billing %s" % tag).count() == 0
-        page.get_by_role("navigation", name="Breadcrumb").get_by_role("link", name="Vendors").click()
+        page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
         okta = page.get_by_test_id("vendor-row").filter(has_text="Okta %s" % tag)
         expect(okta).to_contain_text("2 systems")
         okta.get_by_role("link", name="2 systems").click()

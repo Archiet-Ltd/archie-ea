@@ -91,7 +91,7 @@ def test_page_answer_table_and_vendor_page_agree(client, login_as, db_session, t
     # table says what is left over, and Salesforce's own row counts its two
     assert "1 of your 4 systems do not name their vendor yet" in text
     systems_link = rows[f"Salesforce {tag}"].select_one('a[href$="#vendor-systems"]')
-    assert systems_link is not None and systems_link.get_text(strip=True) == "2"
+    assert systems_link is not None and systems_link.get_text(strip=True) == "2 systems"
     # exactly one renewal is due, and it is the monitoring contract's vendor
     assert "Due within 90 days" in rows[f"Datadog {tag}"].get_text(" ", strip=True)
     assert sum("Due within 90 days" in r.get_text(" ", strip=True) for r in rows.values()) == 1
