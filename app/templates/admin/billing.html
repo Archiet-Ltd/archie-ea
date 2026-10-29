@@ -10,7 +10,8 @@
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/dialog.html' import dialog %}
 {% from 'components/empty_state.html' import empty_state %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block content %}
 <div class="space-y-6" data-testid="billing-page">
@@ -262,27 +263,14 @@
         {% elif not invoices %}
             {{ empty_state('receipt', 'No invoices yet', 'An invoice appears here after each payment.') }}
         {% else %}
-        {% call table(attrs_dict={'data-testid': 'invoice-table'}) %}
-            {% call table_header() %}{% call table_row() %}
-                {% call table_head() %}Date{% endcall %}
-                {% call table_head() %}Invoice{% endcall %}
-                {% call table_head(class='text-right') %}Total{% endcall %}
-                {% call table_head(class='text-right') %}Tax{% endcall %}
-                {% call table_head() %}Status{% endcall %}
-                {% call table_head() %}Download{% endcall %}
-            {% endcall %}{% endcall %}
-            {% call table_body() %}
-            {% for inv in invoices %}
-                {% call table_row() %}
-                    {% call table_cell(class='whitespace-nowrap') %}{{ inv.date.strftime('%d %b %Y') if inv.date else '—' }}{% endcall %}
-                    {% call table_cell() %}{{ inv.number or '—' }}{% endcall %}
-                    {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.total is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.total) }}{% else %}—{% endif %}{% endcall %}
-                    {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.tax is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.tax) }}{% else %}—{% endif %}{% endcall %}
-                    {% call table_cell() %}{{ (inv.status or '—') | replace('_', ' ') | capitalize }}{% endcall %}
-                    {% call table_cell() %}{% if inv.pdf_url %}<a href="{{ inv.pdf_url }}" class="text-primary underline" rel="noopener">PDF</a>{% elif inv.hosted_url %}<a href="{{ inv.hosted_url }}" class="text-primary underline" rel="noopener">View</a>{% else %}—{% endif %}{% endcall %}
-                {% endcall %}
-            {% endfor %}
-            {% endcall %}
+        {% set columns = [('Date', ''), ('Invoice', ''), {'label': 'Total', 'class': 'text-right'}, {'label': 'Tax', 'class': 'text-right'}, ('Status', ''), {'label': 'Download', 'sortable': false}] %}
+        {% call(inv) list_table(rows=invoices, columns=columns, caption='Invoices', testid='invoice-table', row_testid='invoice-row', search_placeholder='Filter invoices...') %}
+            {% call table_cell(class='whitespace-nowrap') %}{{ inv.date.strftime('%d %b %Y') if inv.date else '—' }}{% endcall %}
+            {% call table_cell() %}{{ inv.number or '—' }}{% endcall %}
+            {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.total is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.total) }}{% else %}—{% endif %}{% endcall %}
+            {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.tax is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.tax) }}{% else %}—{% endif %}{% endcall %}
+            {% call table_cell() %}{{ (inv.status or '—') | replace('_', ' ') | capitalize }}{% endcall %}
+            {% call table_cell() %}{% if inv.pdf_url %}<a href="{{ inv.pdf_url }}" class="text-primary underline" rel="noopener">PDF</a>{% elif inv.hosted_url %}<a href="{{ inv.hosted_url }}" class="text-primary underline" rel="noopener">View</a>{% else %}—{% endif %}{% endcall %}
         {% endcall %}
         {% endif %}
         {% endcall %}
