@@ -362,8 +362,8 @@ def _element_for_repository(org_id, repository, path=None):
     return element
 
 
-def _person_in_org(org_id, owners: List[str]):
-    """The one user of the organisation named by an e-mail code owner, else None."""
+def _people_in_org(org_id, owners: List[str]) -> list:
+    """Every user of the organisation named by an e-mail code owner."""
     from app.models.user import User
 
     emails = {o.lower() for o in owners or [] if not o.startswith("@") and "@" in o}
@@ -373,7 +373,18 @@ def _person_in_org(org_id, owners: List[str]):
             db.select(User).where(db.func.lower(User.email) == email).where(User.organization_id == org_id)
         ).scalars():
             found[user.id] = user
-    return next(iter(found.values())) if len(found) == 1 else None
+    return list(found.values())
+
+
+def _person_in_org(org_id, owners: List[str]):
+    """The one user of the organisation named by an e-mail code owner, else None."""
+    found = _people_in_org(org_id, owners)
+    return found[0] if len(found) == 1 else None
+
+
+def _owner_logins(owners: List[str]) -> List[str]:
+    """The code owners as stored: one leading "@" dropped, so `@octocat` and `@org/team` read the same everywhere."""
+    return [o[1:] if o.startswith("@") else o for o in owners or [] if o]
 
 
 def proposal_blocker(approval) -> Optional[str]:
@@ -468,7 +479,8 @@ def _assign_owner_from_payload(org_id, row, element, payload, assigned_by) -> No
     from app.models.application_owner import ApplicationOwner
 
     owners = payload.get("owners") or []
-    user = _person_in_org(org_id, owners)
+    people = _people_in_org(org_id, owners)
+    user = people[0] if len(people) == 1 else None
     if user:
         if ApplicationOwner.query.filter_by(application_id=row.id, organization_id=org_id, ownership_type="primary").first():
             return
@@ -483,10 +495,12 @@ def _assign_owner_from_payload(org_id, row, element, payload, assigned_by) -> No
             )
         )
         db.session.flush()
-    elif owners:
+    elif _owner_logins(owners):
+        logins = _owner_logins(owners)
         facts = {
             "github_code_owner_unmatched": {
-                "login": owners[0],
+                "login": logins[0],
+                "logins": logins,
                 "source": {
                     "repository": payload.get("repository"),
                     "file": payload.get("evidence_file"),
