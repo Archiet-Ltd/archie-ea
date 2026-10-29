@@ -110,9 +110,10 @@
                                 {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
                                 {% endif %}
                                 {% if startup_first_steps.sample %}
-                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}">
+                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-sample-form data-testid="chat-first-sample-form">
                                     {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                                     {{ button(text='See a sample company', type='submit', variant='outline' if startup_first_steps.connect else 'default', testid='chat-first-sample') }}
+                                    <p class="mt-2 text-sm text-muted-foreground" role="status" hidden data-sample-busy data-testid="chat-first-sample-busy">Loading the sample company. This takes a few seconds.</p>
                                 </form>
                                 {% endif %}
                             </div>
