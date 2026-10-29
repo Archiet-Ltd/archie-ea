@@ -207,7 +207,7 @@ def _run_cost(org_id, now):
     from app.models.application_portfolio import VendorContract
     from app.modules.procurement.services import get_spend_summary
 
-    summary = get_spend_summary()
+    summary = get_spend_summary(org_id)
     total = summary["total_annual_cost"]
     if total is None:
         return {"total": None, "contracts": summary["total_contracts"]}
