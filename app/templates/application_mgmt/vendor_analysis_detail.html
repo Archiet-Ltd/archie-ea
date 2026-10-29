@@ -12,6 +12,7 @@
 {% from "components/confirmation_dialog.html" import confirmation_dialog %}
 {% import "components/card.html" as ui %}
 {% from "components/dense_table.html" import dense_table %}
+{% from "components/empty_state.html" import empty_state %}
 {% from "macros/page_shell.html" import page_shell %}
 
 {% block content %}
@@ -376,14 +377,24 @@
               </template>
             </div>
           </div>
-          <!-- Empty / prompt state -->
-          <div x-show="discoveredVendors.length === 0 && !loadingVendors" x-cloak class="text-center py-8 text-muted-foreground">
+          <!-- Prompt state: nothing searched yet -->
+          <div x-show="discoveredVendors.length === 0 && !loadingVendors && !vendorSearchDone" x-cloak class="text-center py-8 text-muted-foreground">
             <i data-lucide="building-2" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
-            <p class="text-sm" x-text="vendorSearchDone
-              ? 'No matching vendors found. You can proceed without pre-selected vendors.'
-              : hasSelections()
-                ? 'Click &quot;Discover Matching Vendors&quot; to find vendors for your selections'
-                : 'Select capabilities, processes, or value streams above to discover matching vendors'"></p>
+            <p class="text-sm" x-text="hasSelections()
+              ? 'Click &quot;Discover Matching Vendors&quot; to find vendors for your selections'
+              : 'Select capabilities, processes, or value streams above to discover matching vendors'"></p>
+          </div>
+          <!-- Honest empty state: searched, nothing is mapped yet -->
+          <div x-show="discoveredVendors.length === 0 && !loadingVendors && vendorSearchDone" x-cloak>
+            {{ empty_state(
+              icon='building-2',
+              title='No vendor is mapped to this selection yet',
+              description='No vendor product is mapped to the selected capabilities, processes or value streams yet. Record vendor coverage in the vendor catalogue, then search again.',
+              cta_text=('Open vendor catalogue' if vendor_catalogue_url else none),
+              cta_href=vendor_catalogue_url,
+              secondary_cta_text='Proceed without pre-selected vendors',
+              secondary_cta_onclick="attemptSwitchTab('scoring')"
+            ) }}
           </div>
         {% endcall %}
       {% endcall %}
