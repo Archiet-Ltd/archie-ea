@@ -703,8 +703,10 @@ def _project_capability_row(connection, target):
     # migration, a human edit. Projecting it here would insert a second
     # unified_capabilities row carrying the same name as the one it was
     # already pointed at, which is the exact disagreement ADR 0008 exists to
-    # prevent. The normal self-link (set by the CLI's own backlink pass after
-    # this listener's own projection) still projects/updates as usual.
+    # prevent, and is what made a capability list render its name twice
+    # (two UnifiedCapability rows, one query, no de-duplication to hide
+    # behind). The normal self-link (set by the CLI's own backlink pass
+    # after this listener's own projection) still projects/updates as usual.
     if target.deprecated_in_favor_of_id is not None:
         already_self_projected = connection.execute(
             text(
