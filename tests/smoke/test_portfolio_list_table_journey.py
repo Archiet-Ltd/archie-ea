@@ -13,6 +13,7 @@ nothing from the other organisation leaks in.
 import uuid
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .test_archetype_journeys import _login
@@ -87,6 +88,8 @@ def test_portfolio_manager_reads_searches_sorts_hides_and_pages(browser, live_se
         page.goto(live_server + "/portfolio/", timeout=PAGE_TIMEOUT)
         table = page.get_by_test_id("portfolio-table")
         table.wait_for(timeout=PAGE_TIMEOUT)
+        visible_rows = page.locator('[data-table-id="portfolio-table"] [data-row]:not([hidden])')
+        total_rows_before = visible_rows.count()
 
         # --- the initiatives given are on screen with their real figures
         body_text = page.locator("main, body").first.inner_text()
@@ -106,46 +109,34 @@ def test_portfolio_manager_reads_searches_sorts_hides_and_pages(browser, live_se
         search = page.locator('[data-slot="data-table"] [data-table-filter]').first
         search.wait_for(timeout=PAGE_TIMEOUT)
         search.fill("Fraud detection")
-        page.wait_for_function(
-            "document.querySelectorAll('[data-table-id=\"portfolio-table\"] [data-row]:not([hidden])').length === 1",
-            timeout=PAGE_TIMEOUT,
-        )
+        expect(visible_rows).to_have_count(1, timeout=PAGE_TIMEOUT)
         narrowed = page.locator("main, body").first.inner_text()
         assert "Fraud detection uplift" in narrowed
         assert "Core banking replatform" not in narrowed
         reset_btn = page.locator('[data-slot="data-table"] [data-table-reset]').first
         reset_btn.click()
-        page.wait_for_function(
-            "document.querySelectorAll('[data-table-id=\"portfolio-table\"] [data-row]:not([hidden])').length > 1",
-            timeout=PAGE_TIMEOUT,
-        )
+        expect(visible_rows).to_have_count(total_rows_before, timeout=PAGE_TIMEOUT)
 
-        # --- sort by Budget ascending
+        # --- sort by Budget ascending. `data-row="N"` is a static id assigned at
+        # initial render, never rewritten by the client sort (which only reorders the
+        # DOM nodes and toggles `hidden`), so the first VISUALLY visible row after
+        # sorting is the first element in DOM order among non-hidden rows, not the
+        # element whose fixed data-row attribute happens to read "0".
         page.locator('[data-table-sort-trigger="3"]').click()
         page.get_by_role("menuitem", name="Ascending").click()
-        first_row = page.locator('[data-table-id="portfolio-table"] [data-row="0"]')
-        first_row.wait_for(timeout=PAGE_TIMEOUT)
-        assert "Branch digital kiosks" in first_row.inner_text()  # smallest approved budget
+        first_row = visible_rows.first
+        expect(first_row).to_contain_text("Branch digital kiosks", timeout=PAGE_TIMEOUT)  # smallest approved budget
 
         # --- hide the Sponsor column
         page.get_by_role("button", name="View").click()
         page.locator('[data-table-owner="portfolio-table"][data-table-toggle="8"]').click()
-        page.wait_for_function(
-            "document.querySelector('[data-table-id=\"portfolio-table\"] thead [data-col=\"8\"]').hidden === true",
-            timeout=PAGE_TIMEOUT,
-        )
+        expect(page.locator('[data-table-id="portfolio-table"] thead [data-col="8"]')).to_be_hidden(timeout=PAGE_TIMEOUT)
 
         # --- turn the page: 10 rows per page makes an 11-row list a two-page table
         page.locator('[data-table-id="portfolio-table"] [data-table-size]').select_option("10")
-        page.wait_for_function(
-            "document.querySelectorAll('[data-table-id=\"portfolio-table\"] [data-row]:not([hidden])').length === 10",
-            timeout=PAGE_TIMEOUT,
-        )
+        expect(visible_rows).to_have_count(10, timeout=PAGE_TIMEOUT)
         next_button = page.locator('[data-table-id="portfolio-table"] [data-table-pager="next"]')
         next_button.click()
-        page.wait_for_function(
-            "document.querySelectorAll('[data-table-id=\"portfolio-table\"] [data-row]:not([hidden])').length === 1",
-            timeout=PAGE_TIMEOUT,
-        )
+        expect(visible_rows).to_have_count(1, timeout=PAGE_TIMEOUT)
     finally:
         ctx.close()
