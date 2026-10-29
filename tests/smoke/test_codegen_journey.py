@@ -82,17 +82,21 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
     is not bound to a Session" instead.
 
     Genome is the wizard's *default* generation_mode, but on a seeded
-    solution with linked ArchiMate elements and no prior UML, Phase 1 offers
-    only "Quick Generate" (which force-sets generation_mode to
+    solution with a linked ArchiMate element and no prior UML, Phase 1
+    offers only "Quick Generate" (which force-sets generation_mode to
     "deterministic") or AI Enrich (needs an LLM key, unavailable here) --
-    there is no one-click path straight to Genome. An architect who wants
-    Genome instead runs Quick Generate first (which unlocks Phase 3), reopens
-    Phase 3 (Configure), switches the mode radio from the deterministic value
-    Quick Generate left behind back to "Genome", saves, and regenerates. That
-    second, genome-mode generate-stream call is the one the ledger finding
-    and this journey are about; the first (deterministic) call is the same
-    call the Quick Generate journey above already covers and is not itself
-    under test here.
+    there is no one-click path straight to Genome, and generate-stream
+    (what the UI's Generate button actually calls) 400s with "No ArchiMate
+    elements found" for a solution with neither a linked element nor UML,
+    so Skip Enrichment's "no architecture yet" shortcut is not a route to
+    it either. An architect who wants Genome instead runs Quick Generate
+    first (which unlocks Phase 3), reopens Phase 3 (Configure), switches
+    the mode radio from the deterministic value Quick Generate left behind
+    back to "Genome", saves, and regenerates. That second, genome-mode
+    generate-stream call is the one the ledger finding and this journey are
+    about; the first (deterministic) call is the same call the Quick
+    Generate journey above already covers and is not itself under test
+    here.
     """
     page = browser.new_page()
     solution_id = seeded['ids']['codegen_genome_solution']
@@ -109,20 +113,20 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         expect(quick_generate).to_be_visible(timeout=PAGE_TIMEOUT)
         quick_generate.click()
 
-        files_label = page.locator('text=/\\d+ files$/').first
-        expect(files_label).to_be_visible(timeout=GENERATE_TIMEOUT)
+        first_files_label = page.locator('text=/\\d+ files$/').first
+        expect(first_files_label).to_be_visible(timeout=GENERATE_TIMEOUT)
 
         # A completed generation replaces the wizard with the file-tree IDE view
-        # (workbench.html's ideShowSetup flag) and the SSE connection this run
-        # just finished stays open on the client past that point -- clicking
-        # "Setup" to flip ideShowSetup back can lose the race against generate()'s
-        # own `finally` handler for as long as that connection takes to settle.
-        # Reloading sidesteps the race entirely: the browser drops the in-flight
-        # fetch on navigation, and the bundle already persisted server-side (the
-        # same persistence the Quick Generate journey above asserts on), so the
+        # (workbench.html's ideShowSetup flag), and the SSE connection this run
+        # just finished can still be settling on the client past that point --
+        # clicking "Setup" to flip ideShowSetup back can lose the race against
+        # generate()'s own `finally` handler for as long as that takes. Reloading
+        # sidesteps the race entirely: the browser drops the in-flight fetch on
+        # navigation, and the bundle already persisted server-side (the same
+        # persistence the Quick Generate journey above asserts on), so the
         # reloaded page starts from a clean, non-generating state.
         page.reload(timeout=PAGE_TIMEOUT)
-        expect(files_label).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(first_files_label).to_be_visible(timeout=PAGE_TIMEOUT)
 
         setup_button = page.get_by_role('button', name='Setup', exact=True)
         expect(setup_button).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -151,6 +155,7 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         # workbench.js's success banner auto-dismisses; the file-count badge does
         # not, so wait on it (same completion signal the Quick Generate journey
         # above uses) rather than racing a transient toast.
+        files_label = page.locator('text=/\\d+ files$/').first
         expect(files_label).to_be_visible(timeout=GENERATE_TIMEOUT)
         file_count = int(files_label.inner_text().split()[0])
         assert file_count > 0, 'Generate with Genome reported success but produced no files'

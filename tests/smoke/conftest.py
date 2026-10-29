@@ -697,15 +697,17 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         db.session.commit()
 
         # A third solution, separate from codegen_solution above, for the
-        # "Generate with Genome" journey (test_codegen_journey.py). Genome mode
-        # is the wizard's default generation_mode but reaches Phase 4 only via
-        # Skip Enrichment (which force-sets generation_mode to "deterministic")
-        # followed by switching the radio back to "Genome" and saving config --
-        # a different, mutating path through the same wizard than Quick
-        # Generate's one-click shortcut. Sharing codegen_solution between both
-        # journeys would make each test's outcome depend on the other having
-        # run first (phase, config.generation_mode and hasFiles all carry
-        # over), so this fixture gives the genome journey its own solution.
+        # "Generate with Genome" journey (test_codegen_journey.py). Sharing
+        # codegen_solution between both journeys would make each test's
+        # outcome depend on the other having run first (phase,
+        # config.generation_mode and hasFiles all carry over), so this
+        # fixture gives the genome journey its own solution. It needs a real
+        # linked ArchiMate element, the same as codegen_solution: unlike
+        # generate_code, generate-stream (what the UI's Generate button
+        # actually calls) does not run the journey-bridge auto-synthesis
+        # helpers at all, so a from-scratch solution with no linked element
+        # and no UML 400s with "No ArchiMate elements found" before it ever
+        # reaches generation mode.
         genome_component = ApplicationComponent(
             name="Smoke Genome Service %s" % suffix, organization_id=org.id,
             lifecycle_status="operational", description="Smoke fixture for the genome codegen journey.",
