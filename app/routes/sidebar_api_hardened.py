@@ -606,20 +606,36 @@ def api_global_search():
         # organisation is never lost to the limit.
         fetch_limit = 100
 
+        # A record that exists both as a register row (application, capability) and as its
+        # model element is one record in search: the register row's address wins, and the
+        # matching element is excluded below rather than listed a second time under its own
+        # generic element label.
+        linked_element_ids = set()
+
         # Applications
         try:
             apps = _search_filter(q, ApplicationComponent, ApplicationComponent.name, org_id, fetch_limit)
             for a in apps:
                 results.append({"type": "Application", "id": a.id, "name": a.name, "url": f"/applications/{a.id}"})
+                if a.archimate_element_id:
+                    linked_element_ids.add(a.archimate_element_id)
         except Exception as e:
             logger.debug(f"Search skip applications: {e}")
 
-        # Capabilities
+        # Capabilities — opens the capability's own fact sheet when one exists (same
+        # source_table/source_id provenance pattern as the capability map's own simple view,
+        # app/modules/capabilities/routes/map_views.py:capability_row), falling back to the
+        # map only when the capability has no fact sheet of its own.
         try:
             from app.models.unified_capability import UnifiedCapability
             caps = _search_filter(q, UnifiedCapability, UnifiedCapability.name, org_id, fetch_limit)
             for c in caps:
-                results.append({"type": "Capability", "id": c.id, "name": c.name, "url": "/capability-map"})
+                url = "/capability-map"
+                if c.source_table == "business_capability" and c.source_id and str(c.source_id).isdigit():
+                    url = f"/enterprise/capabilities/{int(c.source_id)}/fact-sheet"
+                results.append({"type": "Capability", "id": c.id, "name": c.name, "url": url})
+                if c.archimate_element_id:
+                    linked_element_ids.add(c.archimate_element_id)
         except Exception as e:
             logger.debug(f"Search skip capabilities: {e}")
 
@@ -637,6 +653,8 @@ def api_global_search():
             from app.models.models import ArchiMateElement
             elems = _search_filter(q, ArchiMateElement, ArchiMateElement.name, org_id, fetch_limit)
             for e in elems:
+                if e.id in linked_element_ids:
+                    continue
                 layer = (e.layer or "").lower()
                 if layer not in _VALID_ARCHIMATE_LAYERS:
                     layer = "application"
