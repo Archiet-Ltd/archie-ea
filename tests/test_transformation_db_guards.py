@@ -147,7 +147,6 @@ def guard_fixture(app, _schema):
             yield fixture
         finally:
             db.session.remove()
-            from app.models.organization import Organization
             from app.services.org_deletion_service import OrganizationDeletionService
 
             if db.session.get(Organization, organization_id) is not None:

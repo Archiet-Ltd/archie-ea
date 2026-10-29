@@ -105,7 +105,7 @@ def db_session(app, _schema):
                         "WHERE organization_id = ANY(%s)",
                         (list(organization_ids),),
                     )
-                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks two append-only rings the deletion service cannot — arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles each mutually reference the other; neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report)
+                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring resolves without this, via its one deferrable edge, so the deletion service handles it below.
                     cursor.execute(
                         "DELETE FROM arb_condition_evidence_records "
                         "WHERE organization_id = ANY(%s)",
@@ -113,21 +113,6 @@ def db_session(app, _schema):
                     )
                     cursor.execute(
                         "DELETE FROM arb_canonical_conditions "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_submission_evidence_snapshots "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_review_items "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_review_cycles "
                         "WHERE organization_id = ANY(%s)",
                         (list(organization_ids),),
                     )
@@ -1190,7 +1175,7 @@ def route_scope(app, _schema, request):
                         "WHERE organization_id = ANY(%s)",
                         (org_ids,),
                     )
-                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks two append-only rings the deletion service cannot — arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles each mutually reference the other; neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted, so the own/foreign citation order below never has to break this specific cycle.
+                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring, and arb_conditions (its legacy, non-append-only child with no organisation column of its own), resolve without this: one edge in that ring is DEFERRABLE INITIALLY DEFERRED, and the deletion service clears a table's unowned referrers before deleting it.
                     cursor.execute(
                         "DELETE FROM arb_condition_evidence_records "
                         "WHERE organization_id = ANY(%s)",
@@ -1198,33 +1183,6 @@ def route_scope(app, _schema, request):
                     )
                     cursor.execute(
                         "DELETE FROM arb_canonical_conditions "
-                        "WHERE organization_id = ANY(%s)",
-                        (org_ids,),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_submission_evidence_snapshots "
-                        "WHERE organization_id = ANY(%s)",
-                        (org_ids,),
-                    )
-                    # arb_conditions (the legacy ARBCondition model, a distinct table from
-                    # arb_canonical_conditions) has no organisation column of its own and
-                    # is not append-only, but it is a NOT NULL child of arb_review_items;
-                    # the generic service would normally cascade through it on its own,
-                    # but arb_review_items is force-deleted here outside that mechanism,
-                    # so its legacy children need the same explicit pre-clean this fixture
-                    # always gave them.
-                    cursor.execute(
-                        "DELETE FROM arb_conditions WHERE review_item_id IN ("
-                        "SELECT id FROM arb_review_items WHERE organization_id = ANY(%s))",
-                        (org_ids,),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_review_items "
-                        "WHERE organization_id = ANY(%s)",
-                        (org_ids,),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_review_cycles "
                         "WHERE organization_id = ANY(%s)",
                         (org_ids,),
                     )

@@ -9,7 +9,6 @@ import uuid
 
 import pytest
 import psycopg2
-from psycopg2 import sql
 from sqlalchemy.orm import configure_mappers
 
 from tests._raw_psycopg2 import raw_psycopg2_connection
@@ -1487,25 +1486,6 @@ def _purge_concurrency_test_organizations(connection, organization_ids, app):
     """Remove only committed fixtures created for a multi-transaction race."""
     connection.rollback()
     organization_ids = list(organization_ids)
-    cursor = connection.cursor()
-    try:
-        cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles append-only ring the deletion service cannot — each mutually references the other and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report)
-        for table_name in (
-            "arb_submission_evidence_snapshots",
-            "arb_review_items",
-            "arb_review_cycles",
-        ):
-            cursor.execute(
-                sql.SQL("DELETE FROM {} WHERE organization_id = ANY(%s)").format(
-                    sql.Identifier(table_name)
-                ),
-                (organization_ids,),
-            )
-        cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
     from app.models.organization import Organization
     from app.services.org_deletion_service import OrganizationDeletionService
 

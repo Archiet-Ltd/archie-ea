@@ -186,7 +186,6 @@ def public_journey_scope(app, _schema):
             else:
                 app.config["TRANSFORMATION_PORTFOLIO_STEWARD_ID"] = previous_steward
             db.session.remove()
-            from app.models.organization import Organization
             from app.services.org_deletion_service import OrganizationDeletionService
 
             for org_id in (scope.organization_id, scope.foreign_organization_id):
@@ -234,17 +233,16 @@ def _option_draft(scope, *, title, action_type, ordinal):
 def _expire_and_remove_result(scope, *, operation, command_key, result_id):
     """Model a lost/damaged result envelope while retaining the domain effect.
 
-    The two deletes are admitted by the same transaction-local marker an organisation delete
-    sets (``archie_org_deletion_admits``), scoped here to this one transaction and this one
-    organisation's rows — no trigger is disabled. The receipt update carries ``last_error_class``
-    so it matches the guard's own existing "pre-commit transient, immediately reclaimable"
-    transition; it needs no bypass at all.
+    This organisation is not being deleted, so the org-deletion marker does not apply here
+    and would not help regardless: the guard's unconditional first check on this table
+    refuses to null an already-set ``operation_result_id`` under any admission, by design
+    (ADR-org-deletion-01 — the marker is never allowed to admit an UPDATE, only a DELETE).
+    No real caller writes this exact "lost envelope, result discarded" shape in one
+    transaction, so it is modelled directly here with the trigger switched off for this
+    transaction only.
     """
     with db.engine.begin() as connection:
-        connection.execute(
-            text("SELECT set_config('archie.deleting_organisation', :organization_id, true)"),
-            {"organization_id": str(scope.organization_id)},
-        )
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: see docstring above — constructs a test-only "lost result envelope" state no real caller produces, not an organisation deletion
         connection.execute(
             text(
                 "DELETE FROM transformation_outbox_events "

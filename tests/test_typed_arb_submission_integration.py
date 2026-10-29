@@ -147,19 +147,15 @@ def adr_scope(app, _schema):
             yield scope
         finally:
             db.session.remove()
-            from app.models.organization import Organization
             from app.services.org_deletion_service import OrganizationDeletionService
 
             own_id = scope.organization_id
             foreign_id = scope.foreign_actor.organization_id
             with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks two append-only rings the deletion service cannot — arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles each mutually reference the other; neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted.
+                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted. The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring resolves without this, via its one deferrable edge, so the deletion service handles it below.
                 for table_name in (
                     "arb_condition_evidence_records",
                     "arb_canonical_conditions",
-                    "arb_submission_evidence_snapshots",
-                    "arb_review_items",
-                    "arb_review_cycles",
                 ):
                     connection.execute(
                         text(
@@ -276,24 +272,11 @@ def solution_scope(app, _schema):
             yield scope
         finally:
             db.session.remove()
-            from app.models.organization import Organization
             from app.services.org_deletion_service import OrganizationDeletionService
 
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles append-only ring the deletion service cannot — each mutually references the other and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report)
-                for table_name in (
-                    "arb_submission_evidence_snapshots",
-                    "arb_review_items",
-                    "arb_review_cycles",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id = :organization_id"
-                        ),
-                        {"organization_id": scope.organization_id},
-                    )
-                connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
+            # The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles
+            # append-only ring resolves without a trigger bypass: one edge in it is
+            # DEFERRABLE INITIALLY DEFERRED, so the deletion service orders around it.
             if db.session.get(Organization, scope.organization_id) is not None:
                 OrganizationDeletionService.delete_organization(scope.organization_id)
             db.session.remove()

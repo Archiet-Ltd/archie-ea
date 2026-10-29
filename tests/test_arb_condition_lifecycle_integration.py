@@ -87,19 +87,7 @@ def db_session(app, _schema):
                         # deletion service runs, is the narrowest fix that does not touch
                         # any other append-only table's guard.
                         #
-                        # session-replication-role-ok: arb_submission_evidence_snapshots,
-                        # arb_review_items and arb_review_cycles form a second, separate
-                        # three-way append-only ring (a snapshot names its review item, the
-                        # item names its cycle, the cycle names back to its own solution
-                        # evidence snapshot) with the same property: every guard on these
-                        # three tables admits a DELETE, never an UPDATE, so no column can be
-                        # nulled to break the ring first. This is a second instance of the
-                        # same architectural gap ADR-org-deletion-01 already names for
-                        # arb_canonical_conditions, found while wiring this file's teardown
-                        # onto OrganizationDeletionService — see the deletion-order report
-                        # for the full account. Pre-clearing it here is the same narrowest
-                        # fix, touching only these three tables' rows for this organisation.
-                        cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the two append-only rings above (arb_canonical_conditions/arb_condition_evidence_records and arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles); neither guard admits the UPDATE a column-null would need
+                        cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the append-only ring above (arb_canonical_conditions/arb_condition_evidence_records); neither guard admits the UPDATE a column-null would need. arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles form a second ring but resolve without this: one edge in it is DEFERRABLE INITIALLY DEFERRED, so the deletion service orders around it below.
                         cursor.execute(
                             "DELETE FROM arb_condition_evidence_records "
                             "WHERE organization_id = ANY(%s)",
@@ -107,21 +95,6 @@ def db_session(app, _schema):
                         )
                         cursor.execute(
                             "DELETE FROM arb_canonical_conditions "
-                            "WHERE organization_id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                        cursor.execute(
-                            "DELETE FROM arb_submission_evidence_snapshots "
-                            "WHERE organization_id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                        cursor.execute(
-                            "DELETE FROM arb_review_items "
-                            "WHERE organization_id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                        cursor.execute(
-                            "DELETE FROM arb_review_cycles "
                             "WHERE organization_id = ANY(%s)",
                             (list(organization_ids),),
                         )
