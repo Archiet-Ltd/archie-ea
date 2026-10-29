@@ -1,9 +1,14 @@
 {% from 'components/badge.html' import badge %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {#
   Permissions tab of the Team page: who may create, read, edit or delete each kind
   of object. The grid is the matrix variant of the dense table: sticky header,
   a row header per role, four cell states shown as badges with a legend above,
-  no pagination. Per-user overrides sit below it.
+  no pagination. It is a fixed role-by-action matrix of toggle switches, not a
+  sortable or searchable list of records, so it keeps its own table markup here
+  rather than components/list_table.html. Per-user overrides sit below it as a
+  genuine list of records and use the list table.
 #}
 {% macro _state_badge(allowed, is_set) %}
   {% if allowed and is_set %}{% call badge('info') %}Allowed by grant{% endcall %}
@@ -106,41 +111,25 @@
   </form>
 
   {% if perm_overrides %}
-  <div class="rounded-md border border-border overflow-x-auto">
-    <table class="dense-table w-full text-sm" data-testid="override-table">
-      <caption class="sr-only">Exceptions for individual people</caption>
-      <thead class="sticky top-0 bg-background">
-        <tr>
-          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Person</th>
-          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Action</th>
-          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Decision</th>
-          <th scope="col" class="px-4 py-2 text-right font-medium text-muted-foreground">Remove</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-border">
-        {% for o in perm_overrides %}
-        <tr data-testid="override-row-{{ o.user_id }}-{{ o.action }}">
-          <th scope="row" class="px-4 py-2 text-left font-medium text-foreground">{{ o.name }}</th>
-          <td class="px-4 py-2">{{ o.action|replace("_", " ") }} {{ o.object_type }}s</td>
-          <td class="px-4 py-2">{{ _state_badge(o.allowed, true) }}</td>
-          <td class="px-4 py-2 text-right">
-            <form method="POST" action="{{ url_for('team.team_permission_user_remove') }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="user_id" value="{{ o.user_id }}">
-              <input type="hidden" name="object_type" value="{{ o.object_type }}">
-              <input type="hidden" name="action" value="{{ o.action }}">
-              <button type="submit" data-testid="override-remove-{{ o.user_id }}-{{ o.action }}"
-                      aria-label="Remove the exception for {{ o.name }}: {{ o.action }} {{ o.object_type }}s"
-                      class="inline-flex items-center justify-center rounded-md text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 h-8 px-3">
-                Remove
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% set columns = [('Person', ''), ('Action', ''), ('Decision', ''), {'label': 'Remove', 'class': 'text-right', 'sortable': false}] %}
+  {% call(o) list_table(rows=perm_overrides, columns=columns, caption='Exceptions for individual people', testid='override-table', row_testid='override-row', search_placeholder='Filter exceptions...') %}
+    {% call table_cell(class='font-medium text-foreground') %}{{ o.name }}{% endcall %}
+    {% call table_cell() %}{{ o.action|replace("_", " ") }} {{ o.object_type }}s{% endcall %}
+    {% call table_cell() %}{{ _state_badge(o.allowed, true) }}{% endcall %}
+    {% call table_cell(class='text-right') %}
+      <form method="POST" action="{{ url_for('team.team_permission_user_remove') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="user_id" value="{{ o.user_id }}">
+        <input type="hidden" name="object_type" value="{{ o.object_type }}">
+        <input type="hidden" name="action" value="{{ o.action }}">
+        <button type="submit" data-testid="override-remove-{{ o.user_id }}-{{ o.action }}"
+                aria-label="Remove the exception for {{ o.name }}: {{ o.action }} {{ o.object_type }}s"
+                class="inline-flex items-center justify-center rounded-md text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 h-8 px-3">
+          Remove
+        </button>
+      </form>
+    {% endcall %}
+  {% endcall %}
   {% else %}
   <p class="text-sm text-muted-foreground" data-testid="override-empty">No exceptions yet. Everyone follows their role.</p>
   {% endif %}
