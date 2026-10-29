@@ -476,7 +476,7 @@ class TestZombieProjects:
         db_session.add(initiative)
         db_session.flush()
         
-        bc = _make_business_case(
+        _make_business_case(
             db_session, org.id, "Legacy Migration",
             capability_id=capability.id,
             strategic_initiative_id=initiative.id,
@@ -525,7 +525,7 @@ class TestZombieProjects:
         db_session.add(initiative)
         db_session.flush()
         
-        bc = _make_business_case(
+        _make_business_case(
             db_session, org.id, "CRM Upgrade",
             capability_id=capability.id,
             strategic_initiative_id=initiative.id,
@@ -578,7 +578,7 @@ class TestBusFactor:
         assert user.last_name in alert.target_element
         assert "single point of failure" in alert.recommendation.lower()
         assert len(alert.evidence) >= 2
-        assert f"owns {BUS_FACTOR_THRESHOLD + 1}" in alert.evidence[0] or f"owns 7" in alert.evidence[0]
+        assert f"owns {BUS_FACTOR_THRESHOLD + 1}" in alert.evidence[0] or "owns 7" in alert.evidence[0]
         assert "Distribute ownership" in alert.recommendation
 
     def test_no_alert_when_below_threshold(self, db_session, make_org):
@@ -805,7 +805,7 @@ class TestTopicRouting:
         db_session.add(initiative)
         db_session.flush()
         
-        bc = _make_business_case(db_session, org.id, "Zombie BC", capability_id=capability.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
+        _make_business_case(db_session, org.id, "Zombie BC", capability_id=capability.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
         app = _make_element(db_session, org.id, "App", type_="ApplicationComponent", layer="application")
         _make_cost_fact(db_session, org.id, app.id, "application", 2000, date.today() - timedelta(days=365), date.today())
 
@@ -860,7 +860,7 @@ class TestTopicRouting:
 
         # Create one of each check type
         # 1. Unfunded objective
-        goal = _make_element(db_session, org.id, "Goal", type_="Goal", layer="motivation")
+        _make_element(db_session, org.id, "Goal", type_="Goal", layer="motivation")
 
         # 2. Zombie project
         from app.models.business_capabilities import BusinessCapability
@@ -887,7 +887,7 @@ class TestTopicRouting:
         db_session.add(initiative)
         db_session.flush()
         
-        bc = _make_business_case(db_session, org.id, "Zombie", capability_id=cap.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
+        _ = _make_business_case(db_session, org.id, "Zombie", capability_id=cap.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
         app = _make_element(db_session, org.id, "App", type_="ApplicationComponent", layer="application")
         _make_cost_fact(db_session, org.id, app.id, "application", 2000, date.today() - timedelta(days=365), date.today())
 
@@ -980,7 +980,7 @@ class TestOrganisationIsolation:
         db_session.add(initiative_b)
         db_session.flush()
         
-        bc_b = _make_business_case(db_session, org_b.id, "Zombie B", capability_id=cap_b.id, strategic_initiative_id=initiative_b.id, financial_benefit_annual=1000)
+        _ = _make_business_case(db_session, org_b.id, "Zombie B", capability_id=cap_b.id, strategic_initiative_id=initiative_b.id, financial_benefit_annual=1000)
         app_b = _make_element(db_session, org_b.id, "App B", type_="ApplicationComponent", layer="application")
         _make_cost_fact(db_session, org_b.id, app_b.id, "application", 2000, date.today() - timedelta(days=365), date.today())
 
@@ -1005,7 +1005,7 @@ class TestOrganisationIsolation:
         db_session.add(initiative_a)
         db_session.flush()
         
-        bc_a = _make_business_case(db_session, org_a.id, "Healthy A", capability_id=cap_a.id, strategic_initiative_id=initiative_a.id, financial_benefit_annual=5000)
+        _ = _make_business_case(db_session, org_a.id, "Healthy A", capability_id=cap_a.id, strategic_initiative_id=initiative_a.id, financial_benefit_annual=5000)
         app_a = _make_element(db_session, org_a.id, "App A", type_="ApplicationComponent", layer="application")
         _make_cost_fact(db_session, org_a.id, app_a.id, "application", 1000, date.today() - timedelta(days=365), date.today())
 

@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.extensions import db
-from app.middleware.tenant_context import current_org_id
+from app.middleware.tenant_context import current_org_id  # reuse-ok: canonical org id accessor
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.models.archimate_element_types import application_kind_types
 from app.models.application_owner import ApplicationOwner
