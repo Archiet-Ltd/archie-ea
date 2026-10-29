@@ -821,6 +821,10 @@ def _on_after_flush_reproject_capability_elements(session, flush_context):
     connection = session.connection()
     if not _provenance_index_available(connection):
         return
+    # tenancy-ok: every id here is a business_capability this same session's
+    # own write-time listener already inserted/updated under this request's
+    # organisation this flush -- the lookup is by primary key, not a scan,
+    # and carries no new cross-organisation read.
     rows = connection.execute(
         text(
             "SELECT id, archimate_element_id FROM business_capability "
