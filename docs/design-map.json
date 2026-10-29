@@ -48411,6 +48411,11 @@
    "type_changed": false
   },
   "app/templates/strategic/capability_health.html": {
+   "extra_macros": [
+    "components/initiative_modal.html",
+    "components/llm_recommendations.html"
+   ],
+   "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -48681,6 +48686,13 @@
    "type_changed": true
   },
   "app/templates/strategic/impact_analysis.html": {
+   "extra_macros": [
+    "components/impact_scenario_comparison_modal.html",
+    "components/initiative_modal.html",
+    "components/llm_recommendations.html",
+    "components/priority_actions.html"
+   ],
+   "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -48867,6 +48879,14 @@
    "type_changed": false
   },
   "app/templates/strategic/investment_matrix.html": {
+   "extra_macros": [
+    "components/arb_submission_modal.html",
+    "components/initiative_modal.html",
+    "components/llm_recommendations.html",
+    "components/roi_calculator_modal.html",
+    "components/scenario_comparison_modal.html"
+   ],
+   "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -49145,6 +49165,12 @@
    "type_changed": false
   },
   "app/templates/strategic/risk_assessment.html": {
+   "extra_macros": [
+    "components/initiative_modal.html",
+    "components/llm_recommendations.html",
+    "components/risk_detail_modal.html"
+   ],
+   "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
