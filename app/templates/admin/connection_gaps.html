@@ -1,5 +1,12 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/input.html' import input as text_input %}
+{% from 'components/button.html' import button as submit_button %}
 
 {% block title %}Connection Gaps Report{% endblock %}
 
@@ -62,39 +69,26 @@
         <div class="grid grid-cols-1 gap-3">
             <div>
                 <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain</label>
-                <select id="domain" name="domain"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="">All Domains</option>
-                    {% for d in domain_options %}
-                    <option value="{{ d }}" {{ 'selected' if domain_filter == d else '' }}>{{ d }}</option>
-                    {% endfor %}
-                </select>
+                {%- set domain_opts = [('', 'All Domains')] -%}
+                {% for d in domain_options %}{%- set _ = domain_opts.append((d, d)) -%}{% endfor %}
+                {{ native_select(id='domain', name='domain', class='w-full', options=domain_opts, selected=domain_filter or '') }}
             </div>
             <div>
                 <label for="type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type</label>
-                <select id="type" name="type"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="">All Types</option>
-                    {% for t in type_options %}
-                    <option value="{{ t }}" {{ 'selected' if type_filter == t else '' }}>{{ t }}</option>
-                    {% endfor %}
-                </select>
+                {%- set type_opts = [('', 'All Types')] -%}
+                {% for t in type_options %}{%- set _ = type_opts.append((t, t)) -%}{% endfor %}
+                {{ native_select(id='type', name='type', class='w-full', options=type_opts, selected=type_filter or '') }}
             </div>
             <div>
                 <label for="score_min" class="block text-sm font-medium text-muted-foreground mb-1">Min Score (%)</label>
-                <input type="number" id="score_min" name="score_min" value="{{ score_min }}" min="0" max="100" placeholder="0"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {{ text_input(type='number', id='score_min', name='score_min', value=score_min, placeholder='0', class='w-full', attrs_dict={'min': '0', 'max': '100'}) }}
             </div>
             <div>
                 <label for="score_max" class="block text-sm font-medium text-muted-foreground mb-1">Max Score (%)</label>
-                <input type="number" id="score_max" name="score_max" value="{{ score_max }}" min="0" max="100" placeholder="100"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {{ text_input(type='number', id='score_max', name='score_max', value=score_max, placeholder='100', class='w-full', attrs_dict={'min': '0', 'max': '100'}) }}
             </div>
             <div class="flex items-end">
-                <button type="submit"
-                        class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors w-full">
-                    <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
-                </button>
+                {{ submit_button(text='Filter', type='submit', icon='search', class='w-full') }}
             </div>
         </div>
         <div class="flex items-center gap-3 mt-3">
@@ -109,90 +103,74 @@
         </div>
     </form>
 
-    <!-- Results summary -->
-    <div class="flex items-center justify-between mt-6 mb-3">
-        <p class="text-sm text-muted-foreground">
-            {{ total }} solution{{ 's' if total != 1 else '' }} found
-            {% if page > 1 %} (page {{ page }} of {{ total_pages }}){% endif %}
-        </p>
+    {# The server pages and filters these results; the footer shows the server's own count and Previous / Next. #}
+    {% macro _pager() -%}
+    <div class="flex items-center justify-between px-2" data-slot="data-table-pagination" data-testid="connection-gaps-pages">
+      <p class="flex-1 text-sm text-muted-foreground tabular-nums">{{ total }} solution{{ 's' if total != 1 else '' }} found{% if page > 1 %} (page {{ page }} of {{ total_pages }}){% endif %}</p>
+      {% if total_pages > 1 %}
+      <div class="flex items-center gap-2">
+        {% if page > 1 %}{% call button(variant='outline', size='sm', href=url_for('admin.connection_gaps', page=page-1, domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max)) %}Previous{% endcall %}
+        {% else %}{% call button(variant='outline', size='sm', disabled=true) %}Previous{% endcall %}{% endif %}
+        {% if page < total_pages %}{% call button(variant='outline', size='sm', href=url_for('admin.connection_gaps', page=page+1, domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max)) %}Next{% endcall %}
+        {% else %}{% call button(variant='outline', size='sm', disabled=true) %}Next{% endcall %}{% endif %}
+      </div>
+      {% endif %}
     </div>
+    {%- endmacro %}
 
-    <!-- Results table -->
-    <div class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b bg-muted/50">
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">Solution</th>
-                        <th class="px-3 py-3 text-center font-medium text-muted-foreground whitespace-nowrap">Score</th>
-                        {% for jk, label in junction_labels.items() %}
-                        <th class="px-1.5 py-3 text-center font-medium text-muted-foreground" title="{{ label }}">
-                            <span class="text-xs leading-tight block">{{ label[:3] }}</span>
-                        </th>
-                        {% endfor %}
-                        <th class="px-3 py-3 text-center font-medium text-muted-foreground whitespace-nowrap">Filled</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    {% for sol in solutions %}
-                    <tr class="hover:bg-muted/30 transition-colors">
-                        <td class="px-4 py-3">
-                            <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
-                               class="font-medium text-primary hover:underline">
-                                {{ sol.name }}
-                            </a>
-                            {% if sol.business_domain or sol.solution_type %}
-                            <div class="text-xs text-muted-foreground mt-0.5">
-                                {% if sol.business_domain %}{{ sol.business_domain }}{% endif %}
-                                {% if sol.business_domain and sol.solution_type %} &middot; {% endif %}
-                                {% if sol.solution_type %}{{ sol.solution_type }}{% endif %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-3 text-center">
-                            {% if sol.score < 25 %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">
-                                {{ sol.score }}%
-                            </span>
-                            {% elif sol.score < 50 %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">
-                                {{ sol.score }}%
-                            </span>
-                            {% elif sol.score < 75 %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
-                                {{ sol.score }}%
-                            </span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                                {{ sol.score }}%
-                            </span>
-                            {% endif %}
-                        </td>
-                        {% for jk in junction_labels %}
-                        <td class="px-1.5 py-3 text-center">
-                            {% if jk in sol.filled %}
-                            <span class="inline-block h-3 w-3 rounded-full bg-success" title="{{ junction_labels[jk] }}: Connected"></span>
-                            {% else %}
-                            <span class="inline-block h-3 w-3 rounded-full bg-destructive/40" title="{{ junction_labels[jk] }}: Missing"></span>
-                            {% endif %}
-                        </td>
-                        {% endfor %}
-                        <td class="px-3 py-3 text-center text-muted-foreground">
-                            {{ sol.filled_count }}/{{ sol.total_junctions }}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="{{ junction_labels | length + 3 }}" class="px-4 py-12 text-center text-muted-foreground">
-                            <i data-lucide="link-2-off" class="h-8 w-8 mx-auto mb-2 opacity-50"></i>
-                            <p>No solutions found matching your filters.</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {%- set columns = [('Solution', ''), {'label': 'Score', 'class': 'text-center', 'sortable': false}] -%}
+    {% for jk, label in junction_labels.items() %}
+    {%- set _ = columns.append({'label': label[:3], 'class': 'text-center', 'sortable': false}) -%}
+    {% endfor %}
+    {%- set _ = columns.append({'label': 'Filled', 'class': 'text-center', 'sortable': false}) -%}
+    {% call(sol) list_table(rows=solutions, columns=columns, caption='Solution connection gaps', testid='connection-gaps-table', row_testid='connection-gap-row',
+                             search_placeholder='Filter solutions...', empty_message='No solutions found matching your filters.',
+                             server_pagination=_pager) %}
+        {% call table_cell() %}
+            <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
+               class="font-medium text-primary hover:underline">
+                {{ sol.name }}
+            </a>
+            {% if sol.business_domain or sol.solution_type %}
+            <div class="text-xs text-muted-foreground mt-0.5">
+                {% if sol.business_domain %}{{ sol.business_domain }}{% endif %}
+                {% if sol.business_domain and sol.solution_type %} &middot; {% endif %}
+                {% if sol.solution_type %}{{ sol.solution_type }}{% endif %}
+            </div>
+            {% endif %}
+        {% endcall %}
+        {% call table_cell(class='text-center') %}
+            {% if sol.score < 25 %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">
+                {{ sol.score }}%
+            </span>
+            {% elif sol.score < 50 %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">
+                {{ sol.score }}%
+            </span>
+            {% elif sol.score < 75 %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
+                {{ sol.score }}%
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
+                {{ sol.score }}%
+            </span>
+            {% endif %}
+        {% endcall %}
+        {% for jk in junction_labels %}
+        {% call table_cell(class='text-center') %}
+            {% if jk in sol.filled %}
+            <span class="inline-block h-3 w-3 rounded-full bg-success" title="{{ junction_labels[jk] }}: Connected"></span>
+            {% else %}
+            <span class="inline-block h-3 w-3 rounded-full bg-destructive/40" title="{{ junction_labels[jk] }}: Missing"></span>
+            {% endif %}
+        {% endcall %}
+        {% endfor %}
+        {% call table_cell(class='text-center text-muted-foreground') %}
+            {{ sol.filled_count }}/{{ sol.total_junctions }}
+        {% endcall %}
+    {% endcall %}
 
     <!-- Legend -->
     <div class="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
@@ -204,24 +182,5 @@
         </span>
         <span class="ml-auto">Column headers: Dri=Drivers, Goa=Goals, Con=Constraints, Req=Requirements, App=Applications, Arc=ArchiMate, Ven=Vendors, Rec=Recommendations, Ris=Risks, Tco=TCO, Met=Metrics, Pla=Plateaus, Apq=APQC, Cap=Capabilities</span>
     </div>
-
-    <!-- Pagination -->
-    {% if total_pages > 1 %}
-    <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Connection gaps pagination">
-        {% if page > 1 %}
-        <a href="{{ url_for('admin.connection_gaps', page=page-1, domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Previous
-        </a>
-        {% endif %}
-        <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
-        {% if page < total_pages %}
-        <a href="{{ url_for('admin.connection_gaps', page=page+1, domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Next
-        </a>
-        {% endif %}
-    </nav>
-    {% endif %}
 </div>
 {% endblock %}
