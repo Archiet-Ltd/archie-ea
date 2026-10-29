@@ -1,5 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}{{ org.name }} — Organizations — {{ config.APP_NAME }}{% endblock %}
 
@@ -92,102 +94,42 @@
         <div class="px-6 py-4 border-b border-border">
             <h3 class="text-sm font-semibold">Users ({{ users|length }})</h3>
         </div>
-        {% if users %}
-        <div class="overflow-x-auto">
-            <table class="dense-table min-w-full divide-y divide-border">
-                {# T-14 (2 Sep 2026 audit): same server-side sort pattern as /risks/ and
-                   the Gap register. "Role" (the Permission-tier bitfield) is intentionally
-                   NOT sortable — it is largely uniform across users, per the T-10 note above. #}
-                {% macro sort_th(key, label, align='text-left') %}
-                {% set next_dir = 'desc' if current_sort == key and current_dir == 'asc' else 'asc' %}
-                <th class="px-6 py-3 {{ align }} text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    <a href="{{ request.path }}?sort={{ key }}&dir={{ next_dir }}"
-                       class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                       aria-label="Sort by {{ label }}{{ ', currently ' ~ current_dir ~ 'ending' if current_sort == key }}">
-                        {{ label }}
-                        {% if current_sort == key %}
-                        <i data-lucide="{{ 'arrow-up' if current_dir == 'asc' else 'arrow-down' }}" class="h-3 w-3" aria-hidden="true"></i>
-                        {% else %}
-                        <i data-lucide="chevrons-up-down" class="h-3 w-3 opacity-40" aria-hidden="true"></i>
-                        {% endif %}
-                    </a>
-                </th>
-                {% endmacro %}
-                <thead class="bg-muted/50">
-                    <tr>
-                        {{ sort_th('name', 'Name') }}
-                        {{ sort_th('email', 'Email') }}
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                        {{ sort_th('persona', 'Persona') }}
-                        {{ sort_th('org_admin', 'Org Admin') }}
-                        <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-card divide-y divide-border">
-                    {% for user in users %}
-                    <tr class="hover:bg-accent/50 transition-colors">
-                        <td class="px-6 py-4 text-sm font-medium">{{ user.full_name() or '—' }}</td>
-                        <td class="px-6 py-4 text-sm text-muted-foreground">{{ user.email }}</td>
-                        <td class="px-6 py-4">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground"
-                                  title="Permission tier (Role/Permission bitfield) — largely uniform across users; see Persona for what this person actually does">
-                                {{ user.role.name if user.role else 'No role' }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-foreground">
-                            {# T-10 (2 Sep 2026 audit): every row showed the same permission
-                               tier next to the same Org-Admin=No, which read as "every user
-                               is identical" — the field that actually varies day to day is
-                               enterprise_role, and it wasn't shown at all. #}
-                            {{ get_role_display_name(user.enterprise_role) if user.enterprise_role else '—' }}
-                        </td>
-                        <td class="px-6 py-4">
-                            {% if user.is_org_admin %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                                Yes
-                            </span>
-                            {% else %}
-                            <span class="text-xs text-muted-foreground">No</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex items-center justify-end gap-1.5">
-                                <form method="POST" action="{{ url_for('admin.toggle_org_admin', org_id=org.id, user_id=user.id) }}" class="inline"
-                                      data-confirm="{% if user.is_org_admin %}Revoke org-admin rights for {{ user.full_name() or user.email }}?{% else %}Grant org-admin rights to {{ user.full_name() or user.email }}?{% endif %}">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit"
-                                        class="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-7 px-2.5
-                                            {% if user.is_org_admin %}bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20
-                                            {% else %}bg-success/10 text-success-emphasis hover:bg-success/20{% endif %}"
-                                        title="{{ 'Revoke org-admin' if user.is_org_admin else 'Grant org-admin' }}">
-                                        <i data-lucide="{{ 'shield-off' if user.is_org_admin else 'shield-check' }}" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>
-                                        {{ 'Revoke Admin' if user.is_org_admin else 'Make Admin' }}
-                                    </button>
-                                </form>
-                                {% if org.slug != 'default' %}
-                                <form method="POST" action="{{ url_for('admin.remove_user_from_org', org_id=org.id, user_id=user.id) }}" class="inline"
-                                      data-confirm="Remove {{ user.full_name() or user.email }} from this organization?">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit"
-                                        class="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-7 px-2.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive-emphasis"
-                                        title="Remove from organization"
-                                        aria-label="Remove {{ user.full_name() or user.email }} from this organization">
-                                        <i data-lucide="user-minus" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="px-6 py-8 text-center text-sm text-muted-foreground">
-            No users belong to this organization yet.
-        </div>
-        {% endif %}
+        {# The sort is now client-side on the rendered rows (list_table), replacing the old
+           server-side ?sort=&dir= link pair; "Role" (the Permission-tier bitfield) stays
+           not sortable -- it is largely uniform across users, per the T-10 note below. #}
+        {% call(user) list_table(rows=users, columns=[('Name', ''), ('Email', ''), {'label': 'Role', 'sortable': false}, ('Persona', ''), ('Org Admin', ''), {'label': '', 'class': 'w-12'}],
+                              caption='Organisation users', testid='org-users-table', row_testid='org-user-row', search_placeholder='Filter users...',
+                              empty_message='No users belong to this organization yet.') %}
+          {% call table_cell(class='font-medium') %}{{ user.full_name() or '—' }}{% endcall %}
+          {% call table_cell(class='text-muted-foreground') %}{{ user.email }}{% endcall %}
+          {% call table_cell() %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground"
+                  title="Permission tier (Role/Permission bitfield) — largely uniform across users; see Persona for what this person actually does">
+                {{ user.role.name if user.role else 'No role' }}
+            </span>
+          {% endcall %}
+          {% call table_cell() %}
+            {# T-10 (2 Sep 2026 audit): every row showed the same permission tier next to the
+               same Org-Admin=No, which read as "every user is identical" -- the field that
+               actually varies day to day is enterprise_role, and it wasn't shown at all. #}
+            {{ get_role_display_name(user.enterprise_role) if user.enterprise_role else '—' }}
+          {% endcall %}
+          {% call table_cell(attrs={'data-sort': '1' if user.is_org_admin else '0'}) %}
+            {% if user.is_org_admin %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Yes</span>
+            {% else %}
+            <span class="text-xs text-muted-foreground">No</span>
+            {% endif %}
+          {% endcall %}
+          {% call table_cell(class='w-12 text-right') %}
+            {% call row_actions('Actions for ' ~ (user.full_name() or user.email)) %}
+                {{ row_action(('Revoke Admin' if user.is_org_admin else 'Make Admin'), action=url_for('admin.toggle_org_admin', org_id=org.id, user_id=user.id), confirm=(('Revoke org-admin rights for ' ~ (user.full_name() or user.email) ~ '?') if user.is_org_admin else ('Grant org-admin rights to ' ~ (user.full_name() or user.email) ~ '?'))) }}
+                {% if org.slug != 'default' %}
+                {{ row_action('Remove from organization', action=url_for('admin.remove_user_from_org', org_id=org.id, user_id=user.id), destructive=true, confirm=('Remove ' ~ (user.full_name() or user.email) ~ ' from this organization?'), separator_before=true) }}
+                {% endif %}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
     </div>
 </div>
 {% endblock %}
