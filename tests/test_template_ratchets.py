@@ -78,6 +78,7 @@ def test_explained_value_and_non_display_zero_are_not_counted(scan, body):
 
 @pytest.mark.parametrize("gate,rule,key", [
     ("legacy-macro-calls", "legacy-macro", "legacy_macro_calls"),
+    ("second-component-library", "second-library", "second_component_library"),
     ("raw-button", "raw-button", "raw_button"),
     ("missing-value-placeholder", "missing-value", "missing_value_placeholder"),
 ])
@@ -87,3 +88,36 @@ def test_gate_fails_when_one_more_is_added(gate, rule, key):
     assert at.status == verify.PASS and at.measured <= baseline
     one_more = verify.gate_counted_rule(gate, "scripts/check_ui_contract.py", rule, at.measured - 1)
     assert one_more.status == verify.FAIL
+
+
+@pytest.fixture
+def tree(tmp_path, monkeypatch):
+    """A temporary templates tree holding a one-macro library."""
+    monkeypatch.setattr(contract, "ROOT", tmp_path)
+    monkeypatch.setattr(contract, "TPL", tmp_path / "t")
+    lib = tmp_path / "t" / "components"
+    lib.mkdir(parents=True)
+    (lib / "button.html").write_text("{% macro button(text) %}<b>{{ text }}</b>{% endmacro %}", encoding="utf-8")
+    (tmp_path / "t" / "macros").mkdir()
+    return tmp_path / "t"
+
+
+def test_second_library_clean_tree_passes(tree):
+    (tree / "page.html").write_text("{% from 'components/button.html' import button %}{{ button('Go') }}", encoding="utf-8")
+    assert contract.collect_component_rule("second-library") == []
+
+
+def test_second_library_planted_macro_file_fails(tree):
+    (tree / "macros" / "ui.html").write_text("{% macro button(text='') %}<button>{{ text }}</button>{% endmacro %}", encoding="utf-8")
+    found = contract.collect_component_rule("second-library")
+    assert [(rel, msg.split("(")[0]) for rel, _, msg in found] == [("t/macros/ui.html", "macro button")]
+
+
+def test_second_library_import_from_elsewhere_fails(tree):
+    (tree / "page.html").write_text("{% from 'macros/ui.html' import button %}", encoding="utf-8")
+    assert len(contract.collect_component_rule("second-library")) == 1
+
+
+def test_second_library_unrelated_macro_and_library_files_pass(tree):
+    (tree / "macros" / "x.html").write_text("{% macro unique_thing() %}{% endmacro %}", encoding="utf-8")
+    assert contract.collect_component_rule("second-library") == []

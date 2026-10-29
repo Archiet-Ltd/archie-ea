@@ -32,6 +32,10 @@ definitions, so the canonical macros are never counted against themselves:
   missing-value a bare dash, "N/A" or zero shown where a value is missing
                 ({{ x or '—' }}, |default('—'), {% else %}—), instead of
                 explained_value with its reason and next step;
+  second-library  a macro defined outside app/templates/components and
+                app/templates/basecoat under a name the library already
+                exports (read from those folders), or a page importing such a
+                name from anywhere but the library;
   form-field    a form control inside a <form> that is not rendered by
                 form_field or placed inside a form_group call (label, control,
                 description and error together).
@@ -39,7 +43,7 @@ definitions, so the canonical macros are never counted against themselves:
 Usage:
     python scripts/check_ui_contract.py            # list violations by rule
     python scripts/check_ui_contract.py --count    # print only the total (gate)
-    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value [--count|--list]
+    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value|second-library [--count|--list]
 """
 from __future__ import annotations
 
@@ -307,6 +311,48 @@ def _rule_missing_value(rel: str, text: str, view: str):
     return out
 
 
+_MACRO_DEF = re.compile(r"{%-?\s*macro\s+(\w+)\s*\(")
+_FROM_IMPORT = re.compile(r"{%-?\s*from\s+['\"]([^'\"]+)['\"]\s+import\s+(.*?)\s*-?%}", re.DOTALL)
+_LIBRARY_DIRS = ("components", "basecoat")
+
+
+def _library_macro_names() -> frozenset:
+    """Macro names exported by the component library, read from its files."""
+    names = set()
+    for sub in _LIBRARY_DIRS:
+        for path in (TPL / sub).rglob("*.html"):
+            text = _JINJA_COMMENT.sub("", path.read_text(encoding="utf-8", errors="replace"))
+            names.update(n for n in _MACRO_DEF.findall(text) if not n.startswith("_"))
+    return frozenset(names)
+
+
+def _outside_library(rel: str) -> bool:
+    try:
+        parts = Path(rel).resolve().relative_to(TPL.resolve()).parts
+    except ValueError:
+        return True
+    return not parts or parts[0] not in _LIBRARY_DIRS
+
+
+def _rule_second_library(rel: str, text: str, view: str):
+    if not _outside_library(rel):
+        return []
+    names = _library_macro_names()
+    plain = _HTML_COMMENT.sub(_mask, _JINJA_COMMENT.sub(_mask, text))
+    out = [(_line_of(text, m.start()),
+            f"macro {m.group(1)}() duplicates a library component; use the library's")
+           for m in _MACRO_DEF.finditer(plain) if m.group(1) in names]
+    for m in _FROM_IMPORT.finditer(plain):
+        if m.group(1).split("/")[0] in _LIBRARY_DIRS:
+            continue
+        for item in m.group(2).split(","):
+            name = item.strip().split()[0] if item.strip() else ""
+            if name in names:
+                out.append((_line_of(text, m.start()),
+                            f"imports {name} from {m.group(1)}, not from the library"))
+    return out
+
+
 COMPONENT_RULES = {
     "dialog-title": _rule_dialog_title,
     "empty-state": _rule_empty_state,
@@ -314,6 +360,7 @@ COMPONENT_RULES = {
     "legacy-macro": _rule_legacy_macro,
     "raw-button": _rule_raw_button,
     "missing-value": _rule_missing_value,
+    "second-library": _rule_second_library,
 }
 
 
