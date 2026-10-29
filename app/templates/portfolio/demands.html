@@ -1,5 +1,8 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Demand intake{% endblock %}
 
@@ -111,54 +114,51 @@
         Kept, including declines &mdash; the record is what stops a rejected idea returning each quarter
       </p>
     </div>
-    <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Demand decisions">
-      <table class="dense-table w-full text-sm">
-        <thead class="border-b bg-muted/40">
-          <tr class="text-left">
-            <th class="px-4 py-3 font-medium">Demand</th>
-            <th class="px-4 py-3 font-medium">Decision</th>
-            <th class="px-4 py-3 font-medium">Date</th>
-            <th class="px-4 py-3 font-medium">Route</th>
-            <th class="px-4 py-3 font-medium">Rationale</th>
-            <th class="px-4 py-3 font-medium">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for d in decided %}
-          <tr class="border-b last:border-0">
-            <td class="px-4 py-3 font-medium">{{ d.title }}</td>
-            <td class="px-4 py-3">
-              <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold
-                {% if d.status == 'approved' %}bg-success/10 text-success-emphasis
-                {% elif d.status == 'declined' %}bg-destructive/10 text-destructive-emphasis
-                {% else %}bg-muted text-muted-foreground{% endif %}">{{ d.status|title }}</span>
-            </td>
-            <td class="px-4 py-3">{{ d.decision_date.strftime('%Y-%m-%d') if d.decision_date else '—' }}</td>
-            <td class="px-4 py-3">{{ d.triage_route|capitalize if d.triage_route else '—' }}</td>
-            <td class="px-4 py-3 text-muted-foreground">{{ d.decision_rationale or '—' }}</td>
-            {# A deferred demand is not decided, it is parked, and the row is
-               where someone comes back to it. Approve and decline are final
-               records and stay read-only. #}
-            <td class="px-4 py-3">
-              {% if d.status == 'deferred' %}
-              <form method="post" action="{{ url_for('portfolio.demand_decide', demand_id=d.id) }}"
-                    class="flex flex-wrap items-center gap-2">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="text" name="decision_rationale" placeholder="Rationale (required to decline)"
-                       class="h-9 w-48 rounded-md border border-input bg-background px-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                       aria-label="Decision rationale for {{ d.title }}">
-                <button type="submit" name="status" value="approved" class="h-8 px-2 rounded-md text-xs bg-success/10 text-success-emphasis hover:bg-success/20">Approve</button>
-                <button type="submit" name="status" value="declined" class="h-8 px-2 rounded-md text-xs bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20">Decline</button>
-              </form>
-              {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% if not decided %}
-      <p class="text-sm text-muted-foreground py-8 text-center">No decisions recorded yet.</p>
-      {% endif %}
+    <div class="p-6">
+    {%- set _decided_columns = [
+        {'label': 'Demand', 'sortable': true},
+        {'label': 'Decision', 'sortable': true},
+        {'label': 'Date', 'sortable': true},
+        {'label': 'Route', 'sortable': true},
+        {'label': 'Rationale', 'sortable': true},
+        {'label': 'Action', 'sortable': false},
+    ] -%}
+    {% call(d) list_table(rows=decided, columns=_decided_columns, caption='Demand decisions', testid='demand-decided-table', row_testid='demand-decided-row', empty_message='No decisions recorded yet.') %}
+      <!-- Demand -->
+      {% call table_cell(class='font-medium') %}{{ d.title }}{% endcall %}
+      <!-- Decision -->
+      {% call table_cell(attrs={'data-sort': d.status or ''}) %}
+        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold
+          {% if d.status == 'approved' %}bg-success/10 text-success-emphasis
+          {% elif d.status == 'declined' %}bg-destructive/10 text-destructive-emphasis
+          {% else %}bg-muted text-muted-foreground{% endif %}">{{ d.status|title }}</span>
+      {% endcall %}
+      <!-- Date -->
+      {% call table_cell(attrs={'data-sort': d.decision_date.isoformat() if d.decision_date else ''}) %}
+        {{ d.decision_date.strftime('%Y-%m-%d') if d.decision_date else '—' }}
+      {% endcall %}
+      <!-- Route -->
+      {% call table_cell() %}{{ d.triage_route|capitalize if d.triage_route else '—' }}{% endcall %}
+      <!-- Rationale -->
+      {% call table_cell(class='text-muted-foreground') %}{{ d.decision_rationale or '—' }}{% endcall %}
+      {# A deferred demand is not decided, it is parked, and the row is
+         where someone comes back to it. Approve and decline are final
+         records and stay read-only. #}
+      <!-- Action -->
+      {% call table_cell() %}
+        {% if d.status == 'deferred' %}
+        <form method="post" action="{{ url_for('portfolio.demand_decide', demand_id=d.id) }}"
+              class="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" name="decision_rationale" placeholder="Rationale (required to decline)"
+                 class="h-9 w-48 rounded-md border border-input bg-background px-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                 aria-label="Decision rationale for {{ d.title }}">
+          <button type="submit" name="status" value="approved" class="h-8 px-2 rounded-md text-xs bg-success/10 text-success-emphasis hover:bg-success/20">Approve</button>
+          <button type="submit" name="status" value="declined" class="h-8 px-2 rounded-md text-xs bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20">Decline</button>
+        </form>
+        {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+      {% endcall %}
+    {% endcall %}
     </div>
   </div>
 
