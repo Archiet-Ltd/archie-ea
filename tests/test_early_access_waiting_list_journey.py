@@ -58,9 +58,16 @@ def test_a_visitor_joins_the_waiting_list_for_the_predictive_checks(browser, sit
         expect(page.get_by_test_id("home-hero-promise")).to_have_text(PROMISE)
         expect(page.locator("h1")).to_have_text("See what breaks before you change it.")
 
-        # the home page names both as coming soon, and the features list says early access
+        # the home page names both as coming soon, inside the page's own Coming soon
+        # block, whose caption now carries that meaning once (T-site-14b): a link's own
+        # text is the capability name, marked by the block and by data-availability,
+        # not by repeating "(coming soon)" in every link's own text.
+        coming_soon_block = page.get_by_test_id("home-coming-soon")
+        expect(coming_soon_block.get_by_text("Coming soon", exact=True)).to_be_visible()
         for entry in ENTRIES:
-            expect(page.get_by_role("link", name="%s (coming soon)" % entry)).to_be_visible()
+            link = coming_soon_block.get_by_role("link", name=entry, exact=True)
+            expect(link).to_be_visible()
+            assert link.get_attribute("data-availability") == "early_access", entry
         page.goto(site_url + "/features#coming-soon")
         section = page.locator("article")
         for entry in ENTRIES:

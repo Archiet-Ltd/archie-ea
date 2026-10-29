@@ -113,6 +113,11 @@ def test_nothing_on_the_home_page_sends_a_visitor_to_the_retired_ask_page(browse
 
 
 def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(browser, site_url):
+    # A link is marked as coming soon when it sits inside the home page's own
+    # "Coming soon" block (whose caption already says so once) or carries
+    # data-availability="early_access" directly -- not by repeating the words
+    # "coming soon" in every link's own text, which the block's caption already
+    # makes clear and repeating is clutter, not a stronger promise.
     raw = raw_registry()
     held = {i["label"] for i in raw["product"]["coming_soon"]["items"]}
     held |= {i["label"] for i in raw["solutions"]["coming_soon"]["items"]}
@@ -125,8 +130,15 @@ def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(brow
         links = body.locator("a")
         offered = []
         for index in range(links.count()):
-            text = " ".join(links.nth(index).inner_text().split())
-            if any(label.lower() in text.lower() for label in held) and "coming soon" not in text.lower():
+            link = links.nth(index)
+            text = " ".join(link.inner_text().split())
+            if not any(label.lower() in text.lower() for label in held):
+                continue
+            marked = link.evaluate(
+                "el => el.getAttribute('data-availability') === 'early_access' "
+                "|| !!el.closest('[data-testid=\"home-coming-soon\"]')"
+            )
+            if not marked:
                 offered.append(text)
         assert offered == [], f"offered as available but coming soon: {offered}"
     finally:
