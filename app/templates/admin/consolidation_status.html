@@ -54,7 +54,7 @@
                source rather than from a table. Nothing here is editable from the UI -- progress moves when
                the code is merged. #}
             {% call(target) list_table(rows=targets, columns=[('Target', ''), ('Keep Blueprint', ''), ('Consolidate Blueprints', ''), ('Priority', ''), ('Progress', ''), ('Status', ''), ('Effort', '')],
-                                  caption='Consolidation targets', testid='consolidation-targets-table', row_testid='target-row', search_placeholder='Filter targets...',
+                                  caption='Consolidation targets', testid='consolidation-targets-table', row_testid='target-row', search_placeholder='Filter targets...', toolbar=true,
                                   empty_message='No blueprint-consolidation targets are recorded.') %}
               {% call table_cell(class='font-medium') %}{{ target.name }}{% endcall %}
               {% call table_cell() %}<code class="text-xs bg-muted px-1.5 py-0.5 rounded">{{ target.keep_blueprint }}</code>{% endcall %}
@@ -106,7 +106,7 @@
             {# actionable-rows-ok: the registered Flask blueprints as they exist in the running process. A
                read-only engineering report; blueprints are added or retired in code. #}
             {% call(bp) list_table(rows=blueprints, columns=[('Blueprint', ''), ('Status', ''), ('URL Prefix', ''), {'label': 'Endpoints', 'align': 'right'}, ('Consolidate Into', ''), {'label': 'Notes', 'class': 'hidden lg:table-cell'}],
-                               caption='Registered blueprints', testid='blueprints-table', row_testid='blueprint-row', search_placeholder='Filter blueprints...',
+                               caption='Registered blueprints', testid='blueprints-table', row_testid='blueprint-row', search_placeholder='Filter blueprints...', toolbar=true,
                                empty_message='No registered Flask blueprints were found in this process.') %}
               {% call table_cell(class='font-medium') %}{{ bp.name }}{% endcall %}
               {% call table_cell() %}

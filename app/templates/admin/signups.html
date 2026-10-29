@@ -15,7 +15,7 @@
 ) }}
 
 {% call(s) list_table(rows=signups, columns=[('Person', ''), ('Source', ''), ('Campaign', ''), ('Ref', ''), ('Step reached', ''), {'label': 'Signed up', 'sortable': true}, ('Time to first answer', '')],
-                      caption='Sign-ups', testid='signups-table', row_testid='signup-row', search_placeholder='Filter sign-ups...',
+                      caption='Sign-ups', testid='signups-table', row_testid='signup-row', search_placeholder='Filter sign-ups...', toolbar=true,
                       empty_message='Nobody has created an account yet. Each new account appears here as soon as it is made, with the source, campaign and ref from the link it arrived on.') %}
   {% call table_cell(class='max-w-[260px] truncate font-medium') %}{{ s.email }}{% endcall %}
   {% call table_cell() %}{{ s.source or 'Direct' }}{% endcall %}

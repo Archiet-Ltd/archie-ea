@@ -19,7 +19,7 @@
 
     {% call(u) list_table(rows=users, columns=[('First name', ''), ('Last name', ''), ('Email address', ''), ('Account type', ''), {'label': '', 'class': 'w-12'}],
                           caption='Registered users', testid='registered-users-table', row_testid='user-row',
-                          search_placeholder='Search users...',
+                          search_placeholder='Search users...', toolbar=true,
                           empty_message='No registered users found.') %}
       {% call table_cell(class='font-medium') %}{{ u.first_name or '' }}{% endcall %}
       {% call table_cell() %}{{ u.last_name or '' }}{% endcall %}

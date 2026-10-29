@@ -116,7 +116,7 @@
         <!-- Connector list -->
         <div class="lg:col-span-2">
             {% call(connector) list_table(rows=connectors, columns=[('Connector', ''), ('Health', ''), ('Credential', ''), ('Last synchronisation', ''), ('Schedule', ''), {'label': '', 'class': 'w-12'}],
-                                  caption='Connectors', testid='connectors-table', row_testid='connector-row', search_placeholder='Filter connectors...',
+                                  caption='Connectors', testid='connectors-table', row_testid='connector-row', search_placeholder='Filter connectors...', toolbar=true,
                                   empty_message='No connectors configured for this organisation yet. Add one with the form, then approve it in the approval inbox.') %}
               {% call table_cell() %}
                 <div class="text-sm font-medium text-foreground">

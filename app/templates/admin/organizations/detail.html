@@ -98,7 +98,7 @@
            server-side ?sort=&dir= link pair; "Role" (the Permission-tier bitfield) stays
            not sortable -- it is largely uniform across users, per the T-10 note below. #}
         {% call(user) list_table(rows=users, columns=[('Name', ''), ('Email', ''), {'label': 'Role', 'sortable': false}, ('Persona', ''), ('Org Admin', ''), {'label': '', 'class': 'w-12'}],
-                              caption='Organisation users', testid='org-users-table', row_testid='org-user-row', search_placeholder='Filter users...',
+                              caption='Organisation users', testid='org-users-table', row_testid='org-user-row', search_placeholder='Filter users...', toolbar=true,
                               empty_message='No users belong to this organization yet.') %}
           {% call table_cell(class='font-medium') %}{{ user.full_name() or '—' }}{% endcall %}
           {% call table_cell(class='text-muted-foreground') %}{{ user.email }}{% endcall %}
