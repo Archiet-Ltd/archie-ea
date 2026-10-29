@@ -12,7 +12,7 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
-from tests.smoke.fresh_org import create_fresh_org, sign_in
+from tests.smoke.fresh_org import api, create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -69,6 +69,29 @@ def _propose(org_id, name, repository, owners):
         db.session.remove()
 
 
+def _word_whole(element_handle, word):
+    """True when ``word`` renders as one unbroken run inside ``element_handle``
+    (no mid-word line break -- ``break-all`` would split it, ``break-words``
+    only breaks a run too long to fit, which a short word never is)."""
+    return element_handle.evaluate(
+        """(el, word) => {
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            let node;
+            while ((node = walker.nextNode())) {
+                const idx = node.textContent.indexOf(word);
+                if (idx !== -1) {
+                    const range = document.createRange();
+                    range.setStart(node, idx);
+                    range.setEnd(node, idx + word.length);
+                    return range.getClientRects().length === 1;
+                }
+            }
+            return null;
+        }""",
+        word,
+    )
+
+
 def _application_id(org_id, name):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
@@ -117,10 +140,37 @@ def test_github_code_owner_becomes_application_owner(browser, csrf_server):
         expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_have_text(
             "Code owner on GitHub: @octocat, not yet matched to a person"
         )
+        # CO-25: no mid-word break at 1440, where nothing overflows in the first place.
+        unmatched_cell = page.locator("[data-testid=app-owner-%d]" % unmatched_id).element_handle()
+        assert _word_whole(unmatched_cell, "octocat") is True, "octocat split mid-word at 1440"
+        assert _word_whole(unmatched_cell, "person") is True, "person split mid-word at 1440"
 
-        # The detail page offers the same next step.
+        # At 390 wide in dark mode, the owner cell (carrying the long unmatched
+        # sentence, before it is replaced by a real owner below) does not
+        # overflow the card, and no word inside it is split mid-word.
+        narrow_context = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+        narrow_page = narrow_context.new_page()
+        try:
+            sign_in(narrow_page, live_server, org["emails"]["solution_architect"])
+            narrow_page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            cell = narrow_page.locator("[data-testid=app-owner-mobile-%d]" % unmatched_id)
+            expect(cell).to_be_visible()
+            card = cell.locator("xpath=ancestor::*[contains(@class,'rounded') or contains(@class,'border')][1]")
+            overflow = narrow_page.evaluate(
+                "el => el.scrollWidth <= el.clientWidth + 1", card.first.element_handle()
+            )
+            assert overflow, "the owner cell overflows its card at 390 wide"
+            mobile_cell = cell.element_handle()
+            assert _word_whole(mobile_cell, "GitHub") is True, "GitHub split mid-word at 390 dark"
+            assert _word_whole(mobile_cell, "person") is True, "person split mid-word at 390 dark"
+        finally:
+            narrow_context.close()
+
+        # The detail page offers the same next step: the header action (the
+        # owner-section's own "Assign owner" link was removed -- the header
+        # button and the owner step's picker are the two controls left).
         page.goto("%s/applications/%d" % (live_server, unmatched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("application-assign-owner")).to_be_visible()
+        expect(page.get_by_test_id("application-header-assign-owner")).to_have_text("Assign owner")
 
         # From the list, the editor clicks the link and lands on a page that names the owner and offers people.
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -158,6 +208,11 @@ def test_github_code_owner_becomes_application_owner(browser, csrf_server):
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_have_text("Launch cto")
 
+        # An owned row shows its owner text alone -- the ghost Assign action
+        # belongs only to an empty Owner cell; the detail header's Change
+        # owner is the way to change an already-owned row.
+        expect(page.get_by_test_id("app-assign-owner-%d" % unmatched_id)).to_have_count(0)
+
         # After the assignment, the detail header offers "Change owner" instead.
         page.goto("%s/applications/%d" % (live_server, unmatched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("application-header-assign-owner")).to_have_text("Change owner")
@@ -176,26 +231,22 @@ def test_github_code_owner_becomes_application_owner(browser, csrf_server):
         ghost_button = page.get_by_test_id("app-assign-owner-%d" % no_owner_id)
         expect(ghost_button).to_be_visible()
         assert "cn-button-variant-ghost" in (ghost_button.get_attribute("class") or "")
+        list_h1_x = page.locator("h1").first.bounding_box()["x"]
         ghost_button.click()
         page.wait_for_url("**/applications/%d/assign-owner" % no_owner_id, timeout=PAGE_TIMEOUT)
         expect(page.locator("select[name=user_id]")).to_be_visible()
 
-        # At 390 wide in dark mode, the owner cell (carrying the long unmatched
-        # sentence) does not overflow the card.
-        narrow_context = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
-        narrow_page = narrow_context.new_page()
-        try:
-            sign_in(narrow_page, live_server, org["emails"]["solution_architect"])
-            narrow_page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-            cell = narrow_page.locator("[data-testid=app-owner-mobile-%d]" % unmatched_id)
-            expect(cell).to_be_visible()
-            card = cell.locator("xpath=ancestor::*[contains(@class,'rounded') or contains(@class,'border')][1]")
-            overflow = narrow_page.evaluate(
-                "el => el.scrollWidth <= el.clientWidth + 1", card.first.element_handle()
-            )
-            assert overflow, "the owner cell overflows its card at 390 wide"
-        finally:
-            narrow_context.close()
+        # CO-22: an application with no GitHub code owner at all reads one
+        # plain, capitalised sentence -- not a leading ". " left over from a
+        # missing first sentence.
+        subtitle_text = page.locator("p.mt-1.text-sm.text-muted-foreground").first.inner_text()
+        assert subtitle_text == "Choose the person in your organization who owns it.", subtitle_text
+        assert subtitle_text[0].isupper(), subtitle_text
+
+        # CO-24: the assign page is on the same Page column as the list, so
+        # its heading sits at the same x position, not 24px further right.
+        assign_h1_x = page.locator("h1").first.bounding_box()["x"]
+        assert abs(assign_h1_x - list_h1_x) < 1, "h1 x: %s vs list h1 x: %s" % (assign_h1_x, list_h1_x)
     finally:
         context.close()
 
@@ -254,11 +305,99 @@ def test_viewer_role_cannot_assign_owner(browser, csrf_server):
         sign_in(page, live_server, org["emails"]["cto"])
         page.goto("%s/applications/%d" % (live_server, app_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("application-header-assign-owner")).to_have_count(0)
+        expect(page.locator("[data-owner-picker]")).to_have_count(0)
+
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("app-assign-owner-%d" % app_id)).to_have_count(0)
 
         refused = page.goto(
             "%s/applications/%d/assign-owner" % (live_server, app_id),
             wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
         )
         assert refused.status == 403, "a Viewer with no owner-assign ability reached assign-owner: %s" % refused.status
+
+        status, _ = api(page, "POST", "/applications/%d/owners" % app_id, {"user_id": org["user_ids"]["solution_architect"]})
+        assert status == 403, "a Viewer with no owner-assign ability reached the owners API: %s" % status
     finally:
         context.close()
+
+
+def test_owner_assign_rule_matches_display_and_route_for_edit_and_governance(browser, csrf_server):
+    """CO-23's probe table as the test: the one rule
+    (``can_assign_owner`` -- "assign owner", or "edit application") is what
+    every owner-assign control shows and every owner-assign route allows,
+    for an architect persona outside the owner-assign governance list who
+    holds the ordinary ability to edit an application, and separately for a
+    persona inside that governance list whose organisation role is Viewer
+    (so they hold no edit right at all). Each row is a positive case:
+    reverting the rule to "assign owner" alone would refuse the first, and
+    reverting it to "edit application" alone would refuse the second (CO-28).
+    """
+    live_server = csrf_server
+    org = create_fresh_org(
+        "solution_architect", org_admin=True,
+        extra_roles=("architect", "data_architect"),
+    )
+
+    from app import create_app, db
+    from app.models.org_role import OrgRole
+
+    app = create_app("testing")
+    with app.app_context():
+        # "architect" keeps its matrix role from its Architect platform
+        # role (edit rights, no governance "assign owner" persona). The
+        # data-architect persona's organisation (matrix) role becomes Viewer
+        # (no edit right), independent of its governance ability.
+        OrgRole.set_role(
+            org["org_id"], org["user_ids"]["data_architect"], "viewer",
+            granted_by_id=org["user_ids"]["solution_architect"],
+        )
+        db.session.commit()
+        db.session.remove()
+
+    _propose(org["org_id"], "Journey Architect Edit App", "journey-org/architect-edit", [])
+    _propose(org["org_id"], "Journey Data Architect Viewer App", "journey-org/data-architect-viewer", [])
+
+    admin_context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    admin_page = admin_context.new_page()
+    try:
+        sign_in(admin_page, live_server, org["emails"]["solution_architect"])
+        admin_page.goto(live_server + "/admin/connectors/github/review", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        admin_page.get_by_role("button", name="Approve all (2)").click()
+        admin_page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+    finally:
+        admin_context.close()
+
+    architect_app_id = _application_id(org["org_id"], "Journey Architect Edit App")
+    data_architect_app_id = _application_id(org["org_id"], "Journey Data Architect Viewer App")
+    assert architect_app_id and data_architect_app_id, "approval did not create both applications"
+
+    for persona, app_id in (
+        ("architect", architect_app_id),
+        ("data_architect", data_architect_app_id),
+    ):
+        context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+        page = context.new_page()
+        try:
+            sign_in(page, live_server, org["emails"][persona])
+
+            page.goto("%s/applications/%d" % (live_server, app_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            expect(page.get_by_test_id("application-header-assign-owner")).to_have_text("Assign owner")
+            expect(page.locator("[data-owner-picker]")).to_have_count(1)
+
+            page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            expect(page.get_by_test_id("app-assign-owner-%d" % app_id)).to_be_visible()
+
+            allowed = page.goto(
+                "%s/applications/%d/assign-owner" % (live_server, app_id),
+                wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
+            )
+            assert allowed.status == 200, "%s was refused assign-owner: %s" % (persona, allowed.status)
+
+            status, _ = api(
+                page, "POST", "/applications/%d/owners" % app_id,
+                {"user_id": org["user_ids"]["solution_architect"], "ownership_type": "backup"},
+            )
+            assert status in (201, 409), "%s was refused the owners API: %s" % (persona, status)
+        finally:
+            context.close()
