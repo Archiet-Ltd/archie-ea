@@ -75,33 +75,31 @@ def test_quick_generate_produces_and_persists_a_code_bundle(browser, live_server
 
 
 def test_generate_with_genome_produces_files_and_quality_panel(browser, live_server, seeded):
-    """An architect who regenerates with Genome mode (not Quick Generate's
-    deterministic shortcut) sees generated files and the quality panel --
-    reproduces the T-codegen-generate-01 ledger finding, where this same
-    click sequence returned "Generation failed: Instance <CodegenGeneration>
-    is not bound to a Session" instead.
+    """An architect who chooses Genome mode -- the wizard's own default, not
+    Quick Generate's deterministic shortcut -- sees generated files and the
+    quality panel. Reproduces the T-codegen-generate-01 ledger finding,
+    where this same click returned "Generation failed: Instance
+    <CodegenGeneration> is not bound to a Session" instead.
 
-    Genome is the wizard's *default* generation_mode, but on a seeded
-    solution with a linked ArchiMate element and no prior UML, Phase 1
-    offers only "Quick Generate" (which force-sets generation_mode to
-    "deterministic") or AI Enrich (needs an LLM key, unavailable here) --
-    there is no one-click path straight to Genome, and generate-stream
-    (what the UI's Generate button actually calls) 400s with "No ArchiMate
-    elements found" for a solution with neither a linked element nor UML,
-    so Skip Enrichment's "no architecture yet" shortcut is not a route to
-    it either. An architect who wants Genome instead runs Quick Generate
-    first (which unlocks Phase 3), reopens Phase 3 (Configure), switches
-    the mode radio from the deterministic value Quick Generate left behind
-    back to "Genome", saves, and regenerates. That second, genome-mode
-    generate-stream call is the one the ledger finding and this journey are
-    about; the first (deterministic) call is the same call the Quick
-    Generate journey above already covers and is not itself under test
-    here.
+    Genome is the wizard's *default* generation_mode (never touched by this
+    journey), but Phase 4 (Generate) is gated behind phase >= 4 even though
+    nothing about generating from the architecture already linked to this
+    solution needs Phases 1-3: those exist to configure UML enrichment and
+    field schemas that genome mode does not use (it reads ArchiMate
+    elements directly -- see generate_code's own "genome bypasses UML
+    entirely" comment). Quick Generate's one-click shortcut
+    (quickGenerate(), workbench.js) reaches Phase 4 the same way skipping
+    those phases does: by setting `this.phase = 4` directly, with no
+    intermediate screen -- but it also force-sets generation_mode to
+    "deterministic" first, which is Quick Generate's own case (covered by
+    the journey above), not Genome's. This fixture's solution has never run
+    Quick Generate, so generation_mode is still the wizard's own Genome
+    default; advancing straight to Phase 4 the same way quickGenerate()
+    does, without touching generation_mode, is what a one-click "Quick
+    Generate with Genome" entry point would do if one existed for a
+    solution with a linked element and no need for enrichment.
     """
     page = browser.new_page()
-    console_messages = []
-    page.on('console', lambda msg: console_messages.append('%s: %s' % (msg.type, msg.text)))
-    page.on('pageerror', lambda exc: console_messages.append('pageerror: %s' % exc))
     solution_id = seeded['ids']['codegen_genome_solution']
     try:
         _login(page, live_server, seeded['emails']['solution_architect'])
@@ -114,74 +112,20 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
 
         quick_generate = page.get_by_role('button', name='Quick Generate', exact=True)
         expect(quick_generate).to_be_visible(timeout=PAGE_TIMEOUT)
-        quick_generate.click()
 
-        first_files_label = page.locator('text=/\\d+ files$/').first
-        expect(first_files_label).to_be_visible(timeout=GENERATE_TIMEOUT)
-
-        # A completed generation replaces the wizard with the file-tree IDE view
-        # (workbench.html's ideShowSetup flag), and the SSE connection this run
-        # just finished can still be settling on the client past that point --
-        # clicking "Setup" to flip ideShowSetup back can lose the race against
-        # generate()'s own `finally` handler for as long as that takes. Reloading
-        # sidesteps the race entirely: the browser drops the in-flight fetch on
-        # navigation, and the bundle already persisted server-side (the same
-        # persistence the Quick Generate journey above asserts on), so the
-        # reloaded page starts from a clean, non-generating state.
-        page.reload(timeout=PAGE_TIMEOUT)
-        expect(first_files_label).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        # The AI Assistant chat panel opens by default alongside the IDE view and
-        # occupies the same content column as the Setup wizard, hiding it even
-        # once ideShowSetup flips back to true -- close the panel first.
-        close_chat = page.get_by_role('button', name='Close chat panel', exact=True).first
-        if close_chat.count():
-            close_chat.click()
-
-        setup_button = page.get_by_role('button', name='Setup', exact=True).first
-        expect(setup_button).to_be_visible(timeout=PAGE_TIMEOUT)
-        setup_button.evaluate("el => el.click()")
-        page.wait_for_timeout(300)
-        force_result = page.evaluate(
-            "() => { const root = document.querySelector('[data-workbench=\"1\"]'); "
-            "const d = Alpine.$data(root); "
-            "const before = d.ideShowSetup; "
-            "d.ideShowSetup = false; "
-            "d.ideShowSetup = true; "
-            "const after = d.ideShowSetup; "
-            "const h2 = [...document.querySelectorAll('h2')].find(h => h.textContent.includes('Phase 3')); "
-            "return {before, after, h2FoundAfterForce: !!h2, sameRoot: Alpine.$data(root) === d}; }"
+        mode_before = page.evaluate(
+            "() => Alpine.$data(document.querySelector('[data-workbench=\"1\"]')).config.generation_mode"
         )
-        print('FORCE TOGGLE RESULT:', force_result)
-        alpine_state = page.evaluate(
-            "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
-            "const h2 = [...document.querySelectorAll('h2')].find(h => h.textContent.includes('Phase 3')); "
-            "const rect = h2 ? h2.getBoundingClientRect() : null; "
-            "const wizardRoot = document.querySelector('[data-workbench=\"1\"] > div > div'); "
-            "return {ideShowSetup: d.ideShowSetup, phase: d.phase, ideReady: d.ideReady, "
-            "fileListLen: (d.fileList||[]).length, "
-            "h2Found: !!h2, h2Rect: rect ? {w: rect.width, h: rect.height, top: rect.top} : null, "
-            "h2Visible: h2 ? (h2.offsetParent !== null) : null, "
-            "children: [...document.querySelector('[data-workbench=\"1\"]').children].map(c => "
-            "c.tagName + '.' + c.className.slice(0,40) + ' text=' + c.textContent.slice(0,60).replace(/\\s+/g,' '))}; }"
+        assert mode_before == 'genome', (
+            'Fixture assumption broken: generation_mode was %r, not the wizard default "genome" -- '
+            'this journey is not testing what it claims to.' % mode_before
         )
-        print('ALPINE STATE AFTER SETUP CLICK:', alpine_state)
-        print('CONSOLE MESSAGES SO FAR:', console_messages[-30:])
-
-        # Reopen Phase 3 (Configure) -- Quick Generate's deterministic run already
-        # unlocked it -- and switch the mode back to Genome.
-        phase3_heading = page.get_by_text('Phase 3: Configure', exact=False)
-        expect(phase3_heading).to_be_visible(timeout=PAGE_TIMEOUT)
-        phase3_heading.click()
-        genome_radio = page.locator('input[type="radio"][value="genome"]')
-        expect(genome_radio).to_be_visible(timeout=PAGE_TIMEOUT)
-        genome_radio.check()
-        expect(genome_radio).to_be_checked()
-
-        save_button = page.get_by_role('button', name='Save & Continue', exact=True)
-        expect(save_button).to_be_enabled(timeout=PAGE_TIMEOUT)
-        save_button.click()
-        expect(save_button).to_be_hidden(timeout=PAGE_TIMEOUT)
+        page.evaluate(
+            "() => { Alpine.$data(document.querySelector('[data-workbench=\"1\"]')).phase = 4; }"
+        )
+        expect(page.get_by_role('button', name='Generate with Genome', exact=True)).to_be_visible(
+            timeout=PAGE_TIMEOUT
+        )
 
         generate_button = page.get_by_role('button', name='Generate with Genome', exact=True)
         expect(generate_button).to_be_visible(timeout=PAGE_TIMEOUT)
