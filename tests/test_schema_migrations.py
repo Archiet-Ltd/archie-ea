@@ -37,6 +37,7 @@ RELAX = "20260926_relax_owner_app"
 # WIDEN rather than to "whatever the head currently is".
 WIDEN = "20260926_widen_element_name"
 HEAD = "20261001_adr_canonical_cols"
+PROVENANCE_INDEX = "uq_unified_capabilities_provenance"
 
 _DEFAULT_URL = "postgresql://postgres:postgres@127.0.0.1:5432/archie_test"
 
@@ -203,6 +204,12 @@ def _recorded(url):
         engine.dispose()
 
 
+def _has_index(url, table, index_name):
+    return any(
+        row[1] == index_name for row in _snapshot(url)["indexes"] if row[0] == table
+    )
+
+
 def _column(url, table, column):
     engine = create_engine(url)
     try:
@@ -278,6 +285,37 @@ def test_upgrade_on_an_empty_database_builds_the_full_schema(scratch_databases, 
     assert built["columns"] == deployed["columns"]
     assert built["indexes"] == deployed["indexes"]
     assert built["constraints"] == deployed["constraints"]
+
+
+def test_create_all_and_chain_upgrade_both_carry_the_provenance_index(scratch_databases):
+    """T-cap-prov-index-01, acceptance criterion 1.
+
+    Before this change, ``uq_unified_capabilities_provenance`` existed only
+    via the separate ``apply-unified-capability-provenance-migration``
+    command -- neither ``db.create_all()`` (``flask init-db``, with no
+    reconcile/apply step) nor the plain migration chain (``flask
+    schema-upgrade``, with no apply step either) carried it, which is why a
+    review seat hit a UniqueViolation that the builder's own ``init-db``-only
+    sandbox database never could (the ui/sidebar03 review, 29 Oct 2026).
+    Deliberately does not call ``apply-unified-capability-provenance-
+    migration`` in either path: that command is now a backfill for a
+    database whose ``unified_capabilities`` table already existed before
+    this change, not something either build path should need.
+    """
+    created = scratch_databases("provenance_createall")
+    _flask(created, ["init-db"])
+    assert _has_index(created, "unified_capabilities", PROVENANCE_INDEX), (
+        f"db.create_all() (flask init-db) did not carry {PROVENANCE_INDEX} "
+        "on unified_capabilities"
+    )
+
+    chained = scratch_databases("provenance_chain")
+    assert _tables(_snapshot(chained)) == set()
+    _flask(chained, ["schema-upgrade"])
+    assert _has_index(chained, "unified_capabilities", PROVENANCE_INDEX), (
+        f"the migration chain (flask schema-upgrade) did not carry {PROVENANCE_INDEX} "
+        "on unified_capabilities"
+    )
 
 
 # ------------------------------------------------- deploy-schema.sh ordering

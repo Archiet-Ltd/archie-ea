@@ -17,6 +17,16 @@ does). The SQL itself is idempotent (`CREATE UNIQUE INDEX IF NOT EXISTS`,
 wrapped in its own `BEGIN/COMMIT`) — this command re-applies it safely on every
 deploy.
 
+T-cap-prov-index-01: the index is now also declared on
+`UnifiedCapability.__table_args__` and created by migration
+`20261029_cap_prov_index`, so on every database this
+command now runs against, the index is usually already there (from
+`create_all`, the migration chain, or a previous run of this same command).
+The command checks first and reports "already present" rather than
+re-running DDL that has nothing left to do; it still applies the SQL file
+the one time a database genuinely lacks the index (an existing deployment
+that predates all three of those).
+
     flask --app manage apply-unified-capability-provenance-migration
 """
 
@@ -27,6 +37,7 @@ from flask.cli import with_appcontext
 from sqlalchemy import text
 
 from app import db
+from app.commands.project_capabilities import PROVENANCE_INDEX, _has_provenance_index
 
 MIGRATION_PATH = (
     Path(__file__).resolve().parent.parent.parent
@@ -39,6 +50,14 @@ MIGRATION_PATH = (
 def apply_unified_capability_provenance_migration():
     """Apply scripts/migrate_unified_capability_provenance.sql. Idempotent."""
 
+    conn = db.session.connection()
+    if _has_provenance_index(conn):
+        click.echo(
+            f"apply-unified-capability-provenance-migration: {PROVENANCE_INDEX} "
+            "already present."
+        )
+        return
+
     sql = MIGRATION_PATH.read_text(encoding="utf-8")
     # The file already wraps its own statement in BEGIN/COMMIT; strip those two
     # lines so SQLAlchemy's own transaction (which `with_appcontext` + the ORM
@@ -49,7 +68,6 @@ def apply_unified_capability_provenance_migration():
     ]
     body = "\n".join(statements)
 
-    conn = db.session.connection()
     conn.execute(text(body))
     db.session.commit()
     click.echo(

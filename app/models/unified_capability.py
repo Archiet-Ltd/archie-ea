@@ -352,6 +352,27 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
                 "organization_id IS NOT NULL AND archimate_id IS NOT NULL"
             ),
         ),
+        # T-cap-prov-index-01: the provenance natural key the write-time ON
+        # CONFLICT (source_table, source_id) arbiter in
+        # app/commands/project_capabilities.py requires. Previously created
+        # only by scripts/migrate_unified_capability_provenance.sql via the
+        # apply-unified-capability-provenance-migration command, so neither
+        # db.create_all() nor the plain migration chain carried it on a fresh
+        # install -- declaring it here means both do. Same name, same columns,
+        # same partial predicate as that SQL file; migrations/versions/
+        # 20261029_cap_prov_index.py creates it
+        # IF NOT EXISTS for databases whose table already existed before this
+        # change (create_all's checkfirst skips index backfill on a table that
+        # already exists), and the command above stays for operators.
+        Index(
+            "uq_unified_capabilities_provenance",
+            "source_table",
+            "source_id",
+            unique=True,
+            postgresql_where=db.text(
+                "source_table IS NOT NULL AND source_id IS NOT NULL"
+            ),
+        ),
         {"extend_existing": True},
     )
 

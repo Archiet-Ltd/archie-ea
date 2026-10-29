@@ -109,15 +109,22 @@ def cleanup(db):
 
 
 def _ensure_provenance_index(db):
-    from app.commands.project_capabilities import _has_provenance_index
+    """T-cap-prov-index-01: the index is now declared on the model
+    (``UnifiedCapability.__table_args__``) and created by migration
+    ``20261029_cap_prov_index``, so every database this
+    test suite runs against -- whether built by ``db.create_all()`` or by the
+    migration chain -- carries it. Tolerating its absence with a skip is what
+    let the ui/sidebar03 review find a UniqueViolation the builder's own
+    sandbox never could; this is now a hard assertion, not a skip.
+    """
+    from app.commands.project_capabilities import PROVENANCE_INDEX, _has_provenance_index
 
     with db.engine.connect() as conn:
-        if _has_provenance_index(conn):
-            return
-    pytest.skip(
-        "uq_unified_capabilities_provenance is absent on this database; run "
-        "`flask apply-unified-capability-provenance-migration` first"
-    )
+        assert _has_provenance_index(conn), (
+            f"{PROVENANCE_INDEX} is absent on this database -- it must be present "
+            "unconditionally after T-cap-prov-index-01 (declared on the model and "
+            "created by db.create_all() and by the migration chain alike)"
+        )
 
 
 def _run_projection_tracked(db, cleanup):
