@@ -13,6 +13,18 @@
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/inline_hint.html' import inline_hint %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% macro _case_actions() %}
+{{ button(
+    text='Delete',
+    variant='destructive',
+    size='sm',
+    icon='trash-2',
+    type='button',
+    attrs_dict={'@click': 'showDeleteModal = true', 'data-testid': 'bc-delete-open'}
+) }}
+{% endmacro %}
 
 {% macro draft_with_ai(section_key, label) %}
 {{ button(
@@ -67,23 +79,14 @@
     savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
-  <div>
-    <h1 class="text-2xl font-bold">{{ business_case.title or 'Untitled Business Case' }}</h1>
-    <p class="text-muted-foreground">{{ business_case.description }}</p>
-    <div class="flex justify-end">
-      {{ button(
-          text='Delete',
-          variant='destructive',
-          size='sm',
-          icon='trash-2',
-          attrs_dict={
-              '@click': 'showDeleteModal = true'
-          }
-      ) }}
-    </div>
-  </div>
-
   <div class="p-6 space-y-6">
+
+    {{ page_shell(
+        title=business_case.title or 'Untitled Business Case',
+        subtitle=business_case.description or none,
+        breadcrumb=[('Home', url_for('main.index')), ('Business Cases', url_for('business_case.index')), (business_case.title or 'Untitled Business Case', None)],
+        actions_caller=_case_actions
+    ) }}
 
     {# ── Status + Links panel ── #}
     <div class="rounded-lg border border-border bg-card p-4 space-y-4" data-testid="bc-meta-panel">
@@ -109,7 +112,7 @@
         </span>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {% call form_group(id='bc-link-capability', label='Linked Capability') %}
           {% set capability_options = [('', 'Not linked')] %}
           {% for c in capabilities %}
@@ -117,6 +120,7 @@
           {% endfor %}
           {{ native_select(
               id='bc-link-capability',
+              class='w-full',
               name='capability_id',
               attrs_dict={'x-model': 'capabilityId', '@change': 'saveMeta()'},
               options=capability_options,
@@ -130,6 +134,7 @@
           {% endfor %}
           {{ native_select(
               id='bc-link-initiative',
+              class='w-full',
               name='strategic_initiative_id',
               attrs_dict={'x-model': 'strategicInitiativeId', '@change': 'saveMeta()'},
               options=initiative_options,
@@ -143,6 +148,7 @@
           {% endfor %}
           {{ native_select(
               id='bc-link-solution',
+              class='w-full',
               name='solution_id',
               attrs_dict={'x-model': 'solutionId', '@change': 'saveMeta()'},
               options=solution_options,
@@ -160,12 +166,12 @@
       </div>
 
       {% set export_items = [
-          {'type': 'item', 'label': 'Word document (.docx)', 'attrs_dict': {'@click': 'exportFile("docx")'}},
-          {'type': 'item', 'label': 'PDF document (.pdf)', 'attrs_dict': {'@click': 'exportFile("pdf")'}},
-          {'type': 'separator'},
-          {'type': 'item', 'label': 'Mermaid (.mmd)', 'attrs_dict': {'@click': 'exportFile("mermaid")'}},
-          {'type': 'item', 'label': 'Lucidchart (.lucid)', 'attrs_dict': {'@click': 'exportFile("lucid")'}},
-          {'type': 'item', 'label': 'Archi (.archimate)', 'attrs_dict': {'@click': 'exportFile("archi")'}}
+          {'text': 'Word document (.docx)', 'onclick': "exportFile('docx')"},
+          {'text': 'PDF document (.pdf)', 'onclick': "exportFile('pdf')"},
+          {'divider': true},
+          {'text': 'Mermaid (.mmd)', 'onclick': "exportFile('mermaid')"},
+          {'text': 'Lucidchart (.lucid)', 'onclick': "exportFile('lucid')"},
+          {'text': 'Archi (.archimate)', 'onclick': "exportFile('archi')"}
       ] %}
       {{ dropdown_menu(
           trigger_text='Export',
@@ -180,8 +186,8 @@
           <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
         </a>
       </template>
-      <span x-show="!shareUrl" x-cloak class="text-xs text-muted-foreground" data-testid="bc-share-unavailable">
-        Save an entry on this canvas to get a share link.
+      <span class="text-xs text-muted-foreground" data-testid="bc-export-hint">
+        Download the case as Word or PDF, or send it to Mermaid, Lucidchart or Archi.
       </span>
     </div>
 
