@@ -135,7 +135,7 @@ def test_github_code_owner_becomes_application_owner(browser, csrf_server):
         # says "/assign-owner" (the server's own empty-choice redirect lands
         # on that same URL, so the URL alone cannot tell the two apart).
         select = page.locator("select[name=user_id]")
-        assert select.get_attribute("value") == ""
+        assert select.input_value() == ""
         requests_sent = []
         page.on("request", lambda request: requests_sent.append(request) if request.method == "POST" else None)
         page.locator("button[type=submit]", has_text="Assign owner").click()
@@ -209,21 +209,30 @@ def test_viewer_role_cannot_assign_owner(browser, csrf_server):
     persona is the wrong choice for this negative case post CO-13 -- "cto" is
     not in that allowlist and is used here instead."""
     live_server = csrf_server
-    org = create_fresh_org("cto", org_admin=False, platform_role="Viewer")
+    # A separate administrator approves the proposal (approving one's own
+    # proposal is refused, and the Viewer persona under test may not have
+    # general write permission to approve anything at all); the Viewer
+    # persona is only ever used to exercise the permission boundary below.
+    org = create_fresh_org("solution_architect", org_admin=True, extra_roles=("cto",))
     _propose(org["org_id"], "Journey Viewer App", "journey-org/viewer-case", [])
 
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
     try:
-        # The org has no administrator (org_admin=False); approve the
-        # proposal in-process, the way the review page's own button does,
-        # so the route under test is reached only as the Viewer persona.
         from app import create_app, db
         from app.connectors.github import approve_all_proposals
+        from app.models.org_role import OrgRole
 
         app = create_app("testing")
         with app.app_context():
-            approve_all_proposals(org["org_id"], org["user_ids"]["cto"])
+            approve_all_proposals(org["org_id"], org["user_ids"]["solution_architect"])
+            # The "cto" person's organisation (matrix) role becomes Viewer,
+            # independent of their Architect platform role: a direct role
+            # grant, the same mechanism the permissions matrix reads first.
+            OrgRole.set_role(
+                org["org_id"], org["user_ids"]["cto"], "viewer",
+                granted_by_id=org["user_ids"]["solution_architect"],
+            )
             db.session.commit()
             db.session.remove()
 
