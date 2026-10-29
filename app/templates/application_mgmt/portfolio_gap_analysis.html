@@ -1,5 +1,8 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% block title %}Enterprise Portfolio Gap Analysis{% endblock %}
 
 {% block content %}
@@ -323,38 +326,26 @@
       </div>
     </div>
     <div class="gap-section-body">
-      <table class="dense-table gap-table">
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>Severity</th>
-            <th>Impact</th>
-            <th>Recommendation</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
-          {% for gap in portfolio_gaps.compliance_risks %}
-          <tr>
-            <td class="table-capability">
-              <a href="{{ url_for('unified_applications.application_detail', id=gap.application_id) }}">
-                {{ gap.application_name }}
-              </a>
-            </td>
-            <td>
-              <span class="table-severity severity-{{ gap.severity|lower }}">
-                {{ gap.severity|upper }}
-              </span>
-            </td>
-            <td class="table-recommendation">{{ gap.impact }}</td>
-            <td class="table-recommendation">{{ gap.recommendation }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {%- set _columns = [
+          {'label': 'Application', 'sortable': true},
+          {'label': 'Severity', 'sortable': true},
+          {'label': 'Impact', 'sortable': true},
+          {'label': 'Recommendation', 'sortable': false},
+      ] -%}
+      {% call(gap) list_table(rows=portfolio_gaps.compliance_risks, columns=_columns, caption='Compliance risks', testid='compliance-risks-table', row_testid='compliance-risk-row', empty_message='No compliance risks detected.') %}
+        {% call table_cell(class='font-medium') %}
+          <a href="{{ url_for('unified_applications.application_detail', id=gap.application_id) }}">{{ gap.application_name }}</a>
+        {% endcall %}
+        {% call table_cell(attrs={'data-sort': gap.severity or ''}) %}
+          <span class="table-severity severity-{{ gap.severity|lower }}">{{ gap.severity|upper }}</span>
+        {% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.impact }}{% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.recommendation }}{% endcall %}
+      {% endcall %}
     </div>
   </div>
   {% endif %}
-  
+
   <!-- Single Points of Failure Section -->
   {% if portfolio_gaps.single_point_failures is not none and portfolio_gaps.single_point_failures|length > 0 %}
   <div class="gap-section">
@@ -365,40 +356,28 @@
       </div>
     </div>
     <div class="gap-section-body">
-      <table class="dense-table gap-table">
-        <thead>
-          <tr>
-            <th>Capability</th>
-            <th>Application</th>
-            <th>Severity</th>
-            <th>Impact</th>
-            <th>Recommendation</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
-          {% for gap in portfolio_gaps.single_point_failures %}
-          <tr>
-            <td class="table-capability">{{ gap.capability_name }}</td>
-            <td class="table-application">
-              <a href="{{ url_for('unified_applications.application_detail', id=gap.application_id) }}">
-                {{ gap.application_name }}
-              </a>
-            </td>
-            <td>
-              <span class="table-severity severity-{{ gap.severity|lower }}">
-                {{ gap.severity|upper }}
-              </span>
-            </td>
-            <td class="table-recommendation">{{ gap.impact }}</td>
-            <td class="table-recommendation">{{ gap.recommendation }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {%- set _columns = [
+          {'label': 'Capability', 'sortable': true},
+          {'label': 'Application', 'sortable': true},
+          {'label': 'Severity', 'sortable': true},
+          {'label': 'Impact', 'sortable': true},
+          {'label': 'Recommendation', 'sortable': false},
+      ] -%}
+      {% call(gap) list_table(rows=portfolio_gaps.single_point_failures, columns=_columns, caption='Single points of failure', testid='single-point-failures-table', row_testid='single-point-failure-row', empty_message='No single points of failure detected.') %}
+        {% call table_cell(class='font-medium') %}{{ gap.capability_name }}{% endcall %}
+        {% call table_cell(class='table-application') %}
+          <a href="{{ url_for('unified_applications.application_detail', id=gap.application_id) }}">{{ gap.application_name }}</a>
+        {% endcall %}
+        {% call table_cell(attrs={'data-sort': gap.severity or ''}) %}
+          <span class="table-severity severity-{{ gap.severity|lower }}">{{ gap.severity|upper }}</span>
+        {% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.impact }}{% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.recommendation }}{% endcall %}
+      {% endcall %}
     </div>
   </div>
   {% endif %}
-  
+
   <!-- Unsupported Capabilities Section -->
   {% if portfolio_gaps.unsupported_capabilities|length > 0 %}
   <div class="gap-section">
@@ -409,32 +388,23 @@
       </div>
     </div>
     <div class="gap-section-body">
-      <table class="dense-table gap-table">
-        <thead>
-          <tr>
-            <th>Capability</th>
-            <th>Severity</th>
-            <th>Impact</th>
-            <th>Recommendation</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">{# actionable-rows-ok: computed gaps -- each row is derived on the fly from capability-to-application
-           coverage and carries no stored id to link to. Act on one by mapping an
-           application to the capability named in the row, from that capability page. #}
-          {% for gap in portfolio_gaps.unsupported_capabilities %}
-          <tr>
-            <td class="table-capability">{{ gap.capability_name }}</td>
-            <td>
-              <span class="table-severity severity-{{ gap.severity|lower }}">
-                {{ gap.severity|upper }}
-              </span>
-            </td>
-            <td class="table-recommendation">{{ gap.impact }}</td>
-            <td class="table-recommendation">{{ gap.recommendation }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {# actionable-rows-ok: computed gaps -- each row is derived on the fly from capability-to-application
+         coverage and carries no stored id to link to. Act on one by mapping an
+         application to the capability named in the row, from that capability page. #}
+      {%- set _columns = [
+          {'label': 'Capability', 'sortable': true},
+          {'label': 'Severity', 'sortable': true},
+          {'label': 'Impact', 'sortable': true},
+          {'label': 'Recommendation', 'sortable': false},
+      ] -%}
+      {% call(gap) list_table(rows=portfolio_gaps.unsupported_capabilities, columns=_columns, caption='Unsupported business capabilities', testid='unsupported-capabilities-table', row_testid='unsupported-capability-row', empty_message='All capabilities are supported.') %}
+        {% call table_cell(class='font-medium') %}{{ gap.capability_name }}{% endcall %}
+        {% call table_cell(attrs={'data-sort': gap.severity or ''}) %}
+          <span class="table-severity severity-{{ gap.severity|lower }}">{{ gap.severity|upper }}</span>
+        {% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.impact }}{% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.recommendation }}{% endcall %}
+      {% endcall %}
     </div>
   </div>
   {% endif %}
@@ -449,38 +419,26 @@
       </div>
     </div>
     <div class="gap-section-body">
-      <table class="dense-table gap-table">
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>Severity</th>
-            <th>Impact</th>
-            <th>Recommendation</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
-          {% for gap in portfolio_gaps.orphaned_applications %}
-          <tr>
-            <td class="table-capability">
-              <a href="{{ url_for('unified_applications.application_detail', id=gap.application_id) }}">
-                {{ gap.application_name }}
-              </a>
-            </td>
-            <td>
-              <span class="table-severity severity-{{ gap.severity|lower }}">
-                {{ gap.severity|upper }}
-              </span>
-            </td>
-            <td class="table-recommendation">{{ gap.impact }}</td>
-            <td class="table-recommendation">{{ gap.recommendation }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {%- set _columns = [
+          {'label': 'Application', 'sortable': true},
+          {'label': 'Severity', 'sortable': true},
+          {'label': 'Impact', 'sortable': true},
+          {'label': 'Recommendation', 'sortable': false},
+      ] -%}
+      {% call(gap) list_table(rows=portfolio_gaps.orphaned_applications, columns=_columns, caption='Orphaned applications', testid='orphaned-applications-table', row_testid='orphaned-application-row', empty_message='No orphaned applications detected.') %}
+        {% call table_cell(class='font-medium') %}
+          <a href="{{ url_for('unified_applications.application_detail', id=gap.application_id) }}">{{ gap.application_name }}</a>
+        {% endcall %}
+        {% call table_cell(attrs={'data-sort': gap.severity or ''}) %}
+          <span class="table-severity severity-{{ gap.severity|lower }}">{{ gap.severity|upper }}</span>
+        {% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.impact }}{% endcall %}
+        {% call table_cell(class='table-recommendation') %}{{ gap.recommendation }}{% endcall %}
+      {% endcall %}
     </div>
   </div>
   {% endif %}
-  
+
   <!-- All Clear State — only shown when all analyses ran and returned no gaps -->
   {% set analyses_complete = (
     portfolio_gaps.compliance_risks is not none and
