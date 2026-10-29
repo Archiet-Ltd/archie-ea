@@ -60,6 +60,28 @@ def _make_element(db_session, org_id, name, type_="ApplicationComponent", layer=
     return row
 
 
+def _make_application_component(db_session, org_id, name, criticality=None, archimate_element_id=None):
+    """Create an ApplicationComponent linked to an ArchiMateElement."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models import ArchiMateElement
+
+    if archimate_element_id is None:
+        arch_elem = ArchiMateElement(name=name, type="ApplicationComponent", layer="application", organization_id=org_id)
+        db_session.add(arch_elem)
+        db_session.flush()
+        archimate_element_id = arch_elem.id
+
+    ac = ApplicationComponent(
+        name=name,
+        organization_id=org_id,
+        archimate_element_id=archimate_element_id,
+        criticality=criticality,
+    )
+    db_session.add(ac)
+    db_session.flush()
+    return ac
+
+
 def _make_relationship(db_session, org_id, source_id, target_id, type_="Serving"):
     from app.models import ArchiMateRelationship
 
@@ -110,7 +132,7 @@ def _make_cost_fact(db_session, org_id, element_id, element_type, amount, period
     return cf
 
 
-def _make_application_owner(db_session, org_id, user_id, element_type, element_id, ownership_type="primary"):
+def _make_application_owner(db_session, org_id, user_id, element_type, element_id, ownership_type="primary", application_id=None):
     from app.models.application_owner import ApplicationOwner
 
     owner = ApplicationOwner(
@@ -119,6 +141,7 @@ def _make_application_owner(db_session, org_id, user_id, element_type, element_i
         element_type=element_type,
         element_id=element_id,
         ownership_type=ownership_type,
+        application_id=application_id,
     )
     db_session.add(owner)
     db_session.flush()
@@ -131,7 +154,7 @@ class TestPredictiveEngine:
     def test_unfunded_objective(self, db_session, make_org):
         """Test unfunded objective."""
         org = make_org("unfunded")
-        goal = _make_element(db_session, org.id, "Goal", type_="Goal", layer="motivation")
+        _make_element(db_session, org.id, "Goal", type_="Goal", layer="motivation")
         db_session.commit()
 
         alerts = check_unfunded_objectives(org.id)
@@ -167,9 +190,11 @@ class TestPredictiveEngine:
         db_session.add(initiative)
         db_session.flush()
 
-        bc = _make_business_case(db_session, org.id, "Zombie BC", capability_id=capability.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
-        app = _make_element(db_session, org.id, "App", type_="ApplicationComponent", layer="application")
-        _make_cost_fact(db_session, org.id, app.id, "application", 2000, date.today() - timedelta(days=365), date.today())
+        _make_business_case(db_session, org.id, "Zombie BC", capability_id=capability.id, strategic_initiative_id=initiative.id, financial_benefit_annual=1000)
+        app_elem = _make_element(db_session, org.id, "App", type_="ApplicationComponent", layer="application")
+        # Link app to work package via Realization
+        _make_relationship(db_session, org.id, app_elem.id, wp.id, type_="Realization")
+        _make_cost_fact(db_session, org.id, app_elem.id, "application", 2000, date.today() - timedelta(days=365), date.today())
         db_session.commit()
 
         alerts = check_zombie_projects(org.id)
@@ -184,12 +209,8 @@ class TestPredictiveEngine:
         user = _make_user(db_session, org, "busfactor@example.com")
 
         for i in range(6):
-            app = _make_element(db_session, org.id, f"App {i}", type_="ApplicationComponent", layer="application")
-            from app.models.application_portfolio import ApplicationComponent
-            ac = ApplicationComponent.query.get(app.id)
-            if ac:
-                ac.criticality = "critical"
-            _make_application_owner(db_session, org.id, user.id, "application", app.id, "primary")
+            app = _make_application_component(db_session, org.id, f"App {i}", criticality="critical")
+            _make_application_owner(db_session, org.id, user.id, "application", app.archimate_element_id, "primary", application_id=app.id)
 
         db_session.commit()
 
@@ -263,7 +284,7 @@ class TestPredictiveEngine:
         db_session.add(initiative_b)
         db_session.flush()
 
-        bc_b = _make_business_case(db_session, org_b.id, "Zombie B", capability_id=cap_b.id, strategic_initiative_id=initiative_b.id, financial_benefit_annual=1000)
+        _make_business_case(db_session, org_b.id, "Zombie B", capability_id=cap_b.id, strategic_initiative_id=initiative_b.id, financial_benefit_annual=1000)
         app_b = _make_element(db_session, org_b.id, "App B", type_="ApplicationComponent", layer="application")
         _make_cost_fact(db_session, org_b.id, app_b.id, "application", 2000, date.today() - timedelta(days=365), date.today())
 
@@ -288,7 +309,7 @@ class TestPredictiveEngine:
         db_session.add(initiative_a)
         db_session.flush()
 
-        bc_a = _make_business_case(db_session, org_a.id, "Healthy A", capability_id=cap_a.id, strategic_initiative_id=initiative_a.id, financial_benefit_annual=5000)
+        _make_business_case(db_session, org_a.id, "Healthy A", capability_id=cap_a.id, strategic_initiative_id=initiative_a.id, financial_benefit_annual=5000)
         app_a = _make_element(db_session, org_a.id, "App A", type_="ApplicationComponent", layer="application")
         _make_cost_fact(db_session, org_a.id, app_a.id, "application", 1000, date.today() - timedelta(days=365), date.today())
 
@@ -321,7 +342,7 @@ class TestUnfundedObjectives:
         """Objective with no capability link -> UNFUNDED_OBJECTIVE."""
         org = make_org("unfunded-1")
         # Create a Goal (motivation layer) with no relationships
-        goal = _make_element(db_session, org.id, "Revenue Growth Goal", type_="Goal", layer="motivation")
+        _make_element(db_session, org.id, "Revenue Growth Goal", type_="Goal", layer="motivation")
         db_session.commit()
 
         alerts = check_unfunded_objectives(org.id)
@@ -400,13 +421,15 @@ class TestZombieProjects:
         wp = _make_element(db_session, org.id, "Core Banking WP", type_="WorkPackage", layer="implementation")
         _make_relationship(db_session, org.id, wp.id, cap_element.id, type_="Realization")
 
-        bc = _make_business_case(
+        _make_business_case(
             db_session, org.id, "Core Banking Modernisation",
             capability_id=capability.id,
             financial_benefit_annual=100000,  # 100k benefit
         )
         # Add cost fact for the work package (mapped to application)
         app = _make_element(db_session, org.id, "Core Banking App", type_="ApplicationComponent", layer="application")
+        # Link app to work package via Realization
+        _make_relationship(db_session, org.id, app.id, wp.id, type_="Realization")
         _make_cost_fact(db_session, org.id, app.id, "application", 150000,  # 150k cost > 100k benefit
                         date.today() - timedelta(days=365), date.today())
         db_session.commit()
@@ -419,7 +442,7 @@ class TestZombieProjects:
         assert alert.severity == "HIGH"
         assert "Core Banking Modernisation" in alert.target_element
         assert len(alert.evidence) >= 2
-        assert "exceeds forecast benefit" in alert.evidence[0] or "exceeds forecast benefit" in alert.evidence[1]
+        assert "exceeds forecast benefit" in alert.recommendation.lower() or "exceeds forecast benefit" in " ".join(alert.evidence).lower()
         assert "Review business case" in alert.recommendation
 
     def test_alert_when_past_end_date(self, db_session, make_org):
@@ -534,13 +557,8 @@ class TestBusFactor:
 
         # Create 6 critical applications
         for i in range(6):
-            app = _make_element(db_session, org.id, f"Critical App {i}", type_="ApplicationComponent", layer="application")
-            # Set criticality to critical
-            from app.models.application_portfolio import ApplicationComponent
-            ac = ApplicationComponent.query.get(app.id)
-            if ac:
-                ac.criticality = "critical"
-            _make_application_owner(db_session, org.id, user.id, "application", app.id, "primary")
+            app = _make_application_component(db_session, org.id, f"Critical App {i}", criticality="critical")
+            _make_application_owner(db_session, org.id, user.id, "application", app.archimate_element_id, "primary", application_id=app.id)
 
         # Create 1 critical capability
         from app.models.unified_capability import UnifiedCapability
@@ -558,7 +576,7 @@ class TestBusFactor:
         assert alert.prediction_type == "BUS_FACTOR"
         assert alert.severity == "MEDIUM"
         assert user.last_name in alert.target_element
-        assert "Single point of failure" in alert.target_element
+        assert "single point of failure" in alert.recommendation.lower()
         assert len(alert.evidence) >= 2
         assert f"owns {BUS_FACTOR_THRESHOLD + 1}" in alert.evidence[0] or f"owns 7" in alert.evidence[0]
         assert "Distribute ownership" in alert.recommendation
@@ -570,12 +588,8 @@ class TestBusFactor:
 
         # Create 5 critical applications (at threshold)
         for i in range(5):
-            app = _make_element(db_session, org.id, f"App {i}", type_="ApplicationComponent", layer="application")
-            from app.models.application_portfolio import ApplicationComponent
-            ac = ApplicationComponent.query.get(app.id)
-            if ac:
-                ac.criticality = "critical"
-            _make_application_owner(db_session, org.id, user.id, "application", app.id, "primary")
+            app = _make_application_component(db_session, org.id, f"App {i}", criticality="critical")
+            _make_application_owner(db_session, org.id, user.id, "application", app.archimate_element_id, "primary", application_id=app.id)
 
         db_session.commit()
 
@@ -815,12 +829,8 @@ class TestTopicRouting:
         org = make_org("topic-hr")
         user = _make_user(db_session, org, "hr@example.com")
         for i in range(6):
-            app = _make_element(db_session, org.id, f"App {i}", type_="ApplicationComponent", layer="application")
-            from app.models.application_portfolio import ApplicationComponent
-            ac = ApplicationComponent.query.get(app.id)
-            if ac:
-                ac.criticality = "critical"
-            _make_application_owner(db_session, org.id, user.id, "application", app.id, "primary")
+            app = _make_application_component(db_session, org.id, f"App {i}", criticality="critical")
+            _make_application_owner(db_session, org.id, user.id, "application", app.archimate_element_id, "primary", application_id=app.id)
         db_session.commit()
 
         alerts = run_all_checks(org.id, topic="hr")

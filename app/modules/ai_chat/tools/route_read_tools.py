@@ -294,6 +294,19 @@ def _get_canvas(args: dict) -> dict:
             "message": f"Unknown canvas_type: {canvas_type}"}}
 
 
+def _get_predictive_insights(args: dict) -> dict:
+    """``get_predictive_insights`` runs the Predictive Engine's five heuristic
+    checks and returns alerts with evidence. The organisation is the caller's,
+    taken from the token or session by the middleware; it is not an argument."""
+    from app.services.predictive_engine import get_predictive_insights as run_predictive
+
+    topic = args.get("topic")
+    try:
+        return run_predictive(topic=topic)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
+
 ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
     "ask_impact": _impact_answer,
     "ask_data_flow": _data_flow,
@@ -306,6 +319,7 @@ ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
     "get_element": _get_element,
     "list_canvases": _list_canvases,
     "get_canvas": _get_canvas,
+    "get_predictive_insights": _get_predictive_insights,
 }
 
 

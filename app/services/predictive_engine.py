@@ -13,15 +13,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.extensions import db
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-from app.models.archimate_element_types import is_application_kind, application_kind_types
+from app.models.archimate_element_types import application_kind_types
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
 from app.models.business_case import BusinessCase
 from app.models.cost_fact import CostFact, KIND_ACTUAL
-from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
-from app.models.process_data import DataEntity, DataDomain
-from app.modules.genome.slices.registry import get_slice
-from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
 
 # --------------------------------------------------------------------------- #
@@ -47,13 +43,6 @@ class PredictiveAlert:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
-
-def _org_id() -> int:
-    org = current_org_id()
-    if org is None:
-        raise RuntimeError("No organisation context")
-    return org
-
 
 def _severity_for(prediction_type: str, evidence_count: int, is_critical_element: bool) -> str:
     """Severity rule stated in code per brief."""
@@ -181,15 +170,6 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
     today = date.today()
 
     for bc in business_cases:
-        is_zombie = False
-        is_zombie = False
-        is_zombie = False
-        is_zombie = False
-        is_zombie = False
-        is_zombie = False
-        is_zombie = False
-        end_date = None
-        end_date = None
         # Get linked work packages through the capability or strategic initiative
         wp_ids: List[int] = []
 
@@ -280,10 +260,26 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
         evidence_lines = []
         reason = ""
 
+        # Get end date from linked entity (StrategicInitiative or Solution)
+        end_date = None
+        end_date_source = ""
+        if bc.strategic_initiative_id:
+            from app.models.strategic import StrategicInitiative
+            initiative = db.session.get(StrategicInitiative, bc.strategic_initiative_id)
+            if initiative and initiative.target_completion_date:
+                end_date = initiative.target_completion_date
+                end_date_source = f"StrategicInitiative '{initiative.name}'"
+        elif bc.solution_id:
+            from app.models.solution_models import Solution
+            solution = db.session.get(Solution, bc.solution_id)
+            if solution and solution.planned_end_date:
+                end_date = solution.planned_end_date
+                end_date_source = f"Solution '{solution.name}'"
+
         if bc.financial_benefit_annual is not None:
             benefit = float(bc.financial_benefit_annual)
             if total_actual_cost > benefit:
-
+                is_zombie = True
                 reason = f"Actual cost ({total_actual_cost:,.0f}) exceeds forecast benefit ({benefit:,.0f})"
                 evidence_lines.append(
                     f"BusinessCase '{bc.title or bc.id}' linked work packages actual cost: {total_actual_cost:,.0f} "
@@ -291,7 +287,10 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
                 )
                 evidence_lines.append(
                     f"BusinessCase forecast benefit: {benefit:,.0f} [BusinessCase, as of {bc.updated_at.date().isoformat() if bc.updated_at else 'unknown'}]"
-                )            
+                )
+
+        if end_date and (today - end_date).days > 180:
+            is_zombie = True
             reason = f"End date {end_date.isoformat()} is more than 6 months past"
             evidence_lines.append(
                 f"BusinessCase '{bc.title or bc.id}' linked {end_date_source} target end date: {end_date.isoformat()} "
@@ -355,7 +354,7 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
 
         # Get owners via ApplicationOwner
         if elem_type == "ApplicationComponent":
-            owners = db.session.query(ApplicationOwner).filter_by(element_id=elem_id, element_type='application', organization_id=org_id).all()
+            owners = db.session.query(ApplicationOwner).filter_by(application_id=elem_id, organization_id=org_id).all()
         else:
             owners = db.session.query(ApplicationOwner).filter_by(element_id=elem_id, element_type='capability', organization_id=org_id).all()
 
@@ -394,6 +393,7 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
                 recommendation=f"Distribute ownership of critical elements away from '{data['name']}' to reduce single point of failure."
             ))
 
+    return alerts
 
 
 # --------------------------------------------------------------------------- #
@@ -589,8 +589,6 @@ def check_cost_to_serve(org_id: int) -> List[PredictiveAlert]:
                     wp_count += len(wp_rels)
 
                 # Check revenue measure (BusinessCase benefit linked to these apps)
-                revenue_flat = True  # Simplified - would need actual revenue tracking
-
                 # For now, assume flat if we can't measure revenue
                 # In reality, would check BusinessCase.financial_benefit_annual for linked cases
 
@@ -627,7 +625,9 @@ def run_all_checks(org_id: Optional[int] = None, topic: Optional[str] = None) ->
     - other: error
     """
     if org_id is None:
-        org_id = _org_id()
+        org_id = current_org_id()
+        if org_id is None:
+            raise RuntimeError("No organisation context")
 
     all_alerts: List[PredictiveAlert] = []
 
@@ -661,10 +661,10 @@ def run_all_checks(org_id: Optional[int] = None, topic: Optional[str] = None) ->
 
 def get_predictive_insights(topic: Optional[str] = None) -> Dict[str, Any]:
     """MCP tool entry point — returns alerts wrapped in answer envelope shape."""
-    from app.modules.intelligence.services.answer_envelope import build_envelope
-    from app.modules.intelligence.services.reason_codes import validate_reason_code
 
-    org_id = _org_id()
+    org_id = current_org_id()
+    if org_id is None:
+        raise RuntimeError("No organisation context")
     alerts = run_all_checks(org_id, topic)
 
     # Convert alerts to answer envelope rows
