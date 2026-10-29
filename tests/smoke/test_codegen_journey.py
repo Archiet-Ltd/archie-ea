@@ -141,10 +141,14 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         page.wait_for_timeout(300)
         alpine_state = page.evaluate(
             "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
+            "const h2 = [...document.querySelectorAll('h2')].find(h => h.textContent.includes('Phase 3')); "
+            "const rect = h2 ? h2.getBoundingClientRect() : null; "
+            "const wizardRoot = document.querySelector('[data-workbench=\"1\"] > div > div'); "
             "return {ideShowSetup: d.ideShowSetup, phase: d.phase, ideReady: d.ideReady, "
             "fileListLen: (d.fileList||[]).length, "
-            "hasPhase3Text: document.body.innerHTML.includes('Phase 3: Configure'), "
-            "wbRootCount: document.querySelectorAll('[data-workbench=\"1\"]').length}; }"
+            "h2Found: !!h2, h2Rect: rect ? {w: rect.width, h: rect.height, top: rect.top} : null, "
+            "h2Visible: h2 ? (h2.offsetParent !== null) : null, "
+            "wbChildCount: document.querySelector('[data-workbench=\"1\"]').children.length}; }"
         )
         print('ALPINE STATE AFTER SETUP CLICK:', alpine_state)
 
