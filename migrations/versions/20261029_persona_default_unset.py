@@ -10,7 +10,7 @@ nothing. The down step does nothing: the old value cannot be told apart from a
 deliberate choice afterwards, and restoring it would widen access.
 
 Revision ID: 20261029_persona_default_unset
-Revises: 20261027_admin_every_org
+Revises: 20261029_llm_spend_ledger
 Create Date: 2026-10-29
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261029_persona_default_unset"
-down_revision = "20261027_admin_every_org"
+down_revision = "20261029_llm_spend_ledger"
 branch_labels = None
 depends_on = None
 
