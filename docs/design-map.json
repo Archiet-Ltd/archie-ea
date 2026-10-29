@@ -37,6 +37,7 @@
     "components/alert.html",
     "components/answer_cascade.html",
     "components/app_stats_grid.html",
+    "components/arb_submission_modal.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
@@ -52,6 +53,7 @@
     "components/filter_bar.html",
     "components/gantt_timeline.html",
     "components/inline_hint.html",
+    "components/llm_recommendations.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -60,6 +62,9 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/risk_detail_modal.html",
+    "components/roi_calculator_modal.html",
+    "components/scenario_comparison_modal.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
@@ -192,12 +197,15 @@
     "components/empty_state.html",
     "components/error_boundary.html",
     "components/form_field.html",
+    "components/impact_scenario_comparison_modal.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/llm_recommendations.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/priority_actions.html",
     "components/progress.html",
     "components/provenance.html",
     "components/select.html",
@@ -43108,8 +43116,7 @@
   },
   "app/templates/strategic/capability_health.html": {
    "extra_macros": [
-    "components/initiative_modal.html",
-    "components/llm_recommendations.html"
+    "components/initiative_modal.html"
    ],
    "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
@@ -43383,10 +43390,7 @@
   },
   "app/templates/strategic/impact_analysis.html": {
    "extra_macros": [
-    "components/impact_scenario_comparison_modal.html",
-    "components/initiative_modal.html",
-    "components/llm_recommendations.html",
-    "components/priority_actions.html"
+    "components/initiative_modal.html"
    ],
    "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
@@ -43576,11 +43580,7 @@
   },
   "app/templates/strategic/investment_matrix.html": {
    "extra_macros": [
-    "components/arb_submission_modal.html",
-    "components/initiative_modal.html",
-    "components/llm_recommendations.html",
-    "components/roi_calculator_modal.html",
-    "components/scenario_comparison_modal.html"
+    "components/initiative_modal.html"
    ],
    "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [
@@ -43862,9 +43862,7 @@
   },
   "app/templates/strategic/risk_assessment.html": {
    "extra_macros": [
-    "components/initiative_modal.html",
-    "components/llm_recommendations.html",
-    "components/risk_detail_modal.html"
+    "components/initiative_modal.html"
    ],
    "note": "Design lead, 29 Oct 2026: the plan dialog (initiative_modal) is built on library parts and proven by a journey. The page's other dialogs and panels are its own, already on the page; they are allowed on this page only, and converting them to library parts is brief T-strategic-dialogs-01.",
    "allowed_macros": [

@@ -1,6 +1,8 @@
 {% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 {% macro scenario_comparison_modal(capability_scores) %}
-<!-- Scenario Comparison Modal — uses shared modal.html component -->
+<!-- Scenario Comparison Modal — uses shared modal.html component and the library's
+     native-select, button and table parts. -->
 {# tojson emits JSON with double-quotes; embedding it directly in a
    double-quoted x-data="..." attribute truncates the attribute at the first
    inner quote (breaking the whole component). Hoist it to a script variable and
@@ -15,7 +17,7 @@
         estimated_cost: c.estimated_cost != null ? c.estimated_cost : (need.estimated_cost || 0)
     });
 });</script>
-<div
+<div class="style-vega"
     x-data="{
         capabilities: (window.__SCENARIO_CAPS || []),
         selectedCapabilities: [],
@@ -222,7 +224,7 @@
         </div>
     </div>
 
-    <div class="space-y-6">
+    <div class="space-y-6" data-testid="scenario-comparison-content">
         <!-- Scenario Selection -->
         <div class="bg-muted/50 rounded-lg p-4">
             <h4 class="text-sm font-semibold mb-3">Select Capabilities to Compare</h4>
@@ -231,110 +233,98 @@
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-2" x-text="`Scenario ${index + 1}`"></label>
                         <div class="flex gap-2">
-                            <select
-                                x-model="selectedIds[index]"
-                                @change="addScenario(index)"
-                                class="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
-                             aria-label="Select capability...">
-                                <option value="">Select capability...</option>
-                                <template x-for="cap in capabilities" :key="cap.id">
-                                    <option :value="cap.id" x-text="cap.name"></option>
-                                </template>
-                            </select>
-                            <button type="button"
-                                @click="removeScenario(index)"
-                                :disabled="!selectedIds[index]"
-                                class="p-2 text-muted-foreground hover:text-destructive-emphasis disabled:opacity-30 disabled:cursor-not-allowed"
-                             aria-label="Remove">
+                            {% call ui.native_select_wrapper(class='relative flex-1') %}
+                                {% call ui.native_select(class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'selectedIds[index]', '@change': 'addScenario(index)', 'aria-label': 'Select capability', 'data-testid': 'scenario-capability-select'}) %}
+                                    {{ ui.native_select_option(text='Select capability...', value='') }}
+                                    <template x-for="cap in capabilities" :key="cap.id">
+                                        <option :value="cap.id" x-text="cap.name"></option>
+                                    </template>
+                                {% endcall %}
+                                {{ ui.native_select_icon(class='pointer-events-none absolute') }}
+                            {% endcall %}
+                            {% call ui.button(type='button', variant='ghost', size='icon', class='text-muted-foreground hover:text-destructive-emphasis', attrs={'@click': 'removeScenario(index)', ':disabled': '!selectedIds[index]', 'aria-label': 'Remove scenario'}) %}
                                 <i data-lucide="trash-2" class="h-4 w-4"></i>
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </template>
             </div>
             <div class="mt-3 flex justify-end">
-                <button type="button" @click="clearAll()" class="text-sm text-muted-foreground hover:text-foreground">
-                    Clear All
-                </button>
+                {{ ui.button(text='Clear All', type='button', variant='ghost', class='text-sm text-muted-foreground hover:text-foreground', attrs={'@click': 'clearAll()'}) }}
             </div>
         </div>
 
         <!-- Comparison Table -->
-        <div class="overflow-x-auto" x-show="scenarios.filter(s => s).length > 0" x-cloak>
-            <table class="dense-table w-full text-sm">
-                <thead class="bg-muted/50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase">Metric</th>
-                        <template x-for="(scenario, index) in scenarios" :key="index">
-                            <th
-                                class="px-4 py-3 text-center text-xs font-semibold uppercase"
-                                :class="getRecommendedIndex() === index ? 'bg-warning/10 border-2 border-warning/50' : ''"
-                                x-show="scenario" x-cloak
-                            >
-                                <div class="flex items-center justify-center gap-2">
-                                    <span x-text="`Scenario ${index + 1}`"></span>
-                                    <span
-                                        x-show="getRecommendedIndex() === index" x-cloak
-                                        class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30"
-                                    >
-                                        Recommended
-                                    </span>
-                                </div>
-                            </th>
-                        </template>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    <tr>
-                        <td class="px-4 py-3 font-medium">Capability</td>
+        <div x-show="scenarios.filter(s => s).length > 0" x-cloak>
+        {% call ui.table_container(class='overflow-x-auto') %}
+            {% call ui.table() %}
+                {% call ui.table_header() %}{% call ui.table_row() %}
+                    {{ ui.table_head(text='Metric') }}
+                    <template x-for="(scenario, index) in scenarios" :key="index">
+                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase"
+                            :class="getRecommendedIndex() === index ? 'bg-warning/10 border-2 border-warning/50' : ''"
+                            x-show="scenario" x-cloak>
+                            <div class="flex items-center justify-center gap-2">
+                                <span x-text="`Scenario ${index + 1}`"></span>
+                                <span x-show="getRecommendedIndex() === index" x-cloak
+                                      class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">
+                                    Recommended
+                                </span>
+                            </div>
+                        </th>
+                    </template>
+                {% endcall %}{% endcall %}
+                {% call ui.table_body() %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Capability', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`name-${index}`">
                             <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="scenario?.name || 'N/A'"></td>
                         </template>
-                    </tr>
-                    <tr class="bg-muted/30">
-                        <td class="px-4 py-3 font-medium">Initial Investment</td>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted/30') %}
+                        {{ ui.table_cell(text='Initial Investment', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`investment-${index}`">
                             <td class="px-4 py-3 text-center font-semibold" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="formatCurrency(scenario?.investment || 0)"></td>
                         </template>
-                    </tr>
-                    <tr>
-                        <td class="px-4 py-3 font-medium">Annual Benefit</td>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Annual Benefit', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`benefit-${index}`">
                             <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="formatCurrency(scenario?.annualBenefit || 0)"></td>
                         </template>
-                    </tr>
-                    <tr class="bg-muted/30">
-                        <td class="px-4 py-3 font-medium">ROI %</td>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted/30') %}
+                        {{ ui.table_cell(text='ROI %', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`roi-${index}`">
                             <td class="px-4 py-3 text-center font-bold" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.roi >= 20 ? 'text-success' : scenario?.roi >= 0 ? 'text-warning-emphasis' : 'text-destructive']" x-show="scenario" x-cloak x-text="formatPercentage(scenario?.roi || 0)"></td>
                         </template>
-                    </tr>
-                    <tr>
-                        <td class="px-4 py-3 font-medium">Payback Period</td>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Payback Period', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`payback-${index}`">
                             <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="formatDuration(scenario?.paybackPeriod)"></td>
                         </template>
-                    </tr>
-                    <tr class="bg-muted/30">
-                        <td class="px-4 py-3 font-medium">Net Present Value</td>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted/30') %}
+                        {{ ui.table_cell(text='Net Present Value', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`npv-${index}`">
                             <td class="px-4 py-3 text-center font-semibold" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.npv >= 0 ? 'text-success' : 'text-destructive']" x-show="scenario" x-cloak x-text="formatCurrency(scenario?.npv || 0)"></td>
                         </template>
-                    </tr>
-                    <tr>
-                        <td class="px-4 py-3 font-medium">Strategic Score</td>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Strategic Score', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`strategic-${index}`">
                             <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="`${scenario?.strategic_score || 0} / 25`"></td>
                         </template>
-                    </tr>
-                    <tr class="bg-muted/30">
-                        <td class="px-4 py-3 font-medium">Risk Score</td>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted/30') %}
+                        {{ ui.table_cell(text='Risk Score', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`risk-${index}`">
                             <td class="px-4 py-3 text-center" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.risk_score <= 10 ? 'text-success-emphasis' : scenario?.risk_score <= 15 ? 'text-warning-emphasis' : 'text-destructive-emphasis']" x-show="scenario" x-cloak x-text="`${scenario?.risk_score || 0} / 25`"></td>
                         </template>
-                    </tr>
-                    <tr>
-                        <td class="px-4 py-3 font-medium">Priority Level</td>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Priority Level', class='font-medium') }}
                         <template x-for="(scenario, index) in scenarios" :key="`priority-${index}`">
                             <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak>
                                 <span
@@ -349,9 +339,10 @@
                                 ></span>
                             </td>
                         </template>
-                    </tr>
-                </tbody>
-            </table>
+                    {% endcall %}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
         </div>
 
         <!-- Visualizations -->
@@ -389,20 +380,11 @@
             </span>
         </div>
         <div class="flex items-center gap-3">
-            <button type="button"
-                @click="exportComparison()"
-                :disabled="scenarios.filter(s => s).length === 0"
-                class="inline-flex items-center gap-2 px-4 py-2 border border-input text-foreground font-medium rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-             aria-label="Export">
+            {% call ui.button(type='button', variant='outline', class='border border-input text-foreground hover:bg-accent', attrs={'@click': 'exportComparison()', ':disabled': 'scenarios.filter(s => s).length === 0', 'aria-label': 'Export comparison to CSV', 'data-testid': 'scenario-export'}) %}
                 <i data-lucide="download" class="h-4 w-4"></i>
                 Export CSV
-            </button>
-            <button type="button"
-                @click="Platform.modal.close('scenario-comparison')"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-             aria-label="Close">
-                Close
-            </button>
+            {% endcall %}
+            {{ ui.button(text='Close', type='button', variant='ghost', class='text-muted-foreground hover:bg-accent hover:text-foreground', attrs={'@click': "Platform.modal.close('scenario-comparison')", 'aria-label': 'Close'}) }}
         </div>
     </div>
 {% endcall %}

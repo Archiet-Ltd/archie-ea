@@ -1,16 +1,19 @@
 {# The one prioritised action list, shared by every screen that answers "what should be done first".
-   Expects `priority_actions` from app.services.priority_action_service.prioritised_actions(). #}
-{% from 'components/badge.html' import badge %}
+   Expects `priority_actions` from app.services.priority_action_service.prioritised_actions().
+   Built on the library's card and badge parts (basecoat/index.html). #}
+{% import 'basecoat/index.html' as ui %}
 {% set pa = priority_actions %}
 {% set vf = flask.current_app.view_functions %}
-<section id="priority-actions" class="rounded-lg border bg-card" data-testid="priority-actions" aria-labelledby="priority-actions-title">
-    <div class="border-b p-4">
-        <h2 id="priority-actions-title" class="text-lg font-semibold flex items-center gap-2">
+<div class="style-vega" data-testid="priority-actions">
+{% call ui.card(id='priority-actions', attrs={'aria-labelledby': 'priority-actions-title'}) %}
+    {% call ui.card_header() %}
+        {% call ui.card_title(id='priority-actions-title', class='flex items-center gap-2') %}
             <i data-lucide="list-ordered" class="h-5 w-5 text-primary" aria-hidden="true"></i>
             Prioritised actions
-        </h2>
-        <p class="text-sm text-muted-foreground mt-1" data-testid="priority-actions-rule">{{ pa.rule }}</p>
-    </div>
+        {% endcall %}
+        {{ ui.card_description(text=pa.rule, attrs={'data-testid': 'priority-actions-rule'}) }}
+    {% endcall %}
+    {% call ui.card_content(class='p-0') %}
     {% if pa.rows %}
     <ol class="divide-y divide-border/50" data-testid="priority-actions-list">
         {% for row in pa.rows %}
@@ -33,11 +36,11 @@
                 <p class="text-sm text-muted-foreground mt-0.5">{{ row.why }}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-                {% call badge('neutral') %}{{ row.kind_label }}{% endcall %}
+                {{ ui.badge(text=row.kind_label, variant='secondary') }}
                 {% if row.severity in ('Critical', 'High') %}
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-warning/10 text-warning-emphasis border-warning/30">{{ row.severity }}</span>
+                {{ ui.badge(text=row.severity, variant='outline', class='border-warning/30 bg-warning/10 text-warning-emphasis') }}
                 {% else %}
-                {% call badge('secondary') %}{{ row.severity or '—' }}{% endcall %}
+                {{ ui.badge(text=(row.severity or '—'), variant='outline') }}
                 {% endif %}
             </div>
         </li>
@@ -53,4 +56,6 @@
     {% else %}
     <p class="p-4 text-sm text-muted-foreground" data-testid="priority-actions-empty">Nothing needs doing right now: no open gaps, late or blocked work packages, or open risks.</p>
     {% endif %}
-</section>
+    {% endcall %}
+{% endcall %}
+</div>

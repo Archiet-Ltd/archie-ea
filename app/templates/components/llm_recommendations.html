@@ -7,6 +7,9 @@
    - Feedback notes and implementation tracking
    - LLM metadata (model used, provider)
 
+   Built on the library's card, button and the shared modal shell
+   (components/modal.html) for the rating dialog.
+
    Usage:
    {% from 'components/llm_recommendations.html' import llm_recommendations with context %}
 
@@ -15,6 +18,8 @@
        context_data={...}  # Dashboard-specific context
    ) }}
 #}
+{% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 
 {% macro llm_recommendations(dashboard='', context_data={}) %}
 <script>
@@ -77,8 +82,7 @@ function llmRecommendationsComponent(dashboard) {
                     }
 
                     this.showToast('Success', 'Rating submitted successfully', 'success');
-                    this.ratingRecommendation = null;
-                    this.resetRatingForm();
+                    this.closeRatingModal();
                 } else {
                     this.showToast('Error', data.error || 'Failed to submit rating', 'error');
                 }
@@ -94,6 +98,13 @@ function llmRecommendationsComponent(dashboard) {
                 feedback_notes: rec.feedback_notes || '',
                 was_implemented: rec.was_implemented || false
             };
+            Platform.modal.open('llm-recommendation-rating');
+        },
+
+        closeRatingModal() {
+            Platform.modal.close('llm-recommendation-rating');
+            this.ratingRecommendation = null;
+            this.resetRatingForm();
         },
 
         resetRatingForm() {
@@ -135,11 +146,10 @@ function llmRecommendationsComponent(dashboard) {
     };
 }
 </script>
-<div x-data='llmRecommendationsComponent({{ dashboard | tojson }})'>
+<div class="style-vega" x-data='llmRecommendationsComponent({{ dashboard | tojson }})' data-testid="llm-recommendations">
 
-    <!-- Generate Button -->
-    <div data-block="recommendations" class="rounded-lg border border-border bg-card text-card-foreground">
-        <div class="p-6">
+    {% call ui.card(attrs={'data-block': 'recommendations'}) %}
+    {% call ui.card_content(class='p-6') %}
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h3 class="text-lg font-semibold">AI-Powered Recommendations</h3>
@@ -147,37 +157,34 @@ function llmRecommendationsComponent(dashboard) {
                         Generate context-aware strategic recommendations using your configured LLM provider
                     </p>
                 </div>
-                <button type="button" 
-                    @click="generateRecommendations()"
-                    :disabled="loading"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Generate recommendations">
+                {% call ui.button(type='button', class='bg-primary px-4 text-primary-foreground hover:bg-primary/90', attrs={'@click': 'generateRecommendations()', ':disabled': 'loading', 'aria-label': 'Generate recommendations', 'data-testid': 'llm-generate'}) %}
                     <i data-lucide="sparkles" class="h-4 w-4" :class="{ 'animate-spin': loading }"></i>
                     <span x-text="loading ? 'Generating...' : 'Generate Recommendations'"></span>
-                </button>
+                {% endcall %}
             </div>
-            
+
             <!-- Error Message -->
-            <div x-show="error" x-cloak 
+            <div x-show="error" x-cloak
                  class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis"
                  x-transition>
                 <strong>Error:</strong> <span x-text="error"></span>
             </div>
-            
+
             <!-- Recommendations List -->
-            <div x-show="recommendations.length > 0" x-cloak 
+            <div x-show="recommendations.length > 0" x-cloak
                  class="space-y-4 mt-6"
                  x-transition>
-                
+
                 <template x-for="rec in recommendations" :key="rec.id">
-                    <div :class="getPriorityColor(rec.priority)" 
-                         class="p-5 rounded-lg border-l-4 transition-shadow">
-                        
+                    <div :class="getPriorityColor(rec.priority)"
+                         class="p-5 rounded-lg border-l-4 transition-shadow" data-testid="llm-recommendation-card">
+
                         <!-- Header -->
                         <div class="flex items-start justify-between mb-3">
                             <div class="flex-1">
                                 <h4 class="text-lg font-semibold text-foreground" x-text="rec.title"></h4>
                                 <div class="flex items-center gap-2 mt-1">
-                                    <span :class="getPriorityBadgeColor(rec.priority)" 
+                                    <span :class="getPriorityBadgeColor(rec.priority)"
                                           class="text-xs px-2 py-1 rounded"
                                           x-text="rec.priority"></span>
                                     <span class="text-xs text-muted-foreground">
@@ -186,37 +193,33 @@ function llmRecommendationsComponent(dashboard) {
                                     <span class="text-xs text-muted-foreground" x-text="`${rec.provider_used} / ${rec.model_used}`"></span>
                                 </div>
                             </div>
-                            
+
                             <!-- Rating Display or Button -->
                             <div class="ml-4">
                                 <template x-if="rec.user_rating">
                                     <div class="flex items-center gap-1">
                                         <template x-for="star in 5" :key="star">
-                                            <i data-lucide="star" 
+                                            <i data-lucide="star"
                                                class="h-4 w-4"
                                                :class="star <= rec.user_rating ? 'fill-yellow-400 text-warning-emphasis/80' : 'text-muted-foreground/50'"></i>
                                         </template>
                                     </div>
                                 </template>
                                 <template x-if="!rec.user_rating">
-                                    <button type="button" 
-                                        @click="openRatingModal(rec)"
-                                        class="text-sm text-primary hover:text-primary font-medium" aria-label="Rate this recommendation">
-                                        Rate this
-                                    </button>
+                                    {% call ui.button(type='button', variant='ghost', class='h-auto p-0 text-primary hover:text-primary', attrs={'@click': 'openRatingModal(rec)', 'aria-label': 'Rate this recommendation', 'data-testid': 'llm-rate-open'}) %}Rate this{% endcall %}
                                 </template>
                             </div>
                         </div>
-                        
+
                         <!-- Description -->
                         <p class="text-foreground/80 mb-3" x-text="rec.description"></p>
-                        
+
                         <!-- Rationale -->
                         <div class="bg-background/50 p-3 rounded border border-border mb-3">
                             <strong class="text-sm text-muted-foreground">Rationale:</strong>
                             <p class="text-sm text-foreground/80 mt-1" x-text="rec.rationale"></p>
                         </div>
-                        
+
                         <!-- Footer Metadata -->
                         <div class="flex items-center gap-4 text-xs text-muted-foreground">
                             <span x-show="rec.estimated_effort_weeks" x-cloak>
@@ -237,75 +240,52 @@ function llmRecommendationsComponent(dashboard) {
                     </div>
                 </template>
             </div>
-        </div>
-    </div>
-    
-    <!-- Rating Modal -->
-    <div x-show="ratingRecommendation !== null" x-cloak
-         @keydown.escape.window="ratingRecommendation = null; resetRatingForm()"
-         role="dialog" aria-modal="true" aria-label="Rate Recommendation"
-         class="modal-root fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
-         @click="ratingRecommendation = null; resetRatingForm()">
-        
-        <div class="bg-background rounded-lg max-w-md w-full p-6 border border-border"
-             @click.stop>
-            
-            <h3 class="text-xl font-bold mb-4">Rate Recommendation</h3>
-            
-            <!-- Star Rating -->
-            <div class="mb-4">
+    {% endcall %}
+    {% endcall %}
+
+    <!-- Rating Modal — the shared modal shell -->
+    {% call modal(id='llm-recommendation-rating', title='Rate Recommendation', size='sm') %}
+        <div class="space-y-4">
+            <div>
                 <label class="block text-sm font-medium mb-2">Your Rating</label>
                 <div class="flex items-center gap-2">
                     <template x-for="star in 5" :key="star">
-                        <button @click="ratingData.rating = star"
-                                class="focus:outline-none" :aria-label="'Rate ' + star + ' star' + (star > 1 ? 's' : '')"
-                                type="button">
-                            <i data-lucide="star" 
+                        {% call ui.button(type='button', variant='ghost', size='icon', class='h-auto w-auto p-0', attrs={'@click': 'ratingData.rating = star', ':aria-label': "'Rate ' + star + ' of 5'"}) %}
+                            <i data-lucide="star"
                                class="h-8 w-8 cursor-pointer transition-colors"
                                :class="star <= ratingData.rating ? 'fill-yellow-400 text-warning-emphasis/80' : 'text-muted-foreground/50 hover:text-warning-emphasis/50'"></i>
-                        </button>
+                        {% endcall %}
                     </template>
                     <span class="ml-2 text-sm text-muted-foreground" x-text="ratingData.rating + ' / 5'"></span>
                 </div>
             </div>
-            
-            <!-- Feedback Notes -->
-            <div class="mb-4">
-                <label class="block text-sm font-medium mb-2">Feedback (Optional)</label>
-                <textarea 
+
+            <div>
+                <label class="block text-sm font-medium mb-2" for="llm-rating-feedback">Feedback (Optional)</label>
+                <textarea
+                    id="llm-rating-feedback"
                     x-model="ratingData.feedback_notes"
                     rows="3"
-                    class="w-full px-3 py-2 border border-border rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
-                    placeholder="Share your thoughts on this recommendation..." aria-label="Feedback (Optional)"></textarea>
+                    class="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Share your thoughts on this recommendation..."></textarea>
             </div>
-            
-            <!-- Implementation Status -->
-            <div class="mb-6">
+
+            <div>
                 <label class="flex items-center gap-2 cursor-pointer">
-                    <input 
+                    <input
                         type="checkbox"
                         x-model="ratingData.was_implemented"
-                        class="w-4 h-4 text-primary border-border rounded focus:ring-ring" aria-label="Checkbox field">
+                        class="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-ring" aria-label="I implemented this recommendation">
                     <span class="text-sm font-medium">I implemented this recommendation</span>
                 </label>
             </div>
-            
-            <!-- Actions -->
-            <div class="flex items-center gap-3">
-                <button type="button" 
-                    @click="rateRecommendation(ratingRecommendation.id)"
-                    class="flex-1 px-4 py-2 bg-primary hover:bg-primary text-primary-foreground font-medium rounded-lg transition-colors" aria-label="Submit rating">
-                    Submit Rating
-                </button>
-                <button type="button" 
-                    @click="ratingRecommendation = null; resetRatingForm()"
-                    class="px-4 py-2 border border-border hover:bg-muted text-foreground/80 font-medium rounded-lg transition-colors" aria-label="Cancel rating">
-                    Cancel
-                </button>
+
+            <div class="flex items-center gap-3 pt-2">
+                {% call ui.button(type='button', class='flex-1 bg-primary px-2.5 text-primary-foreground hover:bg-primary/90', attrs={'@click': 'rateRecommendation(ratingRecommendation.id)', 'aria-label': 'Submit rating', 'data-testid': 'llm-rate-submit'}) %}Submit Rating{% endcall %}
+                {{ ui.button(text='Cancel', type='button', variant='outline', class='border border-input bg-background px-2.5 text-foreground hover:bg-accent', attrs={'@click': 'closeRatingModal()', 'aria-label': 'Cancel rating'}) }}
             </div>
         </div>
-    </div>
-
+    {% endcall %}
 </div>
 
 <!-- Lucide Icons Refresh -->

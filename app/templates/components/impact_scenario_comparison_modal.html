@@ -1,22 +1,24 @@
+{% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 {% macro impact_scenario_comparison_modal() %}
-<!-- Impact Analysis Scenario Comparison Modal -->
-<div 
+<!-- Impact Analysis Scenario Comparison Modal — uses the shared modal.html shell
+     and the library's table and button parts. -->
+<div class="style-vega"
     x-data="{
-        open: false,
         scenarios: [],
         selectedScenarios: [],
         loading: false,
-        
+
         openScenarioModal() {
             this.loadScenarios();
             Platform.modal.open('impact-scenario-comparison-modal');
         },
-        
+
         closeScenarioModal() {
             Platform.modal.close('impact-scenario-comparison-modal');
             this.selectedScenarios = [];
         },
-        
+
         loadScenarios() {
             // Load scenarios from localStorage
             const saved = localStorage.getItem('impactAnalysisScenarios');
@@ -26,34 +28,34 @@
                 this.scenarios = [];
             }
         },
-        
+
         toggleScenario(scenarioId) {
             const index = this.selectedScenarios.indexOf(scenarioId);
             if (index > -1) {
                 this.selectedScenarios.splice(index, 1);
+            } else {
+                if (this.selectedScenarios.length < 3) {
+                    this.selectedScenarios.push(scenarioId);
                 } else {
-                    if (this.selectedScenarios.length < 3) {
-                        this.selectedScenarios.push(scenarioId);
-                    } else {
-                        Platform.toast('Maximum 3 scenarios for comparison', 'warning');
+                    Platform.toast.warning('Maximum 3 scenarios for comparison');
                 }
             }
         },
-        
+
         getScenario(scenarioId) {
             return this.scenarios.find(s => s.id === scenarioId);
         },
-        
+
         getComparisonData() {
             return this.selectedScenarios.map(id => this.getScenario(id)).filter(Boolean);
         },
-        
+
         exportToCSV() {
             const comparison = this.getComparisonData();
             if (comparison.length === 0) return;
-            
+
             let csv = 'Metric,' + comparison.map(s => s.name).join(',') + '\\n';
-            
+
             csv += 'Change Type,' + comparison.map(s => s.change_type).join(',') + '\\n';
             csv += 'Element,' + comparison.map(s => s.element.name).join(',') + '\\n';
             csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
@@ -61,7 +63,7 @@
             csv += 'Affected Processes,' + comparison.map(s => (s.analysis_result.impacted_processes?.length || 0)).join(',') + '\\n';
             csv += 'Financial Risk ($),' + comparison.map(s => (s.analysis_result.estimated_risk_cost || 0)).join(',') + '\\n';
             csv += 'Dependencies,' + comparison.map(s => (s.analysis_result.dependencies?.length || 0)).join(',') + '\\n';
-            
+
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -69,11 +71,11 @@
             a.download = 'impact-scenario-comparison-' + Date.now() + '.csv';
             a.click();
         },
-        
+
         getBestScenario() {
             const comparison = this.getComparisonData();
             if (comparison.length === 0) return null;
-            
+
             // Score: Lower financial risk + lower severity = better
             const scores = comparison.map(s => {
                 const severityScore = {
@@ -82,19 +84,19 @@
                     'HIGH': 3,
                     'CRITICAL': 4
                 }[s.analysis_result.severity] || 2;
-                
+
                 const financialScore = (s.analysis_result.estimated_risk_cost || 0) / 100000;
-                
+
                 return {
                     scenario: s,
                     score: severityScore + financialScore
                 };
             });
-            
+
             scores.sort((a, b) => a.score - b.score);
             return scores[0].scenario;
         },
-        
+
         getSeverityColor(severity) {
             const colors = {
                 'CRITICAL': 'bg-destructive/10 text-destructive border-destructive/20',
@@ -105,232 +107,161 @@
             return colors[severity] || 'bg-muted text-foreground/80 border-border';
         }
     }"
-    @open-impact-scenario-comparison.window="Platform.modal.open('impact-scenario-comparison-modal')"
-    @keydown.escape.window="Platform.modal.close('impact-scenario-comparison-modal')"
-    id="impact-scenario-comparison-modal"
-    data-modal-id="impact-scenario-comparison-modal"
-    class="relative z-50"
-    role="dialog" aria-modal="true"
-    x-cloak
-    :aria-hidden="!($store.modal && $store.modal['impact-scenario-comparison-modal'])">
-    <!-- Backdrop -->
-    <div 
-        x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']"
-        x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="modal-backdrop fixed inset-0 bg-overlay/50" aria-hidden="true"
-         @click="Platform.modal.close('impact-scenario-comparison-modal')"
-     ></div>
+    @open-impact-scenario-comparison.window="openScenarioModal()"
+>
+{% call modal(id='impact-scenario-comparison-modal', labelledby='impact-scenario-comparison-title', size='2xl') %}
+    <!-- Header (aria-labelledby → impact-scenario-comparison-title) -->
+    <div class="flex items-center gap-3 mb-6">
+        <div class="p-2 bg-accent rounded-lg">
+            <i data-lucide="git-compare" class="h-5 w-5 text-primary"></i>
+        </div>
+        <div>
+            <h3 id="impact-scenario-comparison-title" class="text-lg font-semibold text-foreground">Compare Impact Scenarios</h3>
+            <p class="text-sm text-muted-foreground">Side-by-side comparison of change impacts</p>
+        </div>
+    </div>
 
-    <!-- Modal -->
-    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="overflow-y-auto fixed inset-0" >
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div
-                x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']"
-                x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                @click.stop
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="impact-scenario-comparison-title"
-                class="relative w-full max-w-6xl bg-background rounded-lg max-h-[90vh] overflow-y-auto border border-border"
-            >
-                <!-- Header -->
-                <div class="sticky top-0 z-10 bg-background flex items-center justify-between px-6 py-4 border-b border-border">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-accent rounded-lg">
-                            <i data-lucide="git-compare" class="h-5 w-5 text-primary"></i>
-                        </div>
-                    <div>
-                            <h3 id="impact-scenario-comparison-title" class="text-lg font-semibold text-foreground">Compare Impact Scenarios</h3>
-                            <p class="text-sm text-muted-foreground">Side-by-side comparison of change impacts</p>
-                        </div>
-                    </div>
-                    <button
-                        @click="closeScenarioModal()"
-                        type="button"
-                        aria-label="Close scenario comparison dialog"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <div class="space-y-6" data-testid="impact-scenario-comparison-content">
+        <!-- Scenario Selection -->
+        <div>
+            <label class="block text-sm font-medium text-foreground/80 mb-3">
+                Select Scenarios to Compare (up to 3)
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <template x-for="scenario in scenarios" :key="scenario.id">
+                    <div
+                        @click="toggleScenario(scenario.id)"
+                        class="relative border-2 rounded-lg p-4 cursor-pointer transition-all"
+                        :class="selectedScenarios.includes(scenario.id) ?
+                               'border-primary bg-accent' :
+                               'border-border hover:border-border'"
+                        data-testid="impact-scenario-card"
                     >
-                        <i data-lucide="x" class="h-5 w-5 text-muted-foreground" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <!-- Content -->
-                <div class="p-6 space-y-6">
-                    <!-- Scenario Selection -->
-                    <div>
-                        <label class="block text-sm font-medium text-foreground/80 mb-3">
-                            Select Scenarios to Compare (up to 3)
-                        </label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            <template x-for="scenario in scenarios" :key="scenario.id">
-                                <div
-                                    @click="toggleScenario(scenario.id)"
-                                    class="relative border-2 rounded-lg p-4 cursor-pointer transition-all"
-                                    :class="selectedScenarios.includes(scenario.id) ? 
-                                           'border-primary bg-accent' : 
-                                           'border-border hover:border-border'"
-                                >
-                                    <div
-                                        x-show="selectedScenarios.includes(scenario.id)" x-cloak
-                                        class="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center"
-                                    >
-                                        <i data-lucide="check" class="h-4 w-4"></i>
-                                    </div>
-                                    <div class="font-medium text-foreground mb-1" x-text="scenario.name"></div>
-                                    <div class="text-sm text-muted-foreground mb-2" x-text="scenario.element.name"></div>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <span 
-                                            class="px-2 py-0.5 text-xs font-medium rounded border"
-                                            :class="getSeverityColor(scenario.analysis_result.severity)"
-                                            x-text="scenario.analysis_result.severity"
-                                        ></span>
-                                        <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_type"></span>
-                                    </div>
-                                </div>
-                            </template>
+                        <div
+                            x-show="selectedScenarios.includes(scenario.id)" x-cloak
+                            class="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center"
+                        >
+                            <i data-lucide="check" class="h-4 w-4"></i>
                         </div>
-                        
-                        <div x-show="scenarios.length === 0" x-cloak class="text-center py-12 text-muted-foreground">
-                            <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
-                            <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
-                            <p class="text-sm">Run an analysis and save it to compare scenarios</p>
+                        <div class="font-medium text-foreground mb-1" x-text="scenario.name"></div>
+                        <div class="text-sm text-muted-foreground mb-2" x-text="scenario.element.name"></div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span
+                                class="px-2 py-0.5 text-xs font-medium rounded border"
+                                :class="getSeverityColor(scenario.analysis_result.severity)"
+                                x-text="scenario.analysis_result.severity"
+                            ></span>
+                            <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_type"></span>
                         </div>
                     </div>
+                </template>
+            </div>
 
-                    <!-- Comparison Table -->
-                    <div x-show="selectedScenarios.length > 0" x-cloak class="border rounded-lg overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="dense-table w-full">
-                                <thead class="bg-muted">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80 w-48">Metric</th>
-                                        <template x-for="(scenarioId, index) in selectedScenarios" :key="scenarioId">
-                                            <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold" x-text="index + 1"></span>
-                                                    <span class="truncate" x-text="getScenario(scenarioId)?.name"></span>
-                                                </div>
-                                            </th>
-                                        </template>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-border">
-                                    <!-- Element -->
-                                    <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Element</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'elem-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm text-foreground/80" x-text="getScenario(scenarioId)?.element.name"></td>
-                                        </template>
-                                    </tr>
-                                    
-                                    <!-- Change Type -->
-                                    <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Change Type</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm">
-                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
-                                            </td>
-                                        </template>
-                                    </tr>
-                                    
-                                    <!-- Severity -->
-                                    <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Impact Severity</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'sev-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm">
-                                                <span 
-                                                    class="px-2 py-1 rounded text-xs font-medium border"
-                                                    :class="getSeverityColor(getScenario(scenarioId)?.analysis_result.severity)"
-                                                    x-text="getScenario(scenarioId)?.analysis_result.severity"
-                                                ></span>
-                                            </td>
-                                        </template>
-                                    </tr>
-                                    
-                                    <!-- Affected Capabilities -->
-                                    <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Affected Capabilities</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'cap-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_capabilities?.length || 0"></td>
-                                        </template>
-                                    </tr>
-                                    
-                                    <!-- Affected Processes -->
-                                    <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Affected Processes</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'proc-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_processes?.length || 0"></td>
-                                        </template>
-                                    </tr>
-                                    
-                                    <!-- Financial Risk -->
-                                    <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Financial Risk</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'cost-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-destructive">
-                                                <span x-text="'$' + ((getScenario(scenarioId)?.analysis_result.estimated_risk_cost || 0) / 1000).toFixed(0) + 'k'"></span>
-                                            </td>
-                                        </template>
-                                    </tr>
-                                    
-                                    <!-- Dependencies -->
-                                    <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Direct Dependencies</td>
-                                        <template x-for="scenarioId in selectedScenarios" :key="'dep-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="getScenario(scenarioId)?.analysis_result.dependencies?.length || 0"></td>
-                                        </template>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+            <div x-show="scenarios.length === 0" x-cloak class="text-center py-12 text-muted-foreground" data-testid="impact-scenario-empty">
+                <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
+                <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
+                <p class="text-sm">Run an analysis and save it to compare scenarios</p>
+            </div>
+        </div>
 
-                    <!-- Recommendation -->
-                    <div x-show="selectedScenarios.length > 1" x-cloak class="bg-success/5 border border-success/20 rounded-lg p-4">
-                        <div class="flex items-start gap-3">
-                            <div class="p-2 bg-success/10 rounded-lg">
-                                <i data-lucide="lightbulb" class="h-5 w-5 text-success"></i>
+        <!-- Comparison Table -->
+        <div x-show="selectedScenarios.length > 0" x-cloak>
+        {% call ui.table_container(class='border rounded-lg overflow-hidden') %}
+            {% call ui.table() %}
+                {% call ui.table_header() %}{% call ui.table_row() %}
+                    {{ ui.table_head(text='Metric', class='w-48') }}
+                    <template x-for="(scenarioId, index) in selectedScenarios" :key="scenarioId">
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80">
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold" x-text="index + 1"></span>
+                                <span class="truncate" x-text="getScenario(scenarioId)?.name"></span>
                             </div>
-                            <div>
-                                <h4 class="font-semibold text-success-emphasis mb-1">Recommended Scenario</h4>
-                                <p class="text-sm text-success-emphasis">
-                                    <span class="font-medium" x-text="getBestScenario()?.name"></span> 
-                                    has the lowest combined risk score based on severity and financial impact.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        </th>
+                    </template>
+                {% endcall %}{% endcall %}
+                {% call ui.table_body() %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Element', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'elem-' + scenarioId">
+                            <td class="px-4 py-3 text-sm text-foreground/80" x-text="getScenario(scenarioId)?.element.name"></td>
+                        </template>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted') %}
+                        {{ ui.table_cell(text='Change Type', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
+                            <td class="px-4 py-3 text-sm">
+                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
+                            </td>
+                        </template>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Impact Severity', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'sev-' + scenarioId">
+                            <td class="px-4 py-3 text-sm">
+                                <span
+                                    class="px-2 py-1 rounded text-xs font-medium border"
+                                    :class="getSeverityColor(getScenario(scenarioId)?.analysis_result.severity)"
+                                    x-text="getScenario(scenarioId)?.analysis_result.severity"
+                                ></span>
+                            </td>
+                        </template>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted') %}
+                        {{ ui.table_cell(text='Affected Capabilities', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'cap-' + scenarioId">
+                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_capabilities?.length || 0"></td>
+                        </template>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Affected Processes', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'proc-' + scenarioId">
+                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_processes?.length || 0"></td>
+                        </template>
+                    {% endcall %}
+                    {% call ui.table_row(class='bg-muted') %}
+                        {{ ui.table_cell(text='Financial Risk', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'cost-' + scenarioId">
+                            <td class="px-4 py-3 text-lg font-bold text-destructive">
+                                <span x-text="'$' + ((getScenario(scenarioId)?.analysis_result.estimated_risk_cost || 0) / 1000).toFixed(0) + 'k'"></span>
+                            </td>
+                        </template>
+                    {% endcall %}
+                    {% call ui.table_row() %}
+                        {{ ui.table_cell(text='Direct Dependencies', class='font-medium') }}
+                        <template x-for="scenarioId in selectedScenarios" :key="'dep-' + scenarioId">
+                            <td class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="getScenario(scenarioId)?.analysis_result.dependencies?.length || 0"></td>
+                        </template>
+                    {% endcall %}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
+        </div>
 
-                <!-- Footer -->
-                <div class="sticky bottom-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-                    <button type="button"
-                        @click="exportToCSV()"
-                        :disabled="selectedScenarios.length === 0"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                     aria-label="Export">
-                        <i data-lucide="download" class="h-4 w-4"></i>
-                        Export to CSV
-                    </button>
-                    <button type="button"
-                        @click="closeScenarioModal()"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                     aria-label="Close">
-                        Close
-                    </button>
+        <!-- Recommendation -->
+        <div x-show="selectedScenarios.length > 1" x-cloak class="bg-success/5 border border-success/20 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+                <div class="p-2 bg-success/10 rounded-lg">
+                    <i data-lucide="lightbulb" class="h-5 w-5 text-success"></i>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-success-emphasis mb-1">Recommended Scenario</h4>
+                    <p class="text-sm text-success-emphasis">
+                        <span class="font-medium" x-text="getBestScenario()?.name"></span>
+                        has the lowest combined risk score based on severity and financial impact.
+                    </p>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-border">
+        {% call ui.button(type='button', variant='outline', class='border border-input text-foreground hover:bg-accent', attrs={'@click': 'exportToCSV()', ':disabled': 'selectedScenarios.length === 0', 'aria-label': 'Export to CSV', 'data-testid': 'impact-scenario-export'}) %}
+            <i data-lucide="download" class="h-4 w-4"></i>
+            Export to CSV
+        {% endcall %}
+        {{ ui.button(text='Close', type='button', variant='ghost', class='text-muted-foreground hover:bg-accent hover:text-foreground', attrs={'@click': 'closeScenarioModal()', 'aria-label': 'Close'}) }}
+    </div>
+{% endcall %}
 </div>
 {% endmacro %}

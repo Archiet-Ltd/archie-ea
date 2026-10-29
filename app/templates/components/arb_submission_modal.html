@@ -1,7 +1,9 @@
 {% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 {% macro arb_submission_modal(capability={}) %}
-<!-- ARB Submission Modal — uses shared modal.html component -->
-<div x-data='{
+<!-- ARB Submission Modal — uses shared modal.html component and the library's
+     native-select and button parts. -->
+<div class="style-vega" x-data='{
     loading: false,
     capability: {{ capability | tojson }},
     formData: {
@@ -78,7 +80,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
         </div>
     </div>
 
-    <div class="space-y-6">
+    <div class="space-y-6" data-testid="arb-submission-content">
         <!-- Pre-populated Business Case Summary -->
         <div class="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
             <h4 class="font-medium text-sm flex items-center gap-2">
@@ -111,17 +113,17 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
 
         <!-- Additional Justification -->
         <div class="space-y-2">
-            <label class="text-sm font-medium flex items-center gap-2">
+            <label class="text-sm font-medium flex items-center gap-2" for="arb-justification">
                 <i data-lucide="align-left" class="h-4 w-4"></i>
                 Additional Justification
                 <span class="text-muted-foreground font-normal">(optional)</span>
             </label>
             <textarea
+                id="arb-justification"
                 x-model="formData.justification"
                 rows="4"
                 class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm resize-none focus:ring-2 focus:ring-primary"
-                placeholder="Add any additional context or justification for this ARB submission..."
-             aria-label="Additional Justification (optional)"></textarea>
+                placeholder="Add any additional context or justification for this ARB submission..."></textarea>
             <p class="text-xs text-muted-foreground">
                 This will be appended to the auto-generated business case.
             </p>
@@ -135,30 +137,30 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                     Override Priority
                     <span class="text-muted-foreground font-normal">(optional)</span>
                 </label>
-                <select
-                    x-model="formData.priority_override"
-                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm"
-                 aria-label="Override Priority (optional)">
-                    <option value="">Use capability priority</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
+                {% call ui.native_select_wrapper(class='relative w-full') %}
+                    {% call ui.native_select(class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'formData.priority_override', 'aria-label': 'Override Priority (optional)', 'data-testid': 'arb-priority-override'}) %}
+                        {{ ui.native_select_option(text='Use capability priority', value='') }}
+                        {{ ui.native_select_option(text='Critical', value='critical') }}
+                        {{ ui.native_select_option(text='High', value='high') }}
+                        {{ ui.native_select_option(text='Medium', value='medium') }}
+                        {{ ui.native_select_option(text='Low', value='low') }}
+                    {% endcall %}
+                    {{ ui.native_select_icon(class='pointer-events-none absolute') }}
+                {% endcall %}
             </div>
 
             <div class="space-y-2">
-                <label class="text-sm font-medium flex items-center gap-2">
+                <label class="text-sm font-medium flex items-center gap-2" for="arb-timeline">
                     <i data-lucide="calendar" class="h-4 w-4"></i>
                     Estimated Timeline
                     <span class="text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <input
+                    id="arb-timeline"
                     type="text"
                     x-model="formData.estimated_timeline"
                     class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm"
-                    placeholder="e.g., 12-18 months"
-                 aria-label="e.g., 12-18 months"/>
+                    placeholder="e.g., 12-18 months"/>
             </div>
         </div>
 
@@ -179,17 +181,8 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
 
     <!-- Footer -->
     <div class="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-border">
-        <button type="button"
-            @click="Platform.modal.close('arb-submission')"
-            :disabled="loading"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-         aria-label="Close">
-            Cancel
-        </button>
-        <button type="button"
-            @click="submitToARB()"
-            :disabled="loading"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        {{ ui.button(text='Cancel', type='button', variant='ghost', class='text-muted-foreground hover:bg-accent hover:text-foreground', attrs={'@click': "Platform.modal.close('arb-submission')", ':disabled': 'loading', 'aria-label': 'Close'}) }}
+        {% call ui.button(type='button', class='bg-primary px-4 text-primary-foreground hover:bg-primary/90', attrs={'@click': 'submitToARB()', ':disabled': 'loading', 'data-testid': 'arb-submit'}) %}
             <span x-show="!loading" x-cloak>
                 <i data-lucide="send" class="h-4 w-4 inline"></i>
                 Submit to ARB
@@ -201,7 +194,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 </svg>
                 Submitting...
             </span>
-        </button>
+        {% endcall %}
     </div>
 {% endcall %}
 </div>
