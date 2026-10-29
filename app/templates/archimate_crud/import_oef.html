@@ -177,7 +177,7 @@
 
                         <div class="flex flex-col gap-2 sm:flex-row">
                             {{ button(text='Preview import', variant='outline', icon='eye', attrs_dict={'@click': 'runPreview()', ':disabled': '!fileName || previewing'}, testid='btn-preview-import') }}
-                            {{ button(text='Import Model', icon='upload', testid='btn-import-model') }}
+                            {{ button(text='Import Model', icon='upload', type='submit', testid='btn-import-model') }}
                         </div>
                     </form>
 

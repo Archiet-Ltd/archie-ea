@@ -326,7 +326,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-gap-modal')") %}{% endcall %}
-              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
+              {% call button(text='Save', type='submit', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -369,7 +369,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-plateau-modal')") %}{% endcall %}
-              {% call button(text='Create Plateau', variant='default', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
+              {% call button(text='Create Plateau', type='submit', variant='default', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -456,7 +456,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-wp-modal')") %}{% endcall %}
-              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Work Package'"}) %}{% endcall %}
+              {% call button(text='Save', type='submit', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Work Package'"}) %}{% endcall %}
             </div>
           </form>
         </div>

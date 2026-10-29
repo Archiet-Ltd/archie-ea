@@ -45,6 +45,7 @@
         {% set enctype = '' %}
     {% endif %}
 
+    {# forms-submit-ok: opening half of a begin_form/end_form pair, the caller supplies the controls #}
     <form action="{{ action }}" method="{{ method }}" enctype="{{ enctype }}" class="space-y-6 {{ extra_classes }}">
     {{ form.hidden_tag() }}
 {% endmacro %}
