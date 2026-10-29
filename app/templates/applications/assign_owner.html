@@ -2,6 +2,7 @@
 {# design-block: form #}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/form_field.html' import form_group %}
+{% from 'components/input.html' import hidden_input %}
 {% import 'basecoat/index.html' as ui %}
 
 {% block title %}Assign Owner for {{ app.name }}{% endblock %}
@@ -22,7 +23,7 @@
         ]
     ) }}
     <form method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
         {% call ui.card() %}
             {% call ui.card_content(class='space-y-6') %}
                 {% call form_group(id='user_id', label='Owner', required=true, help_text='The person who becomes the primary owner of this application.') %}
