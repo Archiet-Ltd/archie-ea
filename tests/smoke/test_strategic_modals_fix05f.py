@@ -89,10 +89,11 @@ def test_strategic_page_no_errors_and_modal_behaviour(browser, live_server, link
     dialog.get_by_role("button", name="Cancel").click()
     expect(dialog).to_be_hidden()
 
-    # The recommendation rating dialog (opened from a generated recommendation).
+    # The recommendation rating dialog (opened from a generated recommendation),
+    # now the shared modal shell: Platform.modal.open/close, not a bespoke x-show.
     page.evaluate(
         "() => { const el = document.querySelector('[x-data^=\"llmRecommendationsComponent\"]');"
-        " Alpine.$data(el).ratingRecommendation = {id: 1}; }"
+        " Alpine.$data(el).openRatingModal({id: 1}); }"
     )
     rating = page.get_by_role("heading", name="Rate Recommendation")
     expect(rating).to_be_visible()
@@ -100,24 +101,23 @@ def test_strategic_page_no_errors_and_modal_behaviour(browser, live_server, link
     expect(rating).to_be_hidden()
     page.evaluate(
         "() => { const el = document.querySelector('[x-data^=\"llmRecommendationsComponent\"]');"
-        " Alpine.$data(el).ratingRecommendation = {id: 1}; }"
+        " Alpine.$data(el).openRatingModal({id: 1}); }"
     )
     expect(rating).to_be_visible()
     page.get_by_role("button", name="Cancel rating").click()
     expect(rating).to_be_hidden()
 
-    # The recommendation rating dialog (opened from a generated recommendation).
+    # Repeated to confirm the rating dialog re-opens cleanly after a close.
     page.evaluate(
         "() => { const el = document.querySelector('[x-data^=\"llmRecommendationsComponent\"]');"
-        " Alpine.$data(el).ratingRecommendation = {id: 1}; }"
+        " Alpine.$data(el).openRatingModal({id: 1}); }"
     )
-    rating = page.get_by_role("heading", name="Rate Recommendation")
     expect(rating).to_be_visible()
     page.keyboard.press("Escape")
     expect(rating).to_be_hidden()
     page.evaluate(
         "() => { const el = document.querySelector('[x-data^=\"llmRecommendationsComponent\"]');"
-        " Alpine.$data(el).ratingRecommendation = {id: 1}; }"
+        " Alpine.$data(el).openRatingModal({id: 1}); }"
     )
     expect(rating).to_be_visible()
     page.get_by_role("button", name="Cancel rating").click()
