@@ -1,139 +1,92 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Interface Register — {{ config.APP_NAME }}{% endblock %}
+{% block title %}Interface register{% endblock %}
+
+{#- A stored value as a person writes it: underscores become spaces, a lowercase word gets a capital. -#}
+{% macro _human(value, unset='Not recorded') -%}
+{%- if value is none or value|string|trim in ['', 'None', '?', 'TBD'] -%}<span class="text-muted-foreground">{{ unset }}</span>
+{%- else -%}{%- set text = value|string|replace('_', ' ')|trim -%}{{ (text[:1]|upper ~ text[1:]) if text == text|lower else text }}{%- endif -%}
+{%- endmacro %}
+
+{% macro _actions() %}
+<div class="flex flex-wrap items-center gap-2">
+  {% call ui.button(href=url_for('interface_register.comparison', initiative_id=initiative.id), variant='outline', attrs={'data-testid': 'interface-comparison-link'}) %}{{ lucide('arrow-left-right') }}As-is and to-be{% endcall %}
+  {% call ui.button(href=url_for('interface_register.new', initiative_id=initiative.id), attrs={'data-testid': 'interface-register-new'}) %}{{ lucide('plus') }}New interface{% endcall %}
+</div>
+{% endmacro %}
+
+{% macro _open_roadmap() %}{% call ui.button(href=url_for('strategic.technology_roadmap')) %}{{ lucide('map') }}Open the technology roadmap{% endcall %}{% endmacro %}
 
 {% block content %}
-<div class="flex-1 overflow-auto p-6">
-  {{ page_shell(
-      title='Interface Register',
-      subtitle=initiative.name if initiative else 'Pick an initiative to view its interface register.',
-      breadcrumb=[('Home', url_for('main.index')), ('Interface Register', None)]
-  ) }}
+<div class="p-6 space-y-6">
+{% if initiative is none %}
+{{ page_shell(title='Interface register', subtitle='Every interface between your systems, recorded for each technology roadmap initiative',
+              breadcrumb=[('Home', url_for('main.index')), ('Interface register', none)]) }}
 
-  {% if initiative is none %}
   {% if initiatives %}
-  <div class="rounded-lg border border-border bg-card p-4">
-    <ul class="divide-y divide-border">
-      {% for init in initiatives %}
-      <li class="py-3 flex items-center justify-between gap-4">
-        <div class="min-w-0">
-          <p class="text-sm font-medium truncate">{{ init.name }}</p>
-          <p class="text-xs text-muted-foreground">{{ init.fiscal_year_start }}–{{ init.fiscal_year_end }}</p>
-        </div>
-        <a href="{{ url_for('interface_register.index', initiative_id=init.id) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center shrink-0">
-          View register
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
+  {% call(init) list_table(rows=initiatives, columns=[('Initiative', ''), {'label': 'Years', 'sortable': true}],
+                           caption='Technology roadmap initiatives', testid='interface-initiatives-table', row_testid='interface-initiative-row',
+                           search_placeholder='Filter initiatives...') %}
+    {% call table_cell(class='max-w-[500px] truncate font-medium') %}
+      <a href="{{ url_for('interface_register.index', initiative_id=init.id) }}" class="text-foreground hover:underline">{{ init.name }}</a>
+    {% endcall %}
+    {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': init.fiscal_year_start or 0}) %}
+      {% if init.fiscal_year_start and init.fiscal_year_end and init.fiscal_year_start != init.fiscal_year_end %}{{ init.fiscal_year_start }} to {{ init.fiscal_year_end }}
+      {% elif init.fiscal_year_start %}{{ init.fiscal_year_start }}
+      {% else %}Years not set{% endif %}
+    {% endcall %}
+  {% endcall %}
   {% else %}
-  {{ empty_state(
-      icon='route',
-      headline='No technology roadmap initiatives yet',
-      body='The interface register is scoped to a technology roadmap initiative. Create one before registering interfaces.'
-  ) }}
+  {% call ui.card() %}
+    {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'interface-register-empty'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('map') }}{% endcall %}
+        {{ ui.empty_title(text='No roadmap initiatives yet') }}
+        {{ ui.empty_description(text='Interfaces are registered against a technology roadmap initiative. Plan one first.') }}
+      {% endcall %}
+      {% call ui.empty_content() %}{{ _open_roadmap() }}{% endcall %}
+    {% endcall %}
+  {% endcall %}
   {% endif %}
 
-  {% else %}
+{% else %}
+{# duplicate-breadcrumb-ok: the two trails sit in the two branches of one if; only one renders per request #}
+{{ page_shell(title='Interface register', subtitle='Interfaces for ' ~ initiative.name,
+              breadcrumb=[('Home', url_for('main.index')), ('Interface register', url_for('interface_register.index')), (initiative.name, none)],
+              actions_caller=_actions) }}
 
-  <div class="mb-4 flex justify-end gap-2">
-    <a href="{{ url_for('interface_register.comparison', initiative_id=initiative.id) }}"
-       data-testid="interface-comparison-link"
-       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-      <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>
-      As-is / To-be comparison
-    </a>
-    <a href="{{ url_for('interface_register.new', initiative_id=initiative.id) }}"
-       data-testid="interface-register-new"
-       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-      <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-      New interface
-    </a>
-  </div>
-
-  {% if rows %}
-  <div class="rounded-lg border border-border bg-card overflow-hidden">
-    <div class="hidden md:block overflow-x-auto">
-      <table class="dense-table w-full text-sm" data-testid="interface-register-table">
-        <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
-          <tr>
-            <th class="text-left px-4 py-2.5">Name</th>
-            <th class="text-left px-4 py-2.5">Type</th>
-            <th class="text-left px-4 py-2.5">Protocol</th>
-            <th class="text-left px-4 py-2.5">Pattern</th>
-            <th class="text-left px-4 py-2.5">Sync</th>
-            <th class="text-left px-4 py-2.5">Criticality</th>
-            <th class="text-left px-4 py-2.5">Daily volume</th>
-            <th class="text-left px-4 py-2.5">Status</th>
-            <th class="text-right px-4 py-2.5">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          {% for row in rows %}
-          {% set element = row.element %}
-          {% set meta = row.metadata %}
-          {% set full_name = (element.custom_properties or {}).get('source_name') %}
-          <tr data-testid="interface-row-{{ element.id }}">
-            <td class="px-4 py-2.5 font-medium"
-                {% if full_name %}title="{{ full_name }}"{% endif %}>{{ element.name }}</td>
-            <td class="px-4 py-2.5">{{ meta.interface_type | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.protocol | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.message_pattern | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">
-              {% if meta and meta.is_synchronous is not none %}
-                {{ 'Sync' if meta.is_synchronous else 'Async' }}
-              {% else %}—{% endif %}
-            </td>
-            <td class="px-4 py-2.5">{{ meta.business_criticality | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.transaction_volume_daily | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5">{{ meta.operational_status | dash if meta else '—' }}</td>
-            <td class="px-4 py-2.5 text-right">
-              <a href="{{ url_for('interface_register.edit', element_id=element.id) }}"
-                 data-testid="interface-edit-{{ element.id }}"
-                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Edit
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Narrow width: card list. Name and business_criticality survive the collapse. -->
-    <ul class="md:hidden divide-y divide-border">
-      {% for row in rows %}
-      {% set element = row.element %}
-      {% set meta = row.metadata %}
-      {% set full_name = (element.custom_properties or {}).get('source_name') %}
-      <li class="p-4" data-testid="interface-card-{{ element.id }}">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-sm font-medium truncate" {% if full_name %}title="{{ full_name }}"{% endif %}>{{ element.name }}</p>
-            <p class="text-xs text-muted-foreground mt-0.5">{{ meta.business_criticality | dash if meta else '—' }}</p>
-          </div>
-          <a href="{{ url_for('interface_register.edit', element_id=element.id) }}"
-             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center shrink-0">
-            Edit
-          </a>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% else %}
-  {{ empty_state(
-      icon='cable',
-      headline='No interfaces registered for this initiative',
-      body='Register the first SAP S/4HANA interface for this initiative.',
-      cta_label='New interface',
-      cta_href=url_for('interface_register.new', initiative_id=initiative.id)
-  ) }}
-  {% endif %}
-
-  {% endif %}
+  {% call(row) list_table(rows=rows, columns=[('Name', ''), {'label': 'Type', 'class': 'hidden md:table-cell'}, {'label': 'Protocol', 'class': 'hidden lg:table-cell'},
+                                              {'label': 'Pattern', 'class': 'hidden lg:table-cell'}, {'label': 'Mode', 'class': 'hidden xl:table-cell'}, ('Criticality', ''),
+                                              {'label': 'Daily volume', 'align': 'right', 'sortable': true, 'class': 'hidden xl:table-cell'}, ('Status', ''), ('', 'w-12')],
+                          caption='Interfaces', testid='interface-register-table', row_testid='interface-row', search_placeholder='Filter interfaces...',
+                          empty_message='No interfaces registered for this initiative yet. Use New interface to record the first one.') %}
+    {% set element = row.element %}
+    {% set meta = row.metadata %}
+    {% set full_name = (element.custom_properties or {}).get('source_name') %}
+    {% call table_cell(class='max-w-[500px] truncate font-medium', attrs=({'title': full_name} if full_name else {})) %}
+      <a href="{{ url_for('interface_register.edit', element_id=element.id) }}" class="text-foreground hover:underline">{{ element.name }}</a>
+    {% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}{{ _human(meta.interface_type if meta else none) }}{% endcall %}
+    {% call table_cell(class='hidden lg:table-cell') %}{{ _human(meta.protocol if meta else none) }}{% endcall %}
+    {% call table_cell(class='hidden lg:table-cell') %}{{ _human(meta.message_pattern if meta else none) }}{% endcall %}
+    {% call table_cell(class='hidden xl:table-cell') %}
+      {% if meta and meta.is_synchronous is not none %}{{ 'Synchronous' if meta.is_synchronous else 'Asynchronous' }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}
+    {% endcall %}
+    {% call table_cell() %}{% if meta and meta.business_criticality %}{{ state_badge(meta.business_criticality) }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+    {% call table_cell(class='hidden xl:table-cell text-right tabular-nums', attrs={'data-sort': meta.transaction_volume_daily if meta and meta.transaction_volume_daily is not none else -1}) %}
+      {% if meta and meta.transaction_volume_daily is not none %}{{ meta.transaction_volume_daily|format_number }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}
+    {% endcall %}
+    {% call table_cell() %}{% if meta and meta.operational_status %}{{ state_badge(meta.operational_status) }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+    {% call table_cell(class='w-12 text-right') %}
+      {% call row_actions() %}{{ row_action('Edit', href=url_for('interface_register.edit', element_id=element.id), testid='interface-edit-' ~ element.id) }}{% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% endif %}
 </div>
 {% endblock %}

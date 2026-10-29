@@ -169,9 +169,11 @@ def test_vendor_create_modal_wiring_is_consistent():
     template = (REPO / "app/templates/vendors/list.html").read_text(encoding="utf-8")
     arch = (REPO / "app/static/js/alpine-architecture.js").read_text(encoding="utf-8")
 
-    # Template calls submitCreateVendor(); the factory must define it AND register
-    # itself with Alpine so the CSP build resolves x-data="vendorCreateModal()".
-    assert "submitCreateVendor()" in template
+    # Template submits through submitCreateVendor (a bare method name, as the
+    # CSP build of Alpine requires); the factory must define it AND register
+    # itself with Alpine so the CSP build resolves x-data="vendorCreateModal".
+    assert 'x-data="vendorCreateModal"' in template
+    assert '@submit.prevent="submitCreateVendor"' in template
     assert "submitCreateVendor()" in js
     assert "Alpine.data('vendorCreateModal', vendorCreateModal)" in js
     # The stale duplicate that shadowed it must be gone.

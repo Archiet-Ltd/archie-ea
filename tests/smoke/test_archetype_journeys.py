@@ -408,8 +408,10 @@ def test_gap_analysis_convert_to_work_package_shows_the_new_package(page, live_s
     cell = page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)
     assert cell.count() == 1, "the gap row did not render"
     assert cell.locator('[data-testid="gap-work-package-link"]').count() == 0
-    button = page.locator("tr", has=page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)) \
-        .get_by_role("button", name="Convert this gap to a work package")
+    # Convert sits in the row's menu.
+    page.locator("tr", has=page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)) \
+        .get_by_role("button", name="Actions for").click()
+    button = page.locator('[data-convert-gap="%d"]' % gap_id)
     button.click()
     cell.locator('[data-testid="gap-work-package-link"]').first.wait_for(timeout=PAGE_TIMEOUT)
     assert button.is_disabled(), "the button still offers a second conversion"
@@ -780,8 +782,9 @@ def test_solution_architect_full_interface_register_journey_from_sidebar(
     # rendered control -- not a direct URL visit -- so this actually proves
     # the sidebar entry reaches the module (US-7's own acceptance criterion).
     _visit(page, live_server, "/")
+    _open_sidebar_group(page, "systems")
     sidebar_link = page.get_by_test_id("sidebar").get_by_role(
-        "link", name="Interface Register", exact=True
+        "link", name="Interfaces", exact=True
     )
     with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
         sidebar_link.click()
@@ -901,6 +904,13 @@ def test_solution_architect_full_interface_register_journey_from_sidebar(
     )
 
 
+def _open_sidebar_group(page, key):
+    """Open a sidebar group (Systems) the way a person does, when it starts shut."""
+    toggle = page.get_by_test_id("sidebar").locator('[data-nav-toggle="%s"]' % key).first
+    if toggle.count() and toggle.get_attribute("aria-expanded") == "false":
+        toggle.click()
+
+
 @pytest.mark.parametrize("archetype", ["security_architect", "data_architect"])
 def test_non_solution_architect_reaches_interface_register_from_own_sidebar(
     page, live_server, seeded, archetype
@@ -921,11 +931,12 @@ def test_non_solution_architect_reaches_interface_register_from_own_sidebar(
     _login(page, live_server, seeded["emails"][archetype])
 
     _visit(page, live_server, "/")
+    _open_sidebar_group(page, "systems")
     sidebar_link = page.get_by_test_id("sidebar").get_by_role(
-        "link", name="Interface Register", exact=True
+        "link", name="Interfaces", exact=True
     )
     assert sidebar_link.count() == 1, (
-        "%s's rendered sidebar has no 'Interface Register' link" % archetype
+        "%s's rendered sidebar has no 'Interfaces' link (the interface register)" % archetype
     )
     with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
         sidebar_link.click()
