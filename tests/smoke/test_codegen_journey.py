@@ -127,13 +127,17 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         # reloaded page starts from a clean, non-generating state.
         page.reload(timeout=PAGE_TIMEOUT)
         expect(first_files_label).to_be_visible(timeout=PAGE_TIMEOUT)
-        page.screenshot(path='/tmp/claude-0/-home-user/7509dd19-0375-513c-b89f-6495c6787196/scratchpad/shots/after_reload.png', full_page=True)
+
+        # The AI Assistant chat panel opens by default alongside the IDE view and
+        # occupies the same content column as the Setup wizard, hiding it even
+        # once ideShowSetup flips back to true -- close the panel first.
+        close_chat = page.get_by_role('button', name='Close chat panel', exact=True)
+        if close_chat.count():
+            close_chat.click()
 
         setup_button = page.get_by_role('button', name='Setup', exact=True)
         expect(setup_button).to_be_visible(timeout=PAGE_TIMEOUT)
         setup_button.click()
-        page.wait_for_timeout(500)
-        page.screenshot(path='/tmp/claude-0/-home-user/7509dd19-0375-513c-b89f-6495c6787196/scratchpad/shots/after_setup_click.png', full_page=True)
 
         # Reopen Phase 3 (Configure) -- Quick Generate's deterministic run already
         # unlocked it -- and switch the mode back to Genome.
