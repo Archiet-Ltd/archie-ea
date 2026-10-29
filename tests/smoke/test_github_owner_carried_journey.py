@@ -140,7 +140,7 @@ def test_github_code_owner_becomes_application_owner(browser, csrf_server):
         expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_have_text(
             "Code owner on GitHub: @octocat, not yet matched to a person"
         )
-        # CO-25: no mid-word break at 1440, where nothing overflows in the first place.
+        # No mid-word break at 1440, where nothing overflows in the first place.
         unmatched_cell = page.locator("[data-testid=app-owner-%d]" % unmatched_id).element_handle()
         assert _word_whole(unmatched_cell, "octocat") is True, "octocat split mid-word at 1440"
         assert _word_whole(unmatched_cell, "person") is True, "person split mid-word at 1440"
@@ -236,15 +236,15 @@ def test_github_code_owner_becomes_application_owner(browser, csrf_server):
         page.wait_for_url("**/applications/%d/assign-owner" % no_owner_id, timeout=PAGE_TIMEOUT)
         expect(page.locator("select[name=user_id]")).to_be_visible()
 
-        # CO-22: an application with no GitHub code owner at all reads one
-        # plain, capitalised sentence -- not a leading ". " left over from a
+        # An application with no GitHub code owner at all reads one plain,
+        # capitalised sentence -- not a leading ". " left over from a
         # missing first sentence.
         subtitle_text = page.locator("p.mt-1.text-sm.text-muted-foreground").first.inner_text()
         assert subtitle_text == "Choose the person in your organization who owns it.", subtitle_text
         assert subtitle_text[0].isupper(), subtitle_text
 
-        # CO-24: the assign page is on the same Page column as the list, so
-        # its heading sits at the same x position, not 24px further right.
+        # The assign page is on the same content column as the list, so its
+        # heading sits at the same x position, not 24px further right.
         assign_h1_x = page.locator("h1").first.bounding_box()["x"]
         assert abs(assign_h1_x - list_h1_x) < 1, "h1 x: %s vs list h1 x: %s" % (assign_h1_x, list_h1_x)
     finally:
@@ -323,15 +323,15 @@ def test_viewer_role_cannot_assign_owner(browser, csrf_server):
 
 
 def test_owner_assign_rule_matches_display_and_route_for_edit_and_governance(browser, csrf_server):
-    """CO-23's probe table as the test: the one rule
-    (``can_assign_owner`` -- "assign owner", or "edit application") is what
-    every owner-assign control shows and every owner-assign route allows,
-    for an architect persona outside the owner-assign governance list who
-    holds the ordinary ability to edit an application, and separately for a
-    persona inside that governance list whose organisation role is Viewer
-    (so they hold no edit right at all). Each row is a positive case:
-    reverting the rule to "assign owner" alone would refuse the first, and
-    reverting it to "edit application" alone would refuse the second (CO-28).
+    """The one rule (``can_assign_owner`` -- "assign owner", or "edit
+    application") is what every owner-assign control shows and every
+    owner-assign route allows, for an architect persona outside the
+    owner-assign governance list who holds the ordinary ability to edit an
+    application, and separately for a persona inside that governance list
+    whose organisation role is Viewer (so they hold no edit right at all).
+    Each row is a positive case: reverting the rule to "assign owner" alone
+    would refuse the first, and reverting it to "edit application" alone
+    would refuse the second.
     """
     live_server = csrf_server
     org = create_fresh_org(
