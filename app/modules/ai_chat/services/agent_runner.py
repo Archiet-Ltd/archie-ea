@@ -118,6 +118,8 @@ def sanitize_agent_error(reason) -> "Optional[str]":
     if m:
         status = f" (provider HTTP {m.group(1)})"
 
+    if "answers are paused" in lowered:
+        return "Answers are paused: every provider in the order is at its ceiling."
     if any(t in lowered for t in ("no api key", "not configured", "no provider", "no keys")):
         return "No LLM provider is configured."
     if any(
@@ -164,6 +166,8 @@ def is_retryable_llm_error(exc) -> bool:
     """
     status = _error_status(exc)
     text = str(exc).lower()
+    if "answers are paused" in text:
+        return True  # this provider is at its ceiling; the next in the chain may still answer
     if status is not None:
         if status == 429 or status >= 500:
             return True
@@ -177,6 +181,15 @@ def is_retryable_llm_error(exc) -> bool:
     if isinstance(exc, (TimeoutError, ConnectionError)):
         return True
     return any(t in text for t in _QUOTA_PHRASES) or "timed out" in text
+
+
+def _base_url_of(provider: str) -> Optional[str]:
+    """The address of an OpenAI-compatible third-party provider, honouring its configured override."""
+    if provider not in _PROVIDER_BASE_URLS:
+        return None
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    return LLMService.base_url_for(provider) or _PROVIDER_BASE_URLS.get(provider)
 
 
 def _models_of(setting_model: Optional[str]) -> list:
@@ -211,10 +224,19 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     except Exception:
         logger.warning("AgentRunner: could not read provider settings", exc_info=True)
 
-    names = [p for p in _PROVIDER_PRIORITY if p in _TOOL_PROVIDERS and (p in rows or os.getenv(p.upper() + "_API_KEY"))]
-    has_paid = any(p in rows or os.getenv(p.upper() + "_API_KEY") for p in ("anthropic", "openai", "azure", "gemini"))
+    own = [p for p in _PROVIDER_PRIORITY if p in _TOOL_PROVIDERS and p in rows]
+    # The platform's own keys count only for the providers in the configured order, each within its ceiling.
+    platform = [
+        p for p in LLMService.provider_order()
+        if p in _TOOL_PROVIDERS and p not in rows and os.getenv(p.upper() + "_API_KEY") and LLMService.has_headroom(p)
+    ]
+    names = own + [p for p in platform if p not in own]
+    has_paid = any(p in rows for p in ("anthropic", "openai", "azure", "gemini"))
 
-    configured = [p.strip().lower() for p in (os.getenv("AI_PROVIDER_ORDER") or "").split(",") if p.strip()]
+    configured = (
+        [p for p in LLMService.provider_order()]
+        if (os.getenv("LLM_PROVIDER_ORDER") or os.getenv("AI_PROVIDER_ORDER")) else []
+    )
     if configured:
         order = [p for p in configured if p in names] + [p for p in names if p not in configured]
     elif not has_paid:
@@ -245,7 +267,7 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
             keys = []
         for model in models:
             for key in keys:
-                chain.append((provider, model, key, os.getenv("AI_PROVIDER_BASE_URL_" + provider.upper()) or _PROVIDER_BASE_URLS.get(provider)))
+                chain.append((provider, model, key, os.getenv("AI_PROVIDER_BASE_URL_" + provider.upper()) or _base_url_of(provider)))
     return chain
 
 
@@ -763,7 +785,7 @@ class AgentRunner:
             )
 
         # Resolve base_url for OpenAI-compatible third-party providers
-        base_url = (first_base_url if chain else None) or _PROVIDER_BASE_URLS.get(provider)
+        base_url = (first_base_url if chain else None) or _base_url_of(provider)
 
         # Build tool schemas for the provider
         tool_schemas = self._build_tool_schemas(provider, TOOL_SCHEMAS)
@@ -1165,14 +1187,59 @@ class AgentRunner:
 
         system_prompt = scrub_for_transmission(system_prompt)
         messages = scrub_chat_messages(messages)
+        platform_funded = self._platform_funded(provider)
+        if platform_funded:
+            from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService
+
+            reached, reason = LLMService.ceiling_reached(provider)
+            if reached:
+                raise AnswersPaused(reason)
         if provider == "anthropic":
             if stream:
-                return self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
-            return self._call_anthropic(model, api_key, system_prompt, messages, tools)
+                result = self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
+            else:
+                result = self._call_anthropic(model, api_key, system_prompt, messages, tools)
         else:
             if stream:
-                return self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url)
-            return self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url)
+                result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url)
+            else:
+                result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url)
+        if platform_funded:
+            self._record_platform_spend(provider, model, result.get("raw") if isinstance(result, dict) else None)
+        return result
+
+    @staticmethod
+    def _platform_funded(provider: str) -> bool:
+        """True when the key in use is the platform's (from the environment), not the organisation's row."""
+        try:
+            from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+            return LLMService._keys_are_platform(provider)
+        except Exception:  # noqa: BLE001 - without a settings table in reach the key can only be the platform's
+            return True
+
+    @staticmethod
+    def _record_platform_spend(provider: str, model: str, raw) -> None:
+        """Add the call to this month's ledger from the usage the provider reported; never breaks the turn."""
+        try:
+            from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+            usage = getattr(raw, "usage", None)
+            if usage is None and isinstance(raw, dict):
+                usage = raw.get("usage")
+
+            def _count(*names):
+                for name in names:
+                    value = getattr(usage, name, None) if not isinstance(usage, dict) else usage.get(name)
+                    if value:
+                        return int(value)
+                return 0
+
+            LLMService.record_spend(
+                provider, model, _count("prompt_tokens", "input_tokens"), _count("completion_tokens", "output_tokens"),
+            )
+        except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
+            logger.warning("AgentRunner: spend was not recorded for %s", provider, exc_info=True)
 
     def _call_anthropic(self, model, api_key, system_prompt, messages, tools) -> dict:
         import anthropic
@@ -1571,7 +1638,11 @@ class AgentRunner:
 
     def _fallback(self, reason: str, busy: bool = False) -> dict:
         reason_l = (reason or "").lower()
-        if busy:
+        if "answers are paused" in reason_l:
+            from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
+
+            msg = PAUSED_MESSAGE
+        elif busy:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
             )
