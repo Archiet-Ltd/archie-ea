@@ -147,10 +147,10 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
 
         # The quality panel (including the business rule coverage bar from the
         # brief's acceptance criteria) must actually render, not just the file
-        # list -- the "Structural N%" pill switches the IDE's right panel to it.
-        quality_pill = page.get_by_text('Structural', exact=False)
-        expect(quality_pill).to_be_visible(timeout=PAGE_TIMEOUT)
-        quality_pill.click()
+        # list -- the right panel's "Quality" tab switches to it.
+        quality_tab = page.get_by_role('button', name='Quality', exact=True)
+        expect(quality_tab).to_be_visible(timeout=PAGE_TIMEOUT)
+        quality_tab.click()
         expect(page.get_by_text('Business rule coverage', exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # ---- Persistence: reload and confirm the bundle survived server-side ----
