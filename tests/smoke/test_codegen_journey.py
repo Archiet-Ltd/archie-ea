@@ -180,6 +180,15 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         # one is individually confirmed to reach the button -- a separate,
         # pre-existing client-side defect unrelated to this fix; see the
         # report for the evidence trail.
+        # init()'s loadQuality() fetch is deliberately staggered 100ms after
+        # the files it depends on load, to avoid flooding the main thread with
+        # concurrent state updates on page load -- wait for it rather than
+        # read a point-in-time snapshot that can race it.
+        page.wait_for_function(
+            "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
+            "return !!d.qualityDetails; }",
+            timeout=PAGE_TIMEOUT,
+        )
         quality_state = page.evaluate(
             "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
             "return {qualityDetailsKeys: d.qualityDetails ? Object.keys(d.qualityDetails) : null, "
