@@ -153,10 +153,22 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         # event, so both intercept a physical click on the tab -- switch the
         # same `rightTab` property its own button sets, directly, the way the
         # phase jump above does, rather than fighting either overlay.
+        page.wait_for_timeout(1000)
         page.evaluate(
             "() => { Alpine.$data(document.querySelector('[data-workbench=\"1\"]')).rightTab = 'quality'; }"
         )
-        expect(page.get_by_text('Business rule coverage', exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1000)
+        rule_coverage_text = page.get_by_text('Business rule coverage', exact=False)
+        if rule_coverage_text.count() == 0:
+            # The direct property write above can lose the race against this
+            # subtree's own first-mount directive processing (471 directives,
+            # per workbench.html's own comment on why it is deferred) -- a
+            # real click re-asserts the same property through Alpine's own
+            # evaluation once that settles, which a bare external write does not.
+            quality_tab = page.get_by_role('button', name='Quality', exact=True)
+            expect(quality_tab).to_be_visible(timeout=PAGE_TIMEOUT)
+            quality_tab.click(force=True)
+        expect(rule_coverage_text).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # ---- Persistence: reload and confirm the bundle survived server-side ----
         page.reload(timeout=PAGE_TIMEOUT)
