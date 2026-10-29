@@ -408,7 +408,7 @@ function archimateDetail() {
 
         downloadDiagram() {
             const elId = {{ (source_ae_id or element.id) | tojson }};
-            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint=application';
+            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint={{ element.layer | default('application') | lower }}';
             const a = document.createElement('a');
             a.href = url;
             a.download = 'archimate-diagram-' + elId + '.svg';
