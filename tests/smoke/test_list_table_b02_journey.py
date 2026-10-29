@@ -467,6 +467,137 @@ def test_connection_gaps_rows_do_not_cross_organisations(browser, live_server, a
 # --------------------------------------------------------------------------- #
 
 
+@pytest.fixture
+def workflow_catalog_emptied():
+    """Temporarily deactivate every active workflow definition so the
+    catalog's own empty state can be proven, regardless of what earlier
+    tests or seeds left behind. ``EAWorkflowDefinition`` is deliberately
+    global, not organisation-scoped (its own docstring: "Global reference
+    data (shared across tenants)"), so a fresh organisation on its own does
+    not produce an empty catalog -- this fixture is the only reliable way to
+    see the empty state once anything else has seeded a definition. Restores
+    every row's prior state when the test ends."""
+    from app import create_app, db
+    from app.models.workflow_models import EAWorkflowDefinition
+
+    app = create_app("testing")
+    active_ids = []
+    with app.app_context():
+        active_ids = [
+            row[0]
+            for row in db.session.query(EAWorkflowDefinition.id).filter(
+                EAWorkflowDefinition.is_active.is_(True)
+            )
+        ]
+        if active_ids:
+            EAWorkflowDefinition.query.filter(
+                EAWorkflowDefinition.id.in_(active_ids)
+            ).update({"is_active": False}, synchronize_session=False)
+            db.session.commit()
+    try:
+        yield
+    finally:
+        with app.app_context():
+            if active_ids:
+                EAWorkflowDefinition.query.filter(
+                    EAWorkflowDefinition.id.in_(active_ids)
+                ).update({"is_active": True}, synchronize_session=False)
+                db.session.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Agent run records: the empty state (ai_chat/run_records/list.html) -- no
+# records seeded at all, so the page's own empty state is what a person sees.
+# --------------------------------------------------------------------------- #
+
+
+def test_run_records_empty_state_offers_ai_chat(browser, live_server):
+    """A platform administrator who opens Agent Run Records before anyone has
+    asked the AI chat a question reads why the list is empty, and the one
+    action it offers lands on the AI chat with real content -- not a blank
+    or dead page."""
+    org = create_fresh_org("platform_admin", org_admin=True)
+    email = org["emails"]["platform_admin"]
+    context, page = _new_page(browser)
+    try:
+        sign_in(page, live_server, email)
+        page.goto(live_server + "/ai-chat/run-records", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        table = page.locator('[data-testid="run-records-table-pager"]')
+        table.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+
+        # The empty state says why the list is empty -- not just that it is.
+        expect(table).to_contain_text("No agent run records have been recorded yet")
+        expect(table).to_contain_text("Records are written when the AI chat runs an agent on a question")
+
+        # Its one action goes to the place that produces a record.
+        action = table.get_by_role("link", name="Ask a question in the AI chat")
+        expect(action).to_be_visible()
+        action.click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/ai-chat" in page.url, "the empty state's action did not reach the AI chat"
+        expect(page.locator("h1")).to_contain_text("How can I help you today?")
+
+        _screenshot(page, "run-records-empty", 1440)
+    finally:
+        context.close()
+    _shots(browser, live_server, email, "/ai-chat/run-records", "run-records-empty")
+
+
+# --------------------------------------------------------------------------- #
+# Workflow catalog: the empty state (integration/workflow_list.html) -- an
+# administrator gets an action; a non-administrator gets the same reason
+# with nothing to click, since they cannot act on it.
+# --------------------------------------------------------------------------- #
+
+
+def test_workflow_catalog_empty_state_by_role(browser, live_server, workflow_catalog_emptied):
+    """Before any workflow definition exists, an administrator reads why the
+    catalog is empty and can go connect an integration from there, landing on
+    a real page; a non-administrator reads the same reason but is given
+    nothing to click, and Back to Dashboard appears exactly once."""
+    admin = create_fresh_org("platform_admin", org_admin=True)
+    member = create_fresh_org("solution_architect", org_admin=False)
+
+    context, page = _new_page(browser)
+    try:
+        sign_in(page, live_server, admin["emails"]["platform_admin"])
+        page.goto(live_server + "/integration/workflows", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        empty = page.locator('[data-testid="workflow-catalog-empty"]')
+        expect(empty).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(empty).to_contain_text("No workflow definitions exist in this organisation yet")
+        expect(empty).to_contain_text("The catalog fills once the first integration is connected")
+
+        # Back to Dashboard appears once on the page, not once in the header
+        # and again in the empty state.
+        expect(page.get_by_role("link", name="Back to Dashboard")).to_have_count(1)
+
+        action = empty.get_by_role("link", name="Connect an integration")
+        expect(action).to_be_visible()
+        action.click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/admin/connectors" in page.url, "Connect an integration did not reach the connectors page"
+        expect(page.locator("h1")).to_contain_text("Connectors")
+
+        _screenshot(page, "workflow-catalog-empty-admin", 1440)
+    finally:
+        context.close()
+    _shots(browser, live_server, admin["emails"]["platform_admin"], "/integration/workflows", "workflow-catalog-empty-admin")
+
+    context, page = _new_page(browser)
+    try:
+        sign_in(page, live_server, member["emails"]["solution_architect"])
+        page.goto(live_server + "/integration/workflows", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        empty = page.locator('[data-testid="workflow-catalog-empty"]')
+        expect(empty).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(empty).to_contain_text("Ask your administrator to connect an integration")
+        expect(empty.get_by_role("link")).to_have_count(0)
+
+        _screenshot(page, "workflow-catalog-empty-non-admin", 1440)
+    finally:
+        context.close()
+    _shots(browser, live_server, member["emails"]["solution_architect"], "/integration/workflows", "workflow-catalog-empty-non-admin")
+
+
 def test_billing_page_renders_with_empty_invoices(browser, live_server, seeded):
     email = seeded["emails"]["platform_admin"]
     context, page = _new_page(browser)

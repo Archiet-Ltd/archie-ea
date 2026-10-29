@@ -15,6 +15,12 @@
 ) }}
 
 {# The server pages these records; the footer shows the server's own Previous / Next. #}
+{# The empty state's one action: records are written when the AI chat runs an
+   agent on a question, so the next step is to ask one. #}
+{% macro _ask_in_chat() -%}
+{% call button(variant='outline', href=url_for('unified_ai_chat.index')) %}{{ lucide('message-square') }}Ask a question in the AI chat{% endcall %}
+{%- endmacro %}
+
 {% macro _pager() -%}
 <div class="flex items-center justify-between px-2" data-slot="data-table-pagination" data-testid="run-records-pages">
   <div class="flex-1 text-sm text-muted-foreground tabular-nums">Page {{ pagination.page }} of {{ pagination.pages }}</div>
@@ -29,7 +35,9 @@
 
 {% set columns = [('ID', ''), ('Persona', ''), ('Domain', ''), {'label': 'Tools', 'sortable': false}, ('Outcome', ''), ('Created', ''), {'label': '', 'class': 'w-12', 'sortable': false}] %}
 {% call(r) list_table(rows=records, columns=columns, caption='Agent run records', testid='run-records-table', row_testid='run-record-row',
-                      search_placeholder='Filter run records...', empty_message='No agent run records have been recorded yet.',
+                      search_placeholder='Filter run records...',
+                      empty_message='No agent run records have been recorded yet. Records are written when the AI chat runs an agent on a question.',
+                      empty_action=_ask_in_chat,
                       server_pagination=(_pager if pagination and pagination.pages > 1 else none)) %}
     {% call table_cell() %}{{ r.id }}{% endcall %}
     {% call table_cell() %}{{ r.persona or '—' }}{% endcall %}

@@ -9,9 +9,25 @@
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
-{% from 'components/empty_state.html' import empty_state %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Workflow Catalog{% endblock %}
+
+{#- One empty state, drawn the same way wherever this page has nothing to show. -#}
+{% macro _empty(icon, title, sentence, testid, action=none) -%}
+{% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': testid, 'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide(icon) }}{% endcall %}
+    {{ ui.empty_title(text=title) }}
+    {{ ui.empty_description(text=sentence) }}
+  {% endcall %}
+  {% if action %}{% call ui.empty_content() %}{{ action() }}{% endcall %}{% endif %}
+{% endcall %}
+{%- endmacro %}
+
+{% macro _try_again() %}{% call ui.button(href=url_for('integration.list_workflows'), variant='outline') %}{{ lucide('refresh-cw') }}Try again{% endcall %}{% endmacro %}
+{% macro _view_all_workflows() %}{% call ui.button(href=url_for('integration.list_workflows'), variant='outline') %}{{ lucide('list') }}View all workflows{% endcall %}{% endmacro %}
+{% macro _connect_integration() %}{% call ui.button(href=url_for('m365_connector.connectors_index'), variant='outline') %}{{ lucide('link') }}Connect an integration{% endcall %}{% endmacro %}
 
 {% block content %}
 {% set workflow_type_labels = {
@@ -92,39 +108,21 @@
         {% endcall %}
     {% endcall %}
     {% elif load_error %}
-        <div>
-            {{ empty_state(
-                icon='triangle-alert',
-                title='The workflow catalog could not be read',
-                description='The catalog could not be loaded. Refresh the page to try again.',
-                cta_text='Try again',
-                cta_href=url_for('integration.list_workflows'),
-                cta_icon='refresh-cw'
-            ) }}
-        </div>
+        {{ _empty('triangle-alert', 'The workflow catalog could not be read',
+                   'The catalog could not be loaded. Refresh the page to try again.',
+                   'workflow-catalog-error-empty', action=_try_again) }}
     {% elif selected_category %}
         {% set empty_desc = 'There are no workflows in ' ~ (selected_category|replace('_', ' ')|title) ~ ' yet.' %}
-        <div>
-            {{ empty_state(
-                icon='search-x',
-                title='No workflows in this category',
-                description=empty_desc,
-                cta_text='View all workflows',
-                cta_href=url_for('integration.list_workflows'),
-                cta_icon='list'
-            ) }}
-        </div>
+        {{ _empty('search', 'No workflows in this category', empty_desc,
+                   'workflow-catalog-category-empty', action=_view_all_workflows) }}
+    {% elif current_user.is_org_admin %}
+        {{ _empty('git-branch', 'No workflows yet',
+                   'No workflow definitions exist in this organisation yet. The catalog fills once the first integration is connected.',
+                   'workflow-catalog-empty', action=_connect_integration) }}
     {% else %}
-        <div>
-            {{ empty_state(
-                icon='workflow',
-                title='No workflows yet',
-                description='No workflow definitions are available. Contact an administrator to set up the catalog.',
-                cta_text='Back to Dashboard',
-                cta_href=url_for('integration.workflow_dashboard'),
-                cta_icon='layout-dashboard'
-            ) }}
-        </div>
+        {{ _empty('git-branch', 'No workflows yet',
+                   'Ask your administrator to connect an integration to populate the workflow catalog.',
+                   'workflow-catalog-empty') }}
     {% endif %}
 </div>
 {% endblock %}
