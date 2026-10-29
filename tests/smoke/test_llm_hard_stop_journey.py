@@ -158,6 +158,10 @@ def test_at_the_ceiling_the_person_reads_a_plain_pause_and_the_provider_is_not_c
         assert "could not be completed" not in body, body
         expect(page.get_by_test_id("chat-provider-settings-link")).to_have_count(0)
         expect(page.get_by_test_id("model-unavailable-notice")).to_contain_text("AI paused. Records still answer.")
+        # The footer under the pause names the pause and claims no source: nothing answered it.
+        footer = page.locator(".js-evidence-toggle").last
+        expect(footer).to_contain_text("Answers are paused; nothing was read for this reply.")
+        assert "snapshot" not in footer.inner_text() and "No portfolio data was read" not in footer.inner_text()
         assert len(gemini.calls) == calls_before, "the provider was called although its ceiling was reached"
         _shot(page, "paused-1440-light")
     finally:

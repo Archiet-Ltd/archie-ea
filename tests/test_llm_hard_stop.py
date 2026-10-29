@@ -197,6 +197,7 @@ def test_the_chat_route_returns_the_pause_as_an_ordinary_answer(app, platform, m
     assert body["response"] == PAUSED_MESSAGE
     assert body["success"] is False
     assert body["agent_error"] is None, "the pause is the whole reply; no error rides beside it"
+    assert body["paused"] is True and body["sources"] == [] and body["context_used"] is False
     assert "Traceback" not in response.get_data(as_text=True)
     assert platform.gemini_calls == [] and platform.openai_compatible_calls == []
 
@@ -262,3 +263,60 @@ def test_a_priced_provider_in_the_order_with_no_ceiling_is_refused_at_the_point_
         LLMService._call_llm_with_failover("hello", DEFAULT_MODELS["gemini"], provider="gemini")
     assert "no spend ceiling" in str(refused.value)
     assert platform.gemini_calls == []
+
+
+def test_the_stream_marks_the_pause_and_cites_nothing(app, platform, monkeypatch):
+    """The streamed reply carries the pause flag, no error and no source, so the footer names the pause."""
+    from tests.test_ai_chat_stream_error import _login, _make_user, _parse_sse_events
+
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_GEMINI", "0.25")
+    monkeypatch.setenv("LLM_REQUEST_CEILING_NVIDIA", "1")
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setitem(app.config, "AI_CHAT_ENABLED", None)
+    with app.app_context():
+        from app import db
+
+        LLMService.record_spend("gemini", DEFAULT_MODELS["gemini"], 120, 80)
+        LLMService.record_spend("nvidia", DEFAULT_MODELS["nvidia"], 7, 3)
+        user_id = _make_user(db)
+    client = app.test_client()
+    _login(client, user_id)
+    response = client.post(
+        "/ai-chat/message/stream",
+        data=json.dumps({"message": "What breaks if the ledger fails? %s" % uuid.uuid4().hex[:6]}),
+        content_type="application/json",
+    )
+    body = response.get_data()
+    assert response.status_code == 200
+    done = [e for e in _parse_sse_events(body) if e.get("type") == "done"]
+    assert len(done) == 1, done
+    assert done[0]["paused"] is True
+    assert done[0]["error"] is None
+    assert done[0]["response"] == PAUSED_MESSAGE
+    assert not done[0].get("sources") and not done[0].get("answered_by")
+    assert platform.gemini_calls == [] and platform.openai_compatible_calls == []
+
+
+def test_a_provider_without_a_key_is_not_configured_on_the_admin_card(app, platform, monkeypatch, db_session, make_org,
+                                                                      client, login_as):
+    """NVIDIA is in the order with headroom but no key is stored: the card says Not configured, never Answering."""
+    import re
+
+    from tests.test_admin_nav_offers_only_permitted_links import _make_admin
+
+    monkeypatch.delenv("NVIDIA_API_KEY")
+    with app.app_context():
+        rows = {r["provider"]: r for r in LLMService.spend_ledger_rows()}
+    assert rows["nvidia"]["configured"] is False and rows["nvidia"]["open"] is True
+    assert rows["gemini"]["configured"] is True
+
+    admin = _make_admin(db_session, make_org, org_admin=True, platform_admin=True)
+    login_as(client, admin)
+    response = client.get("/admin/api-settings")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    nvidia = re.search(r'data-provider="nvidia".*?</dd>', html, re.DOTALL).group(0)
+    gemini = re.search(r'data-provider="gemini".*?</dd>', html, re.DOTALL).group(0)
+    assert "Not configured" in nvidia and "Answering" not in nvidia, nvidia
+    assert "No key is stored for this provider" in nvidia
+    assert "Answering" in gemini and "Not configured" not in gemini, gemini

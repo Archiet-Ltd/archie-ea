@@ -471,8 +471,17 @@ class LLMService:
         return usd
 
     @staticmethod
+    def platform_key_present(provider: str) -> bool:
+        """True when the platform's environment holds a key for the provider."""
+        return bool(os.environ.get((provider or "").upper() + "_API_KEY"))
+
+    @staticmethod
     def spend_ledger_rows() -> List[Dict[str, Any]]:
-        """One row per provider in the order, for the admin API settings page."""
+        """One row per provider in the order, for the admin API settings page.
+
+        A provider whose key is not stored is reported as not configured, whatever its headroom:
+        it answers nothing until a key is set.
+        """
         month = LLMService.month_key()
         rows: List[Dict[str, Any]] = []
         for provider in LLMService.provider_order():
@@ -484,6 +493,7 @@ class LLMService:
                 "label": provider.upper() if provider == "nvidia" else provider.title(),
                 "month": month,
                 "priced": priced,
+                "configured": LLMService.platform_key_present(provider),
                 "usd_spent": spent[0],
                 "requests": spent[1],
                 "ceiling_usd": LLMService.spend_ceiling_usd(provider) if priced else None,

@@ -707,6 +707,8 @@ def send_message():
                 # That was reaching the browser verbatim. The full reason is in
                 # the server log line above.
                 "agent_error": agent_error,
+                # The platform's pause: the reply is the pause itself, built from nothing.
+                "paused": bool(agent_failure) and is_pause(agent_failure),
                 # Was hardcoded True on every response regardless of whether any
                 # context was built - _build_system_prompt swallows a context
                 # failure into an empty string, so the API asserted grounding
@@ -1012,8 +1014,9 @@ def send_message_stream():
                 # provider account's user_id). Log it, send a category.
                 if result.get("error"):
                     logger.warning("stream agent failure: %s", result["error"])
-                    # The pause is the whole reply; no error rides beside it.
-                    result["error"] = None if is_pause(result["error"]) else sanitize_agent_error(result["error"])
+                    # The pause is the whole reply; no error rides beside it, and the footer names the pause.
+                    result["paused"] = is_pause(result["error"])
+                    result["error"] = None if result["paused"] else sanitize_agent_error(result["error"])
                 event_queue.put({"type": "done", **result})
         except Exception as exc:
             logger.exception("send_message_stream: agent error")

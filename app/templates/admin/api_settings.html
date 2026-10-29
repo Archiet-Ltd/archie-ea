@@ -42,7 +42,8 @@
                     <div class="rounded-md border p-4" data-testid="llm-spend-row" data-provider="{{ row.provider }}">
                         <dt class="flex items-center justify-between gap-2 text-sm font-medium">
                             <span>{{ loop.index }}. {{ row.label }}</span>
-                            <span class="text-xs {% if row.open %}text-muted-foreground{% else %}text-destructive{% endif %}">{{ 'Answering' if row.open else 'Paused' }}</span>
+                            {%- set _state = 'Not configured' if not row.configured else ('Answering' if row.open else 'Paused') -%}
+                            <span class="text-xs {% if _state == 'Paused' %}text-destructive{% else %}text-muted-foreground{% endif %}" data-testid="llm-spend-state">{{ _state }}</span>
                         </dt>
                         <dd class="mt-2 space-y-1 text-sm text-muted-foreground">
                             {% if row.priced %}
@@ -55,7 +56,8 @@
                             {% else %}
                                 <p>Free provider: <span class="tabular-nums text-foreground">{{ row.requests }}</span> request{{ '' if row.requests == 1 else 's' }} this month{% if row.request_ceiling %} of {{ row.request_ceiling }} allowed; remaining {{ row.remaining_requests }}{% else %}; no request ceiling is set{% endif %}.</p>
                             {% endif %}
-                            {% if not row.open %}<p class="text-destructive">{{ row.reason }}.</p>{% endif %}
+                            {% if not row.configured %}<p>No key is stored for this provider, so it answers nothing until one is set.</p>
+                            {% elif not row.open %}<p class="text-destructive">{{ row.reason }}.</p>{% endif %}
                         </dd>
                     </div>
                     {% endfor %}
