@@ -5,7 +5,8 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -73,47 +74,31 @@
     </form>
 
     {% if instances %}
-    {# Data table of the executions (pattern P03). #}
-    {% call table(attrs_dict={'aria-label': 'Workflow instances'}) %}
-        {% call table_header() %}
-            {% call table_row(class='hover:bg-transparent') %}
-                {% call table_head() %}Instance{% endcall %}
-                {% call table_head() %}Workflow{% endcall %}
-                {% call table_head() %}Status{% endcall %}
-                {% call table_head() %}Progress{% endcall %}
-                {% call table_head() %}Started{% endcall %}
-                {% call table_head() %}Duration{% endcall %}
-                {% call table_head(class='text-right') %}Actions{% endcall %}
-            {% endcall %}
+    {# The standard list table (data-type register: record-list), shadcn's Data Table as the library ports it. #}
+    {% set columns = [('Instance', ''), ('Workflow', ''), {'label': 'Status', 'sortable': false}, {'label': 'Progress', 'sortable': false}, ('Started', ''), ('Duration', ''), {'label': 'Actions', 'class': 'text-right', 'sortable': false}] %}
+    {% call(instance) list_table(rows=instances, columns=columns, caption='Workflow instances', testid='instances-table', row_testid='instance-row', search_placeholder='Filter instances...', empty_message='No workflow instances yet.') %}
+        {% call table_cell() %}
+            <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}"
+               class="font-medium text-foreground hover:underline">{{ instance.instance_code }}</a>
         {% endcall %}
-        {% call table_body() %}
-        {% for instance in instances %}
-            {% call table_row() %}
-                {% call table_cell() %}
-                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}"
-                       class="font-medium text-foreground hover:underline">{{ instance.instance_code }}</a>
-                {% endcall %}
-                {% call table_cell() %}
-                    <span class="text-muted-foreground">{{ instance.definition.workflow_name|dash }}</span>
-                {% endcall %}
-                {% call table_cell() %}
-                    {% call badge(variant=status_variants.get(instance.status, 'neutral')) %}{{ instance.status|replace('_', ' ')|title }}{% endcall %}
-                {% endcall %}
-                {% call table_cell() %}
-                    <span class="text-muted-foreground">{{ instance.current_step_id|dash }}</span>
-                    <span class="ml-2 text-xs text-muted-foreground">{{ instance.progress_percent|dash }}%</span>
-                {% endcall %}
-                {% call table_cell() %}
-                    {{ instance.started_at.strftime('%Y-%m-%d %H:%M') if instance.started_at else 'Pending' }}
-                {% endcall %}
-                {% call table_cell() %}
-                    {{ instance.duration_seconds|dash('s') }}
-                {% endcall %}
-                {% call table_cell(class='text-right') %}
-                    {{ button(text='View', variant='ghost', icon='arrow-right', href=url_for('integration.instance_detail', instance_id=instance.id)) }}
-                {% endcall %}
-            {% endcall %}
-        {% endfor %}
+        {% call table_cell() %}
+            <span class="text-muted-foreground">{{ instance.definition.workflow_name|dash }}</span>
+        {% endcall %}
+        {% call table_cell() %}
+            {% call badge(variant=status_variants.get(instance.status, 'neutral')) %}{{ instance.status|replace('_', ' ')|title }}{% endcall %}
+        {% endcall %}
+        {% call table_cell() %}
+            <span class="text-muted-foreground">{{ instance.current_step_id|dash }}</span>
+            <span class="ml-2 text-xs text-muted-foreground">{{ instance.progress_percent|dash }}%</span>
+        {% endcall %}
+        {% call table_cell() %}
+            {{ instance.started_at.strftime('%Y-%m-%d %H:%M') if instance.started_at else 'Pending' }}
+        {% endcall %}
+        {% call table_cell() %}
+            {{ instance.duration_seconds|dash('s') }}
+        {% endcall %}
+        {% call table_cell(class='text-right') %}
+            {{ button(text='View', variant='ghost', icon='arrow-right', href=url_for('integration.instance_detail', instance_id=instance.id)) }}
         {% endcall %}
     {% endcall %}
     {% elif load_error %}
