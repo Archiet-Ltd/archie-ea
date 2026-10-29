@@ -291,7 +291,7 @@ def test_an_organisation_with_complete_chains_is_told_how_many_were_checked(
     login_as(client, user)
     html = client.get("/architecture/traceability").get_data(as_text=True)
     assert 'data-testid="broken-count">0<' in html
-    assert "Every chain is complete: all 2 components and capabilities checked" in html
+    assert "Every chain is complete: all 2 applications and capabilities checked" in html
 
 
 def test_record_pages_carry_a_trace_action_to_the_filtered_page(app, db_session, make_org, tenant_ctx, login_as):

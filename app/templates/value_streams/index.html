@@ -1,162 +1,118 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
-{% from 'components/data_card.html' import data_card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset, section %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/modal.html' import modal %}
+{% from 'basecoat/native-select.html' import native_select, native_select_option %}
 
-{% block title %}Value Streams{% endblock %}
+{% block title %}Value streams{% endblock %}
+
+{% macro _actions() %}
+{% call ui.button(type='button', attrs={'data-modal-open': 'vs-create-modal', 'data-testid': 'vs-new'}) %}{{ lucide('plus') }}New value stream{% endcall %}
+{% endmacro %}
 
 {% block content %}
-<div class="flex-1 overflow-auto" x-data="valueStreamIndex()" x-cloak>
-    {{ page_header(
-        title='Value Streams',
-        description='End-to-end value delivery flows and the BIZBOK capability-to-stage cross-map.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Value Streams'}
-        ],
-        actions=[
-            {'text': 'New Value Stream', 'icon': 'plus', 'onclick': "Platform.modal.open('vs-create-modal')", 'variant': 'default'}
-        ]
-    ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Value streams', subtitle='How value flows end to end, stage by stage, and which capabilities support each stage',
+              breadcrumb=[('Home', url_for('main.index')), ('Value streams', none)], actions_caller=_actions) }}
 
-    <div class="p-6 space-y-6">
-        {% if streams %}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {{ data_card(icon='workflow', icon_color='blue', value=streams|length, label='Value Streams', subtitle='Defined end-to-end flows') }}
-            {{ data_card(icon='layers', icon_color='green', value=streams|sum(attribute='stage_count'), label='Total Stages', subtitle='Across all value streams') }}
-            {{ data_card(icon='link', icon_color='purple', value=streams|sum(attribute='mapped_capability_count'), label='Mapped Capabilities', subtitle='BIZBOK grid rows') }}
-            {{ data_card(icon='target', icon_color='amber', value=(streams|selectattr('strategic_importance', 'equalto', 'critical')|list|length), label='Critical Streams', subtitle='Strategic importance') }}
-        </div>
+{% if not_found %}
+{% call ui.alert() %}{{ lucide('circle-alert') }}{{ ui.alert_title(text='That value stream no longer exists') }}{{ ui.alert_description(text='It may have been deleted. Pick another one from the list below.') }}{% endcall %}
+{% endif %}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for vs in streams %}
-            <a href="{{ url_for('value_stream.detail', value_stream_id=vs.id) }}"
-               class="block rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <i data-lucide="workflow" class="h-5 w-5 text-primary" aria-hidden="true"></i>
-                    </div>
-                    {% if vs.code %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border font-mono">{{ vs.code }}</span>
-                    {% endif %}
-                </div>
-                <h3 class="font-semibold text-foreground mb-1 truncate">{{ vs.name }}</h3>
-                <p class="text-xs text-muted-foreground mb-4 line-clamp-2">{{ vs.description or '—' }}</p>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-muted-foreground">{{ vs.stage_count }} stage{{ 's' if vs.stage_count != 1 else '' }}</span>
-                    <span class="text-muted-foreground">{{ vs.mapped_capability_count }} capabilit{{ 'ies' if vs.mapped_capability_count != 1 else 'y' }}</span>
-                </div>
-                {% if vs.value_stream_type or vs.strategic_importance %}
-                <div class="flex items-center gap-2 mt-3">
-                    {% if vs.value_stream_type %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">{{ vs.value_stream_type|replace('_', ' ')|title }}</span>
-                    {% endif %}
-                    {% if vs.strategic_importance == 'critical' %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">Critical</span>
-                    {% elif vs.strategic_importance == 'high' %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">High</span>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        {{ empty_state(
-            icon='workflow',
-            title='No value streams yet',
-            description='Model your end-to-end value delivery flows (e.g. Order-to-Cash, Concept-to-Market) and map supporting capabilities to each stage.',
-            cta_text='Create Value Stream',
-            cta_onclick="Platform.modal.open('vs-create-modal')",
-            cta_icon='plus'
-        ) }}
-        {% endif %}
-    </div>
+{% if streams %}
+{%- set stage_total = streams|sum(attribute='stage_count') -%}
+{%- set cap_total = streams|sum(attribute='mapped_capability_count') -%}
+{%- set critical = streams|selectattr('strategic_importance', 'equalto', 'critical')|list|length -%}
+{{ stat_cards([
+    {'label': 'Value streams', 'value': streams|length, 'icon': 'waves', 'sentence': 'End-to-end flows defined', 'testid': 'vs-count'},
+    ({'label': 'Stages', 'value': stage_total, 'icon': 'layers', 'sentence': 'Across every value stream'} if stage_total else {'label': 'No stages yet', 'value': none, 'icon': 'layers', 'sentence': 'Open a value stream to add its stages'}),
+    ({'label': 'Mapped capabilities', 'value': cap_total, 'icon': 'link', 'sentence': 'Capabilities linked to a stage'} if cap_total else {'label': 'No capabilities mapped', 'value': none, 'icon': 'link', 'sentence': 'Link capabilities to stages on each value stream'}),
+    ({'label': 'Critical value streams', 'value': critical, 'icon': 'target', 'sentence': 'Marked critical to the business'} if critical else {'label': 'None marked critical', 'value': none, 'icon': 'target', 'sentence': 'Rate importance on each value stream to see which matter most'})
+]) }}
+{% endif %}
 
-    {% call modal(id='vs-create-modal', title='New Value Stream', description='Define an end-to-end value delivery flow.', size='default') %}
-    <form method="POST" action="{{ url_for('value_stream.create') }}" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div>
-            <label for="vs-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input type="text" id="vs-name" name="name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                   placeholder="e.g. Order to Cash">
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label for="vs-code" class="block text-sm font-medium text-muted-foreground mb-1">Code</label>
-                <input type="text" id="vs-code" name="code"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                       placeholder="OTC">
-            </div>
-            <div>
-                <label for="vs-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-                {# DEF-056, Capgemini dry-run: no placeholder option meant the
-                   browser pre-selected "Customer Facing" (the first option) —
-                   a value stream saved without the user ever touching this
-                   field, silently, as if it had been chosen deliberately. #}
-                <select id="vs-type" name="value_stream_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="">Select type…</option>
-                    <option value="customer_facing">Customer Facing</option>
-                    <option value="internal">Internal</option>
-                    <option value="supporting">Supporting</option>
-                </select>
-            </div>
-        </div>
-        <div>
-            <label for="vs-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea id="vs-description" name="description" rows="3"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label for="vs-importance" class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
-                <select id="vs-importance" name="strategic_importance"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="">—</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
-            <div>
-                <label for="vs-owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
-                <input type="text" id="vs-owner" name="business_owner"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-            <button type="button" data-modal-close="vs-create-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Create
-            </button>
-        </div>
-    </form>
-    {% endcall %}
+{% if streams %}
+{%- set any_type = streams|selectattr('value_stream_type')|list|length > 0 -%}
+{%- set any_rated = streams|selectattr('strategic_importance')|list|length > 0 -%}
+{%- set cols = [{'label': 'Value stream', 'sortable': true}] + ([{'label': 'Type', 'class': 'hidden md:table-cell', 'sortable': true}] if any_type else []) + ([{'label': 'Importance', 'sortable': true}] if any_rated else []) + [{'label': 'Stages', 'align': 'right', 'sortable': true}, {'label': 'Capabilities', 'align': 'right', 'sortable': true}, {'label': '', 'class': 'w-12'}] -%}
+{% call section('All value streams', 'Open one to see its stages and the capabilities mapped to each', testid='value-streams-card') %}
+{% call(vs) list_table(rows=streams, columns=cols, caption='Value streams', testid='value-streams-table', row_testid='value-stream-row',
+                       search_placeholder='Filter value streams...', toolbar=true) %}
+  {% call table_cell(class='max-w-[500px]') %}
+    <a href="{{ url_for('value_stream.detail', value_stream_id=vs.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="value-stream-link">{{ vs.name }}</a>
+    {% if vs.description %}<span class="block truncate text-xs text-muted-foreground">{{ vs.description }}</span>{% endif %}
+  {% endcall %}
+  {% if any_type %}{% call table_cell(class='hidden md:table-cell whitespace-nowrap') %}{{ (vs.value_stream_type|replace('_', ' '))|capitalize if vs.value_stream_type else '' }}{% endcall %}{% endif %}
+  {% if any_rated %}{% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get(vs.strategic_importance, 0)}) %}{% if vs.strategic_importance %}{{ state_badge(vs.strategic_importance) }}{% endif %}{% endcall %}{% endif %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': vs.stage_count or 0}) %}{{ vs.stage_count or 0 }}{% endcall %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': vs.mapped_capability_count or 0}) %}{{ vs.mapped_capability_count or 0 }}{% endcall %}
+  {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ vs.name) %}
+    {{ row_action('Open', href=url_for('value_stream.detail', value_stream_id=vs.id), testid='value-stream-open') }}
+    {{ row_action('Capability grid', href=url_for('value_stream.grid', value_stream_id=vs.id)) }}
+    {{ row_action('Delete', action=url_for('value_stream.delete', value_stream_id=vs.id), destructive=true, separator_before=true, confirm='Delete the ' ~ vs.name ~ ' value stream and its stages? This cannot be undone.', testid='value-stream-delete') }}
+  {% endcall %}{% endcall %}
+{% endcall %}
+{% endcall %}
+{% else %}
+{% call ui.card() %}
+{% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'value-streams-empty', 'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('waves') }}{% endcall %}
+    {{ ui.empty_title(text='No value streams yet') }}
+    {{ ui.empty_description(text='Model a flow such as Order to Cash with New value stream, then map the capabilities that support each stage.') }}
+  {% endcall %}
+{% endcall %}
+{% endcall %}
+{% endif %}
 </div>
 
-<script>
-// Registered on alpine:init, not at top level.
-//
-// alpine.min.js is loaded with `defer`, so it has not executed when an inline
-// script runs. Calling Alpine.data() here directly threw "Alpine is not defined",
-// the component was never registered, and x-data="valueStreamIndex()" then threw
-// "valueStreamIndex is not defined" - leaving the enterprise architect's value
-// stream page inert behind x-cloak. This is the pattern the rest of the templates
-// already use.
-document.addEventListener('alpine:init', function () {
-    Alpine.data('valueStreamIndex', function () {
-        return {
-            init() {}
-        };
-    });
-});
-</script>
+{% call modal(id='vs-create-modal', title='New value stream', description='Define an end-to-end flow of value.', size='default') %}
+<form method="POST" action="{{ url_for('value_stream.create') }}" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="space-y-2">
+        {{ ui.label(text='Name', attrs={'for': 'vs-name'}) }}
+        {{ ui.input(type='text', id='vs-name', name='name', required=true, placeholder='e.g. Order to Cash') }}
+    </div>
+    <div class="space-y-2">
+        {{ ui.label(text='Code', attrs={'for': 'vs-code'}) }}
+        {{ ui.input(type='text', id='vs-code', name='code', class='font-mono', placeholder='OTC') }}
+    </div>
+    <div class="space-y-2">
+        {{ ui.label(text='Type', attrs={'for': 'vs-type'}) }}
+        {# DEF-056: an explicit empty first option, so the type is never chosen silently. #}
+        {% call native_select(id='vs-type', name='value_stream_type', class='w-full') %}
+            {{ native_select_option('Choose a type', value='') }}
+            {{ native_select_option('Customer facing', value='customer_facing') }}
+            {{ native_select_option('Internal', value='internal') }}
+            {{ native_select_option('Supporting', value='supporting') }}
+        {% endcall %}
+    </div>
+    <div class="space-y-2">
+        {{ ui.label(text='Description', attrs={'for': 'vs-description'}) }}
+        {{ ui.textarea(id='vs-description', name='description', rows=3) }}
+    </div>
+    <div class="space-y-2">
+        {{ ui.label(text='Strategic importance', attrs={'for': 'vs-importance'}) }}
+        {% call native_select(id='vs-importance', name='strategic_importance', class='w-full') %}
+            {{ native_select_option('Not rated', value='') }}
+            {{ native_select_option('Critical', value='critical') }}
+            {{ native_select_option('High', value='high') }}
+            {{ native_select_option('Medium', value='medium') }}
+            {{ native_select_option('Low', value='low') }}
+        {% endcall %}
+    </div>
+    <div class="space-y-2">
+        {{ ui.label(text='Business owner', attrs={'for': 'vs-owner'}) }}
+        {{ ui.input(type='text', id='vs-owner', name='business_owner') }}
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+        {{ ui.button(text='Cancel', type='button', variant='ghost', attrs={'data-modal-close': 'vs-create-modal'}) }}
+        {{ ui.button(text='Create', type='submit') }}
+    </div>
+</form>
+{% endcall %}
 {% endblock %}

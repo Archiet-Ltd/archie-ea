@@ -482,10 +482,10 @@ def test_roadmap_api_and_gap_analysis_page_counts_agree(
     assert len(roadmap_data.get("gaps", [])) == roadmap_total
     # Parse the Recorded Gaps card value from the rendered HTML
     match = re.search(
-        r"Recorded Gaps</p>\s*<div data-slot=\"card-title\"[^>]*>\s*([0-9]+)\s*</div>",
+        r"data-testid=\"gap-stat-recorded-value\">\s*([0-9]+)\s*<",
         html,
     )
-    assert match is not None, "Recorded Gaps metric not found in rendered page"
+    assert match is not None, "Recorded gaps metric not found in rendered page"
     recorded = int(match.group(1))
     assert recorded == roadmap_total, (
         "Recorded Gaps metric (%d) must equal the roadmap API total (%d)" % (recorded, roadmap_total)
@@ -548,10 +548,10 @@ def test_switched_session_gap_analysis_page_shows_active_org(
 
     # Parse the Recorded Gaps card
     match = re.search(
-        r"Recorded Gaps</p>\s*<div data-slot=\"card-title\"[^>]*>\s*([0-9]+)\s*</div>",
+        r"data-testid=\"gap-stat-recorded-value\">\s*([0-9]+)\s*<",
         html,
     )
-    assert match is not None, "Recorded Gaps metric not found"
+    assert match is not None, "Recorded gaps metric not found"
     recorded = int(match.group(1))
     assert recorded == 3, (
         "Switched to B: Recorded Gaps should be 3 (B's gaps), got %d" % recorded
