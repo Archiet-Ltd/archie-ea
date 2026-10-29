@@ -151,7 +151,8 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
             "fileListLen: (d.fileList||[]).length, "
             "h2Found: !!h2, h2Rect: rect ? {w: rect.width, h: rect.height, top: rect.top} : null, "
             "h2Visible: h2 ? (h2.offsetParent !== null) : null, "
-            "wbChildCount: document.querySelector('[data-workbench=\"1\"]').children.length}; }"
+            "children: [...document.querySelector('[data-workbench=\"1\"]').children].map(c => "
+            "c.tagName + '.' + c.className.slice(0,40) + ' text=' + c.textContent.slice(0,60).replace(/\\s+/g,' '))}; }"
         )
         print('ALPINE STATE AFTER SETUP CLICK:', alpine_state)
         print('CONSOLE MESSAGES SO FAR:', console_messages[-30:])
