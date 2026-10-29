@@ -91,7 +91,7 @@ def test_gap_surfaces_use_distinct_labels():
 
     assert "Capability Gaps Detected" in roadmap
     assert "Capability Gap Signals" in health
-    assert "Recorded Gaps" in register
+    assert "Recorded gaps" in register
     # None of the three should reuse the bare ambiguous "Total Gaps" label.
     assert "Total Gaps" not in roadmap
     assert "Total Gaps" not in register

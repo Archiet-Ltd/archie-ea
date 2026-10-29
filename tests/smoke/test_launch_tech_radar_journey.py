@@ -8,6 +8,7 @@ record is created through the product's own screens and read back after a
 reload; a second organisation sees none of it.
 """
 
+import re
 import uuid
 
 import pytest
@@ -38,7 +39,7 @@ def _create_technology_element(page, base, name, element_type="SystemSoftware"):
         lambda r: r.url.endswith("/architecture/technology/%s/new" % element_type)
         and r.request.method == "POST"
     ) as created:
-        modal.get_by_role("button", name="Submit").click()
+        modal.get_by_role("button", name="Create").click()
     assert created.value.status == 200, created.value.text()
     assert created.value.json()["success"] is True
 
@@ -79,22 +80,46 @@ def _create_programme(page, base, name):
     page.wait_for_url("**/workstreams/*/objective", timeout=PAGE_TIMEOUT)
 
 
+def _row(page, name):
+    return page.locator("tr[data-row]").filter(has=page.locator("[data-element-name='%s']" % name))
+
+
 def _element_id(page, name):
-    """The radar row for *name*: its classify/reclassify button carries the element id."""
-    row = page.locator("li[data-element-name='%s']" % name)
-    button = row.locator("[data-testid^='radar-classify-'], [data-testid^='radar-reclassify-']").first
-    return button.get_attribute("data-testid").rsplit("-", 1)[1]
+    """The radar row for *name*: its place link carries the element id."""
+    link = _row(page, name).locator("[data-testid^='radar-place-']").first
+    return link.get_attribute("data-testid").rsplit("-", 1)[1]
 
 
-def _assert_assess_entry(page, element_id, rationale, programme, existing):
-    section = page.get_by_test_id("radar-section-assess")
-    expect(section.get_by_test_id("radar-reclassify-%s" % element_id)).to_be_visible(timeout=PAGE_TIMEOUT)
+def _open_row_menu(page, name):
+    _row(page, name).get_by_role("button", name="Actions for %s" % name).click()
+
+
+def _open_place_page(page, name, element_id):
+    """Radar row menu, then the link to the page that places the technology."""
+    _open_row_menu(page, name)
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        page.get_by_test_id("radar-place-%s" % element_id).click()
+    expect(page.get_by_test_id("radar-classify-form-%s" % element_id)).to_be_visible(timeout=PAGE_TIMEOUT)
+
+
+def _move_to(page, name, element_id, ring):
+    """Row menu item that moves the technology to *ring*; lands back on the radar."""
+    _open_row_menu(page, name)
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        page.get_by_test_id("radar-move-%s-%s" % (element_id, ring)).click()
+
+
+def _assert_assess_entry(page, name, element_id, rationale, programme, existing):
+    expect(page.get_by_test_id("radar-ring-%s" % element_id)).to_have_text("Assess", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("radar-rationale-%s" % element_id)).to_have_text(rationale)
     expect(page.get_by_test_id("radar-review-date-%s" % element_id)).to_have_text("31 Mar 2027")
     expect(page.get_by_test_id("radar-initiative-%s" % element_id)).to_have_text(programme)
+    # The place page shows the other technology of the same kind.
+    _open_place_page(page, name, element_id)
     same = page.get_by_test_id("radar-same-type-%s" % element_id)
-    expect(same).to_contain_text("Other SystemSoftware elements in the model")
+    expect(same).to_contain_text("Other system software elements and where they sit")
     expect(same).to_contain_text(existing)
+    page.goto(page.url.rsplit("/", 2)[0] + "/", timeout=PAGE_TIMEOUT)
 
 
 def test_architect_places_a_new_broker_on_assess_with_rationale_and_initiative(browser, live_server):
@@ -116,42 +141,39 @@ def test_architect_places_a_new_broker_on_assess_with_rationale_and_initiative(b
         assert page.goto(live_server + "/technology/radar/", timeout=PAGE_TIMEOUT).status == 200
         broker_id = _element_id(page, broker)
         existing_id = _element_id(page, existing)
+        expect(_row(page, broker).get_by_test_id("radar-ring-%s" % broker_id)).to_have_text("Not placed")
 
-        # Before classifying, the platform already shows the other broker.
+        # Before placing, the place page already shows the other broker.
+        _open_place_page(page, broker, broker_id)
         expect(page.get_by_test_id("radar-same-type-%s" % broker_id)).to_contain_text(existing)
 
         form = page.get_by_test_id("radar-classify-form-%s" % broker_id)
-        form.locator("summary").click()
-        form.locator('textarea[name="rationale"]').fill(rationale)
-        form.locator('input[name="review_date"]').fill("2027-03-31")
+        form.get_by_label("Ring").select_option("assess")
+        form.get_by_label("Rationale").fill(rationale)
+        form.get_by_label("Review by").fill("2027-03-31")
         picker = form.get_by_role("combobox", name="Requesting initiative")
         picker.press_sequentially("Integration Prog", delay=20)
         form.get_by_role("option").filter(has_text=programme).get_by_role("button").click()
-        expect(form.get_by_text("Selected:")).to_be_visible()
-        form.locator('select[name="ring"]').select_option("assess")
+        expect(picker).to_have_value(programme)
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
             page.get_by_test_id("radar-classify-%s" % broker_id).click()
+        expect(page).to_have_url(re.compile(r"/technology/radar/?$"))
 
-        _assert_assess_entry(page, broker_id, rationale, programme, existing)
+        _assert_assess_entry(page, broker, broker_id, rationale, programme, existing)
         assert page.reload(timeout=PAGE_TIMEOUT).status == 200
-        _assert_assess_entry(page, broker_id, rationale, programme, existing)
+        _assert_assess_entry(page, broker, broker_id, rationale, programme, existing)
 
-        # The existing broker, classified with the ring alone, has nothing
-        # recorded for the other details: each reads as a dash.
-        button = page.get_by_test_id("radar-classify-%s" % existing_id)
-        button.locator("..").locator('select[name="ring"]').select_option("hold")
-        with page.expect_navigation(timeout=PAGE_TIMEOUT):
-            button.click()
-        for field in ("rationale", "review-date", "initiative"):
-            expect(page.get_by_test_id("radar-%s-%s" % (field, existing_id))).to_have_text("—")
+        # The existing broker, placed with the ring alone, has nothing
+        # recorded for the other details: each says so in words.
+        _move_to(page, existing, existing_id, "hold")
+        expect(page.get_by_test_id("radar-ring-%s" % existing_id)).to_have_text("Hold")
+        for field, unset in (("rationale", "None recorded"), ("review-date", "Not set"),
+                             ("initiative", "Not linked")):
+            expect(page.get_by_test_id("radar-%s-%s" % (field, existing_id))).to_have_text(unset)
         # Moving the new broker keeps what was recorded for it.
-        move = page.get_by_test_id("radar-reclassify-%s" % broker_id)
-        move.locator("..").locator('select[name="ring"]').select_option("trial")
-        with page.expect_navigation(timeout=PAGE_TIMEOUT):
-            move.click()
+        _move_to(page, broker, broker_id, "trial")
         assert page.reload(timeout=PAGE_TIMEOUT).status == 200
-        expect(page.get_by_test_id("radar-section-trial").get_by_test_id(
-            "radar-reclassify-%s" % broker_id)).to_be_visible()
+        expect(page.get_by_test_id("radar-ring-%s" % broker_id)).to_have_text("Trial")
         expect(page.get_by_test_id("radar-rationale-%s" % broker_id)).to_have_text(rationale)
         expect(page.get_by_test_id("radar-initiative-%s" % broker_id)).to_have_text(programme)
     finally:
@@ -221,7 +243,7 @@ def test_cto_publishes_a_standard_with_ring_and_sunset_date(browser, live_server
 
         # The ring lives on the radar: the element is shown in Adopt there.
         assert page.goto(live_server + "/technology/radar/", timeout=PAGE_TIMEOUT).status == 200
-        expect(page.get_by_test_id("radar-section-adopt").get_by_text(element, exact=True)).to_be_visible()
+        expect(page.get_by_test_id("radar-ring-%s" % _element_id(page, element))).to_have_text("Adopt")
     finally:
         context.close()
 

@@ -7,9 +7,9 @@
                strategic/*, governance/*, and all other authenticated pages.
    See also: public_base.html (unauthenticated), base.html (legacy, avoid).
 #}
-{% from 'components/button.html' import button %}
-{% from 'components/dialog.html' import dialog %}
-{% from 'components/input.html' import input %}
+{% from 'components/button.html' import button as _layout_button %}
+{% from 'components/dialog.html' import dialog as _layout_dialog %}
+{% from 'components/input.html' import input as _layout_input %}
 {% from 'components/ui_sidebar.html' import sidebar_wrapper, sidebar_inset %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
@@ -78,11 +78,15 @@
     <!-- NOTE: api-fetch.js removed — Platform.fetch (03-fetch.js) already provides window.apiFetch -->
     <script src="{{ url_for('static', filename='js/shared/debounce.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alpine-architecture.js') }}"></script>
+    {# flask-basecoat behaviour for library menus, selects, tabs and dialogs (data-slot elements only) #}
+    <script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-ui.js') }}" defer></script>
+    {# the list table's filter, column visibility, sorting and paging (components/list_table.html) #}
+    <script src="{{ url_for('static', filename='js/data-table.js') }}" defer></script>
 
     <!-- Page-specific Alpine registrations (after Platform, before Alpine defer fires) -->
     {% block extra_head_js %}{% endblock %}
 </head>
-<body class="h-full bg-background text-foreground antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
+<body class="style-vega h-full bg-background text-foreground antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
     {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
     <!-- Skip navigation links for keyboard users -->
     <a href="#main-content"
@@ -129,10 +133,10 @@
                     {% if sample_company_restore_point_id %}
                     <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-testid="sample-company-indicator">
                         <p class="text-muted-foreground">You are looking at the sample company.</p>
-                        {% call dialog(trigger_text='Remove it', trigger_label='Remove it', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
+                        {% call _layout_dialog(trigger_text='Remove it', trigger_label='Remove it', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
                         <form method="post" action="{{ url_for('architect_ui.remove_sample_company') }}" class="flex justify-end">
-                            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-                            {{ button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
+                            {{ _layout_input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                            {{ _layout_button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
                         </form>
                         {% endcall %}
                     </div>
@@ -144,7 +148,8 @@
                        history, subscribe) for every signed-in user. Outside the sidebar
                        so it does not spend a navigation slot. #}
                     {% if current_user.is_authenticated and 'service_status.status_page' in flask.current_app.view_functions %}
-                    <footer class="flex h-8 items-center text-xs text-muted-foreground" data-testid="app-footer">
+                    {# The footer link sits on the content column; the Overview keeps the placement the founder approved. #}
+                    <footer class="flex h-8 items-center{% if request.path != '/dashboard/overview' %} px-6{% endif %} text-xs text-muted-foreground" data-testid="app-footer">
                         <a href="{{ url_for('service_status.status_page') }}"
                            class="inline-flex items-center gap-1.5 hover:text-foreground"
                            data-testid="footer-service-status">
@@ -235,8 +240,8 @@
                 </div>
             </div>
             <div class="flex items-center justify-between border-t border-border px-4 py-3">
-                {{ button(text='Exit', variant='ghost', on_click='exit()') }}
-                {{ button(text='Next', variant='default', on_click='next()', attrs_dict={'x-text': "currentIndex === steps.length - 1 ? 'Done' : 'Next'"}) }}
+                {{ _layout_button(text='Exit', variant='ghost', on_click='exit()') }}
+                {{ _layout_button(text='Next', variant='default', on_click='next()', attrs_dict={'x-text': "currentIndex === steps.length - 1 ? 'Done' : 'Next'"}) }}
             </div>
         </div>
     </div>
