@@ -1,8 +1,13 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}AI Extraction Corrections{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block content %}
 <div class="space-y-6">
@@ -59,123 +64,75 @@
         {% endcall %}
         {% call card_content() %}
             {% if rows %}
-                <div class="overflow-x-auto">
-                    <table class="dense-table w-full text-sm" id="corrections-table">
-                        <thead>
-                            <tr class="border-b border-border">
-                                <th class="text-left py-3 px-4 font-medium text-muted-foreground">Application</th>
-                                <th class="text-left py-3 px-4 font-medium text-muted-foreground">AI Element Name</th>
-                                <th class="text-left py-3 px-4 font-medium text-muted-foreground">AI Type</th>
-                                <th class="text-left py-3 px-4 font-medium text-muted-foreground">AI Layer</th>
-                                <th class="text-left py-3 px-4 font-medium text-muted-foreground">Completeness</th>
-                                <th class="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border" id="corrections-tbody">
-                            {% for row in rows %}
-                            <tr class="hover:bg-muted/50 transition-colors" id="row-{{ row.element_id }}" data-element-id="{{ row.element_id }}">
-                                <td class="py-3 px-4">
-                                    <span class="font-medium text-foreground">{{ row.app_name }}</span>
-                                </td>
-                                <td class="py-3 px-4 text-foreground/80">{{ row.element_name or '—' }}</td>
-                                <td class="py-3 px-4">
-                                    {% if row.element_type %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
-                                            {{ row.element_type }}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted-foreground">—</span>
-                                    {% endif %}
-                                </td>
-                                <td class="py-3 px-4">
-                                    {% if row.element_layer %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary/10 text-secondary-foreground border border-border">
-                                            {{ row.element_layer }}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted-foreground">—</span>
-                                    {% endif %}
-                                </td>
-                                <td class="py-3 px-4">
-                                    {% set score = row.completeness %}
-                                    <div class="flex items-center gap-2">
-                                        <div class="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
-                                            <div class="h-full rounded-full {% if score >= 70 %}bg-success{% elif score >= 40 %}bg-warning{% else %}bg-destructive{% endif %}"
-                                                 style="width: {{ score | int }}%"></div>
-                                        </div>
-                                        <span class="text-xs text-muted-foreground">{{ score | int }}%</span>
-                                    </div>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <div class="flex items-center gap-2" id="actions-{{ row.element_id }}">
-                                        <!-- Correct button -->
-                                        <button
-                                            type="button"
-                                            data-action="markCorrect" data-eid="{{ row.element_id }}"
-                                            class="inline-flex items-center gap-1 rounded-md bg-success/10 border border-success/30 text-success-emphasis px-2.5 py-1 text-xs font-medium hover:bg-success/20 transition-colors"
-                                            aria-label="Mark element {{ row.element_id }} as correct">
-                                            <i data-lucide="check" class="h-3 w-3" aria-hidden="true"></i>
-                                            Correct
-                                        </button>
+                {% set columns = [('Application', ''), ('AI Element Name', ''), ('AI Type', ''), ('AI Layer', ''), {'label': 'Completeness', 'sortable': false}, {'label': 'Actions', 'sortable': false}] %}
+                {% call(row) list_table(rows=rows, columns=columns, caption='AI-generated elements', testid='corrections-table', row_testid='correction-row',
+                                         search_placeholder='Filter elements...', empty_message='No AI-generated elements found.') %}
+                    {% call table_cell(attrs={'id': 'row-' ~ row.element_id, 'data-element-id': row.element_id}) %}
+                        <span class="font-medium text-foreground">{{ row.app_name }}</span>
+                    {% endcall %}
+                    {% call table_cell(class='text-foreground/80') %}{{ row.element_name or '—' }}{% endcall %}
+                    {% call table_cell() %}
+                        {% if row.element_type %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
+                                {{ row.element_type }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted-foreground">—</span>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if row.element_layer %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary/10 text-secondary-foreground border border-border">
+                                {{ row.element_layer }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted-foreground">—</span>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% set score = row.completeness %}
+                        <div class="flex items-center gap-2">
+                            <div class="h-1.5 w-16 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow="{{ score|int }}" aria-valuemin="0" aria-valuemax="100" aria-label="Completeness">
+                                {# token-migration-ok: dynamic per-row fill width; no Tailwind-only equivalent exists for an arbitrary runtime percentage #}
+                                <div class="h-full rounded-full {% if score >= 70 %}bg-success{% elif score >= 40 %}bg-warning{% else %}bg-destructive{% endif %}"
+                                     style="width: {{ score | int }}%"></div>
+                            </div>
+                            <span class="text-xs text-muted-foreground">{{ score | int }}%</span>
+                        </div>
+                    {% endcall %}
+                    {% call table_cell() %}
+                        <div class="flex items-center gap-2" id="actions-{{ row.element_id }}">
+                            {{ button(text='Correct', type='button', variant='bare', size='bare', icon='check',
+                                      class='inline-flex items-center gap-1 rounded-md bg-success/10 border border-success/30 text-success-emphasis px-2.5 py-1 text-xs font-medium hover:bg-success/20 transition-colors',
+                                      data_action='markCorrect', aria_label='Mark element ' ~ row.element_id ~ ' as correct', attrs_dict={'data-eid': row.element_id}) }}
+                            {{ button(text='Fix', type='button', variant='bare', size='bare', icon='edit-2',
+                                      class='inline-flex items-center gap-1 rounded-md bg-warning/10 border border-warning/30 text-warning-emphasis px-2.5 py-1 text-xs font-medium hover:bg-warning/20 transition-colors',
+                                      data_action='toggleFixForm', aria_label='Fix element ' ~ row.element_id, attrs_dict={'data-eid': row.element_id}) }}
+                        </div>
 
-                                        <!-- Fix inline form -->
-                                        <button
-                                            type="button"
-                                            data-action="toggleFixForm" data-eid="{{ row.element_id }}"
-                                            class="inline-flex items-center gap-1 rounded-md bg-warning/10 border border-warning/30 text-warning-emphasis px-2.5 py-1 text-xs font-medium hover:bg-warning/20 transition-colors"
-                                            aria-label="Fix element {{ row.element_id }}">
-                                            <i data-lucide="edit-2" class="h-3 w-3" aria-hidden="true"></i>
-                                            Fix
-                                        </button>
+                        <!-- Inline fix form (hidden by default) -->
+                        <div id="fix-form-{{ row.element_id }}" class="hidden mt-2">
+                            <div class="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-xs font-medium text-muted-foreground" for="fix-name-{{ row.element_id }}">Correct Name</label>
+                                        {{ input(id='fix-name-' ~ row.element_id, type='text', placeholder=row.element_name, size='xs', class='mt-1 w-full') }}
                                     </div>
-
-                                    <!-- Inline fix form (hidden by default) -->
-                                    <div id="fix-form-{{ row.element_id }}" class="hidden mt-2">
-                                        <div class="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-                                            <div class="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label class="text-xs font-medium text-muted-foreground" for="fix-name-{{ row.element_id }}">Correct Name</label>
-                                                    <input
-                                                        id="fix-name-{{ row.element_id }}"
-                                                        type="text"
-                                                        placeholder="{{ row.element_name }}"
-                                                        class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label class="text-xs font-medium text-muted-foreground" for="fix-type-{{ row.element_id }}">Correct Type</label>
-                                                    <input
-                                                        id="fix-type-{{ row.element_id }}"
-                                                        type="text"
-                                                        placeholder="{{ row.element_type }}"
-                                                        class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div class="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    data-action="submitFix" data-eid="{{ row.element_id }}"
-                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                                    aria-label="Submit fix for element {{ row.element_id }}">
-                                                    Submit Fix
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    data-action="toggleFixForm" data-eid="{{ row.element_id }}"
-                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                                    aria-label="Cancel fix for element {{ row.element_id }}">
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
+                                    <div>
+                                        <label class="text-xs font-medium text-muted-foreground" for="fix-type-{{ row.element_id }}">Correct Type</label>
+                                        {{ input(id='fix-type-' ~ row.element_id, type='text', placeholder=row.element_type, size='xs', class='mt-1 w-full') }}
                                     </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    {{ button(text='Submit Fix', type='button', variant='default', size='sm',
+                                              data_action='submitFix', aria_label='Submit fix for element ' ~ row.element_id, attrs_dict={'data-eid': row.element_id}) }}
+                                    {{ button(text='Cancel', type='button', variant='outline', size='sm',
+                                              data_action='toggleFixForm', aria_label='Cancel fix for element ' ~ row.element_id, attrs_dict={'data-eid': row.element_id}) }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endcall %}
+                {% endcall %}
             {% else %}
                 <div class="rounded-xl border-2 border-dashed border-muted-foreground/25 p-12 text-center">
                     <div class="flex justify-center mb-4">
@@ -207,7 +164,7 @@ function markCorrect(elementId) {
     Platform.fetch.post(`/dashboard/api/archimate-elements/${elementId}/correct`, { action: 'approve' }, { silent: true })
         .then(data => {
             if (data.success !== false) {
-                const row = document.getElementById(`row-${elementId}`);
+                const row = document.getElementById(`actions-${elementId}`)?.closest("tr");
                 if (row) {
                     row.classList.add('opacity-50');
                     const actionsEl = document.getElementById(`actions-${elementId}`);
@@ -251,7 +208,7 @@ function submitFix(elementId) {
     Platform.fetch.post(`/dashboard/api/archimate-elements/${elementId}/correct`, payload, { silent: true })
         .then(data => {
             if (data.success !== false) {
-                const row = document.getElementById(`row-${elementId}`);
+                const row = document.getElementById(`actions-${elementId}`)?.closest("tr");
                 if (row) {
                     row.classList.add('bg-warning/5');
                     const actionsEl = document.getElementById(`actions-${elementId}`);
