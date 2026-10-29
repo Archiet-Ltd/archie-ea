@@ -1,6 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: form #}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'macros/ui.html' import ui %}
+{% from 'basecoat/index.html' import ui %}
 
 {% block title %}Assign Owner for {{ app.name }}{% endblock %}
 
@@ -19,12 +20,17 @@
     {%- for u in users -%}{%- set _ = user_options.append((u.id, u.full_name + ' (' + u.email + ')')) -%}{%- endfor -%}
     <form method="POST">
         <div class="mb-4">
-            {{ ui.field(label='Select a user to assign as owner', name='user_id', help='The user who will become the primary owner of this application.') }}
-            {{ ui.select(id='user_id', name='user_id', options=user_options, required=True) }}
+            <label for="user_id" class="form-label">Select a user to assign as owner</label>
+<p class="form-text">The user who will become the primary owner of this application.</p>
+            <select id="user_id" name="user_id" class="form-control" required>
+    {% for value, label in user_options %}
+        <option value="{{ value }}">{{ label }}</option>
+    {% endfor %}
+</select>
         </div>
         <div class="flex justify-end gap-2">
-            {{ ui.button(text='Cancel', href=url_for('unified_applications.application_detail', id=app.id), intent='secondary') }}
-            {{ ui.button(text='Assign Owner', type='submit') }}
+            <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Assign Owner</button>
         </div>
     </form>
 </div>

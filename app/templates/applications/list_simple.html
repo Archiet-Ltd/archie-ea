@@ -1,10 +1,27 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/ui.html' import ui %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import explained_value %}
 {% from 'components/completeness_ring.html' import completeness_ring %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/alert.html' import alert as quiet_alert %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'components/card.html' import card %}
+{# Options-list form of the shared native select: the page passes (value, label) pairs. #}
+{% macro select_native(id='', name='', options=[], selected=none, empty_label=none, size='default', class='', attrs_dict={}) %}
+  {% call native_select(id=id, name=name, size=size, class=('' if 'w-' in class else 'w-full ') ~ class, attrs_dict=attrs_dict) %}
+    {% if empty_label is not none %}<option value="">{{ empty_label }}</option>{% endif %}
+    {% for value, label in options %}<option value="{{ value }}"{% if selected is not none and selected|string == value|string %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  {% endcall %}
+{% endmacro %}
 
 {% block title %}Applications{% endblock %}
 
@@ -78,7 +95,7 @@
   {%- set _ = items.append({'divider': true}) -%}
   {%- set _ = items.append({'text': 'Delete', 'icon': 'trash-2', 'variant': 'destructive', 'aria_label': 'Delete ' ~ app.name, 'onclick': 'deleteApplication(' ~ (url_for('unified_applications.application_delete', id=app.id) | tojson | forceescape) ~ ', ' ~ name_js ~ ')', 'testid': 'btn-delete' ~ sfx ~ '-' ~ app.id}) -%}
   {%- endif -%}
-  {{ ui.dropdown_menu(trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', trigger_variant='ghost',
+  {{ dropdown_menu(trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', trigger_variant='ghost',
                    trigger_aria_label='Actions for ' ~ app.name, trigger_testid='btn-actions' ~ sfx ~ '-' ~ app.id,
                    menu_width='w-52', items=items) }}
 {% endmacro %}
@@ -87,12 +104,7 @@
 {% macro owner_cell(app, owner_names, sfx='') %}
   {%- if owner_names -%}
     {%- for owner_name in owner_names -%}
-      {% if owner_name.startswith('Code owner on GitHub:') %}
-        <span class="block text-sm text-warning-emphasis" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
-        <a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="text-xs text-primary hover:underline">Assign to a member</a>
-      {% else %}
-        <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
-      {% endif %}
+    <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
     {%- endfor -%}
   {%- elif can('edit', 'application') -%}
     <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
@@ -106,7 +118,7 @@
     {{ explained_value('Not set') }}
   {%- else -%}
     {%- set known = status_map.get(status_text | lower) -%}
-    {{ ui.badge(known.label if known else status_text, variant=(known.variant if known else 'neutral')) }}
+    {% call badge(known.variant if known else 'neutral') %}{{ known.label if known else status_text }}{% endcall %}
   {%- endif -%}
 {% endmacro %}
 
@@ -130,14 +142,14 @@
     {%- set _ = more_items.append({'text': 'AI Map', 'icon': 'sparkles', 'onclick': 'openAiMapModal()', 'testid': 'btn-ai-map', 'title': 'Use AI to suggest capability, process and ArchiMate mappings for your applications', 'aria_label': 'AI map applications'}) -%}
     <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
       {% if can('create', 'application') %}
-      {{ ui.button(text='Add Application', icon='plus', testid='btn-add-application', aria_label='Add application',
+      {{ button(text='Add Application', icon='plus', testid='btn-add-application', aria_label='Add application',
                 attrs_dict={'data-modal-open': 'modal-create', 'title': 'Register a new application in the portfolio'}) }}
       {% endif %}
-      {{ ui.button(text='Import', icon='upload', variant='outline', testid='btn-import', aria_label='Import applications',
+      {{ button(text='Import', icon='upload', variant='outline', testid='btn-import', aria_label='Import applications',
                 attrs_dict={'data-modal-open': 'application-import-modal', 'title': 'Import applications from a spreadsheet or the Abacus feed'}) }}
-      {{ ui.button(text='Export', icon='download', variant='outline', testid='btn-export', aria_label='Export applications',
+      {{ button(text='Export', icon='download', variant='outline', testid='btn-export', aria_label='Export applications',
                 on_click='exportCSV()', attrs_dict={'title': 'Download the current filtered list as a CSV file'}) }}
-      {{ ui.dropdown_menu(trigger_text='More', trigger_variant='default', trigger_size='md', trigger_testid='btn-more-actions',
+      {{ dropdown_menu(trigger_text='More', trigger_variant='default', trigger_size='md', trigger_testid='btn-more-actions',
                        trigger_aria_label='More actions', menu_width='w-56', items=more_items) }}
     </div>
   {% endmacro %}
@@ -152,7 +164,7 @@
   {% if stats.summary_total %}
   {%- set total_n = stats.summary_total -%}
   {%- set keep_decom = 'true' if include_decom else none -%}
-  {% call ui.alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
+  {% call quiet_alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
                 link_href=url_for('enterprise_crud.data_freshness_cockpit'), link_text='View full data-freshness report', class='flex-wrap') %}
     {%- if stats.no_owner > 0 -%}
     <a href="{{ url_for('unified_applications.application_list', no_owner='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-owner">{{ stats.no_owner }} of {{ total_n }} have no owner</a>
@@ -195,10 +207,10 @@
     }
   {%- endset -%}
   <div x-data="{ appDiagramOpen: false, appDiagramLoaded: false, appDiagramError: '' }">
-    {{ ui.button(text='Application Cooperation Viewpoint', icon='chevron-right', variant='ghost', size='sm', on_click=diagram_toggle,
+    {{ button(text='Application Cooperation Viewpoint', icon='chevron-right', variant='ghost', size='sm', on_click=diagram_toggle,
               attrs_dict={':aria-expanded': 'appDiagramOpen.toString()'}) }}
     <div x-show="appDiagramOpen" x-cloak x-transition class="mt-3">
-      {% call ui.card(class='overflow-hidden') %}
+      {% call card(class='overflow-hidden') %}
         <div class="flex items-center justify-between border-b border-border bg-muted/20 px-5 py-2">
           <span class="text-xs font-medium text-muted-foreground">Application Cooperation Viewpoint</span>
           <a href="/archimate/composer" class="text-2xs text-primary hover:underline">Full Composer →</a>
@@ -211,20 +223,20 @@
   </div>
 
   {# ─ MAIN TABLE CARD ─ #}
-  {% call ui.card(class='overflow-hidden') %}
+  {% call card(class='overflow-hidden') %}
   <div role="region" aria-label="Applications table">
     <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3" data-testid="filter-bar-head">
       <div class="flex flex-wrap items-center gap-2">
         {# This counts the rows in the current (filtered) view, which by default
            hides decommissioned applications, so it is not the portfolio total:
            it is labelled "shown" and names the portfolio size when they differ. #}
-        {% if total_count %}{{ ui.badge(total_count ~ ' shown' ~ (' of ' ~ portfolio_total if portfolio_total and portfolio_total != total_count else ''), variant='neutral', class='tabular-nums', testid='total-count-badge') }}{% endif %}
+        {% if total_count %}{% call badge('neutral', class='tabular-nums') %}<span data-testid="total-count-badge">{{ total_count }} shown{% if portfolio_total and portfolio_total != total_count %} of {{ portfolio_total }}{% endif %}</span>{% endcall %}{% endif %}
         {# active filter chips #}
         {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor %}
         <span class="text-xs font-medium text-muted-foreground" data-testid="active-filters">Active filters:
-          {% if active_filters.no_owner %}{{ ui.badge('No owner', size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_com else none))) }}{% endif %}
-          {% if active_filters.no_capability %}{{ ui.badge('No capability', size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) }}{% endif %}
-          {% if active_filters.no_vendor %}{{ ui.badge('No vendor', size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) }}{% endif %}
+          {% if active_filters.no_owner %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No owner<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
+          {% if active_filters.no_capability %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No capability<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
+          {% if active_filters.no_vendor %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No vendor<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
         </span>
         {% endif %}
       </div>
@@ -259,37 +271,40 @@
     <div class="border-b border-border bg-muted/20 px-4 py-3" data-testid="filter-bar">
       <div class="flex flex-wrap items-end gap-3">
         <div class="min-w-[180px] max-w-xs flex-1">
-          {{ ui.field(label='Search', name='search', icon='search') }}
-          {{ ui.input(id='filter-search', name='search', type='search', size='sm', class='pl-8', placeholder='Name, description, stack...', value=filters.search,
+          <label for="filter-search" class="mb-1 block text-xs font-medium text-muted-foreground">Search</label>
+          <div class="relative">
+            <i data-lucide="search" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true"></i>
+            {{ input(id='filter-search', name='search', type='search', size='sm', class='pl-8', placeholder='Name, description, stack...', value=filters.search,
                      attrs_dict={'autocomplete': 'off', 'data-testid': 'filter-search', 'x-model': 'filters.search', '@input.debounce.300ms': 'onFilterChange()'}) }}
+          </div>
         </div>
         <div class="min-w-[140px]">
-          {{ ui.field(label='Type', name='type') }}
-          {{ ui.select(id='filter-type', name='type', size='sm', options=type_options, selected=filters.type, empty_option='All types',
+          <label for="filter-type" class="mb-1 block text-xs font-medium text-muted-foreground">Type</label>
+          {{ select_native(id='filter-type', size='sm', options=type_options, selected=filters.type, empty_label='All types',
                            attrs_dict={'data-testid': 'filter-type', 'x-model': 'filters.type', '@change': 'onFilterChange()'}) }}
         </div>
         <div class="min-w-[180px]">
-          {{ ui.field(label='Lifecycle Status', name='status') }}
-          {{ ui.select(id='filter-status', name='status', size='sm', options=status_options, selected=filters.status, empty_option='All lifecycle statuses',
+          <label for="filter-status" class="mb-1 block text-xs font-medium text-muted-foreground">Lifecycle Status</label>
+          {{ select_native(id='filter-status', name='status', size='sm', options=status_options, selected=filters.status, empty_label='All lifecycle statuses',
                            attrs_dict={'data-testid': 'filter-lifecycle-status', 'x-model': 'filters.status', '@change': 'onFilterChange()'}) }}
         </div>
         <div class="min-w-[140px]">
-          {{ ui.field(label='Domain', name='domain') }}
-          {{ ui.select(id='filter-domain', name='domain', size='sm', options=domain_options, selected=filters.domain, empty_option='All domains',
+          <label for="filter-domain" class="mb-1 block text-xs font-medium text-muted-foreground">Domain</label>
+          {{ select_native(id='filter-domain', size='sm', options=domain_options, selected=filters.domain, empty_label='All domains',
                            attrs_dict={'data-testid': 'filter-domain', 'x-model': 'filters.domain', '@change': 'onFilterChange()'}) }}
         </div>
         <div class="min-w-[130px]">
-          {{ ui.field(label='Cap. Level', name='capability_level') }}
-          {{ ui.select(id='filter-cap-level', name='capability_level', size='sm', options=level_options, selected=filters.capability_level, empty_option='All levels',
+          <label for="filter-cap-level" class="mb-1 block text-xs font-medium text-muted-foreground">Cap. Level</label>
+          {{ select_native(id='filter-cap-level', size='sm', options=level_options, selected=filters.capability_level, empty_label='All levels',
                            attrs_dict={'data-testid': 'filter-capability-level', 'x-model': 'filters.capability_level', '@change': 'onFilterChange()'}) }}
         </div>
         <div class="flex items-end">
-          {{ ui.button(text='Clear', icon='x', variant='outline', aria_label='Clear filters', testid='btn-clear-filters', on_click='clearFilters()',
+          {{ button(text='Clear', icon='x', variant='outline', aria_label='Clear filters', testid='btn-clear-filters', on_click='clearFilters()',
                     attrs_dict={'x-show': 'hasActiveFilters()', 'x-cloak': ''}) }}
         </div>
         {# APP-031: default active portfolio; optional full portfolio including decommissioned #}
         <div class="flex min-w-[220px] items-end pb-1.5" data-testid="include-decom-toggle-wrap">
-          {{ ui.checkbox(id='include-decom', label=decom_label, checked=include_decom,
+          {{ checkbox(id='include-decom', label=decom_label, checked=include_decom,
                       attrs_dict={'data-testid': 'include-decom-checkbox',
                                   'data-href-on': request.path ~ '?' ~ qs_include_decom_true,
                                   'data-href-off': request.path ~ '?' ~ qs_include_decom_false,
@@ -314,20 +329,20 @@
       {%- set _ = lifecycle_items.append({'text': stage_label, 'aria_label': stage_label, 'onclick': "bulkUpdateLifecycle('" ~ stage ~ "')"}) -%}
       {%- endfor -%}
       <div class="flex flex-wrap items-center gap-2">
-        {{ ui.button(text='Export', icon='download', variant='outline', size='sm', aria_label='Export', testid='bulk-btn-export', on_click='bulkExportSelected()') }}
-        {{ ui.button(text='Map', icon='git-branch', variant='outline', size='sm', aria_label='Map selected applications', testid='bulk-btn-map',
+        {{ button(text='Export', icon='download', variant='outline', size='sm', aria_label='Export', testid='bulk-btn-export', on_click='bulkExportSelected()') }}
+        {{ button(text='Map', icon='git-branch', variant='outline', size='sm', aria_label='Map selected applications', testid='bulk-btn-map',
                   on_click="openUnifiedMappingModalDiscovery({context:'capability', ids: [...selectedIds]})") }}
-        {{ ui.dropdown_menu(trigger_text='Lifecycle', trigger_icon='refresh-cw', trigger_size='sm', trigger_testid='bulk-btn-lifecycle',
+        {{ dropdown_menu(trigger_text='Lifecycle', trigger_icon='refresh-cw', trigger_size='sm', trigger_testid='bulk-btn-lifecycle',
                          trigger_aria_label='Update lifecycle', position='left', menu_width='w-44', items=lifecycle_items) }}
-        {{ ui.button(text='Owner', icon='user-check', variant='outline', size='sm', aria_label='Assign owner', testid='bulk-btn-assign-owner', on_click='promptBulkAssignOwner()') }}
-        {{ ui.button(text='Tag', icon='tag', variant='outline', size='sm', aria_label='Add tag', testid='bulk-btn-tag', on_click='promptBulkTag()') }}
+        {{ button(text='Owner', icon='user-check', variant='outline', size='sm', aria_label='Assign owner', testid='bulk-btn-assign-owner', on_click='promptBulkAssignOwner()') }}
+        {{ button(text='Tag', icon='tag', variant='outline', size='sm', aria_label='Add tag', testid='bulk-btn-tag', on_click='promptBulkTag()') }}
         {% if can('bulk_delete', 'application') %}
-        {{ ui.button(text='Delete', icon='trash-2', variant='outline', size='sm', aria_label='Delete', testid='bulk-btn-delete', on_click='confirmBulkDelete()',
+        {{ button(text='Delete', icon='trash-2', variant='outline', size='sm', aria_label='Delete', testid='bulk-btn-delete', on_click='confirmBulkDelete()',
                   class='border-destructive/30 text-destructive-emphasis hover:bg-destructive/10') }}
         {% endif %}
       </div>
       <div class="ml-auto">
-        {{ ui.button(icon='x', variant='ghost', size='icon-sm', aria_label='Clear selection', on_click='clearSelection()') }}
+        {{ button(icon='x', variant='ghost', size='icon-sm', aria_label='Clear selection', on_click='clearSelection()') }}
       </div>
     </div>
 
@@ -359,31 +374,31 @@
     <div class="hidden lg:block">
 {% set _dt_header %}
             <th scope="col" class="h-10 w-10 px-2 text-left align-middle">
-              {{ ui.checkbox(id='select-all-desktop',
+              {{ checkbox(id='select-all-desktop',
                           attrs_dict={'aria-label': 'Select all', 'data-testid': 'select-all', ':checked': 'allSelected()', ':indeterminate': 'someSelected()', '@change': 'toggleSelectAll($event.target.checked)'}) }}
             </th>
             <th scope="col" class="h-10 min-w-[180px] px-2 text-left align-middle">
-              {{ ui.button(text='Application', variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Application name', testid='th-sort-name', on_click="sortBy('name')", icon=('chevron-up' if sort == 'name' and dir == 'asc' else 'chevron-down' if sort == 'name' and dir == 'desc' else None)) }}
+              {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Application name', testid='th-sort-name', on_click="sortBy('name')") %}Application<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'name' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'name' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
             </th>
             <th scope="col" class="h-10 min-w-[120px] px-2 text-left align-middle">
-              {{ ui.button(text='Type', variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Type', testid='th-sort-type', on_click="sortBy('type')", icon=('chevron-up' if sort == 'type' and dir == 'asc' else 'chevron-down' if sort == 'type' and dir == 'desc' else None)) }}
+              {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Type', testid='th-sort-type', on_click="sortBy('type')") %}Type<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
             </th>
             <th scope="col" class="h-10 min-w-[110px] px-2 text-left align-middle" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">ArchiMate</th>
             <th scope="col" class="h-10 min-w-[160px] px-2 text-left align-middle">
-              {{ ui.button(text='Lifecycle Status', variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Lifecycle Status', testid='th-sort-lifecycle-status', on_click="sortBy('lifecycle_status')", icon=('chevron-up' if sort == 'lifecycle_status' and dir == 'asc' else 'chevron-down' if sort == 'lifecycle_status' and dir == 'desc' else None)) }}
+              {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Lifecycle Status', testid='th-sort-lifecycle-status', on_click="sortBy('lifecycle_status')") %}Lifecycle Status<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
             </th>
             <th scope="col" class="h-10 min-w-[140px] px-2 text-left align-middle">Owner</th>
             <th scope="col" class="h-10 w-20 px-2 text-center align-middle">Record</th>
             <th scope="col" class="h-10 min-w-[150px] px-2 text-left align-middle">Capability</th>
             <th scope="col" class="h-10 w-14 px-2 text-right align-middle"><span class="sr-only">Actions</span></th>
 {% endset %}
-{% call ui.table(header=_dt_header, testid='applications-table', flush=true, max_height='calc(100vh - 280px)') %}
+{% call dense_table(header=_dt_header, testid='applications-table', flush=true, max_height='calc(100vh - 280px)') %}
           {% for app in applications %}
           {%- set status_text = app.lifecycle_status or app.deployment_status or 'Not set' -%}
           {%- set pc = app.capability_mappings | selectattr('business_capability') | first -%}
           <tr class="group transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
             <td class="px-2 align-middle">
-              {{ ui.checkbox(class='row-select',
+              {{ checkbox(class='row-select',
                           attrs_dict={'aria-label': 'Select ' ~ app.name, 'data-testid': 'row-select-' ~ app.id, ':checked': 'selectedIds.has(' ~ app.id ~ ')', '@change': 'toggleRow(' ~ app.id ~ ', $event.target.checked)'}) }}
             </td>
             <td class="px-2 align-middle">
@@ -433,7 +448,7 @@
         <div class="p-4" data-app-id="{{ app.id }}" data-testid="mobile-card-{{ app.id }}">
           <div class="mb-3 flex items-start justify-between gap-2">
             <div class="flex min-w-0 items-start gap-3">
-              {{ ui.checkbox(class='row-select pt-1',
+              {{ checkbox(class='row-select pt-1',
                           attrs_dict={'aria-label': 'Select ' ~ app.name, ':checked': 'selectedIds.has(' ~ app.id ~ ')', '@change': 'toggleRow(' ~ app.id ~ ', $event.target.checked)'}) }}
               <div class="min-w-0">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block truncate text-base font-semibold text-foreground hover:underline">{{ app.name }}</a>
@@ -494,16 +509,16 @@
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2">
             <label for="page-size-select" class="text-sm text-muted-foreground">Show:</label>
-            {{ ui.select(id='page-size-select', name='page_size', size='xs', class='w-20', options=[(25, 25), (50, 50), (100, 100)], selected=page_size,
+            {{ select_native(id='page-size-select', size='xs', class='w-20', options=[(25, 25), (50, 50), (100, 100)], selected=page_size,
                              attrs_dict={'data-testid': 'page-size-select', '@change': 'changePageSize($event.target.value)'}) }}
           </div>
           <div class="flex items-center gap-1">
-            {{ ui.button(icon='chevron-left', variant='outline', size='icon-sm', aria_label='Previous page', testid='btn-prev-page', disabled=not has_prev,
+            {{ button(icon='chevron-left', variant='outline', size='icon-sm', aria_label='Previous page', testid='btn-prev-page', disabled=not has_prev,
                       on_click='goToPage(' ~ (current_page - 1) ~ ')', attrs_dict={'id': 'prev-page'}) }}
             <span class="min-w-[90px] px-2 text-center text-sm text-muted-foreground" data-testid="page-indicator">
               Page <span class="font-medium text-foreground">{{ current_page }}</span> of <span class="font-medium text-foreground">{{ total_pages }}</span>
             </span>
-            {{ ui.button(icon='chevron-right', variant='outline', size='icon-sm', aria_label='Next page', testid='btn-next-page', disabled=not has_next,
+            {{ button(icon='chevron-right', variant='outline', size='icon-sm', aria_label='Next page', testid='btn-next-page', disabled=not has_next,
                       on_click='goToPage(' ~ (current_page + 1) ~ ')', attrs_dict={'id': 'next-page'}) }}
           </div>
         </div>
@@ -513,14 +528,14 @@
   {% endcall %}{# end table card #}
 
   {# AI Map modal — inside the appPortfolio() x-data scope, which owns aiMap state #}
-  {% call ui.modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs={'data-testid': 'ai-map-modal'}) %}
+  {% call modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs={'data-testid': 'ai-map-modal'}) %}
       <div class="flex-1 space-y-4 overflow-y-auto">
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
-          {% call ui.form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
-            {{ ui.input(id='ai-map-max', type='number', class='w-32', attrs_dict={'min': '1', 'max': '200', 'x-model.number': 'aiMap.maxApplications'}) }}
+          {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
+            {{ input(id='ai-map-max', type='number', class='w-32', attrs_dict={'min': '1', 'max': '200', 'x-model.number': 'aiMap.maxApplications'}) }}
           {% endcall %}
-          {{ ui.checkbox(id='ai-map-capabilities', label='Map to business capabilities', attrs_dict={'x-model': 'aiMap.mapCapabilities'}) }}
-          {{ ui.checkbox(id='ai-map-processes', label='Map to APQC processes', attrs_dict={'x-model': 'aiMap.mapProcesses'}) }}
+          {{ checkbox(id='ai-map-capabilities', label='Map to business capabilities', attrs_dict={'x-model': 'aiMap.mapCapabilities'}) }}
+          {{ checkbox(id='ai-map-processes', label='Map to APQC processes', attrs_dict={'x-model': 'aiMap.mapProcesses'}) }}
         </div>
 
         <div x-show="aiMap.loading" x-cloak class="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground" data-testid="ai-map-loading">
@@ -529,24 +544,24 @@
         </div>
 
         <div x-show="aiMap.error" x-cloak>
-          {% call ui.alert('danger', testid='ai-map-error') %}<span x-text="aiMap.error"></span>{% endcall %}
+          {% call quiet_alert('danger', testid='ai-map-error') %}<span x-text="aiMap.error"></span>{% endcall %}
         </div>
 
         <div x-show="aiMap.result && !aiMap.loading" x-cloak class="space-y-3" data-testid="ai-map-results">
           <div class="grid grid-cols-2 gap-3 text-sm">
-            {% call ui.card(class='p-3') %}
+            {% call card(class='p-3') %}
               <p class="text-xs text-muted-foreground">Applications analyzed</p>
               <p class="text-lg font-semibold" x-text="aiMap.result?.statistics?.applications_processed ?? '—'"></p>
             {% endcall %}
-            {% call ui.card(class='p-3') %}
+            {% call card(class='p-3') %}
               <p class="text-xs text-muted-foreground">Capability mappings found</p>
               <p class="text-lg font-semibold" x-text="aiMap.result?.statistics?.capabilities_mapped ?? '—'"></p>
             {% endcall %}
-            {% call ui.card(class='p-3') %}
+            {% call card(class='p-3') %}
               <p class="text-xs text-muted-foreground">ArchiMate elements proposed</p>
               <p class="text-lg font-semibold" x-text="aiMap.result?.statistics?.archimate_elements ?? '—'"></p>
             {% endcall %}
-            {% call ui.card(class='p-3') %}
+            {% call card(class='p-3') %}
               <p class="text-xs text-muted-foreground">High-confidence mappings</p>
               <p class="text-lg font-semibold" x-text="aiMap.result?.high_confidence_mappings ?? '—'"></p>
             {% endcall %}
@@ -555,13 +570,13 @@
         </div>
 
         <div x-show="aiMap.acceptResult" x-cloak data-testid="ai-map-accept-result">
-          {% call ui.alert('success') %}<span x-text="aiMap.acceptResult"></span>{% endcall %}
+          {% call quiet_alert('success') %}<span x-text="aiMap.acceptResult"></span>{% endcall %}
         </div>
       </div>
       <div class="flex shrink-0 justify-end gap-3 border-t border-border p-6">
-        {{ ui.button(text='Close', variant='ghost', aria_label='Close', on_click='closeAiMapModal()') }}
-        {{ ui.button(text='Run AI Analysis', testid='btn-ai-map-run', aria_label='Run AI analysis', on_click='runAiMap()', attrs_dict={'x-show': '!aiMap.result', 'x-cloak': '', ':disabled': 'aiMap.loading'}) }}
-        {{ ui.button(text='Accept & Save', testid='btn-ai-map-accept', aria_label='Accept and save mappings', on_click='acceptAiMap()', attrs_dict={'x-show': 'aiMap.result && !aiMap.acceptResult', 'x-cloak': '', ':disabled': 'aiMap.accepting'}) }}
+        {{ button(text='Close', variant='ghost', aria_label='Close', on_click='closeAiMapModal()') }}
+        {% call button(testid='btn-ai-map-run', aria_label='Run AI analysis', on_click='runAiMap()', attrs_dict={'x-show': '!aiMap.result', 'x-cloak': '', ':disabled': 'aiMap.loading'}) %}<span x-text="aiMap.loading ? 'Analyzing...' : 'Run AI Analysis'">Run AI Analysis</span>{% endcall %}
+        {% call button(testid='btn-ai-map-accept', aria_label='Accept and save mappings', on_click='acceptAiMap()', attrs_dict={'x-show': 'aiMap.result && !aiMap.acceptResult', 'x-cloak': '', ':disabled': 'aiMap.accepting'}) %}<span x-text="aiMap.accepting ? 'Saving...' : 'Accept & Save'">Accept &amp; Save</span>{% endcall %}
       </div>
   {% endcall %}
 </div>{# end app-portfolio-root #}
@@ -579,59 +594,70 @@
 {%- set deployment_choices = [('production', 'Production'), ('staging', 'Staging'), ('development', 'Development'), ('retired', 'Retired'), ('planned', 'Planned')] -%}
 {%- set create_status_choices = [] -%}
 {%- for opt in filter_options.lifecycle_statuses -%}{%- set _ = create_status_choices.append((opt.value, opt.label)) -%}{%- endfor -%}
-{% call ui.modal(id='modal-create', title='New Application', description='Register a new application in the portfolio.') %}
+{% call modal(id='modal-create', title='New Application', description='Register a new application in the portfolio.') %}
     <div class="flex-1 overflow-y-auto" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
         <div class="grid grid-cols-1 gap-4">
-          {{ ui.field(label='Application Name', name='name', required=true) }}
-          {{ ui.input(id='ca-name', name='name', required=true, placeholder='e.g. Customer Portal', size='sm',
+          {% call form_group(id='ca-name', label='Application Name', required=true) %}
+            {{ input(id='ca-name', required=true, placeholder='e.g. Customer Portal', size='sm',
                      attrs_dict={'x-model': 'form.name', '@input': 'scheduleCheck()', 'maxlength': '255',
                                  ':aria-invalid': "fieldInvalid('name') ? 'true' : 'false'",
                                  ':aria-describedby': "fieldInvalid('name') ? 'ca-name-error' : null"}) }}
-          <p x-show="fieldInvalid('name')" x-cloak id="ca-name-error" role="alert" class="mt-1 text-sm text-destructive-emphasis" x-text="fieldErrors.name"></p>
+            <p x-show="fieldInvalid('name')" x-cloak id="ca-name-error" role="alert" class="mt-1 text-sm text-destructive-emphasis" x-text="fieldErrors.name"></p>
+          {% endcall %}
           <div id="ca-duplicate-check" aria-live="polite">
             <p x-show="checkError" x-cloak class="text-sm text-warning-emphasis" role="alert" x-text="checkError"></p>
             <template x-if="matches && matches.length > 0"><div class="rounded-md border border-border bg-muted p-3 text-sm">
               <p class="mb-2 font-medium">These applications already exist</p>
               <ul class="space-y-1" x-ref="matchList"></ul>
               <div x-show="needsConfirmation" class="mt-3">
-                {{ ui.checkbox(id='ca-confirm-distinct', label='None of these is the application I am registering', attrs_dict={'x-model': 'confirmedDistinct'}) }}
+                {{ checkbox(id='ca-confirm-distinct', label='None of these is the application I am registering', attrs_dict={'x-model': 'confirmedDistinct'}) }}
               </div>
               <p x-show="hasSameName" class="mt-3 text-destructive-emphasis">An application with this exact name exists. Open it rather than registering a second record.</p>
             </div></template>
           </div>
-          {{ ui.field(label='Application Code', name='application_code') }}
-          {{ ui.input(id='ca-code', name='application_code', placeholder='e.g. CUST-PORTAL', size='sm', attrs_dict={'x-model': 'form.application_code', '@input': 'scheduleCheck()', 'maxlength': '50'}) }}
-          {{ ui.field(label='Application Type', name='application_type') }}
-          {{ ui.select(id='ca-type', name='application_type', size='sm', options=type_choices, empty_option='Select type...', attrs_dict={'x-model': 'form.application_type'}) }}
-          {{ ui.field(label='Business Criticality', name='business_criticality') }}
-          {{ ui.select(id='ca-criticality', name='business_criticality', size='sm', options=criticality_choices, empty_option='Select...', attrs_dict={'x-model': 'form.business_criticality'}) }}
-          {{ ui.field(label='Deployment Status', name='deployment_status') }}
-          {{ ui.select(id='ca-status', name='deployment_status', size='sm', options=deployment_choices, empty_option='Select...', attrs_dict={'x-model': 'form.deployment_status'}) }}
+          {% call form_group(id='ca-code', label='Application Code') %}
+            {{ input(id='ca-code', placeholder='e.g. CUST-PORTAL', size='sm', attrs_dict={'x-model': 'form.application_code', '@input': 'scheduleCheck()', 'maxlength': '50'}) }}
+          {% endcall %}
+          {% call form_group(id='ca-type', label='Application Type') %}
+            {{ select_native(id='ca-type', size='sm', options=type_choices, empty_label='Select type...', attrs_dict={'x-model': 'form.application_type'}) }}
+          {% endcall %}
+          {% call form_group(id='ca-criticality', label='Business Criticality') %}
+            {{ select_native(id='ca-criticality', size='sm', options=criticality_choices, empty_label='Select...', attrs_dict={'x-model': 'form.business_criticality'}) }}
+          {% endcall %}
+          {% call form_group(id='ca-status', label='Deployment Status') %}
+            {{ select_native(id='ca-status', size='sm', options=deployment_choices, empty_label='Select...', attrs_dict={'x-model': 'form.deployment_status'}) }}
+          {% endcall %}
           {# Lifecycle Status (the TOGAF decommission vocabulary) is a real, separate column from
              Deployment Status above; it could previously only be set in bulk. #}
-          {{ ui.field(label='Lifecycle Status', name='lifecycle_status') }}
-          {{ ui.select(id='ca-lifecycle', name='lifecycle_status', size='sm', options=create_status_choices, empty_option='Select...', attrs_dict={'x-model': 'form.lifecycle_status'}) }}
+          {% call form_group(id='ca-lifecycle', label='Lifecycle Status') %}
+            {{ select_native(id='ca-lifecycle', size='sm', options=create_status_choices, empty_label='Select...', attrs_dict={'x-model': 'form.lifecycle_status'}) }}
+          {% endcall %}
           <div x-data="userSearchWidget(() => form.business_owner, v => { form.business_owner = v; })" @click.outside="ushow = false">
-            {{ ui.field(label='Business Owner', name='business_owner') }}
+            {% call form_group(id='ca-owner', label='Business Owner') %}
             <div class="relative">
-              {{ ui.input(id='ca-owner', name='business_owner', placeholder='Search by name or email...', size='sm', attrs_dict={'x-model': 'form.business_owner', '@input.debounce.300ms': 'usearch()', 'maxlength': '255', 'autocomplete': 'off'}) }}
+              {{ input(id='ca-owner', placeholder='Search by name or email...', size='sm', attrs_dict={'x-model': 'form.business_owner', '@input.debounce.300ms': 'usearch()', 'maxlength': '255', 'autocomplete': 'off'}) }}
               <div x-show="ushow" x-cloak class="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-border bg-popover">
                 <template x-for="u in ures" :key="u.id">
-                  {{ ui.button(variant='ghost', class='w-full justify-between rounded-none', on_click='uselect(u)', text=u.name, secondary_text=u.email) }}
+                  {% call button(variant='ghost', class='w-full justify-between rounded-none', on_click='uselect(u)') %}
+                    <span x-text="u.name" class="font-medium"></span>
+                    <span x-text="u.email" class="text-xs text-muted-foreground"></span>
+                  {% endcall %}
                 </template>
               </div>
             </div>
+            {% endcall %}
           </div>
-          {{ ui.field(label='Description', name='description') }}
-          {{ ui.textarea(id='ca-description', name='description', rows=2, placeholder='Brief description', attrs_dict={'x-model': 'form.description', 'maxlength': '2000'}) }}
+          {% call form_group(id='ca-description', label='Description') %}
+            {{ textarea(id='ca-description', rows=2, placeholder='Brief description', attrs_dict={'x-model': 'form.description', 'maxlength': '2000'}) }}
+          {% endcall %}
         </div>
         <div x-show="errorMsg" x-cloak>
-          {% call ui.alert('danger') %}<span x-text="errorMsg"></span>{% endcall %}
+          {% call quiet_alert('danger') %}<span x-text="errorMsg"></span>{% endcall %}
         </div>
         <div class="flex justify-end gap-3 border-t border-border pt-2">
-          {{ ui.button(text='Cancel', variant='ghost', on_click="Platform.modal.close('modal-create')") }}
-          {{ ui.button(text='Add Application', type='submit', attrs_dict={':disabled': 'submitting'}) }}
+          {{ button(text='Cancel', variant='ghost', on_click="Platform.modal.close('modal-create')") }}
+          {% call button(type='submit', attrs_dict={':disabled': 'submitting'}) %}<i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true"></i><span x-text="submitting ? 'Creating...' : 'Add Application'">Add Application</span>{% endcall %}
         </div>
       </form>
     </div>
@@ -647,3 +673,52 @@
 </div>
 
 {% endblock %}
+
+{% block extra_head_js %}
+<script>
+  window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
+  window.__APP_CONFIG__.createApplicationUrl = '{{ url_for("unified_applications.application_create") }}';
+  if (document.body) {
+    document.body.dataset.currencySymbol = '{{ currency_symbol | default("£") | e }}';
+  }
+</script>
+<script>
+function userSearchWidget(getVal, setVal) {
+    return {
+        ures: [], ushow: false, uErrorShown: false,
+        async usearch() {
+            const q = getVal();
+            if (!q || q.length < 2) { this.ures = []; this.ushow = false; return; }
+            try {
+                const d = await Platform.fetch.get('/api/users', null, { silent: true });
+                if (d.success) { const lq = q.toLowerCase(); this.ures = d.users.filter(u => (u.name || '').toLowerCase().includes(lq) || (u.email || '').toLowerCase().includes(lq)).slice(0, 5); this.ushow = this.ures.length > 0; }
+                this.uErrorShown = false;
+            } catch (e) {
+                // Debounced on every keystroke — toast once per outage, not on every retry.
+                if (!this.uErrorShown) {
+                    this.uErrorShown = true;
+                    if (window.Platform && Platform.toast) Platform.toast.error('User search failed.');
+                }
+            }
+        },
+        uselect(u) { setVal(u.name); this.ushow = false; this.ures = []; }
+    };
+}
+</script>
+<script src="{{ url_for('static', filename='js/applications/list.js') }}"></script>
+<script>
+/* The setup checklist links here with ?import=1: open the import dialog. */
+window.addEventListener('load', function () {
+  if (new URLSearchParams(window.location.search).get('import') !== '1') return;
+  var btn = document.querySelector('[data-testid="btn-import"]');
+  if (btn) btn.click();
+});
+</script>
+<script src="/static/vendor/jquery.min.js" crossorigin="anonymous"></script>
+<script src="/static/vendor/lodash.min.js" crossorigin="anonymous"></script>
+<script src="/static/vendor/backbone-min.js" crossorigin="anonymous"></script>
+<script src="/static/vendor/joint.min.js" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/static/vendor/joint.min.css" crossorigin="anonymous">
+<script src="{{ url_for('static', filename='js/archimate/composer_renderer.js') }}"></script>
+{% endblock %}
+{# design-block: data-table #}
