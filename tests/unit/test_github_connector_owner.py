@@ -72,3 +72,19 @@ def test_assign_owner_from_payload_unmatched(test_user: User, test_client):
         assert owner_record is None
         assert app.github_code_owner_unmatched is not None
         assert app.github_code_owner_unmatched['login'] == "unmatcheduser"
+
+
+def test_unmatched_code_owner_text_reads_with_one_at_and_names_every_owner():
+    from app.connectors.github import _owner_logins
+
+    assert _owner_logins(["@octocat", "@org/platform", "dev@example.com", "bare"]) == [
+        "octocat", "org/platform", "dev@example.com", "bare",
+    ]
+    text = ApplicationComponent.code_owner_text
+    assert text({"login": "octocat", "logins": ["octocat"]}) == "Code owner on GitHub: @octocat, not yet matched to a person"
+    assert text({"login": "org/platform"}) == "Code owner on GitHub: @org/platform, not yet matched to a person"
+    assert text({"login": "dev@example.com"}) == "Code owner on GitHub: dev@example.com, not yet matched to a person"
+    assert text({"login": "a", "logins": ["a", "b@example.com"]}) == (
+        "Code owners on GitHub: @a, b@example.com, not yet matched to a single person"
+    )
+    assert text({"login": None, "logins": None}) is None
