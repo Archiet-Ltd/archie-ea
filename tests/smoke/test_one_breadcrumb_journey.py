@@ -22,6 +22,7 @@ covers. On each it asserts:
 from __future__ import annotations
 
 import os
+import pathlib
 
 import pytest
 from playwright.sync_api import expect
@@ -31,6 +32,7 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 DEMO_USER = "demo@lantern-quay.example.com"
+SHOTS = pathlib.Path(os.environ.get("CRUMB01_SHOTS", "/tmp/crumb01-shots"))
 
 # (path, expected crumb list). The last page (vendors) is the R34 lookup fix;
 # the rest are Group A pages whose own breadcrumb block was removed.
@@ -119,6 +121,7 @@ def test_one_breadcrumb_following_the_sidebar(browser, live_server, demo_archite
     )
     ctx.add_init_script("localStorage.setItem('theme', '%s');" % ("dark" if dark else "light"))
     page = ctx.new_page()
+    SHOTS.mkdir(parents=True, exist_ok=True)
     try:
         _login(page, live_server, demo_architect["email"])
         for path, expected_crumbs in demo_architect["pages"]:
@@ -127,6 +130,8 @@ def test_one_breadcrumb_following_the_sidebar(browser, live_server, demo_archite
 
             breadcrumb_nav = page.locator('nav[aria-label="Breadcrumb"], nav[aria-label="breadcrumb"]')
             expect(breadcrumb_nav).to_have_count(1)
+            name = path.strip("/").replace("/", "-") or "home"
+            page.screenshot(path=str(SHOTS / ("%s-%d-%s.png" % (name, width, "dark" if dark else "light"))))
 
             labels = _crumb_labels(page)
             assert labels, "%s rendered a breadcrumb nav with no crumbs" % path
