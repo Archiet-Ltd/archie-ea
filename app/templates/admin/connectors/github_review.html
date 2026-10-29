@@ -75,7 +75,7 @@
         <h2 id="group-{{ loop.index }}" class="text-sm font-semibold mb-2">{{ section.group }}</h2>
         {% call(item) list_table(rows=section['items'], columns=[('Application', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), {'label': '', 'class': 'text-right'}],
                               caption='Applications in ' ~ section.group, testid='github-review-applications-' ~ loop.index, row_testid='github-review-row', search_placeholder='Filter applications...',
-                              empty_message='Nothing here yet.') %}
+                              empty_message='No applications found in ' ~ section.group ~ '.') %}
           {% call table_cell(class='font-medium text-foreground') %}{{ item.name }}{% endcall %}
           {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.reason }}{% endcall %}
           {% call table_cell(class='text-xs') %}{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}{% endcall %}
@@ -90,7 +90,7 @@
         <h2 id="parts-heading" class="text-sm font-semibold mb-2">Parts of applications</h2>
         {% call(item) list_table(rows=review.parts, columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), {'label': '', 'class': 'text-right'}],
                               caption='Parts of applications', testid='github-review-parts', row_testid='github-review-part-row', search_placeholder='Filter parts...',
-                              empty_message='Nothing here yet.') %}
+                              empty_message='No parts of applications were found in this read.') %}
           {% call table_cell(class='font-medium text-foreground') %}{{ item.name }}{% endcall %}
           {% call table_cell(class='text-xs') %}{{ item.parent_name }}{% endcall %}
           {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.reason }}{% endcall %}
@@ -106,7 +106,7 @@
         <h2 id="links-heading" class="text-sm font-semibold mb-2">Links between them</h2>
         {% call(item) list_table(rows=review.links, columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), {'label': '', 'class': 'text-right'}],
                               caption='Links between applications', testid='github-review-links', row_testid='github-review-link-row', search_placeholder='Filter links...',
-                              empty_message='Nothing here yet.') %}
+                              empty_message='No links between applications were found in this read.') %}
           {% call table_cell(class='font-medium text-foreground') %}{{ item.source_name }} {{ 'serves' if item.relationship_type == 'Serving' else 'is linked to' }} {{ item.target_name }}{% endcall %}
           {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.detail }}{% endcall %}
           {% call table_cell(class='text-xs font-mono text-muted-foreground break-words') %}{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }}){% endcall %}
@@ -125,7 +125,7 @@
         <h2 id="others-heading" class="text-sm font-semibold mb-2">Not added to the model</h2>
         {% call(item) list_table(rows=review.others, columns=[('Repository', ''), ('Looks like', ''), ('Why', ''), {'label': '', 'class': 'text-right'}],
                               caption='Repositories that are not added to the model', testid='github-review-others', row_testid='github-review-other-row', search_placeholder='Filter repositories...',
-                              empty_message='Nothing here yet.') %}
+                              empty_message='Every repository read from this connection was added to the model.') %}
           {% call table_cell(class='font-medium text-foreground') %}{{ item.name }}{% endcall %}
           {% call table_cell(class='text-xs') %}{{ item.classification|capitalize }}{% endcall %}
           {% call table_cell(class='text-xs text-muted-foreground') %}{{ item.reason }}{% endcall %}
@@ -140,7 +140,7 @@
         <h2 id="owners-heading" class="text-sm font-semibold mb-2">Owner changes to decide one by one</h2>
         {% call(item) list_table(rows=review.owner_changes, columns=[('Proposal', '')],
                               caption='Owner changes', testid='github-review-owner-changes', row_testid='github-review-owner-row',
-                              toolbar=false, empty_message='Nothing here yet.') %}
+                              toolbar=false, empty_message='No owner changes are waiting for a decision.') %}
           {% call table_cell(class='text-xs') %}{{ item.user_email }} is named as code owner of {{ item.repository }}.{% endcall %}
         {% endcall %}
         <p class="mt-2 text-xs text-muted-foreground">These would replace an owner a person recorded, so they are decided one at a time in the <a class="underline" href="{{ url_for('unified_ai_chat.approval_inbox') }}">approval inbox</a>.</p>

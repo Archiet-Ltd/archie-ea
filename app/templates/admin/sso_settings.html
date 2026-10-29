@@ -167,7 +167,7 @@
                 {% if mappings %}
                 {% call(mapping) list_table(rows=mappings, columns=[('IdP Group Name', ''), ('Platform Role', ''), {'label': 'Description', 'class': 'hidden md:table-cell'}, ('Status', ''), {'label': 'Actions', 'class': 'w-12'}],
                                       caption='SSO group-to-role mappings', testid='sso-mappings-table', row_testid='sso-mapping-row', search_placeholder='Filter mappings...',
-                                      empty_message='No database mappings configured. The platform is using the default hardcoded mappings from config.') %}
+                                      empty_message='No mappings are configured yet. The platform is using the default mappings from config.') %}
                   {% call table_cell(class='font-mono text-xs') %}{{ mapping.sso_group_name }}{% endcall %}
                   {% call table_cell() %}
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
