@@ -207,8 +207,8 @@
         {% endfor %}
 
         <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-border">
-            {# The page's base button reset is unlayered and outranks the library's layered button rules on a
-               <button>, so the variant's surface is restated with token utilities, as the Overview does. #}
+            {# The page's base button reset is unlayered and outranks the library's layered button rules on a button
+               element, so the variant's surface is restated with token utilities, as the Overview does. #}
             {{ ui.button(text='Cancel', variant='outline', type='button', class='border border-input bg-background px-2.5 text-foreground hover:bg-accent', attrs={'@click': "Platform.modal.close('initiative-" ~ id ~ "')"}) }}
             {% call ui.button(type='submit', class='bg-primary px-2.5 text-primary-foreground hover:bg-primary/90', attrs={':disabled': 'loading', 'data-testid': 'initiative-create'}) %}
                 <span x-show="!loading">Create</span>
