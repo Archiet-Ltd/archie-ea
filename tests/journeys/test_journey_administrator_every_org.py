@@ -140,7 +140,7 @@ def test_the_only_administrator_cannot_demote_themselves(app, client):
     html = resp.get_data(as_text=True)
     assert html.count(REFUSAL) == 1, "the page says why the change was refused, once"
     assert "data-team-member-error" in html
-    assert "Team Management" in html and "<table" in html, "the members list is still shown"
+    assert "data-testid=\"team-members\"" in html and "<table" in html, "the members list is still shown"
 
     with app.app_context():
         assert OrgRole.get_role(org_id, admin_id) == "org_admin"

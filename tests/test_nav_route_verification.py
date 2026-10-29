@@ -56,7 +56,7 @@ NAV_PAGES = {
     # admin dashboard page (Command Center) instead.
     "error_events.errors_dashboard": (
         "/admin/errors",
-        "Deduplicated server + client errors, aggregated by fingerprint across every organization.",
+        "Server and browser errors, one row per distinct problem",
     ),
     "intelligence_ui.value_streams_at_risk": (
         "/intelligence/value-streams-at-risk",
@@ -88,7 +88,10 @@ NAV_PAGES = {
     # NAV-1: the sidebar used to name solution_prompt_admin.
     # solution_prompts_page here, which registers the same rule as this one and
     # loses the URL-map match — it could never be served. See role_access.py.
-    "admin.solution_prompts_page": ("/admin/solution-prompts", "Solution AI Prompts"),
+    "admin.solution_prompts_page": (
+        "/admin/solution-prompts",
+        "What the Architecture Journey tells the AI in each phase",
+    ),
     "strategic.capability_health": (
         "/strategic/capability-health",
         "Capability Health Dashboard",

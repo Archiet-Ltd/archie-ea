@@ -4888,7 +4888,15 @@ def _get_capability_suggestion_default():
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
-    return render_template("admin/solution_prompts.html")
+    # The list is rendered on the server (the CSP Alpine build cannot run the old
+    # client-side table); the same data the JSON endpoint below returns.
+    try:
+        prompts = solution_prompts_data().get_json().get("prompts", [])
+        load_error = None
+    except Exception:
+        logger.exception("Failed to load solution prompts")
+        prompts, load_error = [], "The prompts could not be read. Refresh the page to try again."
+    return render_template("admin/solution_prompts.html", prompts=prompts, load_error=load_error)
 
 
 @admin_bp_v2.route("/solution-prompts/data")
