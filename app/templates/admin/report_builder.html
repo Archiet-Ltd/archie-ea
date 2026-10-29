@@ -1,5 +1,8 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/button.html' import button %}
 
 {% block title %}Application Report Builder{% endblock %}
 
@@ -66,86 +69,49 @@
         </div>
     </form>
 
-    <!-- Results summary -->
-    <div class="flex items-center justify-between mt-6 mb-3">
-        <p class="text-sm text-muted-foreground">
-            {{ total }} application{{ 's' if total != 1 else '' }} found
-            {% if page > 1 %} (page {{ page }} of {{ total_pages }}){% endif %}
-        </p>
-    </div>
-
-    <!-- Results table -->
-    <div class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b bg-muted/50">
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Lifecycle</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Technology</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    {% for app in apps %}
-                    <tr class="hover:bg-muted/30 transition-colors">
-                        <td class="px-4 py-3">
-                            {# The row names a real ApplicationComponent; the name is the
-                               way into it. Guarded because blueprints register non-fatally. #}
-                            {% if 'unified_applications.application_detail' in flask.current_app.view_functions and app.id %}
-                            <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
-                               class="font-medium text-primary hover:underline">{{ app.name or '-' }}</a>
-                            {% else %}
-                            <div class="font-medium">{{ app.name or '-' }}</div>
-                            {% endif %}
-                            {% if app.description %}
-                            <div class="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{{ app.description[:100] }}</div>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3">
-                            {% if app.lifecycle_status %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-                                {{ app.lifecycle_status }}
-                            </span>
-                            {% else %}-{% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-muted-foreground max-w-xs truncate">
-                            {{ app.technology_stack or '-' }}
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                            {{ app.created_at.strftime('%Y-%m-%d') if app.created_at else '-' }}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" class="px-4 py-12 text-center text-muted-foreground">
-                            <i data-lucide="file-search" class="h-8 w-8 mx-auto mb-2 opacity-50"></i>
-                            <p>No matching applications found.</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% macro _pager() %}
+    <div class="flex items-center justify-between px-2" data-testid="report-pager">
+        <div class="flex-1 text-sm text-muted-foreground tabular-nums">{{ total }} application{{ 's' if total != 1 else '' }} found</div>
+        <div class="flex items-center gap-2">
+            <div class="flex w-[100px] items-center justify-center text-sm font-medium tabular-nums">Page {{ page }} of {{ total_pages }}</div>
+            {% if page > 1 %}
+            {% call button(variant='outline', size='sm', href=url_for('admin.report_builder', page=page-1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter)) %}Previous{% endcall %}
+            {% else %}
+            {% call button(variant='outline', size='sm', disabled=true) %}Previous{% endcall %}
+            {% endif %}
+            {% if page < total_pages %}
+            {% call button(variant='outline', size='sm', href=url_for('admin.report_builder', page=page+1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter)) %}Next{% endcall %}
+            {% else %}
+            {% call button(variant='outline', size='sm', disabled=true) %}Next{% endcall %}
+            {% endif %}
         </div>
     </div>
+    {% endmacro %}
 
-    <!-- Pagination -->
-    {% if total_pages > 1 %}
-    <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Report pagination">
-        {% if page > 1 %}
-        <a href="{{ url_for('admin.report_builder', page=page-1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Previous
-        </a>
+    {% call(app) list_table(rows=apps, columns=[('Name', ''), ('Lifecycle', ''), ('Technology', ''), ('Created', '')],
+                        caption='Application report', testid='report-builder-table', row_testid='report-row',
+                        toolbar=true, server_pagination=_pager,
+                        empty_message='No matching applications found.') %}
+      {% call table_cell() %}
+        {# The row names a real ApplicationComponent; the name is the way into it.
+           Guarded because blueprints register non-fatally. #}
+        {% if 'unified_applications.application_detail' in flask.current_app.view_functions and app.id %}
+        <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
+           class="font-medium text-primary hover:underline">{{ app.name or '-' }}</a>
+        {% else %}
+        <div class="font-medium">{{ app.name or '-' }}</div>
         {% endif %}
-        <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
-        {% if page < total_pages %}
-        <a href="{{ url_for('admin.report_builder', page=page+1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Next
-        </a>
+        {% if app.description %}
+        <div class="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{{ app.description[:100] }}</div>
         {% endif %}
-    </nav>
-    {% endif %}
+      {% endcall %}
+      {% call table_cell() %}
+        {% if app.lifecycle_status %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">{{ app.lifecycle_status }}</span>
+        {% else %}-{% endif %}
+      {% endcall %}
+      {% call table_cell(class='text-muted-foreground max-w-xs truncate') %}{{ app.technology_stack or '-' }}{% endcall %}
+      {% call table_cell(class='whitespace-nowrap text-muted-foreground') %}{{ app.created_at.strftime('%Y-%m-%d') if app.created_at else '-' }}{% endcall %}
+    {% endcall %}
 </div>
 {% endblock %}
