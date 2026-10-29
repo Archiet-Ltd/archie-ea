@@ -13,8 +13,10 @@ a second organisation, proves the refusal that role still gets is reported
 in plain words rather than hidden behind a generic error.
 """
 import os
+import re
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
 from .fresh_org import create_fresh_org, sign_in
@@ -93,8 +95,11 @@ def demo(live_server, app):
 
 def test_seed_loads_the_catalogues_and_is_idempotent(demo):
     """The seed loads the APQC catalogue and scores the portfolio; a second
-    run creates nothing new."""
-    assert demo["before"]["apqc_processes"] == 0, demo["before"]
+    run creates nothing new. The "before" counts are reported for the
+    record rather than asserted at zero: this suite shares one persistent
+    test database (tests/conftest.py), so an earlier test in the same
+    session may already have seeded the catalogue -- a fresh install's
+    actual zero start is shown directly in the build report."""
     assert demo["after_first"]["apqc_processes"] > 0, demo["after_first"]
     assert demo["after_first"]["application_rationalization_scores"] > 0, demo["after_first"]
     assert demo["after_second"] == demo["after_first"], (
@@ -109,7 +114,7 @@ def test_seed_loads_the_catalogues_and_is_idempotent(demo):
 def test_demo_architect_scores_portfolio_already_scored_on_open(page, live_server, demo):
     """The portfolio opens already scored (from the seed), and the demo
     architect can score it again without a refusal."""
-    base = live_server.url()
+    base = live_server
     sign_in(page, base, DEMO_EMAIL)
 
     page.goto(base + "/applications/rationalization", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -132,7 +137,7 @@ def test_demo_architect_runs_detection_and_sees_a_result(page, live_server, demo
     """Run detection succeeds for the demo architect and the page reports a
     real result -- found groups, or the honest empty state -- never a
     refusal."""
-    base = live_server.url()
+    base = live_server
     sign_in(page, base, DEMO_EMAIL)
 
     page.goto(base + "/applications/rationalization", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -144,22 +149,29 @@ def test_demo_architect_runs_detection_and_sees_a_result(page, live_server, demo
     assert "PERMISSION_DENIED" not in body_text and "Platform admin" not in body_text, (
         "run detection refused the demo architect"
     )
-    assert page.locator("[data-testid='rationalization-last-run']").inner_text().strip(), (
-        "the last-run line has nothing in it after detection ran"
+    assert "detection finished" in body_text.lower(), (
+        "no result was reported after running detection: %r" % body_text[:400]
     )
 
 
 def test_demo_architect_places_a_technology_on_the_radar(page, live_server, demo):
     """The demo architect opens the radar, places (or moves) one technology
     with a rationale, and sees it reflected on the radar afterwards."""
-    base = live_server.url()
+    base = live_server
     sign_in(page, base, DEMO_EMAIL)
 
     page.goto(base + "/technology/radar/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    place_link = page.locator("[data-testid^='radar-place-']").first
-    assert place_link.count() > 0, "the radar has no technology to place at all"
+    # Every row's "Place with a rationale" / "Edit rationale" link sits
+    # behind that row's own "Actions for ..." menu, closed by default -- open
+    # the first row's menu, then take whichever such link that opened makes
+    # visible (the table may re-sort client-side after the trigger is first
+    # located, so re-deriving the row from the trigger is not reliable).
+    page.get_by_role("button", name=re.compile("^Actions for ")).first.click()
+    place_link = page.locator("[data-testid^='radar-place-']:visible").first
+    place_link.wait_for(state="visible", timeout=PAGE_TIMEOUT)
     element_testid = place_link.get_attribute("data-testid")
     element_id = element_testid.rsplit("-", 1)[-1]
+    place_link.wait_for(state="visible", timeout=PAGE_TIMEOUT)
 
     with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
         place_link.click()
@@ -172,12 +184,12 @@ def test_demo_architect_places_a_technology_on_the_radar(page, live_server, demo
         page.locator("[data-testid='radar-classify-%s']" % element_id).click()
 
     assert "moved to" in page.inner_text("body").lower() or "/technology/radar" in page.url
-    # The radar index reflects the change: the element is no longer offered
-    # as "Place with a rationale" (it now shows "Edit rationale...").
+    # The radar index reflects the change: the ring badge for this element
+    # now shows a real ring instead of "Not placed".
     page.goto(base + "/technology/radar/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    row = page.locator("[data-testid='radar-place-%s']" % element_id)
-    assert row.count() == 0 or "Edit rationale" in row.inner_text(), (
-        "the placed technology still offers 'Place with a rationale' as if nothing happened"
+    ring_cell = page.locator("[data-testid='radar-ring-%s']" % element_id)
+    assert ring_cell.count() > 0 and ring_cell.inner_text().strip() != "Not placed", (
+        "the placed technology still shows 'Not placed' as if nothing happened"
     )
 
 
@@ -185,23 +197,25 @@ def test_options_analysis_process_tab_lists_processes_and_enables_discover(page,
     """In options analysis, the APQC process tab lists real processes (the
     catalogue the seed now loads) and Discover becomes enabled once one is
     picked."""
-    base = live_server.url()
+    base = live_server
     sign_in(page, base, DEMO_EMAIL)
 
     page.goto(base + "/dashboard/vendor-analysis/new", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.get_by_role("tab", name="APQC Processes").click()
 
     l1 = page.get_by_role("listbox", name="L1 APQC processes")
+    checkbox = l1.locator("input[type='checkbox']").first
+    # The L1 list loads via its own fetch after the tab switch; wait for a
+    # real checkbox to appear rather than judging the list the instant the
+    # loading placeholder is still showing.
+    expect(checkbox).to_be_attached(timeout=PAGE_TIMEOUT)
     assert "No APQC processes found" not in l1.inner_text(), (
         "the process picker has no processes to offer"
     )
-    checkbox = l1.locator("input[type='checkbox']").first
-    assert checkbox.count() > 0, "no selectable process in the L1 list"
     checkbox.check()
 
     discover = page.get_by_role("button", name="Discover Matching Vendors")
-    page.wait_for_timeout(300)
-    assert discover.is_enabled(), "Discover stayed disabled after a process was selected"
+    expect(discover).to_be_enabled(timeout=PAGE_TIMEOUT)
 
 
 def test_viewer_in_a_second_organisation_sees_the_plain_refusal(page, live_server):
@@ -209,7 +223,19 @@ def test_viewer_in_a_second_organisation_sees_the_plain_refusal(page, live_serve
     Score portfolio in plain words -- never 'Try again in a moment', which
     hides the real reason."""
     ids = create_fresh_org("enterprise_architect", platform_role="Viewer")
-    base = live_server.url()
+    from app import create_app, db
+
+    with create_app("testing").app_context():
+        from app.models.application_portfolio import ApplicationComponent
+
+        db.session.add(ApplicationComponent(
+            name="Launch Org Application", organization_id=ids["org_id"],
+            lifecycle_status="2.1 strategic",
+        ))
+        db.session.commit()
+        db.session.remove()
+
+    base = live_server
     sign_in(page, base, ids["emails"]["enterprise_architect"])
 
     page.goto(base + "/applications/rationalization", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
