@@ -50,6 +50,77 @@ def test_component_use_and_definitions_are_not_counted(scan):
     assert scan("legacy-macro", "{{ button('Save') }}{{ explained_value(basis='x') }}") == []
 
 
+_LEGACY_HOME_AND_NAME = [
+    ("components/empty_state.html", "empty_state"),
+    ("components/page_header.html", "page_header"),
+    ("components/modal.html", "modal"),
+    ("components/dense_table.html", "dense_table"),
+    ("macros/shadcn_compat.html", "shadcn_select"),
+]
+
+
+def _expected_legacy_message(name):
+    if name == "empty_state":
+        return "use the ui.empty block (basecoat/empty.html)"
+    return "use the component"
+
+
+@pytest.mark.parametrize("home,name", _LEGACY_HOME_AND_NAME)
+def test_aliased_import_call_is_counted(scan, home, name):
+    body = f"{{% from '{home}' import {name} as x %}}\n{{{{ x('a') }}}}"
+    found = scan("legacy-macro", body)
+    assert len(found) == 1
+    assert _expected_legacy_message(name) in found[0][2]
+
+
+@pytest.mark.parametrize("home,name", _LEGACY_HOME_AND_NAME)
+def test_namespace_import_call_is_counted(scan, home, name):
+    body = f"{{% import '{home}' as ns %}}\n{{{{ ns.{name}('a') }}}}"
+    found = scan("legacy-macro", body)
+    assert len(found) == 1
+    assert _expected_legacy_message(name) in found[0][2]
+
+
+def test_aliased_import_with_no_call_is_not_counted(scan):
+    body = "{% from 'components/empty_state.html' import empty_state as x %}"
+    assert scan("legacy-macro", body) == []
+
+
+def test_unaliased_direct_import_call_still_counted_once(scan):
+    body = "{% from 'components/empty_state.html' import empty_state %}\n{{ empty_state('a') }}"
+    assert len(scan("legacy-macro", body)) == 1
+
+
+def test_aliased_import_from_a_non_legacy_home_is_not_counted(scan):
+    body = "{% from 'components/button.html' import button as x %}\n{{ x('a') }}"
+    assert scan("legacy-macro", body) == []
+
+
+def test_empty_state_message_names_the_library_block(scan):
+    body = (
+        '<div>\n'
+        '<svg data-lucide="inbox"></svg>\n'
+        '\n\n\n\n\n'
+        '<p>No items found yet</p>\n'
+        '</div>'
+    )
+    found = scan("empty-state", body)
+    assert len(found) == 1
+    assert "ui.empty block (basecoat/empty.html)" in found[0][2]
+    assert "empty_state macro" not in found[0][2]
+
+
+def test_no_text_in_the_checker_tells_a_builder_to_call_empty_state_macro():
+    contract_src = (ROOT / "scripts" / "check_ui_contract.py").read_text(encoding="utf-8")
+    assert "empty_state macro" not in contract_src
+    assert "ui.empty block (basecoat/empty.html)" in contract_src
+
+
+def test_legacy_macro_calls_remediation_names_the_library_block():
+    verify_src = (ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
+    assert 'remediation="for empty_state use the ui.empty block (basecoat/empty.html)' in verify_src
+
+
 def test_raw_button_is_counted_and_component_is_not(scan):
     assert len(scan("raw-button", '<button type="button">Go</button>')) == 1
     assert scan("raw-button", "{{ button('Go') }}") == []
