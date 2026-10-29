@@ -62,6 +62,7 @@ from app import db
 from app.decorators import audit_log
 from datetime import datetime
 from app.utils.pagination import safe_int_arg
+from app.utils.role_access import can_edit_capabilities
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
 
@@ -500,14 +501,31 @@ def api_check_compliance():
 # ============================================================================
 
 
+def _forbid_unless_may_plan_initiatives():
+    """None when the signed-in user may create a StrategicInitiative, else the 403 response.
+
+    Reuses can_edit_capabilities (app.utils.role_access) -- the one existing rule
+    for "who may author the capability/architecture model" -- rather than a new
+    role list: creating a remediation, investment, mitigation or change-request
+    initiative commits the architecture roadmap the same way editing a
+    capability does.
+    """
+    if can_edit_capabilities(current_user):
+        return None
+    return jsonify({"success": False, "error": "You do not have permission to create initiatives"}), 403
+
+
 @strategic_bp.route("/api/initiatives/from-health", methods=["POST"])
 @login_required
 @audit_log("create_initiative_from_health")
 def api_create_initiative_from_health():
     """Create strategic initiative from capability health dashboard."""
+    forbidden = _forbid_unless_may_plan_initiatives()
+    if forbidden:
+        return forbidden
     try:
         data = request.get_json()
-        
+
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
         
@@ -532,9 +550,12 @@ def api_create_initiative_from_health():
 @audit_log("create_initiative_from_investment")
 def api_create_initiative_from_investment():
     """Create strategic initiative from investment matrix dashboard."""
+    forbidden = _forbid_unless_may_plan_initiatives()
+    if forbidden:
+        return forbidden
     try:
         data = request.get_json()
-        
+
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
         
@@ -559,9 +580,12 @@ def api_create_initiative_from_investment():
 @audit_log("create_initiative_from_risk")
 def api_create_initiative_from_risk():
     """Create strategic initiative from risk assessment dashboard."""
+    forbidden = _forbid_unless_may_plan_initiatives()
+    if forbidden:
+        return forbidden
     try:
         data = request.get_json()
-        
+
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
         
@@ -586,9 +610,12 @@ def api_create_initiative_from_risk():
 @audit_log("create_initiative_from_impact")
 def api_create_initiative_from_impact():
     """Create strategic initiative from impact analysis dashboard."""
+    forbidden = _forbid_unless_may_plan_initiatives()
+    if forbidden:
+        return forbidden
     try:
         data = request.get_json()
-        
+
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
         
