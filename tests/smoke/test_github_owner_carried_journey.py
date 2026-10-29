@@ -216,29 +216,41 @@ def test_viewer_role_cannot_assign_owner(browser, csrf_server):
     org = create_fresh_org("solution_architect", org_admin=True, extra_roles=("cto",))
     _propose(org["org_id"], "Journey Viewer App", "journey-org/viewer-case", [])
 
+    from app import create_app, db
+    from app.models.org_role import OrgRole
+
+    app = create_app("testing")
+    with app.app_context():
+        # The "cto" person's organisation (matrix) role becomes Viewer,
+        # independent of their Architect platform role: a direct role
+        # grant, the same mechanism the permissions matrix reads first.
+        OrgRole.set_role(
+            org["org_id"], org["user_ids"]["cto"], "viewer",
+            granted_by_id=org["user_ids"]["solution_architect"],
+        )
+        db.session.commit()
+        db.session.remove()
+
+    # Approve through the live server, signed in as the administrator, the
+    # same way the review page's own button does -- running the approval
+    # outside a request/tenant context leaves the new row's organization_id
+    # unset and the insert fails its not-null constraint.
+    admin_context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    admin_page = admin_context.new_page()
+    try:
+        sign_in(admin_page, live_server, org["emails"]["solution_architect"])
+        admin_page.goto(live_server + "/admin/connectors/github/review", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        admin_page.get_by_role("button", name="Approve all (1)").click()
+        admin_page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+    finally:
+        admin_context.close()
+
+    app_id = _application_id(org["org_id"], "Journey Viewer App")
+    assert app_id, "the viewer-case application was not created"
+
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
     try:
-        from app import create_app, db
-        from app.connectors.github import approve_all_proposals
-        from app.models.org_role import OrgRole
-
-        app = create_app("testing")
-        with app.app_context():
-            approve_all_proposals(org["org_id"], org["user_ids"]["solution_architect"])
-            # The "cto" person's organisation (matrix) role becomes Viewer,
-            # independent of their Architect platform role: a direct role
-            # grant, the same mechanism the permissions matrix reads first.
-            OrgRole.set_role(
-                org["org_id"], org["user_ids"]["cto"], "viewer",
-                granted_by_id=org["user_ids"]["solution_architect"],
-            )
-            db.session.commit()
-            db.session.remove()
-
-        app_id = _application_id(org["org_id"], "Journey Viewer App")
-        assert app_id, "the viewer-case application was not created"
-
         sign_in(page, live_server, org["emails"]["cto"])
         page.goto("%s/applications/%d" % (live_server, app_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("application-header-assign-owner")).to_have_count(0)
