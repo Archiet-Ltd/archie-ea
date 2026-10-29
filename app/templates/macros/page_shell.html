@@ -68,7 +68,13 @@
     {#- the sidebar knows only the section: the page's own trail below it (Solutions, then the record) -#}
     {%- set breadcrumb = [('Home', _where.home)] + _where.trail + _own[:-1] + [(_own[-1][0], none)] -%}
   {%- else -%}
-    {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [((_own[-1][0] if _own else title), none)] -%}
+    {%- set _page = (_own[-1][0] if _own else title) -%}
+    {%- if (_last[0]|lower) == (_page|lower) -%}
+      {#- the sidebar names this page but offers this person no link to it: the name appears once -#}
+      {%- set breadcrumb = [('Home', _where.home)] + _where.trail[:-1] + [(_last[0], none)] -%}
+    {%- else -%}
+      {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [(_page, none)] -%}
+    {%- endif -%}
   {%- endif -%}
 {%- endif -%}
 <div class="mb-6">
