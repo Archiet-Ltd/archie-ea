@@ -91,6 +91,14 @@ def week_records(app, seeded):
             snapshot={"name": element.name, "type": "ApplicationComponent", "layer": "application"},
             valid_from=stamp, recorded_at=stamp, source="trigger",
         ))
+        db.session.flush()
+        # A later update that never touches name or type -- the shape the
+        # dated demo spread's own changes take, and the one the briefing
+        # used to show as the bare word "element" because it re-derived the
+        # row's name and kind from this update's own diff instead of from
+        # the change history entry's own name and kind.
+        element.description = f"Reassigned to the platform team {tag}"
+        db.session.flush()
         made["element"] = (element.id, element.name)
 
         for number, priority, days in (("A", "critical", 20), ("B", "high", 30)):
@@ -185,6 +193,12 @@ def test_old_address_lands_on_a_briefing_with_linked_items_in_every_section(
         [headline] + [_section_text(page, key) for key in SECTIONS]
     )
     assert not re.search(r"(^|\s)[—–-](\s|$)", briefing_text), "a bare dash is shown"
+    # The changes row for a record whose update never touched its name must
+    # still name the record and its kind, never fall back to the generic
+    # word "element" (a real defect seen on the preview on 25 Oct 2026).
+    changes_text = _section_text(page, "changes")
+    assert "element" not in changes_text.lower(), "a changes row reads 'element': %s" % changes_text
+    assert re.search(r"\([a-z ]+\)", changes_text), "no row names its kind: %s" % changes_text
     assert "not available" not in content.lower()
     assert "how to read this page" not in content.lower()
     # The shell carries a search box and a page-guide drawer on every page; the
