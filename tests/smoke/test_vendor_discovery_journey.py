@@ -16,6 +16,7 @@ state, never the first organisation's vendors.
 import uuid
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
@@ -292,6 +293,9 @@ def test_a_selection_with_nothing_mapped_shows_the_honest_empty_state(
         body = page.locator("main, body").first.inner_text()
         assert "No vendor is mapped to this selection yet" in body
         assert "No matching vendors found" not in body
+        # The honest empty state is the library's Empty block, not a hand-rolled
+        # lookalike -- one data-slot="empty" element, not the old empty_state() div.
+        expect(page.locator('[data-slot="empty"]', has_text="No vendor is mapped")).to_have_count(1)
         page.screenshot(path="tests/smoke/vendor-map01-shots/empty-state-%sx%s-%s.png"
                          % (width, height, color_scheme))
 
