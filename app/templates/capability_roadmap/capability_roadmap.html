@@ -81,7 +81,7 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Capability Gaps Detected{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_gaps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_gaps" data-testid="rdm-metric-gaps"></span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
         <div class="line-clamp-1 flex gap-2 font-medium">Coverage, quality &amp; modernization signals across capabilities</div>
@@ -90,13 +90,13 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Plateaus{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_plateaus"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_plateaus" data-testid="rdm-metric-plateaus"></span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Work Packages{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_wps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_wps" data-testid="rdm-metric-wps"></span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
@@ -156,7 +156,7 @@
             {% call card(class='bg-muted/30') %}
               <div class="flex items-start justify-between p-4">
                 <div>
-                  <p class="text-sm font-semibold text-foreground" x-text="plateau.name"></p>
+                  <p class="text-sm font-semibold text-foreground" x-text="plateau.name" data-testid="roadmap-plateau-name"></p>
                   <p class="mt-0.5 text-xs text-muted-foreground" x-text="plateau.description || 'No description'"></p>
                 </div>
                 {% call badge(variant='outline') %}<span x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>{% endcall %}
@@ -557,14 +557,17 @@
   // ── Main page component ──
   window.enterpriseCapabilityRoadmap = function () {
     return {
-      gaps: [],
-      plateaus: [],
-      workPackages: [],
       gapFilter: { priority: '', type: '' },
       selectedGapIds: [],
       isDetecting: false,
       errorMessage: '',
       loading: true,
+
+      // ── One source of truth: the page reads the same store the dialogs
+      // write, so a save is visible the moment it lands (no reload). ──
+      get gaps() { return Alpine.store('rdm').gaps; },
+      get plateaus() { return Alpine.store('rdm').plateaus; },
+      get workPackages() { return Alpine.store('rdm').workPackages; },
 
       get gapModalTitle() {
         const editing = Alpine.store('rdm').editingGap;
@@ -609,10 +612,8 @@
       async loadGaps() {
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
-          this.gaps = d.gaps || [];
-          Alpine.store('rdm').gaps = this.gaps;
+          Alpine.store('rdm').gaps = d.gaps || [];
         } catch (e) {
-          this.gaps = [];
           Alpine.store('rdm').gaps = [];
           this.errorMessage = 'Failed to load gaps (' + e.message + ').';
         }
@@ -621,10 +622,8 @@
       async loadPlateaus() {
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/plateaus', { silent: true });
-          this.plateaus = d.plateaus || [];
-          Alpine.store('rdm').plateaus = this.plateaus;
+          Alpine.store('rdm').plateaus = d.plateaus || [];
         } catch (e) {
-          this.plateaus = [];
           Alpine.store('rdm').plateaus = [];
           this.errorMessage = 'Failed to load plateaus (' + e.message + ').';
         }
@@ -633,10 +632,8 @@
       async loadWorkPackages() {
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/work-packages', { silent: true });
-          this.workPackages = d.work_packages || [];
-          Alpine.store('rdm').workPackages = this.workPackages;
+          Alpine.store('rdm').workPackages = d.work_packages || [];
         } catch (e) {
-          this.workPackages = [];
           Alpine.store('rdm').workPackages = [];
           this.errorMessage = 'Failed to load work packages (' + e.message + ').';
         }
@@ -706,8 +703,7 @@
         try {
           const d = await Platform.fetch.delete(`/capability-map/api/roadmap/gaps/${gap.id}`, { silent: true });
           if (!d.success) throw new Error(d.error || 'Delete failed');
-          this.gaps = this.gaps.filter(g => g.id !== gap.id);
-          Alpine.store('rdm').gaps = this.gaps;
+          Alpine.store('rdm').gaps = Alpine.store('rdm').gaps.filter(g => g.id !== gap.id);
         } catch (e) {
           this.errorMessage = e.message || 'Failed to delete gap.';
         }
@@ -720,8 +716,7 @@
         try {
           const d = await Platform.fetch.delete(`/capability-map/api/roadmap/work-packages/${wp.id}`, { silent: true });
           if (!d.success) throw new Error(d.error || 'Delete failed');
-          this.workPackages = this.workPackages.filter(w => w.id !== wp.id);
-          Alpine.store('rdm').workPackages = this.workPackages;
+          Alpine.store('rdm').workPackages = Alpine.store('rdm').workPackages.filter(w => w.id !== wp.id);
         } catch (e) {
           this.errorMessage = e.message || 'Failed to delete work package.';
         }
@@ -812,6 +807,9 @@
             store.gaps = [saved, ...store.gaps];
           }
           Platform.modal.close('rdm-create-gap-modal');
+          Alpine.store('announcer').assertive(
+            'Gap "' + saved.name + '" ' + (editing ? 'updated' : 'added') + '.'
+          );
         } catch (e) {
           Platform.alert(e.message || 'Failed to save gap.');
         } finally {
@@ -838,6 +836,7 @@
           store.plateaus = [...store.plateaus, d.plateau].sort((a, b) => a.sequence_order - b.sequence_order);
           this.form = { name: '', sequence_order: store.plateaus.length + 1, target_date: '', description: '' };
           Platform.modal.close('rdm-create-plateau-modal');
+          Alpine.store('announcer').assertive('Plateau "' + d.plateau.name + '" added.');
         } catch (e) {
           Platform.alert(e.message || 'Failed to create plateau.');
         } finally {
@@ -941,6 +940,9 @@
             store.workPackages = [saved, ...store.workPackages];
           }
           Platform.modal.close('rdm-create-wp-modal');
+          Alpine.store('announcer').assertive(
+            'Work package "' + saved.name + '" ' + (editing ? 'updated' : 'added') + '.'
+          );
         } catch (e) {
           Platform.alert(e.message || 'Failed to save work package.');
         } finally {
