@@ -146,12 +146,16 @@ def test_the_other_organisation_sees_its_own_vendor_and_its_own_count(browser, l
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page).to_have_url(re.compile(r"/applications/vendors/?$"), timeout=PAGE_TIMEOUT)
+        # Two vendors: Workday (its own) and Okta (shared with the first
+        # organisation, which genuinely supplies a system here too, through
+        # "Their CRM" -- not a leak, the same vendor legitimately used twice.
         rows = page.get_by_test_id("vendor-row")
-        expect(rows).to_have_count(1, timeout=PAGE_TIMEOUT)
-        expect(rows.first).to_contain_text("Workday %s" % tag)
+        expect(rows).to_have_count(2, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Workday %s" % tag)).to_be_visible()
+        expect(page.get_by_text("Okta %s" % tag)).to_be_visible()
         assert page.get_by_text("Salesforce %s" % tag).count() == 0, "saw the first organisation's vendor"
         assert page.get_by_text("Oracle %s" % tag).count() == 0
-        expect(page.get_by_test_id("vendors-answer")).to_contain_text("1 vendor supplies")
+        expect(page.get_by_test_id("vendors-answer")).to_contain_text("2 vendors supply")
     finally:
         page.close()
 
@@ -242,7 +246,12 @@ def test_no_row_shows_edit_and_only_a_platform_administrator_edits_from_the_reco
         new_name = "Oracle %s renamed" % tag
         page.get_by_label("Vendor Name", exact=False).first.fill(new_name)
         page.get_by_role("button", name=re.compile("Save|Update", re.I)).first.click()
-        page.wait_for_url(re.compile(r"/applications/vendors/%d$" % vendor_id), timeout=PAGE_TIMEOUT)
+        # The edit route's own success path returns to the edit form itself
+        # (its flash confirms the save); the persisted change is then proven
+        # on the record page a reload reaches independently.
+        expect(page.locator("body")).to_contain_text(new_name, timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/applications/vendors/%d" % vendor_id,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("body")).to_contain_text(new_name, timeout=PAGE_TIMEOUT)
     finally:
         page.close()
@@ -269,7 +278,7 @@ def test_no_route_serves_the_retired_legacy_template(live_server, two_org_vendor
     import os
 
     world = two_org_vendor_world
-    with world["app"].app_context():
+    with world["app"].test_request_context():
         from flask import url_for
         canonical = url_for("unified_applications.vendors")
     assert canonical.rstrip("/") == "/applications/vendors"

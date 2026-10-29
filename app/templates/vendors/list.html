@@ -106,7 +106,10 @@
 {%- set has_renewal = (rows|selectattr('next_renewal')|list|length) > 0 -%}
 
 {% macro _set_vendors() %}{% if unmapped_n %}{{ ui.button(text='Set system vendors (' ~ unmapped_n ~ ')', href=url_for('unified_applications.vendors', tab='mapping'), variant='outline', size='sm', attrs={'data-testid': 'vendors-mapping-link'}) }}{% endif %}{% endmacro %}
-{% macro _toolbar() %}{{ _filters() }}{{ _set_vendors() }}{% endmacro %}
+{#- The toolbar's own Clear filters sits beside Filters only while the table still has rows to
+   show; when a combination leaves it empty, the table's own empty state carries the one clear
+   action instead (avoids two controls sharing one test id at once). -#}
+{% macro _toolbar() %}{{ _filters() }}{% if rows and (vendor_type_filter != 'all' or contract_status_filter != 'all') %}{{ _clear_filters() }}{% endif %}{{ _set_vendors() }}{% endmacro %}
 
 <div class="p-6 space-y-6">
 {% if tab == 'mapping' %}
