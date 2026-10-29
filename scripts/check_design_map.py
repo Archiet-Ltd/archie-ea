@@ -144,6 +144,32 @@ def load_map(path=MAP_PATH):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def duplicate_key_problems(path=MAP_PATH):
+    """A key written twice in one object: json.loads keeps the last copy, so the first is dead text."""
+    text = Path(path).read_text(encoding="utf-8")
+    doubled = []
+
+    def hook(pairs):
+        seen = set()
+        for key, _ in pairs:
+            if key in seen and key not in doubled:
+                doubled.append(key)
+            seen.add(key)
+        return dict(pairs)
+
+    json.loads(text, object_pairs_hook=hook)
+    lines = text.split("\n")
+    problems = []
+    for key in sorted(doubled):
+        marker = json.dumps(key) + ":"
+        at = [(n, len(line) - len(line.lstrip())) for n, line in enumerate(lines, 1) if line.lstrip().startswith(marker)]
+        indents = sorted({i for _, i in at if sum(1 for _, j in at if j == i) > 1})
+        same = [n for n, i in at if indents and i == indents[0]]
+        where = f"lines {same[0]} and {same[1]}" if len(same) > 1 else "twice"
+        problems.append(f"{key}: written twice in docs/design-map.json ({where}); only the last copy is read")
+    return problems
+
+
 def component_of(macro):
     """The component name a shared macro file is an instance of."""
     stem = Path(macro).stem
@@ -409,11 +435,12 @@ def port_map_problems(rel, entry, design_map):
 
 
 def measure(design_map=None, pages=None):
+    errors = duplicate_key_problems() if design_map is None else []
     design_map = design_map if design_map is not None else load_map()
     pages = pages if pages is not None else tree_pages()
     blocks = design_map["blocks"]
     entries = design_map["pages"]
-    errors, outside, unmarked, outside_components = [], [], [], []
+    outside, unmarked, outside_components = [], [], []
     personas = design_map.get("personas", {})
     vocabulary = design_map.get("components", {})
     for rel in sorted(set(pages) - set(entries)):
