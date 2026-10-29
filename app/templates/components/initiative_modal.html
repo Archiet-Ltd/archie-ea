@@ -107,7 +107,7 @@
         // The page lists the plans created from it; read the fresh list from the page itself.
         const card = document.querySelector('[data-plans-card={{ id }}]');
         if (!card) return;
-        fetch(window.location.href, { credentials: 'same-origin' })
+        fetch(window.location.href, { credentials: 'same-origin' }) // raw-fetch-ok: reads this page's HTML to replace the plans card; Platform.fetch parses JSON
             .then(response => response.text())
             .then(html => {
                 const fresh = new DOMParser().parseFromString(html, 'text/html')
