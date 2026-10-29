@@ -9,7 +9,7 @@ import io
 import json
 from datetime import datetime
 
-from flask import abort, current_app, jsonify, render_template, request, send_file
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
 from .. import db
@@ -107,11 +107,54 @@ def _check_analysis_access(analysis):
 # ---------------------------------------------------------------------------
 # PAGE ROUTES — render HTML templates for vendor analysis workflows
 # ---------------------------------------------------------------------------
-@application_mgmt.route("/vendor-analysis", methods=["GET"])
+@application_mgmt.route("/vendor-analysis", methods=["GET", "POST"])
 @login_required
 def vendor_analysis_list():
-    """Vendor Options Analysis list page."""
-    return render_template("application_mgmt/vendor_analysis_list.html")
+    """Vendor Options Analysis list page.
+
+    Rendered on the server from the same rows and counts as
+    /api/vendor-analyses (the signed-in user's own analyses). A POST with
+    ``?delete=<id>`` deletes one, behind the same access check as the JSON
+    delete, and comes back here.
+    """
+    from app.models.vendor_analysis import OptionsAnalysis
+
+    if request.method == "POST":
+        analysis = db.session.get(OptionsAnalysis, request.args.get("delete", type=int) or 0)
+        if analysis is None or _check_analysis_access(analysis) is not None:
+            flash("That analysis could not be deleted.", "error")
+        else:
+            name = analysis.name
+            db.session.delete(analysis)
+            db.session.commit()
+            flash(f'Deleted "{name}".', "success")
+        return redirect(url_for("application_mgmt.vendor_analysis_list", status=request.args.get("status") or None))
+
+    status_filter = request.args.get("status") or ""
+    mine = OptionsAnalysis.query.filter_by(created_by_id=current_user.id)
+    query = mine
+    if status_filter in ("approved", "rejected", "pending_approval"):
+        query = query.filter_by(approval_status=status_filter)
+    elif status_filter:
+        query = query.filter_by(status=status_filter)
+    analyses = []
+    for a in query.order_by(OptionsAnalysis.created_at.desc()).limit(500).all():
+        winner = a.get_winner()
+        analyses.append({
+            "analysis": a,
+            "vendor_count": len(a.vendor_options),
+            "recommended_vendor": _resolve_vendor_name(winner) if winner else None,
+        })
+    summary = {
+        "total": mine.count(),
+        "approved": mine.filter_by(approval_status="approved").count(),
+        "in_progress": mine.filter(OptionsAnalysis.status.in_(["draft", "running"])).count(),
+        "with_recommendation": mine.filter(OptionsAnalysis.recommendation_confidence.isnot(None)).count(),
+    }
+    return render_template(
+        "application_mgmt/vendor_analysis_list.html",
+        analyses=analyses, summary=summary, status=status_filter,
+    )
 
 
 @application_mgmt.route("/vendor-analysis/new", methods=["GET"])

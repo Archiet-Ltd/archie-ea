@@ -20,6 +20,14 @@ from app import db
 from app.models import LLMInteraction
 
 
+@pytest.fixture(autouse=True)
+def _platform_order(monkeypatch):
+    """The providers these tests name are platform-funded and priced, so the order and ceilings admit them."""
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "openai,anthropic,deepseek,openrouter,nvidia,gemini")
+    for provider in ("OPENAI", "ANTHROPIC", "DEEPSEEK", "GEMINI"):
+        monkeypatch.setenv("LLM_SPEND_CEILING_USD_" + provider, "100")
+
+
 class TestIsAllowedForOrg:
     """ModelProvider.is_allowed_for_org resolution logic."""
 
