@@ -214,7 +214,7 @@ def renewals_dashboard():
         today=today,
         # Template reads summary.{critical,warning,ok,unknown,upcoming,total} -
         # precisely get_renewal_summary()'s return shape.
-        summary=get_renewal_summary(),
+        summary=get_renewal_summary(org_id),
     )
 
 
@@ -344,5 +344,5 @@ def spend_analytics():
         # Every figure on the page comes from this one summary. Total contract
         # value and annual cost are each summed here and nowhere else, so the
         # page cannot state two different totals or add a missing amount as 0.
-        summary=get_spend_summary(),
+        summary=get_spend_summary(org_id),
     )
