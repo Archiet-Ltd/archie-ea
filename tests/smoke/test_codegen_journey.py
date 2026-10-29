@@ -99,6 +99,9 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
     here.
     """
     page = browser.new_page()
+    console_messages = []
+    page.on('console', lambda msg: console_messages.append('%s: %s' % (msg.type, msg.text)))
+    page.on('pageerror', lambda exc: console_messages.append('pageerror: %s' % exc))
     solution_id = seeded['ids']['codegen_genome_solution']
     try:
         _login(page, live_server, seeded['emails']['solution_architect'])
@@ -151,6 +154,7 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
             "wbChildCount: document.querySelector('[data-workbench=\"1\"]').children.length}; }"
         )
         print('ALPINE STATE AFTER SETUP CLICK:', alpine_state)
+        print('CONSOLE MESSAGES SO FAR:', console_messages[-30:])
 
         # Reopen Phase 3 (Configure) -- Quick Generate's deterministic run already
         # unlocked it -- and switch the mode back to Genome.
