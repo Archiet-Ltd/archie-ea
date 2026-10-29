@@ -114,17 +114,26 @@ class _Plan:
                 # its own (the table isn't append-only) and whose column is nullable.
                 removed = False
                 for u, v in cycle_edges:
+                    # A DiGraph collapses every (u, v) pair to one edge even when several
+                    # of u's columns point at v (as arb_canonical_conditions does, with
+                    # both submitted_evidence_id and fulfilment_evidence_id naming
+                    # arb_condition_evidence_records): every one of them must be cleared,
+                    # not just the first found, or the edge removed here is still a live
+                    # reference under the other column.
                     if u in _APPEND_ONLY_TABLES:
                         continue
-                    for child, child_col, _, not_null in self.referrers[v]:
-                        if child == u and not not_null:
-                            sub.remove_edge(u, v)
-                            graph.remove_edge(u, v)
-                            breaks.append((u, child_col))
-                            removed = True
-                            break
-                    if removed:
-                        break
+                    columns = [
+                        child_col
+                        for child, child_col, _, not_null in self.referrers[v]
+                        if child == u and not not_null
+                    ]
+                    if not columns:
+                        continue
+                    sub.remove_edge(u, v)
+                    graph.remove_edge(u, v)
+                    breaks.extend((u, child_col) for child_col in columns)
+                    removed = True
+                    break
                 if not removed:
                     # No safe edge in this cycle: leave it for the database to refuse.
                     break
