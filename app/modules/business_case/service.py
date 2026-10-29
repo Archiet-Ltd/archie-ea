@@ -415,3 +415,70 @@ def _safe_latest_allocation(capability_id):
             capability_id,
         )
         return None
+
+
+# Canvas boxes that carry the case's own written text, keyed by box_key; the
+# detail page shows the same text in the matching card. "recommendation" has
+# no canvas zone, so it is listed beside the zones in page order.
+_BOX_TEXT_FIELDS = {
+    "problem_statement": "problem_statement",
+    "options_considered": "options_considered",
+    "recommendation": "recommended_option",
+    "expected_benefits": "expected_benefits",
+    "key_risks": "key_risks",
+}
+
+_FIGURES = (
+    ("Capex", "capex"),
+    ("Opex (annual)", "opex_annual"),
+    ("3yr TCO", "tco_3yr"),
+    ("Annual financial benefit", "financial_benefit_annual"),
+    ("ROI %", "roi_percentage"),
+    ("Payback (months)", "payback_months"),
+)
+
+
+def _figure_text(value):
+    """A figure as the page's own field shows it; an unset figure is an em dash."""
+    return "—" if value is None else str(value)
+
+
+def build_export_context(business_case):
+    """The business case as the Word and PDF exports print it.
+
+    Reads the same record, canvas zones and figures the detail page renders, so
+    the document and the page agree. The case must already have been loaded
+    through get_business_case_or_none (the organisation-fenced query).
+    """
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.models.organization import Organization
+
+    organisation = db.session.get(Organization, business_case.organization_id)
+
+    boxes = []
+    for zone in CANVAS_TEMPLATES["business_case"]["zones"]:
+        key = zone["box_key"]
+        boxes.append({"key": key, "label": zone["label"],
+                      "text": (getattr(business_case, _BOX_TEXT_FIELDS[key], None) or "").strip()
+                      if key in _BOX_TEXT_FIELDS else ""})
+        if key == "options_considered":
+            boxes.append({"key": "recommendation", "label": "Recommendation",
+                          "text": (business_case.recommended_option or "").strip()})
+
+    figures = [(label, _figure_text(getattr(business_case, attr))) for label, attr in _FIGURES]
+    figures.append(("NPV (3yr, 10% discount)",
+                    "—" if business_case.npv is None else f"{business_case.npv:.2f}"))
+
+    return {
+        "title": business_case.title or "Untitled Business Case",
+        "status": (business_case.status or "draft"),
+        "organisation": organisation.name if organisation else "",
+        "summary": (business_case.description or "").strip(),
+        "boxes": boxes,
+        "links": [
+            ("Strategic initiative", business_case.strategic_initiative.name if business_case.strategic_initiative else None),
+            ("Capability", business_case.capability.name if business_case.capability else None),
+            ("Solution", business_case.solution.name if business_case.solution else None),
+        ],
+        "figures": figures,
+    }

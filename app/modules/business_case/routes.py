@@ -6,6 +6,7 @@ Index endpoint (linked from the sidebar by the orchestrator post-merge):
 """
 
 import logging
+import re
 
 from flask import Blueprint, Response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -115,6 +116,29 @@ def detail(business_case_id):
     )
 
 
+_DOCUMENT_MIMETYPES = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+}
+
+
+def _export_document(business_case, fmt):
+    """Serve the case as a Word or PDF download named after its title."""
+    from app.services.togaf_deliverable_export_service import TOGAFDeliverableExportService
+
+    context = service.build_export_context(business_case)
+    exporter = TOGAFDeliverableExportService()
+    if fmt == "docx":
+        body = exporter.export_business_case_to_docx(business_case, context)
+    else:
+        body = exporter.export_business_case_to_pdf(business_case, context)
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", context["title"]).strip("-.")[:80] or f"business-case-{business_case.id}"
+    return Response(
+        body, status=200, mimetype=_DOCUMENT_MIMETYPES[fmt],
+        headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'},
+    )
+
+
 @business_case_bp.route("/<int:business_case_id>/export", methods=["GET"])
 @login_required
 def export_canvas(business_case_id):
@@ -122,15 +146,20 @@ def export_canvas(business_case_id):
     (mermaid, lucid, archi) over the record's saved diagram, with every empty
     box's reason named in the file.
 
-    Query parameter: format (mermaid|lucid|archi, default mermaid).
+    Word and PDF documents are written from the record itself.
+
+    Query parameter: format (mermaid|lucid|archi|docx|pdf, default mermaid).
     """
     business_case = service.get_business_case_or_none(business_case_id)
     if business_case is None:
         return not_found_response("Business Case")
 
     fmt = request.args.get("format", "mermaid")
-    if fmt not in ("mermaid", "lucid", "archi"):
+    if fmt not in ("mermaid", "lucid", "archi", "docx", "pdf"):
         return error_response(f"Unsupported format: {fmt}", code="VALIDATION_ERROR", status_code=400)
+
+    if fmt in ("docx", "pdf"):
+        return _export_document(business_case, fmt)
 
     from app.services.composer_export_formats import (
         export_canvas_viewpoint,

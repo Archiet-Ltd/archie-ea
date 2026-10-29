@@ -692,3 +692,109 @@ class TOGAFDeliverableExportService:
         output.close()
         logger.info("Roadmap Excel exported: %s", migration_plan.title)
         return result
+
+    # =========================================================================
+    # BUSINESS CASE (Word and PDF; context from business_case.service.build_export_context)
+    # =========================================================================
+
+    _EMPTY_BOX = "Nothing recorded yet."
+
+    def export_business_case_to_pdf(self, business_case, context) -> bytes:
+        """Export a business case to branded PDF.
+
+        Sections: title block, summary, canvas boxes, links, financial figures.
+        """
+        if not REPORTLAB_AVAILABLE:
+            raise ImportError("ReportLab is required for PDF export")
+
+        def para(text):
+            return escape(text).replace("\n", "<br/>")
+
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=letter, title=context["title"])
+        elements = []
+        styles = self._get_branded_styles()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        self._build_branded_header(
+            elements, styles, escape(context["title"]), "Business Case", timestamp,
+        )
+        meta = f"Status: {escape(context['status'].title())}"
+        if context["organisation"]:
+            meta += f" | Organisation: {escape(context['organisation'])}"
+        elements.append(Paragraph(meta, styles["BodyText"]))
+
+        elements.append(Paragraph("Summary", styles["SectionHead"]))
+        elements.append(Paragraph(para(context["summary"] or self._EMPTY_BOX), styles["BodyText"]))
+
+        elements.append(Paragraph("Canvas", styles["SectionHead"]))
+        for box in context["boxes"]:
+            elements.append(Paragraph(f"<b>{escape(box['label'])}</b>", styles["BodyText"]))
+            elements.append(Paragraph(para(box["text"] or self._EMPTY_BOX), styles["BodyText"]))
+
+        elements.append(Paragraph("Links", styles["SectionHead"]))
+        link_rows = [["Link", "Name"]] + [
+            [Paragraph(escape(label), styles["Normal"]),
+             Paragraph(escape(name or "Not linked"), styles["Normal"])]
+            for label, name in context["links"]
+        ]
+        elements.append(self._make_table(link_rows, col_widths=[2 * inch, 4.5 * inch]))
+
+        elements.append(Paragraph("Financial figures", styles["SectionHead"]))
+        figure_rows = [["Figure", "Value"]] + [
+            [Paragraph(escape(label), styles["Normal"]), Paragraph(escape(value), styles["Normal"])]
+            for label, value in context["figures"]
+        ]
+        elements.append(self._make_table(figure_rows, col_widths=[3 * inch, 3.5 * inch]))
+
+        self._build_branded_footer(elements, styles)
+        doc.build(elements)
+        result = output.getvalue()
+        output.close()
+        logger.info("Business case PDF exported: %s", context["title"])
+        return result
+
+    def export_business_case_to_docx(self, business_case, context) -> bytes:
+        """Export a business case to Word, in the same section order as the PDF."""
+        from docx import Document
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        document = Document()
+        document.core_properties.title = context["title"]
+        document.add_paragraph("Entelim — Business Case")
+        document.add_heading(context["title"], level=1)
+        meta = f"Status: {context['status'].title()}"
+        if context["organisation"]:
+            meta += f" | Organisation: {context['organisation']}"
+        document.add_paragraph(meta)
+        document.add_paragraph(f"Generated: {timestamp} | {CONFIDENTIALITY_NOTICE}")
+
+        document.add_heading("Summary", level=2)
+        document.add_paragraph(context["summary"] or self._EMPTY_BOX)
+
+        document.add_heading("Canvas", level=2)
+        for box in context["boxes"]:
+            document.add_heading(box["label"], level=3)
+            document.add_paragraph(box["text"] or self._EMPTY_BOX)
+
+        document.add_heading("Links", level=2)
+        links = document.add_table(rows=1, cols=2)
+        links.style = "Table Grid"
+        links.rows[0].cells[0].text, links.rows[0].cells[1].text = "Link", "Name"
+        for label, name in context["links"]:
+            cells = links.add_row().cells
+            cells[0].text, cells[1].text = label, name or "Not linked"
+
+        document.add_heading("Financial figures", level=2)
+        figures = document.add_table(rows=1, cols=2)
+        figures.style = "Table Grid"
+        figures.rows[0].cells[0].text, figures.rows[0].cells[1].text = "Figure", "Value"
+        for label, value in context["figures"]:
+            cells = figures.add_row().cells
+            cells[0].text, cells[1].text = label, value
+
+        output = io.BytesIO()
+        document.save(output)
+        result = output.getvalue()
+        logger.info("Business case Word exported: %s", context["title"])
+        return result
