@@ -1,5 +1,8 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Portfolio{% endblock %}
 
@@ -64,66 +67,62 @@
     {% endif %}
   </div>
 
-  <div class="rounded-lg border border-border bg-card overflow-x-auto">
-    {# An empty table with nine column headers under it told a reader nothing
-       about what this module is or how it gets populated, which is how a
-       complete-but-unpopulated module gets mis-assessed as absent. Render the
-       grid only when there is something in it. #}
-    {% if initiatives %}
-    <table class="dense-table w-full text-sm">
-      <thead class="border-b bg-muted/40">
-        <tr class="text-left">
-          <th class="px-4 py-3 font-medium">Initiative</th>
-          <th class="px-4 py-3 font-medium">Phase</th>
-          <th class="px-4 py-3 font-medium">Health</th>
-          <th class="px-4 py-3 font-medium text-right">Budget</th>
-          <th class="px-4 py-3 font-medium text-right">Spent</th>
-          <th class="px-4 py-3 font-medium text-right">Variance</th>
-          <th class="px-4 py-3 font-medium text-right">Complete</th>
-          <th class="px-4 py-3 font-medium text-right">Benefits</th>
-          <th class="px-4 py-3 font-medium">Sponsor</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in initiatives %}
-        <tr class="border-b last:border-0 hover:bg-accent/40">
-          <td class="px-4 py-3">
-            <a href="{{ url_for('portfolio.detail', initiative_id=i.id) }}"
-               class="font-medium text-primary hover:underline">{{ i.name }}</a>
-            {% if i.code %}<div class="text-xs text-muted-foreground">{{ i.code }}</div>{% endif %}
-          </td>
-          <td class="px-4 py-3">{{ i.current_phase or '—' }}</td>
-          <td class="px-4 py-3">
-            {% set h = (i.health_status or '')|lower %}
-            {% if h == 'red' %}<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-destructive/10 text-destructive-emphasis">Red</span>
-            {% elif h in ('amber', 'yellow') %}<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-warning/10 text-warning-emphasis">Amber</span>
-            {% elif h == 'green' %}<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-success/10 text-success-emphasis">Green</span>
-            {% else %}<span class="text-muted-foreground" title="No health status recorded">&mdash;</span>{% endif %}
-          </td>
-          <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.approved_budget is not none %}{{ '{:,.0f}'.format(i.approved_budget) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
-          </td>
-          <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.spent_to_date is not none %}{{ '{:,.0f}'.format(i.spent_to_date) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
-          </td>
-          <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.variance_pct is not none %}
-              <span class="{% if i.variance_pct > 10 %}text-destructive{% elif i.variance_pct > 0 %}text-warning{% else %}text-success{% endif %} font-medium">
-                {{ '%+.1f' | format(i.variance_pct) }}%
-              </span>
-            {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
-          </td>
-          <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.completion_percentage is not none %}{{ i.completion_percentage }}%{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
-          </td>
-          <td class="px-4 py-3 text-right tabular-nums">{{ i.benefit_count or '—' }}</td>
-          <td class="px-4 py-3">{{ i.executive_sponsor or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% if initiatives %}
+  {%- set _columns = [
+      {'label': 'Initiative', 'sortable': true},
+      {'label': 'Phase', 'sortable': true},
+      {'label': 'Health', 'sortable': true},
+      {'label': 'Budget', 'align': 'right', 'sortable': true},
+      {'label': 'Spent', 'align': 'right', 'sortable': true},
+      {'label': 'Variance', 'align': 'right', 'sortable': true},
+      {'label': 'Complete', 'align': 'right', 'sortable': true},
+      {'label': 'Benefits', 'align': 'right', 'sortable': true},
+      {'label': 'Sponsor', 'sortable': true},
+  ] -%}
+  {% call(i) list_table(rows=initiatives, columns=_columns, caption='Transformation initiatives', testid='portfolio-table', row_testid='portfolio-row', empty_message='No initiatives recorded yet.') %}
+    <!-- Initiative -->
+    {% call table_cell() %}
+      <a href="{{ url_for('portfolio.detail', initiative_id=i.id) }}"
+         class="font-medium text-primary hover:underline" data-testid="portfolio-link">{{ i.name }}</a>
+      {% if i.code %}<div class="text-xs text-muted-foreground">{{ i.code }}</div>{% endif %}
+    {% endcall %}
+    <!-- Phase -->
+    {% call table_cell() %}{{ i.current_phase or '—' }}{% endcall %}
+    <!-- Health -->
+    {%- set h = (i.health_status or '')|lower -%}
+    {% call table_cell(attrs={'data-sort': h}) %}
+      {% if h == 'red' %}<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-destructive/10 text-destructive-emphasis">Red</span>
+      {% elif h in ('amber', 'yellow') %}<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-warning/10 text-warning-emphasis">Amber</span>
+      {% elif h == 'green' %}<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-success/10 text-success-emphasis">Green</span>
+      {% else %}<span class="text-muted-foreground" title="No health status recorded">&mdash;</span>{% endif %}
+    {% endcall %}
+    <!-- Budget -->
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': i.approved_budget if i.approved_budget is not none else ''}) %}
+      {% if i.approved_budget is not none %}{{ '{:,.0f}'.format(i.approved_budget) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+    {% endcall %}
+    <!-- Spent -->
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': i.spent_to_date if i.spent_to_date is not none else ''}) %}
+      {% if i.spent_to_date is not none %}{{ '{:,.0f}'.format(i.spent_to_date) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+    {% endcall %}
+    <!-- Variance -->
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': i.variance_pct if i.variance_pct is not none else ''}) %}
+      {% if i.variance_pct is not none %}
+        <span class="{% if i.variance_pct > 10 %}text-destructive{% elif i.variance_pct > 0 %}text-warning{% else %}text-success{% endif %} font-medium">
+          {{ '%+.1f' | format(i.variance_pct) }}%
+        </span>
+      {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+    {% endcall %}
+    <!-- Complete -->
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': i.completion_percentage if i.completion_percentage is not none else ''}) %}
+      {% if i.completion_percentage is not none %}{{ i.completion_percentage }}%{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+    {% endcall %}
+    <!-- Benefits -->
+    {% call table_cell(class='text-right tabular-nums') %}{{ i.benefit_count or '—' }}{% endcall %}
+    <!-- Sponsor -->
+    {% call table_cell() %}{{ i.executive_sponsor or '—' }}{% endcall %}
+  {% endcall %}
 
-    {% else %}
+  {% else %}
     <div class="py-16 px-6 text-center">
       <div class="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <i data-lucide="briefcase" class="h-5 w-5 text-muted-foreground" aria-hidden="true"></i>
@@ -142,7 +141,6 @@
       </p>
     </div>
     {% endif %}
-  </div>
 
 </div>
 {% endblock %}
