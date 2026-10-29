@@ -5,7 +5,8 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -55,50 +56,39 @@
     <p id="workflow-table-summary" class="text-sm text-muted-foreground">
         {% if selected_category %}Showing {{ selected_category|replace('_', ' ')|title }} workflows.{% else %}Every workflow in the catalog.{% endif %}
     </p>
-    {% call table(attrs_dict={'aria-label': 'Workflow definitions', 'aria-describedby': 'workflow-table-summary'}) %}
-        {% call table_header() %}
-            {% call table_row(class='hover:bg-transparent') %}
-                {% call table_head() %}Workflow{% endcall %}
-                {% call table_head() %}Category{% endcall %}
-                {% call table_head() %}Type{% endcall %}
-                {% call table_head() %}Automation{% endcall %}
-                {% call table_head(class='text-right') %}Steps{% endcall %}
-                {% call table_head(class='text-right') %}Runs{% endcall %}
-                {% call table_head(class='text-right') %}Actions{% endcall %}
-            {% endcall %}
+    {%- set rows = [] -%}
+    {% for category, defs in workflows_by_category.items() %}
+    {% for definition in defs %}
+    {%- set _ = rows.append((category, definition)) -%}
+    {% endfor %}
+    {% endfor %}
+    {% set columns = [('Workflow', ''), ('Category', ''), ('Type', ''), ('Automation', ''), {'label': 'Steps', 'class': 'text-right'}, {'label': 'Runs', 'class': 'text-right'}, {'label': 'Actions', 'class': 'text-right', 'sortable': false}] %}
+    {% call(row) list_table(rows=rows, columns=columns, caption='Workflow definitions', testid='workflows-table', row_testid='workflow-row', search_placeholder='Filter workflows...', empty_message='No workflows yet.') %}
+        {%- set category, definition = row -%}
+        {% call table_cell() %}
+            <a href="{{ url_for('integration.workflow_detail', workflow_code=definition.workflow_code) }}"
+               class="font-medium text-foreground hover:underline">{{ definition.workflow_name|dash }}</a>
+            {% if definition.workflow_description %}
+            <p class="text-xs text-muted-foreground">{{ definition.workflow_description }}</p>
+            {% endif %}
         {% endcall %}
-        {% call table_body() %}
-        {% for category, defs in workflows_by_category.items() %}
-        {% for definition in defs %}
-            {% call table_row() %}
-                {% call table_cell() %}
-                    <a href="{{ url_for('integration.workflow_detail', workflow_code=definition.workflow_code) }}"
-                       class="font-medium text-foreground hover:underline">{{ definition.workflow_name|dash }}</a>
-                    {% if definition.workflow_description %}
-                    <p class="text-xs text-muted-foreground">{{ definition.workflow_description }}</p>
-                    {% endif %}
-                {% endcall %}
-                {% call table_cell() %}
-                    {% call badge(variant='secondary') %}{{ category|replace('_', ' ')|title }}{% endcall %}
-                {% endcall %}
-                {% call table_cell() %}
-                    <span class="text-muted-foreground">{{ workflow_type_labels.get(definition.workflow_type, definition.workflow_type|dash|title) }}</span>
-                {% endcall %}
-                {% call table_cell() %}
-                    <span class="text-muted-foreground">{{ definition.automation_level|dash|replace('_', ' ')|title }}</span>
-                {% endcall %}
-                {% call table_cell(class='text-right') %}
-                    {{ (definition.steps or [])|length }}
-                {% endcall %}
-                {% call table_cell(class='text-right') %}
-                    {{ definition.execution_count|dash }}
-                {% endcall %}
-                {% call table_cell(class='text-right') %}
-                    {{ button(text='View Details', variant='ghost', icon='arrow-right', href=url_for('integration.workflow_detail', workflow_code=definition.workflow_code)) }}
-                {% endcall %}
-            {% endcall %}
-        {% endfor %}
-        {% endfor %}
+        {% call table_cell() %}
+            {% call badge(variant='secondary') %}{{ category|replace('_', ' ')|title }}{% endcall %}
+        {% endcall %}
+        {% call table_cell() %}
+            <span class="text-muted-foreground">{{ workflow_type_labels.get(definition.workflow_type, definition.workflow_type|dash|title) }}</span>
+        {% endcall %}
+        {% call table_cell() %}
+            <span class="text-muted-foreground">{{ definition.automation_level|dash|replace('_', ' ')|title }}</span>
+        {% endcall %}
+        {% call table_cell(class='text-right') %}
+            {{ (definition.steps or [])|length }}
+        {% endcall %}
+        {% call table_cell(class='text-right') %}
+            {{ definition.execution_count|dash }}
+        {% endcall %}
+        {% call table_cell(class='text-right') %}
+            {{ button(text='View Details', variant='ghost', icon='arrow-right', href=url_for('integration.workflow_detail', workflow_code=definition.workflow_code)) }}
         {% endcall %}
     {% endcall %}
     {% elif load_error %}
