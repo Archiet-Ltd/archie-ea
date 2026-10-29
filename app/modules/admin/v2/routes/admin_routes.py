@@ -5727,11 +5727,19 @@ def organization_delete(org_id):
     """Delete an organization and all its tenant data."""
     from app.services.org_deletion_service import OrganizationDeletionService
 
-    result = OrganizationDeletionService.delete_organization(org_id, requester_id=current_user.id)
-    if result["success"]:
-        flash(result["message"], "success")
-    else:
-        flash(result["message"], "error")
+    from flask import current_app
+
+    from app.services.org_deletion_service import OrganizationDeletionRefused
+
+    try:
+        flash(OrganizationDeletionService.delete_organization(org_id, requester_id=current_user.id), "success")
+    except OrganizationDeletionRefused as refused:
+        flash(str(refused), "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
+    except Exception:  # noqa: BLE001 - rolled back by the service; the reason is logged, the person told
+        current_app.logger.exception("Organisation %s could not be deleted", org_id)
+        flash("The organisation could not be deleted, and nothing was changed. The reason is in the server log.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
     return redirect(url_for("admin.organizations_list"))
 
 

@@ -1,169 +1,149 @@
-"""Organization deletion service.
+"""Deleting an organisation, with every row that belongs to it.
 
-Deletes all tenant-scoped data for an organization before deleting the
-organization itself. Uses the canonical tenant table list from
-scripts/tenant_tables.txt and deletes in dependency order (leaf tables first).
+The organisation's people move to the Default organisation (an Administrator there becomes an
+ordinary member). Every other row that belongs to the organisation is removed first, in the order
+the database's own foreign keys require: a row is removed only after every row that points at it.
+
+What belongs to the organisation is read from the database, not from a hand-kept list:
+  - a row of any table with a foreign key to ``organizations`` that names this organisation;
+  - a row of a table with no such key that points (through its own foreign keys, at any depth) at
+    one of those rows, such as a sync log of the organisation's connector.
+
+Nothing is disabled on the way: no trigger is switched off, no ``session_replication_role`` is set,
+and a statement the database refuses is not skipped. The whole deletion is one transaction; if any
+statement fails, it is rolled back and the error is raised to the caller with the database's reason.
 """
 
-from pathlib import Path
-from sqlalchemy import text, inspect
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session as SASession
+from collections import defaultdict
+
+from sqlalchemy import text
 
 from app.extensions import db
-from app.models.organization import Organization
-from app.models.user import User
-from app.models.org_role import OrgRole
+
+# The people of a deleted organisation are moved, not deleted.
+MOVED_NOT_DELETED = "users"
+
+_FOREIGN_KEYS = text(
+    """
+    SELECT child.relname AS child_table, child_col.attname AS child_column,
+           parent.relname AS parent_table, parent_col.attname AS parent_column
+    FROM pg_constraint c
+    JOIN pg_class child ON child.oid = c.conrelid
+    JOIN pg_namespace ns ON ns.oid = child.relnamespace
+    JOIN pg_class parent ON parent.oid = c.confrelid
+    JOIN pg_attribute child_col ON child_col.attrelid = c.conrelid AND child_col.attnum = c.conkey[1]
+    JOIN pg_attribute parent_col ON parent_col.attrelid = c.confrelid AND parent_col.attnum = c.confkey[1]
+    WHERE c.contype = 'f' AND ns.nspname = current_schema() AND array_length(c.conkey, 1) = 1
+    """
+)
+
+
+class OrganizationDeletionRefused(ValueError):
+    """The organisation may not be deleted (the Default organisation, or no Default to move people to)."""
+
+
+def _q(name):
+    return '"%s"' % name.replace('"', '""')
+
+
+class _Plan:
+    """The foreign-key graph of the current schema, read once per deletion."""
+
+    def __init__(self, sess):
+        self.referrers = defaultdict(list)  # parent table -> [(child table, child column, parent column)]
+        self.org_columns = defaultdict(list)  # table -> columns that point at organizations.id
+        for child, child_col, parent, parent_col in sess.execute(_FOREIGN_KEYS):
+            self.referrers[parent].append((child, child_col, parent_col))
+            if parent == "organizations" and parent_col == "id" and child != "organizations":
+                self.org_columns[child].append(child_col)
+
+    def order(self):
+        """Tables that name an organisation, each after every such table that points at it."""
+        tables = set(self.org_columns) - {MOVED_NOT_DELETED}
+        children_of = {t: {c for c, _, _ in self.referrers[t] if c in tables and c != t} for t in tables}
+        remaining = {t: set(children) for t, children in children_of.items()}
+        order = []
+        while remaining:
+            ready = sorted(t for t, children in remaining.items() if not children)
+            if not ready:
+                # A cycle: take the rest in name order; the database says plainly if one is refused.
+                ready = sorted(remaining)
+            for table in ready:
+                order.append(table)
+                remaining.pop(table)
+            for children in remaining.values():
+                children.difference_update(ready)
+        return order
+
+
+def _delete(sess, table, where, params):
+    """Delete the rows of ``table`` in ``where``, only when there are any.
+
+    An append-only table refuses every delete statement, even one that matches nothing; asking
+    first keeps those tables out of a deletion that has no rows in them. When the organisation does
+    hold such rows, the delete is sent and the database's refusal is raised, not skipped.
+    """
+    if sess.execute(text("SELECT 1 FROM %s WHERE %s LIMIT 1" % (_q(table), where)), params).first() is not None:
+        sess.execute(text("DELETE FROM %s WHERE %s" % (_q(table), where)), params)
+
+
+def _remove_pointing_rows(sess, plan, table, where, params, path):
+    """Remove the rows of tables with no organisation column that point at ``table``'s rows in ``where``."""
+    for child, child_col, parent_col in plan.referrers[table]:
+        if child == table or child in path or child == MOVED_NOT_DELETED or child in plan.org_columns:
+            continue
+        child_where = "%s IN (SELECT %s FROM %s WHERE %s)" % (_q(child_col), _q(parent_col), _q(table), where)
+        _remove_pointing_rows(sess, plan, child, child_where, params, path | {child})
+        _delete(sess, child, child_where, params)
 
 
 class OrganizationDeletionService:
-    """Service for deleting an organization and all its tenant data."""
-
-    _tenant_tables_cache = None
-    _deletion_order_cache = None
-
-    @classmethod
-    def _get_tenant_tables(cls):
-        """Load the canonical tenant table list."""
-        if cls._tenant_tables_cache is None:
-            tenant_tables_path = Path(__file__).parent.parent.parent / "scripts" / "tenant_tables.txt"
-            with open(tenant_tables_path) as f:
-                cls._tenant_tables_cache = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-        return cls._tenant_tables_cache
-
-    @classmethod
-    def _get_deletion_tables(cls):
-        """Get tenant tables that should be deleted (excludes tables handled specially)."""
-        # Users are handled specially (moved to default org), not deleted
-        excluded = {"users"}
-        return [t for t in cls._get_tenant_tables() if t not in excluded]
-
-    @classmethod
-    def _get_deletion_order(cls, engine=None):
-        """Determine the correct deletion order based on foreign key dependencies.
-
-        Returns tables ordered so that leaf tables (no other tenant tables
-        reference them) are deleted first, then tables they reference, etc.
-        """
-        if cls._deletion_order_cache is not None:
-            return cls._deletion_order_cache
-
-        tenant_tables = set(cls._get_tenant_tables())
-        if engine is None:
-            engine = db.engine
-        inspector = inspect(engine)
-
-        # Build dependency graph: table -> set of tables it references (within tenant_tables)
-        deps = {table: set() for table in tenant_tables}
-        for table in tenant_tables:
-            try:
-                fks = inspector.get_foreign_keys(table)
-                for fk in fks:
-                    ref_table = fk["referred_table"]
-                    if ref_table in tenant_tables:
-                        deps[table].add(ref_table)
-            except OperationalError:
-                # Table might not exist in test database yet
-                pass
-
-        # Topological sort (Kahn's algorithm)
-        # We want to delete leaf tables first, so we reverse the topological order
-        in_degree = {table: 0 for table in tenant_tables}
-        for table, refs in deps.items():
-            for ref in refs:
-                in_degree[ref] += 1
-
-        # Start with tables that have no incoming edges (no other tenant tables reference them)
-        queue = [table for table, deg in in_degree.items() if deg == 0]
-        order = []
-
-        while queue:
-            table = queue.pop(0)
-            order.append(table)
-            for ref in deps[table]:
-                in_degree[ref] -= 1
-                if in_degree[ref] == 0:
-                    queue.append(ref)
-
-        # If there are cycles or missing tables, append remaining in original order
-        remaining = [t for t in cls._get_tenant_tables() if t not in order]
-        order.extend(remaining)
-
-        cls._deletion_order_cache = order
-        return order
+    """Delete an organisation and every row that belongs to it."""
 
     @classmethod
     def delete_organization(cls, org_id, requester_id=None, session=None):
-        """Delete an organization and all its tenant data.
+        """Delete organisation ``org_id``; return the sentence to show the person who asked.
 
-        Args:
-            org_id: The organization ID to delete.
-            requester_id: The user ID performing the deletion (for audit).
-            session: Optional SQLAlchemy session to use. If not provided, uses
-                Flask-SQLAlchemy's db.session.
-
-        Returns:
-            dict: Result with 'success' bool and 'message' str.
+        Raises OrganizationDeletionRefused when the organisation may not be deleted, and the
+        database's own error (after rolling back) when a row cannot be removed.
         """
-        # Use provided session or fall back to Flask-SQLAlchemy session
+        from app.models.organization import Organization
+        from app.models.user import User
+
         sess = session or db.session
-        engine = sess.get_bind() if hasattr(sess, 'get_bind') else db.engine
-
         org = sess.get(Organization, org_id)
-        if not org:
-            return {"success": False, "message": "Organization not found"}
-
+        if org is None:
+            raise OrganizationDeletionRefused("That organisation no longer exists.")
         if org.slug == "default":
-            return {"success": False, "message": "Cannot delete the Default organization"}
-
-        # Get default org for user reassignment
+            raise OrganizationDeletionRefused("The Default organisation cannot be deleted.")
         default_org = sess.query(Organization).filter_by(slug="default").first()
-        if not default_org:
-            return {"success": False, "message": "Cannot delete — no Default organization to reassign users"}
+        if default_org is None:
+            raise OrganizationDeletionRefused("There is no Default organisation to move its people to.")
 
+        org_name = org.name
         try:
-            # Step 1: Delete all tenant data in dependency order
-            deletion_order = cls._get_deletion_order(engine)
-            for table in deletion_order:
-                try:
-                    sess.execute(
-                        text(f"DELETE FROM {table} WHERE organization_id = :org_id"),
-                        {"org_id": org_id}
-                    )
-                except OperationalError:
-                    # Table might not exist or have different schema; log and continue
-                    pass
-
-            # Step 2: Delete user sessions for users in this organization
-            # (user_sessions references users, not just organization)
-            user_ids = [u.id for u in sess.query(User).filter_by(organization_id=org_id).all()]
-            if user_ids:
-                placeholders = ",".join([f":uid{i}" for i in range(len(user_ids))])
-                params = {f"uid{i}": uid for i, uid in enumerate(user_ids)}
-                sess.execute(
-                    text(f"DELETE FROM user_sessions WHERE user_id IN ({placeholders})"),
-                    params
-                )
-
-            # Step 3: Move users to default org
-            users = sess.query(User).filter_by(organization_id=org_id).all()
+            # The people move first; an Administrator of this organisation is not one of Default.
             moved = 0
-            for user in users:
+            for user in sess.query(User).filter_by(organization_id=org_id).all():
                 user.organization_id = default_org.id
                 if user.is_admin():
                     user.revoke_org_admin()
                 moved += 1
+            sess.flush()
 
-            # Step 4: Delete OrgRole rows for the deleted organization
-            sess.query(OrgRole).filter_by(organization_id=org_id).delete(synchronize_session=False)
+            plan = _Plan(sess)
+            params = {"org_id": org_id}
+            for table in plan.order():
+                where = " OR ".join("%s = :org_id" % _q(col) for col in plan.org_columns[table])
+                _remove_pointing_rows(sess, plan, table, where, params, {table})
+                _delete(sess, table, where, params)
 
-            # Step 5: Delete the organization
-            org_name = org.name
-            sess.delete(org)
+            sess.expunge(org)
+            sess.execute(text("DELETE FROM organizations WHERE id = :org_id"), params)
             sess.commit()
-
-            return {"success": True, "message": f'Organization "{org_name}" deleted. {moved} user(s) moved to Default.'}
-
-        except Exception as e:
+        except Exception:
             sess.rollback()
-            return {"success": False, "message": f"Deletion failed: {str(e)}"}
+            raise
+
+        return 'Organisation "%s" deleted. %d %s moved to Default.' % (
+            org_name, moved, "person" if moved == 1 else "people")

@@ -229,7 +229,11 @@ def test_two_independent_sessions_cannot_claim_the_same_pending_approval(app):
             try:
                 if org_id is not None:
                     from app.services.org_deletion_service import OrganizationDeletionService
+
                     OrganizationDeletionService.delete_organization(org_id, session=cleanup)
+                people = [i for i in (requester_id, first_reviewer_id, second_reviewer_id) if i is not None]
+                if people:
+                    cleanup.query(User).filter(User.id.in_(people)).delete(synchronize_session=False)
                 cleanup.commit()
             finally:
                 cleanup.close()
@@ -339,7 +343,11 @@ def test_two_sessions_rejection_cannot_overwrite_a_durable_claim(app):
             try:
                 if org_id is not None:
                     from app.services.org_deletion_service import OrganizationDeletionService
+
                     OrganizationDeletionService.delete_organization(org_id, session=cleanup)
+                people = [i for i in (requester_id, reviewer_id) if i is not None]
+                if people:
+                    cleanup.query(User).filter(User.id.in_(people)).delete(synchronize_session=False)
                 cleanup.commit()
             finally:
                 cleanup.close()

@@ -175,8 +175,7 @@ def db_session(app, _schema):
 @pytest.fixture
 def make_org(db_session):
     """Factory for Organization rows with collision-free names."""
-    orgs_to_delete = []
-    
+
     def _make(label: str = "org"):
         from app.models.organization import Organization
 
@@ -184,25 +183,9 @@ def make_org(db_session):
         org = Organization(name=f"Test {label} {suffix}", slug=f"test-{label}-{suffix}")
         db_session.add(org)
         db_session.flush()
-        orgs_to_delete.append(org.id)
         return org
 
-    yield _make
-
-    from app.services.org_deletion_service import OrganizationDeletionService
-
-    for org_id in orgs_to_delete:
-        try:
-            # Use the same deletion service as the product
-            with db_session.begin_nested():
-                result = OrganizationDeletionService.delete_organization(org_id)
-                if not result["success"]:
-                    # Log but don't fail - the transaction will be rolled back anyway
-                    pass
-        except Exception:
-            # Ignore errors in test cleanup
-            raise
-
+    return _make
 
 
 @pytest.fixture

@@ -276,12 +276,3 @@ webhook_subscriptions
 work_package_resource_demand
 work_packages
 workbench_artifact_evidence
-arb_governance_standards
-ea_workflow_definitions
-org_roles
-pending_invitations
-arb_workflow_stages
-sso_configs
-users
-soc2_audit_log
-user_sessions
