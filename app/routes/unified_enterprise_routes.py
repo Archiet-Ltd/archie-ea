@@ -1018,6 +1018,130 @@ def ai_architecture_analysis():
 # gap_discovery removed — empty shell page, frozen sidebar link
 
 
+def _impact_answer_context(answer_address):
+    """The stored cited answer for *answer_address*, drawn through the same
+    envelope and template the AI chat uses — or None when there isn't one.
+
+    Reused, never recomputed: ``envelope.open_answer`` reads the exact row
+    ``envelope.ask_and_store`` wrote, so the figures below match the chat's
+    answer for the same element.
+    """
+    if not answer_address:
+        return None
+    from app.modules.ai_chat.services.estate_answer import explanations_for, recorded_text
+    from app.modules.intelligence.services import answer_envelope as envelope
+    from app.modules.intelligence.services.derived_facts import derivation_status
+
+    record = envelope.open_answer(answer_address)
+    if record is None:
+        return None
+    answer = envelope.present(record)
+    try:
+        derivation = derivation_status(int(current_org_id()))
+    except Exception:
+        derivation = None
+    return {
+        "answer": answer,
+        "composer_url": url_for("archimate.composer_page"),
+        "question": "What breaks if %s fails?" % (answer["elements"].get(str(answer["params"].get("element_id")), {}).get("name") or "this"),
+        "derivation": derivation,
+        "shown_limit": 25,
+        "explanations": explanations_for(answer, 25),
+        "recorded_text": recorded_text,
+    }
+
+
+@enterprise_bp.route("/analysis/impact-analysis/run", methods=["POST"])
+@login_required
+def impact_analysis_run():
+    """Run the one cited impact answer for a chosen element and store it.
+
+    Computes nothing of its own: the canonical impact walk
+    (``IntelligenceQueryService.cross_layer_impact``) is reused through
+    ``answer_envelope.ask_and_store``, the same call the AI chat makes for
+    "what breaks if this fails" — so the two surfaces name the same
+    connected elements for the same element. The result is also projected
+    into ``ImpactAnalysisResult`` so the existing history list and headline
+    figures on this page stay populated from the one computation.
+    """
+    import json as _json
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.traceability import ImpactAnalysisResult
+    from app.modules.intelligence.services import answer_envelope as envelope
+
+    element_type = request.form.get("element_type")
+    element_id = request.form.get("element_id", type=int)
+    if element_type not in ("application", "capability") or not element_id:
+        flash("Choose an element type and an element before running an analysis.", "error")
+        return redirect(url_for("enterprise.impact_analysis"))
+
+    if element_type == "application":
+        source = ApplicationComponent.query.filter_by(id=element_id).first()
+    else:
+        source = BusinessCapability.query.filter_by(id=element_id).first()
+    archimate_element_id = getattr(source, "archimate_element_id", None) if source else None
+    if archimate_element_id is None:
+        flash("That element has no architecture model record to analyse yet.", "error")
+        return redirect(url_for("enterprise.impact_analysis", element_type=element_type, element_id=element_id))
+
+    try:
+        record = envelope.ask_and_store(
+            envelope.KIND_IMPACT,
+            {"element_id": archimate_element_id, "include_derived": True, "max_depth": 3, "direction": "downstream"},
+            user_id=current_user.id,
+        )
+    except envelope.AnswerNotAskable:
+        flash("That element could not be found in the architecture model.", "error")
+        return redirect(url_for("enterprise.impact_analysis", element_type=element_type, element_id=element_id))
+
+    rows = record.rows or []
+    elements = record.elements or {}
+    app_ids, cap_ids, process_ids = set(), set(), set()
+    for row in rows:
+        eid = row.get("element_id")
+        etype = ((elements.get(str(eid)) or {}).get("type") or "").lower()
+        if "application" in etype:
+            app_ids.add(eid)
+        elif "capability" in etype:
+            cap_ids.add(eid)
+        elif "process" in etype:
+            process_ids.add(eid)
+    total = len(rows)
+    if total > 20:
+        severity = "critical"
+    elif total > 10:
+        severity = "high"
+    elif total > 0:
+        severity = "medium"
+    else:
+        severity = "low"
+
+    result = ImpactAnalysisResult(
+        analysis_type="impact_answer",
+        trigger_element_type=element_type,
+        trigger_element_id=element_id,
+        impacted_elements=_json.dumps([row.get("element_id") for row in rows]),
+        overall_severity=severity,
+        affected_applications_count=len(app_ids),
+        affected_capabilities_count=len(cap_ids),
+        affected_processes_count=len(process_ids),
+        created_by_id=current_user.id,
+    )
+    db.session.add(result)
+    db.session.commit()
+
+    return redirect(
+        url_for(
+            "enterprise.impact_analysis",
+            element_type=element_type,
+            element_id=element_id,
+            answer_address=record.address,
+        )
+    )
+
+
 @enterprise_bp.route("/analysis/impact-analysis")
 @login_required
 def impact_analysis():
@@ -1033,6 +1157,7 @@ def impact_analysis():
             "element_type"
         )  # 'application' or 'capability'
         selected_element_id = request.args.get("element_id", type=int)
+        answer_context = _impact_answer_context(request.args.get("answer_address"))
 
         # Fetch all applications and capabilities for dropdowns (id + name only)
         applications = (
@@ -1106,6 +1231,7 @@ def impact_analysis():
             critical_count=critical_count,
             high_count=high_count,
             avg_affected_applications=avg_affected_applications,
+            answer_context=answer_context,
         )
     except Exception as e:
         current_app.logger.error(f"Error loading impact analysis: {e}")

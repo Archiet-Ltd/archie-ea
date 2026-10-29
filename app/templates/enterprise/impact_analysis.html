@@ -5,6 +5,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/provenance.html' import provenance_badge %}
 
 {% block title %}Impact Analysis{% endblock %}
 
@@ -32,7 +33,7 @@
             <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 gap-4">
                 <div>
                     <label for="element_type" class="block text-sm font-medium text-muted-foreground mb-1">Element Type</label>
-                    {% call native_select(id='element_type', name='element_type', attrs_dict={'@change': 'toggleElementSelect(this.value)'}) %}
+                    {% call native_select(id='element_type', name='element_type') %}
                         <option value="">All Types</option>
                         <option value="application" {% if selected_element_type == 'application' %}selected{% endif %}>Application</option>
                         <option value="capability" {% if selected_element_type == 'capability' %}selected{% endif %}>Capability</option>
@@ -72,8 +73,42 @@
                     {% endif %}
                 </div>
             </form>
+            {% if selected_element_type and selected_element_id %}
+            <form method="POST" action="{{ url_for('enterprise.impact_analysis_run') }}" class="mt-4 border-t border-border pt-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="element_type" value="{{ selected_element_type }}">
+                <input type="hidden" name="element_id" value="{{ selected_element_id }}">
+                {{ button(text='Run Analysis', variant='default', type='submit', icon='play', testid='run-impact-analysis') }}
+            </form>
+            {% endif %}
         {% endcall %}
     {% endcall %}
+
+    {% if answer_context %}
+    <div class="mb-6 space-y-3">
+        {% set answer = answer_context.answer %}
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title(class='text-base') %}Evidence for this answer{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                <div class="flex flex-wrap items-center gap-3 text-sm">
+                    {{ provenance_badge('measured' if answer.truth_class == 'drawn' else 'ai') }}
+                    <span class="text-muted-foreground">Source: the organisation's recorded architecture model</span>
+                    <span class="text-muted-foreground">Confidence: {% if answer.confidence_percent is not none %}{{ answer.confidence_percent }}%{% else %}every row recorded by people{% endif %}</span>
+                    <span class="text-muted-foreground">Computed: {{ answer_context.recorded_text(answer.computed_at) or answer.computed_at }}</span>
+                </div>
+            {% endcall %}
+        {% endcall %}
+        {% set composer_url = answer_context.composer_url %}
+        {% set question = answer_context.question %}
+        {% set derivation = answer_context.derivation %}
+        {% set shown_limit = answer_context.shown_limit %}
+        {% set explanations = answer_context.explanations %}
+        {% set recorded_text = answer_context.recorded_text %}
+        {% include "ai_chat/_estate_answer.html" with context %}
+    </div>
+    {% endif %}
 
     <!-- Summary Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -191,8 +226,7 @@
         {{ empty_state(
             icon='git-branch',
             headline='No Impact Analyses Found',
-            body='No impact analyses have been recorded yet. Select an element above to run an analysis.',
-            cta_label='Begin Assessment'
+            body='No impact analyses have been recorded yet. Choose an element type above, pick an element and run an analysis.'
         ) }}
         {% endif %}
     {% endcall %}
@@ -219,12 +253,8 @@ function toggleElementSelect(elementType) {
     }
 }
 
-document.getElementById('startImpact')?.addEventListener('click', function() {
-    if (typeof Platform !== 'undefined' && Platform.toast) {
-        Platform.toast.show('Assessment queued — results will appear here when complete', 'info');
-    } else {
-        Platform.toast.success('Assessment queued — results will appear here when complete');
-    }
+document.getElementById('element_type')?.addEventListener('change', function () {
+    toggleElementSelect(this.value);
 });
 </script>
 {% endblock %}
