@@ -696,6 +696,47 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         ))
         db.session.commit()
 
+        # A third solution, separate from codegen_solution above, for the
+        # "Generate with Genome" journey (test_codegen_journey.py). Genome mode
+        # is the wizard's default generation_mode but reaches Phase 4 only via
+        # Skip Enrichment (which force-sets generation_mode to "deterministic")
+        # followed by switching the radio back to "Genome" and saving config --
+        # a different, mutating path through the same wizard than Quick
+        # Generate's one-click shortcut. Sharing codegen_solution between both
+        # journeys would make each test's outcome depend on the other having
+        # run first (phase, config.generation_mode and hasFiles all carry
+        # over), so this fixture gives the genome journey its own solution.
+        genome_component = ApplicationComponent(
+            name="Smoke Genome Service %s" % suffix, organization_id=org.id,
+            lifecycle_status="operational", description="Smoke fixture for the genome codegen journey.",
+        )
+        db.session.add(genome_component)
+        db.session.commit()
+        assert genome_component.archimate_element_id is not None
+
+        codegen_genome_solution = Solution(
+            name="Smoke genome solution %s" % suffix,
+            description="Outcome-test fixture for the Generate with Genome journey.",
+            organization_id=org.id,
+            created_by_id=out["ids"]["solution_architect_user"],
+            governance_status="draft",
+            adm_phase="C",
+            has_acm_domains=True,
+        )
+        db.session.add(codegen_genome_solution)
+        db.session.commit()
+        out["ids"]["codegen_genome_solution"] = codegen_genome_solution.id
+
+        db.session.add(SolutionArchiMateElement(
+            solution_id=codegen_genome_solution.id,
+            layer_type="application",
+            element_id=genome_component.archimate_element_id,
+            element_table="archimate_elements",
+            element_name=genome_component.name,
+            element_role="primary",
+        ))
+        db.session.commit()
+
     return out
 
 
