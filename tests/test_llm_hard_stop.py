@@ -196,6 +196,7 @@ def test_the_chat_route_returns_the_pause_as_an_ordinary_answer(app, platform, m
     body = response.get_json()
     assert body["response"] == PAUSED_MESSAGE
     assert body["success"] is False
+    assert body["agent_error"] is None, "the pause is the whole reply; no error rides beside it"
     assert "Traceback" not in response.get_data(as_text=True)
     assert platform.gemini_calls == [] and platform.openai_compatible_calls == []
 

@@ -90,6 +90,12 @@ LIVE ARCHITECTURE CONTEXT:
 """
 
 
+def is_pause(error) -> bool:
+    """True when the agent's error is the platform's pause: every provider in the order at its ceiling.
+    The pause is the whole reply, so the routes send it as the answer and no error beside it."""
+    return "answers are paused" in (str(error or "")).lower()
+
+
 def sanitize_agent_error(reason) -> "Optional[str]":
     """Turn an upstream failure string into something safe to send to a browser.
 

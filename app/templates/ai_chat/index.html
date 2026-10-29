@@ -134,9 +134,9 @@
                not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
             <div class="shrink-0 px-4 pb-2">
                 {% if current_user.is_admin() %}
-                {{ alert('warning', text='No AI model. Records still answer.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Records still answer.'), link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% else %}
-                {{ alert('warning', text='No AI model. Ask an administrator.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Ask an administrator.'), testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% endif %}
             </div>
             {% endif %}

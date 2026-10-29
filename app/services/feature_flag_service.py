@@ -61,9 +61,12 @@ class FeatureFlagService:
     def get_configured_provider_info() -> Optional[dict]:
         try:
             provider, model = LLMService._get_configured_provider()
-            return {"provider": provider, "model": model, "configured": True}
-        except ValueError:
-            return {"provider": None, "model": None, "configured": False}
+            return {"provider": provider, "model": model, "configured": True, "paused": False}
+        except ValueError as exc:
+            from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+            # Paused: the platform has providers, every one at its ceiling this month.
+            return {"provider": None, "model": None, "configured": False, "paused": isinstance(exc, AnswersPaused)}
 
     @staticmethod
     def require_ai_for_route(

@@ -154,6 +154,10 @@ def test_at_the_ceiling_the_person_reads_a_plain_pause_and_the_provider_is_not_c
         assert PAUSED in reply.first.inner_text()
         body = page.locator("body").inner_text()
         assert "Traceback" not in body and "Exception" not in body
+        # The pause is the whole reply: nothing hangs under it, and the banner says paused, not "no model".
+        assert "could not be completed" not in body, body
+        expect(page.get_by_test_id("chat-provider-settings-link")).to_have_count(0)
+        expect(page.get_by_test_id("model-unavailable-notice")).to_contain_text("AI paused. Records still answer.")
         assert len(gemini.calls) == calls_before, "the provider was called although its ceiling was reached"
         _shot(page, "paused-1440-light")
     finally:
