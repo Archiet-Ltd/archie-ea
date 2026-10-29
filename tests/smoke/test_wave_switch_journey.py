@@ -9,6 +9,8 @@ Written from the goal "the first release shows only what works and says plainly 
   and the enquiry is stored;
 * a signed-in CTO's sidebar offers only first-release pages, each opening with content, and none of the
   later waves' entries;
+* a signed-in administrator's sidebar offers the AI chat and the connectors, and /admin/connectors/github and
+  /ai-chat open as pages, not as the early-access page;
 * a write sent to a later release's route answers 404 and stores nothing.
 
 The same journey run with the switch off (WAVE_JOURNEY_SWITCH=off) is red: that is the "before".
@@ -83,6 +85,8 @@ def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(brows
             status, early, heading = _lands_with_content(page, wave_server, href)
             if status != 200 or not heading:
                 problems.append("%s (%s) -> %s, heading %r" % (label, href, status, heading))
+            elif len(page.inner_text("body").strip()) < 200:
+                problems.append("%s (%s) opens a page with no content beyond its heading" % (label, href))
             elif early and href not in coming:
                 problems.append("%s (%s) is listed as available but opens its early-access page" % (label, href))
         assert not problems, "\n".join(problems)
@@ -153,6 +157,25 @@ def test_cto_sidebar_offers_only_first_release_pages_and_each_opens_with_content
         # a later release's address, typed by a signed-in person, says what it is and when to join
         status, early, heading = _lands_with_content(page, wave_server, "/capability-map")
         assert status == 200 and early and heading
+    finally:
+        page.close()
+
+
+def test_administrator_sidebar_offers_ai_chat_and_connectors_and_both_open_as_pages(browser, wave_server, org):
+    """The two things a first customer does after signing in: ask the AI chat, connect GitHub."""
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["platform_admin"])
+        page.goto(wave_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        side = _hrefs(page, '[data-slot="sidebar"] a[href]')
+        offered = [(h.split("?")[0].rstrip("/"), label.lower()) for h, label in side]
+        assert any(h.startswith("/ai-chat") for h, _ in offered), "the sidebar must offer the AI chat: %s" % offered
+        assert any(h.startswith("/admin/connectors") for h, _ in offered), "the sidebar must offer the connectors: %s" % offered
+        for path in ("/admin/connectors/github", "/ai-chat"):
+            status, early, heading = _lands_with_content(page, wave_server, path)
+            assert status == 200 and heading, "%s -> %s %r" % (path, status, heading)
+            assert not early, "%s opens as the early-access page for a signed-in administrator" % path
+            assert len(page.inner_text("main")) > 80, "%s opens without content" % path
     finally:
         page.close()
 
