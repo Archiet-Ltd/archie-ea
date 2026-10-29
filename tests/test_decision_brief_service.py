@@ -439,7 +439,7 @@ def test_brief_hash_uses_stored_python_canonical_utf8_document(decision_scope):
         # Needs a new, named admission path on a production append-only guard for a
         # mutation this test intentionally performs outside any real write path —
         # out of scope here. Left for the lead/founder to decide.
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: mutates a committed evidence_records value directly; the append-only guard correctly refuses every UPDATE on this table
         connection.execute(
             text(
                 "UPDATE evidence_records SET value_json = CAST(:value AS json) "
@@ -688,7 +688,7 @@ def test_readiness_uses_only_latest_versions_in_exact_candidate_scope(decision_s
         # Needs a new, named admission path on a production append-only guard for
         # a mutation outside any real write path — out of scope here. Left for
         # the lead/founder to decide.
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: mutates a frozen transformation_option_versions row; the append-only guard correctly refuses every UPDATE on this table
         connection.execute(
             text(
                 "UPDATE transformation_option_versions "
@@ -986,7 +986,7 @@ def test_citation_records_effective_expiry_at_freeze(decision_scope, evidence_sc
         # Needs a new, named admission path on a production append-only guard for
         # a mutation outside any real write path — out of scope here. Left for
         # the lead/founder to decide.
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: mutates a committed evidence_records row to a stale stored 'fresh' label; the append-only guard correctly refuses every UPDATE on this table
         connection.execute(
             text(
                 "UPDATE evidence_records SET freshness_status = 'fresh', "

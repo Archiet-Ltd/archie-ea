@@ -204,25 +204,18 @@ def _receipt(fixture: CommandFixture, key="same"):
 
 
 def _wait_for_expiry(claim):
+    """Let a live lease actually expire, in real wall-clock time.
+
+    archie_guard_transformation_receipt correctly refuses a direct write that
+    shortens a live receipt's own lease_expires_at: every "heartbeat"/"reclaim"/
+    "finalise" branch requires the lease to move only forward, or a distinct
+    claim_token the test has no legitimate way to mint. The one thing a test may
+    do instead is wait: TRANSFORMATION_COMMAND_LEASE_SECONDS is already cut to a
+    few seconds for exactly this.
+    """
+    lease_seconds = current_app.config.get("TRANSFORMATION_COMMAND_LEASE_SECONDS", 5.0)
+    time.sleep(lease_seconds + 0.25)
     with db.engine.begin() as connection:
-        # Flagged exception (T-teardown-fk-02): this shortens a live receipt's
-        # own lease_expires_at. archie_guard_transformation_receipt correctly
-        # refuses that for a real caller, and admits no transition that allows
-        # it (every "heartbeat"/"reclaim"/"finalise" branch requires the lease
-        # to move only forward, or requires a distinct claim_token the test has
-        # no legitimate way to mint). Giving a test this write needs a new,
-        # named admission branch on a production concurrency-control guard —
-        # out of scope for the organisation-deletion marker this brief adds.
-        # Left for the lead/founder to decide whether that branch should exist.
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-        connection.execute(
-            text(
-                "UPDATE command_idempotency_records "
-                "SET lease_expires_at = clock_timestamp() - interval '1 second' "
-                "WHERE id = :receipt_id"
-            ),
-            {"receipt_id": claim.receipt_id},
-        )
         expired = connection.scalar(
             text(
                 "SELECT lease_expires_at <= clock_timestamp() "
@@ -1250,7 +1243,7 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
         # admission branch on a production concurrency-control guard — out of
         # scope here. Left for the lead/founder to decide whether that branch
         # should exist.
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: clears a succeeded receipt's result link, a transition the guard correctly never admits for any real caller
         connection.execute(
             text(
                 "UPDATE command_idempotency_records SET status = 'retryable_failure', "
@@ -1265,7 +1258,7 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
                 "command_key": "builtin-materialisation",
             },
         )
-        connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
         connection.execute(
             text("DELETE FROM operation_results WHERE id = :result_id"),
             {"result_id": first.operation_result_id},
@@ -1396,7 +1389,7 @@ def test_stale_generation_is_rejected_before_first_real_domain_write(
             # that claim_token. Needs a new, named admission branch on a
             # production concurrency-control guard — out of scope here. Left
             # for the lead/founder to decide whether that branch should exist.
-            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: bumps lease_generation out of band; the guard's reclaim branch needs a claim_token a test cannot legitimately mint
             connection.execute(
                 text(
                     "UPDATE command_idempotency_records "
@@ -1746,7 +1739,7 @@ def test_damaged_receipt_reconciles_natural_key_and_exact_response(command_fixtu
         # new, named admission branch on a production concurrency-control
         # guard — out of scope here. Left for the lead/founder to decide
         # whether that branch should exist.
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: resets a succeeded receipt to in_progress; the guard correctly never admits a terminal-to-in_progress transition
         connection.execute(
             text(
                 """
