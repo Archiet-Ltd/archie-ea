@@ -109,13 +109,18 @@ def test_a_member_who_may_not_see_spend_reads_no_money_and_no_request_fails(brow
         assert not MONEY.search(body), MONEY.search(body).group(0)
         assert dash.locator('[data-testid="card-run-cost-value"]').count() == 0
         assert dash.locator('[data-testid="monthly-cost-value"]').count() == 0
-        text = dash.locator('[data-testid="card-run-cost"]').inner_text()
-        assert not SHORT.search(text), text
+        for testid in ("card-run-cost", "monthly-cost-withheld"):
+            text = dash.locator('[data-testid="%s"]' % testid).inner_text()
+            assert not SHORT.search(text), (testid, text)
 
-        # the applications themselves are still listed, without their costs
+        # the page says why, and still shows the applications themselves
+        assert dash.locator('[data-testid="card-run-cost-sentence"]').inner_text().strip() == \
+            "Shown to finance, procurement and portfolio roles."
+        assert dash.locator('[data-testid="monthly-cost-withheld"]').inner_text().strip() == "Not shown for your role."
         table = dash.locator('[data-testid="applications-table"]').inner_text()
         assert "Ledger Core" in table and "Payments Hub" in table and "Dana Reed" in table
-        assert not SHORT.search(table), table
+        assert "Annual cost not shown for your role" in table and table.count("Not shown for your role") >= 3
+        assert "Not recorded" not in table
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
         _shot(page, "architect-%d-%s" % (viewport["width"], theme))
 

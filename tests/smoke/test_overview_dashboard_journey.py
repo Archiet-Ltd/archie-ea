@@ -113,8 +113,8 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         assert "most connected" in dash.locator('[data-testid="card-relationships-sentence"]').inner_text()
         cost_sentence = dash.locator('[data-testid="card-run-cost-sentence"]').inner_text()
         if persona == "enterprise_architect":
-            # the enterprise architect may not see spend: the card carries no figure and names no vendor
-            assert "Northbeam" not in cost_sentence and "%" not in cost_sentence, cost_sentence
+            # the enterprise architect may not see spend: the card says so and carries no figure
+            assert cost_sentence == "Shown to finance, procurement and portfolio roles.", cost_sentence
             assert dash.locator('[data-testid="card-run-cost-value"]').count() == 0
             assert not re.search(r"[£$€]\s?\d", body), body
         else:
@@ -147,8 +147,8 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         assert "Old Billing" not in table_text and "(Duplicate)" not in table_text
         assert "Dana Reed" in table_text and "No owner" in table_text
         if persona == "enterprise_architect":
-            assert page.locator('[data-testid="monthly-cost-value"]').count() == 0
-            assert "£" not in table_text
+            assert "Not shown for your role" in page.locator('[data-testid="monthly-cost-withheld"]').inner_text()
+            assert "Not shown for your role" in table_text and "£" not in table_text
         else:
             assert page.locator('[data-testid="monthly-cost-value"]').inner_text().strip()
 
@@ -225,7 +225,7 @@ def test_another_company_never_appears(browser, live_server, orgs):
         assert "Zeta Intake" in text and "Sales" in text
         assert _int(page.locator('[data-testid="welcome-applications"] span').first.inner_text()) == 2
         assert _int(page.locator('[data-testid="card-no-owner-value"]').inner_text()) == 2
-        assert "Harlow" not in page.locator('[data-testid="card-run-cost-sentence"]').inner_text()
+        assert "Shown to finance, procurement and portfolio roles." in page.locator('[data-testid="card-run-cost-sentence"]').inner_text()
         # the owner may see spend: the run cost names the company's own vendor and no other
         context.close()
         context, page = _page(browser, FOLD)
@@ -250,7 +250,11 @@ def test_a_new_company_sees_the_same_page_saying_what_will_appear(browser, live_
         for testid in ("card-run-cost", "card-relationships", "card-no-owner"):
             card = dash.locator('[data-testid="%s"]' % testid)
             expect(card).to_be_visible()
-            assert "once" in card.inner_text() or "Appear" in card.inner_text(), card.inner_text()
+            if testid == "card-run-cost":
+                # the enterprise architect may not see spend, so the card says who reads it
+                assert "Shown to finance, procurement and portfolio roles." in card.inner_text(), card.inner_text()
+            else:
+                assert "once" in card.inner_text() or "Appear" in card.inner_text(), card.inner_text()
             assert card.locator('[data-testid="%s-value"]' % testid).count() == 0
         text = dash.inner_text()
         assert not re.search(r"(^|\s)(—|0)(\s|$)", text), text

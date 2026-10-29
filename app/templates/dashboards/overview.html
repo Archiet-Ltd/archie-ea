@@ -87,6 +87,8 @@
       {% else %}{% set cost_badge = none %}
       {% endif %}
       {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change < 0) if cost.change is not none and cost.change != 0 else none, cost_sentence, links.spend, exact=cost.total_exact) }}
+    {% elif cost.withheld %}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Shown to finance, procurement and portfolio roles.', links.spend) }}
     {% else %}
       {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
     {% endif %}
@@ -158,6 +160,8 @@
           <span class="text-2xl font-semibold tabular-nums" data-testid="monthly-cost-value" title="{{ cost.this_month_exact }}">{{ cost.this_month_short }}</span>
           <span class="flex items-center gap-2 text-sm text-muted-foreground">{% if cost.change %}{{ d.delta('%+d%%' % cost.change, cost.change <= 0) }} than last month{% elif cost.change == 0 %}Same as last month{% else %}Active contracts, per month{% endif %}</span>
           {{ d.chart('area', cost.series, [{'key': 'value', 'label': 'Run cost', 'color': chart_1}], grid=false, class='aspect-auto h-[110px] w-full', label='Run cost by month') }}
+          {% elif cost.withheld %}
+          <p class="text-sm text-muted-foreground" data-testid="monthly-cost-withheld">Not shown for your role.</p>
           {% else %}
           <p class="text-sm text-muted-foreground" data-testid="monthly-cost-empty">The monthly run cost appears once a contract states its annual cost.</p>
           {% endif %}
@@ -239,7 +243,7 @@
     {# Applications #}
     <div class="xl:col-span-2" data-testid="applications-table">
       {% call ui.card(class='gap-4') %}
-        {% call ui.card_header() %}{{ ui.card_title(text='Applications') }}{{ ui.card_description(text='Annual cost recorded for the application') }}{% endcall %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Applications') }}{% if cost.withheld %}{{ ui.card_description(text='Annual cost not shown for your role') }}{% else %}{{ ui.card_description(text='Annual cost recorded for the application') }}{% endif %}{% endcall %}
         {% call ui.card_content(class='px-0') %}
           {% if o.table.rows %}
           {% call ui.table_container() %}{% call ui.table() %}
@@ -252,7 +256,7 @@
                 {% call ui.table_cell(class='pl-6') %}<a href="{{ url_for('unified_applications.application_detail', id=row.id) }}" class="font-medium hover:underline">{{ row.name }}</a><span class="block text-sm text-muted-foreground" data-testid="applications-row-type">{{ row.type or 'Type not recorded' }}</span>{% endcall %}
                 {% call ui.table_cell() %}{{ ui.badge(text=row.status or 'Not recorded', variant='outline') }}{% endcall %}
                 {% call ui.table_cell(class='max-w-36 truncate', attrs={'title': row.owner} if row.owner else {}) %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
-                {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost_label }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+                {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost_label }}{% elif cost.withheld %}<span class="text-muted-foreground">Not shown for your role</span>{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
               {% endcall %}
             {% endfor %}
             {% endcall %}
