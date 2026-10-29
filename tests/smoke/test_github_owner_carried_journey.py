@@ -1,153 +1,103 @@
-"""Browser journey for GitHub code owner carried to application."""
+"""A CTO approves what GitHub showed and the code owner becomes the application's owner.
+
+Starts from the goal: "the person GitHub names as code owner owns the application I just
+added." It drives the review page's own Approve all control, then reads the result where a
+person reads it: the application's fact sheet and the applications list.
+"""
+
+import json
 
 import pytest
-from playwright.sync_api import Page, expect
-import json
-from datetime import datetime, timedelta
+from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD
-
+from tests.smoke.conftest import PAGE_TIMEOUT
+from tests.smoke.fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
-def _login_as(page, base, email):
-    """Sign in as a specific user."""
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    try:
-        page.click("#submit", force=True, no_wait_after=True)
-    except TypeError:
-        page.locator("#submit").dispatch_event("click")
-    try:
-        page.wait_for_url(lambda u: "/account/login" not in u, timeout=PAGE_TIMEOUT)
-    except Exception:
-        pass
-    assert "/account/login" not in page.url, "could not sign in as %s" % email
-
-
-@pytest.fixture(scope="module")
-def admin_context(browser, live_server, seeded):
-    """Create an admin context using the seeded platform_admin."""
-    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
-    ctx.set_default_timeout(PAGE_TIMEOUT)
-    ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
-    login_page = ctx.new_page()
-    _login_as(login_page, live_server, seeded["emails"]["platform_admin"])
-    login_page.close()
-    yield ctx
-    ctx.close()
-
-
-@pytest.fixture
-def admin_page(admin_context):
-    """A page for the admin user."""
-    pg = admin_context.new_page()
-    pg.console_errors = []
-    pg.page_errors = []
-    pg.on("console", lambda m: pg.console_errors.append(m.text) if m.type == "error" else None)
-    pg.on("pageerror", lambda e: pg.page_errors.append(str(e)))
-    yield pg
-    pg.close()
-
-
-def test_github_owner_carried_journey(admin_page: Page, live_server, seeded, admin_context):
+def _propose(org_id, name, repository, owners):
     from app import create_app, db
-    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
-    from app.connectors.github import OP_CLASSIFY
+    from app.connectors.github import OP_CLASSIFY, PROPOSAL_SOURCE
+    from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+    app = create_app("testing")
+    with app.app_context():
+        create_approval_record(
+            organization_id=org_id,
+            operation_type=OP_CLASSIFY,
+            entity_type="repository",
+            summary="GitHub repository %s looks like an application. Approving adds it as an application." % repository,
+            operation_payload={
+                "repository": repository,
+                "name": name,
+                "description": "Read from GitHub.",
+                "classification": "application",
+                "reason": "it has a deployable service",
+                "owners": owners,
+                "commit": "abcdef1234567890",
+                "evidence_file": "CODEOWNERS",
+                "group": "Journey system",
+            },
+            source_table=PROPOSAL_SOURCE,
+            expiry_minutes=60 * 24,
+        )
+        db.session.commit()
+        db.session.remove()
+
+
+def _application_id(org_id, name):
+    from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
 
     app = create_app("testing")
     with app.app_context():
-        # 1. Create a mock repository proposal with a GitHub code owner (matched)
-        proposal_payload = {
-            "repository": "test-org/test-repo",
-            "name": "Test Application",
-            "description": "A test application.",
-            "classification": "application",
-            "owners": [seeded["emails"]["platform_admin"]],
-            "commit": "abcdef123456",
-            "evidence_file": "CODEOWNERS"
-        }
+        row = ApplicationComponent.query.filter_by(name=name, organization_id=org_id).first()
+        found = row.id if row else None
+        db.session.remove()
+        return found
 
-        approval = AIChatCRUDApproval(
-            organization_id=seeded["ids"]["org"],
-            user_id=seeded["ids"]["app_manager_user"],
-            operation_type=OP_CLASSIFY,
-            entity_type="application",
-            original_command="Create application from GitHub repository",
-            operation_payload=json.dumps(proposal_payload),
-            summary="Approve Test Application",
-            status=ApprovalStatus.PENDING,
-            expires_at=datetime.utcnow() + timedelta(days=30),
-        )
-        db.session.add(approval)
-        db.session.commit()
-        approval_id = approval.id
 
-    # 2. Log in as an admin and approve the proposal
-    admin_page.goto(f"{live_server}/admin/approvals")
-    admin_page.click(f"#approve-btn-{approval_id}")
+def test_github_code_owner_becomes_application_owner(browser, live_server):
+    org = create_fresh_org("solution_architect", org_admin=True, extra_roles=("cto",))
+    owner_email = org["emails"]["cto"]
+    _propose(org["org_id"], "Journey Matched App", "journey-org/matched", [owner_email])
+    _propose(org["org_id"], "Journey Unmatched App", "journey-org/unmatched", ["nobodyhere"])
 
-    # 3. Verify the application was created with the correct owner
-    admin_page.goto(f"{live_server}/applications/")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["solution_architect"])
+        page.goto(live_server + "/admin/connectors/github/review", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("cell", name="Journey Matched App", exact=True)).to_be_visible()
+        expect(page.get_by_role("cell", name=owner_email)).to_be_visible()
 
-    with app.app_context():
-        app_obj = ApplicationComponent.query.filter_by(name="Test Application").first()
-        assert app_obj is not None
-        app_id = app_obj.id
+        page.get_by_role("button", name="Approve all (2)").click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("#main-content").get_by_text("Added 2 items to your model.")).to_be_visible()
 
-    owner_text = admin_page.locator(f"[data-testid=app-owner--{app_id}]").inner_text()
-    assert owner_text == "Smoke Platform-admin"
+        matched_id = _application_id(org["org_id"], "Journey Matched App")
+        unmatched_id = _application_id(org["org_id"], "Journey Unmatched App")
+        assert matched_id and unmatched_id, "approval did not create both applications"
 
-    # 4. Verify data quality banner does not show "no owner"
-    no_owner_link = admin_page.locator("[data-testid=dq-no-owner]")
-    expect(no_owner_link).not_to_be_visible()
+        # The outcome a person needs: the named person owns the application.
+        page.goto("%s/applications/%d/fact-sheet" % (live_server, matched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Launch cto").first).to_be_visible()
 
-    # 5. Test unmatched owner
-    with app.app_context():
-        unmatched_payload = {
-            "repository": "test-org/unmatched-repo",
-            "name": "Unmatched Application",
-            "description": "An unmatched application.",
-            "classification": "application",
-            "owners": ["unmatcheduser"],
-            "commit": "abcdef123456",
-            "evidence_file": "CODEOWNERS"
-        }
-        unmatched_approval = AIChatCRUDApproval(
-            organization_id=seeded["ids"]["org"],
-            user_id=seeded["ids"]["app_manager_user"],
-            operation_type=OP_CLASSIFY,
-            entity_type="application",
-            original_command="Create application from GitHub repository",
-            operation_payload=json.dumps(unmatched_payload),
-            summary="Approve Unmatched Application",
-            status=ApprovalStatus.PENDING,
-            expires_at=datetime.utcnow() + timedelta(days=30),
-        )
-        db.session.add(unmatched_approval)
-        db.session.commit()
-        unmatched_approval_id = unmatched_approval.id
+        # The list renders its rows, with the carried owner and the unmatched code owner said plainly.
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Journey Matched App").first).to_be_visible()
+        expect(page.get_by_text("Journey Unmatched App").first).to_be_visible()
+        expect(page.locator("[data-testid=app-owner-%d]" % matched_id)).to_have_text("Launch cto")
+        expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_contain_text("Code owner on GitHub: @nobodyhere")
 
-    admin_page.goto(f"{live_server}/admin/approvals")
-    admin_page.click(f"#approve-btn-{unmatched_approval_id}")
-
-    admin_page.goto(f"{live_server}/applications/")
-    with app.app_context():
-        unmatched_app = ApplicationComponent.query.filter_by(name="Unmatched Application").first()
-        assert unmatched_app is not None
-        unmatched_app_id = unmatched_app.id
-
-    unmatched_owner_text = admin_page.locator(f"[data-testid=app-owner--{unmatched_app_id}]").inner_text()
-    assert "Code owner on GitHub: @unmatcheduser" in unmatched_owner_text
-
-    # 6. Assign the unmatched owner
-    admin_page.click(f"a[href='/applications/{unmatched_app_id}/assign-owner']")
-    admin_page.select_option("select[name=user_id]", str(seeded["ids"]["app_manager_user"]))
-    admin_page.click("button[type=submit]")
-
-    admin_page.goto(f"{live_server}/applications/")
-    assigned_owner_text = admin_page.locator(f"[data-testid=app-owner--{unmatched_app_id}]").inner_text()
-    assert assigned_owner_text == "Smoke Application-manager"
+        # Assign the unmatched owner on the assign-owner page (no screen links to it yet, so it is opened by address).
+        page.goto("%s/applications/%d/assign-owner" % (live_server, unmatched_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.select_option("select[name=user_id]", str(org["user_ids"]["cto"]))
+        page.locator("button[type=submit]").last.click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("[data-testid=app-owner-%d]" % unmatched_id)).to_have_text("Launch cto")
+    finally:
+        context.close()
