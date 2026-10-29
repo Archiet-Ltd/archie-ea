@@ -397,8 +397,16 @@ def assign_owner(id):
         from app.services.element_ownership_service import set_element_owner
         from app.models.user import User
 
-        user = User.query.get(user_id)
-        if not user or user.organization_id != g.current_org_id:
+        try:
+            wanted_id = int(user_id)
+        except (TypeError, ValueError):
+            wanted_id = None
+        user = (
+            User.query.filter_by(id=wanted_id, organization_id=g.current_org_id).first()
+            if wanted_id is not None
+            else None
+        )
+        if not user:
             flash("Invalid user selected.", "error")
             return redirect(url_for("unified_applications.assign_owner", id=id))
 
@@ -414,6 +422,7 @@ def assign_owner(id):
 
         from app.modules.architecture_assistant.property_service import PropertyService
         unmatched["login"] = None  # Clear it so it is not shown again
+        unmatched["logins"] = None
         PropertyService().merge_element_properties(app.archimate_element, {"github_code_owner_unmatched": unmatched}, source="github")
 
         db.session.commit()
@@ -423,10 +432,12 @@ def assign_owner(id):
 
     from app.models.user import User
     users = User.query.filter_by(organization_id=g.current_org_id).all()
-    return render_template("applications/assign_owner.html", app=app, users=users, unmatched_login=unmatched.get("login"))
-
-
-_TERMINAL_LIFECYCLE_STATUSES = frozenset({"retired", "decommissioned", "end_of_life", "end of life"})
+    return render_template(
+        "applications/assign_owner.html",
+        app=app,
+        users=users,
+        unmatched_text=type(app).code_owner_text(unmatched),
+    )
 
 
 @unified_applications_bp.route("/<int:id>/retire", methods=["POST"])

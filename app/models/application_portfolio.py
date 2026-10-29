@@ -523,6 +523,22 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
         element = self.archimate_element
         return element.acm_properties if element else {}
 
+    @staticmethod
+    def code_owner_text(value):
+        """The plain sentence for an unmatched code owner value, or None.
+
+        Every owner reads with one "@" (an e-mail address keeps its own); several owners
+        are all named."""
+        if not isinstance(value, dict):
+            return None
+        names = [n for n in (value.get("logins") or [value.get("login")]) if n]
+        if not names or not value.get("login"):
+            return None
+        shown = ", ".join(n if "@" in n.lstrip("@") else "@" + n.lstrip("@") for n in names)
+        if len(names) > 1:
+            return "Code owners on GitHub: %s, not yet matched to a single person" % shown
+        return "Code owner on GitHub: %s, not yet matched to a person" % shown
+
     @property
     def github_code_owner_unmatched(self):
         """The unmatched GitHub code owner, if any, from ACM properties."""
