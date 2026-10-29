@@ -9,8 +9,10 @@ api_delete_application, api_bulk_consolidate.
 import json
 import logging
 from datetime import date, datetime, timedelta
+from functools import wraps
 
 from flask import (
+    abort,
     current_app,
     flash,
     g,
@@ -377,9 +379,42 @@ def application_detail(id):
 _TERMINAL_LIFECYCLE_STATUSES = frozenset({"retired", "decommissioned", "end_of_life", "end of life"})
 
 
+def require_assign_owner(f):
+    """Require the one rule for who may record or change an application's
+    owner: the governance "assign owner" ability, or the ordinary ability to
+    edit the application itself (``can_assign_owner``, app/core/auth/permissions.py),
+    so what the owner-assign controls show is what every owner-assign route
+    allows, for every person.
+    """
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+
+        from app.core.auth.permissions import can_assign_owner
+
+        if not can_assign_owner(current_user):
+            current_app.logger.warning(
+                f"Access denied to {f.__name__}: user "
+                f"{getattr(current_user, 'username', None) or current_user.id} "
+                f"may not assign an owner"
+            )
+            abort(403)
+
+        return f(*args, **kwargs)
+
+    # Kept as a conservative floor for the blueprint-wide write check
+    # (app/modules/applications/routes/__init__.py): narrower than the real
+    # rule above (it cannot express the "or edit application" half), so it
+    # never admits anyone the route's own decorator would refuse.
+    decorated_function.matrix_guard = ("assign", "owner")
+    return decorated_function
+
+
 @unified_applications_bp.route("/<int:id>/assign-owner", methods=["GET", "POST"])
 @login_required
-@require_permission("assign", "owner")
+@require_assign_owner
 @audit_log("application_assign_owner")
 def assign_owner(id):
     app = _verify_app_in_org(id, g.current_org_id, raise_not_found=True)

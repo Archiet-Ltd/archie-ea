@@ -252,6 +252,17 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
     return default_allowed(key, action, object_type)
 
 
+def can_assign_owner(user, organization_id: Optional[int] = None) -> bool:
+    """Whether ``user`` may record or change who owns an application (or another
+    element) on the application pages: the one rule for every owner-assign
+    control and route -- the governance "assign owner" ability, or the
+    ordinary ability to edit the application itself.
+    """
+    return can(user, "assign", "owner", organization_id) or can(
+        user, "edit", "application", organization_id
+    )
+
+
 def may_change_model_element(user, action: str = "edit") -> bool:
     """Whether ``user`` may ``action`` a goal, requirement, epic or other model element.
 

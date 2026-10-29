@@ -653,6 +653,13 @@ def init_context_processors(app):
     def _template_can_change_model():
         return _can_change_model(_matrix_user)
 
+    from app.core.auth.permissions import can_assign_owner as _can_assign_owner
+
+    def _template_can_assign_owner():
+        return _can_assign_owner(_matrix_user)
+
+    app.jinja_env.globals["can_assign_owner"] = _template_can_assign_owner
+
     def _template_is_platform_administrator():
         from app.middleware.tenant_decorators import is_platform_admin
 

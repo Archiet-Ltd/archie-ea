@@ -28,6 +28,7 @@ from app.services.element_ownership_service import (
 
 from . import unified_applications_bp
 from ._helpers import _verify_app_in_org
+from .crud_routes import require_assign_owner
 
 logger = logging.getLogger(__name__)
 def _duplicate_owner(app_id: int, user_id: int, ownership_type: str, org_id: int, exclude_owner_id: int | None = None):
@@ -45,6 +46,7 @@ def _duplicate_owner(app_id: int, user_id: int, ownership_type: str, org_id: int
 
 @unified_applications_bp.route("/<int:app_id>/owners", methods=["POST"])
 @login_required
+@require_assign_owner
 @audit_log("application_owner_add")
 def add_owner(app_id: int):
     """Add an owner to an application (JSON only).

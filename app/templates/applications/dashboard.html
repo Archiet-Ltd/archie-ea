@@ -85,17 +85,13 @@
     <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>Save
   {% endcall %}
   {% else %}
-  <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?edit=1&tab={{ resolved_tab }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
-    <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
-  </a>
-  {% if can('assign', 'owner') %}
-  {{ ui.button(
-       text=('Change owner' if app_has_owner else 'Assign owner'),
-       variant='outline', size='sm',
-       href=url_for('unified_applications.assign_owner', id=app.id),
-       attrs={'data-testid': 'application-header-assign-owner'}
-  ) }}
+  {% call ui.button(variant='outline', href=url_for('unified_applications.application_detail', id=app.id) ~ '?edit=1&tab=' ~ resolved_tab) %}
+    {{ lucide('pencil') }}Edit
+  {% endcall %}
+  {% if can_assign_owner() %}
+  {% call ui.button(variant='outline', href=url_for('unified_applications.assign_owner', id=app.id), attrs={'data-testid': 'application-header-assign-owner'}) %}
+    {{ lucide('user') }}{{ 'Change owner' if app_has_owner else 'Assign owner' }}
+  {% endcall %}
   {% endif %}
   {% if can_retire_applications(current_user) %}
   <div x-data="{ retiring: false }">
@@ -103,8 +99,8 @@
           class="inline-flex"
           @submit.prevent="Platform.confirm('Mark this application for retirement? This creates a decommission work package with a planned end date and surfaces it on the roadmap.').then(function (ok) { if (ok) { retiring = true; $el.submit(); } })">
       {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
-      {% call button(variant='outline', type='submit', class='text-destructive-emphasis', attrs_dict={':disabled': "retiring"}) %}
-        <i data-lucide="archive" class="w-4 h-4 mr-2" aria-hidden="true"></i>Mark for retirement
+      {% call ui.button(variant='outline', type='submit', class='text-destructive-emphasis', attrs={':disabled': "retiring"}) %}
+        {{ lucide('archive') }}Mark for retirement
       {% endcall %}
     </form>
   </div>
@@ -442,7 +438,7 @@
           {{ edit_row('Development Team', 'devTeam', app.development_team) }}
           {{ edit_row('Support Team', 'supportLevel', app.support_team) }}
           {% else %}
-          {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
+          {% set can_edit = can_assign_owner() %}
           {# The owner shows once: the text fields that repeat a named owner are left out. #}
           {% set text_owner = None if owner_rows else (app.application_owner or app.business_owner or app.technical_owner) %}
           {% set named = (owner_rows | map(attribute='user_name') | map('lower') | list) + ([text_owner | lower] if text_owner else []) %}
@@ -451,7 +447,6 @@
             {% include 'partials/owner_step.html' with context %}
             {% if not owner_rows and app.github_code_owner_unmatched %}
             <p class="mt-2 text-sm text-muted-foreground" data-testid="application-owner-unmatched">{{ app.code_owner_text(app.github_code_owner_unmatched) }}</p>
-            {% if can('assign', 'owner') %}<a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="text-sm text-primary hover:underline" data-testid="application-assign-owner">Assign owner</a>{% endif %}
             {% endif %}
           </div>
           {% for label, value in [('Application Owner', app.application_owner), ('Business Owner', app.business_owner), ('Technical Owner', app.technical_owner), ('Technical Lead', app.technical_lead), ('Product Manager', app.product_manager), ('Development Team', app.development_team), ('Support Team', app.support_team)] %}
