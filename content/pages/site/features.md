@@ -322,3 +322,5 @@ These are not available yet. Open one to join its waiting list and we will tell 
 
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.
+- [Advisers for every role](/modules/advisers-for-every-role): early access. An adviser for the technical architect, the product manager, the solution architect, finance and security, each answering from your own model with citations.
+- [Predictive checks](/modules/predictive-checks): early access. Five checks that flag trouble in your model before it costs you, each with the evidence behind it.

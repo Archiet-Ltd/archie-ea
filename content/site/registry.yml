@@ -110,6 +110,10 @@ product:
          blurb: "Coming soon: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+      - {label: Advisers for every role, icon: users, href: /modules/advisers-for-every-role,
+         blurb: "Early access: an adviser per role, answering from your model with citations."}
+      - {label: Predictive checks, icon: lightbulb, href: /modules/predictive-checks,
+         blurb: "Early access: five checks that flag trouble in your model, with the evidence."}
 
 solutions:
   label: Solutions
@@ -139,6 +143,10 @@ solutions:
          blurb: "Coming soon: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+      - {label: Advisers for every role, icon: users, href: /modules/advisers-for-every-role,
+         blurb: "Early access: an adviser per role, answering from your model with citations."}
+      - {label: Predictive checks, icon: lightbulb, href: /modules/predictive-checks,
+         blurb: "Early access: five checks that flag trouble in your model, with the evidence."}
 
 # Role families, in menu order. The menu and the hub list only the roles that
 # have a page, each a link; a family with no role page is left out of the menu.

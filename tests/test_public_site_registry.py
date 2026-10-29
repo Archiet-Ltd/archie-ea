@@ -39,6 +39,8 @@ PRODUCT_ITEMS = [
 PRODUCT_SOON = [
     ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("Advisers for every role", "Early access: an adviser per role, answering from your model with citations."),
+    ("Predictive checks", "Early access: five checks that flag trouble in your model, with the evidence."),
 ]
 SOLUTIONS = [
     ("Application rationalisation", "Find overlapping applications and decide which to keep, consolidate or retire."),
@@ -51,6 +53,8 @@ SOLUTIONS = [
 SOLUTIONS_SOON = [
     ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("Advisers for every role", "Early access: an adviser per role, answering from your model with citations."),
+    ("Predictive checks", "Early access: five checks that flag trouble in your model, with the evidence."),
 ]
 
 
