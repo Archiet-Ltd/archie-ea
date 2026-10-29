@@ -12,7 +12,6 @@ import re
 import uuid
 
 import pytest
-import requests
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, _seed_standard_org
@@ -151,10 +150,10 @@ def test_the_other_organisation_sees_its_own_vendor_and_its_own_count(browser, l
         # "Their CRM" -- not a leak, the same vendor legitimately used twice.
         rows = page.get_by_test_id("vendor-row")
         expect(rows).to_have_count(2, timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Workday %s" % tag)).to_be_visible()
-        expect(page.get_by_text("Okta %s" % tag)).to_be_visible()
-        assert page.get_by_text("Salesforce %s" % tag).count() == 0, "saw the first organisation's vendor"
-        assert page.get_by_text("Oracle %s" % tag).count() == 0
+        expect(rows.filter(has_text="Workday %s" % tag)).to_have_count(1)
+        expect(rows.filter(has_text="Okta %s" % tag)).to_have_count(1)
+        assert rows.filter(has_text="Salesforce %s" % tag).count() == 0, "saw the first organisation's vendor"
+        assert rows.filter(has_text="Oracle %s" % tag).count() == 0
         expect(page.get_by_test_id("vendors-answer")).to_contain_text("2 vendors supply")
     finally:
         page.close()
@@ -273,7 +272,7 @@ def test_the_page_fits_a_phone_in_both_themes(browser, live_server, two_org_vend
             page.close()
 
 
-def test_no_route_serves_the_retired_legacy_template(live_server, two_org_vendor_world):
+def test_no_route_serves_the_retired_legacy_template(browser, live_server, two_org_vendor_world):
     """Walk line 8: the legacy page is gone, not merely unlinked -- the old address itself redirects."""
     import os
 
@@ -283,9 +282,14 @@ def test_no_route_serves_the_retired_legacy_template(live_server, two_org_vendor
         canonical = url_for("unified_applications.vendors")
     assert canonical.rstrip("/") == "/applications/vendors"
 
-    response = requests.get(live_server + "/dashboard/applications/vendors", allow_redirects=False, timeout=10)
-    assert response.status_code == 301, "the legacy address no longer answers as a permanent redirect"
-    assert response.headers["Location"].rstrip("/").endswith("/applications/vendors")
+    page = browser.new_page()
+    try:
+        _login(page, live_server, world["seeded"]["emails"]["procurement"])
+        response = page.context.request.get(live_server + "/dashboard/applications/vendors", max_redirects=0)
+        assert response.status == 301, "the legacy address no longer answers as a permanent redirect"
+        assert response.headers["location"].rstrip("/").endswith("/applications/vendors")
+    finally:
+        page.close()
 
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     assert not os.path.exists(
