@@ -1,5 +1,8 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}{{ initiative.name }}{% endblock %}
 
@@ -181,57 +184,59 @@
         {% endif %}
       </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm">
-        <thead class="border-b bg-muted/40">
-          <tr class="text-left">
-            <th class="px-4 py-3 font-medium">Benefit</th>
-            <th class="px-4 py-3 font-medium">Measure</th>
-            <th class="px-4 py-3 font-medium text-right">Baseline</th>
-            <th class="px-4 py-3 font-medium text-right">Target</th>
-            <th class="px-4 py-3 font-medium text-right">Actual</th>
-            <th class="px-4 py-3 font-medium text-right">Realised</th>
-            <th class="px-4 py-3 font-medium">Owner</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for b in benefits %}
-          <tr class="border-b last:border-0 {% if b.is_overdue %}bg-destructive/5{% endif %}">
-            <td class="px-4 py-3 font-medium">
-              {{ b.name }}
-              {% if b.is_overdue %}
-              <span class="ml-1 text-xs text-destructive-emphasis" title="Past target date with no measured actual">overdue</span>
-              {% endif %}
-            </td>
-            <td class="px-4 py-3 text-muted-foreground">{{ b.measure or '—' }}{% if b.unit %} <span class="text-xs">({{ b.unit }})</span>{% endif %}</td>
-            <td class="px-4 py-3 text-right tabular-nums">{% if b.baseline_value is not none %}{{ '{:,.0f}'.format(b.baseline_value) }}{% else %}&mdash;{% endif %}</td>
-            <td class="px-4 py-3 text-right tabular-nums">{% if b.target_value is not none %}{{ '{:,.0f}'.format(b.target_value) }}{% else %}&mdash;{% endif %}</td>
-            <td class="px-4 py-3 text-right tabular-nums">{% if b.actual_value is not none %}{{ '{:,.0f}'.format(b.actual_value) }}{% else %}&mdash;{% endif %}</td>
-            <td class="px-4 py-3 text-right tabular-nums">
-              {% if b.realisation_percentage is not none %}
-                <span class="{% if b.realisation_percentage >= 90 %}text-success{% elif b.realisation_percentage >= 50 %}text-warning{% else %}text-destructive{% endif %} font-medium">
-                  {{ b.realisation_percentage }}%
-                </span>
-              {% else %}<span class="text-muted-foreground" title="Needs a baseline, a target and a measured actual">&mdash;</span>{% endif %}
-            </td>
-            <td class="px-4 py-3">{{ b.owner.email if b.owner else '—' }}</td>
-            <td class="px-4 py-3">{{ b.status|replace('_',' ')|title }}</td>
-            {# The measurement form for this benefit is on the same page; the row
-               is the place a user looks for the way into it. #}
-            <td class="px-4 py-3">
-              <a href="#m-val-{{ b.id }}" class="font-medium text-primary hover:underline">Record actual</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% if not benefits %}
-      <p class="text-sm text-muted-foreground py-8 text-center">
-        No benefits recorded. An initiative without a measurable benefit cannot be shown to have paid.
-      </p>
-      {% endif %}
+    <div class="p-6">
+      {%- set _benefit_columns = [
+          {'label': 'Benefit', 'sortable': true},
+          {'label': 'Measure', 'sortable': true},
+          {'label': 'Baseline', 'align': 'right', 'sortable': true},
+          {'label': 'Target', 'align': 'right', 'sortable': true},
+          {'label': 'Actual', 'align': 'right', 'sortable': true},
+          {'label': 'Realised', 'align': 'right', 'sortable': true},
+          {'label': 'Owner', 'sortable': true},
+          {'label': 'Status', 'sortable': true},
+          {'label': 'Action', 'sortable': false},
+      ] -%}
+      {% call(b) list_table(rows=benefits, columns=_benefit_columns, caption='Initiative benefits', testid='initiative-benefits-table', row_testid='initiative-benefit-row', empty_message='No benefits recorded. An initiative without a measurable benefit cannot be shown to have paid.') %}
+        <!-- Benefit -->
+        {% call table_cell(class='font-medium' ~ (' bg-destructive/5' if b.is_overdue else '')) %}
+          {{ b.name }}
+          {% if b.is_overdue %}
+          <span class="ml-1 text-xs text-destructive-emphasis" title="Past target date with no measured actual">overdue</span>
+          {% endif %}
+        {% endcall %}
+        <!-- Measure -->
+        {% call table_cell(class='text-muted-foreground') %}{{ b.measure or '—' }}{% if b.unit %} <span class="text-xs">({{ b.unit }})</span>{% endif %}{% endcall %}
+        <!-- Baseline -->
+        {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': b.baseline_value if b.baseline_value is not none else ''}) %}
+          {% if b.baseline_value is not none %}{{ '{:,.0f}'.format(b.baseline_value) }}{% else %}&mdash;{% endif %}
+        {% endcall %}
+        <!-- Target -->
+        {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': b.target_value if b.target_value is not none else ''}) %}
+          {% if b.target_value is not none %}{{ '{:,.0f}'.format(b.target_value) }}{% else %}&mdash;{% endif %}
+        {% endcall %}
+        <!-- Actual -->
+        {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': b.actual_value if b.actual_value is not none else ''}) %}
+          {% if b.actual_value is not none %}{{ '{:,.0f}'.format(b.actual_value) }}{% else %}&mdash;{% endif %}
+        {% endcall %}
+        <!-- Realised -->
+        {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': b.realisation_percentage if b.realisation_percentage is not none else ''}) %}
+          {% if b.realisation_percentage is not none %}
+            <span class="{% if b.realisation_percentage >= 90 %}text-success{% elif b.realisation_percentage >= 50 %}text-warning{% else %}text-destructive{% endif %} font-medium">
+              {{ b.realisation_percentage }}%
+            </span>
+          {% else %}<span class="text-muted-foreground" title="Needs a baseline, a target and a measured actual">&mdash;</span>{% endif %}
+        {% endcall %}
+        <!-- Owner -->
+        {% call table_cell() %}{{ b.owner.email if b.owner else '—' }}{% endcall %}
+        <!-- Status -->
+        {% call table_cell(attrs={'data-sort': b.status or ''}) %}{{ b.status|replace('_',' ')|title }}{% endcall %}
+        {# The measurement form for this benefit is on the same page; the row
+           is the place a user looks for the way into it. #}
+        <!-- Action -->
+        {% call table_cell() %}
+          <a href="#m-val-{{ b.id }}" class="font-medium text-primary hover:underline">Record actual</a>
+        {% endcall %}
+      {% endcall %}
     </div>
 
     {# Add a canonical programme benefit. Baseline is asked for up front on purpose:
@@ -351,43 +356,38 @@
       <h2 class="text-xl font-semibold">Assumptions</h2>
       <p class="text-sm text-muted-foreground mt-1">Highest exposure first &mdash; impact &times; uncertainty</p>
     </div>
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm">
-        <thead class="border-b bg-muted/40">
-          <tr class="text-left">
-            <th class="px-4 py-3 font-medium">Assumption</th>
-            <th class="px-4 py-3 font-medium text-right">Exposure</th>
-            <th class="px-4 py-3 font-medium">Validate by</th>
-            <th class="px-4 py-3 font-medium">Owner</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for a in assumptions %}
-          <tr class="border-b last:border-0 {% if a.is_overdue_for_validation %}bg-warning/5{% endif %}">
-            <td class="px-4 py-3">{{ a.statement }}</td>
-            <td class="px-4 py-3 text-right tabular-nums">{{ a.exposure if a.exposure is not none else '—' }}</td>
-            <td class="px-4 py-3">
-              {{ a.validate_by_date.strftime('%Y-%m-%d') if a.validate_by_date else '—' }}
-              {% if a.is_overdue_for_validation %}<span class="ml-1 text-xs text-warning-emphasis">overdue</span>{% endif %}
-            </td>
-            <td class="px-4 py-3">{{ a.owner.email if a.owner else '—' }}</td>
-            <td class="px-4 py-3">{{ a.status|title }}</td>
-            {# An open assumption is resolved from the form below; a resolved one
-               is a closed record and has nothing left to do. #}
-            <td class="px-4 py-3">
-              {% if a.status == 'open' %}
-              <a href="#assumption-{{ a.id }}" class="font-medium text-primary hover:underline">Resolve</a>
-              {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% if not assumptions %}
-      <p class="text-sm text-muted-foreground py-8 text-center">No assumptions recorded.</p>
-      {% endif %}
+    <div class="p-6">
+      {%- set _assumption_columns = [
+          {'label': 'Assumption', 'sortable': true},
+          {'label': 'Exposure', 'align': 'right', 'sortable': true},
+          {'label': 'Validate by', 'sortable': true},
+          {'label': 'Owner', 'sortable': true},
+          {'label': 'Status', 'sortable': true},
+          {'label': 'Action', 'sortable': false},
+      ] -%}
+      {% call(a) list_table(rows=assumptions, columns=_assumption_columns, caption='Initiative assumptions', testid='initiative-assumptions-table', row_testid='initiative-assumption-row', empty_message='No assumptions recorded.') %}
+        <!-- Assumption -->
+        {% call table_cell(class=('bg-warning/5' if a.is_overdue_for_validation else '')) %}{{ a.statement }}{% endcall %}
+        <!-- Exposure -->
+        {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': a.exposure if a.exposure is not none else ''}) %}{{ a.exposure if a.exposure is not none else '—' }}{% endcall %}
+        <!-- Validate by -->
+        {% call table_cell(attrs={'data-sort': a.validate_by_date.isoformat() if a.validate_by_date else ''}) %}
+          {{ a.validate_by_date.strftime('%Y-%m-%d') if a.validate_by_date else '—' }}
+          {% if a.is_overdue_for_validation %}<span class="ml-1 text-xs text-warning-emphasis">overdue</span>{% endif %}
+        {% endcall %}
+        <!-- Owner -->
+        {% call table_cell() %}{{ a.owner.email if a.owner else '—' }}{% endcall %}
+        <!-- Status -->
+        {% call table_cell(attrs={'data-sort': a.status or ''}) %}{{ a.status|title }}{% endcall %}
+        {# An open assumption is resolved from the form below; a resolved one
+           is a closed record and has nothing left to do. #}
+        <!-- Action -->
+        {% call table_cell() %}
+          {% if a.status == 'open' %}
+          <a href="#assumption-{{ a.id }}" class="font-medium text-primary hover:underline">Resolve</a>
+          {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+        {% endcall %}
+      {% endcall %}
     </div>
 
     {# Resolving keeps the record: an assumption that proved false is the most
