@@ -131,13 +131,19 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         # The AI Assistant chat panel opens by default alongside the IDE view and
         # occupies the same content column as the Setup wizard, hiding it even
         # once ideShowSetup flips back to true -- close the panel first.
-        close_chat = page.get_by_role('button', name='Close chat panel', exact=True)
+        close_chat = page.get_by_role('button', name='Close chat panel', exact=True).first
         if close_chat.count():
             close_chat.click()
 
-        setup_button = page.get_by_role('button', name='Setup', exact=True)
+        setup_button = page.get_by_role('button', name='Setup', exact=True).first
         expect(setup_button).to_be_visible(timeout=PAGE_TIMEOUT)
         setup_button.click()
+        page.wait_for_timeout(300)
+        alpine_state = page.evaluate(
+            "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
+            "return {ideShowSetup: d.ideShowSetup, phase: d.phase, fileListLen: (d.fileList||[]).length}; }"
+        )
+        print('ALPINE STATE AFTER SETUP CLICK:', alpine_state)
 
         # Reopen Phase 3 (Configure) -- Quick Generate's deterministic run already
         # unlocked it -- and switch the mode back to Genome.
