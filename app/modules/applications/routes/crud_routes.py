@@ -418,7 +418,7 @@ def assign_owner(id):
 
         db.session.commit()
 
-        flash(f"{user.full_name} has been assigned as the owner of {app.name}.", "success")
+        flash(f"{user.full_name()} has been assigned as the owner of {app.name}.", "success")
         return redirect(url_for("unified_applications.application_detail", id=id))
 
     from app.models.user import User

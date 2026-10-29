@@ -17,7 +17,7 @@
         ]
     ) }}
     {%- set user_options = [(' ', '-- Select a User --')] -%}
-    {%- for u in users -%}{%- set _ = user_options.append((u.id, u.full_name + ' (' + u.email + ')')) -%}{%- endfor -%}
+    {%- for u in users -%}{%- set _ = user_options.append((u.id, u.full_name() + ' (' + u.email + ')')) -%}{%- endfor -%}
     <form method="POST">
         <div class="mb-4">
             <label for="user_id" class="form-label">Select a user to assign as owner</label>
