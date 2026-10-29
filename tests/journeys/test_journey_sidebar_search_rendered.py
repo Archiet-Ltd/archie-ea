@@ -777,13 +777,19 @@ def _persona_with_duplicate_records(app, enterprise_role):
 
         # The capability's fact-sheet source -- the same source_table/source_id provenance
         # the capability map's own simple view already reads to link to it
-        # (app/modules/capabilities/routes/map_views.py:capability_row).
+        # (app/modules/capabilities/routes/map_views.py:capability_row). Creating a
+        # BusinessCapability auto-creates its own ArchiMate element (the flush listener in
+        # app/services/archimate_backbone.py) and sets archimate_element_id to it, the same
+        # value app/commands/project_capabilities.py's real projection copies onto
+        # unified_capabilities.archimate_element_id -- carried here so the fixture matches
+        # what a real capability write produces.
         business_cap = BusinessCapability(name="Sensor Calibration", organization_id=org_id)
         db.session.add(business_cap)
         db.session.flush()
         unified_cap = UnifiedCapability(
             name="Sensor Calibration", organization_id=org_id,
             source_table="business_capability", source_id=str(business_cap.id),
+            archimate_element_id=business_cap.archimate_element_id,
         )
         db.session.add(unified_cap)
 
@@ -830,7 +836,10 @@ def test_calibration_lists_once_and_opens_the_application(app, client, browser):
         assert href == f"/applications/{data['application_id']}", href
 
         row.click()
-        pg.wait_for_timeout(500)
+        pg.wait_for_function(
+            "() => Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('Calibration Ledger'))",
+            timeout=10000,
+        )
         heading = pg.locator("h1").all_inner_texts()
         assert any("Calibration Ledger" in h for h in heading), (
             f"Opening the result must land on the application's own page: {heading}"
@@ -871,7 +880,10 @@ def test_sensor_calibration_lists_once_and_opens_the_capability(app, client, bro
         assert href == f"/enterprise/capabilities/{data['business_capability_id']}/fact-sheet", href
 
         row.click()
-        pg.wait_for_timeout(500)
+        pg.wait_for_function(
+            "() => Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('Sensor Calibration'))",
+            timeout=10000,
+        )
         heading = pg.locator("h1").all_inner_texts()
         assert any("Sensor Calibration" in h for h in heading), (
             f"Opening the result must land on the capability's own page, not the map: {heading}"
