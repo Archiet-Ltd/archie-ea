@@ -28,10 +28,10 @@ def client(app):
 def _make_user(db_session, org, *, email=None):
     from app.models.user import Role, User
 
-    role = Role.query.filter_by(name="Architect").first()
+    role = Role.query.filter_by(name="Administrator").first()
     if role is None:
         Role.insert_roles()
-        role = Role.query.filter_by(name="Architect").first()
+        role = Role.query.filter_by(name="Administrator").first()
 
     user = User(
         email=email or f"arb-{uuid.uuid4().hex[:8]}@example.com",
@@ -39,9 +39,9 @@ def _make_user(db_session, org, *, email=None):
         last_name="User",
         organization_id=org.id,
         role=role,
-        # An administrator-assigned persona: ARB decisions need one now that a
-        # new account no longer starts on platform_admin.
-        enterprise_role="platform_admin",
+        # Authority comes from the account's role and flag, never from a
+        # stored persona: a platform administrator may record ARB decisions.
+        is_platform_admin=True,
         confirmed=True,
     )
     user.password = uuid.uuid4().hex
