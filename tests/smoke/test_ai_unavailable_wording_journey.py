@@ -15,6 +15,7 @@ tests/smoke/test_page_guide_history_journey.py's own dedicated invocation
 (AI_PAGE_GUIDE_ENABLED=true), since the widget renders nowhere at all without
 that flag and CI already runs that file as its own job.
 """
+import os
 import uuid
 
 import pytest
@@ -26,6 +27,17 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 ADMIN_SENTENCE_TAIL = "An administrator can add an AI key under Settings, AI and models."
 ASK_SENTENCE_TAIL = "Ask your administrator to add an AI key under Settings, AI and models."
 FORBIDDEN_SNIPPETS = ("LLM provider", "provider must be configured", "'suggestions'", "'chat'", "'entity_matching'")
+
+# Opt-in walk screenshots, same pattern as tests/smoke/test_llm_hard_stop_journey.py's
+# WALK/_shot: off by default so ordinary runs never write files, populated on
+# request for the report's walk evidence.
+WALK = os.environ.get("AIPLAIN01_WALK_DIR")
+
+
+def _shot(page, name):
+    if WALK:
+        os.makedirs(WALK, exist_ok=True)
+        page.screenshot(path=os.path.join(WALK, name + ".png"), full_page=True)
 
 
 def _login(page, base, email):
@@ -77,7 +89,7 @@ def test_enterprise_architect_reads_the_plain_sentence(browser, live_server, see
     matching chat) both tell a non-administrator the same thing, in their own
     words -- not the card's banner and not the chat's generic failure line."""
     email = seeded["emails"]["enterprise_architect"]
-    page = browser.new_page()
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
     try:
         _login(page, live_server, email)
 
@@ -103,6 +115,7 @@ def test_enterprise_architect_reads_the_plain_sentence(browser, live_server, see
         assert page.get_by_role("link", name="Settings, AI and models").count() == 0, (
             "a non-administrator must not be offered the settings link"
         )
+        _shot(page, "suggest-mappings-ask-390-dark")
 
         # -- Match entities -----------------------------------------------------
         page.goto(
@@ -125,6 +138,7 @@ def test_enterprise_architect_reads_the_plain_sentence(browser, live_server, see
         reply_text = reply.inner_text()
         assert "Entity matching is not set up for your organisation yet." in reply_text
         assert ASK_SENTENCE_TAIL in reply_text
+        _shot(page, "entity-matching-ask-390-dark")
         for bad in FORBIDDEN_SNIPPETS:
             assert bad not in reply_text, reply_text
         assert reply.locator("a").count() == 0, "a non-administrator must not be offered a settings link"
@@ -137,7 +151,7 @@ def test_organisation_administrator_gets_a_working_settings_link(browser, live_s
     the link next to it lands on the page that actually fixes the gap, on
     both controls."""
     email = seeded["emails"]["platform_admin"]
-    page = browser.new_page()
+    page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="light")
     try:
         _login(page, live_server, email)
 
@@ -159,6 +173,7 @@ def test_organisation_administrator_gets_a_working_settings_link(browser, live_s
         assert ADMIN_SENTENCE_TAIL in card_text
         for bad in FORBIDDEN_SNIPPETS:
             assert bad not in card_text, card_text
+        _shot(page, "suggest-mappings-admin-1440-light")
 
         link = page.get_by_role("link", name="Settings, AI and models")
         link.wait_for(state="visible", timeout=PAGE_TIMEOUT)
@@ -190,6 +205,7 @@ def test_organisation_administrator_gets_a_working_settings_link(browser, live_s
         reply_text = reply.inner_text()
         assert "Entity matching is not set up for your organisation yet." in reply_text
         assert ADMIN_SENTENCE_TAIL in reply_text
+        _shot(page, "entity-matching-admin-1440-light")
         for bad in FORBIDDEN_SNIPPETS:
             assert bad not in reply_text, reply_text
 
