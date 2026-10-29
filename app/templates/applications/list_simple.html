@@ -79,6 +79,8 @@
 } -%}
 {%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level -%}
 {%- set can_populate = current_user.enterprise_role == 'platform_admin' or current_user.is_admin() -%}
+{# One answer per request, not one per row (desktop and mobile each called it once per application). #}
+{%- set user_can_assign_owner = can_assign_owner() -%}
 
 {# One actions menu per application: the same items on the table row and the phone card. #}
 {% macro row_menu(app, sfx='') %}
@@ -103,17 +105,22 @@
                    menu_width='w-52', items=items) }}
 {% endmacro %}
 
-{# The owner cell: the names the summary counted, or the plain reason there are none. #}
-{% macro owner_cell(app, owner_names, sfx='', can_assign=false) %}
-  {%- if owner_names -%}
+{# The owner cell: the names the summary counted, or the plain reason there are none.
+   unmatched: owner_names holds the unmatched-GitHub-code-owner sentence, not a real
+   owner -- the application is still unowned, so the ghost Assign action belongs here too. #}
+{% macro owner_cell(app, owner_names, sfx='', can_assign=false, unmatched=false) %}
+  {%- if owner_names and not unmatched -%}
     {%- for owner_name in owner_names -%}
-    <span class="block min-w-0 break-all text-sm text-foreground" title="{{ owner_name }}" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
+    <span class="block min-w-0 break-words text-sm text-foreground" title="{{ owner_name }}" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
     {%- endfor -%}
-    {%- if can_assign %}
-    {{ ui.button(text='Assign', variant='ghost', size='sm', href=url_for('unified_applications.assign_owner', id=app.id), attrs={'data-testid': 'app-assign-owner' ~ sfx ~ '-' ~ app.id}) }}
-    {%- endif -%}
   {%- elif can_assign -%}
+    {%- if owner_names -%}
+    {%- for owner_name in owner_names -%}
+    <span class="block min-w-0 break-words text-sm text-muted-foreground" title="{{ owner_name }}" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
+    {%- endfor -%}
+    {%- else -%}
     <span class="block min-w-0 text-xs text-muted-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner') }}</span>
+    {%- endif -%}
     {{ ui.button(text='Assign', variant='ghost', size='sm', href=url_for('unified_applications.assign_owner', id=app.id), attrs={'data-testid': 'app-assign-owner' ~ sfx ~ '-' ~ app.id}) }}
   {%- else -%}
     <span data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner') }}</span>
@@ -425,7 +432,7 @@
               {% endif %}
             </td>
             <td class="px-2 align-middle">{{ status_cell(status_text, STATUS_MAP) }}</td>
-            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id), '', can('assign', 'owner')) }}</td>
+            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id), '', user_can_assign_owner, app.id in unmatched_owner_app_ids) }}</td>
             <td class="px-2 text-center align-middle">
               {% if app.completeness_score is not none %}
                 {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
@@ -471,7 +478,7 @@
             </div>
             <div class="min-w-0">
               <p class="mb-0.5 text-xs text-muted-foreground">Owner</p>
-              {{ owner_cell(app, owner_names_by_app.get(app.id), '-mobile', can('assign', 'owner')) }}
+              {{ owner_cell(app, owner_names_by_app.get(app.id), '-mobile', user_can_assign_owner, app.id in unmatched_owner_app_ids) }}
             </div>
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Vendor</p>
