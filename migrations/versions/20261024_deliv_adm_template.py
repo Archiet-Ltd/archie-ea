@@ -25,6 +25,22 @@ def _has_column(table: str, column: str) -> bool:
     return column in {c["name"] for c in insp.get_columns(table)}
 
 
+def _fk_names(table: str, column: str) -> list:
+    """FK constraint names on a column, whichever name created it.
+
+    A database built by ``init-db``'s ``create_all`` names the constraint by
+    SQLAlchemy's own convention, not the literal name this revision's
+    ``upgrade`` chose -- so the downgrade must look the name up rather than
+    assume it, the same way 20261025_vendor_naming_columns.py's
+    ``_get_fk_names`` does.
+    """
+    insp = sa.inspect(op.get_bind())
+    return [
+        fk["name"] for fk in insp.get_foreign_keys(table)
+        if fk["constrained_columns"] == [column]
+    ]
+
+
 def upgrade() -> None:
     if _has_column("deliverables", "adm_template_id"):
         return
@@ -40,5 +56,6 @@ def downgrade() -> None:
     if not _has_column("deliverables", "adm_template_id"):
         return
     op.drop_index("ix_deliverables_adm_template_id", table_name="deliverables")
-    op.drop_constraint("fk_deliverables_adm_template_id", "deliverables", type_="foreignkey")
+    for name in _fk_names("deliverables", "adm_template_id"):
+        op.drop_constraint(name, "deliverables", type_="foreignkey")
     op.drop_column("deliverables", "adm_template_id")
