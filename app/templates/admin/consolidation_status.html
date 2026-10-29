@@ -2,7 +2,8 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
-{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Blueprint Consolidation Status{% endblock %}
 
@@ -49,72 +50,50 @@
             {% call card_title() %}<i data-lucide="target" class="h-5 w-5 inline mr-2 text-muted-foreground" aria-hidden="true"></i>Consolidation Targets{% endcall %}
         {% endcall %}
         {% call card_content(class='p-0') %}
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm border-collapse">
-                    <thead>
-                        <tr class="bg-muted/50 border-b">
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Target</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Keep Blueprint</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Consolidate Blueprints</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Priority</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Progress</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Effort</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">{# actionable-rows-ok: a build-time inventory of the blueprint-consolidation programme, read from
-                           source rather than from a table. Nothing here is editable from the
-                           UI -- progress moves when the code is merged. #}
-                        {% for target in targets %}
-                        <tr class="hover:bg-muted/50 transition-colors {% if target.is_complete %}bg-success/5{% elif target.priority == 'HIGH' %}bg-warning/5{% endif %}">
-                            <td class="p-4 font-medium">{{ target.name }}</td>
-                            <td class="p-4"><code class="text-xs bg-muted px-1.5 py-0.5 rounded">{{ target.keep_blueprint }}</code></td>
-                            <td class="p-4">
-                                <div class="flex flex-wrap gap-1">
-                                    {% for bp in target.consolidate_blueprints %}
-                                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium">{{ bp }}</span>
-                                    {% else %}
-                                    <span class="text-xs text-muted-foreground">None</span>
-                                    {% endfor %}
-                                </div>
-                            </td>
-                            <td class="p-4">
-                                {% if target.priority == 'HIGH' %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-destructive/30 text-destructive-emphasis">{{ target.priority }}</span>
-                                {% elif target.priority == 'MEDIUM' %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-warning/30 text-warning-emphasis">{{ target.priority }}</span>
-                                {% else %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-primary/30 text-primary">{{ target.priority }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-4">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-24 h-2 bg-secondary rounded-full overflow-hidden">
-                                        <div class="h-full rounded-full {% if target.progress_percentage == 100 %}bg-success{% else %}bg-primary{% endif %}"
-                                             style="width: {{ target.progress_percentage }}%"></div>
-                                    </div>
-                                    <span class="text-xs text-muted-foreground tabular-nums">{{ target.completed_count }}/{{ target.total_count }}</span>
-                                </div>
-                            </td>
-                            <td class="p-4">
-                                {% if target.is_complete %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-success/30 text-success-emphasis">Complete</span>
-                                {% else %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-warning/30 text-warning-emphasis">In Progress</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-4 text-muted-foreground">{{ target.estimated_effort }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="7">
-                                {{ empty_state(icon='shield-check', title='No consolidation targets', description='No blueprint-consolidation targets are recorded.') }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {# actionable-rows-ok: a build-time inventory of the blueprint-consolidation programme, read from
+               source rather than from a table. Nothing here is editable from the UI -- progress moves when
+               the code is merged. #}
+            {% call(target) list_table(rows=targets, columns=[('Target', ''), ('Keep Blueprint', ''), ('Consolidate Blueprints', ''), ('Priority', ''), ('Progress', ''), ('Status', ''), ('Effort', '')],
+                                  caption='Consolidation targets', testid='consolidation-targets-table', row_testid='target-row', search_placeholder='Filter targets...',
+                                  empty_message='No blueprint-consolidation targets are recorded.') %}
+              {% call table_cell(class='font-medium') %}{{ target.name }}{% endcall %}
+              {% call table_cell() %}<code class="text-xs bg-muted px-1.5 py-0.5 rounded">{{ target.keep_blueprint }}</code>{% endcall %}
+              {% call table_cell() %}
+                <div class="flex flex-wrap gap-1">
+                    {% for bp in target.consolidate_blueprints %}
+                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium">{{ bp }}</span>
+                    {% else %}
+                    <span class="text-xs text-muted-foreground">None</span>
+                    {% endfor %}
+                </div>
+              {% endcall %}
+              {% call table_cell() %}
+                {% if target.priority == 'HIGH' %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-destructive/30 text-destructive-emphasis">{{ target.priority }}</span>
+                {% elif target.priority == 'MEDIUM' %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-warning/30 text-warning-emphasis">{{ target.priority }}</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-primary/30 text-primary">{{ target.priority }}</span>
+                {% endif %}
+              {% endcall %}
+              {% call table_cell() %}
+                <div class="flex items-center gap-2">
+                    <div class="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+                        <div class="h-full rounded-full {% if target.progress_percentage == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                             style="width: {{ target.progress_percentage }}%"></div>
+                    </div>
+                    <span class="text-xs text-muted-foreground tabular-nums">{{ target.completed_count }}/{{ target.total_count }}</span>
+                </div>
+              {% endcall %}
+              {% call table_cell() %}
+                {% if target.is_complete %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-success/30 text-success-emphasis">Complete</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-warning/30 text-warning-emphasis">In Progress</span>
+                {% endif %}
+              {% endcall %}
+              {% call table_cell(class='text-muted-foreground') %}{{ target.estimated_effort }}{% endcall %}
+            {% endcall %}
         {% endcall %}
     {% endcall %}
 
@@ -124,55 +103,34 @@
             {% call card_title() %}<i data-lucide="list" class="h-5 w-5 inline mr-2 text-muted-foreground" aria-hidden="true"></i>All Blueprints{% endcall %}
         {% endcall %}
         {% call card_content(class='p-0') %}
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm border-collapse">
-                    <thead>
-                        <tr class="bg-muted/50 border-b">
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Blueprint</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">URL Prefix</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Endpoints</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Consolidate Into</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">{# actionable-rows-ok: the registered Flask blueprints as they exist in the running process. A
-                           read-only engineering report; blueprints are added or retired in code. #}
-                        {% for bp in blueprints %}
-                        <tr class="hover:bg-muted/50 transition-colors {% if bp.is_active %}bg-success/5{% elif bp.is_deprecated %}bg-warning/5{% endif %}">
-                            <td class="p-4 font-medium">{{ bp.name }}</td>
-                            <td class="p-4">
-                                {% if bp.is_active %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-success/30 text-success-emphasis">{{ bp.status }}</span>
-                                {% elif bp.is_deprecated %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-warning/30 text-warning-emphasis">{{ bp.status }}</span>
-                                {% elif bp.is_consolidated %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">{{ bp.status }}</span>
-                                {% else %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-primary/30 text-primary">{{ bp.status }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-4"><code class="text-xs bg-muted px-1.5 py-0.5 rounded">{{ bp.url_prefix }}</code></td>
-                            <td class="p-4 tabular-nums">{{ bp.endpoints_count }}</td>
-                            <td class="p-4">
-                                {% if bp.consolidate_into %}
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium border-primary/30 text-primary">{{ bp.consolidate_into }}</span>
-                                {% else %}
-                                <span class="text-muted-foreground">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-4 text-muted-foreground max-w-xs truncate">{{ bp.notes|truncate(50) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6">
-                                {{ empty_state(icon='layout-list', title='No blueprints found', description='No registered Flask blueprints were found in this process.') }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {# actionable-rows-ok: the registered Flask blueprints as they exist in the running process. A
+               read-only engineering report; blueprints are added or retired in code. #}
+            {% call(bp) list_table(rows=blueprints, columns=[('Blueprint', ''), ('Status', ''), ('URL Prefix', ''), {'label': 'Endpoints', 'align': 'right'}, ('Consolidate Into', ''), {'label': 'Notes', 'class': 'hidden lg:table-cell'}],
+                               caption='Registered blueprints', testid='blueprints-table', row_testid='blueprint-row', search_placeholder='Filter blueprints...',
+                               empty_message='No registered Flask blueprints were found in this process.') %}
+              {% call table_cell(class='font-medium') %}{{ bp.name }}{% endcall %}
+              {% call table_cell() %}
+                {% if bp.is_active %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-success/30 text-success-emphasis">{{ bp.status }}</span>
+                {% elif bp.is_deprecated %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-warning/30 text-warning-emphasis">{{ bp.status }}</span>
+                {% elif bp.is_consolidated %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">{{ bp.status }}</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-primary/30 text-primary">{{ bp.status }}</span>
+                {% endif %}
+              {% endcall %}
+              {% call table_cell() %}<code class="text-xs bg-muted px-1.5 py-0.5 rounded">{{ bp.url_prefix }}</code>{% endcall %}
+              {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': bp.endpoints_count or 0}) %}{{ bp.endpoints_count }}{% endcall %}
+              {% call table_cell() %}
+                {% if bp.consolidate_into %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium border-primary/30 text-primary">{{ bp.consolidate_into }}</span>
+                {% else %}
+                <span class="text-muted-foreground">-</span>
+                {% endif %}
+              {% endcall %}
+              {% call table_cell(class='hidden lg:table-cell text-muted-foreground max-w-xs truncate') %}{{ bp.notes|truncate(50) }}{% endcall %}
+            {% endcall %}
         {% endcall %}
     {% endcall %}
 </div>
