@@ -1,5 +1,6 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/dense_table.html' import dense_table %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/button.html' import button %}
 {% from 'components/radio_group.html' import radio_group %}
 {% from 'components/checkbox.html' import checkbox %}
@@ -234,20 +235,24 @@
                             </ul>
                         </div>
 
-                        {% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Why', '')]) %}
+                        {% call ui.table_container(attrs={'data-testid': 'oef-preview-table'}) %}{% call ui.table(attrs={'aria-label': 'Import preview'}) %}
+                        {% call ui.table_header() %}{% call ui.table_row() %}
+                            {{ ui.table_head(text='Name', attrs={'scope': 'col'}) }}{{ ui.table_head(text='Type', attrs={'scope': 'col'}) }}{{ ui.table_head(text='Status', attrs={'scope': 'col'}) }}{{ ui.table_head(text='Why', attrs={'scope': 'col'}) }}
+                        {% endcall %}{% endcall %}
+                        {% call ui.table_body() %}
                             <template x-for="(elem, idx) in (preview ? preview.elements : [])" :key="elem.identifier + '-' + idx">
-                                <tr>
-                                    <td class="px-2 font-medium text-foreground break-words" x-text="elem.name"></td>
-                                    <td class="px-2 text-muted-foreground" x-text="elem.type"></td>
-                                    <td class="px-2">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
-                                              :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
-                                    </td>
-                                    <td class="px-2 text-muted-foreground" data-testid="preview-decision-reason"
-                                        x-text="elem.application_kind_decision || ''"></td>
-                                </tr>
+                            {% call ui.table_row() %}
+                                {% call ui.table_cell(class='font-medium text-foreground break-words', attrs={'x-text': 'elem.name'}) %}{% endcall %}
+                                {% call ui.table_cell(class='text-muted-foreground', attrs={'x-text': 'elem.type'}) %}{% endcall %}
+                                {% call ui.table_cell() %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
+                                          :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
+                                {% endcall %}
+                                {% call ui.table_cell(class='text-muted-foreground', attrs={'data-testid': 'preview-decision-reason', 'x-text': "elem.application_kind_decision || ''"}) %}{% endcall %}
+                            {% endcall %}
                             </template>
                         {% endcall %}
+                        {% endcall %}{% endcall %}
                     </div>
                 </div>
             </div>
