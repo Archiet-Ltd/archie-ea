@@ -786,12 +786,26 @@ def _persona_with_duplicate_records(app, enterprise_role):
         business_cap = BusinessCapability(name="Sensor Calibration", organization_id=org_id)
         db.session.add(business_cap)
         db.session.flush()
-        unified_cap = UnifiedCapability(
-            name="Sensor Calibration", organization_id=org_id,
-            source_table="business_capability", source_id=str(business_cap.id),
-            archimate_element_id=business_cap.archimate_element_id,
-        )
-        db.session.add(unified_cap)
+        # The write-time projection listener (app/models/business_capabilities.py,
+        # project_capability_after_insert) already mirrors this row into
+        # unified_capabilities on the flush above, whenever
+        # uq_unified_capabilities_provenance exists -- the same path a real
+        # capability create runs. Reuse that row instead of inserting a second
+        # one for the same (source_table, source_id), which violates the index.
+        # On a database without the index the listener logs and skips (never a
+        # 500), so the fixture falls back to creating the row itself, exactly
+        # as `flask project-capabilities` would.
+        unified_cap = UnifiedCapability.query.filter_by(
+            organization_id=org_id, source_table="business_capability",
+            source_id=str(business_cap.id),
+        ).first()
+        if unified_cap is None:
+            unified_cap = UnifiedCapability(
+                name="Sensor Calibration", organization_id=org_id,
+                source_table="business_capability", source_id=str(business_cap.id),
+                archimate_element_id=business_cap.archimate_element_id,
+            )
+            db.session.add(unified_cap)
 
         # A second, empty organisation: it must never see org A's records.
         org_b_id = make_org(db, "SidebarSearchDuplicateOther")
