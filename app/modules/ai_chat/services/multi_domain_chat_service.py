@@ -62,7 +62,6 @@ from app.services.ai_chat_extensions import (
     AutomatedActionsService,
     ComplianceStandardsService,
     PredictiveInsightsService,
-    ScenarioAnalysisService,
     VisualGenerationService,
 )
 from app.services.business_output_service import StakeholderRole
@@ -593,7 +592,6 @@ class MultiDomainChatService:
 
         # Initialize AI Chat Extension Services
         self.visual_generation = VisualGenerationService()
-        self.scenario_analysis = ScenarioAnalysisService()
         self.automated_actions = AutomatedActionsService()
         self.advanced_analytics = AdvancedAnalyticsService()
         self.compliance_standards = ComplianceStandardsService()
@@ -2868,27 +2866,6 @@ class MultiDomainChatService:
                 return {"success": False, "error": f"Unknown visual type: {visual_type}"}
         except Exception as e:
             self.logger.error(f"Error generating visual: {e}")
-            return {"success": False, "error": str(e)}
-
-    def run_scenario_analysis(
-        self,
-        scenario_type: str,
-        parameters: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        Run a what-if scenario analysis.
-
-        Args:
-            scenario_type: Type of scenario (retirement, migration, vendor_change, etc.)
-            parameters: Scenario parameters
-
-        Returns:
-            Scenario analysis results
-        """
-        try:
-            return self.scenario_analysis.analyze_scenario(scenario_type, parameters)
-        except Exception as e:
-            self.logger.error(f"Error running scenario analysis: {e}")
             return {"success": False, "error": str(e)}
 
     def create_automated_action(
@@ -6887,19 +6864,16 @@ Instructions:
         """Detect scenario/comparison intent and build a data-driven scenario block."""
         msg_lower = message.lower()
 
-        # Retirement/what-if scenarios
+        # Retirement/what-if scenarios: answered from the one impact answer
+        # (query_catalogue.run_entry("what_breaks_if_fails"), built on
+        # IntelligenceQueryService.cross_layer_impact) -- the same catalogue
+        # entry the MCP tool and the Ask surface already run. Never the
+        # frozen fixed-value scenario service (ADR-003 addendum).
         if any(kw in msg_lower for kw in self._SCENARIO_KEYWORDS):
             resolved = context.get("resolved_entities", {})
             apps = resolved.get("applications", [])
             if apps:
-                app_info = apps[0]
-                # Capability blast radius (existing, fast)
-                blast = self._compute_capability_blast_radius(app_info)
-                # Full retirement analysis (costs, users, integrations, risks)
-                full_analysis = self._build_full_retirement_block(app_info)
-                combined = (blast or "") + (full_analysis or "")
-                if combined.strip():
-                    return combined
+                return self._build_cited_impact_block(apps[0])
             return None
 
         # Vendor comparison
@@ -7503,71 +7477,59 @@ End with: "Type **'next'** to complete the design workflow."
             logger.debug("AIC-301: capability blast radius failed: %s", e)
             return ""
 
-    def _build_full_retirement_block(self, app_info: dict) -> str:
-        """Build a retirement impact block with costs, users, integrations, and risks."""
+    def _build_cited_impact_block(self, app_info: dict) -> Optional[str]:
+        """What breaks if *app_info* is retired, from the one impact answer.
+
+        Calls ``query_catalogue.run_entry("what_breaks_if_fails")`` -- the
+        same catalogue entry the MCP tool and the Ask surface already run,
+        built on ``IntelligenceQueryService.cross_layer_impact`` -- and
+        formats its answer envelope (facts, citations) into the chat block.
+        Nothing here is computed independently and the frozen fixed-value
+        scenario service (ADR-003 addendum) is never called. When the fact
+        is missing (no element resolved, or nothing recorded depends on it),
+        the block says so plainly with a next step rather than guessing.
+        """
+        name = app_info.get("name")
+        if not name:
+            return None
+        org_id = current_org_id()
+        if org_id is None:
+            return None
         try:
-            app_id = app_info.get("id")
-            if not app_id:
-                return ""
+            from app.modules.intelligence.services.query_catalogue import run_entry
 
-            result = self.scenario_analysis.analyze_scenario(
-                "application_retirement", {"application_id": app_id}
-            )
-            if not result.get("success"):
-                return ""
-
-            summary = result.get("impact_summary", {})
-            cost = result.get("cost_impact", {})
-            risk = result.get("risk_assessment", {})
-            recs = result.get("recommendations", [])
-
-            lines = [f"\nRETIREMENT IMPACT ANALYSIS: {app_info.get('name', 'Unknown')}"]
-
-            # Cost impact
-            annual = cost.get("current_annual_cost", 0)
-            if annual > 0:
-                lines.append(f"  Current annual cost: ${annual:,.0f}")
-                lines.append(f"  Estimated migration cost: ${cost.get('migration_cost', 0):,.0f}")
-                lines.append(f"  Annual savings after retirement: ${cost.get('annual_savings', 0):,.0f}")
-                lines.append(f"  5-year net savings: ${cost.get('five_year_savings', 0):,.0f}")
-                payback = cost.get("payback_period_months", 0)
-                if payback > 0:
-                    lines.append(f"  Payback period: {payback} months")
-            else:
-                lines.append("  Cost data: Not available (no cost fields populated)")
-
-            # Integration impact
-            integrations = summary.get("affected_integrations", 0)
-            if integrations > 0:
-                lines.append(f"  Integrations affected: {integrations}")
-
-            # User impact
-            users = summary.get("affected_users", 0)
-            if users > 0:
-                lines.append(f"  Users affected: {users:,}")
-
-            # Risk assessment
-            overall_risk = risk.get("overall_risk", "Not assessed")
-            risk_score = risk.get("score", 0)
-            lines.append(f"  Overall risk: {overall_risk} (score: {risk_score}/100)")
-            for r in risk.get("risks", [])[:3]:
-                lines.append(f"    - [{r.get('severity', '?')}] {r.get('risk', '')}")
-
-            # Recommendations
-            if recs:
-                lines.append("  Recommendations:")
-                for rec in recs[:4]:
-                    lines.append(f"    [{rec.get('priority', '?')}] {rec.get('action', '')}")
-
-            # Timeline
-            timeline = result.get("timeline_suggestion", {})
-            if timeline.get("recommended_duration"):
-                lines.append(f"  Recommended timeline: {timeline['recommended_duration']} ({timeline.get('phases', 0)} phases)")
-
-            return "\n".join(lines) + "\n"
+            result = run_entry("what_breaks_if_fails", org_id, service=name)
         except Exception as e:
-            logger.debug("Full retirement analysis failed: %s", e)
-            return ""
+            logger.debug("AIC-308: impact answer lookup failed: %s", e)
+            return None
+
+        rows = result.get("rows") or []
+        citations_by_id = {
+            c.get("id"): c for c in (result.get("citations") or []) if isinstance(c, dict)
+        }
+        lines = [f"\nWHAT BREAKS IF '{name}' IS RETIRED:"]
+
+        if not rows:
+            reason = result.get("reason") or "nothing is recorded as depending on this application yet"
+            reason = reason[0].upper() + reason[1:] if reason else reason
+            lines.append(f"  {reason}.")
+            lines.append(
+                "  Next step: record what calls this application and what it calls, "
+                "so a retirement question has a real answer to give."
+            )
+            return "\n".join(lines) + "\n"
+
+        lines.append(f"  {result.get('answer') or ('what breaks if %r fails' % name)}")
+        lines.append(f"  {result.get('total', len(rows))} record(s) depend on it:")
+        for row in rows[:15]:
+            citation = citations_by_id.get(row.get("id"))
+            target = citation.get("target") if citation else None
+            cite = f" (cited: {target})" if target else " (source not recorded)"
+            lines.append(f"    - {row.get('name') or 'Unnamed record'}{cite}")
+        if len(rows) > 15:
+            lines.append(f"    ...and {len(rows) - 15} more, each with its own citation.")
+
+        return "\n".join(lines) + "\n"
 
     # ------------------------------------------------------------------
     # AIC-104: Analytics methods (called by analytics_routes.py)
