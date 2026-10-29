@@ -175,6 +175,12 @@ def _make_user(db_session, org, *, enterprise_role, platform_admin=False):
     user.enterprise_role = enterprise_role
     user.confirmed = True
     user.is_platform_admin = platform_admin
+    if platform_admin:
+        # Platform authority is the flag plus the Administrator role, never the persona.
+        from app.models.user import Role
+
+        Role.insert_roles()
+        user.role = Role.query.filter_by(name="Administrator").first()
     user.password = "Directory!12345"
     db_session.add(user)
     db_session.flush()
