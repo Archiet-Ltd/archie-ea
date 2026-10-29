@@ -31,7 +31,6 @@ def vendor_match_world(app):
     from app.models.organization import Organization
     from app.models.user import Role, User
     from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
-    from tests._outbox_cleanup import purge_outbox_events
 
     marker = uuid.uuid4().hex[:8]
     world = {"marker": marker}
@@ -65,23 +64,14 @@ def vendor_match_world(app):
     yield world
 
     with app.app_context():
+        from app.models.organization import Organization
+        from app.services.org_deletion_service import OrganizationDeletionService
+
         org_id = world["org_id"]
         db.session.rollback()
-        db.session.execute(
-            text("DELETE FROM application_vendor_products WHERE vendor_product_id = :p"),
-            {"p": world["product_id"]},
-        )
-        db.session.execute(text("DELETE FROM application_components WHERE organization_id = :o"), {"o": org_id})
-        db.session.execute(text("DELETE FROM archimate_elements WHERE organization_id = :o"), {"o": org_id})
-        db.session.commit()
-        purge_outbox_events(db.session, [org_id])
-        db.session.execute(
-            text("DELETE FROM soc2_audit_log WHERE organization_id = :o OR user_id = :u"),
-            {"o": org_id, "u": world["user_id"]},
-        )
-        db.session.execute(text("DELETE FROM user_sessions WHERE user_id = :u"), {"u": world["user_id"]})
-        db.session.execute(text("DELETE FROM users WHERE organization_id = :o"), {"o": org_id})
-        db.session.execute(text("DELETE FROM organizations WHERE id = :o"), {"o": org_id})
+        if db.session.get(Organization, org_id) is not None:
+            OrganizationDeletionService.delete_organization(org_id)
+        # The vendor catalogue is shared reference data, not owned by the organisation.
         db.session.execute(text("DELETE FROM vendor_products WHERE id = :p"), {"p": world["product_id"]})
         db.session.execute(text("DELETE FROM vendor_organizations WHERE id = :v"), {"v": world["vendor_id"]})
         db.session.commit()

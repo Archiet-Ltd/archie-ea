@@ -51,6 +51,16 @@ DECLARE
     -- a zero-length interval.
     now_ts TIMESTAMP := statement_timestamp();
 BEGIN
+    -- A set-based bulk import (not a user edit) may skip the per-row history
+    -- write: transaction-local, named, and narrow to this one trigger, unlike
+    -- session_replication_role which would also silence every other trigger.
+    IF current_setting('archie.skip_entity_history', TRUE) = 'on' THEN
+        IF TG_OP = 'DELETE' THEN
+            RETURN OLD;
+        END IF;
+        RETURN NEW;
+    END IF;
+
     IF TG_OP = 'DELETE' THEN
         UPDATE entity_history
         SET valid_to = now_ts, superseded_at = now_ts

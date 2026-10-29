@@ -204,11 +204,24 @@ def ensure_arb_submission_event_guards(connection):
     preparer = connection.dialect.identifier_preparer
     quoted_schema = preparer.quote(connection.exec_driver_sql("SELECT current_schema()").scalar())
     connection.exec_driver_sql(_membership_sql(quoted_schema))
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
+
+    connection.exec_driver_sql(
+        _render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, quoted_schema)
+    )
     connection.exec_driver_sql(
         f"""
         CREATE OR REPLACE FUNCTION {quoted_schema}.archie_reject_arb_submission_event_mutation()
         RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
         BEGIN
+            IF TG_OP = 'DELETE' THEN
+                IF {quoted_schema}.archie_org_deletion_admits(OLD.organization_id) THEN
+                    RETURN OLD;
+                END IF;
+            END IF;
             RAISE EXCEPTION 'ARB submission events are append-only' USING ERRCODE = '55000';
         END;
         $$

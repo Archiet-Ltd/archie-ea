@@ -105,11 +105,12 @@ def world(github_server, app):
 
 def remove_organisations(app, org_ids):
     """Leave nothing behind: every row of the two organisations this journey made, and the
-    organisations themselves, and nothing that belongs to anyone else. A table that still
-    holds a row another table points at is tried again once the others are done."""
+    organisations themselves, and nothing that belongs to anyone else."""
     from sqlalchemy import text
 
     from app import db
+    from app.models.organization import Organization
+    from app.services.org_deletion_service import OrganizationDeletionService
 
     with app.app_context():
         # A row another connection still holds (a server process left by an earlier killed run, a
@@ -117,65 +118,16 @@ def remove_organisations(app, org_ids):
         # run for as long as the holder lives.
         db.session.execute(text("SET lock_timeout = '30s'"))
         db.session.commit()
-        # Tables that hold rows of an organisation, by the column that says whose they are.
-        tables = [
-            row[0]
-            for row in db.session.execute(
-                text(
-                    "SELECT c.table_name FROM information_schema.columns c "
-                    "JOIN information_schema.tables t USING (table_schema, table_name) "
-                    "WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE' "
-                    "AND c.column_name = 'organization_id' AND c.table_name <> 'organizations'"
-                )
-            )
-        ]
-        db.session.rollback()
-        ids = {"ids": list(org_ids)}
-        # Rows that point at an organisation's rows through no organisation column of their own.
-        for statement in (
-            "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
-            "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
-            "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
-        ):
-            with db.session.begin_nested():
-                db.session.execute(text(statement), ids)
-        # Append-only tables refuse every delete; the switch that stops their triggers firing
-        # lasts for this one transaction (the same way tests/_outbox_cleanup.py does it).
-        db.session.execute(text("SET LOCAL session_replication_role = replica"))
-        for name in ("transformation_outbox_events",):
-            db.session.execute(text('DELETE FROM "%s" WHERE organization_id = ANY(:ids)' % name), ids)
-        db.session.execute(text("SET LOCAL session_replication_role = DEFAULT"))
-        db.session.commit()
-        # The evidence tables are append-only and this journey never writes to them.
-        evidence = ("arb_submission_evidence_snapshots", "workbench_artifact_evidence")
-        for name in evidence:
-            assert not db.session.execute(
-                text('SELECT count(*) FROM "%s" WHERE organization_id = ANY(:ids)' % name), ids
-            ).scalar_one(), "the journey wrote evidence rows it cannot remove"
-        pending = [name for name in tables if name not in evidence]
-        for _ in range(8):
-            still = []
-            for name in pending:
-                try:
-                    with db.session.begin_nested():
-                        db.session.execute(
-                            text('DELETE FROM "%s" WHERE organization_id = ANY(:ids)' % name.replace('"', "")),
-                            {"ids": list(org_ids)},
-                        )
-                except Exception:
-                    still.append(name)
-            db.session.commit()
-            if not still or still == pending:
-                pending = still
-                break
-            pending = still
-        db.session.execute(text("DELETE FROM organizations WHERE id = ANY(:ids)"), ids)
-        db.session.commit()
-        left = db.session.execute(text("SELECT count(*) FROM organizations WHERE id = ANY(:ids)"), ids).scalar_one()
+        for org_id in org_ids:
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
+        left = db.session.execute(
+            text("SELECT count(*) FROM organizations WHERE id = ANY(:ids)"), {"ids": list(org_ids)}
+        ).scalar_one()
         db.session.execute(text("RESET lock_timeout"))
         db.session.commit()
         db.session.remove()
-        assert left == 0 and not pending, "the journey left rows behind in: %s" % pending
+        assert left == 0, "the journey's organisations were not deleted"
 
 
 @pytest.fixture(scope="module")

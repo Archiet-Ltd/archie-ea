@@ -88,29 +88,11 @@ def fixture(app, _schema):
             yield result
         finally:
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "measure_definitions",
-                    "programme_outcome_commitments",
-                    "programme_role_assignments",
-                    "programme_workstreams",
-                    "solutions",
-                    "strategic_initiatives",
-                    "users",
-                ):
-                    connection.execute(
-                        text(f'DELETE FROM "{table_name}" WHERE organization_id = :org'),
-                        {"org": result.organization_id},
-                    )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id = :org"),
-                    {"org": result.organization_id},
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            if db.session.get(Organization, result.organization_id) is not None:
+                OrganizationDeletionService.delete_organization(result.organization_id)
+            db.session.remove()
 
 
 def _intake(owner_id: int) -> ProgrammeIntake:

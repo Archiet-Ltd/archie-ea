@@ -19,6 +19,11 @@ BRIEF_STATUSES = ("draft", "frozen", "in_governance", "terminal")
 
 _ARB_SUBJECT_SNAPSHOT_IMMUTABILITY_BODY = """
 BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF public.archie_org_deletion_admits(OLD.organization_id) THEN
+            RETURN OLD;
+        END IF;
+    END IF;
     RAISE EXCEPTION 'ARB subject evidence snapshots are append-only'
         USING ERRCODE = '55000';
 END;
@@ -131,6 +136,9 @@ def ensure_arb_subject_snapshot_immutability(connection):
         "SELECT pg_advisory_xact_lock(hashtext("
         "'archie_arb_subject_snapshot_immutability'))"
     )
+    from app.models.transformation_db_guards import _ORG_DELETION_ADMITS_SQL
+
+    connection.exec_driver_sql(_ORG_DELETION_ADMITS_SQL)
     connection.exec_driver_sql(
         f"""
         CREATE OR REPLACE FUNCTION archie_reject_arb_subject_snapshot_mutation()

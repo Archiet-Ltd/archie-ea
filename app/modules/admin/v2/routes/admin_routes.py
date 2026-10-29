@@ -5738,7 +5738,7 @@ def organization_delete(org_id):
         return redirect(url_for("admin.organization_detail", org_id=org_id))
     except Exception:  # noqa: BLE001 - rolled back by the service; the reason is logged, the person told
         current_app.logger.exception("Organisation %s could not be deleted", org_id)
-        flash("The organisation could not be deleted, and nothing was changed. The reason is in the server log.", "error")
+        flash("The organisation could not be deleted. Nothing was changed. The reason is in the server log.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
     return redirect(url_for("admin.organizations_list"))
 

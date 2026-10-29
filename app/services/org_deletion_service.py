@@ -22,12 +22,29 @@ statement fails, it is rolled back and the error is raised to the caller with th
 
 from collections import defaultdict
 
+import networkx as nx
 from sqlalchemy import text
 
 from app.extensions import db
 
 # People are handled on their own: detached when they belong elsewhere, removed when they do not.
 PEOPLE = "users"
+
+# Delete-refusing append-only tables (re-listed from pg_trigger; see
+# ADR-org-deletion-01): a cycle-breaking UPDATE must never target one of these —
+# their guard admits a DELETE, never an UPDATE, no matter what the marker says.
+# A row here resolves only by being deleted, in order; never by nulling a column.
+_APPEND_ONLY_TABLES = frozenset({
+    "transformation_outbox_events", "operation_results", "command_materialisations",
+    "candidate_signals", "candidate_overlap_dispositions", "evidence_records",
+    "evidence_head_events", "transformation_option_versions", "decision_brief_versions",
+    "decision_brief_option_citations", "decision_brief_evidence_citations", "decision_events",
+    "arb_review_cycles", "arb_review_items", "arb_decision_events", "arb_canonical_conditions",
+    "arb_subject_evidence_snapshots", "arb_condition_events", "arb_condition_evidence_records",
+    "arb_submission_events", "arb_submission_evidence_snapshots", "workbench_artifact_evidence",
+    "evidence_claim_heads", "command_idempotency_records", "delivery_export_attempts",
+    "outcome_measurements",
+})
 
 _FOREIGN_KEYS = text(
     """
@@ -65,30 +82,79 @@ class _Plan:
             if parent == "organizations" and parent_col == "id" and child != "organizations":
                 self.org_columns[child].append(child_col)
 
+    def _build(self):
+        """Compute the deletion order and the cycle-breaking NULLs it needs, once.
+
+        A real foreign-key cycle (two tables each pointing at the other, such as an
+        ArchiMate element and the application component it mirrors) has no row order
+        that satisfies every constraint at once. Each such cycle is resolved by
+        clearing the fewest possible nullable columns — never a column on one of the
+        delete-refusing append-only tables, whose guard admits a DELETE but never an
+        UPDATE — so the remaining edges are acyclic and every table, cycle members
+        included, still gets its real dependency order. A cycle with no edge safe to
+        clear this way (every column on its append-only side) is left for the
+        database's own refusal to name.
+        """
+        tables = set(self.org_columns) - {PEOPLE}
+        graph = nx.DiGraph()
+        graph.add_nodes_from(tables)
+        for parent in tables:
+            for child, _, _, _ in self.referrers[parent]:
+                if child in tables and child != parent:
+                    # child must be deleted before parent: an edge in deletion order.
+                    graph.add_edge(child, parent)
+        breaks = []
+        for members in list(nx.strongly_connected_components(graph)):
+            if len(members) < 2:
+                continue
+            sub = graph.subgraph(members).copy()
+            while not nx.is_directed_acyclic_graph(sub):
+                cycle_edges = [(u, v) for u, v in nx.find_cycle(sub)]
+                # Prefer breaking at an edge whose child side may still be deleted on
+                # its own (the table isn't append-only) and whose column is nullable.
+                removed = False
+                for u, v in cycle_edges:
+                    if u in _APPEND_ONLY_TABLES:
+                        continue
+                    for child, child_col, _, not_null in self.referrers[v]:
+                        if child == u and not not_null:
+                            sub.remove_edge(u, v)
+                            graph.remove_edge(u, v)
+                            breaks.append((u, child_col))
+                            removed = True
+                            break
+                    if removed:
+                        break
+                if not removed:
+                    # No safe edge in this cycle: leave it for the database to refuse.
+                    break
+        condensation = nx.condensation(graph)
+        order = []
+        for scc_index in nx.topological_sort(condensation):
+            members = condensation.nodes[scc_index]["members"]
+            sub = graph.subgraph(members)
+            order.extend(nx.topological_sort(sub) if nx.is_directed_acyclic_graph(sub) else sorted(members))
+        self._order = order
+        self._breaks = breaks
+
     def order(self):
         """Tables that name an organisation, each after every such table that points at it."""
-        tables = set(self.org_columns) - {PEOPLE}
-        children_of = {t: {c for c, _, _, _ in self.referrers[t] if c in tables and c != t} for t in tables}
-        remaining = {t: set(children) for t, children in children_of.items()}
-        order = []
-        while remaining:
-            ready = sorted(t for t, children in remaining.items() if not children)
-            if not ready:
-                # A cycle: take the rest in name order; the database says plainly if one is refused.
-                ready = sorted(remaining)
-            for table in ready:
-                order.append(table)
-                remaining.pop(table)
-            for children in remaining.values():
-                children.difference_update(ready)
-        return order
+        if not hasattr(self, "_order"):
+            self._build()
+        return self._order
+
+    def cycle_breaks(self):
+        """(table, column) pairs to NULL for the organisation's own rows before deleting."""
+        if not hasattr(self, "_breaks"):
+            self._build()
+        return self._breaks
 
 
 def _exists(sess, table, where, params):
     return sess.execute(text("SELECT 1 FROM %s WHERE %s LIMIT 1" % (_q(table), where)), params).first() is not None
 
 
-def _delete(sess, table, where, params):
+def _delete(sess, table, where, params, counts=None):
     """Delete the rows of ``table`` in ``where``, only when there are any.
 
     An append-only table refuses every delete statement, even one that matches nothing; asking
@@ -96,17 +162,19 @@ def _delete(sess, table, where, params):
     hold such rows, the delete is sent and the database's refusal is raised, not skipped.
     """
     if _exists(sess, table, where, params):
-        sess.execute(text("DELETE FROM %s WHERE %s" % (_q(table), where)), params)
+        result = sess.execute(text("DELETE FROM %s WHERE %s" % (_q(table), where)), params)
+        if counts is not None and result.rowcount:
+            counts[table] = counts.get(table, 0) + result.rowcount
 
 
-def _remove_pointing_rows(sess, plan, table, where, params, path):
+def _remove_pointing_rows(sess, plan, table, where, params, path, counts=None):
     """Remove the rows of tables with no organisation column that point at ``table``'s rows in ``where``."""
     for child, child_col, parent_col, _ in plan.referrers[table]:
         if child == table or child in path or child == PEOPLE or child in plan.org_columns:
             continue
         child_where = "%s IN (SELECT %s FROM %s WHERE %s)" % (_q(child_col), _q(parent_col), _q(table), where)
-        _remove_pointing_rows(sess, plan, child, child_where, params, path | {child})
-        _delete(sess, child, child_where, params)
+        _remove_pointing_rows(sess, plan, child, child_where, params, path | {child}, counts)
+        _delete(sess, child, child_where, params, counts)
 
 
 def _remove_people(sess, plan, people_ids):
@@ -143,7 +211,14 @@ class OrganizationDeletionService:
 
         Raises OrganizationDeletionRefused when the organisation may not be deleted, and the
         database's own error (after rolling back) when a row cannot be removed.
+
+        Every row the organisation held, including its append-only rows, is removed in the one
+        transaction: a transaction-local marker (``archie.deleting_organisation``) tells each
+        delete-refusing trigger this one delete is admitted. After every row is gone, one platform
+        ``AuditLog`` row (``organization_id`` NULL) records the deletion, its row counts and the
+        requesting administrator; it sits outside every organisation's hash chain.
         """
+        from app.models.audit_log import AuditLog
         from app.models.org_role import OrgRole
         from app.models.organization import Organization
         from app.models.user import User
@@ -155,8 +230,12 @@ class OrganizationDeletionService:
         if org.slug == "default":
             raise OrganizationDeletionRefused("The Default organisation cannot be deleted.")
 
-        org_name = org.name
+        org_name, org_slug = org.name, org.slug
         try:
+            sess.execute(
+                text("SELECT set_config('archie.deleting_organisation', :org_id, true)"),
+                {"org_id": str(org_id)},
+            )
             # People whose home is this organisation: detached when they belong elsewhere too,
             # removed with it when they do not.
             detached, leaving = 0, []
@@ -178,17 +257,37 @@ class OrganizationDeletionService:
             for user in sess.query(User).filter(User.id.in_(leaving)).all() if leaving else []:
                 sess.expunge(user)
 
+            counts = {}
             plan = _Plan(sess)
             params = {"org_id": org_id}
-            for table in plan.order():
+            table_order = plan.order()
+            for table, column in plan.cycle_breaks():
                 where = " OR ".join("%s = :org_id" % _q(col) for col in plan.org_columns[table])
-                _remove_pointing_rows(sess, plan, table, where, params, {table})
-                _delete(sess, table, where, params)
+                sess.execute(text("UPDATE %s SET %s = NULL WHERE %s" % (_q(table), _q(column), where)), params)
+            for table in table_order:
+                where = " OR ".join("%s = :org_id" % _q(col) for col in plan.org_columns[table])
+                _remove_pointing_rows(sess, plan, table, where, params, {table}, counts)
+                _delete(sess, table, where, params, counts)
 
             _remove_people(sess, plan, leaving)
 
             sess.expunge(org)
             sess.execute(text("DELETE FROM organizations WHERE id = :org_id"), params)
+
+            sess.add(AuditLog(
+                organization_id=None,
+                user_id=requester_id,
+                action="DELETE",
+                table_name="organizations",
+                record_id=org_id,
+                new_value={
+                    "name": org_name,
+                    "slug": org_slug,
+                    "row_counts": counts,
+                    "people_removed": len(leaving),
+                    "people_detached": detached,
+                },
+            ))
             sess.commit()
         except Exception:
             sess.rollback()

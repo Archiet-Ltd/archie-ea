@@ -269,24 +269,31 @@ def test_vendor_matching_api_routes_uses_shared_writer(
 
 
 def _delete_element_leaving_pointer(db_session, element):
-    """Delete an element row with raw SQL and foreign-key enforcement off, so the
-    owning row's archimate_element_id keeps pointing at the now-missing row.
+    """Delete an element row with its one owning foreign key dropped for this test's
+    transaction only, so the owning row's archimate_element_id keeps pointing at the
+    now-missing row.
 
     This is the state the repair exists for. Clearing the pointer first (as an
     ORM delete would force) tests nothing: an unlinked row was always repaired.
+    ``db_session`` rolls back its whole real transaction at teardown (see
+    tests/conftest.py), so dropping this one named constraint here is undone with
+    everything else the test did; no trigger is disabled and no other table's
+    integrity is touched.
     """
     from sqlalchemy import text
 
     element_id = element.id
     db_session.flush()
     db_session.expunge(element)
-    db_session.execute(text("SET LOCAL session_replication_role = replica"))
-    try:
-        db_session.execute(
-            text("DELETE FROM archimate_elements WHERE id = :i"), {"i": element_id}
+    db_session.execute(
+        text(
+            "ALTER TABLE application_components "
+            "DROP CONSTRAINT fk_application_components_archimate_element_id"
         )
-    finally:
-        db_session.execute(text("SET LOCAL session_replication_role = DEFAULT"))
+    )
+    db_session.execute(
+        text("DELETE FROM archimate_elements WHERE id = :i"), {"i": element_id}
+    )
     assert db_session.get(ArchiMateElement, element_id) is None
     return element_id
 

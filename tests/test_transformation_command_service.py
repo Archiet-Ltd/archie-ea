@@ -118,29 +118,13 @@ def command_fixture(app, _schema):
                 app.config.pop("TRANSFORMATION_COMMAND_LEASE_SECONDS", None)
             else:
                 app.config["TRANSFORMATION_COMMAND_LEASE_SECONDS"] = original_lease
-            # Append-only guards intentionally block ordinary cleanup. The test
-            # database owner disables triggers only for these recorded tenant IDs.
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "strategic_initiatives",
-                    "users",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id = :organization_id"
-                        ),
-                        {"organization_id": organization_id},
-                    )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id = :organization_id"),
-                    {"organization_id": organization_id},
-                )
+            # Append-only guards admit the organisation's own rows when the
+            # deletion service's transaction-local marker is set; no trigger is
+            # disabled.
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            if db.session.get(Organization, organization_id) is not None:
+                OrganizationDeletionService.delete_organization(organization_id)
 
 
 def _mutation(fixture: CommandFixture, *, events: int = 1):
@@ -221,10 +205,15 @@ def _receipt(fixture: CommandFixture, key="same"):
 
 def _wait_for_expiry(claim):
     with db.engine.begin() as connection:
-        # Test-only state construction: production guards correctly prohibit a
-        # caller from shortening its own live fence.  The database-owner test
-        # fixture bypasses triggers only to place this receipt in the state the
-        # reclamation path must handle.
+        # Flagged exception (T-teardown-fk-02): this shortens a live receipt's
+        # own lease_expires_at. archie_guard_transformation_receipt correctly
+        # refuses that for a real caller, and admits no transition that allows
+        # it (every "heartbeat"/"reclaim"/"finalise" branch requires the lease
+        # to move only forward, or requires a distinct claim_token the test has
+        # no legitimate way to mint). Giving a test this write needs a new,
+        # named admission branch on a production concurrency-control guard —
+        # out of scope for the organisation-deletion marker this brief adds.
+        # Left for the lead/founder to decide whether that branch should exist.
         connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(
@@ -881,7 +870,13 @@ def test_replay_restores_exact_missing_outbox_documents(
         ).all()
     assert len(before) == 2
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        # The append-only guard admits a DELETE on this organisation's own rows
+        # while the deletion service's transaction-local marker is set; no
+        # trigger is disabled.
+        connection.execute(
+            text("SELECT set_config('archie.deleting_organisation', :organization_id, true)"),
+            {"organization_id": str(command_fixture.organization_id)},
+        )
         statement = (
             "DELETE FROM transformation_outbox_events "
             "WHERE operation_result_id = :result_id"
@@ -918,7 +913,13 @@ def test_replay_restores_exact_missing_outbox_documents(
 def test_replay_fails_closed_on_conflicting_extra_outbox_event(command_fixture):
     first = _execute(command_fixture, key="outbox-extra")
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        # The insert guard's own repair escape hatch (already used by
+        # archie_persist_command_envelope/archie_repair_command_envelope)
+        # admits this forged envelope outside its live fence; no trigger is
+        # disabled.
+        connection.execute(
+            text("SELECT set_config('archie.signed_envelope_repair', 'on', true)")
+        )
         connection.execute(
             text(
                 "INSERT INTO transformation_outbox_events "
@@ -1227,7 +1228,12 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
         )
 
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        # The delete is admitted by the deletion service's own transaction-local
+        # marker, scoped to this organisation; no trigger is disabled.
+        connection.execute(
+            text("SELECT set_config('archie.deleting_organisation', :organization_id, true)"),
+            {"organization_id": str(command_fixture.organization_id)},
+        )
         connection.execute(
             text(
                 "DELETE FROM transformation_outbox_events "
@@ -1235,10 +1241,21 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
             ),
             {"result_id": first.operation_result_id},
         )
+        # Flagged exception (T-teardown-fk-02): this receipt has already reached
+        # 'succeeded' with a real operation_result_id, and
+        # archie_guard_transformation_receipt correctly refuses to clear a
+        # succeeded result's object link from any state — that refusal is the
+        # guard doing its job, not a gap the deletion marker should paper over.
+        # Simulating "receipt damage" after a real success needs a new, named
+        # admission branch on a production concurrency-control guard — out of
+        # scope here. Left for the lead/founder to decide whether that branch
+        # should exist.
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(
                 "UPDATE command_idempotency_records SET status = 'retryable_failure', "
-                "operation_result_id = NULL, lease_expires_at = clock_timestamp() - interval '1 second' "
+                "operation_result_id = NULL, last_error_class = 'envelope_lost', "
+                "lease_expires_at = clock_timestamp() - interval '1 second' "
                 "WHERE organization_id = :organization_id AND actor_id = :actor_id "
                 "AND operation = 'programme.create' AND idempotency_key = :command_key"
             ),
@@ -1248,6 +1265,7 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
                 "command_key": "builtin-materialisation",
             },
         )
+        connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")
         connection.execute(
             text("DELETE FROM operation_results WHERE id = :result_id"),
             {"result_id": first.operation_result_id},
@@ -1370,6 +1388,14 @@ def test_stale_generation_is_rejected_before_first_real_domain_write(
 
     def reclaim_then_write(session, claim):
         with db.engine.begin() as connection:
+            # Flagged exception (T-teardown-fk-02): bumps lease_generation out
+            # of band to simulate a concurrent reclaim mid-handler.
+            # archie_guard_transformation_receipt's "reclaim" branch requires a
+            # fresh, distinct claim_token and advancing attempt_count together
+            # with the generation bump; a test has no legitimate way to mint
+            # that claim_token. Needs a new, named admission branch on a
+            # production concurrency-control guard — out of scope here. Left
+            # for the lead/founder to decide whether that branch should exist.
             connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
             connection.execute(
                 text(
@@ -1712,6 +1738,14 @@ def test_damaged_receipt_reconciles_natural_key_and_exact_response(command_fixtu
     first = _execute(command_fixture, key="damaged")
     receipt = _receipt(command_fixture, "damaged")
     with db.engine.begin() as connection:
+        # Flagged exception (T-teardown-fk-02): resets a terminal
+        # ('succeeded') receipt back to 'in_progress' with an expired lease,
+        # simulating external damage. No branch of
+        # archie_guard_transformation_receipt admits a terminal-to-in_progress
+        # transition (by design: a succeeded result is immutable). Needs a
+        # new, named admission branch on a production concurrency-control
+        # guard — out of scope here. Left for the lead/founder to decide
+        # whether that branch should exist.
         connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(

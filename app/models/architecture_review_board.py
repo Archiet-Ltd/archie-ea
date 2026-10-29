@@ -1213,6 +1213,9 @@ def _arb_history_function_sql(quoted_schema):
     BEGIN
         IF TG_TABLE_NAME = 'arb_review_cycles' THEN
             IF TG_OP = 'DELETE' THEN
+                IF {quoted_schema}.archie_org_deletion_admits(OLD.organization_id) THEN
+                    RETURN OLD;
+                END IF;
                 RAISE EXCEPTION 'ARB review cycle history is append-only'
                     USING ERRCODE = '55000';
             END IF;
@@ -1286,6 +1289,9 @@ def _arb_history_function_sql(quoted_schema):
             END IF;
         ELSIF TG_TABLE_NAME = 'arb_review_items' THEN
             IF TG_OP = 'DELETE' AND OLD.review_cycle_id IS NOT NULL THEN
+                IF {quoted_schema}.archie_org_deletion_admits(OLD.organization_id) THEN
+                    RETURN OLD;
+                END IF;
                 RAISE EXCEPTION 'typed ARB review history is append-only'
                     USING ERRCODE = '55000';
             END IF;
@@ -2335,7 +2341,14 @@ def ensure_arb_cycle_constraints(connection):
     from app.models.transformation_decision import (
         ensure_arb_subject_snapshot_immutability,
     )
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
 
+    connection.exec_driver_sql(
+        _render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, quoted_schema)
+    )
     ensure_arb_subject_snapshot_immutability(connection)
     connection.exec_driver_sql(_arb_membership_function_sql(quoted_schema))
     connection.exec_driver_sql(_arb_history_function_sql(quoted_schema))

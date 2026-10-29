@@ -357,15 +357,11 @@ def test_bulk_delete_is_tenant_filtered(app):
     # the shared test database (the 540 stale organisations in it came from
     # exactly this pattern).
     with app.app_context():
-        ApplicationComponent.query.filter(
-            ApplicationComponent.name == "bulk-target %s" % marker
-        ).delete(synchronize_session=False)
-        from tests._outbox_cleanup import purge_outbox_events
+        from app.services.org_deletion_service import OrganizationDeletionService
 
-        purge_outbox_events(db.session, [a_id, b_id])
-        Organization.query.filter(Organization.id.in_([a_id, b_id])).delete(
-            synchronize_session=False)
-        db.session.commit()
+        for org_id in (a_id, b_id):
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
 
 
 # =============================================================================

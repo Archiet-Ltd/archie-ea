@@ -171,7 +171,19 @@ def ensure_arb_condition_evidence_guards(connection):
     schema = connection.exec_driver_sql("SELECT current_schema()").scalar()
     q = connection.dialect.identifier_preparer.quote(schema)
     connection.exec_driver_sql(_membership_sql(q))
-    connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_reject_arb_condition_evidence_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN RAISE EXCEPTION 'ARB condition evidence is append-only' USING ERRCODE='55000'; END $$;
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
+
+    connection.exec_driver_sql(
+        _render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, q)
+    )
+    connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_reject_arb_condition_evidence_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN
+ IF TG_OP='DELETE' THEN
+   IF {q}.archie_org_deletion_admits(OLD.organization_id) THEN RETURN OLD; END IF;
+ END IF;
+ RAISE EXCEPTION 'ARB condition evidence is append-only' USING ERRCODE='55000'; END $$;
 DROP TRIGGER IF EXISTS trg_arb_condition_evidence_membership ON {q}.arb_condition_evidence_records; CREATE CONSTRAINT TRIGGER trg_arb_condition_evidence_membership AFTER INSERT OR UPDATE ON {q}.arb_condition_evidence_records DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION {q}.archie_validate_arb_condition_evidence();
 DROP TRIGGER IF EXISTS trg_arb_condition_evidence_immutable ON {q}.arb_condition_evidence_records; CREATE TRIGGER trg_arb_condition_evidence_immutable BEFORE UPDATE OR DELETE ON {q}.arb_condition_evidence_records FOR EACH ROW EXECUTE FUNCTION {q}.archie_reject_arb_condition_evidence_mutation();""")
 

@@ -152,7 +152,19 @@ def ensure_arb_condition_event_guards(connection):
     q = connection.dialect.identifier_preparer.quote(schema)
     connection.exec_driver_sql(_condition_event_source_sql(q))
     connection.exec_driver_sql(_condition_event_final_sql(q))
-    connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_reject_arb_condition_event_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN RAISE EXCEPTION 'ARB condition events are append-only' USING ERRCODE='55000'; END $$;
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
+
+    connection.exec_driver_sql(
+        _render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, q)
+    )
+    connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_reject_arb_condition_event_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN
+ IF TG_OP='DELETE' THEN
+   IF {q}.archie_org_deletion_admits(OLD.organization_id) THEN RETURN OLD; END IF;
+ END IF;
+ RAISE EXCEPTION 'ARB condition events are append-only' USING ERRCODE='55000'; END $$;
 DROP TRIGGER IF EXISTS trg_arb_condition_event_source ON {q}.arb_condition_events; CREATE TRIGGER trg_arb_condition_event_source BEFORE INSERT ON {q}.arb_condition_events FOR EACH ROW EXECUTE FUNCTION {q}.archie_validate_arb_condition_event_source();
 DROP TRIGGER IF EXISTS trg_arb_condition_event_final ON {q}.arb_condition_events; CREATE CONSTRAINT TRIGGER trg_arb_condition_event_final AFTER INSERT OR UPDATE ON {q}.arb_condition_events DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION {q}.archie_validate_arb_condition_event_final();
 DROP TRIGGER IF EXISTS trg_arb_condition_event_immutable ON {q}.arb_condition_events; CREATE TRIGGER trg_arb_condition_event_immutable BEFORE UPDATE OR DELETE ON {q}.arb_condition_events FOR EACH ROW EXECUTE FUNCTION {q}.archie_reject_arb_condition_event_mutation();""")

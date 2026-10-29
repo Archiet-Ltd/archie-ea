@@ -56,28 +56,10 @@ def independent_application_race(concurrency_database_guard, app, _schema):
         assert not alive, f'Refusing row cleanup while workers remain alive: {alive}'
         with app.app_context():
             db.session.remove()
-            org_id, name = state['org_id'], state['name']
-            applications = ApplicationComponent.query.filter_by(organization_id=org_id, name=name).all()
-            app_ids = [row.id for row in applications]
-            # The ORM before_insert creates mirrors even if an application
-            # flush later fails; the committed exact-org/name scan covers both.
-            mirrors = ArchiMateElement.query.filter_by(
-                organization_id=org_id, name=name, type='ApplicationComponent').all()
-            mirror_ids = [row.id for row in mirrors]
-            ApplicationComponent.query.filter(
-                ApplicationComponent.organization_id == org_id,
-                ApplicationComponent.id.in_(app_ids)).delete(synchronize_session=False)
-            ArchiMateElement.query.filter(
-                ArchiMateElement.organization_id == org_id,
-                ArchiMateElement.id.in_(mirror_ids)).delete(synchronize_session=False)
-            # Application writes emit SOC2 audit rows keyed to the organisation;
-            # they must go before the organisation or its delete violates the FK.
-            from app.models.audit_log import AuditLog
-            AuditLog.query.filter_by(organization_id=org_id).delete(synchronize_session=False)
-            from tests._outbox_cleanup import purge_outbox_events
-            purge_outbox_events(db.session, [org_id])
-            assert Organization.query.filter_by(id=org_id, slug=state['slug']).delete() == 1
-            db.session.commit()
+            org_id = state['org_id']
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            OrganizationDeletionService.delete_organization(org_id)
             assert ApplicationComponent.query.filter_by(organization_id=org_id).count() == 0
             assert ArchiMateElement.query.filter_by(organization_id=org_id).count() == 0
             assert Organization.query.filter_by(id=org_id).count() == 0

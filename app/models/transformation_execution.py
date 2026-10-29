@@ -379,11 +379,19 @@ event.listen(DeliveryExportAttempt, "before_delete", _guard_completed_export_del
 _EXECUTION_GUARD_FUNCTION_BODIES = {
     "archie_reject_outcome_measurement_mutation": """
         BEGIN
+            IF TG_OP = 'DELETE' THEN
+                IF archie_org_deletion_admits((to_jsonb(OLD) ->> 'organization_id')::integer) THEN
+                    RETURN OLD;
+                END IF;
+            END IF;
             RAISE EXCEPTION 'outcome measurements are append-only';
         END;
     """,
     "archie_guard_delivery_export_attempt_mutation": """
         BEGIN
+            IF TG_OP = 'DELETE' AND archie_org_deletion_admits((to_jsonb(OLD) ->> 'organization_id')::integer) THEN
+                RETURN OLD;
+            END IF;
             IF OLD.status IN ('succeeded', 'failed', 'indeterminate') THEN
                 RAISE EXCEPTION 'completed delivery export attempts are immutable';
             END IF;
@@ -561,6 +569,14 @@ def ensure_execution_history_immutability(connection):
                     f"ADD CONSTRAINT {quoted_constraint} CHECK ({expression})"
                 )
             )
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
+
+    connection.execute(
+        db.text(_render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, quoted_schema))
+    )
     for function, body in _EXECUTION_GUARD_FUNCTION_BODIES.items():
         connection.execute(
             db.text(

@@ -10,14 +10,15 @@ Rows are inserted with set-based SQL inside the test's rolled-back transaction,
 the way a bulk import writes them, so no event is queued for them; the
 projection is built from the relational store.
 
-The model is seeded ONCE (one fixture use, one test) and with the history
-trigger switched off for the insert only (``session_replication_role =
-replica``, the same device other bulk-seeding tests here use). With the trigger
-on, every one of the 405,000 rows is copied into ``entity_history`` as a JSON
-snapshot, which doubled the disk the CI shard needed and ran it out of space.
-The seed lives and dies inside the test's rolled-back transaction, so nothing
-is left behind. The history table is not needed here: the budget is measured on
-current-state traversal and on the snapshot round trip.
+The model is seeded ONCE (one fixture use, one test) and with the per-row history
+write skipped for the insert only, via the transaction-local
+``archie.skip_entity_history`` setting the ``entity_history_record_version()``
+trigger itself honours (no trigger is disabled; this one still fires, and chooses
+not to write). With the write on, every one of the 405,000 rows is copied into
+``entity_history`` as a JSON snapshot, which doubled the disk the CI shard needed
+and ran it out of space. The seed lives and dies inside the test's rolled-back
+transaction, so nothing is left behind. The history table is not needed here: the
+budget is measured on current-state traversal and on the snapshot round trip.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ def _seed_big_model(db_session):
     db_session.add_all([org, other])
     db_session.flush()
     # No history rows for the seed (see the module note); restored below.
-    db_session.execute(text("SET LOCAL session_replication_role = replica"))
+    db_session.execute(text("SELECT set_config('archie.skip_entity_history', 'on', true)"))
     db_session.execute(
         text(
             "INSERT INTO archimate_elements (name, type, layer, organization_id) "
@@ -78,7 +79,7 @@ def _seed_big_model(db_session):
         ),
         {"o": other.id},
     )
-    db_session.execute(text("SET LOCAL session_replication_role = origin"))
+    db_session.execute(text("SELECT set_config('archie.skip_entity_history', 'off', true)"))
     db_session.commit()
     return {"org": org, "other": other, "ids": ids}
 

@@ -151,17 +151,10 @@ def signed_in_client(app):
     yield client
 
     with app.app_context():
-        row = db.session.get(User, user_id)
-        if row is not None:
-            db.session.delete(row)
-        db.session.commit()
-        from tests._outbox_cleanup import purge_audit_entries
+        from app.services.org_deletion_service import OrganizationDeletionService
 
-        purge_audit_entries(db.session, [org_id])
-        org_row = db.session.get(Organization, org_id)
-        if org_row is not None:
-            db.session.delete(org_row)
-        db.session.commit()
+        if db.session.get(Organization, org_id) is not None:
+            OrganizationDeletionService.delete_organization(org_id)
 
 
 def test_no_api_endpoint_serves_html(anonymous_responses):
