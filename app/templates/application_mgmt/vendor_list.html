@@ -3,6 +3,8 @@
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Application Vendors{% endblock %}
 
@@ -125,245 +127,170 @@
     </div>
     
     {% if vendors %}
-    <!-- Desktop Table (hidden on mobile) -->
-    <div class="hidden lg:block overflow-x-auto">
-      <table class="dense-table w-full border-collapse">
-        <thead class="bg-muted/50 border-b">
-          <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[200px]">Vendor</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[140px]">Type</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">Products</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[140px]">Readiness</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[150px]">Coverage</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Contract</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[140px]">Location</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[80px]">Profile</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
-          {% for vendor in vendors %}
-          <tr class="border-b hover:bg-muted/30 transition-colors">
-            <td class="px-4 py-3">
-              <div class="min-w-0">
-                <p class="font-medium text-sm truncate">{{ vendor.name }}</p>
-                {% if vendor.website %}
-                <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block truncate">{{ vendor.website }}</a>
-                {% endif %}
-              </div>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted border border-border whitespace-nowrap">
-                {{ (vendor.vendor_type or 'Uncategorized') | replace('_', ' ') | title }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              {% set product_count = vendor.products|length if vendor.products else 0 %}
-              <span class="text-sm text-muted-foreground">{{ product_count }} product{{ 's' if product_count != 1 else '' }}</span>
-            </td>
-            <td class="px-4 py-3">
-              {% set vendor_metric = vendor_metrics.get(vendor.id, {}) %}
-              {% if vendor.enterprise_readiness_score %}
-                {% set score = vendor.enterprise_readiness_score %}
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 bg-muted h-2 rounded-full overflow-hidden max-w-[100px]">
-                    <div class="h-full {% if score >= 80 %}bg-success{% elif score >= 60 %}bg-warning{% else %}bg-destructive{% endif %}" data-score="{{ score }}"></div>
-                  </div>
-                  <span class="text-sm font-medium min-w-[3rem] text-right">{{ score }}%</span>
-                </div>
-              {% else %}
-                <div class="space-y-1">
-                  <span class="text-sm text-muted-foreground">Not scored</span>
-                  {% if vendor_metric.linked_applications or vendor_metric.linked_solutions %}
-                  <p class="text-xs text-muted-foreground">
-                    {{ vendor_metric.linked_applications }} app{{ 's' if vendor_metric.linked_applications != 1 else '' }},
-                    {{ vendor_metric.linked_solutions }} solution{{ 's' if vendor_metric.linked_solutions != 1 else '' }}
-                  </p>
-                  {% endif %}
-                </div>
-              {% endif %}
-            </td>
-            <td class="px-4 py-3">
-              {% set vendor_metric = vendor_metrics.get(vendor.id, {}) %}
-              <div class="space-y-1 text-xs">
-                <p class="font-medium text-foreground">
-                  {{ vendor_metric.capability_count or 0 }} capabilit{{ 'ies' if (vendor_metric.capability_count or 0) != 1 else 'y' }}
-                </p>
-                <p class="text-muted-foreground">
-                  {% if vendor_metric.average_capability_coverage is not none %}
-                    {{ vendor_metric.average_capability_coverage }}% avg coverage
-                  {% else %}
-                    No mapped coverage yet
-                  {% endif %}
-                </p>
-                <p class="text-muted-foreground">
-                  {{ vendor_metric.linked_applications or 0 }} app{{ 's' if (vendor_metric.linked_applications or 0) != 1 else '' }},
-                  {{ vendor_metric.linked_solutions or 0 }} solution{{ 's' if (vendor_metric.linked_solutions or 0) != 1 else '' }}
-                </p>
-              </div>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium {% if vendor.status == 'active' %}bg-success/10 text-success-emphasis border border-success/30{% else %}bg-muted border border-border{% endif %}">
-                {{ vendor.status | title }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              {% set contract_status = vendor.contract_status or 'catalog' %}
-              {% if contract_status == 'deployed' %}
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success text-primary-foreground whitespace-nowrap">Deployed</span>
-              {% elif contract_status == 'contracted' %}
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary text-primary-foreground whitespace-nowrap">Contracted</span>
-              {% elif contract_status == 'inactive' %}
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive text-primary-foreground whitespace-nowrap">Inactive</span>
-              {% else %}
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted border border-border whitespace-nowrap">Catalog</span>
-              {% endif %}
-            </td>
-            <td class="px-4 py-3">
-              <span class="text-sm text-muted-foreground truncate block min-w-0">{{ vendor.headquarters_location or 'Not provided' }}</span>
-            </td>
-            <td class="px-4 py-3 text-center">
-              {% set vm = vendor_metrics.get(vendor.id, {}) %}
-              {% set completeness = ((1 if (vendor.products and vendor.products|length > 0) else 0) + (1 if vendor.vendor_type else 0) + (1 if (vm.capability_count and vm.capability_count > 0) else 0) + (1 if (vm.linked_applications and vm.linked_applications > 0) else 0) + (1 if vendor.description else 0)) %}
-              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {% if completeness >= 4 %}bg-success/10 text-success-emphasis border border-success/30{% elif completeness >= 2 %}bg-warning/10 text-warning-emphasis border border-warning/30{% else %}bg-destructive/10 text-destructive-emphasis border border-destructive/30{% endif %}">{{ completeness }}/5</span>
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="flex gap-2 justify-end min-w-[120px]">
-                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">View</a>
-                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    {# The desktop <table> and the duplicate mobile card list are replaced by one
+       list_table: its own overflow-x-auto container is the table's responsive form,
+       so a narrow screen scrolls the table rather than reading a second, separately
+       maintained markup. Server-side type/contract-status filtering and pagination
+       (full-page links, built above and here) are kept exactly as before -- list_table's
+       own free-text search and column sort/hide are additive, applying to the page of
+       vendors already fetched; replacing the server-side type/contract filters with the
+       macro's single free-text search would lose the ability to filter by vendor type or
+       contract status on their own, which nothing in this brief asks to give up. #}
+    {% macro _vendor_pager() %}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-2">
+      <p class="text-sm text-muted-foreground">
+        {% if pagination.total > 0 %}
+          Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }}-{{ [pagination.page * pagination.per_page, pagination.total] | min }}
+          of {{ pagination.total }} vendor{{ 's' if pagination.total != 1 else '' }}
+        {% else %}
+          0 results
+        {% endif %}
+      </p>
+      {% if pagination.pages > 1 %}
+      <div class="flex items-center gap-1">
+        {% if pagination.has_prev %}
+        <a href="{{ url_for('application_mgmt.vendors_dashboard', page=pagination.prev_num, vendor_type=vendor_type_filter, search=search_query, contract_status=contract_filter) }}"
+          class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">Previous</a>
+        {% else %}
+        <span class="px-3 py-1.5 text-sm border border-border rounded-md opacity-50 cursor-not-allowed">Previous</span>
+        {% endif %}
 
-    <!-- Mobile Cards (visible on mobile/tablet, hidden on desktop) -->
-    <div class="lg:hidden divide-y">
-      {% for vendor in vendors %}
-      <div class="p-4 hover:bg-muted/30 transition-colors">
-        <div class="flex items-start justify-between mb-3">
-          <div class="flex-1">
-            <h3 class="font-semibold text-base mb-1">{{ vendor.name }}</h3>
-            {% if vendor.website %}
-            <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block">{{ vendor.website }}</a>
+        {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+          {% if p %}
+            {% if p == pagination.page %}
+            <span class="px-3 py-1.5 text-sm border border-primary rounded-md bg-primary text-primary-foreground min-w-[36px] text-center">{{ p }}</span>
+            {% else %}
+            <a href="{{ url_for('application_mgmt.vendors_dashboard', page=p, vendor_type=vendor_type_filter, search=search_query, contract_status=contract_filter) }}"
+              class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted min-w-[36px] text-center">{{ p }}</a>
             {% endif %}
-          </div>
-          <div class="flex gap-2">
-            <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-              <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
-              <span class="sr-only">View vendor</span>
-            </a>
-          </div>
-        </div>
-        
-          <div class="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p class="text-xs text-muted-foreground mb-1">Type</p>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted border">
-              {{ (vendor.vendor_type or 'Uncategorized') | replace('_', ' ') | title }}
-            </span>
-          </div>
-          <div>
-            <p class="text-xs text-muted-foreground mb-1">Products</p>
-            <p class="text-sm font-medium">{{ vendor.products|length if vendor.products else 0 }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-muted-foreground mb-1">Status</p>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if vendor.status == 'active' %}bg-success/10 text-success-emphasis{% else %}bg-muted{% endif %}">
-              {{ vendor.status | title }}
-            </span>
-          </div>
-          <div>
-            <p class="text-xs text-muted-foreground mb-1">Contract</p>
-            {% set contract_status = vendor.contract_status or 'catalog' %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if contract_status == 'deployed' %}bg-success text-primary-foreground{% elif contract_status == 'contracted' %}bg-primary text-primary-foreground{% elif contract_status == 'inactive' %}bg-destructive text-destructive-foreground{% else %}bg-muted border{% endif %}">
-              {{ contract_status | title }}
-            </span>
-          </div>
-          </div>
-          
-          {% set vendor_metric = vendor_metrics.get(vendor.id, {}) %}
-          <div class="mt-3 grid grid-cols-3 gap-3 text-xs">
-            <div>
-              <p class="text-muted-foreground mb-1">Capabilities</p>
-              <p class="font-medium">{{ vendor_metric.capability_count or 0 }}</p>
-            </div>
-            <div>
-              <p class="text-muted-foreground mb-1">Apps</p>
-              <p class="font-medium">{{ vendor_metric.linked_applications or 0 }}</p>
-            </div>
-            <div>
-              <p class="text-muted-foreground mb-1">Solutions</p>
-              <p class="font-medium">{{ vendor_metric.linked_solutions or 0 }}</p>
-            </div>
-          </div>
+          {% else %}
+            <span class="px-3 py-1.5 text-sm">...</span>
+          {% endif %}
+        {% endfor %}
 
-          {% if vendor.enterprise_readiness_score %}
-          <div class="mt-3">
-            <p class="text-xs text-muted-foreground mb-1">Readiness Score</p>
-            {% set score = vendor.enterprise_readiness_score %}
-            <div class="flex items-center gap-2">
-            <div class="flex-1 bg-muted h-2 rounded-full overflow-hidden">
+        {% if pagination.has_next %}
+        <a href="{{ url_for('application_mgmt.vendors_dashboard', page=pagination.next_num, vendor_type=vendor_type_filter, search=search_query, contract_status=contract_filter) }}"
+          class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">Next</a>
+        {% else %}
+        <span class="px-3 py-1.5 text-sm border border-border rounded-md opacity-50 cursor-not-allowed">Next</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endmacro %}
+    <div class="p-4 sm:p-6">
+    {%- set _vendor_columns = [
+        {'label': 'Vendor', 'sortable': true},
+        {'label': 'Type', 'sortable': true},
+        {'label': 'Products', 'sortable': true},
+        {'label': 'Readiness', 'sortable': true},
+        {'label': 'Coverage', 'sortable': false},
+        {'label': 'Status', 'sortable': true},
+        {'label': 'Contract', 'sortable': true},
+        {'label': 'Location', 'sortable': true},
+        {'label': 'Profile', 'align': 'right', 'sortable': true},
+        {'label': 'Actions', 'align': 'right', 'sortable': false},
+    ] -%}
+    {% call(vendor) list_table(rows=vendors, columns=_vendor_columns, caption='Application vendors', testid='vendor-list-table', row_testid='vendor-row', server_pagination=_vendor_pager, empty_message='No vendors found.') %}
+      <!-- Vendor -->
+      {% call table_cell() %}
+        <div class="min-w-0">
+          <p class="font-medium text-sm truncate" data-testid="vendor-name">{{ vendor.name }}</p>
+          {% if vendor.website %}
+          <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block truncate">{{ vendor.website }}</a>
+          {% endif %}
+        </div>
+      {% endcall %}
+      <!-- Type -->
+      {% call table_cell(attrs={'data-sort': vendor.vendor_type or ''}) %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted border border-border whitespace-nowrap">
+          {{ (vendor.vendor_type or 'Uncategorized') | replace('_', ' ') | title }}
+        </span>
+      {% endcall %}
+      <!-- Products -->
+      {% set product_count = vendor.products|length if vendor.products else 0 %}
+      {% call table_cell(attrs={'data-sort': product_count}) %}
+        <span class="text-sm text-muted-foreground">{{ product_count }} product{{ 's' if product_count != 1 else '' }}</span>
+      {% endcall %}
+      <!-- Readiness -->
+      {% set vendor_metric = vendor_metrics.get(vendor.id, {}) %}
+      {% call table_cell(attrs={'data-sort': vendor.enterprise_readiness_score if vendor.enterprise_readiness_score else ''}) %}
+        {% if vendor.enterprise_readiness_score %}
+          {% set score = vendor.enterprise_readiness_score %}
+          <div class="flex items-center gap-2">
+            <div class="flex-1 bg-muted h-2 rounded-full overflow-hidden max-w-[100px]">
               <div class="h-full {% if score >= 80 %}bg-success{% elif score >= 60 %}bg-warning{% else %}bg-destructive{% endif %}" data-score="{{ score }}"></div>
             </div>
-            <span class="text-sm font-medium">{{ score }}%</span>
+            <span class="text-sm font-medium min-w-[3rem] text-right">{{ score }}%</span>
           </div>
-        </div>
-        {% elif vendor_metric.average_capability_coverage is not none %}
-        <div class="mt-3">
-          <p class="text-xs text-muted-foreground mb-1">Average Capability Coverage</p>
-          <p class="text-sm font-medium">{{ vendor_metric.average_capability_coverage }}%</p>
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-    
-    <!-- Table Footer with Pagination -->
-    <div class="p-4 sm:p-6 border-t bg-muted/30">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p class="text-sm text-muted-foreground">
-          {% if pagination.total > 0 %}
-            Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }}-{{ [pagination.page * pagination.per_page, pagination.total] | min }}
-            of {{ pagination.total }} vendor{{ 's' if pagination.total != 1 else '' }}
-          {% else %}
-            0 results
-          {% endif %}
-        </p>
-        {% if pagination.pages > 1 %}
-        <div class="flex items-center gap-1">
-          {% if pagination.has_prev %}
-          <a href="{{ url_for('application_mgmt.vendors_dashboard', page=pagination.prev_num, vendor_type=vendor_type_filter, search=search_query, contract_status=contract_filter) }}"
-            class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">Previous</a>
-          {% else %}
-          <span class="px-3 py-1.5 text-sm border border-border rounded-md opacity-50 cursor-not-allowed">Previous</span>
-          {% endif %}
-
-          {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-            {% if p %}
-              {% if p == pagination.page %}
-              <span class="px-3 py-1.5 text-sm border border-primary rounded-md bg-primary text-primary-foreground min-w-[36px] text-center">{{ p }}</span>
-              {% else %}
-              <a href="{{ url_for('application_mgmt.vendors_dashboard', page=p, vendor_type=vendor_type_filter, search=search_query, contract_status=contract_filter) }}"
-                class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted min-w-[36px] text-center">{{ p }}</a>
-              {% endif %}
-            {% else %}
-              <span class="px-3 py-1.5 text-sm">...</span>
+        {% else %}
+          <div class="space-y-1">
+            <span class="text-sm text-muted-foreground">Not scored</span>
+            {% if vendor_metric.linked_applications or vendor_metric.linked_solutions %}
+            <p class="text-xs text-muted-foreground">
+              {{ vendor_metric.linked_applications }} app{{ 's' if vendor_metric.linked_applications != 1 else '' }},
+              {{ vendor_metric.linked_solutions }} solution{{ 's' if vendor_metric.linked_solutions != 1 else '' }}
+            </p>
             {% endif %}
-          {% endfor %}
-
-          {% if pagination.has_next %}
-          <a href="{{ url_for('application_mgmt.vendors_dashboard', page=pagination.next_num, vendor_type=vendor_type_filter, search=search_query, contract_status=contract_filter) }}"
-            class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">Next</a>
-          {% else %}
-          <span class="px-3 py-1.5 text-sm border border-border rounded-md opacity-50 cursor-not-allowed">Next</span>
-          {% endif %}
-        </div>
+          </div>
         {% endif %}
-      </div>
+      {% endcall %}
+      <!-- Coverage -->
+      {% call table_cell() %}
+        <div class="space-y-1 text-xs">
+          <p class="font-medium text-foreground">
+            {{ vendor_metric.capability_count or 0 }} capabilit{{ 'ies' if (vendor_metric.capability_count or 0) != 1 else 'y' }}
+          </p>
+          <p class="text-muted-foreground">
+            {% if vendor_metric.average_capability_coverage is not none %}
+              {{ vendor_metric.average_capability_coverage }}% avg coverage
+            {% else %}
+              No mapped coverage yet
+            {% endif %}
+          </p>
+          <p class="text-muted-foreground">
+            {{ vendor_metric.linked_applications or 0 }} app{{ 's' if (vendor_metric.linked_applications or 0) != 1 else '' }},
+            {{ vendor_metric.linked_solutions or 0 }} solution{{ 's' if (vendor_metric.linked_solutions or 0) != 1 else '' }}
+          </p>
+        </div>
+      {% endcall %}
+      <!-- Status -->
+      {% call table_cell(attrs={'data-sort': vendor.status or ''}) %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium {% if vendor.status == 'active' %}bg-success/10 text-success-emphasis border border-success/30{% else %}bg-muted border border-border{% endif %}">
+          {{ vendor.status | title }}
+        </span>
+      {% endcall %}
+      <!-- Contract -->
+      {% set contract_status = vendor.contract_status or 'catalog' %}
+      {% call table_cell(attrs={'data-sort': contract_status}) %}
+        {% if contract_status == 'deployed' %}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success text-primary-foreground whitespace-nowrap">Deployed</span>
+        {% elif contract_status == 'contracted' %}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary text-primary-foreground whitespace-nowrap">Contracted</span>
+        {% elif contract_status == 'inactive' %}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive text-primary-foreground whitespace-nowrap">Inactive</span>
+        {% else %}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted border border-border whitespace-nowrap">Catalog</span>
+        {% endif %}
+      {% endcall %}
+      <!-- Location -->
+      {% call table_cell() %}
+        <span class="text-sm text-muted-foreground truncate block min-w-0">{{ vendor.headquarters_location or 'Not provided' }}</span>
+      {% endcall %}
+      <!-- Profile -->
+      {% set vm = vendor_metrics.get(vendor.id, {}) %}
+      {% set completeness = ((1 if (vendor.products and vendor.products|length > 0) else 0) + (1 if vendor.vendor_type else 0) + (1 if (vm.capability_count and vm.capability_count > 0) else 0) + (1 if (vm.linked_applications and vm.linked_applications > 0) else 0) + (1 if vendor.description else 0)) %}
+      {% call table_cell(class='text-right', attrs={'data-sort': completeness}) %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {% if completeness >= 4 %}bg-success/10 text-success-emphasis border border-success/30{% elif completeness >= 2 %}bg-warning/10 text-warning-emphasis border border-warning/30{% else %}bg-destructive/10 text-destructive-emphasis border border-destructive/30{% endif %}">{{ completeness }}/5</span>
+      {% endcall %}
+      <!-- Actions -->
+      {% call table_cell(class='text-right') %}
+        <div class="flex gap-2 justify-end min-w-[120px]">
+          <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap" data-testid="vendor-view-link">View</a>
+          <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
+        </div>
+      {% endcall %}
+    {% endcall %}
     </div>
     {% else %}
     <!-- Empty State -->
