@@ -3,7 +3,10 @@
 What these tests check:
 1. GET / signed out returns 200 with "Entelim" in title/h1, none of the old
    names; the home page offers "Start free" to registration, not a waitlist
-   form.
+   form. The menu, footer and the home page's own Coming soon block carry
+   "Join the waiting list" by design -- see
+   test_home_page_has_start_free_cta_not_a_waitlist_form's own docstring for
+   what is actually checked there.
 2. POST with valid email+consent stores one row; duplicate stores nothing
    new; without consent refuses; without CSRF refused. (The home page no
    longer renders a waitlist form or confirmation copy -- see
@@ -17,6 +20,8 @@ What these tests check:
 import uuid
 
 import pytest
+
+from tests._page_body_test_helpers import page_body_excluding
 
 
 def _make_user(db_session, org, *, email=None, role_name="Architect"):
@@ -68,14 +73,19 @@ class TestHomePage:
     def test_home_page_has_start_free_cta_not_a_waitlist_form(self, client):
         """Community sign-up is open to the public: the home page's primary
         action is "Start free" to registration, and the waitlist form (email
-        and consent fields) is gone."""
+        and consent fields) is gone. The menu, footer and the home page's own
+        Coming soon block carry "Join the waiting list" by design, so this
+        checks the rest of the page body instead: no second copy of that
+        sentence, and no email input (the old pre-launch hero form)."""
         resp = client.get("/")
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "Start free" in html
         assert 'id="email"' not in html
         assert 'id="consent"' not in html
-        assert "Join the waiting list" not in html
+        body = page_body_excluding(html, exclude_testid="home-coming-soon")
+        assert "Join the waiting list" not in body
+        assert 'type="email"' not in body
 
     def test_signed_in_user_is_redirected_to_dashboard(self, client, db_session, make_org, login_as):
         """Signed-in visitors redirect to the dashboard."""

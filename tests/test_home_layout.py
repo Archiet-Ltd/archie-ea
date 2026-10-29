@@ -13,7 +13,7 @@ import pytest
 EXPECTED_H2 = [
     "Every enterprise runs on knowledge it cannot see in one place.",
     "Ask a question. Get an answer that shows its working.",
-    "The eighteen capabilities of Enterprise Intelligence Management.",
+    "The seventeen capabilities of Enterprise Intelligence Management.",
     "Give your AI assistants one true source about your company.",
     "How the company brain grows.",
     "See it answered for where you are.",
