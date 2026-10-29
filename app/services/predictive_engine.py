@@ -238,6 +238,7 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
 
         # Sum actual costs from cost_facts for these work packages
         total_actual_cost = 0
+        cost_fact_date = None
         if wp_ids:
             app_ids = db.session.query(ArchiMateRelationship.source_id).filter(
                 ArchiMateRelationship.target_id.in_(wp_ids),
@@ -246,14 +247,20 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
             ).all()
             app_ids = [app_id for app_id, in app_ids]
 
-            cost_facts = db.session.execute(
-                db.select(CostFact.amount)
+            cost_fact_rows = db.session.execute(
+                db.select(CostFact.amount, CostFact.period_end, CostFact.updated_at)
                 .where(CostFact.organization_id == org_id)
                 .where(CostFact.element_type == "application")
                 .where(CostFact.element_id.in_(app_ids))
                 .where(CostFact.kind == KIND_ACTUAL)
-            ).scalars().all()
-            total_actual_cost = sum(float(c) for c in cost_facts)
+            ).all()
+            total_actual_cost = sum(float(amount) for amount, _, _ in cost_fact_rows)
+            fact_dates = [
+                period_end or (updated_at.date() if updated_at else None)
+                for _, period_end, updated_at in cost_fact_rows
+            ]
+            fact_dates = [d for d in fact_dates if d]
+            cost_fact_date = max(fact_dates) if fact_dates else None
 
         # Check conditions
         is_zombie = False
@@ -283,7 +290,7 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
                 reason = f"Actual cost ({total_actual_cost:,.0f}) exceeds forecast benefit ({benefit:,.0f})"
                 evidence_lines.append(
                     f"BusinessCase '{bc.title or bc.id}' linked work packages actual cost: {total_actual_cost:,.0f} "
-                    f"[CostFact, as of {datetime.utcnow().date().isoformat()}]"
+                    f"[CostFact, as of {cost_fact_date.isoformat() if cost_fact_date else 'unknown'}]"
                 )
                 evidence_lines.append(
                     f"BusinessCase forecast benefit: {benefit:,.0f} [BusinessCase, as of {bc.updated_at.date().isoformat() if bc.updated_at else 'unknown'}]"
@@ -370,12 +377,19 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
                     "role": owner.ownership_type,
                     "count": 0,
                     "element_names": [],
-                    "critical_count": 0
+                    "critical_count": 0,
+                    "latest_owner_date": None,
                 }
             owner_counts[user_id]["count"] += 1
             owner_counts[user_id]["element_names"].append(f"{elem_type}:{elem_name}")
             if is_critical:
                 owner_counts[user_id]["critical_count"] += 1
+            owner_date = owner.updated_at or owner.created_at
+            if owner_date and (
+                owner_counts[user_id]["latest_owner_date"] is None
+                or owner_date > owner_counts[user_id]["latest_owner_date"]
+            ):
+                owner_counts[user_id]["latest_owner_date"] = owner_date
 
     # Check for bus factor violations
     for user_id, data in owner_counts.items():
@@ -386,7 +400,8 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
                 target_element=f"Person: {data['name']} ({data['role']})",
                 evidence=[
                     f"Person '{data['name']}' owns {data['critical_count']} critical elements "
-                    f"(threshold: {BUS_FACTOR_THRESHOLD}) [ApplicationOwner, as of {datetime.utcnow().date().isoformat()}]",
+                    f"(threshold: {BUS_FACTOR_THRESHOLD}) [ApplicationOwner, as of "
+                    f"{data['latest_owner_date'].date().isoformat() if data['latest_owner_date'] else 'unknown'}]",
                     f"Elements: {', '.join(data['element_names'][:10])}"
                     + (f" and {len(data['element_names']) - 10} more" if len(data['element_names']) > 10 else "")
                 ],
@@ -559,6 +574,8 @@ def check_cost_to_serve(org_id: int) -> List[PredictiveAlert]:
             continue
 
         app_ids = [app.id for _, app in app_rels]
+        rel_dates = [rel.updated_at for rel, _ in app_rels if rel.updated_at]
+        realization_date = max(rel_dates) if rel_dates else None
 
         # Get cost facts for these applications over the latest two periods
         cost_facts = db.session.query(CostFact.period_start, CostFact.period_end, db.func.sum(CostFact.amount)).filter(
@@ -615,7 +632,8 @@ def check_cost_to_serve(org_id: int) -> List[PredictiveAlert]:
                     target_element=f"ApplicationService: {svc.name}",
                     evidence=[
                         f"Service '{svc.name}' realised by {len(app_ids)} application(s) "
-                        f"[ArchiMateRelationship, as of {datetime.utcnow().date().isoformat()}]",
+                        f"[ArchiMateRelationship, as of "
+                        f"{realization_date.date().isoformat() if realization_date else 'unknown'}]",
                         f"Cost period {periods[0]}: {prev_cost:,.0f} [CostFact]",
                         f"Cost period {periods[1]}: {curr_cost:,.0f} [CostFact]",
                         f"Cost increase: {pct_change:.1f}% (threshold: 10%)",
@@ -698,7 +716,7 @@ def get_predictive_insights(topic: Optional[str] = None) -> Dict[str, Any]:
                 "chain_elements": [],
                 "confidence": 0.8,
                 "provenance": {"basis": "derived", "kind": "heuristic", "label": alert.prediction_type,
-                               "text": alert.recommendation, "recorded_at": datetime.utcnow().isoformat()},
+                               "text": alert.recommendation, "recorded_at": None},
                 "computed_at": datetime.utcnow().isoformat(),
                 "stale": False,
                 "derived_id": None,
