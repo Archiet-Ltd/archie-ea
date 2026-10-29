@@ -8,8 +8,11 @@
 {% from 'components/input.html' import hidden_input %}
 {% import 'basecoat/index.html' as ui %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% block content %}
-<div class="max-w-6xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+<div class="style-vega max-w-6xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='Connectors',
         description='Every connector of your organisation: health, last synchronisation, and the change queue each edit goes through.',
