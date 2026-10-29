@@ -6,6 +6,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, textarea %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/nav_macros_shadcn.html' import pill_tabs, tab_panel with context %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -71,6 +72,8 @@
 {% if app %}
 {% set valid_tab_ids = ['overview','architecture','capabilities','processes','vendors','technology','motivation','compliance','health','cost','dependencies','ea-workflows'] %}
 {% set resolved_tab = active_tab_id if active_tab_id in valid_tab_ids else 'overview' %}
+{% set owner_rows = owner_rows | default([]) %}
+{% set app_has_owner = (owner_rows or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team) %}
 
 {% macro _app_detail_actions() %}
   {% if edit_mode %}
@@ -86,6 +89,14 @@
      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
   </a>
+  {% if can('assign', 'owner') %}
+  {{ ui.button(
+       text=('Change owner' if app_has_owner else 'Assign owner'),
+       variant='outline', size='sm',
+       href=url_for('unified_applications.assign_owner', id=app.id),
+       attrs={'data-testid': 'application-header-assign-owner'}
+  ) }}
+  {% endif %}
   {% if can_retire_applications(current_user) %}
   <div x-data="{ retiring: false }">
     <form method="POST" action="{{ url_for('unified_applications.retire_application', id=app.id) }}"
@@ -431,18 +442,16 @@
           {{ edit_row('Development Team', 'devTeam', app.development_team) }}
           {{ edit_row('Support Team', 'supportLevel', app.support_team) }}
           {% else %}
-          {% set owner_rows = owner_rows | default([]) %}
           {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
           {# The owner shows once: the text fields that repeat a named owner are left out. #}
           {% set text_owner = None if owner_rows else (app.application_owner or app.business_owner or app.technical_owner) %}
           {% set named = (owner_rows | map(attribute='user_name') | map('lower') | list) + ([text_owner | lower] if text_owner else []) %}
-          {% set has_any_owner = owner_rows or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
-          <div {% if owner_rows %}data-testid="application-owner"{% elif not has_any_owner %}data-testid="application-owner-empty"{% endif %}>
+          <div {% if owner_rows %}data-testid="application-owner"{% elif not app_has_owner %}data-testid="application-owner-empty"{% endif %}>
             {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = text_owner %}{% set assign_link = none %}
             {% include 'partials/owner_step.html' with context %}
             {% if not owner_rows and app.github_code_owner_unmatched %}
             <p class="mt-2 text-sm text-muted-foreground" data-testid="application-owner-unmatched">{{ app.code_owner_text(app.github_code_owner_unmatched) }}</p>
-            {% if can_edit %}<a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="text-sm text-primary hover:underline" data-testid="application-assign-owner">Assign owner</a>{% endif %}
+            {% if can('assign', 'owner') %}<a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="text-sm text-primary hover:underline" data-testid="application-assign-owner">Assign owner</a>{% endif %}
             {% endif %}
           </div>
           {% for label, value in [('Application Owner', app.application_owner), ('Business Owner', app.business_owner), ('Technical Owner', app.technical_owner), ('Technical Lead', app.technical_lead), ('Product Manager', app.product_manager), ('Development Team', app.development_team), ('Support Team', app.support_team)] %}

@@ -379,14 +379,15 @@ _TERMINAL_LIFECYCLE_STATUSES = frozenset({"retired", "decommissioned", "end_of_l
 
 @unified_applications_bp.route("/<int:id>/assign-owner", methods=["GET", "POST"])
 @login_required
-@require_permission("edit", "application")
+@require_permission("assign", "owner")
 @audit_log("application_assign_owner")
 def assign_owner(id):
     app = _verify_app_in_org(id, g.current_org_id, raise_not_found=True)
     unmatched = (app.acm_properties or {}).get("github_code_owner_unmatched", {}).get("value")
     if not isinstance(unmatched, dict) or not unmatched.get("login"):
-        flash("Application has no unmatched owner to assign.", "warning")
-        return redirect(url_for("unified_applications.application_detail", id=id))
+        unmatched = None
+
+    from app.models.user import User
 
     if request.method == "POST":
         user_id = request.form.get("user_id")
@@ -395,7 +396,6 @@ def assign_owner(id):
             return redirect(url_for("unified_applications.assign_owner", id=id))
 
         from app.services.element_ownership_service import set_element_owner
-        from app.models.user import User
 
         try:
             wanted_id = int(user_id)
@@ -420,23 +420,31 @@ def assign_owner(id):
             replace_primary=True,
         )
 
-        from app.modules.architecture_assistant.property_service import PropertyService
-        unmatched["login"] = None  # Clear it so it is not shown again
-        unmatched["logins"] = None
-        PropertyService().merge_element_properties(app.archimate_element, {"github_code_owner_unmatched": unmatched}, source="github")
+        if unmatched:
+            from app.modules.architecture_assistant.property_service import PropertyService
+            unmatched["login"] = None  # Clear it so it is not shown again
+            unmatched["logins"] = None
+            PropertyService().merge_element_properties(app.archimate_element, {"github_code_owner_unmatched": unmatched}, source="github")
 
         db.session.commit()
 
         flash(f"{user.full_name()} has been assigned as the owner of {app.name}.", "success")
         return redirect(url_for("unified_applications.application_detail", id=id))
 
-    from app.models.user import User
+    from app.models.application_owner import ApplicationOwner
+
+    current_owner_id = None
+    for row in ApplicationOwner.get_display_rows_for_application(app.id, g.current_org_id):
+        if row.get("ownership_type") == "primary" and row.get("user_id"):
+            current_owner_id = row["user_id"]
+            break
     users = User.query.filter_by(organization_id=g.current_org_id).all()
     return render_template(
         "applications/assign_owner.html",
         app=app,
         users=users,
-        unmatched_text=type(app).code_owner_text(unmatched),
+        unmatched_text=(type(app).code_owner_text(unmatched) if unmatched else None),
+        selected_user_id=current_owner_id,
     )
 
 

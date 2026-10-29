@@ -1,18 +1,13 @@
 {% extends 'layouts/admin_base.html' %}
 {# design-block: form #}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/form_field.html' import form_group %}
 {% from 'components/input.html' import hidden_input %}
 {% import 'basecoat/index.html' as ui %}
 
 {% block title %}Assign Owner for {{ app.name }}{% endblock %}
 
-{% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
-{% endblock %}
-
 {% block content %}
-<div class="style-vega max-w-2xl mx-auto">
+<div class="p-6 space-y-6">
     {{ page_shell(
         title='Assign Owner for ' ~ app.name,
         subtitle=(unmatched_text or '') ~ '. Choose the person in your organization who owns it.',
@@ -22,22 +17,26 @@
             ('Assign Owner', None)
         ]
     ) }}
-    <form method="POST">
+    <form method="POST" class="max-w-2xl">
         {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
         {% call ui.card() %}
             {% call ui.card_content(class='space-y-6') %}
-                {% call form_group(id='user_id', label='Owner', required=true, help_text='The person who becomes the primary owner of this application.') %}
-                    {% call ui.native_select(id='user_id', name='user_id', required=true, class='border border-input px-3') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Owner', attrs={'for': 'user_id'}) }}
+                    {% call ui.native_select_wrapper(class='w-full') %}
+                    {% call ui.native_select(id='user_id', name='user_id', required=true, class='w-full') %}
                         <option value="">Select a person</option>
                         {% for u in users %}
-                        <option value="{{ u.id }}">{{ u.full_name() }} ({{ u.email }})</option>
+                        <option value="{{ u.id }}"{% if selected_user_id and u.id == selected_user_id %} selected{% endif %}>{{ u.full_name() }} ({{ u.email }})</option>
                         {% endfor %}
                     {% endcall %}
+                    {% endcall %}
+                    {{ ui.field_description(text='The person who becomes the primary owner of this application.') }}
                 {% endcall %}
             {% endcall %}
             {% call ui.card_footer(class='justify-end gap-2') %}
                 {{ ui.button(text='Cancel', variant='secondary', class='px-4', href=url_for('unified_applications.application_detail', id=app.id)) }}
-                {{ ui.button(text='Assign owner', type='submit', class='bg-primary text-primary-foreground px-4') }}
+                {{ ui.button(text='Assign owner', type='submit', class='px-4') }}
             {% endcall %}
         {% endcall %}
     </form>

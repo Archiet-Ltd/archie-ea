@@ -1772,6 +1772,7 @@
   },
   "app/templates/applications/assign_owner.html": {
     "allowed_macros": [
+     "basecoat/index.html",
      "components/accessibility_helpers.html",
      "components/alert.html",
      "components/badge.html",
@@ -1796,18 +1797,17 @@
      "components/status_badge.html",
      "macros/page_shell.html"
     ],
+    "extra_macros": [
+     "basecoat/index.html"
+    ],
     "basis": "rule",
     "block": "form",
     "charts": [],
     "components": [
-     "alert",
-     "badge",
      "breadcrumb",
      "button",
-     "empty",
+     "card",
      "field",
-     "input",
-     "page-header",
      "select"
     ],
     "confidence": "high",

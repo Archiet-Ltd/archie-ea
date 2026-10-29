@@ -9,6 +9,7 @@
 {% from 'components/completeness_ring.html' import completeness_ring %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/select.html' import native_select %}
@@ -106,13 +107,14 @@
 {% macro owner_cell(app, owner_names, sfx='', can_assign=false) %}
   {%- if owner_names -%}
     {%- for owner_name in owner_names -%}
-    <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
+    <span class="block min-w-0 break-all text-sm text-foreground" title="{{ owner_name }}" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
     {%- endfor -%}
     {%- if can_assign %}
-    <a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="block text-xs text-muted-foreground hover:underline" data-testid="app-assign-owner{{ sfx }}-{{ app.id }}">Assign owner</a>
+    {{ ui.button(text='Assign', variant='ghost', size='sm', href=url_for('unified_applications.assign_owner', id=app.id), attrs={'data-testid': 'app-assign-owner' ~ sfx ~ '-' ~ app.id}) }}
     {%- endif -%}
-  {%- elif can('edit', 'application') -%}
-    <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
+  {%- elif can_assign -%}
+    <span class="block min-w-0 text-xs text-muted-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner') }}</span>
+    {{ ui.button(text='Assign', variant='ghost', size='sm', href=url_for('unified_applications.assign_owner', id=app.id), attrs={'data-testid': 'app-assign-owner' ~ sfx ~ '-' ~ app.id}) }}
   {%- else -%}
     <span data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner') }}</span>
   {%- endif -%}
@@ -423,7 +425,7 @@
               {% endif %}
             </td>
             <td class="px-2 align-middle">{{ status_cell(status_text, STATUS_MAP) }}</td>
-            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id), '', can('edit', 'application') and app.id in unmatched_owner_app_ids) }}</td>
+            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id), '', can('assign', 'owner')) }}</td>
             <td class="px-2 text-center align-middle">
               {% if app.completeness_score is not none %}
                 {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
@@ -467,9 +469,9 @@
               <p class="mb-0.5 text-xs text-muted-foreground">Status</p>
               {{ status_cell(status_text, STATUS_MAP) }}
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="mb-0.5 text-xs text-muted-foreground">Owner</p>
-              {{ owner_cell(app, owner_names_by_app.get(app.id), '-mobile', can('edit', 'application') and app.id in unmatched_owner_app_ids) }}
+              {{ owner_cell(app, owner_names_by_app.get(app.id), '-mobile', can('assign', 'owner')) }}
             </div>
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Vendor</p>
