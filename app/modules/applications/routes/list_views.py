@@ -144,6 +144,7 @@ def application_list():
             no_vendor=None,
         ),
         owner_names_by_app={},
+        unmatched_owner_app_ids=set(),
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -430,11 +431,28 @@ def application_list():
                 .all()
             }
         owner_names_by_app = {}
+        unmatched_owner_app_ids = set()
+        # One query for the elements of every listed application with no owner.
+        unowned = [a for a in pagination.items if a.id not in owned_ids and a.archimate_element_id]
+        elements_by_id = {}
+        if unowned:
+            from app.models.archimate_core import ArchiMateElement
+
+            elements_by_id = {
+                el.id: el
+                for el in db.session.query(ArchiMateElement)
+                .filter(ArchiMateElement.id.in_([a.archimate_element_id for a in unowned]))
+                .all()
+            }
         for listed in pagination.items:
             if listed.id not in owned_ids:
-                unmatched = (listed.acm_properties or {}).get("github_code_owner_unmatched", {}).get("value")
-                if isinstance(unmatched, dict) and unmatched.get("login"):
-                    owner_names_by_app[listed.id] = [f"Code owner on GitHub: @{unmatched['login']}, not yet matched to a person"]
+                element = elements_by_id.get(listed.archimate_element_id)
+                props = (element.acm_properties if element else None) or {}
+                unmatched = (props.get("github_code_owner_unmatched") or {}).get("value")
+                text = ApplicationComponent.code_owner_text(unmatched)
+                if text:
+                    owner_names_by_app[listed.id] = [text]
+                    unmatched_owner_app_ids.add(listed.id)
                 continue
             names = [
                 o["user_name"]
@@ -621,6 +639,7 @@ def application_list():
             active_filters=active_filters,
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
+            unmatched_owner_app_ids=unmatched_owner_app_ids,
         )
 
     except Exception as exc:

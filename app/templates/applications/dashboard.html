@@ -440,6 +440,10 @@
           <div {% if owner_rows %}data-testid="application-owner"{% elif not has_any_owner %}data-testid="application-owner-empty"{% endif %}>
             {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = text_owner %}{% set assign_link = none %}
             {% include 'partials/owner_step.html' with context %}
+            {% if not owner_rows and app.github_code_owner_unmatched %}
+            <p class="mt-2 text-sm text-muted-foreground" data-testid="application-owner-unmatched">{{ app.code_owner_text(app.github_code_owner_unmatched) }}</p>
+            {% if can_edit %}<a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="text-sm text-primary hover:underline" data-testid="application-assign-owner">Assign owner</a>{% endif %}
+            {% endif %}
           </div>
           {% for label, value in [('Application Owner', app.application_owner), ('Business Owner', app.business_owner), ('Technical Owner', app.technical_owner), ('Technical Lead', app.technical_lead), ('Product Manager', app.product_manager), ('Development Team', app.development_team), ('Support Team', app.support_team)] %}
           {% if not value or (value | lower) not in named %}{{ detail_row(label, value) }}{% endif %}

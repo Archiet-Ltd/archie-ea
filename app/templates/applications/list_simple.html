@@ -43,6 +43,8 @@
                              summary_total, no_owner, no_capability, no_vendor}
     owner_names_by_app dict {application id: [owner names]}; the owner column and the
                        summary answer the same question (has_assigned_owner)
+    unmatched_owner_app_ids set of application ids whose GitHub code owner is not matched to a person
+                       (their owner cell links to the assign-owner page)
     include_decom      bool — full portfolio when true (default false: active portfolio only)
     qs_include_decom_true / qs_include_decom_false — toggle query strings
     currency_symbol    str
@@ -101,11 +103,14 @@
 {% endmacro %}
 
 {# The owner cell: the names the summary counted, or the plain reason there are none. #}
-{% macro owner_cell(app, owner_names, sfx='') %}
+{% macro owner_cell(app, owner_names, sfx='', can_assign=false) %}
   {%- if owner_names -%}
     {%- for owner_name in owner_names -%}
     <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
     {%- endfor -%}
+    {%- if can_assign %}
+    <a href="{{ url_for('unified_applications.assign_owner', id=app.id) }}" class="block text-xs text-muted-foreground hover:underline" data-testid="app-assign-owner{{ sfx }}-{{ app.id }}">Assign owner</a>
+    {%- endif -%}
   {%- elif can('edit', 'application') -%}
     <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
   {%- else -%}
@@ -418,7 +423,7 @@
               {% endif %}
             </td>
             <td class="px-2 align-middle">{{ status_cell(status_text, STATUS_MAP) }}</td>
-            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id)) }}</td>
+            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id), '', can('edit', 'application') and app.id in unmatched_owner_app_ids) }}</td>
             <td class="px-2 text-center align-middle">
               {% if app.completeness_score is not none %}
                 {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
@@ -464,7 +469,7 @@
             </div>
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Owner</p>
-              {{ owner_cell(app, owner_names_by_app.get(app.id), '-mobile') }}
+              {{ owner_cell(app, owner_names_by_app.get(app.id), '-mobile', can('edit', 'application') and app.id in unmatched_owner_app_ids) }}
             </div>
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Vendor</p>
