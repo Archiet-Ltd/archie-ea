@@ -508,7 +508,7 @@ def _once(names):
     return kept
 
 
-def _table(org_id):
+def _table(org_id, with_cost=True):
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import lifecycle_label
     from app.models.application_portfolio import ApplicationComponent as A
@@ -532,7 +532,7 @@ def _table(org_id):
             "status": lifecycle_label(app.lifecycle_status),
             "owners": names,
             "owner": ", ".join(names) if names else None,
-            "cost": get_annual_cost_float(app),
+            "cost": get_annual_cost_float(app) if with_cost else None,
         })
         rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
@@ -557,16 +557,20 @@ def _name_the_basis(run_cost, applications_cost):
             _money(applications_cost, compact=True), _money(-gap, compact=True))
 
 
-def build_overview(org_id, user, now=None):
-    """Every figure the Overview page shows for one organisation."""
+def build_overview(org_id, user, now=None, with_cost=True):
+    """Every figure the Overview page shows for one organisation.
+
+    ``with_cost`` is the one rule's answer (``may_see_spend_pages``): when it is false no cost is read, and the
+    run cost and the applications' costs are withheld in the shape the page renders as not shown.
+    """
     now = now or datetime.utcnow()
     apps = _applications(org_id, now)
     sourced = _sourced_share(org_id)
     relationships = _relationships(org_id, now)
-    run_cost = _run_cost(org_id, now)
+    run_cost = _run_cost(org_id, now) if with_cost else {"total": None, "contracts": 0, "withheld": True}
     changes = _history(org_id, now)
     activity = _activity(changes, now, org_id)
-    table = _table(org_id)
+    table = _table(org_id, with_cost)
     _name_the_basis(run_cost, table["cost_total"])
     empty = not apps["total"] and not relationships["total"] and sourced is None
     return {
@@ -576,6 +580,7 @@ def build_overview(org_id, user, now=None):
         "sourced": sourced,
         "relationships": relationships,
         "run_cost": run_cost,
+        "may_see_spend": with_cost,
         "activity": activity,
         "areas": _areas(org_id),
         "table": table,
@@ -606,9 +611,9 @@ def _layer_keys():
 
 def overview_context(user, org_id):
     """The template context for the Overview page: the figures and where each card leads."""
-    from app.decorators.requires_role import may_open_spend
+    from app.decorators.requires_role import may_open_spend, may_see_spend_pages
 
-    figures = build_overview(org_id, user)
+    figures = build_overview(org_id, user, with_cost=may_see_spend_pages(user))
     figures["links"] = {
         "applications": _link("unified_applications.application_list"),
         "no_owner": _link("unified_applications.application_list", no_owner=1),
