@@ -7652,6 +7652,7 @@
    "block": "settings",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
@@ -7769,6 +7770,7 @@
    "block": "settings",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
@@ -8200,6 +8202,7 @@
    "block": "dashboard",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
@@ -9785,6 +9788,7 @@
    "block": "record-detail",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
@@ -10110,6 +10114,7 @@
    "block": "data-table",
    "charts": [],
    "components": [
+    "list-table",
     "badge",
     "breadcrumb",
     "empty",
@@ -10397,6 +10402,7 @@
    "block": "data-table",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
@@ -10519,6 +10525,7 @@
    "block": "dashboard",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
@@ -11172,6 +11179,7 @@
    "block": "settings",
    "charts": [],
    "components": [
+    "list-table",
     "alert",
     "badge",
     "breadcrumb",
