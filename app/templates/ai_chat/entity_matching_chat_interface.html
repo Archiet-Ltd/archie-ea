@@ -412,6 +412,7 @@
 
 {% block content %}
 {% from 'components/drawer.html' import drawer with context %}
+{% from 'components/alert.html' import alert %}
 <script>
   document.addEventListener('alpine:init', () => {
     if (!Alpine.store('chat')) {
@@ -541,7 +542,18 @@
     
     <!-- Chat Input Area -->
     <div class="chat-input-area">
-      
+
+      {% if not llm_configured %}
+      {# Said before the person starts, not after their first message fails (T-match-01). #}
+      <div class="mb-3">
+        {% if current_user.is_admin() %}
+        {{ alert('warning', text=('AI paused. Matching needs it; try again later.' if llm_paused else 'No AI model. Matching needs one to read documents.'), link_href='/admin/api-settings', link_text='API Settings', testid='entity-matching-model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+        {% else %}
+        {{ alert('warning', text=('AI paused. Matching needs it; try again later.' if llm_paused else 'No AI model. Ask an administrator.'), testid='entity-matching-model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+        {% endif %}
+      </div>
+      {% endif %}
+
       <!-- Document Upload Area -->
       <div x-show="!hasDocument" x-cloak class="document-upload-area" @click="triggerFileUpload()" @dragover="handleDragOver" @dragleave="handleDragLeave" @drop="handleDrop">
         <i data-lucide="upload-cloud" class="upload-icon" aria-hidden="true"></i>
@@ -699,6 +711,15 @@
               </template>
               <template x-if="entity.status === 'pending'">
                 <span class="text-xs text-muted-foreground">⏳ Pending</span>
+              </template>
+              <template x-if="entity.status === 'accepted'">
+                <span class="text-xs text-success-emphasis">✓ Saved</span>
+              </template>
+              <template x-if="entity.status === 'imported'">
+                <span class="text-xs text-success-emphasis">✓ Imported</span>
+              </template>
+              <template x-if="entity.status === 'resolved'">
+                <span class="text-xs text-success-emphasis">✓ Resolved</span>
               </template>
             </div>
             
@@ -896,16 +917,20 @@ function entityMatchingChat() {
     
     extractEntitySuggestions(result) {
       const suggestions = [];
-      
-      // Extract from matching results
+
+      // Extract from matching results. Object.entries (not Object.values) so each
+      // suggestion keeps which bucket it came from ("archimate_elements",
+      // "applications", ...) -- the decision endpoint needs that to know which
+      // record store a match's entity_id actually belongs to.
       if (result.matching_results) {
-        Object.values(result.matching_results).forEach(entityResults => {
+        Object.entries(result.matching_results).forEach(([category, entityResults]) => {
           if (entityResults.matches) {
             entityResults.matches.slice(0, 3).forEach(match => {
               suggestions.push({
                 id: `match_${match.entity_id}`,
                 name: match.entity_name,
                 type: match.entity_type.toLowerCase(),
+                category: category,
                 confidence: match.match_confidence,
                 confidenceLevel: match.match_level,
                 description: match.existing_data?.description || 'Existing entity match',
@@ -914,13 +939,30 @@ function entityMatchingChat() {
               });
             });
           }
-          
+
+          if (entityResults.potential_duplicates) {
+            entityResults.potential_duplicates.slice(0, 3).forEach(dup => {
+              suggestions.push({
+                id: `dup_${dup.entity_id}`,
+                name: dup.entity_name,
+                type: dup.entity_type.toLowerCase(),
+                category: category,
+                confidence: dup.match_confidence,
+                confidenceLevel: dup.match_level,
+                description: dup.warning || 'Possible duplicate',
+                status: 'duplicate',
+                data: dup
+              });
+            });
+          }
+
           if (entityResults.new_entities) {
             entityResults.new_entities.slice(0, 2).forEach(newEntity => {
               suggestions.push({
                 id: `new_${newEntity.name}`,
                 name: newEntity.name,
                 type: newEntity.type.toLowerCase(),
+                category: category,
                 confidence: 0,
                 confidenceLevel: 'low',
                 description: newEntity.recommendation || 'New entity detected',
@@ -931,7 +973,7 @@ function entityMatchingChat() {
           }
         });
       }
-      
+
       return suggestions.slice(0, 5); // Limit to 5 suggestions
     },
     
@@ -973,15 +1015,50 @@ function entityMatchingChat() {
       this.selectedEntity = entity;
     },
     
-    acceptEntity(entity) {
-      // Implement accept logic
-      entity.status = 'accepted';
+    // Decision calls share one endpoint: /ai-chat/entity-matching/decision.
+    // It always answers {success, message, record_url?} -- never silently
+    // nothing, even when the category isn't wired to a decision yet (T-match-01).
+    async saveDecision(action, entity, extraPayload) {
+      const category = entity.category || null;
+      const entityId = entity.data?.entity_id || null;
+      try {
+        const result = await Platform.fetch.post('/ai-chat/entity-matching/decision', Object.assign({
+          action: action,
+          category: category,
+          entity_id: entityId,
+        }, extraPayload || {}));
+        return result;
+      } catch (error) {
+        return { success: false, message: 'Sorry, that did not save: ' + error.message };
+      }
     },
-    
-    reviewEntity(entity) {
-      // Implement review logic
+
+    notifyDecision(result) {
+      if (result.success) {
+        Platform.toast.success(result.message, result.record_url ? {
+          description: 'Open it: ' + result.record_url
+        } : undefined);
+      } else {
+        Platform.toast.warning(result.message || 'That could not be saved.');
+      }
     },
-    
+
+    async acceptEntity(entity) {
+      const result = await this.saveDecision('accept', entity, { extracted: entity.data?.extracted_data || entity.data?.existing_data || null });
+      this.notifyDecision(result);
+      if (result.success) {
+        entity.status = 'accepted';
+      }
+    },
+
+    async reviewEntity(entity) {
+      const result = await this.saveDecision('review', entity, {});
+      this.notifyDecision(result);
+      if (result.success && result.record_url) {
+        window.open(result.record_url, '_blank', 'noopener');
+      }
+    },
+
     dismissEntity(entity) {
       // Remove from suggestions
       const index = this.allEntities.findIndex(e => e.id === entity.id);
@@ -989,25 +1066,41 @@ function entityMatchingChat() {
         this.allEntities.splice(index, 1);
       }
     },
-    
-    acceptMatch(entity) {
-      this.acceptEntity(entity);
+
+    async acceptMatch(entity) {
+      await this.acceptEntity(entity);
     },
-    
-    importEntity(entity) {
-      this.acceptEntity(entity);
+
+    async importEntity(entity) {
+      const extracted = entity.data?.extracted_data || {};
+      const result = await this.saveDecision('import', entity, {
+        extracted: {
+          name: entity.name,
+          type: extracted.type || entity.type,
+          layer: extracted.layer,
+          description: extracted.description,
+        },
+      });
+      this.notifyDecision(result);
+      if (result.success) {
+        entity.status = 'imported';
+      }
     },
-    
-    resolveDuplicate(entity) {
-      // Implement duplicate resolution
+
+    async resolveDuplicate(entity) {
+      const result = await this.saveDecision('resolve', entity, { extracted: entity.data?.extracted_data || entity.data?.existing_data || null });
+      this.notifyDecision(result);
+      if (result.success) {
+        entity.status = 'resolved';
+      }
     },
-    
+
     dismissDuplicate(entity) {
       this.dismissEntity(entity);
     },
-    
-    viewDetails(entity) {
-      // Navigate to entity details
+
+    async viewDetails(entity) {
+      await this.reviewEntity(entity);
     },
     
     executeAction(action) {

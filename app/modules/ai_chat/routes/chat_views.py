@@ -235,7 +235,20 @@ def business_output_view():
 @unified_ai_chat_bp.route("/entity-matching")
 @login_required
 def entity_matching_view():
-    """Renders the Entity Matching interface for AI-powered entity resolution."""
-    return render_template("ai_chat/entity_matching_chat_interface.html")
+    """Renders the Entity Matching interface for AI-powered entity resolution.
+
+    Says plainly, before the person starts, when there is no AI model to read
+    a document with (T-match-01) -- the same wording and the same check
+    (``FeatureFlagService.get_configured_provider_info``) the main chat page
+    uses, rather than letting every first message fail with a generic error.
+    """
+    from app.services.feature_flag_service import FeatureFlagService
+
+    llm_provider_info = FeatureFlagService.get_configured_provider_info()
+    return render_template(
+        "ai_chat/entity_matching_chat_interface.html",
+        llm_configured=llm_provider_info["configured"],
+        llm_paused=bool(llm_provider_info.get("paused")),
+    )
 
 

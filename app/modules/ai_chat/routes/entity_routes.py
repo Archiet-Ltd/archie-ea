@@ -11,13 +11,15 @@ Routes:
 import logging
 
 from flask import current_app, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.services.ai_architecture_service import CognitiveArchitectureService
 from app.services.business_output_service import BusinessOutputService, StakeholderRole
 from app.services.chat_entity_matching_service import ChatEntityMatchingService
+from app.services import entity_match_decision_service
 from app.utils.duplicate_guard import find_similar_entities
+from app.utils.tenant import current_organization_id
 from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from . import unified_ai_chat_bp
 
@@ -349,6 +351,53 @@ def entity_matching_message():
         result["duplicate_guard_matches"] = duplicate_guard_matches
     except Exception as e:
         current_app.logger.warning(f"[AI_CHAT] duplicate_guard advisory pass failed: {e}")
+
+    return jsonify(result), 200
+
+
+@unified_ai_chat_bp.route("/entity-matching/decision", methods=["POST"])
+@login_required
+@audit_log("ai_chat_entity_matching_decision")
+def entity_matching_decision():
+    """What Review, Accept, Resolve and Import actually do (T-match-01).
+
+    The chat turn above only ever reads; this is where a person's decision on
+    one of its suggestions is saved. Wired for ``archimate_elements`` only --
+    see entity_match_decision_service for why -- every other category gets an
+    honest refusal rather than a silent no-op, per CLAUDE.md s.22/25.
+    """
+    data = request.get_json() or {}
+    action = data.get("action")
+    category = data.get("category")
+    org_id = current_organization_id()
+
+    if category != entity_match_decision_service.SUPPORTED_CATEGORY:
+        return jsonify(
+            {
+                "success": False,
+                "message": entity_match_decision_service.NOT_WIRED.format(
+                    category=category or "this kind of suggestion"
+                ),
+            }
+        ), 200
+
+    if action in ("accept", "resolve"):
+        reason = (
+            "confirmed as a match"
+            if action == "accept"
+            else "resolved as the same element, not a duplicate"
+        )
+        result = entity_match_decision_service.confirm_match(
+            data.get("entity_id"), data.get("extracted"), current_user.id, org_id, reason=reason
+        )
+    elif action == "import":
+        result = entity_match_decision_service.import_entity(
+            data.get("extracted"), current_user.id, org_id
+        )
+    elif action == "review":
+        result = entity_match_decision_service.review_entity(category, data.get("entity_id"))
+    else:
+        return jsonify({"success": False, "error": "Unknown action"}), 400
 
     return jsonify(result), 200
 
