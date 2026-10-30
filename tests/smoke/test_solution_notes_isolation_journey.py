@@ -1,10 +1,11 @@
 """A solution's notes belong to its organisation (T-sec02).
 
 The person: an architect keeping a note log on their own solution. The goal: record a
-meeting on the solution, find it again, and be sure nobody in another organisation can
-read it or write onto the solution. A second organisation's architect signs in too and
-tries the other organisation's notes page and interface; they get the plain not-found page
-and nothing of the note, while their own solution's log works normally.
+meeting on the solution record's Notes card, find it again after a reload, and be sure
+nobody in another organisation can read it or write onto the solution. A second
+organisation's architect signs in too and tries the other organisation's solution, its
+old notes address and its interface; they get the plain not-found page and nothing of
+the note, while their own solution's Notes card works normally.
 """
 
 import os
@@ -21,13 +22,14 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 VIEWS = [(1440, "light"), (390, "light"), (1440, "dark"), (390, "dark")]
 
 
-def _solution_for(org_id, name):
+def _solution_for(org_id, author_id, name):
+    """A solution the architect created, so the record page opens for them."""
     from app import create_app, db
     from app.models.solution_models import Solution
 
     app = create_app("testing")
     with app.app_context():
-        solution = Solution(name=name, organization_id=org_id)
+        solution = Solution(name=name, organization_id=org_id, created_by_id=author_id)
         db.session.add(solution)
         db.session.commit()
         sid = solution.id
@@ -64,13 +66,24 @@ def _shot(page, tag, name):
     page.screenshot(path=os.path.join(folder, name + ".png"), full_page=True)
 
 
+def _add_note(page, kind, subject, summary):
+    """Record a note the way a person does: the Notes card's form on the solution record."""
+    form = page.get_by_test_id("note-form")
+    expect(form).to_be_visible()
+    page.select_option("#note-kind", kind)
+    page.fill("#note-subject", subject)
+    page.fill("#note-summary", summary)
+    page.get_by_test_id("note-add").click()
+    expect(page.get_by_test_id("record-notes-list").get_by_text(subject)).to_be_visible()
+
+
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_notes_stay_inside_their_organisation(browser, live_server, width, theme):
     tag = uuid.uuid4().hex[:6]
     a = create_fresh_org("architect")
     b = create_fresh_org("architect")
-    sol_a = _solution_for(a["org_id"], "Payments platform %s" % tag)
-    sol_b = _solution_for(b["org_id"], "Billing rewrite %s" % tag)
+    sol_a = _solution_for(a["org_id"], a["user_ids"]["architect"], "Payments platform %s" % tag)
+    sol_b = _solution_for(b["org_id"], b["user_ids"]["architect"], "Billing rewrite %s" % tag)
     note_a, note_b = "Kick-off with finance %s" % tag, "Vendor call %s" % tag
 
     ctx_a = _context(browser, width, theme)
@@ -78,47 +91,45 @@ def test_notes_stay_inside_their_organisation(browser, live_server, width, theme
     ctx_b = _context(browser, width, theme)
     page_b = ctx_b.new_page()
     try:
-        # The owner records a meeting through the screen and finds it again after a reload.
+        # The owner opens the old notes address, lands on the record's Notes card, records a
+        # meeting through the form and finds it again after a reload.
         sign_in(page_a, live_server, a["emails"]["architect"])
         page_a.goto("%s/solutions/%d/communications" % (live_server, sol_a), wait_until="domcontentloaded",
                     timeout=PAGE_TIMEOUT)
-        page_a.get_by_role("button", name="Log Communication").click()
-        page_a.select_option("#new-type", "meeting")
-        page_a.fill("#new-subject", note_a)
-        page_a.get_by_role("button", name="Save Entry").click()
-        expect(page_a.get_by_text(note_a)).to_be_visible()
+        assert page_a.url.endswith("/solutions/%d#record-notes" % sol_a), page_a.url
+        _add_note(page_a, "meeting", note_a, "Finance agreed the ledger cut-over date.")
         page_a.reload(wait_until="domcontentloaded")
-        expect(page_a.get_by_text(note_a)).to_be_visible()
+        expect(page_a.get_by_test_id("record-notes-list").get_by_text(note_a)).to_be_visible()
         _shot(page_a, "%d-%s" % (width, theme), "01-owner-log")
         org_id, logged_by, solution_id = _stored(note_a)
         assert org_id == a["org_id"] and logged_by == a["user_ids"]["architect"] and solution_id == sol_a
 
-        # The other organisation cannot read the page or the interface, nor write onto the solution.
+        # The other organisation cannot read the record, its old notes address or the
+        # interface, nor write onto the solution.
         sign_in(page_b, live_server, b["emails"]["architect"])
-        response = page_b.goto("%s/solutions/%d/communications" % (live_server, sol_a),
-                               wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        assert response.status == 404
-        assert note_a not in page_b.content()
+        for path in ("/solutions/%d" % sol_a, "/solutions/%d/communications" % sol_a):
+            response = page_b.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            assert response.status == 404, (path, response.status)
+            assert note_a not in page_b.content()
         _shot(page_b, "%d-%s" % (width, theme), "02-other-org-refused")
         status, body = api(page_b, "GET", "/api/communications?solution_id=%d" % sol_a)
         assert status == 404 and note_a not in str(body)
+        status, _ = api(page_b, "POST", "/solutions/%d/notes" % sol_a,
+                        {"kind": "email", "subject": "planted %s" % tag, "summary": ""})
+        assert status == 404
         status, _ = api(page_b, "POST", "/api/communications",
                         {"solution_id": sol_a, "comm_type": "email", "subject": "planted %s" % tag})
         assert status == 404
 
-        # Their own solution's log works, and holds only their own note.
-        page_b.goto("%s/solutions/%d/communications" % (live_server, sol_b), wait_until="domcontentloaded",
+        # Their own solution's Notes card works, and holds only their own note.
+        page_b.goto("%s/solutions/%d" % (live_server, sol_b), wait_until="domcontentloaded",
                     timeout=PAGE_TIMEOUT)
-        page_b.get_by_role("button", name="Log Communication").click()
-        page_b.select_option("#new-type", "email")
-        page_b.fill("#new-subject", note_b)
-        page_b.get_by_role("button", name="Save Entry").click()
-        expect(page_b.get_by_text(note_b)).to_be_visible()
+        _add_note(page_b, "email", note_b, "The vendor confirmed the renewal terms.")
         assert note_a not in page_b.content()
 
-        # And the owner's log never shows the other organisation's note or the planted one.
+        # And the owner's record never shows the other organisation's note or the planted one.
         page_a.reload(wait_until="domcontentloaded")
-        expect(page_a.get_by_text(note_a)).to_be_visible()
+        expect(page_a.get_by_test_id("record-notes-list").get_by_text(note_a)).to_be_visible()
         assert note_b not in page_a.content() and "planted %s" % tag not in page_a.content()
     finally:
         ctx_a.close()

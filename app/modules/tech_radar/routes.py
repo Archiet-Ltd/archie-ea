@@ -10,6 +10,7 @@ from datetime import date
 
 from flask import (
     Blueprint,
+    abort,
     flash,
     jsonify,
     redirect,
@@ -42,6 +43,29 @@ def index():
         rings=RADAR_RINGS,
         ring_labels=RADAR_RING_LABELS,
     )
+
+
+@tech_radar_bp.route("/<int:element_id>/place")
+@login_required
+@require_roles("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+def classify_form(element_id):
+    """One technology's place on the radar, with its rationale, review date and
+    requesting initiative: the form the radar's row menu links to."""
+    state = service.radar_state()
+    for ring, rows in state["rings"].items():
+        for row in rows:
+            if row["element"].id == element_id:
+                return render_template(
+                    "tech_radar/classify.html", element=row["element"], entry=row["entry"],
+                    current_ring=ring, peers=row["same_type"], rings=RADAR_RINGS, ring_labels=RADAR_RING_LABELS,
+                )
+    for element in state["unclassified"]:
+        if element.id == element_id:
+            return render_template(
+                "tech_radar/classify.html", element=element, entry=None, current_ring=None,
+                peers=state["unclassified_peers"].get(element_id, []), rings=RADAR_RINGS, ring_labels=RADAR_RING_LABELS,
+            )
+    abort(404)
 
 
 @tech_radar_bp.route("/api")
