@@ -144,6 +144,8 @@ def application_list():
             no_vendor=None,
         ),
         owner_names_by_app={},
+        cost_by_app={},
+        show_cost=False,
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -562,6 +564,11 @@ def application_list():
             "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }
 
+        from app.decorators.requires_role import may_see_spend_pages
+        from app.services.application_cost_accessor import annual_cost_figures
+
+        show_cost = may_see_spend_pages(current_user)
+
         # ── 8. Currency symbol ────────────────────────────────────────────────
         try:
             from config import CurrencyConfig
@@ -618,6 +625,8 @@ def application_list():
             active_filters=active_filters,
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
+            show_cost=show_cost,
+            cost_by_app=annual_cost_figures(pagination.items) if show_cost else {},
         )
 
     except Exception as exc:
@@ -676,7 +685,16 @@ def api_list():
         status_filter = request.args.get("status", "").strip()
 
         # Base query — exclude decommissioned when searching for picker use
-        query = ApplicationComponent.query
+        # Decommissioned applications are out unless the caller asks for them or filters by status.
+        from app.services.application_cost_accessor import annual_cost_figures, counted_applications_criteria
+
+        include_decommissioned = (
+            request.args.get("include_decommissioned", "").strip().lower() in ("1", "true", "yes", "on")
+            or bool(request.args.get("status", "").strip())
+        )
+        query = ApplicationComponent.query.filter(
+            *counted_applications_criteria(include_decommissioned=include_decommissioned)
+        )
         if search:
             safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(ApplicationComponent.name.ilike(safe_search, escape="\\"))
@@ -727,12 +745,17 @@ def api_list():
             except Exception as e:
                 current_app.logger.debug("Capability count enrichment failed: %s", e)
 
+        from app.decorators.requires_role import may_see_spend_pages
+
+        cost_figures = annual_cost_figures(apps) if may_see_spend_pages(current_user) else None
         return jsonify(
             {
                 "applications": [
                     {
                         "id": app.id,
                         "name": app.name,
+                        **({"annual_cost": cost_figures[app.id]["value"],
+                            "annual_cost_source": cost_figures[app.id]["source"]} if cost_figures else {}),
                         "component_type": app.component_type,
                         "business_criticality": app.business_criticality,
                         "technology_stack": app.technology_stack,

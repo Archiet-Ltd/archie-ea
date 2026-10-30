@@ -388,6 +388,7 @@
               {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Lifecycle Status', testid='th-sort-lifecycle-status', on_click="sortBy('lifecycle_status')") %}Lifecycle Status<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
             </th>
             <th scope="col" class="h-10 min-w-[140px] px-2 text-left align-middle">Owner</th>
+            {% if show_cost %}<th scope="col" class="h-10 min-w-[120px] px-2 text-right align-middle">Annual cost</th>{% endif %}
             <th scope="col" class="h-10 w-20 px-2 text-center align-middle">Record</th>
             <th scope="col" class="h-10 min-w-[150px] px-2 text-left align-middle">Capability</th>
             <th scope="col" class="h-10 w-14 px-2 text-right align-middle"><span class="sr-only">Actions</span></th>
@@ -419,6 +420,11 @@
             </td>
             <td class="px-2 align-middle">{{ status_cell(status_text, STATUS_MAP) }}</td>
             <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id)) }}</td>
+            {%- set cost = cost_by_app.get(app.id) or {} %}
+            {% if show_cost %}<td class="px-2 text-right align-middle tabular-nums" data-testid="app-cost-{{ app.id }}">
+              {% if cost.value is not none %}<span class="text-sm text-foreground" title="From {{ cost.source }}">{{ currency_symbol }}{{ '{:,.0f}'.format(cost.value) }}</span>
+              {% else %}{{ explained_value('Not recorded', 'No annual cost is recorded for this application') }}{% endif %}
+            </td>{% endif %}
             <td class="px-2 text-center align-middle">
               {% if app.completeness_score is not none %}
                 {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
@@ -474,6 +480,12 @@
                 {%- else %}{{ explained_value('No vendor') }}{%- endif %}
               </p>
             </div>
+            {%- set cost = cost_by_app.get(app.id) or {} %}
+            {% if show_cost %}<div>
+              <p class="mb-0.5 text-xs text-muted-foreground">Annual cost</p>
+              {% if cost.value is not none %}<p class="text-sm tabular-nums text-foreground" title="From {{ cost.source }}">{{ currency_symbol }}{{ '{:,.0f}'.format(cost.value) }}</p>
+              {% else %}<p class="text-sm text-muted-foreground">{{ explained_value('Not recorded', 'No annual cost is recorded for this application') }}</p>{% endif %}
+            </div>{% endif %}
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Capability</p>
               {% if pc %}
