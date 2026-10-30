@@ -9,24 +9,43 @@ class _El:
         self.id, self.name, self.type, self.layer = id, name, type, layer
 
 
+class _Rows:
+    """Stands in for a model class: ``Model.query.filter(...).all()`` returns the rows."""
+
+    source_id = target_id = id = None
+
+    def __init__(self, rows):
+        self.query = self
+        self._rows = rows
+
+    def filter(self, *a, **k):
+        return self
+
+    def all(self):
+        return self._rows
+
+
+class _Db:
+    @staticmethod
+    def or_(*a):
+        return None
+
+
 def _render(monkeypatch, elements, **kw):
-    svc = DiagramRenderService()
     import app.services.archimate_diagram_service as mod
 
-    class _Q:
-        def __init__(self, rows):
-            self.rows = rows
+    class _InCol:
+        def in_(self, ids):
+            return None
 
-        def filter(self, *a, **k):
-            return self
-
-        def all(self):
-            return self.rows
-
-    monkeypatch.setattr(mod.ArchiMateRelationship, "query", _Q([]), raising=False)
-    monkeypatch.setattr(mod.ArchiMateElement, "query", _Q(elements), raising=False)
-    monkeypatch.setattr(mod.ArchiMateRelationship, "source_id", mod.ArchiMateRelationship.source_id, raising=False)
-    return svc.render_diagram([e.id for e in elements], "business", **kw)
+    rels = _Rows([])
+    rels.source_id = rels.target_id = _InCol()
+    els = _Rows(elements)
+    els.id = _InCol()
+    monkeypatch.setattr(mod, "db", _Db)
+    monkeypatch.setattr(mod, "ArchiMateRelationship", rels)
+    monkeypatch.setattr(mod, "ArchiMateElement", els)
+    return DiagramRenderService().render_diagram([e.id for e in elements], "business", **kw)
 
 
 def test_no_naming_preference_keeps_todays_labels(monkeypatch):
