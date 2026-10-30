@@ -64,7 +64,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "core_components": [
     "alert",
@@ -1911,7 +1912,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -2017,7 +2019,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -2124,6 +2127,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "components/roadmap/board.html"
    ],
    "basis": "rule",
@@ -2954,7 +2958,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -3944,7 +3949,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -4043,6 +4049,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "components/disabled_action.html"
    ],
    "basis": "rule",
@@ -4252,7 +4259,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -5017,7 +5025,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -5127,7 +5136,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -6444,7 +6454,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -6552,7 +6563,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -6660,7 +6672,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -6871,7 +6884,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -8194,7 +8208,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -8297,7 +8312,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -8827,7 +8843,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -10201,7 +10218,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -10289,7 +10307,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -10513,7 +10532,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -10731,7 +10751,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -12158,7 +12179,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -12826,7 +12848,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -14520,7 +14543,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -14624,7 +14648,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -14736,7 +14761,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -14955,7 +14981,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -15056,7 +15083,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -15156,7 +15184,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -15393,7 +15422,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -15827,7 +15857,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -18289,7 +18320,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -19270,7 +19302,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -19589,7 +19622,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -19918,7 +19952,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -20647,7 +20682,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -21005,6 +21041,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "components/table.html"
    ],
    "basis": "rule",
@@ -21390,7 +21427,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -22695,7 +22733,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -24270,7 +24309,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -24373,7 +24413,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -24484,7 +24525,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -24702,6 +24744,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "components/input.html",
     "components/select.html",
     "components/table.html"
@@ -24843,7 +24886,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -24944,7 +24988,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -25154,7 +25199,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -25617,6 +25663,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "components/disabled_action.html"
    ],
    "basis": "rule",
@@ -25718,7 +25765,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -26036,7 +26084,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -26150,7 +26199,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -26371,7 +26421,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -26581,7 +26632,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -26692,7 +26744,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -26948,7 +27001,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -28923,7 +28977,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -29249,6 +29304,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "components/disabled_action.html"
    ],
    "basis": "rule",
@@ -29808,7 +29864,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -30195,7 +30252,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -30292,7 +30350,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -30394,7 +30453,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -30503,7 +30563,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -30843,7 +30904,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -31065,7 +31127,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -31431,7 +31494,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -31533,7 +31597,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -31635,7 +31700,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -31736,7 +31802,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -32070,7 +32137,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -32176,7 +32244,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -32530,7 +32599,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -33126,7 +33196,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -33485,7 +33556,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -33585,7 +33657,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -33686,7 +33759,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -33891,7 +33965,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -33988,7 +34063,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -34097,7 +34173,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -34298,7 +34375,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -34647,7 +34725,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -34748,7 +34827,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -35293,7 +35373,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -35513,7 +35594,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -36088,7 +36170,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -36679,7 +36762,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -36783,7 +36867,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -37426,7 +37511,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -37538,7 +37624,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -38393,7 +38480,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -38495,6 +38583,7 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "macros/page_shell.html",
+    "components/initiative_modal.html",
     "macros/kanban_board.html"
    ],
    "basis": "rule",
@@ -39713,7 +39802,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "declared",
    "block": "dashboard",
@@ -39810,7 +39900,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -40739,7 +40830,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -41345,7 +41437,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -41430,7 +41523,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -42876,7 +42970,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43052,7 +43147,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43144,7 +43240,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43239,7 +43336,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43328,7 +43426,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43615,7 +43714,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43721,7 +43821,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43806,7 +43907,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43899,7 +44001,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -43995,7 +44098,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -44083,7 +44187,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -44166,7 +44271,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -44247,7 +44353,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/initiative_modal.html"
    ],
    "basis": "rule",
    "block": "dashboard",

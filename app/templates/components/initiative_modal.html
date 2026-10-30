@@ -56,7 +56,7 @@
                 {% for plan in plans %}
                 {% call ui.table_row(attrs={'data-testid': 'plan-row'}) %}
                     {{ ui.table_cell(text=plan.name, class='max-w-[320px] truncate font-medium') }}
-                    {{ ui.table_cell(text=(plan.owner.full_name() if plan.owner and plan.owner.full_name() else '—')) }}
+                    {{ ui.table_cell(text=(plan.owner.full_name() if plan.owner else '—')) }}
                     {% call ui.table_cell() %}{{ ui.badge(text=((plan.risk_level if kind == 'risk_mitigation' else plan.priority) or 'medium')|capitalize, variant='outline') }}{% endcall %}
                     {{ ui.table_cell(text=(plan.budget_allocated|currency if plan.budget_allocated else '—'), class='text-right tabular-nums') }}
                     {{ ui.table_cell(text=(plan.created_at.strftime('%d %b %Y') if plan.created_at else '—'), class='tabular-nums') }}
@@ -169,11 +169,7 @@
                     {% if field.required %}<span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}
                 </label>
             {% if field.type == 'textarea' %}
-                <textarea id="{{ field_id }}" x-model="formData['{{ field.name }}']"
-                          placeholder="{{ field.placeholder | default('') }}"
-                          {% if field.required %}required{% endif %}
-                          rows="3"
-                          class="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                {{ ui.textarea(id=field_id, rows=3, attrs={'x-model': 'formData["' ~ field.name ~ '"]', 'placeholder': field.placeholder | default(''), 'required': field.required}) }}
 
             {% elif field.type == 'select' %}
                 {% set select_attrs = {'x-model': "formData['" ~ field.name ~ "']"} %}
@@ -195,13 +191,7 @@
                 {% endcall %}
 
             {% else %}
-                <input type="{{ field.type if field.type in ('text', 'date', 'number') else 'text' }}"
-                       id="{{ field_id }}"
-                       x-model="formData['{{ field.name }}']"
-                       placeholder="{{ field.placeholder | default('') }}"
-                       {% if field.type == 'number' %}min="0" step="any"{% endif %}
-                       {% if field.required %}required{% endif %}
-                       class="h-9 w-full px-3 border border-input rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                {{ ui.input(type=field.type if field.type in ('text', 'date', 'number') else 'text', id=field_id, attrs={'x-model': 'formData["' ~ field.name ~ '"]', 'placeholder': field.placeholder | default(''), 'min': 0 if field.type == 'number' else none, 'step': 'any' if field.type == 'number' else none, 'required': field.required}) }}
             {% endif %}
             </div>
         {% endfor %}
