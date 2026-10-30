@@ -32,8 +32,41 @@ class DiagramRenderService:
     LAYER_H = 100
     MARGIN = 40
 
-    def render_diagram(self, element_ids: list, viewpoint: str = "application") -> str:
-        """Return SVG string for the given element IDs grouped by ArchiMate layer."""
+    NAME_LINE_CHARS = 22
+    BOX_H_TWO_LINES = 64
+
+    @classmethod
+    def _name_lines(cls, name: str) -> list:
+        """Split a name over at most two lines on word boundaries; only a name
+        longer than two lines is cut."""
+        lines, current = [], ""
+        for word in name.split():
+            joined = (current + " " + word).strip()
+            if len(joined) <= cls.NAME_LINE_CHARS or not current:
+                current = joined
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+        if len(lines) > 2:
+            rest = " ".join(lines[1:])
+            lines = [lines[0], rest]
+        lines = [ln for ln in lines if ln]
+        if len(lines) == 2 and len(lines[1]) > cls.NAME_LINE_CHARS:
+            lines[1] = lines[1][: cls.NAME_LINE_CHARS - 1] + "\u2026"
+        if len(lines) == 1 and len(lines[0]) > cls.NAME_LINE_CHARS:
+            first, rest = lines[0][: cls.NAME_LINE_CHARS], lines[0][cls.NAME_LINE_CHARS:]
+            lines = [first, rest if len(rest) <= cls.NAME_LINE_CHARS else rest[: cls.NAME_LINE_CHARS - 1] + "\u2026"]
+        return lines or [""]
+
+    def render_diagram(self, element_ids: list, viewpoint: str = "application", type_namer=None) -> str:
+        """Return SVG string for the given element IDs grouped by ArchiMate layer.
+
+        With no ``type_namer`` the labels are the stored type and a name cut at
+        22 characters. With one (a callable from stored type to display name),
+        the type line uses it and names wrap over two lines in full, with the
+        full name on the box as a hover title.
+        """
         if not element_ids:
             return (
                 '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100">'
@@ -90,6 +123,12 @@ class DiagramRenderService:
             + self.MARGIN * 2,
             600,
         )
+        full_labels = type_namer is not None
+        box_h = self.BOX_H
+        if full_labels and any(
+            len(self._name_lines(e.name or "")) > 1 for e in elements
+        ):
+            box_h = self.BOX_H_TWO_LINES
         canvas_h = len(ordered_layers) * self.LAYER_H + self.MARGIN * 2
 
         svg_parts = [
@@ -130,26 +169,35 @@ class DiagramRenderService:
                 bx = x_start + el_idx * (self.BOX_W + self.BOX_GAP)
                 by = y_top + 25
                 # Store centre point for arrow drawing
-                positions[el.id] = (bx + self.BOX_W // 2, by + self.BOX_H // 2)
+                positions[el.id] = (bx + self.BOX_W // 2, by + box_h // 2)
 
                 raw_name = el.name or ""
-                label = html.escape(
-                    raw_name[:22] + "\u2026" if len(raw_name) > 22 else raw_name
-                )
-                el_type = html.escape(el.type or "")
+                cx = bx + self.BOX_W // 2
+                if full_labels:
+                    name_lines = [html.escape(ln) for ln in self._name_lines(raw_name)]
+                    el_type = html.escape(type_namer(el.type) if el.type else "")
+                    svg_parts.append(f"<g><title>{html.escape(raw_name)}</title>")
+                else:
+                    name_lines = [html.escape(
+                        raw_name[:22] + "\u2026" if len(raw_name) > 22 else raw_name
+                    )]
+                    el_type = html.escape(el.type or "")
 
                 svg_parts.append(
-                    f'<rect x="{bx}" y="{by}" width="{self.BOX_W}" height="{self.BOX_H}"'  # raw-html-ok: bx/by/self.BOX_W/self.BOX_H are computed ints (layout math)
+                    f'<rect x="{bx}" y="{by}" width="{self.BOX_W}" height="{box_h}"'  # raw-html-ok: bx/by/self.BOX_W/box_h are computed ints (layout math)
                     f' rx="3" fill="white" stroke="#666" stroke-width="1.5"/>'
                 )
+                for line_idx, line in enumerate(name_lines):
+                    svg_parts.append(
+                        f'<text x="{cx}" y="{by + 18 + line_idx * 14}"'  # raw-html-ok: cx/by/line_idx are computed ints
+                        f' text-anchor="middle" font-weight="bold">{line}</text>'  # raw-html-ok: line is html.escape()'d above, used unchanged
+                    )
                 svg_parts.append(
-                    f'<text x="{bx + self.BOX_W // 2}" y="{by + 18}"'  # raw-html-ok: bx/by are computed ints
-                    f' text-anchor="middle" font-weight="bold">{label}</text>'  # raw-html-ok: label is html.escape()'d 4 lines above, assigned once, used unchanged
+                    f'<text x="{cx}" y="{by + 32 + (len(name_lines) - 1) * 14}"'  # raw-html-ok: cx/by/name_lines are computed ints
+                    f' text-anchor="middle" fill="#888">{el_type}</text>'  # raw-html-ok: el_type is html.escape()'d above, used unchanged
                 )
-                svg_parts.append(
-                    f'<text x="{bx + self.BOX_W // 2}" y="{by + 32}"'  # raw-html-ok: bx/by are computed ints
-                    f' text-anchor="middle" fill="#888">{el_type}</text>'  # raw-html-ok: el_type is html.escape()'d 3 lines above, assigned once, used unchanged
-                )
+                if full_labels:
+                    svg_parts.append("</g>")
 
         # Relationships — drawn after elements so they appear on top of band fills
         try:

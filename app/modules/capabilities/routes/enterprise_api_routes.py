@@ -1814,8 +1814,16 @@ def archimate_diagram():
     except Exception:
         element_ids = []
 
+    type_namer = None
+    if request.args.get("plain_types"):
+        from flask_login import current_user
+        from app.template_helpers import _plain_name
+
+        def type_namer(element_type):
+            return _plain_name(element_type, current_user)
+
     svc = DiagramRenderService()
-    svg = svc.render_diagram(element_ids, viewpoint)
+    svg = svc.render_diagram(element_ids, viewpoint, type_namer=type_namer)
     return Response(svg, mimetype="image/svg+xml")
 
 

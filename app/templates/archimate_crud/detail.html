@@ -72,17 +72,9 @@
             {% else %}
             {{ disabled_action('Edit', 'Only an architect can edit elements. Ask an administrator in Team settings.', 'edit-element-reason', icon='pencil') }}
             {% endif %}
-            <div class="col-span-2 inline-flex flex-col items-start gap-1 sm:col-span-1">
-                {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 w-full', testid='export-diagram') %}
-                    <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
-                {% endcall %}
-                {% if connection_count == 0 %}
-                <p class="text-xs text-muted-foreground" data-testid="export-diagram-no-relationships">
-                    This element has no relationships yet.
-                    {% if source_ae_id %}<a href="#connections" class="text-primary underline hover:underline">Add one</a>.{% endif %}
-                </p>
-                {% endif %}
-            </div>
+            {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 col-span-2 sm:col-span-1', testid='export-diagram', attrs_dict=({'aria-describedby': 'connections-empty'} if connection_count == 0 else {})) %}
+                <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
+            {% endcall %}
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
             {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
@@ -205,7 +197,7 @@
             {% endif %}
         </div>
         {% if row_total == 0 %}
-            <p class="p-6 text-sm text-muted-foreground">No connections to list yet.</p>
+            <p id="connections-empty" class="p-6 text-sm text-muted-foreground">No connections to list yet.</p>
         {% else %}
         <div class="p-6">
             <div class="overflow-hidden rounded-lg border border-border">
@@ -417,7 +409,7 @@ function archimateDetail() {
 
         downloadDiagram() {
             const elId = {{ (source_ae_id or element.id) | tojson }};
-            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint={{ element.layer | default('application') | lower }}';
+            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&plain_types=1&viewpoint={{ element.layer | default('application') | lower }}';
             const a = document.createElement('a');
             a.href = url;
             a.download = 'archimate-diagram-' + elId + '.svg';
