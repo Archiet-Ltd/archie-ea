@@ -423,6 +423,19 @@ def application_list():
         # recorded on the application when no record names anyone.
         owned_ids = set()
         if application_ids:
+            # One grouped count for the page; each row's completeness ring reads it
+            # instead of counting that row's owners itself.
+            _owner_counts = dict(
+                db.session.query(ApplicationOwner.application_id, func.count(ApplicationOwner.id))
+                .filter(
+                    ApplicationOwner.application_id.in_(application_ids),
+                    ApplicationOwner.organization_id == current_user.organization_id,
+                )
+                .group_by(ApplicationOwner.application_id)
+                .all()
+            )
+            for listed in pagination.items:
+                listed._listed_owner_count = _owner_counts.get(listed.id, 0)
             owned_ids = {
                 row[0]
                 for row in db.session.query(ApplicationComponent.id)
