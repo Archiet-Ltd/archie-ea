@@ -20,12 +20,15 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from app.decorators import require_roles
+from app.decorators import require_roles, user_has_any_role
 from app.models.tech_radar import RADAR_RING_LABELS, RADAR_RINGS
 
 from . import service
 
 logger = logging.getLogger(__name__)
+
+# Who may place a technology on the radar; the routes and the radar page both read this list.
+CLASSIFY_ROLES = ("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
 
 tech_radar_bp = Blueprint("tech_radar", __name__, url_prefix="/technology/radar")
 
@@ -42,12 +45,13 @@ def index():
         state=state,
         rings=RADAR_RINGS,
         ring_labels=RADAR_RING_LABELS,
+        may_classify=user_has_any_role(current_user, *CLASSIFY_ROLES),
     )
 
 
 @tech_radar_bp.route("/<int:element_id>/place")
 @login_required
-@require_roles("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+@require_roles(*CLASSIFY_ROLES)
 def classify_form(element_id):
     """One technology's place on the radar, with its rationale, review date and
     requesting initiative: the form the radar's row menu links to."""
@@ -106,7 +110,7 @@ def _wants_json() -> bool:
 
 @tech_radar_bp.route("/classify", methods=["POST"])
 @login_required
-@require_roles("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+@require_roles(*CLASSIFY_ROLES)
 def classify():
     """Set/update the ring for one Technology-layer element. Rejects
     anything that is not a real, already-modelled technology element —

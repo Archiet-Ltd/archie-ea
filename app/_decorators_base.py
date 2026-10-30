@@ -304,6 +304,174 @@ def role_required(*roles):
     return decorator
 
 
+def _normalize_role_name(raw_role):
+    if raw_role is None:
+        return None
+    role_name = str(raw_role).strip().lower()
+    if role_name.startswith("<role '") and role_name.endswith("'>"):
+        role_name = role_name[7:-2]
+    role_name = role_name.replace(" ", "_")
+    if role_name == "administrator":
+        return "admin"
+    return role_name
+
+
+def _effective_roles(current_user):
+    """The normalised role names ``user`` holds, as ``require_roles`` judges them."""
+    user_roles = set()
+            
+    # Try getting roles as list of role objects
+    if hasattr(current_user, 'roles'):
+        for role in current_user.roles:
+            if hasattr(role, 'name'):
+                normalized = _normalize_role_name(role.name)
+                if normalized:
+                    user_roles.add(normalized)
+                if hasattr(role, "index"):
+                    normalized_index = _normalize_role_name(role.index)
+                    if normalized_index:
+                        user_roles.add(normalized_index)
+            elif isinstance(role, str):
+                normalized = _normalize_role_name(role)
+                if normalized:
+                    user_roles.add(normalized)
+            
+    # Try getting roles as list of strings
+    if hasattr(current_user, 'role_names'):
+        user_roles.update(
+            normalized
+            for normalized in (
+                _normalize_role_name(r) for r in current_user.role_names
+            )
+            if normalized
+        )
+            
+    # Try single role field
+    if hasattr(current_user, 'role'):
+        role_obj = current_user.role
+        if hasattr(role_obj, "name"):
+            normalized = _normalize_role_name(role_obj.name)
+            if normalized:
+                user_roles.add(normalized)
+            if hasattr(role_obj, "index"):
+                normalized_index = _normalize_role_name(role_obj.index)
+                if normalized_index:
+                    user_roles.add(normalized_index)
+        else:
+            normalized = _normalize_role_name(role_obj)
+            if normalized:
+                user_roles.add(normalized)
+
+    # enterprise_role is the persona system the product actually gates
+    # navigation and dashboards on, but require_roles never looked at
+    # it -- so a business_architect was 403ed by @require_roles("admin",
+    # "architect") on the capability CRUD endpoints that exist for that
+    # persona. Contribute the role itself, plus the coarse name it
+    # stands for, so the two vocabularies agree.
+    #
+    # But ONLY for an account whose Role already carries permission.
+    # enterprise_role says what someone DOES; Role says what they are
+    # allowed to DO, and a persona label must never manufacture the
+    # second from the first. Without this guard the read-only Viewer
+    # role (permissions=0, added by A-03 precisely so an account can
+    # read and never write) was defeated on every
+    # @require_roles("admin", "architect") route: nearly every user
+    # carries an enterprise_role because it drives the sidebar, so a
+    # Viewer whose persona happened to end in "_architect" was handed
+    # "architect" and could create and delete ArchiMate elements.
+    # Caught by tests/test_r32_ai_permission_gate.py's V-04 regression
+    # pair, which is exactly what those tests were written to hold.
+    try:
+        from app.models.user import Permission
+
+        may_write = bool(current_user.can(Permission.GENERAL))
+        may_administer = bool(current_user.can(Permission.ADMINISTER))
+    except Exception:  # noqa: BLE001 - unusual user models stay as before
+        may_write = True
+        may_administer = True
+
+    enterprise_role = _normalize_role_name(
+        getattr(current_user, "enterprise_role", None)
+    )
+    if enterprise_role and may_write:
+        user_roles.add(enterprise_role)
+        if enterprise_role.endswith("_architect"):
+            user_roles.add("architect")
+        elif enterprise_role == "platform_admin" and may_administer:
+            user_roles.add("admin")
+
+    if hasattr(current_user, "role_archetype") and current_user.role_archetype:
+        normalized_archetype = _normalize_role_name(current_user.role_archetype)
+        if normalized_archetype:
+            user_roles.add(normalized_archetype)
+
+    # D-4 (admin-rbac-active-org continuation): every path above that
+    # can add "admin" to user_roles does so from a flag that is GLOBAL
+    # to the user -- current_user.role.name == "Administrator" (every
+    # self-registered user is Administrator of their own organisation),
+    # current_user.roles/role_names carrying the same, or
+    # enterprise_role == "platform_admin" paired with the global
+    # Permission.ADMINISTER flag. None of those are scoped to
+    # g.current_org_id, so the exact admin_required/org_admin_required
+    # bug this PR fixes applied here too: a Viewer of the ACTIVE
+    # organisation, home-org Administrator of their OWN organisation,
+    # satisfied @require_roles("admin", ...) on every route guarding
+    # bulk-delete, custom fields, ARB stages, import/export and more.
+    # "admin" is the only value here that claims admin AUTHORITY
+    # (the other values -- architect, business_architect, ... -- are
+    # enterprise_role personas, a separate, broader vocabulary this
+    # fix does not touch); re-derive it from the same active-org
+    # predicate admin_required/org_admin_required already use, rather
+    # than trust whatever the paths above contributed.
+    #
+    # R2-5 (PR 428 round 3): extending the url_map sweep to
+    # require_roles instances that list "platform_admin" literally
+    # (e.g. tech_radar.classify's
+    # @require_roles("admin", ..., "platform_admin")) surfaced a
+    # second, unscrubbed path to the same bug: line ~403 above adds
+    # the RAW enterprise_role string to user_roles whenever the
+    # account may write at all, and enterprise_role defaults to
+    # "platform_admin" for every legacy account ("existing users get
+    # full access" -- app/models/user.py). That default is a
+    # backward-compatibility label, not platform authority, but the
+    # only check above gating it was the same global
+    # Permission.ADMINISTER flag as "admin" -- so a home-org
+    # Administrator, Viewer-only in the ACTIVE organisation, who had
+    # never had their enterprise_role persona changed from its
+    # install default, satisfied @require_roles(..., "platform_admin")
+    # the same way they used to satisfy "admin" before this fix.
+    # Re-derived against the one real platform-admin predicate
+    # instead of discarded outright, since "platform_admin" (unlike
+    # "admin") claims PLATFORM authority specifically -- an org-admin
+    # of the active organisation is not that, so only
+    # is_platform_admin applies here, not the is_org_admin fallback
+    # "admin" gets.
+    if "admin" in user_roles or "platform_admin" in user_roles:
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        active_org_id = getattr(g, "current_org_id", None)
+        user_is_platform_admin = is_platform_admin(current_user)
+        if not (
+            user_is_platform_admin
+            or rbac_service.is_org_admin(current_user, active_org_id)
+        ):
+            user_roles.discard("admin")
+        if not user_is_platform_admin:
+            user_roles.discard("platform_admin")
+    return user_roles
+
+
+
+def user_has_any_role(user, *allowed_roles):
+    """True when ``user`` holds one of ``allowed_roles`` by the same judgement ``require_roles`` makes,
+    so a screen can offer an action only to the people the route behind it admits."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    required = {n for n in (_normalize_role_name(r) for r in allowed_roles) if n}
+    return bool(_effective_roles(user) & required)
+
+
 def require_roles(*allowed_roles):
     """Require user to have one of the specified roles.
     
@@ -318,16 +486,6 @@ def require_roles(*allowed_roles):
     Returns:
         403 Forbidden if user lacks required roles
     """
-    def _normalize_role_name(raw_role):
-        if raw_role is None:
-            return None
-        role_name = str(raw_role).strip().lower()
-        if role_name.startswith("<role '") and role_name.endswith("'>"):
-            role_name = role_name[7:-2]
-        role_name = role_name.replace(" ", "_")
-        if role_name == "administrator":
-            return "admin"
-        return role_name
 
     def decorator(f):
         @wraps(f)
@@ -336,147 +494,7 @@ def require_roles(*allowed_roles):
                 abort(401)
 
             # Get user roles (handle different user model formats)
-            user_roles = set()
-            
-            # Try getting roles as list of role objects
-            if hasattr(current_user, 'roles'):
-                for role in current_user.roles:
-                    if hasattr(role, 'name'):
-                        normalized = _normalize_role_name(role.name)
-                        if normalized:
-                            user_roles.add(normalized)
-                        if hasattr(role, "index"):
-                            normalized_index = _normalize_role_name(role.index)
-                            if normalized_index:
-                                user_roles.add(normalized_index)
-                    elif isinstance(role, str):
-                        normalized = _normalize_role_name(role)
-                        if normalized:
-                            user_roles.add(normalized)
-            
-            # Try getting roles as list of strings
-            if hasattr(current_user, 'role_names'):
-                user_roles.update(
-                    normalized
-                    for normalized in (
-                        _normalize_role_name(r) for r in current_user.role_names
-                    )
-                    if normalized
-                )
-            
-            # Try single role field
-            if hasattr(current_user, 'role'):
-                role_obj = current_user.role
-                if hasattr(role_obj, "name"):
-                    normalized = _normalize_role_name(role_obj.name)
-                    if normalized:
-                        user_roles.add(normalized)
-                    if hasattr(role_obj, "index"):
-                        normalized_index = _normalize_role_name(role_obj.index)
-                        if normalized_index:
-                            user_roles.add(normalized_index)
-                else:
-                    normalized = _normalize_role_name(role_obj)
-                    if normalized:
-                        user_roles.add(normalized)
-
-            # enterprise_role is the persona system the product actually gates
-            # navigation and dashboards on, but require_roles never looked at
-            # it -- so a business_architect was 403ed by @require_roles("admin",
-            # "architect") on the capability CRUD endpoints that exist for that
-            # persona. Contribute the role itself, plus the coarse name it
-            # stands for, so the two vocabularies agree.
-            #
-            # But ONLY for an account whose Role already carries permission.
-            # enterprise_role says what someone DOES; Role says what they are
-            # allowed to DO, and a persona label must never manufacture the
-            # second from the first. Without this guard the read-only Viewer
-            # role (permissions=0, added by A-03 precisely so an account can
-            # read and never write) was defeated on every
-            # @require_roles("admin", "architect") route: nearly every user
-            # carries an enterprise_role because it drives the sidebar, so a
-            # Viewer whose persona happened to end in "_architect" was handed
-            # "architect" and could create and delete ArchiMate elements.
-            # Caught by tests/test_r32_ai_permission_gate.py's V-04 regression
-            # pair, which is exactly what those tests were written to hold.
-            try:
-                from app.models.user import Permission
-
-                may_write = bool(current_user.can(Permission.GENERAL))
-                may_administer = bool(current_user.can(Permission.ADMINISTER))
-            except Exception:  # noqa: BLE001 - unusual user models stay as before
-                may_write = True
-                may_administer = True
-
-            enterprise_role = _normalize_role_name(
-                getattr(current_user, "enterprise_role", None)
-            )
-            if enterprise_role and may_write:
-                user_roles.add(enterprise_role)
-                if enterprise_role.endswith("_architect"):
-                    user_roles.add("architect")
-                elif enterprise_role == "platform_admin" and may_administer:
-                    user_roles.add("admin")
-
-            if hasattr(current_user, "role_archetype") and current_user.role_archetype:
-                normalized_archetype = _normalize_role_name(current_user.role_archetype)
-                if normalized_archetype:
-                    user_roles.add(normalized_archetype)
-
-            # D-4 (admin-rbac-active-org continuation): every path above that
-            # can add "admin" to user_roles does so from a flag that is GLOBAL
-            # to the user -- current_user.role.name == "Administrator" (every
-            # self-registered user is Administrator of their own organisation),
-            # current_user.roles/role_names carrying the same, or
-            # enterprise_role == "platform_admin" paired with the global
-            # Permission.ADMINISTER flag. None of those are scoped to
-            # g.current_org_id, so the exact admin_required/org_admin_required
-            # bug this PR fixes applied here too: a Viewer of the ACTIVE
-            # organisation, home-org Administrator of their OWN organisation,
-            # satisfied @require_roles("admin", ...) on every route guarding
-            # bulk-delete, custom fields, ARB stages, import/export and more.
-            # "admin" is the only value here that claims admin AUTHORITY
-            # (the other values -- architect, business_architect, ... -- are
-            # enterprise_role personas, a separate, broader vocabulary this
-            # fix does not touch); re-derive it from the same active-org
-            # predicate admin_required/org_admin_required already use, rather
-            # than trust whatever the paths above contributed.
-            #
-            # R2-5 (PR 428 round 3): extending the url_map sweep to
-            # require_roles instances that list "platform_admin" literally
-            # (e.g. tech_radar.classify's
-            # @require_roles("admin", ..., "platform_admin")) surfaced a
-            # second, unscrubbed path to the same bug: line ~403 above adds
-            # the RAW enterprise_role string to user_roles whenever the
-            # account may write at all, and enterprise_role defaults to
-            # "platform_admin" for every legacy account ("existing users get
-            # full access" -- app/models/user.py). That default is a
-            # backward-compatibility label, not platform authority, but the
-            # only check above gating it was the same global
-            # Permission.ADMINISTER flag as "admin" -- so a home-org
-            # Administrator, Viewer-only in the ACTIVE organisation, who had
-            # never had their enterprise_role persona changed from its
-            # install default, satisfied @require_roles(..., "platform_admin")
-            # the same way they used to satisfy "admin" before this fix.
-            # Re-derived against the one real platform-admin predicate
-            # instead of discarded outright, since "platform_admin" (unlike
-            # "admin") claims PLATFORM authority specifically -- an org-admin
-            # of the active organisation is not that, so only
-            # is_platform_admin applies here, not the is_org_admin fallback
-            # "admin" gets.
-            if "admin" in user_roles or "platform_admin" in user_roles:
-                from app.middleware.tenant_decorators import is_platform_admin
-                from app.services.rbac_service import rbac_service
-
-                active_org_id = getattr(g, "current_org_id", None)
-                user_is_platform_admin = is_platform_admin(current_user)
-                if not (
-                    user_is_platform_admin
-                    or rbac_service.is_org_admin(current_user, active_org_id)
-                ):
-                    user_roles.discard("admin")
-                if not user_is_platform_admin:
-                    user_roles.discard("platform_admin")
+            user_roles = _effective_roles(current_user)
 
             # Check if user has any of the required roles (case-insensitive)
             required = set(
