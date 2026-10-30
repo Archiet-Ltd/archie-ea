@@ -119,6 +119,20 @@
 
             init: function () {
                 let self = this;
+                // A return address is kept only when it is a path on this site: one
+                // leading slash, then neither a slash nor a backslash (a browser
+                // reads "/\host" as "//host"), and it resolves to this origin.
+                function sameSiteReturn(raw, fallback) {
+                    if (typeof raw !== 'string' || raw.charAt(0) !== '/') return fallback;
+                    let second = raw.charAt(1);
+                    if (second === '/' || second === '\\') return fallback;
+                    try {
+                        let url = new URL(raw, global.location.origin);
+                        return url.origin === global.location.origin ? url.pathname + url.search + url.hash : fallback;
+                    } catch (e) {
+                        return fallback;
+                    }
+                }
                 let query = global.matchMedia('(min-width: 1280px)');
                 self.wide = query.matches;
                 query.addEventListener('change', function (e) { self.wide = e.matches; });
@@ -133,11 +147,10 @@
                 // with an element type chosen, and ask to come back after saving.
                 let q = new URLSearchParams(global.location.search);
                 if (q.get('new') === 'Gap') {
-                    let back = q.get('next') || '';
                     self.pendingCreate = {
                         arch_element_type: 'Gap',
                         phase: 'E',
-                        next: (back.charAt(0) === '/' && back.charAt(1) !== '/') ? back : null,
+                        next: sameSiteReturn(q.get('next'), '/adm-kanban/gap-analysis'),
                     };
                 }
                 this.reload();
