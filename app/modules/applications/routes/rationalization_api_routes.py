@@ -397,11 +397,11 @@ def rationalization_tracking():
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
 # Not @platform_admin_required: this is a same-organisation, rate-limited,
-# audited write over the caller's own portfolio -- the same bar its sibling
-# write action (bulk-score, below) already holds to, via the blueprint's own
-# Permission.GENERAL floor (_default_deny_unauthorized_writes). An
-# organisation's own architect runs detection the same way they score the
-# portfolio; cross-tenant platform authority is not what this route needs.
+# audited write over the caller's own portfolio. It takes the Architect role
+# check the module's other write actions use (admin or architect), so a member
+# without that role cannot start a scoring run; cross-tenant platform
+# authority is not what this route needs.
+@require_roles("admin", "architect")
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():

@@ -47,16 +47,17 @@ def _radar_roles_required(view):
     """require_roles for the radar's write views, tagging only the missing-role
     refusal so the 403 handler below can tell it from a CSRF or
     cross-organisation 403, which must keep their own text."""
-    gated = require_roles(*_RADAR_ROLES)(view)
+    role_gate = require_roles(*_RADAR_ROLES)(lambda: None)
 
     @wraps(view)
     def wrapper(*args, **kwargs):
         try:
-            return gated(*args, **kwargs)
+            role_gate()
         except Forbidden as exc:
             if exc.description == Forbidden.description:
                 raise Forbidden(description=_PERMISSION_DENIED_MESSAGE) from exc
             raise
+        return view(*args, **kwargs)
 
     return wrapper
 
