@@ -20,16 +20,16 @@
     {% set total_caps = capabilities|length %}
     {% set total_apps = applications|length %}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {{ metrics_card(title='Capabilities', value=total_caps, icon='layers') }}
-        {{ metrics_card(title='Applications', value=total_apps, icon='monitor') }}
+        {{ metrics_card(title='Capabilities', value=total_caps) }}
+        {{ metrics_card(title='Applications', value=total_apps) }}
         {# Coverage is capabilities with at least one application mapped, as a
            percentage. It used to print "capabilities × applications", which is
-           not a coverage figure at all. With nothing to measure it is an em
-           dash, never 0%. #}
+           not a coverage figure at all. With nothing to measure it reads
+           "Not set" with its reason, never a dash or 0%. Stat cards carry no icons. #}
         {{ metrics_card(
             title='Capabilities with an application',
-            value=(coverage_pct ~ '%') if coverage_pct is not none else '—',
-            icon='grid-3x3',
+            value=(coverage_pct ~ '%') if coverage_pct is not none else 'Not set',
+            description='' if coverage_pct is not none else 'No capability has an application yet',
             value_class='text-primary' if coverage_pct else 'text-muted-foreground') }}
     </div>
 
@@ -44,9 +44,9 @@
     </div>
     {% else %}
     <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="px-6 py-4 border-b border-border flex justify-between items-center">
-            <h2 class="text-base font-semibold text-foreground">Coverage Matrix</h2>
-            <div class="flex gap-3 text-xs text-muted-foreground">
+        <div data-slot="card-header" class="px-6 py-4 border-b border-border flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 data-slot="card-title" class="text-base font-semibold text-foreground">Coverage Matrix</h2>
+            <div data-slot="card-action" class="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 <a href="{{ url_for('unified_low_priority.capability_map_capabilities') }}"
                    class="text-primary hover:underline">All Capabilities &rarr;</a>
                 <a href="{{ url_for('unified_low_priority.capability_map_applications') }}"
