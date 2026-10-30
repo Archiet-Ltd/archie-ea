@@ -1,20 +1,24 @@
-"""What the chat shows today for "What if we retire Payments service?".
+""""What if we retire Payments service?" reaches the chat's own impact tool.
 
-Finding, not a pass of the what-if handler fixed in multi_domain_chat_service.py:
-the ordinary /ai-chat compose box is served by AgentRunner (app/modules/ai_chat/
-services/agent_runner.py), which never calls MultiDomainChatService.process_message
--- its own code says so ("MultiDomainChatService._get_persona_system_prompt <-
-process_message, which this path never calls"). AgentRunner nudges the model to
-call its own canonical `simulate_impact` tool only when
-answer_envelope.classify_estate_question() recognises the question as an estate
-question; that regex matches "if X fails", "is retired", "is decommissioned" and
-similar, but not "what if we retire X". So this exact phrasing reaches no tool
-and no citation today, independent of the fix in this brief's file scope.
+rv-chat-whatif01b: round a fixed the what-if branch in multi_domain_chat_service.py,
+but the ordinary /ai-chat compose box never reaches it -- it is served by
+AgentRunner (app/modules/ai_chat/services/agent_runner.py) through the
+/ai-chat/estate-answer route, which nudges the model to call the chat's own
+canonical impact tool only when answer_envelope.classify_estate_question()
+recognises the question as an estate question. That classifier matched
+"if X fails", "if X is retired", "if X is decommissioned" and similar, but not
+the active phrasing a person actually types -- "what if we retire X", "what if
+we decommission X", "what if we remove X", "what happens if X is removed",
+"what if we replace X". classify_estate_question is widened (with its own unit
+tests) to recognise these; nothing else on this path changes.
 
-This journey is kept as the evidence for that reachability finding and as a
-regression anchor: once a follow-up brief teaches classify_estate_question this
-phrasing, this test's "answered from ... in context, no lookup ran" assertion is
-the one that should go red.
+Once the question classifies as an impact question and names a recorded
+element, /ai-chat/estate-answer answers it from the model's own recorded
+connections (app/modules/ai_chat/services/estate_answer.py) -- the same
+answer envelope the Ask and Impact pages use -- and the chat never reaches the
+model at all for this question. This journey now asserts that cited answer:
+each dependent named, with its own source and as-of date, and never the
+uncited "No lookup ran" text or an internal API path.
 """
 import json
 import os
@@ -31,6 +35,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 WALK = os.environ.get("WHATIF_WALK_DIR")
 QUESTION = "What if we retire Payments service?"
+DEPENDENTS = ("Customer web app", "Order management system")
 
 
 class _EchoProvider(BaseHTTPRequestHandler):
@@ -81,33 +86,54 @@ def _load_sample_from_chat(page, base):
     expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
-def _ask_what_if(page, live_server):
+def _ask_what_if(page, live_server, question=QUESTION):
     page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-    page.locator("#user-input").fill(QUESTION)
+    page.locator("#user-input").fill(question)
     page.locator("#user-input").press("Enter")
     expect(page.locator("#messages-container")).to_contain_text(
-        QUESTION, timeout=PAGE_TIMEOUT * 2
-    )
-    # the turn finishes (the evidence line always appears once the reply lands)
-    expect(page.locator("#messages-container")).to_contain_text(
-        "Answered from", timeout=PAGE_TIMEOUT * 2
+        question, timeout=PAGE_TIMEOUT * 2
     )
 
 
-def _assert_todays_live_behaviour_is_uncited(page):
-    """Documents the reachability finding: today this exact phrasing is
-    answered from context, with no tool run and no citation -- the real,
-    separate defect this build found, outside this brief's file scope."""
-    text = page.locator("#messages-container").inner_text()
-    assert "No lookup ran" in text
-    assert "Answered from" in text
+def _assert_cited_dependents(page):
+    """The question is answered by the chat's own impact tool, from the
+    model's recorded connections: every dependent of Payments service named,
+    each with its own source and as-of date, never the uncited "No lookup
+    ran" text and never an internal API path."""
+    answer = page.get_by_test_id("estate-answer")
+    expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+    text = answer.inner_text()
+    assert "No lookup ran" not in text, text
+    assert "/api/" not in text, text
     # never the frozen fixed-value scenario service's report shape, were it
     # ever (wrongly) reachable from this surface
     assert "RETIREMENT IMPACT ANALYSIS" not in text
     assert "migration cost" not in text.lower()
 
+    rows = answer.locator("[data-answer-row]")
+    count = rows.count()
+    assert count > 0, text
+    names = []
+    for i in range(count):
+        row = rows.nth(i)
+        name = row.locator("a").first.inner_text().strip()
+        assert name, "row %d has no name: %s" % (i, text)
+        names.append(name)
+        card = row.locator("xpath=ancestor::*[@data-slot='card'][1]")
+        source = card.locator("[data-citation]").inner_text().strip()
+        assert source not in ("", "Source not recorded"), \
+            "row %r has no source: %r" % (name, source)
+        assert "/api/" not in source
+        date = card.locator("[data-provenance-date]")
+        if date.count():
+            assert date.first.inner_text().strip() != "Date not recorded", \
+                "row %r has no as-of date" % name
+    for dependent in DEPENDENTS:
+        assert dependent in names, "%r not among the cited dependents: %s" % (dependent, names)
+    return names
 
-def test_what_if_retire_is_answered_uncited_today_at_1440_light(
+
+def test_what_if_retire_is_answered_with_cited_dependents_at_1440_light(
     browser, echo_provider_server
 ):
     email, _org_id = _empty_organisation_user(echo_provider_server)
@@ -119,7 +145,7 @@ def test_what_if_retire_is_answered_uncited_today_at_1440_light(
         _login(page, echo_provider_server, email)
         _load_sample_from_chat(page, echo_provider_server)
         _ask_what_if(page, echo_provider_server)
-        _assert_todays_live_behaviour_is_uncited(page)
+        _assert_cited_dependents(page)
         if WALK:
             os.makedirs(WALK, exist_ok=True)
             page.screenshot(path=os.path.join(WALK, "whatif-1440-light.png"))
@@ -127,7 +153,7 @@ def test_what_if_retire_is_answered_uncited_today_at_1440_light(
         context.close()
 
 
-def test_what_if_retire_is_answered_uncited_today_at_390_dark(
+def test_what_if_retire_is_answered_with_cited_dependents_at_390_dark(
     browser, echo_provider_server
 ):
     email, _org_id = _empty_organisation_user(echo_provider_server)
@@ -140,10 +166,49 @@ def test_what_if_retire_is_answered_uncited_today_at_390_dark(
         _login(page, echo_provider_server, email)
         _load_sample_from_chat(page, echo_provider_server)
         _ask_what_if(page, echo_provider_server)
-        _assert_todays_live_behaviour_is_uncited(page)
+        _assert_cited_dependents(page)
         assert page.evaluate("document.documentElement.classList.contains('dark')")
         if WALK:
             os.makedirs(WALK, exist_ok=True)
             page.screenshot(path=os.path.join(WALK, "whatif-390-dark.png"))
     finally:
         context.close()
+
+
+def test_a_second_organisation_sees_none_of_the_firsts_records(
+    browser, echo_provider_server
+):
+    """A second, empty organisation asking the identical question sees none
+    of the first organisation's dependents -- the model's own connections,
+    not the question's wording, decide the answer."""
+    email_one, _org_one = _empty_organisation_user(echo_provider_server)
+    email_two, _org_two = _empty_organisation_user(echo_provider_server)
+
+    context_one = browser.new_context(viewport={"width": 1440, "height": 900})
+    context_one.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    context_one.set_default_timeout(PAGE_TIMEOUT)
+    page_one = context_one.new_page()
+    context_two = browser.new_context(viewport={"width": 1440, "height": 900})
+    context_two.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    context_two.set_default_timeout(PAGE_TIMEOUT)
+    page_two = context_two.new_page()
+    try:
+        _login(page_one, echo_provider_server, email_one)
+        _load_sample_from_chat(page_one, echo_provider_server)
+        _ask_what_if(page_one, echo_provider_server)
+        names_one = _assert_cited_dependents(page_one)
+
+        # The second organisation never loaded the sample company: it has no
+        # element named "Payments service" and so nothing recorded to answer
+        # this question from.
+        _login(page_two, echo_provider_server, email_two)
+        _ask_what_if(page_two, echo_provider_server)
+        text_two = page_two.locator("#messages-container").inner_text()
+        for dependent in DEPENDENTS:
+            assert dependent not in text_two, \
+                "second organisation's chat shows the first organisation's %r: %s" % (
+                    dependent, text_two[:500])
+        assert set(names_one) & set(DEPENDENTS) == set(DEPENDENTS)
+    finally:
+        context_one.close()
+        context_two.close()
