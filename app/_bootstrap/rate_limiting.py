@@ -254,7 +254,7 @@ def init_rate_limiting(app):
 
     @app.errorhandler(429)
     def _too_many_requests(err):
-        from flask import render_template, request
+        from flask import render_template
 
         retry_after = getattr(err, "retry_after", None) or getattr(
             getattr(err, "response", None), "headers", {}
