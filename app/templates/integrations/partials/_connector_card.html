@@ -1,6 +1,7 @@
+{% from 'components/button.html' import button %}
 <!-- Connector Status Card -->
 <div class="bg-card border border-border rounded-lg p-4 transition-shadow cursor-pointer"
-     @click="viewDetails(connector.id)">
+     @click="viewDetails($data, connector.id)">
   <!-- Header -->
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
@@ -58,15 +59,11 @@
 
   <!-- Actions -->
   <div class="flex gap-2 pt-3 border-t border-border">
-    <button type="button" @click.stop="testConnection(connector.id)"
-            class="flex-1 px-3 py-1.5 bg-muted hover:bg-muted/80 text-muted-foreground rounded text-xs font-medium transition-colors" aria-label="Test connection">  {# placeholder-copy-ok: "Test" is the verb on a connector action button; the accessible name carries the full phrase #}
-      Test
-    </button>
-    <button type="button" disabled
-            class="flex-1 px-3 py-1.5 bg-muted text-muted-foreground rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Sync is not available for this connector yet"
-            aria-label="Sync is not available for this connector yet">
-      Not Available
-    </button>
+    {# placeholder-copy-ok: "Test" is the verb on a connector action button; the accessible name carries the full phrase #}
+    {{ button(text='Test', type='button', variant='secondary', size='sm', class='flex-1', aria_label='Test connection',
+              attrs_dict={'@click.stop': 'testConnection(connector.id)'}) }}
+    {{ button(text='Not Available', type='button', variant='secondary', size='sm', class='flex-1', disabled=true,
+              aria_label='Sync is not available for this connector yet',
+              attrs_dict={'title': 'Sync is not available for this connector yet'}) }}
   </div>
 </div>

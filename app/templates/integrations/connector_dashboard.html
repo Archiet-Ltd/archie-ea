@@ -1,5 +1,9 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'basecoat/card.html' import card, card_header, card_content %}
 
 {% block title %}Connector Health Dashboard{% endblock %}
 
@@ -21,6 +25,22 @@
     <p class="text-sm text-destructive-emphasis" x-text="errorMsg"></p>
   </div>
 
+  <!-- Stat row: counted from the connectors this page already fetched, not a separate figure -->
+  <div x-show="!loading && !errorMsg && connectors.length > 0" x-cloak class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-6" data-testid="connector-stat-row">
+    {% call card() %}
+      {% call card_header() %}<span class="text-sm font-medium text-muted-foreground">Connectors</span>{% endcall %}
+      {% call card_content() %}<span class="text-2xl font-semibold tabular-nums" data-testid="connector-stat-total" x-text="connectors.length"></span>{% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}<span class="text-sm font-medium text-muted-foreground">Active</span>{% endcall %}
+      {% call card_content() %}<span class="text-2xl font-semibold tabular-nums" data-testid="connector-stat-healthy" x-text="connectors.filter(c => c.status === 'active').length"></span>{% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}<span class="text-sm font-medium text-muted-foreground">Needs attention</span>{% endcall %}
+      {% call card_content() %}<span class="text-2xl font-semibold tabular-nums" data-testid="connector-stat-attention" x-text="connectors.filter(c => c.status !== 'active').length"></span>{% endcall %}
+    {% endcall %}
+  </div>
+
   <!-- Connector Cards Grid -->
   <div x-show="!loading && !errorMsg" x-cloak class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     <template x-for="connector in connectors" :key="connector.id">
@@ -39,87 +59,95 @@
   </div>
 
   <!-- Connector Detail Modal -->
-  <div x-show="selectedConnector" x-cloak
-       x-cloak
-       class="modal-root z-50 overflow-y-auto fixed inset-0" @keydown.escape.window="selectedConnector = null" role="dialog">
-    <!-- Backdrop -->
-    <div class="modal-root transition-opacity fixed inset-0 bg-overlay/50"
-         @click="selectedConnector = null" ></div>
-
-    <!-- Modal -->
-    <div class="flex min-h-full items-center justify-center p-4">
-      <div class="relative bg-card border border-border rounded-lg max-w-4xl w-full"
-           @click.away="selectedConnector = null">
-        <!-- Header -->
-        <div class="border-b border-border px-6 py-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-semibold text-card-foreground" x-text="selectedConnector?.name"></h2>
-            <p class="text-sm text-muted-foreground" x-text="selectedConnector?.connector_type"></p>
+  {% call dialog(open_expr='selectedConnector !== null', close_expr='selectedConnector = null', title_expr='selectedConnector?.name', start_hidden=false) %}
+    <p class="text-sm text-muted-foreground -mt-2 mb-4" x-text="selectedConnector?.connector_type"></p>
+    <!-- Sync History -->
+    <h3 class="text-sm font-medium text-foreground mb-3">Recent Sync History</h3>
+    <div class="space-y-2 max-h-[40vh] overflow-y-auto">
+      <template x-for="sync in selectedConnectorSyncs" :key="sync.id">
+        <div class="border border-border rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-foreground" x-text="sync.sync_type"></span>
+            <span class="text-xs px-2 py-1 rounded-full"
+                  :class="{
+                    'bg-primary/10 text-primary': sync.status === 'success',
+                    'bg-destructive/10 text-destructive-emphasis': sync.status === 'error',
+                    'bg-warning/10 text-warning-emphasis': sync.status === 'partial'
+                  }"
+                  x-text="sync.status"></span>
           </div>
-          <button type="button" @click="selectedConnector = null" class="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <i data-lucide="x" class="h-6 w-6" aria-hidden="true"></i>
-          </button>
+          <div class="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+            <div>Processed: <span x-text="sync.records_processed"></span></div>
+            <div>Created: <span x-text="sync.records_created"></span></div>
+            <div>Updated: <span x-text="sync.records_updated"></span></div>
+            <div>Deleted: <span x-text="sync.records_deleted"></span></div>
+          </div>
+          <div class="mt-2 text-xs text-muted-foreground">
+            <span x-text="formatDate(sync.started_at)"></span>
+            <span x-show="sync.duration_seconds" x-cloak class="ml-2">
+              (<span x-text="sync.duration_seconds"></span>s)
+            </span>
+          </div>
+          <div x-show="sync.error_message" x-cloak class="mt-2 text-xs text-destructive-emphasis" x-text="sync.error_message"></div>
         </div>
-
-        <!-- Body -->
-        <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
-          <!-- Sync History -->
-          <h3 class="text-sm font-medium text-foreground mb-3">Recent Sync History</h3>
-          <div class="space-y-2">
-            <template x-for="sync in selectedConnectorSyncs" :key="sync.id">
-              <div class="border border-border rounded-lg p-3">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-medium text-foreground" x-text="sync.sync_type"></span>
-                  <span class="text-xs px-2 py-1 rounded-full"
-                        :class="{
-                          'bg-primary/10 text-primary': sync.status === 'success',
-                          'bg-destructive/10 text-destructive-emphasis': sync.status === 'error',
-                          'bg-warning/10 text-warning-emphasis': sync.status === 'partial'
-                        }"
-                        x-text="sync.status"></span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                  <div>Processed: <span x-text="sync.records_processed"></span></div>
-                  <div>Created: <span x-text="sync.records_created"></span></div>
-                  <div>Updated: <span x-text="sync.records_updated"></span></div>
-                  <div>Deleted: <span x-text="sync.records_deleted"></span></div>
-                </div>
-                <div class="mt-2 text-xs text-muted-foreground">
-                  <span x-text="formatDate(sync.started_at)"></span>
-                  <span x-show="sync.duration_seconds" x-cloak class="ml-2">
-                    (<span x-text="sync.duration_seconds"></span>s)
-                  </span>
-                </div>
-                <div x-show="sync.error_message" x-cloak class="mt-2 text-xs text-destructive-emphasis" x-text="sync.error_message"></div>
-              </div>
-            </template>
-          </div>
-
-          <!-- Actions -->
-          <div class="mt-6 flex gap-2">
-            <button type="button" @click="testConnection(selectedConnector.id)"
-                    class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">
-              Test Connection
-            </button>
-            <button type="button" disabled
-                    class="px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Sync is not available for this connector yet"
-                    aria-label="Sync is not available for this connector yet">
-              Sync Not Available
-            </button>
-          </div>
-        </div>
-      </div>
+      </template>
     </div>
-  </div>
+
+    <!-- Actions -->
+    <div class="mt-6 flex gap-2">
+      {{ button(text='Test Connection', type='button', variant='primary', on_click='testConnection(selectedConnector.id)') }}
+      {{ button(text='Sync Not Available', type='button', variant='secondary', disabled=true, aria_label='Sync is not available for this connector yet',
+                attrs_dict={'title': 'Sync is not available for this connector yet'}) }}
+    </div>
+  {% endcall %}
 </div>
 
 <script>
+// A genuine global, not a connectorDashboard() instance method: the card
+// partial calls it from inside a cloned x-for item one include deep, and the
+// CSP-safe Alpine evaluator (static/js/csp/alpine-csp-adapter.js) only
+// resolves a bare identifier that deep against the real global, not against
+// the ancestor x-data's own methods, so a component method of this name was
+// silently unresolved there -- "formatDate is not a function" on every load
+// with a real connector -- and that uncaught error stopped Alpine's reactive
+// batch before it could clear the loading state.
+window.formatDate = function (dateStr) {
+  return new Date(dateStr).toLocaleString();
+};
+
+// Same reason as formatDate above: called from the card partial inside the
+// x-for clone, so it must be a real global. testConnection never reads or
+// writes component state, so it needs no reference back to it. viewDetails
+// does, so its call site passes $data (an Alpine magic, resolved fresh per
+// element) explicitly rather than relying on `this`.
+window.testConnection = async function (connectorId) {
+  try {
+    const data = await Platform.fetch.post(`/integrations/api/connectors/${connectorId}/test`, null, { silent: true });
+    if (data.success) {
+      Platform.toast.success('Connection test successful!');
+    } else {
+      Platform.toast.error('Connection test failed: ' + data.message);
+    }
+  } catch (err) {
+    Platform.toast.error('Error testing connection: ' + err.message);
+  }
+};
+
+window.viewDetails = async function (data, connectorId) {
+  try {
+    const resp = await Platform.fetch(`/integrations/api/connectors/${connectorId}`, { silent: true });
+    data.selectedConnector = resp.connector;
+    data.selectedConnectorSyncs = resp.recent_syncs;
+  } catch (err) {
+    Platform.toast.error('Error loading connector details: ' + err.message);
+  }
+};
+
 function connectorDashboard() {
   return {
     connectors: [],
     loading: true,
-    error: null,
+    errorMsg: null,
     selectedConnector: null,
     selectedConnectorSyncs: [],
 
@@ -130,37 +158,14 @@ function connectorDashboard() {
     async loadConnectors() {
       try {
         this.loading = true;
-        this.error = null;
+        this.errorMsg = null;
 
         const data = await Platform.fetch('/integrations/api/connectors', { silent: true });
         this.connectors = data.connectors;
       } catch (err) {
-        this.error = err.message;
+        this.errorMsg = err.message;
       } finally {
         this.loading = false;
-      }
-    },
-
-    async viewDetails(connectorId) {
-      try {
-        const data = await Platform.fetch(`/integrations/api/connectors/${connectorId}`, { silent: true });
-        this.selectedConnector = data.connector;
-        this.selectedConnectorSyncs = data.recent_syncs;
-      } catch (err) {
-        Platform.toast.error('Error loading connector details: ' + err.message);
-      }
-    },
-
-    async testConnection(connectorId) {
-      try {
-        const data = await Platform.fetch.post(`/integrations/api/connectors/${connectorId}/test`, null, { silent: true });
-        if (data.success) {
-          Platform.toast.success('Connection test successful!');
-        } else {
-          Platform.toast.error('Connection test failed: ' + data.message);
-        }
-      } catch (err) {
-        Platform.toast.error('Error testing connection: ' + err.message);
       }
     },
 
@@ -171,7 +176,7 @@ function connectorDashboard() {
           Platform.toast.info('Sync triggered successfully!');
           await this.loadConnectors();
           if (this.selectedConnector) {
-            await this.viewDetails(connectorId);
+            await window.viewDetails(this, connectorId);
           }
         } else {
           Platform.toast.error('Sync failed: ' + data.message);
@@ -179,10 +184,6 @@ function connectorDashboard() {
       } catch (err) {
         Platform.toast.error('Error triggering sync: ' + err.message);
       }
-    },
-
-    formatDate(dateStr) {
-      return new Date(dateStr).toLocaleString();
     }
   };
 }
