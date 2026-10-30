@@ -949,6 +949,57 @@ _CAPABILITY_OWNERS = {
     "LQ-CAP-SECURITY": "System Administrator",
 }
 
+# ── enterprise RACI (stakeholders are people from the owner list above) ────
+
+# (capability code, {owner email handle: RACI letter}). One A per row, except the
+# inventory row, which is left without an accountable person on purpose so the
+# matrix shows its "no one is accountable" flag with real data.
+_RACI_ROWS = [
+    ("LQ-CAP-CALIBRATION", {"quinn.production": "R", "ivo.reed": "A", "blake.quality": "C", "bryn.businessarch": "I"}),
+    ("LQ-CAP-WATER-QUALITY", {"blake.quality": "R", "ivo.reed": "A", "sage.itops": "C", "bryn.businessarch": "I"}),
+    ("LQ-CAP-FIELD-SERVICE", {"riley.logistics": "R", "quinn.production": "A", "sage.itops": "C"}),
+    ("LQ-CAP-INVENTORY", {"riley.logistics": "R", "blake.quality": "C", "bryn.businessarch": "I"}),
+    ("LQ-CAP-FULFILMENT", {"quinn.production": "R", "riley.logistics": "A", "ivo.reed": "I"}),
+    ("LQ-CAP-COMPLIANCE", {"bryn.businessarch": "R", "blake.quality": "A", "ivo.reed": "C"}),
+    ("LQ-CAP-INCIDENT", {"sage.itops": "R", "ivo.reed": "A", "riley.logistics": "C"}),
+]
+
+
+def _seed_raci(org_id) -> dict:
+    """Stakeholder x capability assignments for the demonstration organisation only.
+    Idempotent: a cell that exists is left as it is, so a second run adds no rows."""
+    from app.models.organization_model import EnterpriseRaciAssignment
+
+    caps = _resolve_caps(org_id)
+    users = {email.split("@")[0]: u for email, u in _resolve_users(org_id).items()}
+    existing = {
+        (a.stakeholder_type, a.stakeholder_id, a.capability_id)
+        for a in db.session.query(EnterpriseRaciAssignment)
+        .filter(EnterpriseRaciAssignment.organization_id == org_id)
+    }
+    created = 0
+    for code, cells in _RACI_ROWS:
+        cap = caps.get(code)
+        if cap is None:
+            continue
+        for handle, letter in cells.items():
+            user = users.get(handle)
+            if user is None or ("user", user.id, cap.id) in existing:
+                continue
+            db.session.add(EnterpriseRaciAssignment(
+                organization_id=org_id,
+                stakeholder_type="user",
+                stakeholder_id=user.id,
+                stakeholder_name=f"{user.first_name} {user.last_name}",
+                capability_id=cap.id,
+                raci=letter,
+            ))
+            created += 1
+    if created:
+        db.session.flush()
+    return {"raci_assignments_created": created}
+
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -3425,6 +3476,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_data_model(org_id))
         stats.update(_seed_data_flows(org_id))
+        stats.update(_seed_raci(org_id))
 
         db.session.commit()
 
