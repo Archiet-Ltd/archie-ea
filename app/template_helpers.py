@@ -81,10 +81,14 @@ def register_template_filters(app):
         {{ amount | currency }}
         {{ amount | currency('USD') }}
         """
-        if currency_code == "":
-            currency_code = None
-        service = CurrencyService(app)
-        return service.format_currency(amount, currency_code)
+        from app.utils.locale_format import fmt_money
+
+        if amount is None:
+            return "\u2014"
+        text = fmt_money(amount, currency_code or None)
+        if text is None:
+            raise ValueError(f"Invalid amount: {amount}")
+        return text
 
     @app.template_filter("currency_symbol")
     def currency_symbol_filter(currency_code: Optional[str] = None) -> str:
@@ -170,12 +174,10 @@ def register_template_filters(app):
         {{ number | number_format }}
         {{ number | number_format(3) }}
         """
-        try:
-            if isinstance(number, str):
-                number = float(number)
-            return f"{number:,.{decimal_places}f}"
-        except (ValueError, TypeError):
-            return str(number)
+        from app.utils.locale_format import fmt_number
+
+        text = fmt_number(number, decimal_places)
+        return str(number) if text is None else text
 
     @app.template_filter("percent")
     def percent_filter(number: Union[int, float], decimal_places: int = 1) -> str:
@@ -186,12 +188,10 @@ def register_template_filters(app):
         {{ 0.1234 | percent }}
         {{ 0.1234 | percent(2) }}
         """
-        try:
-            if isinstance(number, str):
-                number = float(number)
-            return f"{number * 100:.{decimal_places}f}%"
-        except (ValueError, TypeError):
-            return str(number)
+        from app.utils.locale_format import fmt_percent
+
+        text = fmt_percent(number, decimal_places)
+        return str(number) if text is None else text
 
     @app.template_filter("ordinal")
     def ordinal_filter(number: Union[int, str]) -> str:

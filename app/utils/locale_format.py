@@ -229,6 +229,20 @@ def fmt_date_range(start: Any, end: Any, locale: Optional[str] = None) -> Option
     return "%s %s %s" % (head, joiner, fmt_date(last, "medium", tag))
 
 
+def fmt_datetime_as(value: Any, fmt: Optional[str] = None, locale: Optional[str] = None) -> Optional[str]:
+    """A date and time in a named style ("short", "long", "full") or a Babel pattern ("d MMM yyyy, HH:mm").
+
+    The default and "medium" are the organisation's ``fmt_datetime`` form. Used by the older ``format_datetime`` filter.
+    """
+    when = _as_datetime(value)
+    if when is None:
+        return None
+    if fmt in (None, "", "medium"):
+        return fmt_datetime(when, locale)
+    loc = _babel_locale(locale or current_locale())
+    return _dates.format_datetime(when, format=fmt, locale=loc)
+
+
 # ---- registration ---------------------------------------------------------------------------------------
 
 def _or_dash(text: Optional[str]) -> str:

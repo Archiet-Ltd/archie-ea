@@ -65,3 +65,23 @@ def test_compact_money_without_a_short_word_is_written_in_full():
 
 def test_september_keeps_its_three_letters_in_english():
     assert fmt_date(dt.date(2026, 9, 1), "MMM", "en-GB") == "Sep"
+
+
+def test_the_older_filters_are_aliases_of_the_one_formatter(app, monkeypatch):
+    """number_format, percent, format_number, format_percent, format_date, format_datetime, currency and
+    format_currency all follow the organisation's locale because they call the one formatter."""
+    from app.utils import locale_format
+
+    monkeypatch.setattr(locale_format, "current_locale", lambda: "de-DE")
+    monkeypatch.setattr(locale_format, "current_currency", lambda: "EUR")
+    f = app.jinja_env.filters
+    assert f["number_format"](1234.5) == "1.234,50"
+    assert f["format_number"](1234.5, 2) == "1.234,50"
+    assert f["percent"](0.256, 1) == "25,6" + NB + "%"
+    assert f["format_percent"](0.256, 1) == "25,6" + NB + "%"
+    assert f["format_date"](dt.date(2026, 10, 25)) == "25.10.2026"
+    assert f["format_datetime"](dt.datetime(2026, 10, 25, 19, 32)) == "25.10.2026, 19:32"
+    assert f["format_datetime"](dt.datetime(2026, 10, 25, 19, 32), "d MMM yyyy") == "25 Okt. 2026"
+    assert f["currency"](1234.56) == "1.234,56" + NB + "€"
+    assert f["format_currency"](1234.56) == "1.234,56" + NB + "€"
+    assert f["format_currency"](None) == "—"

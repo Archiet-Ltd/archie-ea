@@ -203,46 +203,11 @@ def _register(app):
     app.add_template_global(index_for_role)
 
     # ── S2-01: i18n formatting filters ─────────────────────────────
-    # H-04: NOT registered as a Jinja filter. A second "format_currency"
-    # existed here and SHADOWED the org-aware one in
-    # _bootstrap/context_processors.py, silently defeating the single
-    # currency source of truth: this one falls back to a hardcoded "USD"
-    # and returns "" for a missing amount, which renders as a blank cell
-    # rather than the em dash the never-invent-data rule requires.
-    # Kept as a plain helper for any caller that passes an explicit
-    # currency; the registered filter is the org-aware one.
-    def format_currency_filter(value, currency=None):
-        """Format a number as locale-aware currency.
-
-        Usage: {{ 1234.56|format_currency }}
-               {{ 1234.56|format_currency('EUR') }}
-
-        Falls back to CurrencyConfig if no currency specified,
-        then to plain formatting if Flask-Babel unavailable.
-        """
-        if value is None:
-            return ""
-        try:
-            from flask_babel import format_currency as babel_fmt
-
-            if not currency:
-                try:
-                    from config import CurrencyConfig
-                    currency = CurrencyConfig.get_currency_config().get("code", "USD")
-                except Exception:
-                    currency = "USD"
-            return babel_fmt(value, currency)
-        except ImportError:
-            # Fallback without Babel
-            try:
-                from config import CurrencyConfig
-                symbol = CurrencyConfig.get_currency_config().get("symbol", "$")
-            except Exception:
-                symbol = "$"
-            return f"{symbol}{value:,.2f}"
+    # The one currency formatter is fmt_money (app/utils/locale_format.py), registered as ``format_currency`` in
+    # _bootstrap/context_processors.py; no second copy lives here.
 
     @app.template_filter("format_datetime")
-    def format_datetime_filter(value, fmt="medium"):
+    def format_datetime_filter(value, fmt=None):
         """Format a datetime as locale-aware string.
 
         Usage: {{ item.created_at|format_datetime }}
@@ -251,25 +216,10 @@ def _register(app):
 
         Falls back to strftime if Flask-Babel unavailable.
         """
-        if value is None:
-            return ""
-        try:
-            from flask_babel import format_datetime as babel_fmt
-            return babel_fmt(value, fmt)
-        except ImportError:
-            try:
-                if fmt == "short":
-                    return value.strftime("%m/%d/%y %H:%M")
-                elif fmt == "medium":
-                    return value.strftime("%b %d, %Y %H:%M")
-                elif fmt == "long":
-                    return value.strftime("%B %d, %Y %H:%M:%S")
-                elif fmt == "full":
-                    return value.strftime("%A, %B %d, %Y %H:%M:%S %Z")
-                else:
-                    return value.strftime(str(fmt))
-            except (AttributeError, ValueError):
-                return str(value)
+        from app.utils.locale_format import fmt_datetime_as
+
+        text = fmt_datetime_as(value, fmt)
+        return "" if value is None else (str(value) if text is None else text)
 
     @app.template_filter("format_number")
     def format_number_filter(value, decimals=None):
@@ -278,20 +228,10 @@ def _register(app):
         Usage: {{ 1234567|format_number }}
                {{ 3.14159|format_number(2) }}
         """
-        if value is None:
-            return ""
-        try:
-            from flask_babel import format_decimal
-            if decimals is not None:
-                fmt = f"#,##0.{'0' * decimals}"
-                return format_decimal(value, format=fmt)
-            return format_decimal(value)
-        except ImportError:
-            if decimals is not None:
-                return f"{value:,.{decimals}f}"
-            if isinstance(value, float):
-                return f"{value:,.2f}"
-            return f"{value:,}"
+        from app.utils.locale_format import fmt_number
+
+        text = fmt_number(value, decimals)
+        return "" if value is None else (str(value) if text is None else text)
 
     @app.template_filter("format_percent")
     def format_percent_filter(value, decimals=1):
@@ -300,10 +240,7 @@ def _register(app):
         Usage: {{ 0.85|format_percent }}     → 85.0%
                {{ 0.85|format_percent(0) }}  → 85%
         """
-        if value is None:
-            return ""
-        try:
-            from flask_babel import format_percent as babel_pct
-            return babel_pct(value)
-        except ImportError:
-            return f"{value * 100:,.{decimals}f}%"
+        from app.utils.locale_format import fmt_percent
+
+        text = fmt_percent(value, decimals)
+        return "" if value is None else (str(value) if text is None else text)

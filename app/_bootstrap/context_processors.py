@@ -788,19 +788,23 @@ def init_context_processors(app):
     app.jinja_env.filters["humanize_error"] = humanize_error
 
     # Register date/datetime formatting filters
-    def _filter_format_date(value, fmt='%d %b %Y'):
-        if value is None:
-            return ''
-        if hasattr(value, 'strftime'):
-            return value.strftime(fmt)
-        return str(value)
+    def _filter_format_date(value, fmt=None):
+        from app.utils.locale_format import fmt_date
 
-    def _filter_format_datetime(value, fmt='%d %b %Y %H:%M'):
         if value is None:
             return ''
-        if hasattr(value, 'strftime'):
-            return value.strftime(fmt)
-        return str(value)
+        if fmt and hasattr(value, 'strftime'):
+            return value.strftime(fmt)  # an explicit strftime layout is the caller's own choice
+        text = fmt_date(value, "medium0")
+        return str(value) if text is None else text
+
+    def _filter_format_datetime(value, fmt=None):
+        from app.utils.locale_format import fmt_datetime_as
+
+        if value is None:
+            return ''
+        text = fmt_datetime_as(value, fmt)
+        return str(value) if text is None else text
 
     # One formatter for dates, numbers, percentages and money (reads the organisation's locale).
     from app.utils.locale_format import register_locale_filters
@@ -814,30 +818,15 @@ def init_context_processors(app):
     # settings['currency_code'] -> config.CurrencyConfig). None stays None ->
     # template renders an em dash, never a fabricated 0.
     def _filter_format_currency(value, show_code=False, currency=None):
-        # A missing amount renders as an em dash, never a blank cell and
-        # never a fabricated 0 (CLAUDE.md).
-        if value is None:
-            return EM_DASH
-        from flask import has_request_context
-        from app.middleware.tenant_context import current_org
-        from config import CurrencyConfig
+        # A missing amount renders as an em dash, never a blank cell and never a fabricated 0 (CLAUDE.md).
+        from app.utils.locale_format import fmt_money
 
-        organization = None
-        try:
-            if has_request_context():
-                organization = current_org()
-        except Exception:
-            organization = None
-        cfg = CurrencyConfig.get_org_currency_config(organization)
-        if currency:
-            cfg = dict(cfg, code=currency)
-        try:
-            amount = float(value)
-        except (TypeError, ValueError):
+        from app.utils.locale_format import current_currency
+
+        text = fmt_money(value, currency or None)
+        if text is None:
             return EM_DASH
-        formatted = "{:,.{dp}f}".format(amount, dp=cfg["decimal_places"])
-        symbolled = f"{cfg['symbol']}{formatted}" if cfg["position"] == "prefix" else f"{formatted}{cfg['symbol']}"
-        return f"{cfg['code']} {symbolled}" if show_code else symbolled
+        return "%s %s" % ((currency or current_currency()).upper(), text) if show_code else text
 
     app.jinja_env.filters["format_currency"] = _filter_format_currency
 

@@ -7,6 +7,7 @@ formatter, ``app/utils/locale_format.py``, on every screen.
 """
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
 from flask_login import current_user, login_required
 
 from app import db
@@ -48,12 +49,12 @@ def regional():
         locale = (request.form.get("locale") or "").strip()
         currency = (request.form.get("currency") or "").strip().upper()
         if locale not in SUPPORTED_LOCALES or not CurrencyConfig.is_supported(currency):
-            error = "Choose a language and region and a currency from the lists."
+            error = _("Choose a language and region and a currency from the lists.")
         else:
             org.locale = locale
             org.reporting_currency = currency
             db.session.commit()
-            flash("Regional settings saved.", "success")
+            flash(_("Regional settings saved."), "success")
             return redirect(url_for("regional.regional"))
     locale = normalise_locale(org.locale)
     currency = (org.reporting_currency or CurrencyConfig.DEFAULT_CURRENCY).upper()

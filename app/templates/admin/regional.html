@@ -4,12 +4,12 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
-{% block title %}Regional settings{% endblock %}
+{% block title %}{{ _('Regional settings') }}{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Regional settings', subtitle='How dates, numbers and amounts of money are written for everyone in this organisation',
-              breadcrumb=[('Admin', url_for('admin.index')), ('Regional settings', none)]) }}
+{{ page_shell(title=_('Regional settings'), subtitle=_('How dates, numbers and amounts of money are written for everyone in this organisation'),
+              breadcrumb=[(_('Admin'), url_for('admin.index')), (_('Regional settings'), none)]) }}
 
 {% if error %}
 {% call ui.alert(variant='destructive', class='max-w-2xl', attrs={'data-testid': 'regional-error', 'role': 'alert'}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=error) }}{% endcall %}
@@ -19,21 +19,21 @@
   <form method="POST" action="{{ url_for('regional.regional') }}" class="space-y-6 p-6" data-testid="regional-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% call ui.field() %}
-      {{ ui.field_label(text='Language and region', attrs={'for': 'locale'}) }}
+      {{ ui.field_label(text=_('Language and region'), attrs={'for': 'locale'}) }}
       {% call native_select_wrapper(class='w-full') %}{% call native_select(id='locale', name='locale', class='w-full') %}
         {% for tag, label in locales.items() %}{{ native_select_option(label, value=tag, selected=(tag == locale)) }}{% endfor %}
       {% endcall %}{% endcall %}
-      {{ ui.field_description(text='Sets how dates and numbers are written.') }}
+      {{ ui.field_description(text=_('Sets how dates and numbers are written.')) }}
     {% endcall %}
     {% call ui.field() %}
-      {{ ui.field_label(text='Currency', attrs={'for': 'currency'}) }}
+      {{ ui.field_label(text=_('Currency'), attrs={'for': 'currency'}) }}
       {% call native_select_wrapper(class='w-full') %}{% call native_select(id='currency', name='currency', class='w-full') %}
         {% for code, name in currencies %}{{ native_select_option(code ~ ' - ' ~ name, value=code, selected=(code == currency)) }}{% endfor %}
       {% endcall %}{% endcall %}
-      {{ ui.field_description(text='The one currency every cost figure is shown in.') }}
+      {{ ui.field_description(text=_('The one currency every cost figure is shown in.')) }}
     {% endcall %}
-    <p class="text-sm text-muted-foreground" data-testid="regional-example">For example: {{ date_example }} and {{ money_example }}.</p>
-    {{ ui.button(text='Save', type='submit') }}
+    <p class="text-sm text-muted-foreground" data-testid="regional-example">{{ _('For example:') }} {{ date_example }} {{ _('and') }} {{ money_example }}.</p>
+    {{ ui.button(text=_('Save'), type='submit') }}
   </form>
 {% endcall %}
 </div>
