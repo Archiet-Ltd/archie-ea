@@ -3270,7 +3270,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -3332,7 +3332,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -3341,7 +3341,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -3718,7 +3718,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -3779,7 +3779,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-app-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -3788,7 +3788,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -4795,7 +4795,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -4856,7 +4856,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-license-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -4866,7 +4866,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -12053,7 +12053,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -12112,7 +12112,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-new.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -12121,7 +12121,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -13043,7 +13043,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -13103,7 +13103,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-custom-field-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -13112,7 +13112,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -13253,7 +13253,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -13313,7 +13313,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-rationalization-assessment.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -13322,7 +13322,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -13361,7 +13361,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -13426,7 +13426,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-response-validation.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -13436,7 +13436,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -14851,7 +14851,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -14909,7 +14909,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-enrich.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -14918,7 +14918,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -16991,7 +16991,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -17052,7 +17052,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-import-review.md",
    "states": [
     "loading",
     "empty-nothing-derived",
@@ -17062,7 +17062,7 @@
     "partial-failure",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -18624,7 +18624,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -18686,7 +18686,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-import-csv.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -18696,7 +18696,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -19370,7 +19370,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -19434,7 +19434,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-architecture-journey-workspace.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -19444,7 +19444,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -19695,7 +19695,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -19762,7 +19762,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-journey-v3.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -19772,7 +19772,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -20361,7 +20361,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -20420,7 +20420,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-record-outcome.md",
    "states": [
     "loading",
     "empty-no-permission",
@@ -20428,7 +20428,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -23488,7 +23488,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -23552,7 +23552,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-mapping.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -23561,7 +23561,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -28283,7 +28283,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -28343,7 +28343,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-new-data-issue.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -28352,7 +28352,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -29581,7 +29581,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -29641,7 +29641,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/forms01-deliverable-editor.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -29651,7 +29651,7 @@
     "export-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -29873,77 +29873,77 @@
     "error-region",
     "populated"
    ],
-"status": "mapped",
-    "tier": "B",
-    "type_changed": false
-   },
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/ea_workflows/vision_not_configured.html": {
-    "allowed_macros": [
-     "components/accessibility_helpers.html",
-     "components/alert.html",
-     "components/breadcrumb_nav.html",
-     "components/button.html",
-     "components/empty_state.html",
-     "components/page_header.html",
-     "macros/page_shell.html"
-    ],
-    "basis": "declared",
-    "block": "empty-state",
-    "components": [
-     "alert",
-     "badge",
-     "breadcrumb",
-     "button",
-     "empty",
-     "page-header"
-    ],
-    "confidence": "high",
-    "controls": {
-     "link": 2
-    },
-    "departures": [
-     {
-      "rule": "brand",
-      "what": "Entelim logo sits above the Empty block, as the error-page slot allows."
-     }
-    ],
-    "extends": [
-     "layouts/admin_base.html"
-    ],
-    "frame": "empty",
-    "grid": "G3",
-    "inhouse_components": [],
-    "macros": [
-     "components/breadcrumb_nav.html",
-     "components/empty_state.html",
-     "components/page_header.html"
-    ],
-    "original": "empty",
-    "page_type": "empty-state",
-    "patterns": [
-     "P26-error-state",
-     "P17-empty-state"
-    ],
-    "persona": "enterprise_architect",
-    "reason": "Vision deliverable not configured; Empty with a link to workflow definitions.",
-    "reference": {
-     "shadcn": {
-      "name": "shadcn components: empty",
-      "url": "https://ui.shadcn.com/docs/components/empty"
-     },
-     "basecoat": {
-      "name": "flask-basecoat examples: coming soon",
-      "image": "docs/design/reference/basecoat-coming-soon.webp"
-     }
-    },
-    "spec": null,
-    "states": [
-     "error-page"
-    ],
-    "status": "mapped",
-    "tier": "B",
-    "type_changed": false
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/page_header.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "empty-state",
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "empty",
+    "page-header"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 2
    },
+   "departures": [
+    {
+     "rule": "brand",
+     "what": "Entelim logo sits above the Empty block, as the error-page slot allows."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "empty",
+   "grid": "G3",
+   "inhouse_components": [],
+   "macros": [
+    "components/breadcrumb_nav.html",
+    "components/empty_state.html",
+    "components/page_header.html"
+   ],
+   "original": "empty",
+   "page_type": "empty-state",
+   "patterns": [
+    "P26-error-state",
+    "P17-empty-state"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "Vision deliverable not configured; Empty with a link to workflow definitions.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn components: empty",
+     "url": "https://ui.shadcn.com/docs/components/empty"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: coming soon",
+     "image": "docs/design/reference/basecoat-coming-soon.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "error-page"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/ea_workflows/schedules.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -40332,7 +40332,7 @@
    "reason": "EA briefing; answer-first report with export.",
    "tier": "C5",
    "type_changed": true
-},
+  },
   "app/templates/solutions/edit.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -40368,7 +40368,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "components": [
     "alert",
@@ -40406,8 +40406,8 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/forms01-edit.md",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
