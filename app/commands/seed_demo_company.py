@@ -3487,7 +3487,7 @@ def _seed_demo_company() -> dict:
             RationalizationScoringService,
         )
 
-        scoring_result = RationalizationScoringService.calculate_portfolio_scores()
+        scoring_result = RationalizationScoringService.calculate_portfolio_scores(org_id)
         stats["portfolio_scores_processed"] = scoring_result.get("processed", 0)
 
         db.session.commit()

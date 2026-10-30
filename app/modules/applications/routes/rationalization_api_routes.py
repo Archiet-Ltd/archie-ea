@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, flash, jsonify, redirect, render_template, render_template_string, request, url_for
+from flask import current_app, flash, g, jsonify, redirect, render_template, render_template_string, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -3763,6 +3763,7 @@ def rationalization_bulk_score():
         else:
             # scope == "all" — delegate to portfolio scorer
             results = RationalizationScoringService.calculate_portfolio_scores(
+                getattr(g, "current_org_id", None),
                 force_recalculate=payload.get("force", False)
             )
             total = results.get("total_apps", 0)
@@ -3830,6 +3831,7 @@ def rationalization_rescore_all():
 
     try:
         results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None),
             force_recalculate=force
         )
         total = results.get("total_apps", 0)

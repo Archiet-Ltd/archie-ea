@@ -11,7 +11,7 @@ Phase 2c: Updated to support BusinessCapability fallback for heatmap profiling (
 import logging
 
 from werkzeug.exceptions import HTTPException
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.decorators import audit_log
@@ -292,7 +292,9 @@ def calculate_portfolio_scores():
         # get_json(silent=True) returns None instead of raising.
         payload = request.get_json(silent=True) or {}
         force_recalc = bool(payload.get("force_recalculate", False))
-        results = RationalizationScoringService.calculate_portfolio_scores(force_recalc)
+        results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None), force_recalc
+        )
         # Add flat keys expected by scorecard JS (updateMetrics function)
         avg = results.get("average_scores", {})
         results["total_scored"] = results.get("processed", 0)

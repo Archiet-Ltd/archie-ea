@@ -875,7 +875,12 @@ class RationalizationScoringService:
             ).first()
 
             if not score:
-                score = ApplicationRationalizationScore(application_component_id=application_id)
+                # Outside a request there is no active organisation to fill this
+                # in on flush, so the score takes its application's.
+                score = ApplicationRationalizationScore(
+                    application_component_id=application_id,
+                    organization_id=app.organization_id,
+                )
                 db.session.add(score)
 
             # Update all fields
@@ -3091,16 +3096,22 @@ class RationalizationScoringService:
         return " ".join(justifications)
 
     @staticmethod
-    def calculate_portfolio_scores(force_recalculate: bool = False) -> Dict:
+    def calculate_portfolio_scores(organization_id: int, force_recalculate: bool = False) -> Dict:
         """
         Calculate rationalization scores for entire application portfolio.
 
         Args:
+            organization_id: The organisation whose applications are scored;
+                required, because outside a request (the CLI, the reseed)
+                the tenant filter is inactive and an unscoped query would
+                reach every organisation's applications.
             force_recalculate: Recalculate even if recent scores exist
 
         Returns:
             Summary statistics and processing results
         """
+        if organization_id is None:
+            raise ValueError("calculate_portfolio_scores needs an organization_id")
         try:
             from sqlalchemy import func as _func
 
@@ -3115,6 +3126,7 @@ class RationalizationScoringService:
             apps = ApplicationComponent.query.options(
                 joinedload(ApplicationComponent.vendor_products)
             ).filter(
+                ApplicationComponent.organization_id == organization_id,
                 db.or_(
                     _func.lower(ApplicationComponent.lifecycle_status).in_(scoreable_lower),
                     db.and_(
