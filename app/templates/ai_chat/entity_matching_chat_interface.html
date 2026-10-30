@@ -497,8 +497,7 @@
       <div class="chat-input-container">
         <textarea 
           x-model="currentMessage"
-          @keydown.enter.exact.prevent="sendMessage()"
-          @keydown.enter.shift="currentMessage += '\n'"
+          @keydown.enter="onComposerEnter($event)"
           placeholder="Type your message or paste document text here..."
           class="chat-input"
           rows="1"
@@ -699,6 +698,12 @@ function entityMatchingChat() {
       });
     },
     
+    onComposerEnter(event) {
+      if (event.shiftKey || event.isComposing) return;
+      event.preventDefault();
+      this.sendMessage();
+    },
+
     async sendMessage() {
       if (!this.currentMessage.trim() || this.isProcessing) return;
       

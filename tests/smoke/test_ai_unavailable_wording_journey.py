@@ -150,22 +150,9 @@ def test_entity_matching_buttons_use_the_library(browser, live_server, seeded):
     """R36b: the Match entities chat page's action controls render through the
     library's button component, not a hand-written <button>. The behaviour a
     person relies on must survive the conversion: Send submits by click, a
-    message in progress (typed with or without Shift+Enter) is never sent by
-    the keyboard alone, focus returns to the composer once a turn finishes,
-    and every icon-only button keeps its aria-label.
-
-    Pressing Enter alone is reproduced, red, on the untouched line head
-    (9c8c75eb7) before any button is touched: `@keydown.enter.exact.prevent`
-    on the composer never fires, because Alpine's own modifier matching
-    treats a bare `.exact` with no accompanying system-modifier key (ctrl,
-    shift, alt, meta) as a key name to match literally, which "exact" never
-    is, so the handler is always skipped. That is a defect in the textarea's
-    own keydown wiring, not in a button, and this round's surface is buttons
-    only (R36b) -- the brief's own four conditions name the send button, the
-    keyboard behaviour it must keep, scope, and icon-only aria-labels, and do
-    not reach the composer's own keydown handlers. It is recorded here as a
-    correction to the brief's assumption, with the reproduction kept as a
-    skipped case rather than silently dropped, so the gap stays visible."""
+    message sends by click and by Enter, Shift+Enter adds exactly one new line
+    without sending, focus returns to the composer once a turn finishes, and
+    every icon-only button keeps its aria-label."""
     email = seeded["emails"]["enterprise_architect"]
     page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="light")
     try:
@@ -195,18 +182,36 @@ def test_entity_matching_buttons_use_the_library(browser, live_server, seeded):
             "() => document.activeElement === document.querySelector('[x-ref=\"chatInput\"]')"
         ), "focus must return to the message box after sending"
 
-        # -- Shift+Enter never sends; plain Enter does not currently send either
-        # (see the docstring's correction) -- neither must add a second message.
+        # -- Enter sends; Shift+Enter adds exactly one new line and does not send
         before = page.locator(".message.user").count()
         box.click()
         box.type("First line")
         box.press("Shift+Enter")
         box.type("Second line")
-        box.press("Enter")
         page.wait_for_timeout(300)
         assert page.locator(".message.user").count() == before, (
-            "the keyboard must never send a message on this page today"
+            "Shift+Enter must not send"
         )
+        assert box.input_value() == "First line\nSecond line", (
+            "Shift+Enter must add exactly one new line"
+        )
+        with page.expect_response(
+            lambda r: "/ai-chat/entity-matching" in r.url and r.request.method == "POST",
+            timeout=PAGE_TIMEOUT,
+        ):
+            box.press("Enter")
+        page.wait_for_function(
+            "n => document.querySelectorAll('.message.user').length === n",
+            arg=before + 1,
+            timeout=PAGE_TIMEOUT,
+        )
+        page.locator(".message.assistant .message-content").last.wait_for(
+            state="visible", timeout=PAGE_TIMEOUT
+        )
+        assert box.input_value() == "", "the box must clear after Enter sends"
+        assert page.evaluate(
+            "() => document.activeElement === document.querySelector('[x-ref=\"chatInput\"]')"
+        ), "focus must return to the message box after Enter sends"
 
         # -- every icon-only button keeps its aria-label -------------------------
         buttons = page.locator("button").all()
