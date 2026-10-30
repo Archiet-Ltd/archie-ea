@@ -208,9 +208,29 @@ def row_macros(design_map, entry):
     return sorted(macros)
 
 
+def ruled_exceptions(entry):
+    """Macros a page's in-house exceptions excuse from its block's allow-list.
+
+    An exception is honoured only with all three fields filled in --
+    ``macro``, ``keep_until`` (the brief that retires it) and ``why`` (one
+    line) -- so a page cannot carry a disallowed macro silently. It is a
+    page-specific escape hatch for a composite with no whole-library
+    equivalent yet, not a way to grow a block's own vocabulary; register the
+    macro as a component instead when it is wanted more widely (R36a).
+    """
+    macros = set()
+    for exception in entry.get("inhouse_exceptions", []):
+        if ((exception.get("macro") or "").strip() and
+                (exception.get("keep_until") or "").strip() and
+                (exception.get("why") or "").strip()):
+            macros.add(exception["macro"])
+    return macros
+
+
 def allowed_macros(design_map, entry):
     block = design_map["blocks"].get(entry.get("block"), {})
-    return sorted(set(block.get("allowed_macros", [])) | set(entry.get("extra_macros", [])))
+    return sorted(set(block.get("allowed_macros", [])) | set(entry.get("extra_macros", [])) |
+                  ruled_exceptions(entry))
 
 
 # ------------------------------------------------------------------ the tier checks
