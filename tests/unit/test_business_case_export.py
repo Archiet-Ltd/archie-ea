@@ -117,7 +117,7 @@ def test_empty_boxes_and_unset_figures_are_stated_not_invented(app, db_session, 
     text = _docx_text(TOGAFDeliverableExportService().export_business_case_to_docx(case, _context(case)))
     assert "Nothing recorded yet." in text
     assert "Not linked" in text
-    assert "—" in text
+    assert "Not set" in text
 
 
 @pytest.mark.parametrize("fmt", FORMATS)

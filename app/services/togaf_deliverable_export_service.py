@@ -741,11 +741,13 @@ class TOGAFDeliverableExportService:
         elements.append(self._make_table(link_rows, col_widths=[2 * inch, 4.5 * inch]))
 
         elements.append(Paragraph("Financial figures", styles["SectionHead"]))
-        figure_rows = [["Figure", "Value"]] + [
-            [Paragraph(escape(label), styles["Normal"]), Paragraph(escape(value), styles["Normal"])]
-            for label, value in context["figures"]
+        figure_rows = [["Figure", "Value", "Source / As of"]] + [
+            [Paragraph(escape(label), styles["Normal"]),
+             Paragraph(escape(value), styles["Normal"]),
+             Paragraph(escape(source), styles["Normal"])]
+            for label, value, source in context["figures"]
         ]
-        elements.append(self._make_table(figure_rows, col_widths=[3 * inch, 3.5 * inch]))
+        elements.append(self._make_table(figure_rows, col_widths=[2 * inch, 2.5 * inch, 2 * inch]))
 
         self._build_branded_footer(elements, styles)
         doc.build(elements)
@@ -786,12 +788,12 @@ class TOGAFDeliverableExportService:
             cells[0].text, cells[1].text = label, name or "Not linked"
 
         document.add_heading("Financial figures", level=2)
-        figures = document.add_table(rows=1, cols=2)
+        figures = document.add_table(rows=1, cols=3)
         figures.style = "Table Grid"
-        figures.rows[0].cells[0].text, figures.rows[0].cells[1].text = "Figure", "Value"
-        for label, value in context["figures"]:
+        figures.rows[0].cells[0].text, figures.rows[0].cells[1].text, figures.rows[0].cells[2].text = "Figure", "Value", "Source / As of"
+        for label, value, source in context["figures"]:
             cells = figures.add_row().cells
-            cells[0].text, cells[1].text = label, value
+            cells[0].text, cells[1].text, cells[2].text = label, value, source
 
         output = io.BytesIO()
         document.save(output)
