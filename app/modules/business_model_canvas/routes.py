@@ -154,6 +154,7 @@ def detail(canvas_id):
         canvas=canvas,
         canvas_key=key,
         canvas_type_name=CANVAS_TEMPLATES[key]["name"],
+        canvas_credit=" ".join(CANVAS_TEMPLATES[key].get("credit") or []),
         is_bmc=key == model_service.TEMPLATE_KEY,
         boxes=boxes,
         zones=zones,

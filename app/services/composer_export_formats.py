@@ -134,6 +134,9 @@ def to_mermaid(vp: Dict[str, Any]) -> str:
         for r in reasons:
             lines.append(f"    %% {r['box_key']}: {r['reason']}")
 
+    for line in vp.get("credit") or []:
+        lines.append(f"    %% {line}")
+
     return "\n".join(lines) + "\n"
 
 
@@ -189,6 +192,8 @@ def to_lucid_document(vp: Dict[str, Any]) -> Dict[str, Any]:
         # fabricated element. A key of its own so it can never collide with
         # a Lucid-native key.
         document["notes"] = [f"{r['box_key']}: {r['reason']}" for r in reasons]
+    if vp.get("credit"):
+        document["credit"] = list(vp["credit"])
     return document
 
 
@@ -319,6 +324,9 @@ def to_archi(vp: Dict[str, Any]) -> str:
         ET.SubElement(root, "property", attrib={
             "key": f"reason:{r['box_key']}", "value": r["reason"],
         })
+
+    for line in vp.get("credit") or []:
+        ET.SubElement(root, "property", attrib={"key": "credit", "value": line})
 
     raw = ET.tostring(root, encoding="unicode")
     reparsed = minidom.parseString(f'<?xml version="1.0" encoding="UTF-8"?>{raw}')
@@ -477,4 +485,7 @@ def export_canvas_viewpoint(template_key: str, saved_diagram_id, fmt: str, name:
         vp = {"viewpoint_name": name, "elements": [], "relationships": []}
 
     vp["reasons"] = canvas_export_reasons(template_key, saved_diagram_id)
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    vp["credit"] = CANVAS_TEMPLATES.get(template_key, {}).get("credit", [])
     return render_viewpoint(vp, fmt)

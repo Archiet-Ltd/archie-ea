@@ -4,7 +4,7 @@
 {% set SPEC = {
   'form': 'C4', 'name': 'Lean canvas', 'grid': 'grid-cols-10 grid-rows-[auto_auto_auto]',
   'hint': 'Scroll sideways on a narrow screen to see all nine blocks. The number on each block is the order to fill them in.',
-  'credit': 'Lean Canvas adapted by Ash Maurya from the Business Model Canvas.',
+  'credit': canvas_credit or '',
   'boxes': [
     {'key': 'problem', 'title': 'Problem', 'number': '2', 'question': 'What are the top three problems?', 'empty': 'No problems yet. Add the assessments that name what customers struggle with.', 'area': 'col-span-2 col-start-1 row-span-2 row-start-1',
      'subs': [{'key': 'existing-alternatives', 'title': 'Existing alternatives', 'question': 'How do they cope today?', 'empty': 'No alternatives yet. Add the competitors or workarounds customers use today.'}]},

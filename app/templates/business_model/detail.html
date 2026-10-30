@@ -24,7 +24,8 @@
 <div class="flex-1 overflow-auto">
   {{ page_header(
       title='Value Proposition Canvas' if vpc else (canvas.name or canvas_type_name),
-      description=('What ' ~ (canvas.name or 'this canvas') ~ ' offers each customer segment. It reads the same elements as the business model canvas.') if vpc else canvas.description,
+      description=('What ' ~ (canvas.name or 'this canvas') ~ ' offers each customer segment. It reads the same elements as the business model canvas.') if vpc else '',
+      class='mb-3',
       breadcrumbs=([
           {'label': 'Home', 'href': url_for('main.index')},
           {'label': 'Canvases', 'href': url_for('business_model.index')},
@@ -38,7 +39,7 @@
       actions=actions
   ) }}
 
-  <div class="space-y-6">
+  <div class="space-y-3">
     {% for category, message in get_flashed_messages(with_categories=true) %}
     <div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" data-testid="bmc-error">{{ message }}</div>
     {% endfor %}
@@ -71,11 +72,12 @@
     </section>
     {% endif %}
     {% else %}
-    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
-      {% if vision %}
-      <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
-      {% endif %}
-      <div class="ml-auto flex flex-wrap items-end gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5 text-sm text-muted-foreground">
+        {% if canvas.description %}<p data-testid="bmc-description">{{ canvas.description }}</p>{% endif %}
+        {% if vision %}<p data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>{% endif %}
+      </div>
+      <div class="ml-auto flex flex-wrap items-center gap-2">
       {% if can_edit and canvas_key == 'wardley_mapping' %}
       {% set add_items = [] %}
       {% for key, zone in zones.items() if zone.membership != 'attribute' %}{% set _ = add_items.append({'text': zone.label, 'onclick': "Platform.modal.open('add-" ~ (key | replace('_', '-')) ~ "')"}) %}{% endfor %}
@@ -85,13 +87,13 @@
       {% endif %}
       {% if canvas_key == 'business_model_canvas' %}
       {% if can_edit %}
-      <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-operating-model-panel">
+      <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-center gap-2" data-testid="bmc-operating-model-panel">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         <div class="flex flex-col gap-1.5">
-          {% call label(for='bmc-operating-model') %}Operating model{% endcall %}
+          {% call label(for='bmc-operating-model', class='sr-only') %}Operating model{% endcall %}
           {% call native_select(id='bmc-operating-model', name='operating_model_type', size='sm', attrs_dict={'data-testid': 'bmc-operating-model-select', 'x-on:change': '$el.form.requestSubmit()'}) %}
-            <option value="">Not set</option>
-            {% for t in operating_model_types %}<option value="{{ t }}"{% if canvas.operating_model_type == t %} selected{% endif %}>{{ t | capitalize }}</option>{% endfor %}
+            <option value="">Operating model: not set</option>
+            {% for t in operating_model_types %}<option value="{{ t }}"{% if canvas.operating_model_type == t %} selected{% endif %}>Operating model: {{ t | capitalize }}</option>{% endfor %}
           {% endcall %}
         </div>
       </form>
@@ -99,13 +101,13 @@
       <p class="flex h-9 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-operating-model-text">Operating model: <span class="font-medium text-foreground">{{ canvas.operating_model_type | capitalize }}</span></p>
       {% endif %}
       {% endif %}
-      <form method="get" action="{{ url_for('business_model.export_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-export-panel">
+      <form method="get" action="{{ url_for('business_model.export_canvas', canvas_id=canvas.id) }}" class="flex items-center gap-2" data-testid="bmc-export-panel">
         <div class="flex flex-col gap-1.5">
-          {% call label(for='bmc-export-format') %}Download as{% endcall %}
+          {% call label(for='bmc-export-format', class='sr-only') %}Download as{% endcall %}
           {% call native_select(id='bmc-export-format', name='format', size='sm', attrs_dict={'data-testid': 'bmc-export-format'}) %}
-            <option value="mermaid">Mermaid</option>
-            <option value="lucid">Lucidchart</option>
-            <option value="archi">Archi</option>
+            <option value="mermaid">Download as Mermaid</option>
+            <option value="lucid">Download as Lucidchart</option>
+            <option value="archi">Download as Archi</option>
           {% endcall %}
         </div>
         {{ button(text='Download', variant='outline', type='submit', testid='bmc-export-file') }}

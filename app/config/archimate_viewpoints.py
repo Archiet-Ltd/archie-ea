@@ -1517,6 +1517,10 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
     "lean_canvas": {
         "key": "lean_canvas",
         "name": "Lean Canvas",
+        "credit": [
+            "Business Model Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder and Yves Pigneur, licensed under CC BY-SA.",
+            "Lean Canvas adapted by Ash Maurya from the Business Model Canvas, CC BY-SA.",
+        ],
         "record": "business_model_canvas",
         "projects": ["motivation", "strategy"],
         "zones": _LEAN_ZONES,
@@ -1524,6 +1528,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
     "business_model_canvas": {
         "key": "business_model_canvas",
         "name": "Business Model Canvas",
+        "credit": ["Business Model Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder and Yves Pigneur, licensed under CC BY-SA."],
         "record": "business_model_canvas",
         "projects": ["motivation", "strategy", "product"],
         "zones": _BMC_ZONES,

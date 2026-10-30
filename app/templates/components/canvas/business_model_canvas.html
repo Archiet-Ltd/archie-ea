@@ -12,7 +12,7 @@
 {% set SPEC = {
   'form': 'C4', 'name': 'Business model canvas', 'grid': 'grid-cols-10 grid-rows-[auto_auto_auto]',
   'hint': 'Scroll sideways on a narrow screen to see all nine blocks.',
-  'credit': 'Business Model Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder and Yves Pigneur.',
+  'credit': canvas_credit or '',
   'boxes': [
     {'key': 'key-partners', 'empty': 'No partners yet. Add the organisations and suppliers you rely on.', 'title': 'Key Partners', 'icon': 'handshake', 'question': 'Who helps you?', 'area': 'col-span-2 row-span-2 row-start-1'},
     {'key': 'key-activities', 'empty': 'No activities yet. Add the processes and functions that deliver the offer.', 'title': 'Key Activities', 'icon': 'clipboard-check', 'question': 'What must you do every day?', 'area': 'col-span-2 col-start-3 row-start-1'},
