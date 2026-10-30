@@ -126,6 +126,7 @@ def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
         assert chat_names, "the AI chat must name at least one connected element for Calibration Ledger"
 
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        listed_before = page.get_by_test_id("impact-run-row").count()
         _pick(page, "Calibration Ledger")
 
         # A cited answer, naming the same connected elements as the chat.
@@ -138,7 +139,7 @@ def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
         # recorded-runs table, and its figures are the answer's: one store, one
         # set of numbers. (Changed with the lead's ruling of 30 Oct: a GET no
         # longer stores a run, so the run appears on Save, not on picking.)
-        assert page.get_by_test_id("impact-run-row").count() == 0
+        assert page.get_by_test_id("impact-run-row").count() == listed_before
         _save(page)
         runs = page.get_by_test_id("impact-run-row")
         expect(runs.first).to_be_visible(timeout=PAGE_TIMEOUT)
