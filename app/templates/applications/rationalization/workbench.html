@@ -50,7 +50,7 @@
       {% call ui.card_header() %}{{ ui.card_title(text='Scored applications by disposition') }}{{ ui.card_description(text='The recommendation each scored application carries') }}{% endcall %}
       {% call ui.card_content(class='flex flex-col gap-4') %}
         {% if summary and summary.dispositions %}
-        {{ d.bar_rows(summary.dispositions, 'disposition', 'applications', 'Applications', 'hsl(var(--chart-1))', label='Scored applications by disposition', testid='workbench-disposition-chart') }}
+        {{ d.bar_rows(summary.dispositions, 'disposition', 'applications', 'Applications', chart_colour, label='Scored applications by disposition', testid='workbench-disposition-chart') }}
         {% call ui.table_container() %}{% call ui.table() %}
           {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Disposition') }}{{ ui.table_head(text='Applications', class='text-right') }}{% endcall %}{% endcall %}
           {% call ui.table_body() %}
@@ -115,7 +115,7 @@
           {{ ui.native_select_option(text='Name (A to Z)', value='name_asc') }}
         {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
         <label class="flex h-8 items-center gap-2 text-sm text-muted-foreground">
-          {{ ui.input(attrs={'type': 'checkbox', 'x-model': 'filters.includeUnscored', '@change': 'page = 1; load()', 'data-testid': 'include-unscored'}) }}Include unscored
+          {{ ui.input(class='size-4 w-4 p-0', attrs={'type': 'checkbox', 'x-model': 'filters.includeUnscored', '@change': 'page = 1; load()', 'data-testid': 'include-unscored'}) }}Include unscored
         </label>
       </div>
 

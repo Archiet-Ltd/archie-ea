@@ -371,6 +371,7 @@ def rationalization_workbench():
         active_tab="workbench",
         portfolio_applications=_portfolio_application_count(),
         summary=_workbench_summary(),
+        chart_colour="hsl(var(--chart-1))",
     )
 
 
