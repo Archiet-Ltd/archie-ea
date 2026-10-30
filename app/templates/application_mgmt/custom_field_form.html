@@ -1,104 +1,54 @@
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Custom Field Management{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <div class="max-w-4xl mx-auto">
-        <!-- Header -->
-        <div class="mb-8">
-            {% macro _ps_actions() %}
-<a href="{{ url_for('unified_applications.application_list') }}"
-                   class="inline-flex items-center px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2" aria-hidden="true"></i>
-                    Back to Applications
-                </a>
-            {% endmacro %}
-            {{ page_shell(title='Custom Field Management', breadcrumb=[('Home', '/'), ('Custom Field Management', none)], subtitle='Manage custom fields for applications', actions_caller=_ps_actions) }}
-        </div>
+    <div class="max-w-2xl mx-auto">
+        {% macro _ps_actions() %}
+        {% call ui.button(href=url_for('unified_applications.application_list'), variant='outline') %}{{ lucide('arrow-left') }}Back to Applications{% endcall %}
+        {% endmacro %}
+        {{ page_shell(title='Custom Field Management', breadcrumb=[('Home', '/'), ('Custom Field Management', none)], subtitle='Manage custom fields for applications', actions_caller=_ps_actions) }}
 
-        <!-- Custom Field Form -->
-        <div class="bg-card rounded-lg border border-border p-6">
-            <form method="POST" action="{{ request.path }}">
-                {{ form.hidden_tag() }}
-                
-                <!-- Field Name -->
-                <div class="mb-6">
-                    {{ form.field_name.label(class="block text-sm font-medium text-foreground mb-2") }}
-                    {{ form.field_name(class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring") }}
-                    {% if form.field_name.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.field_name.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
+        <form method="POST" action="{{ request.path }}" class="mt-6" data-testid="custom-field-form">
+            {{ form.hidden_tag() }}
+            {% call ui.card() %}{% call ui.card_content(class='space-y-6') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text=form.field_name.label.text, attrs={'for': form.field_name.id}) }}
+                    {{ ui.input(id=form.field_name.id, name=form.field_name.name, type='text', value=form.field_name.data or '') }}
+                    {% for error in form.field_name.errors %}{{ ui.field_error(text=error) }}{% endfor %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text=form.field_type.label.text, attrs={'for': form.field_type.id}) }}
+                    {% call ui.native_select_wrapper(class='w-full') %}{% call ui.native_select(id=form.field_type.id, name=form.field_type.name, class='w-full') %}
+                        {% for value, label in form.field_type.choices %}{{ ui.native_select_option(label, value=value, selected=(value == form.field_type.data)) }}{% endfor %}
+                    {% endcall %}{% endcall %}
+                    {% for error in form.field_type.errors %}{{ ui.field_error(text=error) }}{% endfor %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text=form.description.label.text, attrs={'for': form.description.id}) }}
+                    {{ ui.textarea(id=form.description.id, name=form.description.name, rows=3, text=form.description.data or '') }}
+                    {% for error in form.description.errors %}{{ ui.field_error(text=error) }}{% endfor %}
+                {% endcall %}
+                {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
+                    {{ ui.checkbox(id=form.required.id, name=form.required.name, checked=form.required.data) }}
+                    {{ ui.field_label(text=form.required.label.text, attrs={'for': form.required.id}) }}
+                    {% for error in form.required.errors %}{{ ui.field_error(text=error) }}{% endfor %}
+                {% endcall %}
+                <div class="flex items-center justify-end gap-3">
+                    {{ ui.button(text='Cancel', variant='outline', href=url_for('unified_applications.application_list')) }}
+                    {{ ui.button(text='Save Custom Field', type='submit') }}
                 </div>
+            {% endcall %}{% endcall %}
+        </form>
 
-                <!-- Field Type -->
-                <div class="mb-6">
-                    {{ form.field_type.label(class="block text-sm font-medium text-foreground mb-2") }}
-                    {{ form.field_type(class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring") }}
-                    {% if form.field_type.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.field_type.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Field Description -->
-                <div class="mb-6">
-                    {{ form.description.label(class="block text-sm font-medium text-foreground mb-2") }}
-                    {{ form.description(class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring", rows="3") }}
-                    {% if form.description.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.description.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Required Field -->
-                <div class="mb-6">
-                    <div class="flex items-center">
-                        {{ form.required(class="h-4 w-4 text-primary focus:ring-primary border-border rounded") }}
-                        {{ form.required.label(class="ml-2 block text-sm text-foreground") }}
-                    </div>
-                    {% if form.required.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.required.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Submit Buttons -->
-                <div class="flex items-center justify-end space-x-4">
-                    <a href="{{ url_for('unified_applications.application_list') }}"
-                       class="px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-                        Cancel
-                    </a>
-                    <button type="submit"
-                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-                        Save Custom Field
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Existing Custom Fields -->
         <div class="mt-8">
             <h2 class="text-lg font-semibold text-foreground mb-4">Existing Custom Fields</h2>
-            <div class="bg-card rounded-lg border border-border">
-                <div class="p-4">
-                    <p class="text-muted-foreground text-sm">No custom fields defined yet.</p>
-                </div>
-            </div>
+            {% call ui.card() %}{% call ui.card_content() %}
+                <p class="text-muted-foreground text-sm">No custom fields defined yet.</p>
+            {% endcall %}{% endcall %}
         </div>
     </div>
 </div>

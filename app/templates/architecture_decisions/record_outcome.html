@@ -1,4 +1,6 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/input.html' import hidden_input %}
 {% from "components/page_header.html" import page_header %}
 
 {% block title %}Record Review Outcome{% endblock %}
@@ -17,9 +19,9 @@
         ]
     ) }}
 
-    <form method="POST" action="{{ url_for('arch_decisions.record_outcome', decision_id=decision.id) }}"
-          class="bg-card border border-border rounded-lg p-6 space-y-5">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form method="POST" action="{{ url_for('arch_decisions.record_outcome', decision_id=decision.id) }}" data-testid="record-outcome-form">
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        {% call ui.card() %}{% call ui.card_content(class='space-y-6') %}
 
         <div class="text-sm text-muted-foreground">
             Review date: <span class="font-medium text-foreground">{{ decision.review_date.isoformat() if decision.review_date else '—' }}</span>
@@ -86,31 +88,23 @@
         </div>
         {% endif %}
 
-        <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1" for="review_outcome">
-                Review Outcome <span class="text-destructive-emphasis">*</span>
-            </label>
-            <p class="text-xs text-muted-foreground mb-2">What was found, and whether the decision still stands.</p>
-            <textarea id="review_outcome" name="review_outcome" rows="5" required
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-                      placeholder="The decision still holds; renewed the vendor contract for another 12 months...">{{ decision.review_outcome or '' }}</textarea>
-        </div>
+        {% call ui.field() %}
+            {{ ui.field_label(text='Review Outcome', attrs={'for': 'review_outcome'}) }}
+            {{ ui.field_description(text='What was found, and whether the decision still stands.') }}
+            {{ ui.textarea(id='review_outcome', name='review_outcome', rows=5, required=true, class='resize-y', placeholder='The decision still holds; renewed the vendor contract for another 12 months...', text=decision.review_outcome or '') }}
+        {% endcall %}
 
-        <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1" for="next_review_date">Next Review Date</label>
-            <p class="text-xs text-muted-foreground mb-2">Leave blank if this decision does not need reviewing again.</p>
-            <input type="date" id="next_review_date" name="next_review_date"
-                   class="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
+        {% call ui.field() %}
+            {{ ui.field_label(text='Next Review Date', attrs={'for': 'next_review_date'}) }}
+            {{ ui.field_description(text='Leave blank if this decision does not need reviewing again.') }}
+            {{ ui.input(id='next_review_date', name='next_review_date', type='date', class='max-w-xs') }}
+        {% endcall %}
 
-        <div class="flex justify-end gap-3 pt-2">
-            <a href="{{ url_for('arch_decisions.view_decision', decision_id=decision.id) }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Cancel</a>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Record Outcome
-            </button>
+        <div class="flex justify-end gap-3">
+            {{ ui.button(text='Cancel', variant='outline', href=url_for('arch_decisions.view_decision', decision_id=decision.id)) }}
+            {{ ui.button(text='Record Outcome', type='submit') }}
         </div>
+        {% endcall %}{% endcall %}
     </form>
 </div>
 {% endblock %}

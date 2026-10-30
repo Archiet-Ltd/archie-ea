@@ -1,25 +1,29 @@
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Register agent — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
-<div class="flex-1 overflow-auto p-6 max-w-xl">
+<div class="flex-1 overflow-auto p-6 max-w-2xl">
   {{ page_shell(
       title='Register agent',
       breadcrumb=[('Home', url_for('main.index')), ('Agent Registry', url_for('agent_registry.index')), ('Register', None)]
   ) }}
-  <form method="post" class="space-y-4" data-testid="new-agent-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div>
-      <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-      <input type="text" id="name" name="name" required class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
-    </div>
-    <div>
-      <label for="purpose" class="block text-sm font-medium text-muted-foreground mb-1">Purpose</label>
-      <textarea id="purpose" name="purpose" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
-    </div>
-    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Register</button>
+  <form method="post" data-testid="new-agent-form">
+    {{ hidden_input('csrf_token', csrf_token()) }}
+    {% call ui.card() %}{% call ui.card_content(class='space-y-6') %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Name', attrs={'for': 'name'}) }}
+        {{ ui.input(id='name', name='name', type='text', required=true) }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Purpose', attrs={'for': 'purpose'}) }}
+        {{ ui.textarea(id='purpose', name='purpose', rows=3) }}
+      {% endcall %}
+      <div>{{ ui.button(text='Register', type='submit') }}</div>
+    {% endcall %}{% endcall %}
   </form>
 </div>
 {% endblock %}
