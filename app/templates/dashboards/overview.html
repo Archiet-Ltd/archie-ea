@@ -88,7 +88,7 @@
       {% endif %}
       {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change < 0) if cost.change is not none and cost.change != 0 else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
-      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once an application states its annual cost.' if not cost.applications else (cost.applications ~ (' application has' if cost.applications == 1 else ' applications have') ~ ' no annual cost recorded yet.'), links.spend) }}
     {% endif %}
 
     {# Relationships #}
@@ -156,10 +156,10 @@
         {% call ui.card_content(class='flex flex-col gap-2') %}
           {% if cost.total is not none %}
           <span class="text-2xl font-semibold tabular-nums" data-testid="monthly-cost-value" title="{{ cost.this_month_exact }}">{{ cost.this_month_short }}</span>
-          <span class="flex items-center gap-2 text-sm text-muted-foreground">{% if cost.change %}{{ d.delta('%+d%%' % cost.change, cost.change <= 0) }} than last month{% elif cost.change == 0 %}Same as last month{% else %}Active contracts, per month{% endif %}</span>
-          {{ d.chart('area', cost.series, [{'key': 'value', 'label': 'Run cost', 'color': chart_1}], grid=false, class='aspect-auto h-[110px] w-full', label='Run cost by month') }}
+          <span class="flex items-center gap-2 text-sm text-muted-foreground">{% if cost.change %}{{ d.delta('%+d%%' % cost.change, cost.change <= 0) }} than last month{% elif cost.change == 0 %}Same as last month{% else %}Across the applications, per month{% endif %}</span>
+          {% if cost.series %}{{ d.chart('area', cost.series, [{'key': 'value', 'label': 'Run cost', 'color': chart_1}], grid=false, class='aspect-auto h-[110px] w-full', label='Run cost by month') }}{% endif %}
           {% else %}
-          <p class="text-sm text-muted-foreground" data-testid="monthly-cost-empty">The monthly run cost appears once a contract states its annual cost.</p>
+          <p class="text-sm text-muted-foreground" data-testid="monthly-cost-empty">The monthly run cost appears once an application states its annual cost.</p>
           {% endif %}
         {% endcall %}
       {% endcall %}

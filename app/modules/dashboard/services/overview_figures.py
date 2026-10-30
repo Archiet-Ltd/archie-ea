@@ -18,7 +18,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 from app import db
 
@@ -119,13 +119,10 @@ def _is_first_visit(user):
 
 
 def _active_applications():
-    """The applications the Systems list shows by default."""
-    from app.models.application_portfolio import ApplicationComponent as A
+    """The applications the Systems list shows by default (the rule every count and cost total uses)."""
+    from app.services.application_cost_accessor import counted_applications_query
 
-    return db.select(A).where(
-        ~A.name.ilike("(Duplicate)%", escape="\\"),
-        or_(A.lifecycle_status.is_(None), func.lower(A.lifecycle_status) != "5. decommissioned"),
-    )
+    return counted_applications_query()
 
 
 def _applications(org_id, now):
@@ -228,45 +225,38 @@ def _months(now, count=12):
 
 
 def _run_cost(org_id, now):
-    from app.models.application_portfolio import VendorContract
-    from app.modules.procurement.services import get_spend_summary
+    """The annual run cost: what the organisation's applications cost, read through the one cost accessor."""
+    from app.models.application_portfolio import ApplicationComponent as A
+    from app.services.application_cost_accessor import organisation_annual_cost
 
-    summary = get_spend_summary(org_id)
-    total = summary["total_annual_cost"]
+    summary = organisation_annual_cost(org_id)
+    total = summary["total"]
     if total is None:
-        return {"total": None, "contracts": summary["total_contracts"]}
-    contracts = db.session.execute(
-        db.select(VendorContract.start_date, VendorContract.end_date, VendorContract.annual_cost).where(
-            VendorContract.organization_id == org_id,
-            VendorContract.status == "active",
-            VendorContract.annual_cost.isnot(None),
-        )
-    ).all()
-    series = []
-    for first in _months(now.date()):
-        nxt = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
-        monthly = sum(
-            c.annual_cost / 12
-            for c in contracts
-            if c.start_date < nxt and (c.end_date is None or c.end_date >= first)
-        )
-        series.append({"month": first.strftime("%b"), "value": round(monthly)})
-    this_month, last_month = series[-1]["value"], series[-2]["value"]
-    top = summary["top_vendors"][0] if summary["top_vendors"] else None
-    share = None
-    if top and top[1]["annual_cost"] and total:
-        share = {"name": top[0], "percent": round(top[1]["annual_cost"] / total * 100)}
+        return {"total": None, "applications": summary["applications"], "with_cost": 0}
+    month = total / 12
+    top = None
+    ranked = sorted(
+        ((app_id, f["value"]) for app_id, f in summary["figures"].items() if f["value"] is not None),
+        key=lambda item: (-item[1], item[0]),
+    )
+    if ranked:
+        name = db.session.execute(
+            db.select(A.name).where(A.id == ranked[0][0], A.organization_id == org_id)
+        ).scalar_one_or_none()
+        if name:
+            top = {"name": name, "percent": round(ranked[0][1] / total * 100)}
     return {
         "total": total,
         "total_short": _money(total, compact=True),
         "total_exact": _money(total),
-        "contracts": summary["total_contracts"],
-        "series": series,
-        "this_month": this_month,
-        "this_month_short": _money(this_month, compact=True),
-        "this_month_exact": _money(this_month),
-        "change": _percent_change(this_month, last_month),
-        "top": share,
+        "applications": summary["applications"],
+        "with_cost": summary["applications_with_cost"],
+        "series": [],
+        "this_month": month,
+        "this_month_short": _money(month, compact=True),
+        "this_month_exact": _money(month),
+        "change": None,
+        "top": top,
     }
 
 
@@ -536,11 +526,12 @@ def _table(org_id, with_cost=True):
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import lifecycle_label
     from app.models.application_portfolio import ApplicationComponent as A
-    from app.services.application_cost_accessor import get_annual_cost_float
+    from app.services.application_cost_accessor import annual_cost_figures
     from app.services.element_ownership_service import application_is_owned
 
     apps = db.session.execute(_active_applications().where(A.organization_id == org_id).order_by(A.name)).scalars().all()
     owners = ApplicationOwner.get_display_rows_for_applications([a.id for a in apps], org_id) if apps else {}
+    figures = annual_cost_figures(apps) if with_cost else {}
     rows = []
     for app in apps:
         names = []
@@ -556,7 +547,8 @@ def _table(org_id, with_cost=True):
             "status": lifecycle_label(app.lifecycle_status),
             "owners": names,
             "owner": ", ".join(names) if names else None,
-            "cost": get_annual_cost_float(app) if with_cost else None,
+            "cost": figures.get(app.id, {}).get("value"),
+            "cost_source": figures.get(app.id, {}).get("source"),
         })
         rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
@@ -565,20 +557,15 @@ def _table(org_id, with_cost=True):
 
 
 def _name_the_basis(run_cost, applications_cost):
-    """Say where the run cost comes from, and why the applications' own costs may add up to another figure."""
+    """Say where the run cost comes from."""
     if run_cost["total"] is None:
         return
-    count = run_cost["contracts"]
-    run_cost["basis"] = "from %d active %s" % (count, "contract" if count == 1 else "contracts")
+    count = run_cost["with_cost"]
+    run_cost["basis"] = "from the annual cost of %d %s" % (count, "application" if count == 1 else "applications")
     run_cost["difference"] = None
-    if applications_cost is None:
-        return
-    gap = run_cost["total"] - applications_cost
-    if round(gap) > 0:
-        run_cost["difference"] = "%s of contract cost is not yet tied to an application." % _money(gap, compact=True)
-    elif round(gap) < 0:
-        run_cost["difference"] = "The applications' own costs add up to %s, %s more than the contracts state." % (
-            _money(applications_cost, compact=True), _money(-gap, compact=True))
+    missing = run_cost["applications"] - count
+    if missing > 0:
+        run_cost["difference"] = "%d %s no cost recorded." % (missing, "application has" if missing == 1 else "applications have")
 
 
 def build_overview(org_id, user, now=None, with_cost=True):
@@ -591,7 +578,7 @@ def build_overview(org_id, user, now=None, with_cost=True):
     apps = _applications(org_id, now)
     sourced = _sourced_share(org_id)
     relationships = _relationships(org_id, now)
-    run_cost = _run_cost(org_id, now) if with_cost else {"total": None, "contracts": 0, "withheld": True}
+    run_cost = _run_cost(org_id, now) if with_cost else {"total": None, "applications": 0, "with_cost": 0, "withheld": True}
     changes = _history(org_id, now)
     activity = _activity(changes, now, org_id)
     table = _table(org_id, with_cost)
