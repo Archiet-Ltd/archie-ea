@@ -1,11 +1,15 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
 {% block room_content %}
-<section class="rounded-lg border border-border bg-card p-5" aria-labelledby="options-heading" data-resource-state="{{ room.stage_view.resource_states.options.state }}">
+{% call card.card(class='') %}
+<section class="p-5" aria-labelledby="options-heading" data-resource-state="{{ room.stage_view.resource_states.options.state }}">
   <h2 id="options-heading" class="text-lg font-semibold text-foreground">Transformation options</h2>
   <p class="mt-1 text-sm text-muted-foreground">Business, policy, process and technology choices remain distinct; technology is never assumed.</p>
   {% if room.stage_view.resources.options %}
-  <div class="mt-4 grid gap-4 sm:grid-cols-2">{% for option in room.stage_view.resources.options %}<article class="rounded-md border border-border p-4"><h3 class="text-sm font-semibold text-foreground">{{ option.title }}</h3><p class="mt-1 text-xs text-muted-foreground">{{ option.action_type|replace('_', ' ')|title }}</p><p class="mt-3 text-sm text-muted-foreground">{{ option.description or '—' }}</p></article>{% endfor %}</div>
+  <div class="mt-4 grid gap-4 sm:grid-cols-2">{% for option in room.stage_view.resources.options %}{% call card.card(class='p-4') %}<article><h3 class="text-sm font-semibold text-foreground">{{ option.title }}</h3><p class="mt-1 text-xs text-muted-foreground">{{ option.action_type|replace('_', ' ')|title }}</p><p class="mt-3 text-sm text-muted-foreground">{{ option.description or '—' }}</p></article>{% endcall %}{% endfor %}</div>
   {% else %}<p class="mt-4 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.options }}</p>{% endif %}
   {% if room.stage_view.resource_states.option_versions and room.stage_view.resource_states.option_versions.state == 'unavailable' %}<p class="mt-4 text-sm text-destructive-emphasis" role="alert">{{ room.stage_view.resource_states.option_versions.reason }}</p>{% endif %}
 </section>
+{% endcall %}
 {% endblock %}

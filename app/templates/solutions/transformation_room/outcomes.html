@@ -1,9 +1,15 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
+{% import "basecoat/index.html" as ui %}
 {% block room_content %}
-<section class="rounded-lg border border-border bg-card p-5" aria-labelledby="outcomes-heading" data-resource-state="{{ room.stage_view.resource_states.stage.state }}">
+{% call card.card(class='') %}
+<section class="p-5" aria-labelledby="outcomes-heading" data-resource-state="{{ room.stage_view.resource_states.stage.state }}">
   <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Not available in this release</p>
   <h2 id="outcomes-heading" class="mt-1 text-lg font-semibold text-foreground">Measured outcomes</h2>
   <p class="mt-2 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.stage }}</p>
   <p class="mt-4 text-sm text-muted-foreground">Outcome commitments remain visible in the programme context; measured actuals are not available.</p>
+  <div class="mt-5">{{ ui.button(text='Return to the objective', href=url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage='objective'), variant='outline', attrs={'data-testid': 'stage-next-step'}) }}</div>
 </section>
+{% endcall %}
 {% endblock %}

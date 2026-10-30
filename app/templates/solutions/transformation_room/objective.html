@@ -1,24 +1,36 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
+{% import "basecoat/index.html" as ui %}
+{% from "components/form_field.html" import form_group %}
 {% block room_content %}
 <div class="grid gap-6 lg:grid-cols-3">
-  <section class="rounded-lg border border-border bg-card p-5 lg:col-span-2" aria-labelledby="objective-heading">
+  {% call card.card(class='lg:col-span-2') %}
+  <section class="p-5" aria-labelledby="objective-heading">
     <h2 id="objective-heading" class="text-lg font-semibold text-foreground">Objective and scope</h2>
     <p class="mt-1 text-sm text-muted-foreground">Keep the accountable business change explicit before discovery begins.</p>
     {% if room.form_error %}<p class="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" role="alert">{{ room.form_error }}</p>{% endif %}
     <form method="post" data-testid="objective-form" class="mt-5 space-y-4" x-data="{ submitting: false }" @submit="submitting = true" @pageshow.window="submitting = false" :aria-busy="submitting">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="expected_revision" value="{{ room.workstream.revision }}">
-      <input type="hidden" name="command_key" value="{{ room.command_key }}">
-      <label class="block text-sm font-medium text-muted-foreground mb-1 grid gap-2">Objective<textarea name="objective" rows="4" required class="rounded-md border border-input bg-background px-3 py-2 text-sm">{{ room.workstream.objective or '' }}</textarea></label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1 grid gap-2">Business units in scope<input name="scope_expression" value="{{ room.workstream.scope_expression.business_units|join(', ') if room.workstream.scope_expression and room.workstream.scope_expression.business_units else '' }}" required class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
-      <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"><span x-show="!submitting">Save objective</span><span x-show="submitting" x-cloak role="status" aria-live="polite">Saving…</span></button>
+      {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {{ ui.input(type='hidden', name='expected_revision', value=room.workstream.revision) }}
+      {{ ui.input(type='hidden', name='command_key', value=room.command_key) }}
+      {% call form_group(id='objective', label='Objective', required=true) %}
+        {{ ui.textarea(id='objective', name='objective', rows=4, required=true, text=room.workstream.objective or '') }}
+      {% endcall %}
+      {% call form_group(id='scope_expression', label='Business units in scope', required=true) %}
+        {{ ui.input(id='scope_expression', name='scope_expression', required=true, value=(room.workstream.scope_expression.business_units|join(', ') if room.workstream.scope_expression and room.workstream.scope_expression.business_units else '')) }}
+      {% endcall %}
+      {% call ui.button(type='submit', attrs={':disabled': 'submitting'}) %}<span x-show="!submitting">Save objective</span><span x-show="submitting" x-cloak role="status" aria-live="polite">Saving…</span>{% endcall %}
     </form>
   </section>
-  <aside class="rounded-lg border border-border bg-card p-5" aria-labelledby="objective-outcomes-heading" data-resource-state="{{ room.stage_view.resource_states.outcomes.state }}">
+  {% endcall %}
+  {% call card.card() %}
+  <aside class="p-5" aria-labelledby="objective-outcomes-heading" data-resource-state="{{ room.stage_view.resource_states.outcomes.state }}">
     <h2 id="objective-outcomes-heading" class="text-sm font-semibold text-foreground">Recorded outcomes</h2>
     {% if room.stage_view.resources.outcomes %}
     <ul class="mt-4 space-y-3">{% for outcome in room.stage_view.resources.outcomes %}<li class="text-sm text-foreground">{{ outcome.statement }}</li>{% endfor %}</ul>
     {% else %}<p class="mt-4 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.outcomes }}</p>{% endif %}
   </aside>
+  {% endcall %}
 </div>
 {% endblock %}

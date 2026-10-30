@@ -1,10 +1,14 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
 {% block room_content %}
-<section class="rounded-lg border border-border bg-card p-5" aria-labelledby="discover-heading" data-resource-state="{{ room.stage_view.resource_states.candidates.state }}">
+{% call card.card(class='') %}
+<section class="p-5" aria-labelledby="discover-heading" data-resource-state="{{ room.stage_view.resource_states.candidates.state }}">
   <h2 id="discover-heading" class="text-lg font-semibold text-foreground">Accepted candidates</h2>
   <p class="mt-1 text-sm text-muted-foreground">Only persisted candidates and their recorded signals appear here.</p>
   {% if room.stage_view.resources.candidates %}
   <div class="mt-4 divide-y divide-border">{% for candidate in room.stage_view.resources.candidates %}<article class="py-4"><h3 class="text-sm font-medium text-foreground">{{ candidate.subject_type|replace('_', ' ')|title }} {{ candidate.subject_id }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ candidate.inclusion_status|replace('_', ' ')|title }}{% if candidate.inclusion_reason %} · {{ candidate.inclusion_reason }}{% endif %}</p></article>{% endfor %}</div>
   {% else %}<p class="mt-4 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.candidates }}</p>{% endif %}
 </section>
+{% endcall %}
 {% endblock %}

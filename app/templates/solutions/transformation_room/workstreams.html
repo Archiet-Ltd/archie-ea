@@ -1,66 +1,54 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
+{% import "basecoat/index.html" as ui %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/list_table.html" import list_table %}
+{% from "basecoat/table.html" import table_cell %}
+{% from "basecoat/native-select.html" import native_select, native_select_option %}
 {% block room_content %}
-<section class="rounded-lg border border-border bg-card p-5" aria-labelledby="workstreams-heading">
+{% call card.card() %}
+<section class="p-5" aria-labelledby="workstreams-heading">
   <h2 id="workstreams-heading" class="text-lg font-semibold text-foreground">Programme workstreams</h2>
-  {% if room.workstreams %}
-  <div class="mt-4 divide-y divide-border">
-    {% for workstream in room.workstreams %}
-    <a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ workstream.id }}/objective" class="flex flex-col gap-2 py-4 hover:text-primary sm:flex-row sm:items-center sm:justify-between">
-      <div><p class="text-sm font-medium text-foreground">{{ workstream.workstream_type|replace('_', ' ')|title }}</p><p class="mt-1 text-sm text-muted-foreground">{{ workstream.objective or '—' }}</p></div>
-      <span class="text-xs text-muted-foreground">{{ (workstream.lifecycle_stage or '—')|replace('_', ' ')|title }}</span>
-    </a>
-    {% endfor %}
+  <div class="mt-4">
+    {% call(workstream) list_table(rows=room.workstreams, columns=[('Workstream', ''), ('Objective', ''), ('Stage', '')], caption='Programme workstreams', testid='workstreams-table', row_testid='workstream-row', empty_message='This programme has no workstreams yet. Add the first one below.') %}
+      {% call table_cell(class='font-medium') %}<a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ workstream.id }}/objective" class="hover:text-primary hover:underline">{{ workstream.workstream_type|replace('_', ' ')|title }}</a>{% endcall %}
+      {% call table_cell(class='max-w-[500px] truncate') %}{{ workstream.objective or '—' }}{% endcall %}
+      {% call table_cell() %}{{ ui.badge(text=(workstream.lifecycle_stage or 'Not set')|replace('_', ' ')|title, variant='outline') }}{% endcall %}
+    {% endcall %}
   </div>
-  {% else %}<p class="mt-4 text-sm text-muted-foreground">No persisted workstreams are available.</p>{% endif %}
 </section>
+{% endcall %}
 
-<section class="mt-6 rounded-lg border border-border bg-card p-5" aria-labelledby="add-workstream-heading">
+{% call card.card(class='mt-6') %}
+<section class="p-5" aria-labelledby="add-workstream-heading">
   <h2 id="add-workstream-heading" class="text-lg font-semibold text-foreground">Add workstream</h2>
   {% if room.form_error %}
-  <p class="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">{{ room.form_error }}</p>
+  <p class="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" role="alert">{{ room.form_error }}</p>
   {% endif %}
-  <form method="POST" action="" class="mt-4 grid gap-4 grid-cols-1">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="sm:col-span-1">
-      <label for="ws-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-      <select id="ws-type" name="workstream_type" required
-              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-        {% for wt in room.workstream_types or [] %}
-        <option value="{{ wt }}">{{ wt|replace('_', ' ')|title }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="sm:col-span-1">
-      <label for="ws-lead" class="block text-sm font-medium text-muted-foreground mb-1">Lead</label>
-      <select id="ws-lead" name="lead_id" required
-              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-        {% for opt in room.lead_options or [] %}
-        <option value="{{ opt.id }}">{{ opt.label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="">
-      <label for="ws-objective" class="block text-sm font-medium text-muted-foreground mb-1">Objective</label>
-      <textarea id="ws-objective" name="objective" required rows="2"
-                class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
-    </div>
-    <div class="sm:col-span-1">
-      <label for="ws-target-date" class="block text-sm font-medium text-muted-foreground mb-1">Target date</label>
-      <input id="ws-target-date" name="target_date" type="date"
-             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-    </div>
-    <div class="sm:col-span-1">
-      <label for="ws-target-reason" class="block text-sm font-medium text-muted-foreground mb-1">Target date unavailable — reason</label>
-      <input id="ws-target-reason" name="target_date_unavailable_reason" type="text"
-             placeholder="Required if no target date"
-             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-    </div>
-    <div class="">
-      <button type="submit"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        Add workstream
-      </button>
-    </div>
+  <form method="POST" action="" class="mt-4 max-w-2xl space-y-4">
+    {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+    {% call form_group(id='ws-type', label='Type', required=true) %}
+      {% call native_select(id='ws-type', name='workstream_type', required=true, class='w-full') %}
+        {% for wt in room.workstream_types or [] %}{{ native_select_option(text=wt|replace('_', ' ')|title, value=wt) }}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% call form_group(id='ws-lead', label='Lead', required=true) %}
+      {% call native_select(id='ws-lead', name='lead_id', required=true, class='w-full') %}
+        {% for opt in room.lead_options or [] %}{{ native_select_option(text=opt.label, value=opt.id) }}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% call form_group(id='ws-objective', label='Objective', required=true) %}
+      {{ ui.textarea(id='ws-objective', name='objective', required=true, rows=2) }}
+    {% endcall %}
+    {% call form_group(id='ws-target-date', label='Target date') %}
+      {{ ui.input(type='date', id='ws-target-date', name='target_date') }}
+    {% endcall %}
+    {% call form_group(id='ws-target-reason', label='Target date unavailable — reason', help_text='Required if no target date') %}
+      {{ ui.input(type='text', id='ws-target-reason', name='target_date_unavailable_reason', placeholder='Required if no target date') }}
+    {% endcall %}
+    <div>{{ ui.button(text='Add workstream', type='submit') }}</div>
   </form>
 </section>
+{% endcall %}
 {% endblock %}
