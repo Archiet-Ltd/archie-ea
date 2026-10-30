@@ -67,6 +67,19 @@ def _chat_connected_names(page, live_server):
     return sorted(rows.all_inner_texts())
 
 
+_SHOT_DIR = os.environ.get("JOURNEY_SHOT_DIR")
+
+
+def _shot_runs(page, name):
+    """Evidence for the report, only when JOURNEY_SHOT_DIR is set: the runs table in view."""
+    if not _SHOT_DIR:
+        return
+    os.makedirs(_SHOT_DIR, exist_ok=True)
+    table = page.get_by_test_id("impact-runs-table")
+    table.scroll_into_view_if_needed()
+    page.screenshot(path=os.path.join(_SHOT_DIR, name + ".png"))
+
+
 def _pick(page, name):
     page.locator("#impact-page-picker-input").fill(name)
     option = page.get_by_role("option", name=name, exact=True)
@@ -106,6 +119,8 @@ def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
         assert cells[2] == str(len(page_names)), (cells, len(page_names))
         assert str(int(cells[3]) + int(cells[4])) == cells[2], cells
 
+        _shot_runs(page, "impact-runs-table-1440-light")
+
         # The row's Open link lands on the stored answer with its rows.
         runs.first.get_by_test_id("impact-run-open").click()
         page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -137,5 +152,20 @@ def test_a_second_organisations_elements_never_appear(browser, live_server, demo
         body_text = page.locator("body").inner_text()
         assert "Calibration Ledger" not in body_text, "another organisation's application leaked into the picker"
         assert page.get_by_test_id("impact-run-row").count() == 0, "another organisation's run was listed"
+    finally:
+        context.close()
+
+
+def test_the_runs_table_reads_at_390_in_dark(browser, live_server, demo):
+    context = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, DEMO_EMAIL)
+        page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _pick(page, "Calibration Ledger")
+        expect(page.get_by_test_id("impact-run-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert "Calibration Ledger" in page.get_by_test_id("impact-run-row").first.inner_text()
+        _shot_runs(page, "impact-runs-table-390-dark")
     finally:
         context.close()
