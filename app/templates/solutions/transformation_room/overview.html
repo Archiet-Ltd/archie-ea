@@ -1,24 +1,33 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
+{% import "basecoat/index.html" as ui %}
 {% block room_content %}
 <div class="grid gap-6 lg:grid-cols-3">
-  <section class="rounded-lg border border-border bg-card p-5 lg:col-span-2" aria-labelledby="room-overview-heading">
+  {% call card.card(class='lg:col-span-2') %}
+<section class="p-5" aria-labelledby="room-overview-heading">
     <h2 id="room-overview-heading" class="text-lg font-semibold text-foreground">Transformation overview</h2>
     <p class="mt-2 text-sm text-muted-foreground">Follow the durable programme record from objective through evidence and options. Later governed stages remain visible without implying that their services are active.</p>
     {% if room.workstream %}
-    <a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ room.workstream.id }}/objective" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-5 items-center">Open current workstream</a>
+    <div class="mt-5">{{ ui.button(text='Open current workstream', href='/solutions/programmes/' ~ room.programme.id ~ '/workstreams/' ~ room.workstream.id ~ '/objective') }}</div>
     {% endif %}
   </section>
-  <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="overview-workstreams-heading">
+{% endcall %}
+  {% call card.card(class='') %}
+<section class="p-5" aria-labelledby="overview-workstreams-heading">
     <h2 id="overview-workstreams-heading" class="text-sm font-semibold text-foreground">Workstreams</h2>
     <p class="mt-3 text-2xl font-bold text-foreground">{{ room.workstreams|length }}</p>
     <a href="/solutions/programmes/{{ room.programme.id }}/workstreams" class="mt-4 inline-flex text-sm font-medium text-primary hover:underline">View workstreams</a>
   </section>
+{% endcall %}
   {% if 'stakeholder_map.stakeholder_map_page' in flask.current_app.view_functions %}
-  <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="overview-stakeholders-heading">
+  {% call card.card(class='') %}
+<section class="p-5" aria-labelledby="overview-stakeholders-heading">
     <h2 id="overview-stakeholders-heading" class="text-sm font-semibold text-foreground">Stakeholders</h2>
     <p class="mt-2 text-sm text-muted-foreground">Who this programme needs to manage, satisfy or keep informed.</p>
     <a href="{{ url_for('stakeholder_map.stakeholder_map_page', programme_id=room.programme.id) }}" data-testid="programme-stakeholder-map-link" class="mt-4 inline-flex text-sm font-medium text-primary hover:underline">Open stakeholder map</a>
   </section>
+{% endcall %}
   {% endif %}
 </div>
 {% endblock %}

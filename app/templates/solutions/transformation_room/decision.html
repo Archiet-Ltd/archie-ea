@@ -1,10 +1,16 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
+{% import "basecoat/index.html" as ui %}
 {% block room_content %}
-<section class="rounded-lg border border-border bg-card p-5" aria-labelledby="decision-heading" data-resource-state="{{ room.stage_view.resource_states.stage.state }}">
+{% call card.card(class='') %}
+<section class="p-5" aria-labelledby="decision-heading" data-resource-state="{{ room.stage_view.resource_states.stage.state }}">
   <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Not available in this release</p>
   <h2 id="decision-heading" class="mt-1 text-lg font-semibold text-foreground">Governed decision</h2>
   <p class="mt-2 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.stage }}</p>
   {% if room.stage_view.resources.briefs %}<div class="mt-5 border-t border-border pt-4"><h3 class="text-sm font-semibold text-foreground">Persisted decision briefs</h3><ul class="mt-3 space-y-2">{% for brief in room.stage_view.resources.briefs %}<li class="text-sm text-muted-foreground">{{ brief.title }} · {{ brief.status|replace('_', ' ')|title }}</li>{% endfor %}</ul></div>{% endif %}
   {% if room.stage_view.resource_states.brief_versions and room.stage_view.resource_states.brief_versions.state == 'unavailable' %}<p class="mt-4 text-sm text-destructive-emphasis" role="alert">{{ room.stage_view.resource_states.brief_versions.reason }}</p>{% endif %}
+  <div class="mt-5">{{ ui.button(text='Return to the objective', href=url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage='objective'), variant='outline', attrs={'data-testid': 'stage-next-step'}) }}</div>
 </section>
+{% endcall %}
 {% endblock %}

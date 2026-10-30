@@ -1,13 +1,19 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
 {% block room_content %}
 <div class="grid gap-6 lg:grid-cols-2">
-  <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="requests-heading" data-resource-state="{{ room.stage_view.resource_states.requests.state }}">
+  {% call card.card(class='') %}
+<section class="p-5" aria-labelledby="requests-heading" data-resource-state="{{ room.stage_view.resource_states.requests.state }}">
     <h2 id="requests-heading" class="text-lg font-semibold text-foreground">Evidence requests</h2>
     {% if room.stage_view.resources.requests %}<dl class="mt-4 divide-y divide-border">{% for item in room.stage_view.resources.requests %}<div class="py-3"><dt class="text-sm font-medium text-foreground">{{ item.claim_key }}</dt><dd class="mt-1 text-sm text-muted-foreground">{{ item.status|replace('_', ' ')|title }}{% if item.due_at %} · Due {{ item.due_at }}{% endif %}</dd></div>{% endfor %}</dl>{% else %}<p class="mt-4 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.requests }}</p>{% endif %}
   </section>
-  <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="evidence-heading" data-resource-state="{{ room.stage_view.resource_states.evidence.state }}">
+{% endcall %}
+  {% call card.card(class='') %}
+<section class="p-5" aria-labelledby="evidence-heading" data-resource-state="{{ room.stage_view.resource_states.evidence.state }}">
     <h2 id="evidence-heading" class="text-lg font-semibold text-foreground">Evidence records</h2>
     {% if room.stage_view.resources.evidence %}<dl class="mt-4 divide-y divide-border">{% for item in room.stage_view.resources.evidence %}<div class="py-3"><dt class="text-sm font-medium text-foreground">{{ item.claim_key }}</dt><dd class="mt-1 text-sm text-muted-foreground">{{ item.freshness_status|replace('_', ' ')|title }} · Integrity verified</dd></div>{% endfor %}</dl>{% elif room.stage_view.resource_states.evidence.state == 'unavailable' %}<p class="mt-4 text-sm text-destructive-emphasis" role="alert">{{ room.stage_view.resource_states.evidence.reason }}</p>{% else %}<p class="mt-4 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.evidence }}</p>{% endif %}
   </section>
+{% endcall %}
 </div>
 {% endblock %}

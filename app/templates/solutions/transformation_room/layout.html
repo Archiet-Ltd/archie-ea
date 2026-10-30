@@ -1,6 +1,9 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% import "components/card.html" as card %}
+{% from "components/tabs.html" import section_tabs %}
+{% import "basecoat/index.html" as ui %}
 
 {% block title %}{{ room.programme.name }} · Transformation Room{% endblock %}
 
@@ -19,16 +22,13 @@
       ]
   ) }}
 
-  <nav aria-label="Transformation Room" class="mb-6 overflow-x-auto rounded-lg border border-border bg-card p-1">
-    <div class="flex min-w-max gap-1">
-      <a href="{{ url_for('solution_design.transformation_programme_overview', programme_id=room.programme.id) }}" {% if room.stage in [none, 'objective', 'discover', 'evidence', 'options'] %}aria-current="page"{% endif %} class="rounded-md px-3 py-2 text-sm font-medium {% if room.stage in [none, 'objective', 'discover', 'evidence', 'options'] %}bg-accent text-accent-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}">Transform</a>
-      {% if room.workstream %}
-      {% for intent in [('decision', 'Decisions'), ('execute', 'Execute'), ('outcomes', 'Outcomes')] %}
-      <a href="{{ url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=intent[0]) }}" {% if room.stage == intent[0] %}aria-current="page"{% endif %} class="rounded-md px-3 py-2 text-sm font-medium {% if room.stage == intent[0] %}bg-accent text-accent-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}">{{ intent[1] }}</a>
-      {% endfor %}
-      {% endif %}
-    </div>
-  </nav>
+  {%- set _room_tabs = [('Transform', url_for('solution_design.transformation_programme_overview', programme_id=room.programme.id), room.stage in [none, 'objective', 'discover', 'evidence', 'options'])] -%}
+  {%- if room.workstream -%}
+  {%- for intent in [('decision', 'Decisions'), ('execute', 'Execute'), ('outcomes', 'Outcomes')] -%}
+  {%- set _ = _room_tabs.append((intent[1], url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=intent[0]), room.stage == intent[0])) -%}
+  {%- endfor -%}
+  {%- endif -%}
+  {{ section_tabs(_room_tabs, label='Transformation Room', testid='room-tabs') }}
 
   {% call card.card() %}
   <section class="p-5 sm:p-6" aria-labelledby="programme-context-heading">
@@ -46,10 +46,10 @@
             Offer it right here, next to the action that names it. #}
         {% if room.workstream and room.stage in ('objective', 'discover', 'evidence', 'options') %}
         <form method="post" action="{{ url_for('solution_design.transformation_workstream_advance', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=room.stage) }}" class="mt-2">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="expected_revision" value="{{ room.workstream.revision }}">
-          <input type="hidden" name="command_key" value="{{ room.command_key }}">
-          <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Advance now</button>
+          {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+          {{ ui.input(type='hidden', name='expected_revision', value=room.workstream.revision) }}
+          {{ ui.input(type='hidden', name='command_key', value=room.command_key) }}
+          {{ ui.button(text='Advance now', type='submit') }}
         </form>
         {% endif %}
         {% else %}{{ room.header.next_action or '—' }}{% endif %}
@@ -61,14 +61,11 @@
   {% endcall %}
 
   {% if room.workstream %}
-  <nav aria-label="Workstream stages" class="mt-6 overflow-x-auto border-b border-border">
-    <div class="flex min-w-max gap-5">
-      {% for item in room.stage_routes %}
-      <a href="{{ url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=item.key) }}" {% if room.stage == item.key %}aria-current="step"{% endif %}
-         class="border-b-2 px-1 pb-3 text-sm font-medium {% if room.stage == item.key %}border-primary text-foreground{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}">{{ item.label }}</a>
-      {% endfor %}
-    </div>
-  </nav>
+  {%- set _stage_tabs = [] -%}
+  {%- for item in room.stage_routes -%}
+  {%- set _ = _stage_tabs.append((item.label, url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=item.key), room.stage == item.key, 'stage-' ~ item.key)) -%}
+  {%- endfor -%}
+  {{ section_tabs(_stage_tabs, label='Workstream stages', testid='stage-stepper', class='mt-6') }}
   {% endif %}
 
   <div class="mt-6">

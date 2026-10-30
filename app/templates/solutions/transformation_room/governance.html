@@ -1,8 +1,14 @@
+{# design-block: record-detail #}
 {% extends "solutions/transformation_room/layout.html" %}
+{% import "components/card.html" as card %}
+{% import "basecoat/index.html" as ui %}
 {% block room_content %}
-<section class="rounded-lg border border-border bg-card p-5" aria-labelledby="governance-heading">
+{% call card.card(class='') %}
+<section class="p-5" aria-labelledby="governance-heading">
   <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Not available in this release</p>
   <h2 id="governance-heading" class="mt-1 text-lg font-semibold text-foreground">Programme governance</h2>
   <p class="mt-2 text-sm text-muted-foreground">Typed ARB decision cycles are not available. This stable page does not infer governance status from unrelated records.</p>
+  <div class="mt-5">{{ ui.button(text='Return to the programme overview', href=url_for('solution_design.transformation_programme_overview', programme_id=room.programme.id), variant='outline', attrs={'data-testid': 'stage-next-step'}) }}</div>
 </section>
+{% endcall %}
 {% endblock %}

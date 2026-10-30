@@ -41885,7 +41885,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -41917,8 +41917,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -41967,7 +41971,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -41999,8 +42003,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42049,7 +42057,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42081,8 +42089,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42131,7 +42143,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42162,8 +42174,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42212,7 +42228,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42243,8 +42259,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42293,7 +42313,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42330,8 +42350,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "error-region", "loading"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42383,7 +42407,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42418,8 +42442,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs", "P10-sectioned-form"],
+   "states": ["populated", "error-region"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42468,7 +42496,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42500,8 +42528,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42550,7 +42582,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42581,8 +42613,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42631,7 +42667,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42664,8 +42700,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -42714,7 +42754,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42745,8 +42785,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs"],
+   "states": ["populated", "empty-first-use"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "low",
    "frame": "dashboard-01",
@@ -42795,7 +42839,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "components": [
     "alert",
@@ -42831,8 +42875,12 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/transformation-room.md",
+   "patterns": ["P01-page-header", "P02-section-tabs", "P03-data-table", "P10-sectioned-form"],
+   "states": ["empty-first-use", "populated", "error-region"],
+   "departures": [],
+   "grid": "G4",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
