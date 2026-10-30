@@ -30,6 +30,7 @@ from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
 
 from .solution_design_routes import solution_design_bp
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def solution_review_packet(solution_id):
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     # The packet is the Review tab of the solution record now.
     return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="review"))
 
@@ -296,7 +297,7 @@ def solution_conformance(solution_id):
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     # The findings are on the Review tab of the solution record now.
     return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="review"))
 
@@ -326,7 +327,7 @@ def solution_options(solution_id):
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     latest = SolutionOptionsAdvisor.latest(solution_id)
     return render_template(
         "solutions/options_advisor.html",
@@ -373,7 +374,7 @@ def solution_migration_roadmap(solution_id):
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     latest = MigrationRoadmapAdvisor.latest(solution_id)
     return render_template(
         "solutions/migration_roadmap.html",
@@ -405,7 +406,7 @@ def ea_briefings():
 
     org_id = current_org_id()
     if org_id is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     week = weekly_briefing.parse_week(request.args.get("week"))
     briefing = weekly_briefing.build(org_id, week)
     return render_template("solutions/weekly_briefing.html", briefing=briefing)
@@ -420,7 +421,7 @@ def ea_briefing_detail(briefing_id):
 
     stored = db.session.get(EnterpriseBriefing, briefing_id)
     if stored is None or stored.generated_at is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     week = weekly_briefing.week_start_for(stored.generated_at.date())
     return redirect(f"/solutions/briefings?week={week.isoformat()}")
 
@@ -461,7 +462,7 @@ def programme_drift(initiative_id):
 
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     snapshots = ProgrammeGovernanceService.list_snapshots(initiative_id, limit=50) or []
     return render_template(
         "solutions/programme_cockpit.html",
@@ -489,7 +490,7 @@ def programme_cockpit(initiative_id):
 
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     # PROG-013: surface the most recent AI-on-contact review (captured at import).
     import_review = None
     for snap in (ProgrammeGovernanceService.list_snapshots(initiative_id, limit=20) or []):
@@ -601,7 +602,7 @@ def programme_fit_gap(initiative_id):
 
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     entries = ProgrammeGovernanceService.fit_gap_entries(initiative_id) or []
     return render_template(
         "solutions/programme_fit_gap.html",

@@ -51,6 +51,7 @@ from ..services.unified_duplicate_service import UnifiedDuplicateService
 from app.utils.api_response import error_response
 from app.utils.pagination import safe_int_arg
 from app.modules.duplicate_detection.group_access import group_visible_to_caller
+from app.utils.plain_errors import render_plain_error
 logger = logging.getLogger(__name__)
 
 # Create unified blueprint
@@ -1243,7 +1244,7 @@ def ai_insights(run_id):
     try:
         run = UnifiedDetectionRun.query.get(run_id)
         if run is None:
-            return render_template("errors/404.html"), 404
+            return render_plain_error(404)
 
         # Get AI-specific insights
         if run.algorithm_version.startswith("ai_"):
@@ -1293,7 +1294,7 @@ def ai_insights(run_id):
 
     except Exception as e:
         current_app.logger.error(f"Error loading AI insights: {e}")
-        return render_template("errors/500.html"), 500
+        return render_plain_error(500)
 
 
 # ===== AI API Endpoints =====

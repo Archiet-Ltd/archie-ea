@@ -32,6 +32,7 @@ from app.modules.codegen.models import (  # noqa: F401 — import surface shared
     CodegenGeneration, CodegenGenerationHistory, CodegenSystemBoundary, SystemBoundarySolution,
     CodegenTemplateSet, CodegenTemplateFile, DataImport,
 )
+from app.utils.plain_errors import render_plain_error
 # Alias for readability within this module — all SystemBoundary refs here mean the codegen one
 SystemBoundary = CodegenSystemBoundary
 from app.models.solution_models import Solution
@@ -383,7 +384,7 @@ def workbench_page(solution_id):
         except Exception as e:
             db.session.rollback()
             logger.error("Failed to create CodegenGeneration for solution %s: %s", solution_id, e)
-            return render_template("errors/500.html", error="Code Workbench is temporarily unavailable."), 500
+            return render_plain_error(500)
 
     has_uml = gen.uml_snapshot is not None
     has_files = gen.generated_files is not None

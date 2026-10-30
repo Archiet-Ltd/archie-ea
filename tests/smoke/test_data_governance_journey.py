@@ -225,7 +225,8 @@ def test_no_steward_isolation_from_another_organisation(page, live_server, world
     sign_in(page, str(live_server), org_b["emails"]["procurement"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/no-steward", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("h1")).to_contain_text("403")
+    # Re-pointed from the retired "403" heading to the library no-access screen.
+    expect(page.get_by_role("heading", name="You don't have access to this page")).to_be_visible()
 
 
 def test_retention_breaches_page_shows_breached_entities(page, live_server, world):
@@ -262,7 +263,8 @@ def test_retention_breaches_isolation_from_another_organisation(page, live_serve
     sign_in(page, str(live_server), org_b["emails"]["procurement"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/retention-breaches", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("h1")).to_contain_text("403")
+    # Re-pointed from the retired "403" heading to the library no-access screen.
+    expect(page.get_by_role("heading", name="You don't have access to this page")).to_be_visible()
 
 
 def test_undeclared_copies_page_shows_duplicate_holds(page, live_server, world):
@@ -304,7 +306,8 @@ def test_undeclared_copies_isolation_from_another_organisation(page, live_server
     sign_in(page, str(live_server), org_b["emails"]["procurement"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/undeclared-copies", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("h1")).to_contain_text("403")
+    # Re-pointed from the retired "403" heading to the library no-access screen.
+    expect(page.get_by_role("heading", name="You don't have access to this page")).to_be_visible()
 
 
 def test_tabs_navigate_between_data_governance_pages(page, live_server, world):

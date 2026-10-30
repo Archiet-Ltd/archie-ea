@@ -28,6 +28,7 @@ from app.models import (
 )
 from app.models.process_data import DataDomain
 from app.utils.pagination import safe_int_arg
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -731,7 +732,7 @@ def edit_data_entity(entity_id):
 
     entity = sor.get_entity(_current_org_id(), entity_id)
     if entity is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     sor.backfill_system_of_record_application_links(_current_org_id(), [entity.id])
     db.session.refresh(entity)
 

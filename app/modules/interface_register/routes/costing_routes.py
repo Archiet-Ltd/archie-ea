@@ -7,6 +7,7 @@ from flask_login import login_required
 
 from app.modules.interface_register.routes.register_routes import interface_register_bp, _guard
 from app.modules.interface_register.services import interface_register_service as service, programme_rollup_service
+from app.utils.plain_errors import render_plain_error
 
 
 @interface_register_bp.route("/costing", methods=["GET"])
@@ -24,7 +25,7 @@ def costing():
     try:
         rollup = programme_rollup_service.interface_programme_rollup(initiative_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     return render_template(
         "interface_register/costing.html",

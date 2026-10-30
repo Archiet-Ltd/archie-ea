@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Something went wrong</title>
+    <title>{{ error_title }}</title>
     <style>
         :root {
             color-scheme: light;
@@ -15,9 +15,9 @@
             --primary: #0f172a;
             --primary-foreground: #ffffff;
             --accent: #f8fafc;
+            --ring: rgba(15, 23, 42, 0.18);
             --destructive: #dc2626;
             --destructive-soft: rgba(220, 38, 38, 0.1);
-            --ring: rgba(15, 23, 42, 0.18);
         }
         * { box-sizing: border-box; }
         body {
@@ -32,9 +32,9 @@
         .icon-wrap {
             width: 5rem; height: 5rem; margin: 0 auto 1.5rem;
             display: flex; align-items: center; justify-content: center;
-            border-radius: 9999px; background: var(--destructive-soft);
+            border-radius: 9999px; background: rgba(100, 116, 139, 0.1);
         }
-        .icon { width: 2.5rem; height: 2.5rem; color: var(--destructive); }
+        .icon { width: 2.5rem; height: 2.5rem; color: var(--muted-foreground); }
         .code {
             margin: 0 0 0.5rem; font-size: clamp(4.5rem, 14vw, 6rem);
             line-height: 1; font-weight: 800; letter-spacing: -0.04em;
@@ -63,37 +63,24 @@
         <div class="wrap">
             <div class="icon-wrap" aria-hidden="true">
                 <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"></path>
-                    <path d="M12 9v4"></path>
-                    <path d="M12 17h.01"></path>
+                    {{ error_icon_paths|safe }}
                 </svg>
             </div>
 
-            <h1 class="code">500</h1>
-            <h2 class="title">Something went wrong on our side</h2>
+            <h1 class="title" data-status="{{ error_status }}">{{ error_title }}</h1>
 
-            <p class="copy">
-                Check whether your changes were saved before trying again. If it keeps
-                happening, tell your administrator.
-            </p>
+            <p class="copy">{{ error_message }}</p>
 
             <div class="actions">
-                <a href="/" class="button button-primary">
+                <a href="/dashboard/overview" class="button button-primary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path>
                     </svg>
-                    Go to Dashboard
+                    Go to the dashboard
                 </a>
-                <button id="btn-retry-500" type="button" class="button button-secondary">
-                    <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15.55-6.36L21 8"></path>
-                        <path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15.55 6.36L3 16"></path>
-                    </svg>
-                    Try Again
-                </button>
+                <a href="/status" class="button button-secondary">Service status</a>
             </div>
         </div>
     </main>
-    <script nonce="{{ csp_nonce }}">document.getElementById('btn-retry-500').addEventListener('click', function(){ location.reload(); });</script>
 </body>
 </html>

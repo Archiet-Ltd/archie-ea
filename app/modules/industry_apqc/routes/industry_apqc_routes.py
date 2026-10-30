@@ -22,6 +22,7 @@ from app.jobs.tenant_safe_job import platform_scope
 from app.middleware.tenant_decorators import platform_admin_required
 
 from app.services.industry_apqc_service import IndustryAPQCService
+from app.utils.plain_errors import render_plain_error
 
 industry_apqc_bp = Blueprint("industry_apqc", __name__, url_prefix="/industry-apqc")
 
@@ -59,7 +60,7 @@ def industry_apqc_framework_detail(industry_code):
     service = IndustryAPQCService()
     framework = service.get_framework_by_code(industry_code)
     if not framework:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     tab = "recommendations" if request.args.get("tab") == "recommendations" else "hierarchy"
     org_id = getattr(current_user, "organization_id", None)

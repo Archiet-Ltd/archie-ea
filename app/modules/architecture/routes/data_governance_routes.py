@@ -21,6 +21,7 @@ from app.modules.architecture.services.data_model_validation_service import (
     DataModelValidationService,
 )
 from app.utils.role_access import can_access_section
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ data_governance_bp = Blueprint("data_governance", __name__, url_prefix="/data-go
 
 def _guard():
     if not can_access_section(current_user, "data_integration"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403)
     return None
 
 
@@ -67,7 +68,7 @@ def entity_detail(entity_id):
         return guard
     entity = sor.get_entity(g.current_org_id, entity_id)
     if entity is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     declared = sor.get_application(g.current_org_id, entity.system_of_record_application_id)
 
     from app.models.application_owner import ApplicationOwner
@@ -286,7 +287,7 @@ def model_standards(model_id):
         LogicalDataModel.id == model_id, LogicalDataModel.organization_id == g.current_org_id
     ).first()
     if model is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     result = DataModelValidationService().check_logical_model_standards(model, g.current_org_id)
     return render_template(
         "data_governance/model_standards.html",
