@@ -137,7 +137,7 @@ def _consented_site(org_id: int) -> Tuple[Any, str]:
     try:
         validate_user_supplied_url(url)
     except BlockedOutboundURL:
-        raise CrawlRefused("That website address cannot be read from here.", "blocked")
+        raise CrawlRefused("We could not read that address. Check it is your public website.", "blocked")
     return org, url
 
 
