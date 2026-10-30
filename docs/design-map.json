@@ -634,8 +634,7 @@
   "app/templates/applications/dashboard.html",
   "app/templates/archimate_crud/detail.html",
   "app/templates/ai_chat/index.html",
-  "app/templates/capability_map/index.html",
-  "app/modules/intelligence/templates/intelligence/ask.html"
+  "app/templates/capability_map/index.html"
  ],
  "page_names": {
   "app/templates/main/index.html": "Home",
@@ -648,8 +647,7 @@
   "app/templates/applications/dashboard.html": "Application page",
   "app/templates/archimate_crud/detail.html": "Element page",
   "app/templates/ai_chat/index.html": "AI chat",
-  "app/templates/capability_map/index.html": "Capability map",
-  "app/modules/intelligence/templates/intelligence/ask.html": "Ask"
+  "app/templates/capability_map/index.html": "Capability map"
  },
  "personas": {
   "solution_architect": "Solution Architect",
@@ -2244,7 +2242,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "chat",
    "charts": [],
    "components": [
@@ -2301,7 +2299,7 @@
      "image": "docs/design/reference/basecoat-ai-chat.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/answer.md",
    "states": [
     "loading",
     "empty-nothing-derived",
@@ -2310,7 +2308,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -2432,117 +2430,6 @@
     "populated"
    ],
    "status": "implemented",
-   "tier": "B",
-   "type_changed": false
-  },
-  "app/modules/intelligence/templates/intelligence/ask.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/file_upload.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "reviewed",
-   "block": "chat",
-   "charts": [],
-   "components": [
-    "alert",
-    "answer-cascade",
-    "badge",
-    "breadcrumb",
-    "button",
-    "empty",
-    "input",
-    "page-header",
-    "page-shell",
-    "skeleton",
-    "table",
-    "card",
-    "message",
-    "message-scroller",
-    "marker",
-    "spinner",
-    "input-group"
-   ],
-   "confidence": "low",
-   "controls": {
-    "button": 1,
-    "link": 1,
-    "table": 1
-   },
-   "departures": [
-    {
-     "rule": "R10",
-     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
-    }
-   ],
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "grid": "G3",
-   "inhouse_components": [
-    "answer-cascade:Compose",
-    "dense_table:Replace",
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "components/answer_cascade.html",
-    "components/dense_table.html",
-    "macros/page_shell.html"
-   ],
-   "original": "preview-03",
-   "page_type": "chat",
-   "patterns": [
-    "P01-page-header",
-    "P28-cited-answer-chat",
-    "P27-evidence-line"
-   ],
-   "persona": "startup_cto",
-   "reason": "Ask on the startup path; sources-chat held at B until the preview-03 render exists (G-12), and the cascade (flows, policy violations, indirect connections) and table are extra parts that must sit inside a message.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: playground",
-     "url": "https://ui.shadcn.com/examples/playground"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: AI chat",
-     "image": "docs/design/reference/basecoat-ai-chat.webp"
-    }
-   },
-   "spec": "docs/design/specs/ask.md",
-   "states": [
-    "loading",
-    "empty-first-use",
-    "empty-nothing-derived",
-    "empty-no-permission",
-    "error-region",
-    "populated"
-   ],
-   "status": "specified",
    "tier": "B",
    "type_changed": false
   },
@@ -7878,7 +7765,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -7938,7 +7825,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/jira-connector.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -7948,7 +7835,7 @@
     "long-job-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -11284,7 +11171,7 @@
     "components/workbench_table.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "data-table",
    "charts": [],
    "components": [
@@ -11294,11 +11181,15 @@
     "button",
     "empty",
     "field",
+    "figures",
     "input",
+    "list-table",
     "page-header",
+    "page-shell",
     "pagination",
     "select",
     "table",
+    "tabs",
     "avatar",
     "dropdown-menu"
    ],
@@ -11350,7 +11241,7 @@
      "image": "docs/design/reference/basecoat-tasks.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/team.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -11359,7 +11250,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -12549,6 +12440,7 @@
     "components/tabs.html",
     "components/drawer.html"
    ],
+   "note": "The old /ask address (intelligence/ask.html, retired) redirects here; a question asked there with ?q= lands in this chat with the question already in the box.",
    "original": "preview-03",
    "page_type": "chat",
    "patterns": [
@@ -36098,7 +35990,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [],
    "components": [
@@ -36107,6 +35999,7 @@
     "breadcrumb",
     "button",
     "card",
+    "dialog",
     "empty",
     "page-header",
     "page-shell",
@@ -36151,7 +36044,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/connector-dashboard.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -36161,7 +36054,7 @@
     "long-job-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },

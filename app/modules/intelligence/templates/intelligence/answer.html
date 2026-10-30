@@ -1,6 +1,8 @@
+{# design-block: chat #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_caption %}
 
 {% block title %}Answer{% endblock %}
 
@@ -161,36 +163,36 @@
     {% endcall %}
     {% else %}
     {% call section_card(title='Affected') %}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm" data-answer-rows>
-                <caption class="sr-only">Everything affected, ranked by how many of the failing elements reach it</caption>
-                <thead>
-                    <tr class="text-left text-muted-foreground">
-                        <th scope="col" class="py-2 pr-4 font-medium">Element</th>
-                        {% if kind == 'set_impact' %}<th scope="col" class="py-2 pr-4 font-medium">Reached from</th>{% endif %}
-                        <th scope="col" class="py-2 pr-4 font-medium">Steps away</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Owner</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Basis</th>
-                        <th scope="col" class="py-2 font-medium">Read from</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <div class="overflow-x-auto" data-answer-rows>
+            {% call table() %}
+                {{ table_caption(text='Everything affected, ranked by how many of the failing elements reach it') }}
+                {% call table_header() %}
+                    {% call table_row() %}
+                        {{ table_head(text='Element', attrs={'scope': 'col'}) }}
+                        {% if kind == 'set_impact' %}{{ table_head(text='Reached from', attrs={'scope': 'col'}) }}{% endif %}
+                        {{ table_head(text='Steps away', attrs={'scope': 'col'}) }}
+                        {{ table_head(text='Owner', attrs={'scope': 'col'}) }}
+                        {{ table_head(text='Basis', attrs={'scope': 'col'}) }}
+                        {{ table_head(text='Read from', attrs={'scope': 'col'}) }}
+                    {% endcall %}
+                {% endcall %}
+                {% call table_body() %}
                     {% for row in answer.rows %}
-                    <tr class="border-t border-border" data-element-id="{{ row.element_id }}">
-                        <th scope="row" class="py-2 pr-4 text-left font-medium text-foreground">{{ name_of(answer, row.element_id) }}</th>
+                    {% call table_row(attrs={'data-element-id': row.element_id}) %}
+                        {% call table_cell(class='font-medium text-foreground', attrs={'scope': 'row'}) %}{{ name_of(answer, row.element_id) }}{% endcall %}
                         {% if kind == 'set_impact' %}
-                        <td class="py-2 pr-4 text-foreground" data-seeds="{{ row.seed_ids | join(',') }}">
+                        {% call table_cell(attrs={'data-seeds': row.seed_ids | join(',')}) %}
                             {% for seed_id in row.seed_ids %}{{ name_of(answer, seed_id) }}{% if not loop.last %}, {% endif %}{% endfor %}
-                        </td>
+                        {% endcall %}
                         {% endif %}
-                        <td class="py-2 pr-4 text-foreground">{% if kind == 'set_impact' %}{{ row.depth }}{% else %}{{ row.relation.depth }}{% endif %}</td>
-                        <td class="py-2 pr-4 text-foreground">{{ owner_text(row) }}</td>
-                        <td class="py-2 pr-4">{{ basis_badge(row.truth_class) }}</td>
-                        <td class="py-2 text-xs">{{ origins_text(row.relations if kind == 'set_impact' else [row.relation]) }}</td>
-                    </tr>
+                        {% call table_cell() %}{% if kind == 'set_impact' %}{{ row.depth }}{% else %}{{ row.relation.depth }}{% endif %}{% endcall %}
+                        {% call table_cell() %}{{ owner_text(row) }}{% endcall %}
+                        {% call table_cell() %}{{ basis_badge(row.truth_class) }}{% endcall %}
+                        {% call table_cell(class='text-xs') %}{{ origins_text(row.relations if kind == 'set_impact' else [row.relation]) }}{% endcall %}
+                    {% endcall %}
                     {% endfor %}
-                </tbody>
-            </table>
+                {% endcall %}
+            {% endcall %}
         </div>
     {% endcall %}
     {% endif %}

@@ -375,12 +375,14 @@ def test_every_network_call_goes_through_platform_fetch():
 # --- one disclosure control -------------------------------------------------
 
 
-def test_full_detail_is_defined_once_and_called_from_exactly_two_places():
+def test_full_detail_is_defined_once_and_called_from_exactly_one_place():
+    # ask.html (retired per criteria-v4 section 1.6: questions are asked and
+    # answered in the AI chat, not a second page) used to be the second caller.
     templates = _templates()
     definitions = [n for n, t in templates.items() for _ in re.findall(r"\{%\s*macro\s+full_detail\(", t)]
     assert definitions == ["_full_detail.html"]
     calls = [n for n, t in templates.items() for _ in re.findall(r"\{\{\s*full_detail\(", t)]
-    assert sorted(calls) == ["_provenance_drawer.html", "ask.html"]
+    assert sorted(calls) == ["_provenance_drawer.html"]
 
 
 def test_the_disclosure_label_is_full_detail_and_it_starts_collapsed():
@@ -404,18 +406,18 @@ def test_no_second_show_more_affordance_exists():
     for name, source in _scripts().items():
         assert not re.search(r"Show more|More questions", source, re.I), name
     # The only controls that carry aria-expanded: the one disclosure control,
-    # the combobox, the question card that opens the picker, the button
-    # and the Value streams at risk
-    # row toggle that opens one value stream's own capabilities.
+    # the combobox, and the Value streams at risk row toggle that opens one
+    # value stream's own capabilities. ask.html owned a fourth, "question"
+    # (the question card that opened the picker); that page is retired
+    # (criteria-v4 section 1.6) and no remaining template has the pattern.
     owners = {}
     for name, source in _templates().items():
         for tag in re.findall(r"<(?:button|input)[^>]*aria-expanded[^>]*>", source, re.S):
             key = ("full-detail" if "data-full-detail-toggle" in tag else
                    "combobox" if 'role="combobox"' in tag else
-                   "question" if "ask-question-" in tag else
                    "vsr-row" if "data-vsr-toggle" in tag else "OTHER")
             owners.setdefault(key, []).append(name)
-    assert set(owners) == {"full-detail", "combobox", "question", "vsr-row"}, owners
+    assert set(owners) == {"full-detail", "combobox", "vsr-row"}, owners
     assert owners["vsr-row"] == ["_value_streams_at_risk_table.html"], owners
 
 
@@ -472,12 +474,10 @@ def test_the_drawer_renders_the_supplied_sentence_in_one_paragraph_and_nothing_e
     assert 'x-show="drawer.plainTerms"' in source
 
 
-def test_programme_and_strategy_cards_use_server_formatted_variance_text():
-    source = _templates()["ask.html"]
-    assert "wp.costVarianceText" in source
-    assert "initiative.budgetVarianceText" in source
-    assert "costVariancePct" not in source
-    assert "budgetVariancePct" not in source
+# test_programme_and_strategy_cards_use_server_formatted_variance_text removed:
+# it asserted a formatting convention on ask.html's embedded work-package and
+# initiative cards, and that page is retired (criteria-v4 section 1.6). No
+# remaining intelligence template renders those cards.
 
 
 # --- colour and copy of the map ---------------------------------------------
@@ -504,7 +504,6 @@ def test_the_page_scripts_are_top_level_factories_not_alpine_data_registrations(
         source = _code(_scripts()[name])
         assert "Alpine.data(" not in source, name
     assert "window.askSurface = askSurface;" in _scripts()["ask.js"]
-    assert 'x-data="askSurface()"' in _templates()["ask.html"]
 
 
 def test_the_shipped_macros_are_the_named_ones_with_the_right_keywords():
