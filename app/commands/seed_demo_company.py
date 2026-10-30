@@ -2972,6 +2972,18 @@ def _seed_demo_company() -> dict:
         db.session.flush()
         stats["capability_elements_created"] = elements_made
 
+        # Link each business capability to its unified twin (ADR 0008's FK),
+        # so vendor discovery's capability bridge (vendor_analysis_routes.py)
+        # resolves a selection through the FK instead of resting on name
+        # equality alone. The pair created or confirmed just above shares a
+        # code, which is the stable join key (two capabilities can share a
+        # display name; they cannot share a code within this seed).
+        for code, ucap in unified_by_code.items():
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.deprecated_in_favor_of_id is None:
+                bc.deprecated_in_favor_of_id = ucap.id
+        db.session.flush()
+
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
 
