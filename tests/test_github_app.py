@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from app.connectors import github_app
 
 API = "https://api.github.com/"
+LOGIN = "https://github.com/"
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -56,10 +57,12 @@ def private_key_path(tmp_path, rsa_keypair):
 
 @pytest.fixture
 def configured_app(app, monkeypatch, private_key_path):
-    """The three GitHub App settings, all set, for the duration of one test."""
+    """The five GitHub App settings, all set, for the duration of one test."""
     monkeypatch.setitem(app.config, "GITHUB_APP_ID", "5534377")
     monkeypatch.setitem(app.config, "GITHUB_APP_SLUG", "entelim")
     monkeypatch.setitem(app.config, "GITHUB_APP_PRIVATE_KEY_PATH", private_key_path)
+    monkeypatch.setitem(app.config, "GITHUB_APP_CLIENT_ID", "Iv1.testclientid")
+    monkeypatch.setitem(app.config, "GITHUB_APP_CLIENT_SECRET", "test-client-secret-not-real")
     return app
 
 
@@ -223,13 +226,15 @@ def github_api(configured_app, monkeypatch):
             "app/installations/123": (200, {"account": {"login": "acme"}, "suspended_at": None}),
             "app/installations/123/access_tokens": (201, {"token": "ghs_mock_installation_token"}),
             "installation/repositories": (200, {"total_count": 3, "repositories": []}),
+            "login/oauth/access_token": (200, {"access_token": "ghu_mock_user_token"}),
+            "user/installations": (200, {"total_count": 1, "installations": [{"id": 123}]}),
         },
         calls=[],
     )
 
     def fake_request(self, method=None, url=None, headers=None, **kw):
-        assert url.startswith(API), "a request left for an unexpected host: %s" % url
-        path = url[len(API):].strip("/")
+        assert url.startswith((API, LOGIN)), "a request left for an unexpected host: %s" % url
+        path = url[len(LOGIN):].strip("/") if url.startswith(LOGIN) else url[len(API):].strip("/")
         auth = {**self.headers, **(headers or {})}.get("Authorization")
         state.calls.append({"method": method, "path": path, "auth": auth})
         if path not in state.bundle:
@@ -339,3 +344,151 @@ def test_resolve_api_token_never_crosses_organisations(configured_app, make_org,
     with tenant_ctx(org_a.id):
         token_a = github_app.resolve_api_token(org_a.id)
     assert token_a == "ghs_mock_installation_token"
+
+
+# --------------------------------------------------------------------- #
+# Round github-app01b: an installation is attached only by a person who  #
+# can see it                                                            #
+# --------------------------------------------------------------------- #
+
+
+def _admin_client(app, db_session, login_as, org, label):
+    from tests.test_connector_approval_flow import _make_admin
+
+    user = _make_admin(db_session, org.id, label)
+    client = app.test_client()
+    login_as(client, user)
+    return client
+
+
+def _installed(client, state, installation_id="123", code="mock-code"):
+    from urllib.parse import urlencode
+
+    query = urlencode(
+        {"installation_id": installation_id, "setup_action": "install", "state": state, "code": code}
+    )
+    return client.get("/admin/connectors/github/installed?" + query)
+
+
+def _flashed(client):
+    with client.session_transaction() as sess:
+        return " ".join(message for _category, message in sess.get("_flashes", []))
+
+
+def _stored_installation(org_id):
+    """What the vault holds for *org_id*, read the way that organisation's own request would."""
+    from flask import g
+
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    g.current_org_id = org_id
+    try:
+        return OrgCredentialVault().retrieve(org_id, "github", "installation_id")
+    finally:
+        g.current_org_id = None
+
+
+def test_organisation_b_cannot_attach_the_installation_of_organisation_a(
+    configured_app, github_api, make_org, db_session, login_as
+):
+    """The swap: B starts an install (a valid state for B), then puts A's installation
+    id in the address. B's GitHub user cannot see installation 123, so it is refused
+    and nothing is stored for B."""
+    org_a, org_b = make_org("a"), make_org("b")
+    client = _admin_client(configured_app, db_session, login_as, org_b, "Bee")
+    github_api.bundle["user/installations"] = (
+        200,
+        {"total_count": 1, "installations": [{"id": 999}]},
+    )
+    state_b = github_app.sign_state(org_b.id)
+
+    _installed(client, state_b, installation_id="123")
+
+    assert _stored_installation(org_b.id) is None
+    assert _stored_installation(org_a.id) is None
+    message = _flashed(client)
+    assert "can't see that GitHub installation" in message or "cannot see that GitHub installation" in message
+    assert "mock-code" not in message and "ghu_mock_user_token" not in message
+
+
+def test_an_installation_bound_to_another_organisation_is_refused(
+    configured_app, github_api, make_org, db_session, login_as
+):
+    """Even a GitHub user who can see the installation cannot attach it to a second
+    organisation: it already belongs to organisation A."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    org_a, org_b = make_org("a"), make_org("b")
+    OrgCredentialVault().store(
+        org_id=org_a.id, connector_type="github", credential_type="installation_id", value="123"
+    )
+    db_session.flush()
+    client = _admin_client(configured_app, db_session, login_as, org_b, "Bee")
+    # GitHub says B's user can see 123 (they are in A's GitHub organisation too).
+    _installed(client, github_app.sign_state(org_b.id), installation_id="123")
+
+    assert _stored_installation(org_b.id) is None
+    assert "already connected to another organisation" in _flashed(client)
+
+
+def test_a_missing_code_is_refused_and_nothing_is_stored(
+    configured_app, github_api, make_org, db_session, login_as
+):
+    org_b = make_org("b")
+    client = _admin_client(configured_app, db_session, login_as, org_b, "Bee")
+    from urllib.parse import urlencode
+
+    state = github_app.sign_state(org_b.id)
+    client.get("/admin/connectors/github/installed?" + urlencode(
+        {"installation_id": "123", "setup_action": "install", "state": state}))
+    assert _stored_installation(org_b.id) is None
+    assert "Start again from Connect GitHub" in _flashed(client)
+
+
+def test_a_rate_limit_is_named_as_one(configured_app, github_api, make_org, db_session, login_as):
+    org_b = make_org("b")
+    client = _admin_client(configured_app, db_session, login_as, org_b, "Bee")
+    github_api.bundle["user/installations"] = (429, {"message": "slow down"})
+    _installed(client, github_app.sign_state(org_b.id))
+    assert "GitHub's rate limit was reached; try again in a few minutes" in _flashed(client)
+    assert _stored_installation(org_b.id) is None
+
+
+def test_a_403_rate_limit_is_named_as_one_but_a_plain_403_is_not(configured_app, github_api):
+    with configured_app.app_context():
+        limited = github_app._failure(
+            SimpleNamespace(status_code=403, error="API rate limit exceeded for installation"), "x"
+        )
+        refused = github_app._failure(SimpleNamespace(status_code=403, error="Resource not accessible"), "x")
+    assert "rate limit was reached" in str(limited)
+    assert "rate limit" not in str(refused)
+
+
+def test_a_refused_connection_leaves_no_installation_in_the_vault(
+    configured_app, github_api, make_org, db_session, login_as, monkeypatch
+):
+    """The id is stored only once the connection is made. ``connect_and_start`` is made
+    to refuse (as it does for an account GitHub cannot read), and the vault holds
+    nothing afterwards. Its refusal is the one thing stubbed here."""
+    from app.connectors import github as gh
+
+    def refuse(*args, **kwargs):
+        raise gh.ConnectRefused("GitHub could not read that account.")
+
+    monkeypatch.setattr(gh, "connect_and_start", refuse)
+    org_b = make_org("b")
+    client = _admin_client(configured_app, db_session, login_as, org_b, "Bee")
+    _installed(client, github_app.sign_state(org_b.id), installation_id="123")
+    assert "could not read that account" in _flashed(client)
+    assert _stored_installation(org_b.id) is None
+
+
+def test_the_one_click_path_needs_the_client_id_and_secret(app, configured_app, monkeypatch):
+    with configured_app.app_context():
+        assert github_app.app_configured() is True
+    for name in ("GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET"):
+        monkeypatch.setitem(configured_app.config, name, "")
+        with configured_app.app_context():
+            assert github_app.app_configured() is False
+            assert github_app.install_url(1) is None
+        monkeypatch.setitem(configured_app.config, name, "set-again")

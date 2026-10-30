@@ -982,7 +982,29 @@ def github_installed():
         return _back(return_to)
     installation_id = int(raw_id)
 
+    code = request.args.get("code", "")
+    if not code:
+        flash(
+            "GitHub did not say who completed this installation. Start again from Connect GitHub.",
+            "error",
+        )
+        return _back(return_to)
+
     try:
+        user_token = github_app.exchange_code(code)
+        if not github_app.user_can_see_installation(user_token, installation_id):
+            flash(
+                "Your GitHub account can't see that GitHub installation, so it was not connected. "
+                "Install the app yourself from Connect GitHub.",
+                "error",
+            )
+            return _back(return_to)
+        if github_app.installation_bound_elsewhere(org_id, installation_id):
+            flash(
+                "That GitHub installation is already connected to another organisation.",
+                "error",
+            )
+            return _back(return_to)
         confirmed = github_app.confirm_installation(installation_id)
     except github_app.GitHubAppError as exc:
         flash(str(exc), "error")
@@ -993,13 +1015,16 @@ def github_installed():
         flash("GitHub did not name a valid organisation or account for this installation.", "error")
         return _back(return_to)
 
+    # Stored in the open transaction only: connect_and_start commits it once the
+    # connection is made, and a refusal rolls it back, so a refused connection
+    # leaves no installation in the vault.
     OrgCredentialVault().store(
         org_id=org_id, connector_type="github", credential_type="installation_id", value=str(installation_id)
     )
-    db.session.commit()
     try:
         gh.connect_and_start(org_id, account, None)
     except gh.ConnectRefused as exc:
+        db.session.rollback()
         flash(str(exc), "error")
         return _back(return_to)
     flash("Connected through the GitHub App. Reading your repositories now; this page shows when it is done.", "success")

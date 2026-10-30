@@ -146,6 +146,8 @@ class Config:
     GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID", "")
     GITHUB_APP_SLUG = os.environ.get("GITHUB_APP_SLUG", "")
     GITHUB_APP_PRIVATE_KEY_PATH = os.environ.get("GITHUB_APP_PRIVATE_KEY_PATH", "")
+    GITHUB_APP_CLIENT_ID = os.environ.get("GITHUB_APP_CLIENT_ID", "")
+    GITHUB_APP_CLIENT_SECRET = os.environ.get("GITHUB_APP_CLIENT_SECRET", "")
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     # Separate from SECRET_KEY so database command capabilities can be rotated
     # without invalidating sessions. This value is shared only by the schema

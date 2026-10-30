@@ -11,12 +11,16 @@ token is read (``resolve_api_token``, read by ``connector_framework._credential_
 
 The query string a browser redirect carries is never trusted on its own: ``state`` is
 a value this server signed and timed (30 minutes) for the organisation that started
-the install, and the ``installation_id`` GitHub sends back is independently confirmed
-with GitHub's API (``GET /app/installations/{id}``) before anything is stored, so an
-organisation cannot attach an installation it was never shown by GitHub, and a forged
-or expired link is refused with a plain message rather than an error page.
+the install; the ``code`` GitHub sends with it (the App's "Request user authorization
+during installation" setting) is exchanged for the installing person's own GitHub
+token, and the ``installation_id`` is stored only if that person's installations
+(``GET /user/installations``) include it -- the App's own JWT sees every installation
+of the App, so it cannot tell whose installation this is. The id is then confirmed
+with GitHub's API (``GET /app/installations/{id}``), an id already bound to another
+organisation is refused, and a forged or expired link is refused with a plain message
+rather than an error page.
 
-When the three settings are not all set, ``app_configured()`` is False and
+When the five settings are not all set, ``app_configured()`` is False and
 ``install_url()`` returns ``None``: the one-click button does not render, and the
 token form -- unchanged -- is the only way to connect.
 """
@@ -55,10 +59,12 @@ class GitHubAppStateError(ValueError):
 
 
 def app_configured() -> bool:
-    """Whether the three settings the one-click button needs are all set.
+    """Whether the five settings the one-click button needs are all set.
 
-    Read from ``current_app.config`` in one place, so every caller agrees: with
-    any of the three unset, the button does not render anywhere, and the pages
+    The client id and secret are what let the server ask GitHub who completed an
+    install; without them it cannot make the visibility check, so it offers no
+    one-click path. Read from ``current_app.config`` in one place, so every caller
+    agrees: with any of the five unset, the button does not render anywhere, and the pages
     that would have shown it fall back to exactly the token form.
     """
     config = current_app.config
@@ -66,6 +72,8 @@ def app_configured() -> bool:
         str(config.get("GITHUB_APP_ID") or "").strip()
         and str(config.get("GITHUB_APP_SLUG") or "").strip()
         and str(config.get("GITHUB_APP_PRIVATE_KEY_PATH") or "").strip()
+        and str(config.get("GITHUB_APP_CLIENT_ID") or "").strip()
+        and str(config.get("GITHUB_APP_CLIENT_SECRET") or "").strip()
     )
 
 
@@ -165,8 +173,14 @@ def _app_headers() -> Dict[str, str]:
     return {"Authorization": f"Bearer {_app_jwt()}", "Accept": "application/vnd.github+json"}
 
 
+RATE_LIMITED = "GitHub's rate limit was reached; try again in a few minutes."
+
+
 def _failure(response, what: str) -> GitHubAppError:
     status = getattr(response, "status_code", None)
+    detail = str(getattr(response, "error", "") or "").lower()
+    if status == 429 or (status == 403 and "rate limit" in detail):
+        return GitHubAppError(RATE_LIMITED)
     if status == 404:
         return GitHubAppError(f"GitHub could not find {what}. It may have been uninstalled.")
     if status in (401, 403):
@@ -225,6 +239,71 @@ def confirm_installation(installation_id: int) -> Dict[str, Any]:
             "repository on GitHub, then connect again."
         )
     return {"account": account, "repository_count": total}
+
+
+# --------------------------------------------------------------------- #
+# Who completed the install: the person's own GitHub token               #
+# --------------------------------------------------------------------- #
+
+
+def exchange_code(code: str) -> str:
+    """Exchange the one-time ``code`` GitHub sent back for the installing person's
+    own user token. The code and the token are never logged, stored or echoed."""
+    from app.services.api_clients.github_client import GitHubAPIClient
+
+    config = current_app.config
+    response = GitHubAPIClient(api_token=None, base_url="https://github.com").post(
+        "login/oauth/access_token",
+        json_data={
+            "client_id": str(config.get("GITHUB_APP_CLIENT_ID") or "").strip(),
+            "client_secret": str(config.get("GITHUB_APP_CLIENT_SECRET") or "").strip(),
+            "code": code,
+        },
+        headers={"Accept": "application/json"},
+    )
+    if not response.success:
+        raise _failure(response, "who completed this installation")
+    data = response.data if isinstance(response.data, dict) else {}
+    token = data.get("access_token")
+    if not token:
+        raise GitHubAppError(
+            "GitHub did not confirm who completed this installation. Start again from Connect GitHub."
+        )
+    return token
+
+
+def user_can_see_installation(user_token: str, installation_id: int) -> bool:
+    """Whether the installations the person behind *user_token* can see include
+    *installation_id* (``GET /user/installations``, every page)."""
+    headers = {"Authorization": f"Bearer {user_token}", "Accept": "application/vnd.github+json"}
+    seen = 0
+    for page in range(1, 21):
+        response = _client().get(
+            "user/installations",
+            params={"per_page": 100, "page": page},
+            headers=headers,
+            use_cache=False,
+        )
+        if not response.success or not isinstance(response.data, dict):
+            raise _failure(response, "the installations you can see")
+        batch = response.data.get("installations") or []
+        if any(isinstance(item, dict) and item.get("id") == installation_id for item in batch):
+            return True
+        seen += len(batch)
+        if not batch or seen >= (response.data.get("total_count") or 0):
+            return False
+    return False
+
+
+def installation_bound_elsewhere(org_id: int, installation_id: int) -> bool:
+    """Whether an organisation other than *org_id* already holds this installation."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    return bool(
+        OrgCredentialVault().organisations_holding(
+            "github", "installation_id", str(installation_id), excluding=org_id
+        )
+    )
 
 
 # --------------------------------------------------------------------- #
