@@ -267,6 +267,49 @@ class HistoryService:
     def difference(self, from_date: datetime, to_date: datetime) -> DifferenceResult:
         """Return every recorded change between ``from_date`` and ``to_date``, newest first."""
         rows = self._rows(AUDITED_TABLES, since=from_date, until=to_date)
+        changes = self._entries(rows)
+        changes.sort(key=lambda c: c.recorded_at, reverse=True)
+        return DifferenceResult(from_date=from_date, to_date=to_date, changes=changes)
+
+    def recent(self, from_date: datetime, to_date: datetime, limit: int) -> list[ChangeEntry]:
+        """The ``limit`` newest recorded changes between the two dates, newest first.
+
+        The database orders and cuts the list, so a long history is not read in full to show its latest rows.
+        """
+        query = select(AuditLog).where(
+            AuditLog.organization_id == self.organization_id,
+            AuditLog.table_name.in_(list(AUDITED_TABLES)),
+            AuditLog.action.in_(list(_ACTIONS)),
+            AuditLog.created_at >= from_date,
+            AuditLog.created_at <= to_date,
+        ).order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit)
+        return self._entries(self.session.execute(query).scalars().all())
+
+    def daily_counts(self, from_date: datetime, to_date: datetime, source_kinds) -> list[tuple[Any, str, bool, int]]:
+        """Changes per day, as ``(day, action, from_a_connected_source, count)``, counted by the database.
+
+        ``action`` reads as in :meth:`difference` (insert, update, delete). A change is from a connected source
+        when its recorded values name one of ``source_kinds``.
+        """
+        from sqlalchemy import case, func
+
+        day = func.date(AuditLog.created_at)
+        connected = case((AuditLog.new_value["source_kind"].as_string().in_(list(source_kinds)), True), else_=False)
+        query = (
+            select(day, AuditLog.action, connected, func.count(AuditLog.id))
+            .where(
+                AuditLog.organization_id == self.organization_id,
+                AuditLog.table_name.in_(list(AUDITED_TABLES)),
+                AuditLog.action.in_(list(_ACTIONS)),
+                AuditLog.created_at >= from_date,
+                AuditLog.created_at <= to_date,
+            )
+            .group_by(day, AuditLog.action, connected)
+        )
+        return [(d, _ACTIONS[action], bool(is_connected), int(n))
+                for d, action, is_connected, n in self.session.execute(query).all()]
+
+    def _entries(self, rows) -> list[ChangeEntry]:
         names = self._names(row.user_id for row in rows)
 
         changes: list[ChangeEntry] = []
@@ -292,8 +335,7 @@ class HistoryService:
                 label=label,
                 kind=AUDITED_TABLES.get(row.table_name),
             ))
-        changes.sort(key=lambda c: c.recorded_at, reverse=True)
-        return DifferenceResult(from_date=from_date, to_date=to_date, changes=changes)
+        return changes
 
 
 

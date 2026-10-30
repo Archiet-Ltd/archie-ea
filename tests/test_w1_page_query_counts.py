@@ -130,3 +130,36 @@ def test_applications_list_does_not_ask_permissions_or_owner_counts_per_row(db_s
     assert page.count <= 200, "%d statements for a page of %d applications" % (page.count, ROWS)
     per_row = [s for s in page.sql if "FROM org_roles" in s or "FROM permission_grants" in s]
     assert len(per_row) <= 20, "%d permission lookups for %d rows" % (len(per_row), ROWS)
+
+
+def test_overview_activity_is_counted_by_the_database_not_read_row_by_row(db_session, make_org, tenant_ctx):
+    """A busy estate has a long audit trail; the overview's activity figures come from counts, not from every row."""
+    from datetime import datetime
+
+    from app.models.audit_log import AuditLog
+    from app.modules.dashboard.services import overview_figures
+
+    org = make_org("perf-activity")
+    now = datetime(2026, 10, 30, 12, 0, 0)
+    for i in range(300):
+        db_session.add(AuditLog(
+            organization_id=org.id, action="create", table_name="archimate_elements", record_id=1000 + i,
+            new_value={"name": "Element %d" % i, "source_kind": "connector" if i < 100 else "manual"},
+            created_at=now,
+        ))
+    for i in range(20):
+        db_session.add(AuditLog(
+            organization_id=org.id, action="update", table_name="archimate_elements", record_id=1000 + i,
+            new_value={"name": "Element %d" % i}, created_at=now,
+        ))
+    db_session.commit()
+    with tenant_ctx(org.id), Statements("soc2_audit_log") as reads:
+        history = overview_figures._history(org.id, now)
+        activity = overview_figures._activity(history, now, org.id)
+    seven = activity["ranges"]["7d"]
+    assert (seven["connected"], seven["manual"], seven["total"]) == (100, 200, 300)
+    assert activity["week"] == {"rows": activity["week"]["rows"], "total": 320, "added": 300, "updated": 20, "removed": 0}
+    assert activity["this_year"] == 300
+    assert len(activity["recent"]) == 5
+    unbounded = [q[:80] for q in reads.sql if "GROUP BY" not in q and "LIMIT" not in q]
+    assert not unbounded, "audit rows read in full: %s" % unbounded
