@@ -1,288 +1,231 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_health_scorecard_journey.py #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/progress.html' import progress as progress_bar %}
-{% from 'components/button.html' import button %}
-{% from 'components/table.html' import table %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
-{% import 'components/card.html' as card %}
+{% import 'basecoat/index.html' as ui %}
+{% import 'dashboards/_overview_parts.html' as d %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Architecture Health Scorecard{% endblock %}
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-chart.js') }}" defer></script>
+{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    {{ page_header(
-        title='Architecture Health Scorecard', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Architecture Health Scorecard'}],
-        description='Real-time portfolio risk, ARB pipeline, ArchiMate coverage, and ADM progression'
-    ) }}
+<div class="p-6 space-y-6" data-testid="health-dashboard">
+    {{ page_shell(title='Architecture Health Scorecard', breadcrumb=[('Home', '/'), ('Architecture Health Scorecard', none)], subtitle='Real-time portfolio risk, ARB pipeline, ArchiMate coverage, and ADM progression') }}
 
-    {# ── Health Score — the composite this page is named for. One line, not a
-       card: the value and format are the ones the dashboard shows, and the
-       components named are the ones the score was actually weighted from. ── #}
+    {# The composite this page is named for: the value and format are the ones the Overview shows, and the
+       components named are the ones the score was actually weighted from. #}
     {% set basis = health_basis|default({}) %}
-    <p class="-mt-3 text-sm text-muted-foreground" data-testid="health-score-line">
+    <p class="text-sm text-muted-foreground" data-testid="health-score-line">
         Health Score
-        <strong class="ml-1 text-2xl font-bold tabular-nums text-foreground" data-testid="health-score-value">{{ health_score_text|default('—') }}</strong>
+        <strong class="ml-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="health-score-value">{{ health_score_text|default('—') }}</strong>
         {% if basis.weighted_from %}<span class="ml-1">out of 100, weighted from {{ basis.weighted_from }}.</span>{% endif %}
         {% if basis.not_measured %}<span class="ml-1" data-testid="health-score-not-measured">Not measured: {{ basis.not_measured }}.</span>{% endif %}
     </p>
 
-    {# ── AI Executive Briefing (advisory) ─────────────────────────────────── #}
-    <div x-data="execBriefingPanel()" class="bg-card border border-border rounded-lg p-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-            <div class="flex items-center gap-2">
-                <i data-lucide="sparkles" class="h-4 w-4 text-primary"></i>
-                <h3 class="text-sm font-semibold text-foreground">AI Executive Briefing</h3>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested summary</span>
-            </div>
-            {% call button(variant="default", class="justify-center whitespace-nowrap", attrs_dict={"@click": ("generate()"), ":disabled": ("loading"), "title": "Generate AI executive briefing"}) %}
-                <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <span x-text="loading ? 'Generating…' : (briefing ? 'Regenerate' : 'Generate briefing')"></span>
+    {# Stat card row: each figure is the route's own; nothing is recomputed here. #}
+    {% set risks_known = risk_counts.critical is not none and risk_counts.high is not none and risk_counts.medium is not none and risk_counts.low is not none %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="health-stats">
+        {% call ui.card(attrs={'data-testid': 'health-maturity'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='Avg Solution Maturity') }}
+                {{ ui.card_title(text=((avg_maturity | string) ~ '%') if avg_maturity is not none else '—', class='text-2xl font-semibold tabular-nums') }}
             {% endcall %}
-        </div>
-        <p class="text-xs text-muted-foreground mt-1">
-            AI summary of this scorecard's own metrics — solution risk, ARB pipeline, ArchiMate coverage
-            and ADM progression. Advisory only; nothing here changes the scorecard.
-        </p>
-
-        <div x-show="error" x-cloak class="mt-3 text-sm text-destructive-emphasis bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2" x-text="error"></div>
-
-        <div x-show="briefing" x-cloak class="mt-4 space-y-4">
-            <div>
-                <h4 class="text-xs font-semibold text-foreground/80 uppercase tracking-wide mb-1">Headline</h4>
-                <p class="text-sm text-foreground font-medium" x-text="briefing && briefing.headline"></p>
-            </div>
-
-            <div x-show="briefing && briefing.what_changed && briefing.what_changed.length">
-                <h4 class="text-xs font-semibold text-foreground/80 uppercase tracking-wide mb-1">What changed</h4>
-                <ul class="list-disc list-inside text-sm text-foreground space-y-0.5">
-                    <template x-for="(item, idx) in (briefing ? briefing.what_changed : [])" :key="idx">
-                        <li x-text="item"></li>
-                    </template>
-                </ul>
-            </div>
-
-            <div x-show="briefing && briefing.risks && briefing.risks.length">
-                <h4 class="text-xs font-semibold text-warning-emphasis uppercase tracking-wide mb-1">Risks</h4>
-                <ul class="list-disc list-inside text-sm text-foreground space-y-0.5">
-                    <template x-for="(risk, idx) in (briefing ? briefing.risks : [])" :key="idx">
-                        <li x-text="risk"></li>
-                    </template>
-                </ul>
-            </div>
-
-            <div x-show="briefing && briefing.recommended_focus && briefing.recommended_focus.length">
-                <h4 class="text-xs font-semibold text-foreground/80 uppercase tracking-wide mb-1">Recommended focus</h4>
-                <ul class="list-disc list-inside text-sm text-foreground space-y-0.5">
-                    <template x-for="(item, idx) in (briefing ? briefing.recommended_focus : [])" :key="idx">
-                        <li x-text="item"></li>
-                    </template>
-                </ul>
-            </div>
-
-            <div>
-                <h4 class="text-xs font-semibold text-foreground/80 uppercase tracking-wide mb-1">Rationale</h4>
-                <p class="text-sm text-muted-foreground" x-text="briefing && briefing.rationale"></p>
-            </div>
-        </div>
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">Average ADM phase progress, phase D counting as 50% and phase H as 100%; solutions without a recorded phase are left out</p>{% endcall %}
+        {% endcall %}
+        {% call ui.card(attrs={'data-testid': 'health-solutions'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='Solutions in Organisation') }}
+                {% call ui.card_title(class='text-2xl font-semibold tabular-nums') %}<span data-testid="health-total-solutions">{{ total_solutions if total_solutions is not none else '—' }}</span>{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">All solutions tracked org-wide, regardless of who created them. {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}<a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary underline underline-offset-2">View solutions</a>{% endif %}</p>{% endcall %}
+        {% endcall %}
+        {% call ui.card(attrs={'data-testid': 'health-archimate'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='ArchiMate Elements') }}
+                {% call ui.card_title(class='text-2xl font-semibold tabular-nums') %}<span data-testid="health-total-archimate">{{ total_archimate }}</span>{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">Catalog elements across all layers</p>{% endcall %}
+        {% endcall %}
+        {% call ui.card(attrs={'data-testid': 'health-risks'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='Open Risks') }}
+                {% if risks_known %}
+                {% call ui.card_title(class='text-2xl font-semibold tabular-nums') %}<span data-testid="health-open-risks">{{ risk_counts.critical + risk_counts.high + risk_counts.medium + risk_counts.low }}</span>{% endcall %}
+                {% else %}
+                {{ ui.card_title(text='Not available', class='text-lg font-semibold', attrs={'data-testid': 'health-open-risks'}) }}
+                {% endif %}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{% if risks_known %}Active risk register entries{% else %}The risk register could not be read. Reload the page to try again.{% endif %}</p>{% endcall %}
+        {% endcall %}
     </div>
 
-    {# ── Summary Metric Cards ─────────────────────────────────────────────── #}
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {{ metrics_card(
-            title='Avg Solution Maturity',
-            value=(avg_maturity | string) + '%' if avg_maturity is not none else '—',
-            icon='trending-up',
-            description='Average ADM phase progress, phase D counting as 50% and phase H as 100%; solutions without a recorded phase are left out'
-        ) }}
-        {{ metrics_card(
-            title='Solutions in Organisation',
-            value=total_solutions | string if total_solutions is not none else '—',
-            value_testid='health-total-solutions',
-            icon='puzzle',
-            description='All solutions tracked org-wide, regardless of who created them',
-            href=url_for('solution_design.list_solutions') if 'solution_design.list_solutions' in flask.current_app.view_functions else ''
-        ) }}
-        {{ metrics_card(
-            title='ArchiMate Elements',
-            value=total_archimate | string,
-            icon='boxes',
-            description='Catalog elements across all layers'
-        ) }}
-        {{ metrics_card(
-            title='Open Risks',
-            value=((risk_counts.critical or 0) + (risk_counts.high or 0) + (risk_counts.medium or 0) + (risk_counts.low or 0)) | string,
-            icon='alert-triangle',
-            description='Active risk register entries'
-        ) }}
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-2">
-        {# ── P1: Solution Risk Summary ─────────────────────────────────────── #}
-        {% call card.card() %}
-            {% call card.card_header(class='pb-3') %}
-                {% call card.card_title(class='text-lg') %}
-                    <i data-lucide="shield-alert" class="h-5 w-5 inline mr-2 text-destructive" aria-hidden="true"></i>
-                    Solution Risk Register
-                {% endcall %}
+    {% set layer_rows = [] %}
+    {% for layer, count in archimate_by_layer.items() %}{% if count > 0 %}{% set _ = layer_rows.append({'layer': layer|capitalize, 'elements': count}) %}{% endif %}{% endfor %}
+    {# Chart grid: ArchiMate coverage as the primary chart, ADM progression beside it. #}
+    {% set adm_labels = {'A': 'Vision', 'B': 'Business', 'C': 'Info Systems', 'D': 'Technology', 'E': 'Opportunities', 'F': 'Migration', 'G': 'Governance', 'H': 'Change Mgmt'} %}
+    {% set adm_rows = [] %}
+    {% if adm_distribution is not none %}
+        {% for phase, count in adm_distribution.items() %}
+            {% set _ = adm_rows.append({'phase': ('Unclassified' if phase == 'Unclassified' else phase ~ ': ' ~ adm_labels.get(phase, '')), 'solutions': count}) %}
+        {% endfor %}
+    {% endif %}
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        {% call ui.card(class='xl:col-span-2', attrs={'data-testid': 'health-layers'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='ArchiMate Coverage by Layer', tag='h2') }}
+                {{ ui.card_description(text='Elements in the catalogue, by layer') }}
+                {% call ui.card_action() %}{{ ui.button(text='Manage catalog', href=url_for('archimate_crud.dashboard'), variant='outline', size='sm') }}{% endcall %}
             {% endcall %}
-            {% call card.card_content() %}
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {% set risk_colors = {'critical': 'text-destructive', 'high': 'text-warning-emphasis', 'medium': 'text-layer-strategy-emphasis', 'low': 'text-success'} %}{# design-tokens-ok: 4-tier severity scale (critical/high/medium/low) beyond the 3-tier RAG semantic set — kept raw so each tier stays visually distinct #}
-                    {% for level in ['critical', 'high', 'medium', 'low'] %}
-                    <div class="rounded-lg border border-border bg-background p-4 text-center">
-                        <p class="text-xs text-muted-foreground capitalize mb-1">{{ level }}</p>
-                        <p class="text-3xl font-bold {{ risk_colors.get(level, 'text-foreground') }}">
-                            {{ risk_counts.get(level, 0) }}
-                        </p>
-                    </div>
+            {% call ui.card_content(class='flex flex-col gap-4') %}
+                {% if layer_rows %}
+                {{ d.bar_rows(layer_rows, 'layer', 'elements', 'Elements', chart_colour, label='ArchiMate elements by layer', testid='health-layer-chart', class='aspect-auto h-[240px] w-full') }}
+                {% call ui.table_container() %}{% call ui.table() %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Layer') }}{{ ui.table_head(text='Elements', class='text-right') }}{{ ui.table_head(text='Share', class='text-right') }}{% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
+                    {% for row in layer_rows %}
+                        {% call ui.table_row(attrs={'data-testid': 'health-layer-row'}) %}
+                            {{ ui.table_cell(text=row.layer) }}
+                            {{ ui.table_cell(text=row.elements, class='text-right tabular-nums') }}
+                            {{ ui.table_cell(text=(((row.elements / total_archimate) * 100) | round(1) ~ '%') if total_archimate else '—', class='text-right tabular-nums text-muted-foreground') }}
+                        {% endcall %}
                     {% endfor %}
-                </div>
-                <p class="mt-3 text-xs text-muted-foreground">
-                    Live from the solution risk register.
-                    <a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary underline underline-offset-2">View solutions &#8594;</a>
-                </p>
-            {% endcall %}
-        {% endcall %}
-
-        {# ── P2: ARB Pipeline ─────────────────────────────────────────────── #}
-        {% call card.card() %}
-            {% call card.card_header(class='pb-3') %}
-                {% call card.card_title(class='text-lg') %}
-                    <i data-lucide="git-pull-request" class="h-5 w-5 inline mr-2 text-primary" aria-hidden="true"></i>
-                    ARB Review Pipeline
-                {% endcall %}
-            {% endcall %}
-            {% call card.card_content() %}
-                <div class="grid grid-cols-3 gap-3 mb-3">
-                    <div class="rounded-lg border border-border bg-background p-4 text-center">
-                        <p class="text-xs text-muted-foreground mb-1">Pending</p>
-                        <p class="text-3xl font-bold text-warning">{{ arb_pipeline.pending }}</p>
-                    </div>
-                    <div class="rounded-lg border border-border bg-background p-4 text-center">
-                        <p class="text-xs text-muted-foreground mb-1">Under Review</p>
-                        <p class="text-3xl font-bold text-primary">{{ arb_pipeline.under_review }}</p>
-                    </div>
-                    <div class="rounded-lg border border-border bg-background p-4 text-center">
-                        <p class="text-xs text-muted-foreground mb-1">Approved</p>
-                        <p class="text-3xl font-bold text-success">{{ arb_pipeline.approved }}</p>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="rounded-lg border border-border bg-background p-3 text-center">
-                        <p class="text-xs text-muted-foreground mb-1">Rejected</p>
-                        <p class="text-2xl font-bold text-destructive">{{ arb_pipeline.rejected }}</p>
-                    </div>
-                    <div class="rounded-lg border border-border bg-background p-3 text-center">
-                        <p class="text-xs text-muted-foreground mb-1">Deferred</p>
-                        <p class="text-2xl font-bold text-muted-foreground">{{ arb_pipeline.deferred }}</p>
-                    </div>
-                </div>
-                <p class="mt-3 text-xs text-muted-foreground">
-                    Live from the ARB review pipeline.
-                    <a href="{{ url_for('arb.decision_register_page') }}" class="text-primary underline underline-offset-2">View ARB decisions &#8594;</a>
-                </p>
-            {% endcall %}
-        {% endcall %}
-
-        {# ── P3: ArchiMate Coverage by Layer ──────────────────────────────── #}
-        {% call card.card() %}
-            {% call card.card_header(class='pb-3') %}
-                {% call card.card_title(class='text-lg') %}
-                    <i data-lucide="layers" class="h-5 w-5 inline mr-2 text-warning" aria-hidden="true"></i>
-                    ArchiMate Coverage by Layer
-                {% endcall %}
-            {% endcall %}
-            {% call card.card_content() %}
-                {% set layer_colors = {'motivation': 'bg-layer-motivation/10 text-layer-motivation-emphasis', 'strategy': 'bg-layer-strategy/10 text-layer-strategy-emphasis', 'business': 'bg-layer-business/10 text-layer-business-emphasis', 'application': 'bg-layer-application/10 text-layer-application-emphasis', 'technology': 'bg-layer-technology/10 text-layer-technology-emphasis', 'implementation': 'bg-layer-implementation/10 text-layer-implementation-emphasis', 'other': 'bg-muted text-foreground'} %}{# ArchiMate layer tokens: tint plus the layer's own emphasis text, both theme-aware #}
-                <div class="rounded-lg border border-border overflow-hidden">
-                    {% call table(class="dense-table w-full text-sm") %}
-                        <thead class="bg-muted/50">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Layer</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Elements</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Share</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for layer, count in archimate_by_layer.items() %}
-                                {% if count > 0 %}
-                            <tr class="border-t border-border">
-                                <td class="px-4 py-2">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ layer_colors.get(layer, 'bg-muted') }} capitalize">{{ layer }}</span>
-                                </td>
-                                <td class="px-4 py-2 text-right font-medium text-foreground">{{ count }}</td>
-                                <td class="px-4 py-2 text-right text-muted-foreground">
-                                    {% if total_archimate > 0 %}{{ ((count / total_archimate) * 100) | round(1) }}%{% else %}&#8212;{% endif %}
-                                </td>
-                            </tr>
-                                {% endif %}
-                            {% endfor %}
-                            {% if archimate_by_layer.items()|length == 0 %}
-                            <tr>
-                                <td colspan="3" class="px-4 py-3 text-center text-muted-foreground">No ArchiMate elements found</td>
-                            </tr>
-                            {% endif %}
-                        </tbody>
                     {% endcall %}
-                </div>
-                <p class="mt-3 text-xs text-muted-foreground">
-                    Total: <strong>{{ total_archimate }}</strong> elements.
-                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="text-primary hover:underline">Manage catalog &#8594;</a>
-                </p>
+                {% endcall %}{% endcall %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="health-layers-empty">No ArchiMate elements yet. They appear here once a source is connected or an architect adds one.</p>
+                {% endif %}
             {% endcall %}
         {% endcall %}
-
-        {# ── P4: ADM Phase Distribution ───────────────────────────────────── #}
-        {% call card.card() %}
-            {% call card.card_header(class='pb-3') %}
-                {% call card.card_title(class='text-lg') %}
-                    <i data-lucide="milestone" class="h-5 w-5 inline mr-2 text-success" aria-hidden="true"></i>
-                    ADM Phase Distribution
-                {% endcall %}
+        {% call ui.card(attrs={'data-testid': 'health-adm'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='ADM Phase Distribution', tag='h2') }}
+                {{ ui.card_description(text='Where each solution stands in the architecture development cycle') }}
+                {% call ui.card_action() %}{% if 'solution_design.list_solutions' in flask.current_app.view_functions %}{{ ui.button(text='View all', href=url_for('solution_design.list_solutions'), variant='outline', size='sm') }}{% endif %}{% endcall %}
             {% endcall %}
-            {% call card.card_content() %}
-                {% set adm_labels = {
-                    'A': 'Vision', 'B': 'Business', 'C': 'Info Systems',
-                    'D': 'Technology', 'E': 'Opportunities', 'F': 'Migration',
-                    'G': 'Governance', 'H': 'Change Mgmt'
-                } %}
-                {# The trailing % is the MEASURED share of the portfolio in this
-                   phase (count / total_solutions), not a hardcoded ladder. A
-                   fixed 12/25/…/100 ladder per phase was removed: it read as
-                   "Governance 87%" from zero solutions — a fabricated-looking
-                   constant. Em dash when there are no solutions to measure. #}
+            {% call ui.card_content(class='flex flex-col gap-4') %}
                 {% if adm_distribution is none %}
                 <p class="text-sm text-muted-foreground" role="status">Phase data unavailable. Reload the page to try again.</p>
                 {% else %}
-                <div class="space-y-2">
-                    {% for phase, count in adm_distribution.items() %}
-                    {% set count = adm_distribution.get(phase, 0) %}
-                    {% set phase_share = ((count / total_solutions) * 100) | round(1) if total_solutions > 0 else none %}
-                    <div class="flex items-center gap-3">
-                        <span class="w-24 text-xs font-medium text-muted-foreground shrink-0">
-                            {% if phase == 'Unclassified' %}Unclassified{% else %}{{ phase }}: {{ adm_labels.get(phase, '') }}{% endif %}
-                        </span>
-                        {{ progress_bar(value=(phase_share if phase_share is not none else 0), max=100, class='flex-1 !h-2 !bg-muted', label=(phase ~ ' share of solutions')) }}
-                        <span class="w-8 text-xs text-right text-foreground font-medium shrink-0">{{ count }}</span>
-                        <span class="w-12 text-xs text-right text-muted-foreground shrink-0">{% if phase_share is not none %}{{ phase_share }}%{% else %}&#8212;{% endif %}</span>
-                    </div>
+                                {% call ui.table_container() %}{% call ui.table(attrs={'data-testid': 'health-adm-table'}) %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Phase') }}{{ ui.table_head(text='Solutions', class='text-right') }}{{ ui.table_head(text='Share', class='text-right') }}{% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
+                    {% for row in adm_rows %}
+                        {# The share is the MEASURED fraction of the portfolio in the phase; no solutions, no share. #}
+                        {% set share = ((row.solutions / total_solutions) * 100) | round(1) if total_solutions else none %}
+                        {% call ui.table_row(attrs={'data-testid': 'health-adm-row'}) %}
+                            {{ ui.table_cell(text=row.phase) }}
+                            {{ ui.table_cell(text=row.solutions, class='text-right tabular-nums') }}
+                            {{ ui.table_cell(text=((share ~ '%') if share is not none else '—'), class='text-right tabular-nums text-muted-foreground') }}
+                        {% endcall %}
                     {% endfor %}
+                    {% endcall %}
+                {% endcall %}{% endcall %}
+                <div class="flex items-center justify-between border-t pt-4 text-sm">
+                    <span class="text-muted-foreground">Avg Solution Maturity</span>
+                    <span class="font-semibold tabular-nums">{{ (avg_maturity | string ~ '%') if avg_maturity is not none else '—' }}</span>
                 </div>
+                <p class="text-sm text-muted-foreground">Average derived from recorded ADM phases only; unclassified solutions are excluded.</p>
                 {% endif %}
-                <div class="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                    <span class="text-sm text-muted-foreground">Avg Solution Maturity</span>
-                    <span class="text-2xl font-bold text-primary">{% if avg_maturity is not none %}{{ avg_maturity }}%{% else %}&#8212;{% endif %}</span>
-                </div>
-                <p class="mt-2 text-xs text-muted-foreground">
-                    Average derived from recorded ADM phases only; unclassified solutions are excluded.
-                    <a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary underline underline-offset-2">View all &#8594;</a>
-                </p>
             {% endcall %}
         {% endcall %}
     </div>
+
+    {# Equal pair: the risk register by severity and the ARB review pipeline. #}
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {% call ui.card(attrs={'data-testid': 'health-risk-register'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='Solution Risk Register', tag='h2') }}
+                {{ ui.card_description(text='Live from the solution risk register') }}
+                {% call ui.card_action() %}{% if 'solution_design.list_solutions' in flask.current_app.view_functions %}{{ ui.button(text='View solutions', href=url_for('solution_design.list_solutions'), variant='outline', size='sm') }}{% endif %}{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}
+                {% if risks_known %}
+                {% call ui.table_container() %}{% call ui.table() %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Severity') }}{{ ui.table_head(text='Open risks', class='text-right') }}{% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
+                    {% for level in ['critical', 'high', 'medium', 'low'] %}
+                        {% call ui.table_row() %}
+                            {% call ui.table_cell() %}{{ state_badge(level) }}{% endcall %}
+                            {{ ui.table_cell(text=risk_counts[level], class='text-right tabular-nums', attrs={'data-testid': 'health-risk-' ~ level}) }}
+                        {% endcall %}
+                    {% endfor %}
+                    {% endcall %}
+                {% endcall %}{% endcall %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" role="status" data-testid="health-risk-unavailable">The risk register could not be read, so no counts are shown. Reload the page to try again.</p>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+
+        {% call ui.card(attrs={'data-testid': 'health-arb'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='ARB Review Pipeline', tag='h2') }}
+                {{ ui.card_description(text='Live from the ARB review pipeline') }}
+                {% call ui.card_action() %}{{ ui.button(text='ARB decisions', href=url_for('arb.decision_register_page'), variant='outline', size='sm') }}{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}
+                {% call ui.table_container() %}{% call ui.table() %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Status') }}{{ ui.table_head(text='Items', class='text-right') }}{% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
+                    {% for label, key in [('Pending', 'pending'), ('Under review', 'under_review'), ('Approved', 'approved'), ('Rejected', 'rejected'), ('Deferred', 'deferred')] %}
+                        {% call ui.table_row(attrs={'data-testid': 'health-arb-row'}) %}
+                            {{ ui.table_cell(text=label) }}
+                            {{ ui.table_cell(text=arb_pipeline[key], class='text-right tabular-nums') }}
+                        {% endcall %}
+                    {% endfor %}
+                    {% endcall %}
+                {% endcall %}{% endcall %}
+            {% endcall %}
+        {% endcall %}
+    </div>
+
+    {# AI Executive Briefing (advisory): reads this page's own figures and writes nothing back. #}
+    {% call ui.card(attrs={'x-data': 'execBriefingPanel()', 'data-testid': 'health-briefing'}) %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='AI Executive Briefing', tag='h2') }}
+            {{ ui.card_description(text="AI summary of this scorecard's own figures: solution risk, ARB pipeline, ArchiMate coverage and ADM progression. Advisory only; nothing here changes the scorecard.") }}
+            {% call ui.card_action() %}
+                {% call ui.button(attrs={'type': 'button', '@click': 'generate()', ':disabled': 'loading', 'title': 'Generate AI executive briefing'}) %}<span x-text="loading ? 'Generating…' : (briefing ? 'Regenerate' : 'Generate briefing')">Generate briefing</span>{% endcall %}
+            {% endcall %}
+        {% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-4') %}
+            <p x-show="error" x-cloak class="text-sm text-destructive" role="alert" x-text="error"></p>
+            <div x-show="briefing" x-cloak class="flex flex-col gap-4">
+                <div>
+                    <h3 class="text-sm font-medium">Headline</h3>
+                    <p class="text-sm" x-text="briefing && briefing.headline"></p>
+                </div>
+                <div x-show="briefing && briefing.what_changed && briefing.what_changed.length">
+                    <h3 class="text-sm font-medium">What changed</h3>
+                    <ul class="list-disc list-inside text-sm space-y-0.5">
+                        <template x-for="(item, idx) in (briefing ? briefing.what_changed : [])" :key="idx"><li x-text="item"></li></template>
+                    </ul>
+                </div>
+                <div x-show="briefing && briefing.risks && briefing.risks.length">
+                    <h3 class="text-sm font-medium">Risks</h3>
+                    <ul class="list-disc list-inside text-sm space-y-0.5">
+                        <template x-for="(risk, idx) in (briefing ? briefing.risks : [])" :key="idx"><li x-text="risk"></li></template>
+                    </ul>
+                </div>
+                <div x-show="briefing && briefing.recommended_focus && briefing.recommended_focus.length">
+                    <h3 class="text-sm font-medium">Recommended focus</h3>
+                    <ul class="list-disc list-inside text-sm space-y-0.5">
+                        <template x-for="(item, idx) in (briefing ? briefing.recommended_focus : [])" :key="idx"><li x-text="item"></li></template>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium">Rationale</h3>
+                    <p class="text-sm text-muted-foreground" x-text="briefing && briefing.rationale"></p>
+                </div>
+            </div>
+        {% endcall %}
+    {% endcall %}
 </div>
 
 <script>
@@ -319,4 +262,3 @@ function execBriefingPanel() {
 }
 </script>
 {% endblock %}
-{# design-block: dashboard #}

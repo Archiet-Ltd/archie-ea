@@ -459,6 +459,8 @@ def health_scorecard():
         "dashboards/health.html",
         health_score_text=format_health_score(health_score),
         health_basis=health_score_basis(health_score, unavailable),
+        # The chart series colour is a token, passed in as the Overview passes its own.
+        chart_colour="hsl(var(--chart-1))",
         **metrics,
     )
 
