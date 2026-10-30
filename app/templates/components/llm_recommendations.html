@@ -150,16 +150,16 @@ function llmRecommendationsComponent(dashboard) {
 
     {% call ui.card(attrs={'data-block': 'recommendations'}) %}
     {% call ui.card_content(class='p-6') %}
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <div>
                     <h3 class="text-lg font-semibold">AI-Powered Recommendations</h3>
                     <p class="text-sm text-muted-foreground mt-1">
-                        Generate context-aware strategic recommendations using your configured LLM provider
+                        Suggestions drawn from your capability model
                     </p>
                 </div>
-                {% call ui.button(type='button', class='bg-primary px-4 text-primary-foreground hover:bg-primary/90', attrs={'@click': 'generateRecommendations()', ':disabled': 'loading', 'aria-label': 'Generate recommendations', 'data-testid': 'llm-generate'}) %}
+                {% call ui.button(type='button', class='w-full sm:w-auto bg-primary px-4 text-primary-foreground hover:bg-primary/90', attrs={'@click': 'generateRecommendations()', ':disabled': 'loading', 'aria-label': 'Generate recommendations', 'data-testid': 'llm-generate'}) %}
                     <i data-lucide="sparkles" class="h-4 w-4" :class="{ 'animate-spin': loading }"></i>
-                    <span x-text="loading ? 'Generating...' : 'Generate Recommendations'"></span>
+                    <span x-text="loading ? 'Generating...' : 'Generate recommendations'"></span>
                 {% endcall %}
             </div>
 
