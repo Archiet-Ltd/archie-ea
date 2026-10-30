@@ -13,19 +13,6 @@
 
 {% block body_theme %}theme-marketing{% endblock %}
 
-{% macro no_data(title, description) -%}
-{%- call ui.empty() -%}
-{%- call ui.empty_header() -%}{{ ui.empty_title(text=title) }}{{ ui.empty_description(text=description) }}{%- endcall -%}
-{%- endcall -%}
-{%- endmacro %}
-
-{% macro state_badge(state, label, testid) -%}
-{%- set dot = {'operational': 'bg-success', 'degraded': 'bg-warning', 'outage': 'bg-destructive'}.get(state, 'bg-muted-foreground') -%}
-{%- call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground', attrs={'data-testid': testid}) -%}
-<span class="size-1.5 shrink-0 rounded-full {{ dot }}" aria-hidden="true"></span>{{ label }}
-{%- endcall -%}
-{%- endmacro %}
-
 {% block content %}
 <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-12 sm:px-6" data-testid="service-status-page">
   <header class="flex flex-col gap-2">
@@ -43,7 +30,7 @@
           <p class="font-medium text-foreground">{{ c.name }}</p>
           <p class="text-sm text-muted-foreground">{{ c.detail }}</p>
         </div>
-        {{ state_badge(c.state, c.label, 'status-badge-' ~ c.key) }}
+        {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground', attrs={'data-testid': 'status-badge-' ~ c.key}) %}<span class="size-1.5 shrink-0 rounded-full {{ {'operational': 'bg-success', 'degraded': 'bg-warning', 'outage': 'bg-destructive'}.get(c.state, 'bg-muted-foreground') }}" aria-hidden="true"></span>{{ c.label }}{% endcall %}
       {% endcall %}
     {% endcall %}
     {% endfor %}
@@ -57,7 +44,7 @@
       {% call ui.card_content(class='flex flex-col gap-1') %}
         <div class="flex items-center justify-between gap-3">
           <span class="font-medium text-foreground">{{ incident.title }}</span>
-          {{ state_badge(incident.impact, 'Down' if incident.impact == 'outage' else 'Degraded', none) }}
+          {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground') %}<span class="size-1.5 shrink-0 rounded-full {{ 'bg-destructive' if incident.impact == 'outage' else 'bg-warning' }}" aria-hidden="true"></span>{{ 'Down' if incident.impact == 'outage' else 'Degraded' }}{% endcall %}
         </div>
         {% if incident.summary %}<p class="text-sm text-muted-foreground">{{ incident.summary }}</p>{% endif %}
         <p class="text-xs text-muted-foreground">Since {{ incident.started_at.strftime('%d %b %Y %H:%M') }} UTC</p>
@@ -70,7 +57,7 @@
   <section aria-labelledby="incident-history-heading" class="flex flex-col gap-3">
     <h2 id="incident-history-heading" class="text-base font-semibold text-foreground">Incident history</h2>
     {% if not status.incidents_checked %}
-    {{ no_data('Incident history is not available right now', 'The incident record could not be read during this check. The component states above are still current.') }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='Incident history is not available right now') }}{{ ui.empty_description(text='The incident record could not be read during this check. The component states above are still current.') }}{% endcall %}{% endcall %}
     {% elif status.history %}
     <ul class="flex flex-col gap-2" data-testid="service-status-history">
       {% for incident in status.history %}
@@ -79,7 +66,7 @@
           {% call ui.card_content(class='flex flex-col gap-1') %}
             <div class="flex items-center justify-between gap-3">
               <span class="font-medium text-foreground">{{ incident.title }}</span>
-              {{ state_badge(incident.impact, 'Down' if incident.impact == 'outage' else 'Degraded', none) }}
+              {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground') %}<span class="size-1.5 shrink-0 rounded-full {{ 'bg-destructive' if incident.impact == 'outage' else 'bg-warning' }}" aria-hidden="true"></span>{{ 'Down' if incident.impact == 'outage' else 'Degraded' }}{% endcall %}
             </div>
             <p class="text-xs text-muted-foreground">Started {{ incident.started_at.strftime('%d %b %Y %H:%M') }} UTC · {{ 'Resolved ' ~ incident.resolved_at.strftime('%d %b %Y %H:%M') ~ ' UTC' if incident.resolved_at else 'Ongoing' }}</p>
           {% endcall %}
@@ -88,7 +75,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    {{ no_data('No incidents in the last 90 days', 'When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.') }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No incidents in the last 90 days') }}{{ ui.empty_description(text='When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.') }}{% endcall %}{% endcall %}
     {% endif %}
   </section>
 </div>
