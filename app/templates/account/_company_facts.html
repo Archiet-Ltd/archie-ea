@@ -5,7 +5,7 @@
         {% if completeness %}<span class="text-xs text-muted-foreground" data-testid="signup-completeness">{{ ((completeness.value * 100) if completeness.value <= 1 else completeness.value) | round | int }}% of the profile found</span>{% endif %}
     </div>
     {% set site_row = sources | selectattr('key', 'equalto', 'website') | first %}
-    {% if site_row and site_row.state == 'reading' %}
+    {% if (site_row and site_row.state == 'reading') or more_coming %}
     <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" role="status" data-testid="signup-facts-more">
         More facts are still being worked out from your website.
         <a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline" data-testid="signup-facts-refresh">Show them when they are ready</a>
