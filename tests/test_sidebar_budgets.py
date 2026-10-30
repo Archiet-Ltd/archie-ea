@@ -173,7 +173,8 @@ def test_every_role_sees_the_same_top_work_and_model_entries(ctx, role):
 
 @pytest.mark.parametrize("role", VALID_ROLES)
 def test_work_pages_follow_who_may_open_them(ctx, role):
-    nav = _nav(_Person(role))
+    # Authority is the account's Administrator permission, not the stored persona.
+    nav = _nav(_Person(role, admin=role == ROLE_PLATFORM_ADMIN))
     held = {item.label: _labels(item.children) for item in nav["work"]}
     spend = list(WORK_CHILDREN["Spend"])
     if role == ROLE_FINANCE:
