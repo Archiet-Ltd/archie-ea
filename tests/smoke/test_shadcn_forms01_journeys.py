@@ -158,3 +158,86 @@ def test_converted_form_pages_open_with_labelled_library_controls(page, live_ser
         .map(e => e.name || e.id)""")
     assert not unnamed, unnamed
     assert not errors, errors
+
+
+# ---- forms01c: the assessment page, the mapping page and the journey page read as one family ----
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_assessment_page_has_one_card_width(page, live_server, seeded, width):
+    page.set_viewport_size({"width": width, "height": 900})
+    _login(page, live_server, seeded["emails"]["application_manager"])
+    page.goto(live_server + "/dashboard/rationalization/assessment")
+    widths = page.evaluate("""() => ['[data-testid=assessment-column] > div:first-child', '#app-selector',
+        '.questionnaire-step:not(.hidden) > div'].map(s => Math.round(document.querySelector(s).getBoundingClientRect().width))""")
+    assert max(widths) - min(widths) <= 1, widths
+    assert max(widths) <= 672 + 1, widths
+
+
+def test_assessment_choice_is_carried_through_the_steps_and_submitted(page, live_server, seeded):
+    _login(page, live_server, seeded["emails"]["application_manager"])
+    posted = {}
+
+    def fulfil(route):
+        if route.request.method == "POST" and route.request.url.endswith("/assessment"):
+            posted.update(route.request.post_data_json or {})
+        route.fulfill(status=200, content_type="application/json", body='{"success": true, "data": {}}')
+
+    page.route("**/dashboard/api/rationalization/**", fulfil)
+    page.goto(live_server + "/dashboard/rationalization/assessment")
+    page.locator("#application-select").select_option(index=1)
+    page.get_by_label("Monolithic").check()
+    for _ in range(5):
+        page.get_by_role("button", name="Go to next step").click()
+    expect(page.get_by_role("button", name="Submit assessment")).to_be_visible()
+    page.get_by_role("button", name="Submit assessment").click()
+    page.wait_for_url("**/rationalization**")
+    assert posted.get("architecture_pattern") == "monolithic", posted
+    assert posted.get("application_id"), posted
+
+
+def test_mapping_page_reads_not_set_with_its_reason_and_no_icons_in_stat_cards(page, live_server, seeded):
+    from .test_try_sample_company_journey import _empty_organisation_user, _login as _login_plain
+
+    email, _org = _empty_organisation_user(live_server)
+    _login_plain(page, live_server, email)
+    page.goto(live_server + "/enterprise/capability-map/mapping")
+    cards = page.locator("div.grid > [data-slot=card]")
+    assert cards.count() <= 4 and cards.count() >= 3
+    coverage = cards.filter(has_text="Capabilities with an application")
+    expect(coverage).to_contain_text("Not set")
+    expect(coverage).to_contain_text("No capability has an application yet")
+    assert "—" not in coverage.inner_text()
+    assert page.locator("div.grid > [data-slot=card] svg, div.grid > [data-slot=card] [data-lucide]").count() == 0
+    assert page.locator("div.grid > [data-slot=card] .tabular-nums").count() == cards.count()
+
+
+def test_mapping_coverage_matrix_links_stack_under_the_title_on_a_phone(page, live_server, seeded):
+    from app import create_app, db
+    from app.models.business_capabilities import BusinessCapability
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(BusinessCapability(name="Forms phone %s" % uuid.uuid4().hex[:6],
+                                          organization_id=seeded["ids"]["org"]))
+        db.session.commit()
+    page.set_viewport_size({"width": 390, "height": 844})
+    _login(page, live_server, seeded["emails"]["business_architect"])
+    page.goto(live_server + "/enterprise/capability-map/mapping")
+    header = page.locator("[data-slot=card-header]", has_text="Coverage Matrix")
+    title = header.locator("[data-slot=card-title]").bounding_box()
+    action = header.locator("[data-slot=card-action]")
+    expect(action.get_by_role("link", name="All Capabilities")).to_be_visible()
+    expect(action.get_by_role("link", name="All Applications")).to_be_visible()
+    assert action.bounding_box()["y"] >= title["y"] + title["height"] - 1
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+
+def test_journey_page_hidden_state_inputs_all_carry_a_name(page, live_server, seeded):
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    resp = page.goto(live_server + "/architecture-journey/%s" % seeded["ids"]["solution"])
+    assert resp.status < 400
+    unnamed = page.evaluate("""() => [...document.querySelectorAll('input[type=hidden]')]
+        .filter(e => !e.getAttribute('name')).map(e => e.id)""")
+    assert not unnamed, unnamed
+    names = page.evaluate("[...document.querySelectorAll('input[id^=journey-v2-]')].map(e => e.name)")
+    assert set(names) >= {"solution_description", "solution_name", "journey_state", "governance_status"}, names
