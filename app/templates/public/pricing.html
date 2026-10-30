@@ -32,6 +32,8 @@
 
 {% block content %}
 {% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
+{% set _sso = sso_offered() %}
+{% set _self_serve = self_serve_plans_offered() %}
 {% set _yes = '<span class="pp-yes" role="img" aria-label="Included"></span>'|safe %}
 {% set _no = '<span class="pp-no" aria-label="Not included">&mdash;</span>'|safe %}
 <div class="pricing-page">
@@ -74,7 +76,7 @@
           ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
             ['Ten people', 'Email support']),
           ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-            ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
+            ['Pay for editors only; everyone else asks for free'] + (['Single sign-on'] if _sso else []) + ['The review-board workflow', 'Your own model key', 'Email support'])
         ] %}
         {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
@@ -88,7 +90,10 @@
             <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of ten. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
             {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
           </p>
-          {% if _billing %}
+          {% if not _self_serve %}
+          <p class="pp-note" data-testid="plans-open-soon-{{ key }}">Entelim is free while it is in early access. Plans open for purchase soon.</p>
+          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-{{ key }}">Start free</a>
+          {% elif _billing %}
           <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
              class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
           <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
@@ -115,7 +120,7 @@
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
             <li>Unlimited editors</li>
-            <li>SAML sign-in</li>
+            {% if _sso %}<li>SAML sign-in</li>{% endif %}
             <li>Audit log export</li>
             <li>Your own model key by default</li>
             <li>Supported self-hosting and dedicated deployment</li>
@@ -157,8 +162,8 @@
                 ('Audit log export', [0, 0, 0, 1]),
               ]),
               ('Security and access', [
-                ('Single sign-on', [0, 0, 1, 1]),
-                ('SAML sign-in', [0, 0, 0, 1]),
+                ('Single sign-on', [0, 0, 1, 1] if _sso else [0, 0, 'Coming', 'Coming']),
+                ('SAML sign-in', [0, 0, 0, 1] if _sso else [0, 0, 0, 'Coming']),
                 ('Your own model key', [0, 0, 1, 'By default']),
                 ('Supported self-hosting and dedicated deployment', [0, 0, 0, 1]),
               ]),
@@ -219,8 +224,9 @@
       <div class="public-faq max-w-3xl">
         <details>
           <summary>Can I cancel at any time?{{ faq_chevron() }}</summary>
-          <p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact" class="public-link">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>
+          {% if not _self_serve %}<p>Entelim is free while it is in early access, so there is nothing to cancel yet. Plans open for purchase soon, and this answer will say how to cancel then.</p>{% else %}<p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact" class="public-link">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>{% endif %}
         </details>
+        {% if _self_serve %}
         <details>
           <summary>What happens when I add or remove seats?{{ faq_chevron() }}</summary>
           <p>On Team you pay for editors, and people who only ask questions are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
@@ -233,6 +239,7 @@
           <summary>Where do I find my invoices?{{ faq_chevron() }}</summary>
           <p>Each payment produces an invoice, listed on your organisation's billing page. The invoice e-mail address and billing details are yours to set there.</p>
         </details>
+        {% endif %}
         <details>
           <summary>What happens to my data if I move to a smaller plan?{{ faq_chevron() }}</summary>
           <p>If you have more people than the new plan admits, everyone keeps access, and no one new can be added until you are within the limit.</p>

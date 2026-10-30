@@ -364,14 +364,14 @@
             <td><strong>$29</strong>/editor/month</td>
             <td>$290/editor/year. Askers free.</td>
             <td>For scale-ups and services companies, 50 to 500 people.</td>
-            <td>Single sign-on and the review-board workflow.</td>
+            <td>{% if sso_offered() %}Single sign-on and the review-board workflow.{% else %}The review-board workflow. Single sign-on is coming.{% endif %}</td>
           </tr>
           <tr>
             <td>Enterprise</td>
             <td><strong>From $24,000</strong>/year</td>
             <td>Annual contract.</td>
             <td>For enterprise architecture teams.</td>
-            <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
+            <td>Unlimited editors, {% if sso_offered() %}SAML, {% endif %}audit export, own key by default, supported self-hosting, named contact.{% if not sso_offered() %} Single sign-on is coming.{% endif %}</td>
           </tr>
         </tbody>
       {% endcall %}
