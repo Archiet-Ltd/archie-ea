@@ -142,6 +142,31 @@ types:
     signals: []
     retired: []
 
+  # Ruling R33, design-system lead, 29 Oct 2026. Tables the browser fills from JSON it already holds,
+  # in application rationalisation and its neighbours, are of two kinds:
+  #   - a list of records (roadmap work packages, triage, dependency risk, tracking, workbench results)
+  #     is a record-list: the route renders the rows, the page uses list_table, and search, filters,
+  #     sort and page live in query parameters so a link reproduces the view;
+  #   - a working grid that is not a list of records (the enrich grid a person edits in place, a CSV
+  #     import preview before it is saved, a side-by-side comparison of options or responses) is this
+  #     type.
+  # Not ruled: keeping hand-written table markup on tokens only (every table is built from the
+  # library's table parts), or a client-rendered mode in the library macro (no library change for
+  # Entelim; list_table stays the one record list).
+  - id: working-grid
+    data: a grid that is not a list of records, filled in the browser - cells edited in place, rows of
+      a file being imported before they are saved, or options and responses compared side by side
+    show_with: the library table parts (basecoat/table.html - table_container, table, table_header,
+      table_body, table_row, table_head, table_cell) with the row loop as a template x-for inside
+      table_body; editable cells use ui.input or ui.select; scrolls sideways inside table_container at
+      390 wide; no search toolbar or pagination footer, and a count line instead ("12 rows to import,
+      2 with problems"); every cell that is empty says why
+    components: [basecoat/table.html, basecoat/index.html, basecoat/macros.html]
+    pages: rationalization enrich grid, rationalization tracking CSV import preview, response
+      validation comparison, rationalization workbench comparison
+    signals: []
+    retired: []
+
 hand_pagination:
   signal: '\b\w+\.(?:iter_pages\(|has_next\b|has_prev\b|next_num\b|prev_num\b)'
   allowed_with: [components/pagination_controls.html, components/list_table.html, components/element_table.html, basecoat/pagination.html, basecoat/index.html, basecoat/macros.html]
