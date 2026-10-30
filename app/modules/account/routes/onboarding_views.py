@@ -41,6 +41,8 @@ def add_routes(bp, access) -> None:
     @login_required
     @access
     def welcome():
+        from app.connectors import github_app
+
         org = _org()
         step = request.args.get("step", type=int)
         step = step if step in (3, 4) else 2
@@ -48,6 +50,7 @@ def add_routes(bp, access) -> None:
         return render_template(
             "account/register.html",
             form=None,
+            github_app_install_url=github_app.install_url(org.id, return_to="welcome"),
             step=step,
             org=org,
             kinds=onboarding.KINDS,

@@ -1469,10 +1469,15 @@ def connect_and_start(org_id, organization, token, *, task=None, extra=None) -> 
     organization = (organization or "").strip()
     token = (token or "").strip()
     existing = _load_org_connector(org_id, connector_type="github")
-    has_token = OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None
+    vault = OrgCredentialVault()
+    has_token = vault.get_masked(org_id, "github", "api_token") is not None
+    # A GitHub App installation (app/connectors/github_app.py) is also a connection
+    # with nothing to paste: the state and the installation are confirmed with
+    # GitHub before this is ever called, so its presence here is enough.
+    has_installation = vault.get_masked(org_id, "github", "installation_id") is not None
     if not is_valid_github_name(organization):
         raise ConnectRefused("Enter your GitHub organisation or account name exactly as it appears in github.com/<name>.")
-    if not token and not has_token:
+    if not token and not has_token and not has_installation:
         raise ConnectRefused("Paste a read-only GitHub token to connect.")
     if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
         raise ConnectRefused("That does not look like a GitHub token.")
