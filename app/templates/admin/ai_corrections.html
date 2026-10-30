@@ -2,8 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}AI Extraction Corrections{% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
@@ -35,34 +34,45 @@
     {% endwith %}
 
     {# ── Stats Bar ─────────────────────────────────────────────────────────── #}
-    <div class="grid gap-4 md:grid-cols-3">
-        {{ metrics_card(
-            title='Elements Reviewed',
-            value=total_with_elements|string,
-            icon='layers',
-            description='Apps with AI-assigned ArchiMate elements'
-        ) }}
-        {{ metrics_card(
-            title='Corrections Logged',
-            value=correction_count|string,
-            icon='check-circle',
-            description='Total corrections submitted',
-            value_class=('text-success' if correction_count > 0 else 'text-muted-foreground')
-        ) }}
-        {{ metrics_card(
-            title='Pending Review',
-            value=((total_with_elements - correction_count) if total_with_elements > correction_count else 0)|string,
-            icon='clock',
-            description='Elements awaiting confirmation'
-        ) }}
+    <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        {% call ui.card(class='@container/card') %}
+            {% call ui.card_header() %}
+                {% call ui.card_description() %}Elements Reviewed{% endcall %}
+                {% call ui.card_title(class='tabular-nums @[250px]/card:text-3xl') %}{{ total_with_elements }}{% endcall %}
+                {% call ui.card_action() %}<i data-lucide="layers" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}
+                <p class="text-xs text-muted-foreground">Apps with AI-assigned ArchiMate elements</p>
+            {% endcall %}
+        {% endcall %}
+        {% call ui.card(class='@container/card') %}
+            {% call ui.card_header() %}
+                {% call ui.card_description() %}Corrections Logged{% endcall %}
+                {% call ui.card_title(class='tabular-nums @[250px]/card:text-3xl ' ~ ('text-success' if correction_count > 0 else 'text-muted-foreground')) %}{{ correction_count }}{% endcall %}
+                {% call ui.card_action() %}<i data-lucide="check-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}
+                <p class="text-xs text-muted-foreground">Total corrections submitted</p>
+            {% endcall %}
+        {% endcall %}
+        {% call ui.card(class='@container/card') %}
+            {% call ui.card_header() %}
+                {% call ui.card_description() %}Pending Review{% endcall %}
+                {% call ui.card_title(class='tabular-nums @[250px]/card:text-3xl') %}{{ (total_with_elements - correction_count) if total_with_elements > correction_count else 0 }}{% endcall %}
+                {% call ui.card_action() %}<i data-lucide="clock" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>{% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}
+                <p class="text-xs text-muted-foreground">Elements awaiting confirmation</p>
+            {% endcall %}
+        {% endcall %}
     </div>
 
     {# ── Corrections Table ─────────────────────────────────────────────────── #}
-    {% call card() %}
-        {% call card_header() %}
-            {% call card_title() %}<i data-lucide="cpu" class="h-5 w-5 inline mr-2" aria-hidden="true"></i>AI-Generated Elements{% endcall %}
+    {% call ui.card() %}
+        {% call ui.card_header() %}
+            {% call ui.card_title() %}<i data-lucide="cpu" class="h-5 w-5 inline mr-2" aria-hidden="true"></i>AI-Generated Elements{% endcall %}
         {% endcall %}
-        {% call card_content() %}
+        {% call ui.card_content() %}
             {% if rows %}
                 {% set columns = [('Application', ''), ('AI Element Name', ''), ('AI Type', ''), ('AI Layer', ''), {'label': 'Completeness', 'sortable': false}, {'label': 'Actions', 'sortable': false}] %}
                 {% call(row) list_table(rows=rows, columns=columns, caption='AI-generated elements', testid='corrections-table', row_testid='correction-row',
