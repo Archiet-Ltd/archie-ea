@@ -20,6 +20,7 @@ Directory layout maps to URL families:
 from __future__ import annotations
 
 import functools
+import threading
 import json
 import re
 from dataclasses import dataclass, field
@@ -332,6 +333,9 @@ FAMILY_URL_PREFIX = {
 }
 
 _md = markdown.Markdown(extensions=["extra"])
+# One shared converter holds state between calls, so two threads converting at once corrupt each other
+# (a 500 on the roles, comparison and use-case pages under load). Conversion takes this lock.
+_md_lock = threading.Lock()
 
 # Tags and attributes produced by standard Markdown (plus extra extension).
 # Any HTML tag or attribute not in these lists is stripped by bleach.
@@ -784,7 +788,9 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     front_matter, body_md = _parse_front_matter(raw)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
-    body_html = _sanitize_html(_md.reset().convert(body_md))
+    with _md_lock:
+        converted = _md.reset().convert(body_md)
+    body_html = _sanitize_html(converted)
     title = _extract_title(body_html, front_matter)
     external_url = _build_external_url(front_matter)
     return PublicPage(
@@ -804,7 +810,24 @@ def _slug_from_filename(filename: str) -> str:
 
 
 def load_all_pages() -> list[PublicPage]:
-    """Load every Markdown page under content/pages/."""
+    """Every Markdown page under content/pages/.
+
+    Read and converted once per change to the content (the same modification-time fingerprint that
+    ``_pages_by_url`` uses), not on every request: the roles, comparison and use-case pages each asked for
+    the whole set twice, which ran markdown and the sanitiser over every file for every visitor.
+    """
+    from app.services.legal_pages import legal_pages_enabled
+
+    return list(_all_pages_for_fingerprint(_content_fingerprint(), bool(legal_pages_enabled())))
+
+
+@functools.lru_cache(maxsize=2)
+def _all_pages_for_fingerprint(fingerprint, legal_enabled) -> tuple[PublicPage, ...]:
+    return tuple(_read_all_pages())
+
+
+def _read_all_pages() -> list[PublicPage]:
+    """Load every Markdown page under content/pages/ from disk."""
     pages: list[PublicPage] = []
     if not CONTENT_ROOT.is_dir():
         return pages
