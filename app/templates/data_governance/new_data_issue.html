@@ -1,40 +1,41 @@
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Raise data issue — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
-<div class="flex-1 overflow-auto p-6">
+<div class="p-6 space-y-6">
   {{ page_shell(
       title='Raise a data issue',
       subtitle='Report a data-quality or governance problem on an entity.',
       breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Data issues', url_for('data_governance.data_issues')), ('New', None)],
       tabs=tabs
   ) }}
-  <form method="post" action="{{ url_for('data_governance.new_data_issue') }}" class="max-w-xl space-y-4 rounded-lg border border-border bg-card p-6">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div>
-      <label for="data_entity_id" class="block text-sm font-medium text-muted-foreground mb-1">Data entity ID</label>
-      <input type="number" id="data_entity_id" name="data_entity_id" required value="{{ data_entity_id or '' }}"
-             class="h-9 mt-1 block w-full rounded-md border border-border bg-background px-3 text-sm text-foreground">
-    </div>
-    <div>
-      <label for="title" class="block text-sm font-medium text-muted-foreground mb-1">Title</label>
-      <input type="text" id="title" name="title" required
-             class="h-9 mt-1 block w-full rounded-md border border-border bg-background px-3 text-sm text-foreground">
-    </div>
-    <div>
-      <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-      <textarea id="description" name="description" rows="3"
-                class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"></textarea>
-    </div>
-    <div class="flex items-center gap-3 pt-2">
-      <button type="submit"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        Raise issue
-      </button>
-      <a href="{{ url_for('data_governance.data_issues') }}" class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
-    </div>
-  </form>
+  <div class="max-w-2xl">
+    {% call ui.card() %}
+    <form method="post" action="{{ url_for('data_governance.new_data_issue') }}" class="space-y-6 p-6" data-testid="new-data-issue-form">
+      {{ hidden_input('csrf_token', csrf_token()) }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Data entity ID', attrs={'for': 'data_entity_id'}) }}
+        {{ ui.input(id='data_entity_id', name='data_entity_id', type='number', required=true, value=(data_entity_id or '')) }}
+        {{ ui.field_description(text='The number of the data entity the problem is on.') }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Title', attrs={'for': 'title'}) }}
+        {{ ui.input(id='title', name='title', type='text', required=true, autocomplete='off') }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Description', attrs={'for': 'description'}) }}
+        {{ ui.textarea(id='description', name='description', rows=3) }}
+      {% endcall %}
+      <div class="flex items-center justify-end gap-3">
+        {{ ui.button(text='Cancel', variant='outline', href=url_for('data_governance.data_issues')) }}
+        {{ ui.button(text='Raise issue', type='submit') }}
+      </div>
+    </form>
+    {% endcall %}
+  </div>
 </div>
 {% endblock %}
