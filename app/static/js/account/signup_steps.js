@@ -119,6 +119,10 @@
         say(name, 'Connecting…', false);
         post(url, body).then(function (result) {
             paint(result.sources);
+            if (result.note) {
+                var shown = root.querySelector('[data-source="' + name + '"]');
+                if (shown) shown.textContent = shown.textContent + ' ' + result.note;
+            }
             poll();
         }).catch(function (error) {
             say(name, error.message || 'That did not work. Check it and try again.', true);
