@@ -1452,6 +1452,23 @@ for _src in BUSINESS_ELEMENTS + APPLICATION_ELEMENTS + TECHNOLOGY_ELEMENTS + PHY
 
 del _src, _types
 
+# Serving relationships the specification permits and the hand-authored table left out
+# (ArchiMate 3.2 §12.1 and Appendix B): an application serves the people who use it, a
+# technology node serves the application it hosts, and a technology service serves its
+# users. These are the most common relationships in any context view. Added to the
+# finished table in front of association, and only ever added.
+_SERVING_ADDITIONS = (
+    ("ApplicationComponent", "BusinessActor"),
+    ("Node", "ApplicationComponent"),
+    ("TechnologyService", "BusinessActor"),
+)
+for _pair in _SERVING_ADDITIONS:
+    _types = VALID_RELATIONSHIPS.setdefault(_pair, [])
+    if "serving" not in _types:
+        _types.insert(0, "serving")
+
+del _pair, _types
+
 # Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
 # Appendix B). Applied last, over the finished table, and only ever added: no
 # existing entry is removed or reordered.
