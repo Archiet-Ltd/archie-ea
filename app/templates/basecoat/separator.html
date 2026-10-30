@@ -1,0 +1,7 @@
+{# separator: port of shadcn/ui separator.tsx (pinned in compliance/upstream). Macros: separator #}
+
+{#- Separator -#}
+{% macro separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

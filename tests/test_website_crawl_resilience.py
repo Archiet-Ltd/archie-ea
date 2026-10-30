@@ -98,6 +98,7 @@ def providers(monkeypatch):
     monkeypatch.setattr(LLMService, "_call_nvidia_once", staticmethod(caller("nvidia")), raising=False)
     monkeypatch.setattr(LLMService, "_get_all_api_keys",
                         staticmethod(lambda provider: ["key-for-" + provider] if provider in keyed else []))
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_GEMINI", "5")  # the platform's paid provider, within its ceiling
     monkeypatch.setattr(LLMService, "_persist_interaction_record", staticmethod(lambda interaction: None))
     monkeypatch.setattr(LLMService, "_sleep", staticmethod(lambda seconds: None))
     return SimpleNamespaceLike(calls=calls, extras=extras, script=script, keyed=keyed, service=LLMService)
