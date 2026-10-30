@@ -52,7 +52,16 @@ def test_module_tests_get_the_shared_fixtures_from_one_bridge():
     bridge = ROOT / "app" / "modules" / "conftest.py"
     assert bridge.exists(), "module tests have no route to the shared fixtures"
     text = bridge.read_text(encoding="utf-8")
-    for fixture in ("app", "client", "db_session", "make_org", "tenant_ctx", "login_as"):
+    for fixture in (
+        "app",
+        "client",
+        "db_session",
+        "make_org",
+        "tenant_ctx",
+        "login_as",
+        "worker_database",
+        "run_id",
+    ):
         assert fixture in text, fixture
     copies = sorted(
         str(p.relative_to(ROOT))
