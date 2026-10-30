@@ -226,7 +226,7 @@
         BANDS.forEach(function (band) {
             html += '<section data-testid="cap-band" data-band="' + band.key + '" class="flex gap-3 rounded-lg border border-dashed border-border p-3">';
             html += '<h3 class="w-20 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">' + band.label + '</h3>';
-            html += '<p class="flex-1 text-sm text-muted-foreground">Nothing here yet.</p></section>';
+            html += '<p class="flex-1 text-sm text-muted-foreground">No ' + band.label.toLowerCase() + ' capabilities are recorded. <a class="font-medium text-primary underline-offset-4 hover:underline" href="' + escapeHtml(container.getAttribute('data-add-url') || '#') + '">Define a capability</a> to place it in this band.</p></section>';
         });
         safeHTML(container, html + '</div>');
         container.classList.remove('hidden');

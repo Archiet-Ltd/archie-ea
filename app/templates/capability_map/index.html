@@ -127,7 +127,7 @@
                         cta_icon='plus'
                     ) }}
                 </div>
-                <div id="capmodel-container" class="hidden"></div>
+                <div id="capmodel-container" class="hidden" data-add-url="{{ url_for('unified_low_priority.capability_map_capabilities') }}"></div>
             </div>
             <div data-testid="capmap-stats" class="grid grid-cols-2 gap-3 xl:grid-cols-1">
                 {% for key, label in [('total', 'Capabilities'), ('mapped', 'Mapped to applications'), ('unmapped', 'Not mapped'), ('coverage', 'Coverage')] %}

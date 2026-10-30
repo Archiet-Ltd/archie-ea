@@ -149,3 +149,27 @@ def test_a_link_can_open_the_map_on_a_measure(browser, live_server, business_arc
         expect(page.locator("#capmap-measure")).to_have_value("coverage")
     finally:
         context.close()
+
+
+def test_an_organisation_with_no_capabilities_still_sees_three_bands_and_the_next_step(browser, live_server):
+    from .fresh_org import create_fresh_org, sign_in
+
+    org = create_fresh_org("business_architect", org_admin=True)
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["business_architect"])
+        page.goto(live_server + MAP_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        region = page.locator(MAP)
+        for band in ("strategic", "core", "supporting"):
+            expect(region.locator('[data-testid="cap-band"][data-band="%s"]' % band)).to_be_visible(timeout=PAGE_TIMEOUT)
+        link = region.locator('[data-testid="cap-band"][data-band="core"]').get_by_role("link", name="Define a capability")
+        expect(link).to_be_visible()
+        link.click()
+        page.wait_for_load_state("domcontentloaded")
+        assert "/capability-map/capabilities" in page.url
+        expect(page.locator("h1")).to_be_visible()
+        _shot(page, "map-empty-1440-light")
+    finally:
+        context.close()
