@@ -54,6 +54,14 @@ def _tenant_ai_system(element_id: int, organization_id: int):
     return element if element is not None and is_ai_system(element) else None
 
 
+def _tenant_epic(element_id: int, organization_id: int):
+    from app.models.models import ArchiMateElement
+
+    return ArchiMateElement.query.filter_by(
+        id=element_id, organization_id=organization_id, type="WorkPackage",
+    ).first()
+
+
 def _tenant_business_process(element_id: int, organization_id: int):
     from app.models.process_data import BusinessProcess
 
@@ -75,6 +83,7 @@ _ELEMENTS: dict[str, tuple[Callable, str]] = {
     "application": (_tenant_application, "That application does not belong to this organisation."),
     "capability": (_tenant_capability, "That capability does not belong to this organisation."),
     "ai_system": (_tenant_ai_system, "That AI system does not belong to this organisation."),
+    "epic": (_tenant_epic, "That epic does not belong to this organisation."),
     "business_process": (_tenant_business_process, "That business process does not belong to this organisation."),
 }
 

@@ -33,6 +33,11 @@ KINDS: Dict[str, Dict] = {
                 "values": ["Funnel", "Reviewing", "Analyzing", "Portfolio Backlog", "Implementing", "Done"],
                 "default": "Funnel",
             },
+            "epic_type": {
+                "type": "enum",
+                "label": "Epic type",
+                "values": ["Business", "Enabler"],
+            },
         },
     },
     "Feature": {

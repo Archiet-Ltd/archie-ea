@@ -1486,6 +1486,23 @@ _SAFE_EPICS = [
     ("Calibration Automation Phase 2", "Portfolio Backlog", 8, 5, 3, 13),
 ]
 
+# epic -> (type, owner email). Types follow SAFe: Business epics deliver customer
+# value, Enabler epics build the architecture or tooling that later work needs.
+_SAFE_EPIC_TYPE_OWNER = {
+    "Digital Transformation Programme": ("Business", "ivo.reed@lantern-quay.example.com"),
+    "Sustainability Initiative": ("Business", "avery.compliance@lantern-quay.example.com"),
+    "Inventory Accuracy Drive": ("Business", "casey.inventory@lantern-quay.example.com"),
+    "Quality Excellence Programme": ("Business", "blake.quality@lantern-quay.example.com"),
+    "Compliance System Upgrade": ("Enabler", "avery.compliance@lantern-quay.example.com"),
+    "Supplier Consolidation Programme": ("Business", "taylor.procurement@lantern-quay.example.com"),
+    "Operational Resilience Programme": ("Enabler", "sage.itops@lantern-quay.example.com"),
+    "Predictive Maintenance Pilot": ("Business", "morgan.calibrator@lantern-quay.example.com"),
+    "Field Tester Rollout": ("Business", "jordan.fieldeng@lantern-quay.example.com"),
+    "Event Backbone Migration": ("Enabler", "sage.itops@lantern-quay.example.com"),
+    "Calibration Automation Phase 1": ("Business", "morgan.calibrator@lantern-quay.example.com"),
+    "Calibration Automation Phase 2": ("Business", "riley.logistics@lantern-quay.example.com"),
+}
+
 # (work package element, kind, business value, time criticality, risk
 #  reduction, job size)
 _SAFE_OTHER_KINDS = [
@@ -1777,8 +1794,10 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     )
     from app.modules.capabilities.services import value_stream_service
     from app.services.adm_deliverable_service import seed_deliverables
+    from app.models.application_owner import ApplicationOwner
     from app.services.element_profile_service import (
-        read_profile, set_kind, set_kind_property, set_wsjf_components,
+        get_kind_property, read_profile, set_kind, set_kind_property,
+        set_wsjf_components,
     )
 
     stats = {
@@ -1793,14 +1812,34 @@ def _seed_boards(org_id, demo_user_id) -> dict:
 
     # SAFe kinds
     elements = _resolve_elements(org_id)
+    from app.models.user import User
+    from app.services.element_ownership_service import set_element_owner
+
+    epic_users = {
+        u.email: u.id
+        for u in db.session.query(User).filter(User.organization_id == org_id)
+    }
     for name, state, bv, tc, rr, js in _SAFE_EPICS:
         el = elements.get(name)
-        if el is None or read_profile(el).get("kind"):
+        if el is None:
             continue
-        set_kind(el, "Epic", source="seed")
-        set_kind_property(el, "kanban_state", state, source="seed")
-        set_wsjf_components(el, bv, tc, rr, js, source="seed")
-        stats["safe_kinds_set"] += 1
+        if not read_profile(el).get("kind"):
+            set_kind(el, "Epic", source="seed")
+            set_kind_property(el, "kanban_state", state, source="seed")
+            set_wsjf_components(el, bv, tc, rr, js, source="seed")
+            stats["safe_kinds_set"] += 1
+        # A type and an owner for every seeded epic, also on a demonstration
+        # that was seeded before epics carried them. An owner or type an
+        # architect has set since is left alone.
+        epic_type, owner_email = _SAFE_EPIC_TYPE_OWNER[name]
+        if read_profile(el).get("kind") == "Epic" and not get_kind_property(el, "epic_type"):
+            set_kind_property(el, "epic_type", epic_type, source="seed")
+        owner_id = epic_users.get(owner_email)
+        if owner_id is not None and not ApplicationOwner.get_owners_for_element("epic", el.id, org_id):
+            set_element_owner(
+                element_type="epic", element_id=el.id, user_id=owner_id,
+                organization_id=org_id, commit=False,
+            )
     for name, kind, bv, tc, rr, js in _SAFE_OTHER_KINDS:
         el = elements.get(name)
         if el is None or read_profile(el).get("kind"):
