@@ -26,7 +26,28 @@
 
             <div class="space-y-3 border-t border-border pt-6" data-testid="signup-github">
                 <h2 class="text-sm font-semibold">GitHub</h2>
-                <p class="text-sm text-muted-foreground">A read-only token is enough. It is stored encrypted for your organisation and never shown again.</p>
+                <p class="text-sm text-muted-foreground">
+                    Connect to GitHub to bring in your repositories.
+                    <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer" class="link">Create a new fine-grained personal access token</a>
+                    and give it read-only access to your organisation's repositories.
+                </p>
+                {% call collapsible(id='github-token-help') %}
+                    {% call collapsible_trigger() %}How to make the token{% endcall %}
+                    {% call collapsible_content() %}
+                        <ol class="list-decimal space-y-2 pl-6 text-sm">
+                            <li>On GitHub, make sure you are acting as the correct organisation.</li>
+                            <li>For <strong>Repository access</strong>, choose <strong>All repositories</strong> or the repositories you want to connect.</li>
+                            <li>Under <strong>Permissions</strong>, find <strong>Repository permissions</strong> and set:
+                                <ul class="list-disc space-y-1 pl-6">
+                                    <li><strong>Contents</strong> to <strong>Read-only</strong>.</li>
+                                    <li><strong>Metadata</strong> to <strong>Read-only</strong>.</li>
+                                </ul>
+                            </li>
+                             <li>Under <strong>Organisation permissions</strong>, set <strong>Members</strong> to <strong>Read-only</strong>.</li>
+                            <li>Click <strong>Generate token</strong> and copy the new token here.</li>
+                        </ol>
+                    {% endcall %}
+                {% endcall %}
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-1.5">
                         {% call label(for='welcome-github-org') %}GitHub organisation{% endcall %}
