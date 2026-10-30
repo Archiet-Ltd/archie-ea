@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import Column, DateTime, Enum, Integer, JSON, String, Text
 
 from app import db
+from app.models.mixins.core import TenantMixin
 
 
 class CommunicationType(enum.Enum):
@@ -20,12 +21,13 @@ class CommunicationType(enum.Enum):
     STATUS_UPDATE = "status_update"
 
 
-class StakeholderCommunication(db.Model):
+class StakeholderCommunication(TenantMixin, db.Model):
     """Log entry for a communication event linked to a solution and stakeholder."""
 
     __tablename__ = "stakeholder_communications"
 
     id = Column(Integer, primary_key=True)
+    # organization_id comes from TenantMixin; it is stamped from the signed-in user.
     solution_id = Column(Integer, nullable=True)
     stakeholder_id = Column(Integer, nullable=True)
     comm_type = Column(Enum(CommunicationType), nullable=False)

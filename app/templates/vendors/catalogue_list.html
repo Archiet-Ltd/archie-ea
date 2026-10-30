@@ -1,0 +1,69 @@
+{# design-block: data-table #}
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from "components/badge.html" import badge %}
+{% from "components/input.html" import input %}
+{% from "components/button.html" import button %}
+
+{% block title %}Vendor catalogue{% endblock %}
+
+{% block content %}
+<div class="space-y-6" data-testid="vendor-catalogue">
+  {{ page_shell(
+      title='Vendor catalogue',
+      subtitle='Known architectures of common products: what each one is made of, what it connects to, where it holds data and what it costs. Every fact links to the public page it came from.',
+      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', None)],
+      tabs=[('Vendors', url_for('unified_applications.vendors'), False), ('Mapping', url_for('unified_applications.vendors', tab='mapping'), False), ('Catalogue', url_for('unified_applications.vendor_catalogue'), True)]
+  ) }}
+
+  <form method="get" action="{{ url_for('unified_applications.vendor_catalogue') }}" class="flex flex-col gap-2 sm:flex-row sm:items-center" role="search">
+    {{ input(id='catalogue-search', name='search', type='search', placeholder='Search products, vendors or categories', value=search, class='sm:max-w-sm', aria_label='Search the catalogue') }}
+    {{ button(text='Search', type='submit', variant='outline') }}
+  </form>
+
+  {% if rows %}
+  <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
+    <div class="overflow-x-auto">
+      {% call table(attrs_dict={'data-testid': 'catalogue-table', 'aria-label': 'Catalogue products'}) %}
+        {% call table_header() %}
+          <tr>
+            {% call table_head() %}Product{% endcall %}
+            {% call table_head() %}Vendor{% endcall %}
+            {% call table_head() %}Category{% endcall %}
+            {% call table_head() %}What it does{% endcall %}
+            {% call table_head(class='text-right') %}Sourced facts{% endcall %}
+          </tr>
+        {% endcall %}
+        {% call table_body() %}
+          {% for row in rows %}
+          {% call table_row(attrs_dict={'data-testid': 'catalogue-row-' ~ row.product.catalogue_slug}) %}
+            {% call table_cell(class='font-medium text-foreground') %}<a class="hover:underline underline-offset-4" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=row.product.catalogue_slug) }}">{{ row.product.product_name }}</a>{% endcall %}
+            {% call table_cell(class='text-muted-foreground') %}{{ row.vendor }}{% endcall %}
+            {% call table_cell() %}{% if row.category %}{% call badge(variant='secondary') %}{{ row.category }}{% endcall %}{% endif %}{% endcall %}
+            {% call table_cell(class='text-muted-foreground min-w-64') %}{{ row.summary.detail if row.summary else 'Summary not yet reviewed.' }}{% endcall %}
+            {% call table_cell(class='text-right tabular-nums') %}{{ row.fact_count }}{% endcall %}
+          {% endcall %}
+          {% endfor %}
+        {% endcall %}
+      {% endcall %}
+    </div>
+  </div>
+  <p class="text-xs text-muted-foreground">{{ rows|length }} product{{ '' if rows|length == 1 else 's' }}. The catalogue is maintained by Entelim and is the same for every organisation; link a product you use to it from the product's page.</p>
+  {% else %}
+  <div data-slot="card" class="rounded-lg border border-border bg-card">
+    <div class="p-6 space-y-3 text-center" role="status">
+    {% if search %}
+      <p class="text-sm font-medium text-foreground">No catalogue products match "{{ search }}".</p>
+      <p class="text-sm text-muted-foreground">Try a product or vendor name, such as Okta or Stripe.</p>
+      {{ button(text='Clear search', href=url_for('unified_applications.vendor_catalogue'), variant='outline') }}
+    {% else %}
+      <p class="text-sm font-medium text-foreground">The catalogue has no reviewed products yet.</p>
+      <p class="text-sm text-muted-foreground">Products appear here once every fact shown has been checked against its public source.</p>
+      {{ button(text='Back to your vendors', href=url_for('unified_applications.vendors'), variant='outline') }}
+    {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

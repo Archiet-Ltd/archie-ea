@@ -44,7 +44,7 @@ WORK_CHILDREN = {
     "Systems": ["Applications", "Portfolio", "Data register", "Interfaces", "Technology radar"],
     "Impact": ["Impact analysis", "Traceability"],
     "Changes": ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap", "Programmes", "Canvases"],
-    "Spend": ["Costs", "Vendors", "Contracts and licences", "Renewals", "Investments"],
+    "Spend": ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
     "Compliance": ["Controls", "Risks", "Decisions", "Review board", "Evidence"],
 }
 LAYER_TYPES = {
@@ -173,11 +173,12 @@ def test_every_role_sees_the_same_top_work_and_model_entries(ctx, role):
 
 @pytest.mark.parametrize("role", VALID_ROLES)
 def test_work_pages_follow_who_may_open_them(ctx, role):
-    nav = _nav(_Person(role))
+    # Authority is the account's Administrator permission, not the stored persona.
+    nav = _nav(_Person(role, admin=role == ROLE_PLATFORM_ADMIN))
     held = {item.label: _labels(item.children) for item in nav["work"]}
     spend = list(WORK_CHILDREN["Spend"])
     if role == ROLE_FINANCE:
-        spend = ["Costs", "Vendors", "Licences", "Investments"]
+        spend = ["Costs", "Vendors", "Vendor catalogue", "Licences", "Investments"]
     elif role not in COST_VIEWERS:
         spend = ["Investments"]
     assert held["Spend"] == spend

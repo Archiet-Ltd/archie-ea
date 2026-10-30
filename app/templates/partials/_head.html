@@ -18,6 +18,8 @@
 
 <!-- Tailwind CSS (local JIT build — run: python scripts/build_css.py) -->
 <link rel="stylesheet" href="{{ 'css/shadcn_tokens.css' | asset_url }}">
+<!-- flask-basecoat component styles, scoped to .style-vega; before Tailwind so a utility class on a component wins -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_ui.css') }}">
 <link rel="stylesheet" href="{{ 'css/tailwind-output.css' | asset_url }}">
 <link rel="stylesheet" href="{{ 'css/app.css' | asset_url }}">
 <link rel="stylesheet" href="{{ 'css/accessibility.css' | asset_url }}">

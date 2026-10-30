@@ -116,7 +116,7 @@ def chain(monkeypatch, catalogue):
     calls, sleeps, script = [], [], {}
 
     def caller(provider):
-        def call(prompt, model, api_key, max_tokens=None, timeout=None):
+        def call(prompt, model, api_key, max_tokens=None, timeout=None, **_ignored):
             calls.append((provider, model))
             outcomes = script.get(provider, ["answer from " + provider])
             seen = sum(1 for p, _ in calls if p == provider) - 1
@@ -128,36 +128,36 @@ def chain(monkeypatch, catalogue):
 
     for name in ("openrouter", "nvidia", "mistral", "cerebras", "groq", "gemini"):
         monkeypatch.setattr(LLMService, "_call_" + name, staticmethod(caller(name)), raising=False)
+    monkeypatch.setattr(LLMService, "_call_nvidia_once", staticmethod(caller("nvidia")), raising=False)
     monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda provider: ["key"]))
     monkeypatch.setattr(LLMService, "_persist_interaction_record", staticmethod(lambda interaction: None))
     monkeypatch.setattr(LLMService, "_sleep", staticmethod(lambda seconds: sleeps.append(seconds)))
     return type("Chain", (), {"calls": calls, "sleeps": sleeps, "script": script, "service": LLMService})
 
 
-def test_nvidia_is_tried_first_then_the_live_openrouter_list_and_a_429_is_waited_out_once(chain):
+def test_openrouter_is_tried_first_then_nvidia_and_a_429_is_waited_out_once(chain):
     from app.modules.ai_chat.services.model_defaults import live_free_openrouter_models
 
-    chain.script["nvidia"] = [_Busy(retry_after=7)]
-    chain.script["openrouter"] = [RuntimeError("down")]
+    chain.script["openrouter"] = [_Busy(retry_after=7)]
+    chain.script["nvidia"] = [RuntimeError("down")]
     chain.script["mistral"] = ["mistral answers"]
     answer = chain.service.generate_from_prompt("public page", use_cache=False, timeout=60, public_input=True)
 
     assert answer == "mistral answers"
     providers = [p for p, _ in chain.calls]
-    nvidia_calls = providers.count("nvidia")
-    assert providers[0] == "nvidia"
+    openrouter_calls = providers.count("openrouter")
+    assert providers[0] == "openrouter"
     assert chain.sleeps[0] == 7, "Retry-After is honoured"
     assert chain.sleeps.count(7) == 1, "backed off once only"
-    first_nvidia_round = len([c for c in chain.calls if c[0] == "nvidia"])
-    assert first_nvidia_round == nvidia_calls and nvidia_calls >= 2, "nvidia was tried again once after the wait"
+    assert openrouter_calls >= 2, "openrouter was tried again once after the wait"
     openrouter = [m for p, m in chain.calls if p == "openrouter"]
     assert set(openrouter) <= set(live_free_openrouter_models()), "only models in today's list"
-    assert providers.index("openrouter") > max(i for i, p in enumerate(providers) if p == "nvidia")
+    assert providers.index("nvidia") > max(i for i, p in enumerate(providers) if p == "openrouter")
     assert providers[-1] == "mistral" and "cerebras" not in providers, "stops at the first answer"
 
 
 def test_a_429_without_retry_after_backs_off_once_with_the_default_wait(chain):
-    chain.script["nvidia"] = [_Busy()] * 5 + ["answer after the wait"]  # every nvidia model is busy, then one answers
+    chain.script["openrouter"] = [_Busy()] * 5 + ["answer after the wait"]  # every openrouter model is busy, then one answers
     assert chain.service.generate_from_prompt("p", use_cache=False, timeout=60, public_input=True) == "answer after the wait"
     assert chain.sleeps == [chain.service.PUBLIC_BACKOFF_SECONDS]
 
@@ -239,8 +239,11 @@ def test_the_person_is_told_more_facts_will_come_when_the_service_is_less_busy(a
     monkeypatch.setattr(website_crawl, "default_model", lambda *a, **k: _busy)
     job_id = website_crawl.queue_website_crawl(org.id).id
     result = website_crawl.run_website_crawl_job({"organization_id": org.id, "job_id": job_id})
-    assert result["more_to_come"] is True
+    assert result["more_to_come"] is True and result["model_pass_queued"] is True
     get_job_queue_service().update_job_status(job_id, JobStatus.COMPLETED.value, result=json.loads(json.dumps(result)))
+    # the model pass is its own job; it finds every provider busy, so a retry is queued for later
+    retry = website_crawl.run_website_retry_job({"organization_id": org.id, "retry_attempt": 0})
+    assert retry["retry_queued"]
 
     with app.test_request_context("/welcome"):
         row = next(r for r in onboarding.sources(db.session.get(Organization, org.id)) if r["key"] == "website")
@@ -268,6 +271,7 @@ def test_step_three_shows_the_sentence_to_a_signed_in_person(app, client, login_
     job_id = website_crawl.queue_website_crawl(org.id).id
     result = website_crawl.run_website_crawl_job({"organization_id": org.id, "job_id": job_id})
     get_job_queue_service().update_job_status(job_id, JobStatus.COMPLETED.value, result=json.loads(json.dumps(result)))
+    assert website_crawl.run_website_retry_job({"organization_id": org.id, "retry_attempt": 0})["retry_queued"]  # the model pass found them busy
 
     login_as(client, user_id)
     page = client.get("/account/welcome?step=3")
