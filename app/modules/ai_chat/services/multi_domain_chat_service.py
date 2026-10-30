@@ -7521,11 +7521,17 @@ End with: "Type **'next'** to complete the design workflow."
 
         lines.append(f"  {result.get('answer') or ('what breaks if %r fails' % name)}")
         lines.append(f"  {result.get('total', len(rows))} record(s) depend on it:")
+        # The record's own name and truth class, never the internal API path
+        # the citation's "target" carries -- a person reads a page, not a route.
+        computed_at = datetime.now(timezone.utc)
+        as_of = "%d %s" % (computed_at.day, computed_at.strftime("%b %Y"))
         for row in rows[:15]:
             citation = citations_by_id.get(row.get("id"))
-            target = citation.get("target") if citation else None
-            cite = f" (cited: {target})" if target else " (source not recorded)"
-            lines.append(f"    - {row.get('name') or 'Unnamed record'}{cite}")
+            record_name = (citation or {}).get("name") or row.get("name") or "Unnamed record"
+            truth_class = row.get("truth_class") or "derived"
+            source = "drawn from your model" if truth_class == "drawn" else "derived from your model"
+            cite = f" ({source}, as of {as_of})" if citation else " (source not recorded)"
+            lines.append(f"    - {record_name}{cite}")
         if len(rows) > 15:
             lines.append(f"    ...and {len(rows) - 15} more, each with its own citation.")
 
