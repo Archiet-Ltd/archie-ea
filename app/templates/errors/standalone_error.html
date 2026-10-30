@@ -4,25 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ error_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shadcn_tokens.css') }}">
     <style>
-        :root {
-            color-scheme: light;
-            --background: #ffffff;
-            --foreground: #0f172a;
-            --muted-foreground: #64748b;
-            --border: #e2e8f0;
-            --input: #e2e8f0;
-            --primary: #0f172a;
-            --primary-foreground: #ffffff;
-            --accent: #f8fafc;
-            --ring: rgba(15, 23, 42, 0.18);
-            --destructive: #dc2626;
-            --destructive-soft: rgba(220, 38, 38, 0.1);
-        }
         * { box-sizing: border-box; }
         body {
             margin: 0; min-height: 100vh;
-            background: var(--background); color: var(--foreground);
+            background: hsl(var(--background)); color: hsl(var(--foreground));
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
         main {
@@ -32,15 +19,15 @@
         .icon-wrap {
             width: 5rem; height: 5rem; margin: 0 auto 1.5rem;
             display: flex; align-items: center; justify-content: center;
-            border-radius: 9999px; background: rgba(100, 116, 139, 0.1);
+            border-radius: 9999px; background: hsl(var(--muted));
         }
-        .icon { width: 2.5rem; height: 2.5rem; color: var(--muted-foreground); }
+        .icon { width: 2.5rem; height: 2.5rem; color: hsl(var(--muted-foreground)); }
         .code {
             margin: 0 0 0.5rem; font-size: clamp(4.5rem, 14vw, 6rem);
             line-height: 1; font-weight: 800; letter-spacing: -0.04em;
         }
         .title { margin: 0 0 0.75rem; font-size: 1.5rem; line-height: 1.25; font-weight: 600; }
-        .copy { margin: 0 0 2rem; color: var(--muted-foreground); line-height: 1.7; }
+        .copy { margin: 0 0 2rem; color: hsl(var(--muted-foreground)); line-height: 1.7; }
         .actions { display: flex; flex-direction: column; gap: 0.75rem; justify-content: center; }
         .button {
             display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
@@ -49,11 +36,11 @@
             text-decoration: none; cursor: pointer;
             transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }
-        .button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
-        .button-primary { background: var(--primary); color: var(--primary-foreground); }
+        .button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+        .button-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
         .button-primary:hover { opacity: 0.9; }
-        .button-secondary { border-color: var(--input); background: var(--background); color: var(--foreground); }
-        .button-secondary:hover { background: var(--accent); }
+        .button-secondary { border-color: hsl(var(--input)); background: hsl(var(--background)); color: hsl(var(--foreground)); }
+        .button-secondary:hover { background: hsl(var(--accent)); }
         .button-icon { width: 1rem; height: 1rem; flex: 0 0 auto; }
         @media (min-width: 640px) { .actions { flex-direction: row; } }
     </style>
