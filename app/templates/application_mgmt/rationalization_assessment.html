@@ -44,6 +44,7 @@
       ]
   ) }}
 
+  <div class="space-y-6 max-w-2xl" data-testid="assessment-column">
   <!-- Progress -->
   <div class="bg-card border border-border rounded-lg p-6 mb-6">
     <div class="flex justify-between items-center mb-2">
@@ -108,7 +109,7 @@
   </div>
 
   <!-- Questionnaire Steps -->
-  <form id="assessment-form" class="space-y-6 max-w-2xl">
+  <form id="assessment-form" class="space-y-6">
     <!-- Step 1: Technical Health -->
     <div class="questionnaire-step" data-step="1">
       <div class="bg-card border border-border rounded-lg p-6">
@@ -297,6 +298,7 @@
       {% call ui.button(class='ml-auto', attrs={'type': 'submit', 'id': 'submit-btn', 'aria-label': 'Submit assessment'}) %}{{ lucide('save') }} Submit Assessment{% endcall %}
     </div>
   </form>
+  </div>
 </div>
 
 <script>
