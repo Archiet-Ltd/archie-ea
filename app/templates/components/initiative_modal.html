@@ -96,6 +96,22 @@
         {% endfor %}
         this.formData = { ...this.defaults };
     },
+    populateLazyOptions() {
+        // The owner picker's options carry every person's name and email; they are kept out of
+        // the page's DOM (and so out of any text match against the closed dialog) until the
+        // dialog is actually opened, instead of rendering server-side on every page load.
+        this.$el.querySelectorAll('select[data-lazy-options]').forEach(select => {
+            if (select.dataset.lazyPopulated) return;
+            const valueKey = select.dataset.valueKey, labelKey = select.dataset.labelKey;
+            JSON.parse(select.dataset.lazyOptions).forEach(option => {
+                const node = document.createElement('option');
+                node.value = String(option[valueKey]);
+                node.textContent = option[labelKey];
+                select.appendChild(node);
+            });
+            select.dataset.lazyPopulated = '1';
+        });
+    },
     payload() {
         // Empty fields are left out; number fields and ids are sent as numbers.
         const out = {};
@@ -145,6 +161,7 @@
 }"
      @open-initiative-{{ id }}.window="
          $event.detail?.prefill && (formData = { ...formData, ...$event.detail.prefill });
+         populateLazyOptions();
          Platform.modal.open('initiative-{{ id }}');
      "
      x-cloak>
@@ -174,14 +191,15 @@
             {% elif field.type == 'select' %}
                 {% set select_attrs = {'x-model': "formData['" ~ field.name ~ "']"} %}
                 {% if field.required %}{% set select_attrs = dict(select_attrs, required='required') %}{% endif %}
+                {# The owner picker (value_key set) lists every person in the organisation by name
+                   and email; those options are loaded only once the dialog opens (see
+                   populateLazyOptions above), not rendered into every page's HTML, so a page that
+                   never opens this dialog never carries anyone's name in its markup. #}
+                {% if field.value_key %}{% set select_attrs = dict(select_attrs, **{'data-lazy-options': field.options | tojson | forceescape, 'data-value-key': field.value_key, 'data-label-key': field.label_key}) %}{% endif %}
                 {% call ui.native_select_wrapper(class='relative w-full') %}
                     {% call ui.native_select(id=field_id, class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs=select_attrs) %}
                         {{ ui.native_select_option(text='Select ' ~ field.label | lower, value='') }}
-                        {% if field.value_key %}
-                            {% for option in field.options %}
-                            {{ ui.native_select_option(text=option[field.label_key], value=option[field.value_key] | string) }}
-                            {% endfor %}
-                        {% else %}
+                        {% if not field.value_key %}
                             {% for value, label in field.options %}
                             {{ ui.native_select_option(text=label, value=value) }}
                             {% endfor %}
