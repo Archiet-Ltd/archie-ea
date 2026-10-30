@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 93 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 94 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -534,6 +534,7 @@ to reconfirm the count before trusting it:**
 | `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
 | `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
 | `legacy-macro-calls` | a call to an old macro (`empty_state`, `page_header`, `modal`, `dense_table`, `shadcn_*`) outside the file that defines it | ratchet @ 429 |
+| `second-component-library` | a macro defined outside `components/` and `basecoat/` under a name the library exports, or a page importing such a name from elsewhere | ratchet @ 18, only falls |
 | `data-types-declared` | a page holding a kind of data without the component the data-type register names, or a journey that does not assert it | ratchet |
 | `data-types-undecided` | pages showing a registered kind of data without its component | ratchet |
 | `data-types-retired` | imports of components the data-type register retires | ratchet |
