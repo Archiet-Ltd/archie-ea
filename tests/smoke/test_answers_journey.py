@@ -134,7 +134,9 @@ def test_security_architect_sees_the_inherited_supplier_risk_with_its_path(page,
     _login(page, live_server, seeded["emails"]["security_architect"])
     _open_answers(page, live_server)
 
-    page.locator('[data-question="risk_propagation"]').check()
+    # The shared radio group component carries the question choice on the native
+    # value attribute, not a page-specific data-question hook.
+    page.locator('input[name="answers-question"][value="risk_propagation"]').check()
     _pick(page, graph["noun"], graph["names"]["ops"])
     page.locator("#answers-ask-button").click()
 
