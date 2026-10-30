@@ -5,6 +5,7 @@ sort, pagination footer), then follows a gap's row action back to the board.
 Runs in the seeded organisation and verifies a second organisation's gaps never
 appear on this organisation's page.
 """
+import re
 import uuid
 
 import pytest
@@ -190,5 +191,63 @@ def test_gap_analysis_list_table(browser, live_server, seeded, gap_data, viewpor
         page.go_back(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
         assert "Foreign Board" not in page.content()
+    finally:
+        context.close()
+
+
+def test_gap_analysis_empty_table_agrees_with_the_computed_figures(browser, live_server):
+    """An enterprise architect opens an organisation that has a computed portfolio
+    gap (an application mapped to no capability) but no recorded Gap element.
+
+    The figures above the table are non-zero -- the screen must not then show an
+    empty table that contradicts them. The empty state names why it is empty (no
+    gap record yet, the figures above come from the capability map) and offers
+    the one next step for someone who may create elements: a link that lands on
+    a real page, never the old, self-contradicting "No gaps detected" sentence.
+    """
+    from .fresh_org import create_fresh_org, sign_in
+
+    org = create_fresh_org("enterprise_architect")
+    email = org["emails"]["enterprise_architect"]
+
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+
+    with create_app("testing").app_context():
+        orphan = ApplicationComponent(
+            name="Unmapped App %s" % org["suffix"],
+            organization_id=org["org_id"],
+            lifecycle_status="operational",
+            description="Not linked to any capability or process; the computed gap this test needs.",
+        )
+        db.session.add(orphan)
+        db.session.commit()
+        db.session.remove()
+
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, email)
+        page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
+
+        # The figures above are computed from the capability map and must be
+        # non-zero: this organisation has a real gap, just no Gap record for it.
+        total_tile = page.locator("div.text-center", has_text="Total Gaps").locator(".text-2xl")
+        expect(total_tile).to_have_text(re.compile(r"[1-9]"))
+
+        table = page.locator('[data-testid="gaps-table"]')
+        expect(table).to_contain_text("No gap record has been made yet")
+        expect(table).to_contain_text("computed from the capability map")
+        assert "No gaps detected" not in table.inner_text(), (
+            "the empty table still says 'No gaps detected' while the figures above it are non-zero"
+        )
+
+        # The one next step: a link that actually lands on content, not a dead end.
+        action = table.get_by_role("link", name=re.compile("gap record", re.I))
+        expect(action).to_be_visible(timeout=PAGE_TIMEOUT)
+        action.click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="architecture-page-header"]')).to_be_visible(timeout=PAGE_TIMEOUT)
     finally:
         context.close()
