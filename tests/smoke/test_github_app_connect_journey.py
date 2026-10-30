@@ -52,6 +52,10 @@ def _install():
     bundle["app/installations/777"] = {"account": {"login": "acme"}, "suspended_at": None}
     bundle["app/installations/777/access_tokens"] = {"token": "ghs_journey_mock_installation_token"}
     bundle["installation/repositories"] = {"total_count": 12}
+    # Who completed the install: the code names the GitHub person, and that person's
+    # token sees installation 777 or only somebody else's.
+    tokens = {"code-sees": "ghu_sees_777", "code-blind": "ghu_sees_999"}
+    visible = {"ghu_sees_777": [777], "ghu_sees_999": [999]}
 
     original = requests.Session.request
 
@@ -68,8 +72,15 @@ def _install():
             return self._body
 
     def dispatch(self, method=None, url=None, params=None, headers=None, **kw):
+        if url == "https://github.com/login/oauth/access_token":
+            token = tokens.get((kw.get("json") or {}).get("code"))
+            return _Resp(200, {"access_token": token} if token else {"error": "bad_verification_code"})
         if not (isinstance(url, str) and url.startswith("https://api.github.com/")):
             return original(self, method, url, params=params, headers=headers, **kw)
+        if url == "https://api.github.com/user/installations":
+            bearer = ((headers or {}).get("Authorization") or "").replace("Bearer ", "")
+            ids = visible.get(bearer, [])
+            return _Resp(200, {"total_count": len(ids), "installations": [{"id": i} for i in ids]})
         path = url[len("https://api.github.com/"):].strip("/")
         if path not in bundle:
             return _Resp(404, {"message": "Not Found"})
@@ -125,6 +136,8 @@ def github_app_server(request, app, tmp_path_factory, private_key_path):
             "GITHUB_APP_ID": "5534377",
             "GITHUB_APP_SLUG": "entelim",
             "GITHUB_APP_PRIVATE_KEY_PATH": private_key_path,
+            "GITHUB_APP_CLIENT_ID": "Iv1.journeyclientid",
+            "GITHUB_APP_CLIENT_SECRET": "journey-client-secret-not-real",
         },
     )
 
@@ -259,7 +272,7 @@ def test_3_returning_through_installed_starts_the_first_read(world, browser):
     try:
         sign_in(page, world["base"], world["one"]["emails"]["solution_architect"])
         page.goto(
-            world["base"] + "/admin/connectors/github/installed?installation_id=%s&setup_action=install&state=%s"
+            world["base"] + "/admin/connectors/github/installed?installation_id=%s&setup_action=install&state=%s&code=code-sees"
             % (INSTALLATION_ID, world["state_one"]),
             wait_until="domcontentloaded",
         )
@@ -304,6 +317,45 @@ def test_5_another_organisation_cannot_attach_the_installation(world, browser):
         context.close()
 
 
+def test_5b_organisation_b_cannot_swap_in_an_installation_its_github_user_cannot_see(world, browser):
+    """The swap: organisation B starts its own install (a valid state for B) and puts
+    installation 777 -- organisation A's -- in the address. B's GitHub user does not see
+    777, so it is refused with a plain message and B's page shows no connection."""
+    context, page = _page(browser)
+    try:
+        sign_in(page, world["base"], world["two"]["emails"]["solution_architect"])
+        state_two = _install_url_and_state(page, world["base"])
+        page.goto(
+            world["base"] + "/admin/connectors/github/installed?installation_id=%s&setup_action=install&state=%s&code=code-blind"
+            % (INSTALLATION_ID, state_two),
+            wait_until="domcontentloaded",
+        )
+        expect(page.locator("#main-content").get_by_text("can't see that GitHub installation", exact=False)).to_be_visible()
+        expect(page.get_by_test_id("github-progress")).to_have_count(0)
+        page.goto(world["base"] + "/admin/connectors/github", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("github-progress")).to_have_count(0)
+    finally:
+        context.close()
+
+
+def test_5c_an_installation_already_connected_elsewhere_is_refused(world, browser):
+    """Organisation A connected installation 777 in step 3. Organisation B, whose GitHub
+    user can also see it, still cannot attach the same installation."""
+    context, page = _page(browser)
+    try:
+        sign_in(page, world["base"], world["two"]["emails"]["solution_architect"])
+        state_two = _install_url_and_state(page, world["base"])
+        page.goto(
+            world["base"] + "/admin/connectors/github/installed?installation_id=%s&setup_action=install&state=%s&code=code-sees"
+            % (INSTALLATION_ID, state_two),
+            wait_until="domcontentloaded",
+        )
+        expect(page.locator("#main-content").get_by_text("already connected to another organisation", exact=False)).to_be_visible()
+        expect(page.get_by_test_id("github-progress")).to_have_count(0)
+    finally:
+        context.close()
+
+
 @pytest.fixture(scope="module")
 def unconfigured_server(request, app):
     """A second server with none of the three GitHub App settings set -- the
@@ -335,3 +387,37 @@ def test_6_with_the_settings_unset_the_page_is_exactly_the_token_form(unconfigur
         expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
     finally:
         context.close()
+
+
+@pytest.fixture(scope="module")
+def three_settings_server(request, app, private_key_path):
+    """The three settings the one-click button needed before this round, without the
+    client id and secret: the server cannot ask GitHub who is installing, so it offers
+    no one-click path."""
+    return boot_live_server(
+        request,
+        None,
+        app,
+        extra_env={
+            "GITHUB_APP_ID": "5534377",
+            "GITHUB_APP_SLUG": "entelim",
+            "GITHUB_APP_PRIVATE_KEY_PATH": private_key_path,
+            "GITHUB_APP_CLIENT_ID": "",
+            "GITHUB_APP_CLIENT_SECRET": "",
+        },
+    )
+
+
+def test_7_without_the_client_id_and_secret_the_page_is_exactly_the_token_form(three_settings_server, app, browser):
+    org = create_fresh_org("solution_architect", org_admin=True)
+    context, page = _page(browser)
+    try:
+        sign_in(page, str(three_settings_server), org["emails"]["solution_architect"])
+        page.goto(str(three_settings_server) + "/admin/connectors/github", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("github-app-connect-link")).to_have_count(0)
+        expect(page.get_by_text("Or paste a read-only token:", exact=False)).to_have_count(0)
+        expect(page.get_by_label("Read-only token")).to_be_visible()
+        expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
+    finally:
+        context.close()
+        remove_organisations(app, [org["org_id"]])
