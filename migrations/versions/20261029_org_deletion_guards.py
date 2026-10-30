@@ -19,7 +19,7 @@ revision applies the exact same Python-defined SQL that ``flask init-db`` and
 ``flask reconcile-schema`` already install, so the two paths cannot drift apart.
 
 Revision ID: 20261029_org_deletion_guards
-Revises: 20261027_admin_every_org
+Revises: 20261029_persona_default_unset
 Create Date: 2026-10-29
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "20261029_org_deletion_guards"
-down_revision = "20261027_admin_every_org"
+down_revision = "20261029_persona_default_unset"
 branch_labels = None
 depends_on = None
 
