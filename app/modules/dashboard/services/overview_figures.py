@@ -276,7 +276,7 @@ def _history(org_id, now):
 
     start = datetime(now.year - 1, 1, 1)
     try:
-        return HistoryService(db.session, org_id).difference(start, now).changes
+        return HistoryService(db.session, org_id).difference(start, now, model_records_only=True).changes
     except Exception:
         db.session.rollback()
         logger.exception("overview: change history could not be read")

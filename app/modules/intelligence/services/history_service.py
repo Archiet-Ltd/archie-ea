@@ -38,6 +38,9 @@ AUDITED_TABLES = {
     "solution": "Solution",
     "user": "User",
 }
+#: The tables whose rows are the architecture model a person builds or a connector derives.
+#: A user account is audited, but it is not a model record.
+MODEL_RECORD_TABLES = {name: label for name, label in AUDITED_TABLES.items() if name != "user"}
 _MODEL_TABLES = ("archimate_elements", "archimate_relationships")
 _ACTIONS = {"create": "insert", "update": "update", "delete": "delete"}
 
@@ -264,9 +267,12 @@ class HistoryService:
     # ------------------------------------------------------------------ #
     #  Difference query
     # ------------------------------------------------------------------ #
-    def difference(self, from_date: datetime, to_date: datetime) -> DifferenceResult:
-        """Return every recorded change between ``from_date`` and ``to_date``, newest first."""
-        rows = self._rows(AUDITED_TABLES, since=from_date, until=to_date)
+    def difference(self, from_date: datetime, to_date: datetime, *, model_records_only: bool = False) -> DifferenceResult:
+        """Return every recorded change between ``from_date`` and ``to_date``, newest first.
+
+        ``model_records_only`` leaves out changes that are not about the architecture model (a user account).
+        """
+        rows = self._rows(MODEL_RECORD_TABLES if model_records_only else AUDITED_TABLES, since=from_date, until=to_date)
         names = self._names(row.user_id for row in rows)
 
         changes: list[ChangeEntry] = []

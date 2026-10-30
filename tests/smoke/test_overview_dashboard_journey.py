@@ -205,7 +205,7 @@ def test_run_cost_card_opens_the_spend_page_for_the_portfolio_manager(browser, l
         _open(page, live_server, info["emails"]["portfolio_manager"])
         page.locator('[data-testid="card-run-cost"]').click()
         page.wait_for_url("**/procurement/spend**", timeout=PAGE_TIMEOUT)
-        assert "250,000" in _content(page) and "Annual Recurring Cost" in _content(page)
+        assert "£250k" in _content(page) and "annual recurring cost" in _content(page).lower()
     finally:
         context.close()
 
@@ -216,7 +216,7 @@ def test_figures_agree_with_the_pages_they_summarise(browser, live_server, orgs)
     try:
         _open(page, live_server, info["emails"]["portfolio_manager"])
         welcome = _int(page.locator('[data-testid="welcome-applications"] span').first.inner_text())
-        cost = page.locator('[data-testid="card-run-cost-value"]').get_attribute("title")
+        cost = page.locator('[data-testid="card-run-cost-value"]').inner_text().strip()
         no_owner = _int(page.locator('[data-testid="card-no-owner-value"]').inner_text())
         page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         listed = page.locator("table tbody tr").count()

@@ -152,7 +152,7 @@ def history_changes_page():
 
     from app.extensions import db
     service = HistoryService(db.session, organization_id)
-    result = service.difference(from_date, to_date)
+    result = service.difference(from_date, to_date, model_records_only=True)
 
     source = request.args.get("source") or ""
     changes = [c for c in result.changes if not source or c.source == source]
