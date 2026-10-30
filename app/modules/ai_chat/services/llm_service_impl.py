@@ -126,6 +126,14 @@ from app.modules.ai_chat.services.model_defaults import (
     is_free_model,
 )
 
+# The free routes. Under the production rules no request is sent to one of them, whatever it carries: the
+# free tiers keep what they are sent. A free model behind a paid provider's name (OpenRouter ``:free``) is
+# caught by ``is_free_model``.
+FREE_PROVIDERS = frozenset(FREE_ONLY_PROVIDERS | {"nvidia"})
+
+# The order used under the production rules when none is configured: paid routes only.
+PRODUCTION_DEFAULT_PROVIDER_ORDER = tuple(p for p in DEFAULT_PROVIDER_ORDER if p not in FREE_PROVIDERS)
+
 # Fallback in-memory cache if Redis is not available
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
 _cache_expiry_fallback = {}  # cache-tenancy-ok: expiry times for the prompt-hash keys above; holds no tenant data
@@ -289,17 +297,47 @@ class LLMService:
         default is Gemini on the credit project, then the free NVIDIA models. A key in the
         environment for a provider outside this order is never used.
         """
+        fenced = LLMService.free_fence_active()
         raw = (
             os.environ.get("LLM_PROVIDER_ORDER")
             or os.environ.get("AI_PROVIDER_ORDER")
-            or ",".join(DEFAULT_PROVIDER_ORDER)
+            or ",".join(PRODUCTION_DEFAULT_PROVIDER_ORDER if fenced else DEFAULT_PROVIDER_ORDER)
         )
         order: List[str] = []
         for name in raw.split(","):
             name = name.strip().lower()
-            if name and name not in order:
+            if name and name not in order and not (fenced and name in FREE_PROVIDERS):
                 order.append(name)
         return order
+
+    @staticmethod
+    def free_fence_active() -> bool:
+        """True under the production rules: no request reaches a free provider.
+
+        On in the production configuration (``LLM_FREE_FENCE`` in the app config) and wherever the
+        environment sets ``LLM_FREE_FENCE`` to 1; testing and preview keep their behaviour otherwise.
+        """
+        if (os.environ.get("LLM_FREE_FENCE") or "").strip().lower() in ("1", "true", "yes", "on"):
+            return True
+        try:
+            return bool(current_app.config.get("LLM_FREE_FENCE"))
+        except RuntimeError:  # no app context: only the environment can turn the rules on
+            return False
+
+    @staticmethod
+    def is_free_route(provider: str, model: str = "") -> bool:
+        """True when this provider and model are a free tier."""
+        return (provider or "").strip().lower() in FREE_PROVIDERS or is_free_model(provider, model)
+
+    @staticmethod
+    def refuse_free_route(provider: str, model: str = "") -> None:
+        """Raise the plain pause when the production rules are on and the route is free.
+
+        The one check every path that sends content to a model passes through: the service entry
+        (chat, website reading, summaries, generation) and the agent runner's call.
+        """
+        if LLMService.free_fence_active() and LLMService.is_free_route(provider, model):
+            raise AnswersPaused("%s is a free route and the platform does not send content to one" % provider)
 
     @staticmethod
     def _env_number(name: str, default: float = 0.0) -> float:
@@ -710,8 +748,10 @@ class LLMService:
         settings_by_provider = {s.provider: s for s in all_enabled_settings}
 
         # Helper: check if a provider has working config (DB or .env)
+        fenced = LLMService.free_fence_active()
+
         def _provider_is_usable(pname):
-            if pname in exclude_providers:
+            if pname in exclude_providers or (fenced and LLMService.is_free_route(pname)):
                 return False, None
             settings = settings_by_provider.get(pname)
             if settings and (pname == "huggingface" or settings.has_key()):
@@ -740,7 +780,7 @@ class LLMService:
         tested_cutoff = datetime.utcnow() - timedelta(hours=24)
 
         for provider_name in provider_priority:
-            if provider_name in exclude_providers:
+            if provider_name in exclude_providers or (fenced and LLMService.is_free_route(provider_name)):
                 continue
             settings = settings_by_provider.get(provider_name)
             if (settings and settings.test_status == "success"
@@ -751,7 +791,7 @@ class LLMService:
 
         # ── Step 3: Any database-configured provider with key + model ──
         for provider_name in provider_priority:
-            if provider_name in exclude_providers:
+            if provider_name in exclude_providers or (fenced and LLMService.is_free_route(provider_name)):
                 continue
             settings = settings_by_provider.get(provider_name)
             if settings:
@@ -797,6 +837,8 @@ class LLMService:
             return provider_name, model
         if closed:
             raise AnswersPaused("; ".join(closed))
+        if fenced:
+            raise AnswersPaused("no paid route is configured")
 
         # No configuration found - provide helpful error message
         configured_env_vars = []
@@ -1986,7 +2028,10 @@ Output clean, executable test code."""
         deadline = time.monotonic() + (float(timeout) if timeout else 120.0)
         everything = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"] + list(PUBLIC_INPUT_CHAIN)
         last_error: Optional[BaseException] = None
+        fenced = LLMService.free_fence_active()
         for provider in PUBLIC_INPUT_CHAIN:
+            if fenced and LLMService.is_free_route(provider, PUBLIC_INPUT_MODELS[provider]):
+                continue
             if not LLMService._get_all_api_keys(provider):
                 continue
             for attempt in (0, 1):
@@ -2020,6 +2065,8 @@ Output clean, executable test code."""
                             LLMService._sleep(wait)
                             continue
                     break
+        if fenced and last_error is None:
+            raise AnswersPaused("no paid route is configured for reading public text")
         raise RuntimeError(
             "Every provider in the public-input chain failed: %s" % (str(last_error)[:200] if last_error else "no provider has a key"))
 
@@ -2258,6 +2305,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             prompt_version=prompt_version,
             retention_setting=retention_setting,
         )
+        LLMService.refuse_free_route(provider, model)
         if not public_input and provider in FREE_ONLY_PROVIDERS:
             raise ProviderNotAllowed(
                 f"Provider '{provider}' reads public input only and is refused for a call carrying organisation data."

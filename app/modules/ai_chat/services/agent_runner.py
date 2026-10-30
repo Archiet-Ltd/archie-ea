@@ -1193,6 +1193,9 @@ class AgentRunner:
 
         system_prompt = scrub_for_transmission(system_prompt)
         messages = scrub_chat_messages(messages)
+        from app.modules.ai_chat.services.llm_service_impl import LLMService as _FenceService
+
+        _FenceService.refuse_free_route(provider, model)
         platform_funded = self._platform_funded(provider)
         if platform_funded:
             from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService

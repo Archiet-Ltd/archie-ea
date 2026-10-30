@@ -718,6 +718,9 @@ class SmokeTestingConfig(TestingConfig):
 
 class ProductionConfig(Config):
     DEBUG = False
+    # Production rules for the language-model service: no request is sent to a free provider, and a
+    # free provider named in LLM_PROVIDER_ORDER stops the app at boot (app/_bootstrap/services.py).
+    LLM_FREE_FENCE = True
     USE_RELOADER = False
     ASSET_MANIFEST_RELOAD = False
 

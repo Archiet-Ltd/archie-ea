@@ -312,3 +312,26 @@ def _init_opentelemetry(app, config_name):
         )
     except Exception as e:
         app.logger.warning(f"[OTEL] Failed to initialize OpenTelemetry: {e}")
+
+
+def check_free_fence(app):
+    """Refuse to boot under the production rules when a free provider is named for answers.
+
+    The check reads the setting itself, not the resolved order, so the error names what the operator
+    wrote. Testing and preview configurations do not set the flag and are left alone.
+    """
+    import os
+
+    flagged = (os.environ.get("LLM_FREE_FENCE") or "").strip().lower() in ("1", "true", "yes", "on")
+    if not (app.config.get("LLM_FREE_FENCE") or flagged):
+        return
+    from app.modules.ai_chat.services.llm_service_impl import FREE_PROVIDERS
+
+    setting = "LLM_PROVIDER_ORDER" if os.environ.get("LLM_PROVIDER_ORDER") else "AI_PROVIDER_ORDER"
+    raw = os.environ.get("LLM_PROVIDER_ORDER") or os.environ.get("AI_PROVIDER_ORDER") or ""
+    free = [n for n in (x.strip().lower() for x in raw.split(",")) if n in FREE_PROVIDERS]
+    if free:
+        raise RuntimeError(
+            "%s names a free provider (%s). Free providers keep what they are sent, so production answers "
+            "come from paid routes only. Remove %s from %s." % (setting, ", ".join(free), ", ".join(free), setting)
+        )

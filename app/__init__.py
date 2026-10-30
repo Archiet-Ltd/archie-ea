@@ -61,6 +61,11 @@ def create_app(config=None):
             "config (see config.py's SmokeTestingConfig)."
         )
 
+    # The production rules for the language-model service are checked before anything else starts.
+    from app._bootstrap.services import check_free_fence
+
+    check_free_fence(app)
+
     Config[config_name].init_app(app)
 
     # 1. Extensions (db, csrf, mail, login_manager, compress, migrate, rq, cache)
