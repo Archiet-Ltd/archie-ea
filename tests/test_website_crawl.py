@@ -703,7 +703,7 @@ def test_the_facts_that_need_no_model_are_proposed_before_the_model_is_asked_onc
     from app.modules.organization.website_crawl.service import MODEL_PAGES, MODEL_PAGES_PER_CALL
 
     expected = -(-min(summary["pages_read"], MODEL_PAGES) // MODEL_PAGES_PER_CALL)
-    assert model.calls == expected, "the model was asked %d times; it should be asked %d, a few pages at a time" % (model.calls, expected)
+    assert expected == 1 and model.calls == 1, "the model was asked %d times; it should be asked once over the pages read" % model.calls
     assert model.at < 10, "the first facts took %.1f s" % model.at
     assert model.seen["company_name"] == "Acme Robotics Ltd", model.seen
     assert "contact_email" in model.seen and "linkedin_url" in model.seen
@@ -730,7 +730,7 @@ def test_a_model_that_fails_leaves_the_facts_already_proposed(make_org, site):
     assert "category" not in found and summary["proposals"] == sum(len(rows) for rows in found.values()) > 0
 
 
-def test_thirty_pages_are_read_with_three_model_calls_however_slow_it_is(make_org):
+def test_thirty_pages_are_read_with_one_model_call_however_slow_it_is(make_org):
     links = " ".join('<a href="/p%d">page %d</a>' % (i, i) for i in range(45))
     pages = {"/": _html("<html><head><title>Big Co | Things</title></head><body>%s</body></html>" % links),
              "/robots.txt": (404, "text/plain", "")}
@@ -742,7 +742,7 @@ def test_thirty_pages_are_read_with_three_model_calls_however_slow_it_is(make_or
         model = _SlowModel(lambda: org.id, time.monotonic())
         summary = _crawl(org, llm=model)
         assert summary["pages_read"] == 30
-        assert model.calls == 3, "the model reads nine pages, three at a time"
+        assert model.calls == 1, "the model reads the first nine pages in one call"
         assert model.at < 10 and model.seen.get("company_name") == "Big Co"
     finally:
         big.stop()

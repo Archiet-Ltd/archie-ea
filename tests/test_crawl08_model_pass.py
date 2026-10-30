@@ -316,7 +316,7 @@ def test_an_address_shown_in_a_code_block_is_not_the_companys_contact():
 
 # ----------------------------------------------------------------------------- the pass reads a few pages per call
 
-def test_the_model_reads_nine_pages_three_at_a_time_and_only_the_first_call_gives_the_business_reading(make_org, site, monkeypatch):
+def test_the_model_reads_nine_pages_in_one_call_that_also_gives_the_business_reading(make_org, site, monkeypatch):
     from app.modules.organization.website_crawl import service
 
     prompts = []
@@ -328,10 +328,10 @@ def test_the_model_reads_nine_pages_three_at_a_time_and_only_the_first_call_give
     org = _org(make_org, site.url)
     summary = _crawl(org, llm=model)
     assert summary["pages_read"] >= 5
-    assert 2 <= len(prompts) <= 3 and all(len(p) <= 32000 for p in prompts), [len(p) for p in prompts]
-    marker = 'The "inference" object'
-    assert marker in prompts[0] and all(marker not in p for p in prompts[1:]), "only the first call asks for it"
-    assert service.MODEL_PAGES_PER_CALL == 3
+    # crawl05: one batched call replaced three, so a slow model is waited on once
+    assert len(prompts) == 1 and len(prompts[0]) <= 42000, [len(p) for p in prompts]
+    assert 'The "inference" object' in prompts[0]
+    assert service.MODEL_PAGES_PER_CALL == service.MODEL_PAGES
 
 
 def test_when_the_first_call_fails_the_rest_are_not_asked(make_org, site):

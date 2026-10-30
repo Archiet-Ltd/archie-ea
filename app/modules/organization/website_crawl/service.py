@@ -43,7 +43,7 @@ TIME_LIMIT_SECONDS = 120.0  # each pass has its own
 MODEL_TIMEOUT_SECONDS = 120.0  # the one batched model call
 PROMPT_PAGE_CHARS = 15000  # the pages handed to the model in one call, shared between them; one call stays under 40,000 characters
 MODEL_PAGES = 9  # the pages the model pass reads: the home page and the first pages after it
-MODEL_PAGES_PER_CALL = 3
+MODEL_PAGES_PER_CALL = MODEL_PAGES  # one batched call over the pages read: a slow model is waited on once, not once per few pages
 DEFAULT_CONFIDENCE = 0.3  # the floor of OperateIQ's own scale ("weak inference") when a model gives none
 
 TAXONOMY = (
