@@ -46,6 +46,7 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -113,6 +114,7 @@
     "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -188,6 +190,7 @@
     "components/dense_table.html",
     "components/detail_meta.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -254,6 +257,7 @@
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -908,6 +912,12 @@
     "components/dialog.html",
     "components/modal.html",
     "components/modal_form.html"
+   ]
+  },
+  "disabled-action": {
+   "source": "app",
+   "macros": [
+    "components/disabled_action.html"
    ]
   },
   "document-analyzer": {
@@ -44622,9 +44632,6 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
    "macros": [
     "components/card.html",
     "components/data_card.html",
@@ -44853,7 +44860,19 @@
    "page_type": "record-detail",
    "reason": "One vendor with tabs for contracts, applications and documents.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "inhouse_exceptions": [
+    {
+     "macro": "components/document_analyzer.html",
+     "keep_until": "T-doc-analyser-01",
+     "why": "The library has no document-analysis component yet; T-doc-analyser-01 replaces this in-house one."
+    },
+    {
+     "macro": "components/unified_mapping_modal.html",
+     "keep_until": "T-mapping-dialog-01",
+     "why": "The mapping dialog is being rebuilt on ui.dialog by T-mapping-dialog-01, which retires this one."
+    }
+   ]
   }
  }
 }
