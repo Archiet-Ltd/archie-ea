@@ -91,13 +91,10 @@ def _warn_about_configuration(environment, **_kwargs):
         )
 
 
-class Architect(HttpUser):
-    """One signed-in architect, reading their own screens."""
+class SignedInUser(HttpUser):
+    """Signs in once on start. Shared by the architect journey and the W1 scenario."""
 
-    # A real user reads a page for a few seconds before clicking. Without this
-    # the test measures how fast the box can refuse requests, not how many
-    # people it can serve.
-    wait_time = between(2, 6)
+    abstract = True
 
     def on_start(self):
         """Sign in once. A failure here is fatal for this user, not silent."""
@@ -145,6 +142,15 @@ class Architect(HttpUser):
                 raise StopUser()
             response.success()
 
+
+class Architect(SignedInUser):
+    """One signed-in architect, reading their own screens."""
+
+    # A real user reads a page for a few seconds before clicking. Without this
+    # the test measures how fast the box can refuse requests, not how many
+    # people it can serve.
+    wait_time = between(2, 6)
+
     @task(sum(weight for _, weight in READ_PAGES))
     def read_a_page(self):
         path = random.choices(
@@ -186,3 +192,86 @@ class Architect(HttpUser):
                   "description": "Created by tests/load/locustfile.py"},
             name="POST /applications/create",
         )
+
+
+# ---------------------------------------------------------------------------------------------------------
+# Wave 1 scenario (T-perf01): every W1 page, as one persona per run.
+#
+#   ARCHIE_LOAD_EMAILS=<persona email> ARCHIE_LOAD_PASSWORD=... ARCHIE_W1_IDS=ids.json \
+#   ARCHIE_W1_RESULTS=out/cto.json locust -f tests/load/locustfile.py W1Cto --host http://127.0.0.1:5077 \
+#       --headless -u 3 -r 1 -t 5m
+#
+# Each simulated person walks the whole page list in a shuffled order with a short think time, so the
+# samples per route are even. A page the persona cannot open (redirect to sign-in, 403) is counted as such
+# and left out of that persona's timings. Results hold routes and timings only.
+# ---------------------------------------------------------------------------------------------------------
+import w1_scenario  # noqa: E402  (locust puts this folder on sys.path)
+
+_W1_SAMPLES = []
+
+
+class _W1Walk:
+    persona = "anonymous"
+    wait_time = between(0.2, 0.8)
+
+    def _slugs(self):
+        ids = w1_scenario.load_ids()
+        for key, index, prefix in (("vs_slug", "/vs", "/vs"), ("connector_slug", "/connectors", "/connectors"),
+                                   ("role_slug", "/roles", "/roles"),
+                                   ("use_case_slug", "/use-cases", "/use-cases")):
+            html = self.client.get(index, name="setup", allow_redirects=True).text
+            ids[key] = w1_scenario.pick_slug(html, prefix, ids[key])
+        html = self.client.get("/modules/", name="setup", allow_redirects=True).text
+        ids["module_slug"] = w1_scenario.pick_slug(html, "/modules", ids["module_slug"])
+        return ids
+
+    def walk_pages(self):
+        routes = [r for r in w1_scenario.resolve(self._slugs()) if w1_scenario.can_open(self.persona, r[2])]
+        random.shuffle(routes)
+        for page_id, path, _access, template in routes:
+            with self.client.get(path, name=template, allow_redirects=True, catch_response=True) as response:
+                final = response.url.split("//", 1)[-1].split("/", 1)[-1]
+                _W1_SAMPLES.append((self.persona, page_id, template, response.status_code, "/" + final,
+                                    response.elapsed.total_seconds() * 1000.0))
+                response.success()
+            gevent.sleep(random.uniform(0.2, 0.8))
+
+
+class W1Anonymous(_W1Walk, HttpUser):
+    persona = "anonymous"
+
+    @task
+    def pages(self):
+        self.walk_pages()
+
+
+class W1Cto(_W1Walk, SignedInUser):
+    persona = "cto"
+
+    @task
+    def pages(self):
+        self.walk_pages()
+
+
+class W1Viewer(_W1Walk, SignedInUser):
+    persona = "viewer"
+
+    @task
+    def pages(self):
+        self.walk_pages()
+
+
+class W1Admin(_W1Walk, SignedInUser):
+    persona = "admin"
+
+    @task
+    def pages(self):
+        self.walk_pages()
+
+
+@events.quitting.add_listener
+def _write_w1_results(environment, **_kwargs):
+    path = os.environ.get("ARCHIE_W1_RESULTS")
+    if path and _W1_SAMPLES:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        w1_scenario.write_results(_W1_SAMPLES, path, meta={"load_average": os.getloadavg()})
