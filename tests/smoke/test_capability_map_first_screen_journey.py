@@ -138,3 +138,14 @@ def test_phone_keeps_nesting_and_scrolls_inside_the_map(browser, live_server, bu
         _shot(page, "map-390-dark")
     finally:
         context.close()
+
+
+def test_a_link_can_open_the_map_on_a_measure(browser, live_server, business_architect):
+    context, page = _open(browser, live_server, business_architect, 1440, 900)
+    try:
+        page.goto(live_server + MAP_URL + "?heat=coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        legend = page.locator('[data-testid="capability-legend"]')
+        expect(legend).to_contain_text("Application coverage", timeout=PAGE_TIMEOUT)
+        expect(page.locator("#capmap-measure")).to_have_value("coverage")
+    finally:
+        context.close()

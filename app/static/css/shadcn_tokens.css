@@ -14,7 +14,14 @@
     --heat-4: 84 81% 44%;
     --heat-5: 142 71% 45%;
     --heat-foreground: 0 0% 0%;  /* black on every level: 5.6 or better */ color-scheme: light; }
-  .dark { color-scheme: dark; }
+  .dark {
+    /* Heat steps in the dark theme: softer than the light ones, black text still 5.8:1 or better. */
+    --heat-1: 0 70% 62%;
+    --heat-2: 25 85% 58%;
+    --heat-3: 45 85% 55%;
+    --heat-4: 84 55% 52%;
+    --heat-5: 142 45% 52%;
+    color-scheme: dark; }
   /* Every native select, text input and textarea reads the surface and foreground tokens, so a control with no
      background class is the page colour in both themes (it was the browser's pale grey under light text in dark).
      Layered, so any bg-*/text-* utility on the control still wins. */

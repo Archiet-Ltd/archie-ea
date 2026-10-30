@@ -475,6 +475,23 @@ def api_unified_capabilities():
                 mappings_by_cap_id[mapping.business_capability_id] = []
             mappings_by_cap_id[mapping.business_capability_id].append(mapping)
 
+        # The unified twin of each capability carries its type (strategic,
+        # operational, supporting): the band the capability map places it in.
+        # One batched read, scoped to the tenant by the capability store's own
+        # listener.
+        from app.models.unified_capability import UnifiedCapability
+
+        twin_ids = {c.deprecated_in_favor_of_id for c in app_capabilities if c.deprecated_in_favor_of_id}
+        twin_type_by_id = (
+            {
+                row.id: row.capability_type
+                for row in UnifiedCapability.query.filter(UnifiedCapability.id.in_(twin_ids)).all()
+            }
+            if twin_ids
+            else {}
+        )
+        band_of_type = {"strategic": "strategic", "operational": "core", "supporting": "supporting"}
+
         # OPTIMIZATION: Pre-fetch all applications referenced in mappings
         app_ids_in_mappings = {m.application_component_id for m in app_mappings}
         all_apps = (
@@ -560,6 +577,12 @@ def api_unified_capabilities():
                         "code": capability.code,
                         "type": "Application",
                         "level": capability.level,
+                        "parent_id": str(capability.parent_capability_id)
+                        if capability.parent_capability_id
+                        else None,
+                        "band": band_of_type.get(
+                            twin_type_by_id.get(capability.deprecated_in_favor_of_id)
+                        ),
                         "category": capability.category,
                         "domain": {
                             "id": domain_id_str,
