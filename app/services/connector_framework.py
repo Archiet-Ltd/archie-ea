@@ -831,6 +831,7 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
         "config": cfg.public_config(),
         "credential_ref": f"vault:{org_id}:{cfg.connector_type}",
         "credential_masked": _connector_credential_mask(org_id, cfg.connector_type),
+        "credential_stored": bool(_connector_credential_mask(org_id, cfg.connector_type)),
         "last_sync": cfg.last_sync,
         "last_sync_status": latest_sync.status if latest_sync else None,
         "description": cfg.description,
@@ -871,6 +872,7 @@ def _proposal_connector_view(approval, org_id: int) -> dict:
         "config": _mask_sensitive(payload.get("config") or {}),
         "credential_ref": f"vault:{org_id}:{connector_type}" if connector_type else None,
         "credential_masked": _connector_credential_mask(org_id, connector_type),
+        "credential_stored": bool(_connector_credential_mask(org_id, connector_type)),
         "last_sync": None,
         "last_sync_status": None,
         "description": approval.summary,
@@ -1399,12 +1401,17 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
 
     if connector_type == "github":
         # The GitHub organisation to read and, for GitHub Enterprise Server, its
-        # API address come from the configuration; the token (read-only scopes)
-        # from the vault, under either save path's key.
+        # API address come from the configuration; the bearer the reader sends
+        # comes from the one token provider (app/connectors/github_app.py), which
+        # mints a fresh installation token when the organisation installed the
+        # GitHub App and falls back to the pasted personal token otherwise -- one
+        # read path regardless of how the organisation connected.
+        from app.connectors.github_app import resolve_api_token
+
         return {
             "organization": config.get("organization", ""),
             "base_url": config.get("base_url", ""),
-            "api_token": _secret("api_token"),
+            "api_token": resolve_api_token(org_id),
         }
 
     # No field map for this connector type: fall back to the generic
