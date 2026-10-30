@@ -73,35 +73,6 @@ def db_session(app, _schema):
                         raw.commit()
                 finally:
                     raw.close()
-                raw = db.engine.raw_connection()
-                try:
-                    with raw.cursor() as cursor:
-                        # session-replication-role-ok: arb_canonical_conditions and
-                        # arb_condition_evidence_records are mutually append-only, each
-                        # pointing at the other (a fulfilled condition's
-                        # fulfilment_evidence_id, an evidence row's own condition_id); no
-                        # row order or admitted UPDATE breaks that cycle, since neither
-                        # guard admits an UPDATE at all. Closing this for real needs a
-                        # lifecycle-aware admission this brief did not design — left for
-                        # the lead/founder to decide. Pre-clearing it here, before the
-                        # deletion service runs, is the narrowest fix that does not touch
-                        # any other append-only table's guard.
-                        #
-                        cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the append-only ring above (arb_canonical_conditions/arb_condition_evidence_records); neither guard admits the UPDATE a column-null would need. arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles form a second ring but resolve without this: one edge in it is DEFERRABLE INITIALLY DEFERRED, so the deletion service orders around it below.
-                        cursor.execute(
-                            "DELETE FROM arb_condition_evidence_records "
-                            "WHERE organization_id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                        cursor.execute(
-                            "DELETE FROM arb_canonical_conditions "
-                            "WHERE organization_id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                        cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
-                        raw.commit()
-                finally:
-                    raw.close()
                 for org_id in organization_ids:
                     if db.session.get(Organization, org_id) is not None:
                         OrganizationDeletionService.delete_organization(org_id)

@@ -60,24 +60,6 @@ def db_session(app, _schema):
             from app.models.organization import Organization
             from app.services.org_deletion_service import OrganizationDeletionService
 
-            raw = db.engine.raw_connection()
-            try:
-                with raw.cursor() as cursor:
-                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring resolves without this, via its one deferrable edge, so the deletion service handles it below.
-                    cursor.execute(
-                        "DELETE FROM arb_condition_evidence_records "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_canonical_conditions "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
-                    raw.commit()
-            finally:
-                raw.close()
             for org_id in organization_ids:
                 if db.session.get(Organization, org_id) is not None:
                     OrganizationDeletionService.delete_organization(org_id)

@@ -222,17 +222,6 @@ def decision_scope(app, evidence_scope: EvidenceScope):
                         "WHERE organization_id IN (%s, %s)",
                         (own_id, foreign_id),
                     )
-                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted. The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring resolves without this, via its one deferrable edge, so the deletion service handles it below.
-                    for table_name in (
-                        "arb_condition_evidence_records",
-                        "arb_canonical_conditions",
-                    ):
-                        cursor.execute(
-                            f'DELETE FROM "{table_name}" '  # nosec B608 -- fixed table allowlist
-                            "WHERE organization_id IN (%s, %s)",
-                            (own_id, foreign_id),
-                        )
-                    cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
                     raw.commit()
             finally:
                 raw.close()

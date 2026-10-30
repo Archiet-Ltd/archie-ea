@@ -105,18 +105,6 @@ def db_session(app, _schema):
                         "WHERE organization_id = ANY(%s)",
                         (list(organization_ids),),
                     )
-                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring resolves without this, via its one deferrable edge, so the deletion service handles it below.
-                    cursor.execute(
-                        "DELETE FROM arb_condition_evidence_records "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_canonical_conditions "
-                        "WHERE organization_id = ANY(%s)",
-                        (list(organization_ids),),
-                    )
-                    cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
                     raw.commit()
             finally:
                 raw.close()
@@ -1175,18 +1163,6 @@ def route_scope(app, _schema, request):
                         "WHERE organization_id = ANY(%s)",
                         (org_ids,),
                     )
-                    cursor.execute("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring, and arb_conditions (its legacy, non-append-only child with no organisation column of its own), resolve without this: one edge in that ring is DEFERRABLE INITIALLY DEFERRED, and the deletion service clears a table's unowned referrers before deleting it.
-                    cursor.execute(
-                        "DELETE FROM arb_condition_evidence_records "
-                        "WHERE organization_id = ANY(%s)",
-                        (org_ids,),
-                    )
-                    cursor.execute(
-                        "DELETE FROM arb_canonical_conditions "
-                        "WHERE organization_id = ANY(%s)",
-                        (org_ids,),
-                    )
-                    cursor.execute("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
                     raw.commit()
             finally:
                 raw.close()

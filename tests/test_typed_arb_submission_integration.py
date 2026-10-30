@@ -151,20 +151,6 @@ def adr_scope(app, _schema):
 
             own_id = scope.organization_id
             foreign_id = scope.foreign_actor.organization_id
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: breaks the arb_canonical_conditions/arb_condition_evidence_records append-only ring the deletion service cannot — the two mutually reference each other with no deferrable edge between them, and neither guard admits the UPDATE a column-null would need (see ADR-org-deletion-01 and the deletion-order report). Both organisations' rows are cleared together here, before either is deleted. The arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles ring resolves without this, via its one deferrable edge, so the deletion service handles it below.
-                for table_name in (
-                    "arb_condition_evidence_records",
-                    "arb_canonical_conditions",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id IN (:organization_id, :foreign_id)"
-                        ),
-                        {"organization_id": own_id, "foreign_id": foreign_id},
-                    )
-                connection.exec_driver_sql("SET LOCAL session_replication_role = DEFAULT")  # session-replication-role-ok: restores the switch flipped above
             # The foreign organisation first: it may deliberately cite the primary
             # organisation's rows, so the citing side must be gone before the cited
             # organisation is deleted.
