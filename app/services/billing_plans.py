@@ -339,6 +339,11 @@ def _limit_for(plan: Plan, seats: Optional[int]) -> Optional[int]:
     return seats if plan.per_seat else plan.user_limit
 
 
+# Accounts the sample company creates to own its sample applications. They cannot sign in, so they
+# are not people and never take a place on a plan.
+SAMPLE_ACCOUNT_SUFFIX = "@sample.invalid"
+
+
 def _count_members(connection, org_id: int, counts: str) -> int:
     """People (or, on an editors plan, people who are not read-only) in *org_id*.
 
@@ -360,6 +365,7 @@ def _count_members(connection, org_id: int, counts: str) -> int:
             )
         )
         .where(or_(users.c.organization_id == org_id, roles.c.organization_id == org_id))
+        .where(users.c.email.is_(None) | ~users.c.email.like("%" + SAMPLE_ACCOUNT_SUFFIX))
     ).subquery()
 
     stmt = select(func.count()).select_from(membership)
@@ -491,6 +497,8 @@ def _flush_changes(session) -> Dict[int, _Change]:
 
     for obj in session.new:
         if isinstance(obj, User):
+            if (obj.email or "").endswith(SAMPLE_ACCOUNT_SUFFIX):
+                continue
             org_id = obj.organization_id
             if org_id is None and obj.organization is not None:
                 org_id = obj.organization.id
