@@ -102,13 +102,15 @@ def test_create_work_package_requires_name(app, db_session, make_org, client, lo
 
 # ── Fix 3 (Edit Save): template calls the method the component actually defines ─
 
-def test_work_packages_template_calls_defined_alpine_method():
+def test_work_packages_template_calls_defined_alpine_method(app):
     template = (REPO / "app/templates/enterprise/work_packages.html").read_text(encoding="utf-8")
-    js = (REPO / "app/static/js/enterprise/work_packages_table.js").read_text(encoding="utf-8")
     # The bug: template @click="saveEdit()" but no saveEdit method existed.
     assert "saveEdit()" not in template
-    assert 'saveWorkPackage()' in template
-    assert "saveWorkPackage: function" in js
+    # The list is rendered on the server now and each row's Edit opens the
+    # work package's own edit page, so Edit leads to a working save rather
+    # than an inline Alpine handler.
+    assert "url_for('implementation_planning.edit_work_package', work_package_id=wp.id)" in template
+    assert "implementation_planning.edit_work_package" in app.view_functions
 
 
 # ── Fix 1 (Map Applications): CSP-safe delegated wiring, no dead inline handlers ─

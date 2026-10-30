@@ -17,14 +17,23 @@ SPEC_LIGHT = [(0.497, 0.163, 257), (0.66, 0.16, 55), (0.45, 0.10, 160), (0.64, 0
 
 
 def _block(selector):
+    """The colour-scheme block for the selector: the one that declares --card inside its own braces.
+
+    The token file opens with a short :root block (heat tokens, closed on its own last line) before the palette block, so
+    the palette block is found by its contents, not by being the first block with --card somewhere nearby."""
     lines = TOKENS.split("\n")
-    start = [i for i, line in enumerate(lines) if line.strip() == selector + " {" and "--card:" in "".join(lines[i:i + 40])][0]
-    out = []
-    for line in lines[start:]:
-        out.append(line)
-        if line == "  }":
-            break
-    return "\n".join(out)
+    for start, line in enumerate(lines):
+        if line.strip() != selector + " {":
+            continue
+        out = []
+        for line in lines[start:]:
+            out.append(line)
+            if line == "  }":
+                break
+        block = "\n".join(out)
+        if "--card:" in block:
+            return block
+    raise AssertionError(f"no {selector} block in the token file declares --card")
 
 
 def _tokens(selector):

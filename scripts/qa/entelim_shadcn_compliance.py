@@ -35,7 +35,7 @@ PALETTE = r"(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|
 OFF_TOKEN = re.compile(r"(?<![\w-])(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|decoration|placeholder|accent|caret)-" + PALETTE + r"-\d{2,3}(?:/\d+)?(?![\w-])")
 SHADOW = re.compile(r"(?<![\w-])shadow(?:-(?:sm|md|lg|xl|2xl|inner))?(?![\w-])|box-shadow\s*:|drop-shadow")
 INLINE_STYLE = re.compile(r"\bstyle\s*=\s*[\"']")
-MACRO_IMPORT = re.compile(r"{%-?\s*(?:from|import)\b[^%]*components/|{%-?\s*from\s+['\"][^'\"]*(?:macros|components)/|\{\{\s*[a-z_]+\.(button|card|badge|table|tabs|dialog|dropdown|input|select|empty_state|toast)\(|\{\{\s*(button|card|badge|table|tabs|dialog|dropdown|render_field|empty_state)\(")  # import or call (25 Oct)
+MACRO_IMPORT = re.compile(r"{%-?\s*(?:from|import)\b[^%]*(?:components|basecoat)/|{%-?\s*from\s+['\"][^'\"]*(?:macros|components|basecoat)/|\{\{\s*[a-z_]+\.(button|card|badge|table|tabs|dialog|dropdown|input|select|empty_state|toast)\(|\{\{\s*(button|card|badge|table|tabs|dialog|dropdown|render_field|empty_state|list_table|element_table)\(")  # import or call (25 Oct)
 
 
 def git(repo, *args):

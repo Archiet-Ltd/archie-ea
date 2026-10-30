@@ -1,0 +1,13 @@
+{# calendar: port of shadcn/ui calendar.tsx (pinned in compliance/upstream). Macros: calendar, calendar_day_button #}
+
+{#- Calendar -#}
+{% macro calendar(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('calendar', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CalendarDayButton -#}
+{% macro calendar_day_button(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('calendar-day-button', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
