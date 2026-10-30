@@ -14852,7 +14852,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -14910,7 +14910,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/enrich-applications.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -14919,7 +14919,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -16992,7 +16992,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -17053,7 +17053,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/import-review.md",
    "states": [
     "loading",
     "empty-nothing-derived",
@@ -17063,7 +17063,7 @@
     "partial-failure",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -18625,7 +18625,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -18687,7 +18687,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/import-file.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -18697,7 +18697,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -23489,7 +23489,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -23505,7 +23505,8 @@
     "select",
     "combobox",
     "table",
-    "card"
+    "card",
+    "dialog"
    ],
    "confidence": "low",
    "controls": {
@@ -23553,7 +23554,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/capability-mapping.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -23562,7 +23563,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },

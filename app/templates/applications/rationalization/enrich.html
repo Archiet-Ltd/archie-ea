@@ -1,4 +1,7 @@
+{# design-block: form #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Data Enrichment — Rationalization{% endblock %}
 
@@ -38,7 +41,7 @@
         <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-center">
             <i data-lucide="alert-circle" class="h-8 w-8 text-destructive mx-auto mb-2"></i>
             <p class="text-sm text-destructive-emphasis font-medium">Failed to load applications</p>
-            <button type="button" @click="load()" class="mt-2 text-xs text-primary hover:underline">Retry</button>
+            {% call ui.button(type='button', variant='ghost', class='mt-2', attrs={'@click': 'load()'}) %}Retry{% endcall %}
         </div>
     </template>
 
@@ -46,91 +49,65 @@
     <template x-if="!loading && !error">
         <div class="rounded-lg border border-border bg-card overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm">
-                    <thead>
-                        <tr class="border-b bg-muted/30">
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-8">#</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Application</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">Health</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Disposition</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-40">Est. Annual Cost</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-44">Application Owner</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-36">Business Criticality</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                {% call ui.table() %}
+                    {% call ui.table_header() %}
+                        {% call ui.table_row() %}
+                            {{ ui.table_head(text='#', class='w-8 ') }}
+                            {{ ui.table_head(text='Application', class='') }}
+                            {{ ui.table_head(text='Health', class='w-20 ') }}
+                            {{ ui.table_head(text='Disposition', class='w-28 ') }}
+                            {{ ui.table_head(text='Est. Annual Cost', class='w-40 ') }}
+                            {{ ui.table_head(text='Application Owner', class='w-44 ') }}
+                            {{ ui.table_head(text='Business Criticality', class='w-36 ') }}
+                            {{ ui.table_head(text='Actions', class='w-28 text-center') }}
+                        {% endcall %}
+                    {% endcall %}
+                    {% call ui.table_body() %}
                         <template x-for="(app, idx) in apps" :key="app.id">
-                            <tr class="border-b border-border/50 hover:bg-muted/20 transition-colors"
-                                :class="app._saved ? 'bg-success/5' : ''">
-                                <td class="px-4 py-3 text-muted-foreground text-xs" x-text="idx + 1"></td>
-                                <td class="px-4 py-3">
-                                    <span class="font-medium text-foreground" x-text="app.name"></span>
-                                </td>
-                                <td class="px-4 py-3">
+                            {% call ui.table_row(attrs={':class': "app._saved ? 'bg-success/5' : ''"}) %}
+                                {{ ui.table_cell(class='text-xs text-muted-foreground', attrs={'x-text': 'idx + 1'}) }}
+                                {% call ui.table_cell(class='') %}
+                                    <span class="font-medium text-foreground" x-text="app.name"></span>{% endcall %}
+                                {% call ui.table_cell(class='') %}
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
                                           :class="app.health_score === null ? 'bg-muted/50 text-muted-foreground' :
                                                   app.health_score <= 25 ? 'bg-destructive/10 text-destructive-emphasis' :
                                                   app.health_score <= 50 ? 'bg-warning/10 text-warning-emphasis' :
                                                   app.health_score <= 75 ? 'bg-primary/10 text-primary' :
                                                   'bg-success/10 text-success-emphasis'"
-                                          x-text="app.health_score !== null ? app.health_score + '%' : 'N/A'"></span>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span class="text-xs text-muted-foreground" x-text="app.disposition ? app.disposition.replace(/_/g, ' ') : '—'"></span>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <input aria-label="Total cost of ownership" type="number" min="0" step="100" placeholder="0.00"
-                                           class="w-full h-8 px-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                                           :value="app.total_cost_of_ownership || ''"
-                                           @input="app.total_cost_of_ownership = parseFloat($event.target.value) || 0; app._dirty = true; app._saved = false">
-                                </td>
-                                <td class="px-4 py-3"><!-- entity-picker-ok -->
-                                    <input type="text" placeholder="Owner name" maxlength="100"
-                                           class="w-full h-8 px-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                                           :value="app.application_owner || ''"
-                                           @input="app.application_owner = $event.target.value; app._dirty = true; app._saved = false" aria-label="Owner name">
-                                </td>
-                                <td class="px-4 py-3">
-                                    <select class="w-full h-8 px-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                                            :value="app.business_criticality || ''"
-                                            @change="app.business_criticality = $event.target.value; app._dirty = true; app._saved = false" aria-label="Select...">
-                                        <option value="">Select...</option>
-                                        <option value="Critical">Critical</option>
-                                        <option value="High">High</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Low">Low</option>
-                                    </select>
-                                </td>
-                                <td class="px-4 py-3 text-center">
+                                          x-text="app.health_score !== null ? app.health_score + '%' : 'Not scored'"></span>{% endcall %}
+                                {% call ui.table_cell(class='') %}
+                                    <span class="text-xs text-muted-foreground" x-text="app.disposition ? app.disposition.replace(/_/g, ' ') : 'Not set'"></span>{% endcall %}
+                                {% call ui.table_cell(class='') %}
+                                    {{ ui.input(type='number', attrs={'aria-label': 'Total cost of ownership', 'min': '0', 'step': '100', 'placeholder': '0.00', ':value': "app.total_cost_of_ownership || ''", '@input': 'app.total_cost_of_ownership = parseFloat($event.target.value) || 0; app._dirty = true; app._saved = false'}) }}{% endcall %}
+                                {% call ui.table_cell(class='') %}<!-- entity-picker-ok -->
+                                    {{ ui.input(type='text', attrs={'placeholder': 'Owner name', 'maxlength': '100', ':value': "app.application_owner || ''", '@input': 'app.application_owner = $event.target.value; app._dirty = true; app._saved = false', 'aria-label': 'Owner name'}) }}{% endcall %}
+                                {% call ui.table_cell(class='') %}
+                                    {% call native_select_wrapper(class='w-full') %}{% call native_select(class='w-full', attrs={':value': "app.business_criticality || ''", '@change': 'app.business_criticality = $event.target.value; app._dirty = true; app._saved = false', 'aria-label': 'Select...'}) %}
+      {{ native_select_option('Select...', value='') }}
+      {{ native_select_option('Critical', value='Critical') }}
+      {{ native_select_option('High', value='High') }}
+      {{ native_select_option('Medium', value='Medium') }}
+      {{ native_select_option('Low', value='Low') }}
+    {% endcall %}{% endcall %}{% endcall %}
+                                {% call ui.table_cell(class='text-center') %}
                                     <div class="flex items-center justify-center gap-1.5">
-                                        <button type="button" @click="saveApp(app)"
-                                                :disabled="!app._dirty || app._saving"
-                                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                            <template x-if="app._saving">
+                                        {% call ui.button(type='button', class='justify-center justify-center', attrs={'@click': 'saveApp(app)', ':disabled': '!app._dirty || app._saving'}) %}<template x-if="app._saving">
                                                 <span class="animate-spin h-3 w-3 border border-primary-foreground border-t-transparent rounded-full mr-1"></span>
                                             </template>
-                                            <span x-text="app._saving ? 'Saving...' : app._saved ? 'Saved' : 'Save'"></span>
-                                        </button>
-                                        <button type="button" x-show="app._saved" x-cloak
-                                                @click="rescoreApp(app)"
-                                                :disabled="app._rescoring"
-                                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                                                title="Re-score this application">
-                                            <template x-if="app._rescoring">
+                                            <span x-text="app._saving ? 'Saving...' : app._saved ? 'Saved' : 'Save'"></span>{% endcall %}
+                                        {% call ui.button(type='button', variant='outline', class='justify-center justify-center', attrs={'x-show': 'app._saved', 'x-cloak': '', '@click': 'rescoreApp(app)', ':disabled': 'app._rescoring', 'title': 'Re-score this application'}) %}<template x-if="app._rescoring">
                                                 <span class="animate-spin h-3 w-3 border border-foreground border-t-transparent rounded-full"></span>
                                             </template>
                                             <template x-if="!app._rescoring">
                                                 <i data-lucide="refresh-cw" class="h-3 w-3"></i>
-                                            </template>
-                                        </button>
+                                            </template>{% endcall %}
                                     </div>
-                                    <p x-show="app._rescored" x-cloak class="text-xs text-success-emphasis mt-1" x-text="app._newDisposition || 'Re-scored'"></p>
-                                </td>
-                            </tr>
+                                    <p x-show="app._rescored" x-cloak class="text-xs text-success-emphasis mt-1" x-text="app._newDisposition || 'Re-scored'"></p>{% endcall %}
+                            {% endcall %}
                         </template>
-                    </tbody>
-                </table>
+                    {% endcall %}
+                {% endcall %}
             </div>
             <div class="border px-4 py-2 border-t bg-muted/20 text-xs text-muted-foreground">
                 Showing <span x-text="apps.length"></span> applications sorted by health score (lowest first)

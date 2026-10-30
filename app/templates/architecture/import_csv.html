@@ -1,6 +1,9 @@
+{# design-block: form #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_content, card_header, card_title %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option, native_select_optgroup %}
 
 {% block title %}Import Architecture Documents{% endblock %}
 
@@ -23,7 +26,7 @@
         {% call card_content() %}
             <div class="space-y-4">
                 {# File type detection info #}
-                <div class="grid grid-cols-3 gap-3 text-xs">
+                <div class="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
                     <div class="rounded-md border px-3 py-2">
                         <p class="font-medium mb-1">Structured Data</p>
                         <p class="text-muted-foreground">.csv, .xlsx, .xls — rows become elements. Columns: name, type, description, layer.</p>
@@ -38,87 +41,55 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium">File</label>
-                        <input type="file"
-                            accept=".csv,.xlsx,.xls,.xml,.archimate,.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf"
-                            @change="onFileSelected($event)"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="File">
-                        <p x-show="detectedMode" x-cloak class="text-xs text-muted-foreground">
+                <div class="space-y-6">
+                    {% call ui.field() %}
+                        {{ ui.field_label(text='File', attrs={'for': 'import-file'}) }}
+                        {{ ui.input(id='import-file', type='file', attrs={'accept': '.csv,.xlsx,.xls,.xml,.archimate,.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf', '@change': 'onFileSelected($event)'}) }}
+                        <p x-show="detectedMode" x-cloak class="text-sm text-muted-foreground">
                             Detected: <span class="font-medium" x-text="detectedMode"></span>
                         </p>
+                    {% endcall %}
+                    <div x-show="detectedMode === 'Structured Data (CSV/Excel)'" x-cloak>
+                    {% call ui.field() %}
+                        {{ ui.field_label(text="Default element type (if no 'type' column)", attrs={'for': 'import-default-type'}) }}
+                        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='import-default-type', class='w-full', attrs={'x-model': 'defaultType'}) %}
+                            {{ native_select_option('Auto-detect from type column', value='') }}
+                            {% for layer, types in [
+                                ('Application Layer', ['ApplicationComponent', 'ApplicationService', 'DataObject', 'ApplicationInterface']),
+                                ('Business Layer', ['BusinessProcess', 'BusinessService', 'BusinessFunction', 'BusinessObject', 'BusinessActor', 'BusinessRole']),
+                                ('Technology Layer', ['Node', 'Device', 'SystemSoftware', 'Artifact', 'CommunicationNetwork']),
+                                ('Motivation Layer', ['Driver', 'Goal', 'Requirement', 'Constraint', 'Stakeholder', 'Principle']),
+                                ('Strategy Layer', ['Capability', 'Resource', 'ValueStream', 'CourseOfAction']),
+                                ('Implementation Layer', ['WorkPackage', 'Deliverable', 'Plateau', 'Gap'])] %}
+                            {% call native_select_optgroup(attrs={'label': layer}) %}
+                                {% for t in types %}{{ native_select_option(t, value=t) }}{% endfor %}
+                            {% endcall %}
+                            {% endfor %}
+                        {% endcall %}{% endcall %}
+                    {% endcall %}
                     </div>
-                    <div class="space-y-2" x-show="detectedMode === 'Structured Data (CSV/Excel)'" x-cloak>
-                        <label class="block text-sm font-medium">Default Element Type (if no 'type' column)</label>
-                        <select x-model="defaultType"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Default Element Type (if no 'type' column)">
-                            <option value="">-- Auto-detect from type column --</option>
-                            <optgroup label="Application Layer">
-                                <option value="ApplicationComponent">ApplicationComponent</option>
-                                <option value="ApplicationService">ApplicationService</option>
-                                <option value="DataObject">DataObject</option>
-                                <option value="ApplicationInterface">ApplicationInterface</option>
-                            </optgroup>
-                            <optgroup label="Business Layer">
-                                <option value="BusinessProcess">BusinessProcess</option>
-                                <option value="BusinessService">BusinessService</option>
-                                <option value="BusinessFunction">BusinessFunction</option>
-                                <option value="BusinessObject">BusinessObject</option>
-                                <option value="BusinessActor">BusinessActor</option>
-                                <option value="BusinessRole">BusinessRole</option>
-                            </optgroup>
-                            <optgroup label="Technology Layer">
-                                <option value="Node">Node</option>
-                                <option value="Device">Device</option>
-                                <option value="SystemSoftware">SystemSoftware</option>
-                                <option value="Artifact">Artifact</option>
-                                <option value="CommunicationNetwork">CommunicationNetwork</option>
-                            </optgroup>
-                            <optgroup label="Motivation Layer">
-                                <option value="Driver">Driver</option>
-                                <option value="Goal">Goal</option>
-                                <option value="Requirement">Requirement</option>
-                                <option value="Constraint">Constraint</option>
-                                <option value="Stakeholder">Stakeholder</option>
-                                <option value="Principle">Principle</option>
-                            </optgroup>
-                            <optgroup label="Strategy Layer">
-                                <option value="Capability">Capability</option>
-                                <option value="Resource">Resource</option>
-                                <option value="ValueStream">ValueStream</option>
-                                <option value="CourseOfAction">CourseOfAction</option>
-                            </optgroup>
-                            <optgroup label="Implementation Layer">
-                                <option value="WorkPackage">WorkPackage</option>
-                                <option value="Deliverable">Deliverable</option>
-                                <option value="Plateau">Plateau</option>
-                                <option value="Gap">Gap</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div class="space-y-2" x-show="detectedMode === 'ArchiMate Exchange (XML)'" x-cloak>
-                        <label class="block text-sm font-medium">Import Strategy</label>
-                        <select x-model="importStrategy"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Import Strategy">
-                            <option value="skip_duplicates">Skip duplicates (safest)</option>
-                            <option value="update_existing">Update existing descriptions</option>
-                            <option value="create_all">Create all (allows duplicates)</option>
-                        </select>
+                    <div x-show="detectedMode === 'ArchiMate Exchange (XML)'" x-cloak>
+                    {% call ui.field() %}
+                        {{ ui.field_label(text='Import strategy', attrs={'for': 'import-strategy'}) }}
+                        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='import-strategy', class='w-full', attrs={'x-model': 'importStrategy'}) %}
+                            {{ native_select_option('Skip duplicates (safest)', value='skip_duplicates') }}
+                            {{ native_select_option('Update existing descriptions', value='update_existing') }}
+                            {{ native_select_option('Create all (allows duplicates)', value='create_all') }}
+                        {% endcall %}{% endcall %}
+                    {% endcall %}
                     </div>
                 </div>
 
                 <div class="flex gap-3">
-                    <button type="button" @click="uploadFile()" :disabled="!file || uploading"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    {% call ui.button(type='button', id='import-upload', attrs={'@click': 'uploadFile()', ':disabled': '!file || uploading'}) %}
                         <span x-show="!uploading" x-cloak>
                             <span x-text="detectedMode === 'Document (AI Analysis)' ? 'Analyse & Extract Elements' : 'Upload & Create Elements'"></span>
                         </span>
                         <span x-show="uploading" x-cloak class="inline-flex items-center gap-2">
-                            <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            {{ ui.spinner() }}
                             <span x-text="detectedMode === 'Document (AI Analysis)' ? 'Analysing document...' : 'Importing...'"></span>
                         </span>
-                    </button>
+                    {% endcall %}
                 </div>
 
                 {# Error #}
@@ -139,45 +110,38 @@
 
                     {# Action buttons #}
                     <div x-show="result?.element_ids?.length > 0" x-cloak class="flex gap-3">
-                        <button type="button" @click="createDiagram()"
-                            :disabled="creatingDiagram"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        {% call ui.button(type='button', attrs={'@click': 'createDiagram()', ':disabled': 'creatingDiagram'}) %}
                             <span x-show="!creatingDiagram" x-cloak>
                                 <i data-lucide="layout" class="h-4 w-4 mr-2 inline"></i>
                                 Generate Diagram in Composer
                             </span>
                             <span x-show="creatingDiagram" x-cloak>Creating diagram...</span>
-                        </button>
-                        <a href="/archimate/traceability"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                            View in Traceability
-                        </a>
+                        {% endcall %}
+                        {{ ui.button(text='View in Traceability', variant='outline', href='/archimate/traceability') }}
                     </div>
 
                     {# Created elements table #}
                     <div x-show="result?.created?.length > 0" x-cloak>
                         <h3 class="text-sm font-medium mb-2">Created Elements</h3>
                         <div class="border rounded-md overflow-hidden max-h-96 overflow-y-auto">
-                            <table class="dense-table w-full text-sm">
-                                <thead class="bg-muted/50 sticky top-0">
-                                    <tr>
-                                        <th class="px-3 py-2 text-left font-medium">Name</th>
-                                        <th class="px-3 py-2 text-left font-medium">Type</th>
-                                        <th class="px-3 py-2 text-left font-medium">Layer</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            {% call ui.table() %}
+                                {% call ui.table_header() %}
+                                    {% call ui.table_row() %}
+                                        {{ ui.table_head(text='Name') }}
+                                        {{ ui.table_head(text='Type') }}
+                                        {{ ui.table_head(text='Layer') }}
+                                    {% endcall %}
+                                {% endcall %}
+                                {% call ui.table_body() %}
                                     <template x-for="elem in (result?.created || [])" :key="elem.id">
-                                        <tr class="border-t">
-                                            <td class="px-3 py-2" x-text="elem.name"></td>
-                                            <td class="px-3 py-2">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" x-text="elem.type"></span>
-                                            </td>
-                                            <td class="px-3 py-2" x-text="elem.layer"></td>
-                                        </tr>
+                                        {% call ui.table_row() %}
+                                            {{ ui.table_cell(attrs={'x-text': 'elem.name'}) }}
+                                            {% call ui.table_cell() %}{{ ui.badge(variant='outline', attrs={'x-text': 'elem.type'}) }}{% endcall %}
+                                            {{ ui.table_cell(attrs={'x-text': 'elem.layer'}) }}
+                                        {% endcall %}
                                     </template>
-                                </tbody>
-                            </table>
+                                {% endcall %}
+                            {% endcall %}
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,10 @@
+{# design-block: form #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import hidden_input %}
+{% from 'components/dialog.html' import dialog %}
 
 {% block title %}Capability Mapping{% endblock %}
 
@@ -18,17 +22,15 @@
     {% set total_caps = capabilities|length %}
     {% set total_apps = applications|length %}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {{ metrics_card(title='Capabilities', value=total_caps, icon='layers') }}
-        {{ metrics_card(title='Applications', value=total_apps, icon='monitor') }}
-        {# Coverage is capabilities with at least one application mapped, as a
-           percentage. It used to print "capabilities × applications", which is
-           not a coverage figure at all. With nothing to measure it is an em
-           dash, never 0%. #}
-        {{ metrics_card(
-            title='Capabilities with an application',
-            value=(coverage_pct ~ '%') if coverage_pct is not none else '—',
-            icon='grid-3x3',
-            value_class='text-primary' if coverage_pct else 'text-muted-foreground') }}
+        {% call ui.card() %}
+          {% call ui.card_header() %}{{ ui.card_description(text='Capabilities') }}{{ ui.card_title(text=total_caps, class='text-2xl tabular-nums '.strip()) }}{% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+          {% call ui.card_header() %}{{ ui.card_description(text='Applications') }}{{ ui.card_title(text=total_apps, class='text-2xl tabular-nums '.strip()) }}{% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+          {% call ui.card_header() %}{{ ui.card_description(text='Capabilities with an application') }}{{ ui.card_title(text=(coverage_pct ~ '%') if coverage_pct is not none else 'Not measured', class='text-2xl tabular-nums '.strip()) }}{% endcall %}
+        {% endcall %}
     </div>
 
     {% if total_caps == 0 and total_apps == 0 %}
@@ -36,10 +38,8 @@
         <p class="font-medium">No data available for mapping.</p>
         <p class="text-sm mt-1 mb-4">Add capabilities and applications first.</p>
         <div class="flex justify-center gap-3">
-            <a href="{{ url_for('unified_low_priority.capability_map_capabilities') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add capabilities</a>
-            <a href="{{ url_for('unified_applications.application_list') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add applications</a>
+            {{ ui.button(text='Add capabilities', href=url_for('unified_low_priority.capability_map_capabilities')) }}
+            {{ ui.button(text='Add applications', variant='ghost', href=url_for('unified_applications.application_list')) }}
         </div>
     </div>
     {% else %}
@@ -74,9 +74,7 @@
                         <span class="text-xs text-muted-foreground">No application mapped</span>
                         {% endfor %}
                         {% if can_edit and total_apps > 0 %}
-                        <button type="button" data-action="openMapDialog"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 ml-2 items-center"
-                                aria-label="Map applications to {{ cap.name|e }}">Map applications</button>
+                        {{ ui.button(type='button', text='Map applications', variant='ghost', size='sm', class='ml-2', attrs={'data-action': 'openMapDialog', 'aria-label': 'Map applications to ' ~ cap.name}) }}
                         {% endif %}
                     </div>
                 </div>
@@ -109,7 +107,7 @@
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground border border-border">{{ app.operational_status|title }}</span>
                 {% endif %}
                 {% else %}
-                <span class="text-xs text-muted-foreground" title="No operational status recorded">&mdash;</span>
+                <span class="text-xs text-muted-foreground">Status not set</span>
                 {% endif %}
             </div>
             {% else %}
@@ -121,27 +119,20 @@
 </div>
 
 {% if can_edit %}
-<dialog id="map-dialog" class="rounded-xl border border-border bg-card text-foreground p-0 w-full max-w-md backdrop:bg-black/50">
-  <div class="p-6">
-    <h3 id="map-dialog-title" class="text-base font-semibold text-foreground text-foreground mb-1">Map applications</h3>
-    <p class="text-sm text-muted-foreground mb-4">Tick every application that supports this capability.</p>
-    <input type="hidden" id="map-cap-id" value="">
-    <div class="space-y-2 max-h-72 overflow-y-auto" id="map-app-list">
+<div x-data="{ mapOpen: false, mapTitle: 'Map applications' }" id="map-root">
+{% call dialog(start_hidden=false, open_expr='mapOpen', close_expr='mapOpen = false', title='Map applications', title_expr='mapTitle', description='Tick every application that supports this capability.') %}
+    {{ hidden_input('map-cap-id', '', id='map-cap-id') }}
+    <div class="space-y-3 max-h-72 overflow-y-auto" id="map-app-list" data-testid="map-app-list">
       {% for app in applications %}
-      <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" class="map-app-checkbox h-4 w-4 rounded border-border" value="{{ app.id }}">
-        <span>{{ app.name }}</span>
-      </label>
+      {{ checkbox(id='map-app-' ~ app.id, value=app.id, label=app.name, attrs_dict={'data-map-app': ''}) }}
       {% endfor %}
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button type="button" data-action="closeMapDialog"
-        class="h-9 px-4 rounded-md text-sm border border-border hover:bg-muted">Cancel</button>
-      <button type="button" id="map-save" data-action="saveMappings"
-        class="h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90">Save mappings</button>
+      {{ ui.button(type='button', text='Cancel', variant='outline', attrs={'data-action': 'closeMapDialog'}) }}
+      {{ ui.button(type='button', text='Save mappings', id='map-save', attrs={'data-action': 'saveMappings'}) }}
     </div>
-  </div>
-</dialog>
+{% endcall %}
+</div>
 
 <script>
 // Scoped: partials/_scripts_common.html installs a global [data-action] delegator
@@ -159,11 +150,12 @@ function mapToast(msg, isErr) {
 function openMapDialog(row) {
     var mapped = (row.dataset.mappedIds || '').split(',').filter(Boolean);
     el('map-cap-id').value = row.dataset.capId;
-    el('map-dialog-title').textContent = 'Map applications to ' + row.dataset.capName;
-    document.querySelectorAll('.map-app-checkbox').forEach(function (cb) {
+    var root = Alpine.$data(el('map-root'));
+    root.mapTitle = 'Map applications to ' + row.dataset.capName;
+    document.querySelectorAll('[data-map-app]').forEach(function (cb) {
         cb.checked = mapped.indexOf(cb.value) !== -1;
     });
-    el('map-dialog').showModal();
+    root.mapOpen = true;
 }
 
 var saving = false;
@@ -176,7 +168,7 @@ async function saveMappings() {
     var capId = el('map-cap-id').value;
     var row = document.querySelector('.cap-row[data-cap-id="' + capId + '"]');
     var before = (row.dataset.mappedIds || '').split(',').filter(Boolean);
-    var after = [...document.querySelectorAll('.map-app-checkbox')]
+    var after = [...document.querySelectorAll('[data-map-app]')]
         .filter(function (cb) { return cb.checked; })
         .map(function (cb) { return cb.value; });
     var added = after.filter(function (id) { return before.indexOf(id) === -1; });
@@ -196,7 +188,7 @@ async function saveMappings() {
                 '/capability-map/api/mappings/by-capability/' + capId + '/application/' + id,
                 { silent: true });
         }
-        el('map-dialog').close();
+        Alpine.$data(el('map-root')).mapOpen = false;
         mapToast('Mappings saved');
         setTimeout(function () { window.location.reload(); }, 400);
     } catch (e) {
@@ -213,7 +205,7 @@ document.addEventListener('click', function (e) {
     var a = t.getAttribute('data-action');
     if (a === 'openMapDialog') return openMapDialog(t.closest('.cap-row'));
     if (a === 'saveMappings') return saveMappings();
-    if (a === 'closeMapDialog') { var d = el('map-dialog'); if (d) d.close(); }
+    if (a === 'closeMapDialog') { Alpine.$data(el('map-root')).mapOpen = false; }
 });
 })();
 </script>

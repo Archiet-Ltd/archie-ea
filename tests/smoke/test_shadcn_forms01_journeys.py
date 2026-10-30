@@ -330,3 +330,154 @@ def test_solution_architect_edits_a_solution_and_the_record_shows_it(browser, li
         expect(form.locator("#edit-technical-lead")).to_have_value("Tomas Berg")
     finally:
         page.close()
+
+
+def test_business_architect_maps_an_application_to_a_capability(browser, live_server):
+    org = create_fresh_org("business_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(BusinessCapability(name="Order management", organization_id=org["org_id"]))
+        db.session.add(ApplicationComponent(name="Order hub", organization_id=org["org_id"]))
+        db.session.add(ApplicationComponent(name="Billing engine", organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["business_architect"])
+        _open(page, live_server, "/enterprise/capability-map/mapping")
+        row = page.locator(".cap-row", has_text="Order management")
+        expect(row).to_contain_text("No application mapped")
+        _shoot(page, "capability-mapping")
+        row.get_by_role("button", name="Map applications to Order management").click()
+        dialog = page.get_by_role("dialog")
+        try:
+            expect(dialog).to_be_visible()
+        except AssertionError:
+            raise AssertionError("dialog did not open; page errors: %s" % errors)
+        dialog.get_by_label("Order hub").check()
+        dialog.get_by_role("button", name="Save mappings").click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        page.wait_for_function(
+            "() => document.querySelector('.cap-row').innerText.includes('Order hub')", timeout=PAGE_TIMEOUT)
+        # Reopen: the saved mapping is ticked and Cancel closes the dialog without a change.
+        row = page.locator(".cap-row", has_text="Order management")
+        row.get_by_role("button", name="Map applications to Order management").click()
+        expect(page.get_by_role("dialog").get_by_label("Order hub")).to_be_checked()
+        page.get_by_role("dialog").get_by_role("button", name="Cancel").click()
+        expect(page.get_by_role("dialog")).to_be_hidden()
+    finally:
+        page.close()
+
+
+def test_application_manager_enriches_an_application_from_the_list(browser, live_server):
+    org = create_fresh_org("application_manager", org_admin=True)
+    from app import create_app, db
+    from app.models.application_layer import ApplicationComponent
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(ApplicationComponent(name="Legacy ledger", organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["application_manager"])
+        _open(page, live_server, "/applications/rationalization/enrich")
+        row = page.locator("tr", has_text="Legacy ledger")
+        expect(row).to_be_visible()
+        _shoot(page, "enrich-applications")
+        expect(row).to_contain_text("Not scored")
+        # Every cell sits under its heading: eight headings, eight cells, the first one the row number.
+        expect(page.locator("table th")).to_have_count(8)
+        expect(row.locator("td")).to_have_count(8)
+        expect(row.locator("td").first).to_have_text("1")
+        save = row.get_by_role("button", name="Save")
+        expect(save).to_be_disabled()
+        row.get_by_label("Owner name").fill("Dana Okafor")
+        row.locator("select").select_option("High")
+        expect(save).to_be_enabled()
+        save.click()
+        expect(row.get_by_role("button", name="Saved")).to_be_visible()
+        # Reload: the owner and criticality were stored and come back into the same cells.
+        _open(page, live_server, "/applications/rationalization/enrich")
+        row = page.locator("tr", has_text="Legacy ledger")
+        expect(row.get_by_label("Owner name")).to_have_value("Dana Okafor")
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
+
+
+def test_architect_imports_a_csv_and_the_created_elements_are_listed(browser, live_server, tmp_path):
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    csv = tmp_path / "elements.csv"
+    csv.write_text("name,type,description,layer\nOrder service,ApplicationService,Takes orders,Application\n"
+                   "Billing engine,ApplicationComponent,Invoices customers,Application\n")
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        _open(page, live_server, "/archimate/import")
+        upload = page.get_by_role("button", name="Upload & Create Elements")
+        expect(upload).to_be_disabled()
+        _shoot(page, "import-file")
+        page.locator("#import-file").set_input_files(str(csv))
+        expect(page.get_by_text("Detected:")).to_contain_text("Structured Data")
+        expect(page.locator("#import-default-type")).to_be_visible()
+        expect(page.locator("#import-strategy")).to_be_hidden()
+        upload.click()
+        expect(page.locator("body")).to_contain_text("2 elements created")
+        created = page.locator("table")
+        expect(created).to_contain_text("Order service")
+        expect(created).to_contain_text("Billing engine")
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
+
+
+def test_architect_reviews_what_an_import_guessed_retypes_and_confirms(browser, live_server):
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
+
+    app = create_app("testing")
+    with app.app_context():
+        for name in ("Order box", "Billing box"):
+            db.session.add(ArchiMateElement(name=name, type="Node", layer="Technology", organization_id=org["org_id"],
+                                            custom_properties={"lucid_type_source": "fallback", "lucid_class": "rect"}))
+        db.session.commit()
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        _open(page, live_server, "/archimate/import-review")
+        table = page.locator("[data-testid=review-table]")
+        expect(table).to_contain_text("Order box")
+        expect(table).to_contain_text("Billing box")
+        expect(table.locator("th")).to_have_count(5)
+        expect(table.locator("tbody tr").first.locator("td")).to_have_count(5)
+        expect(page.get_by_text("0 selected")).to_be_visible()
+        _shoot(page, "import-review")
+        confirm = page.get_by_role("button", name="Confirm as correct")
+        expect(confirm).to_be_disabled()
+        # Pick one row and give it a type: the page reports the change and the queue still holds both.
+        table.get_by_label("Select Order box").check()
+        expect(page.get_by_text("1 selected")).to_be_visible()
+        page.get_by_label("Change element type to").select_option("DataObject")
+        page.get_by_role("button", name="Apply to 1 element(s)").click()
+        expect(page.get_by_text("Retyped 1 to DataObject.")).to_be_visible()
+        # Select everything shown and confirm: the queue empties and says so.
+        page.get_by_label("Select all shown").check()
+        confirm.click()
+        expect(page.get_by_text("Nothing waiting")).to_be_visible()
+        page.get_by_role("button", name="Show items already reviewed").click()
+        expect(page.locator("[data-testid=review-table]")).to_contain_text("Order box")
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
