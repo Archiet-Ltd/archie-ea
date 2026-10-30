@@ -1,6 +1,8 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell, empty_state, stat_card, section_card %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
@@ -174,21 +176,16 @@
     {% call section_card(title='Impact Analysis Results') %}
         {% set analyses_to_display = filtered_analyses if filtered_analyses is not none else recent_analyses %}
         {% if analyses_to_display %}
-        {% call table() %}
-            {% call table_header() %}
-                <tr>
-                    {% call table_head() %}Date{% endcall %}
-                    {% call table_head() %}Analysis Type{% endcall %}
-                    {% call table_head() %}Trigger Element{% endcall %}
-                    {% call table_head() %}Severity{% endcall %}
-                    {% call table_head(class='text-center') %}Capabilities{% endcall %}
-                    {% call table_head(class='text-center') %}Applications{% endcall %}
-                    {% call table_head(class='text-center') %}Processes{% endcall %}
-                </tr>
-            {% endcall %}
-            {% call table_body() %}
-                {% for analysis in analyses_to_display %}
-                <tr class="hover:bg-muted/30">
+        {% set impact_columns = [
+            ('Date', ''),
+            ('Analysis Type', ''),
+            ('Trigger Element', ''),
+            ('Severity', ''),
+            {'label': 'Capabilities', 'class': 'text-center'},
+            {'label': 'Applications', 'class': 'text-center'},
+            {'label': 'Processes', 'class': 'text-center'},
+        ] %}
+        {% call(analysis) list_table(rows=analyses_to_display, columns=impact_columns, caption='Impact analysis results', testid='impact-analysis-table', row_testid='impact-analysis-row', empty_message='No impact analyses have been recorded yet. Choose an element type above, pick an element and run an analysis.') %}
                     {% call table_cell() %}
                         <span class="whitespace-nowrap text-sm text-foreground">{{ analysis.created_at.strftime('%Y-%m-%d') if analysis.created_at else '-' }}</span>
                     {% endcall %}
@@ -219,9 +216,6 @@
                     {% call table_cell(class='text-center') %}{{ analysis.affected_capabilities_count or 0 }}{% endcall %}
                     {% call table_cell(class='text-center') %}{{ analysis.affected_applications_count or 0 }}{% endcall %}
                     {% call table_cell(class='text-center') %}{{ analysis.affected_processes_count or 0 }}{% endcall %}
-                </tr>
-                {% endfor %}
-            {% endcall %}
         {% endcall %}
         {% else %}
         {{ empty_state(
