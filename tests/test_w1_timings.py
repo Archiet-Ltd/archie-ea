@@ -70,14 +70,24 @@ def test_wave_1_list_has_three_personas_and_unique_routes():
     assert {"/dashboard/overview", "/applications/"} <= set(patterns)
 
 
-def test_locust_scenario_defines_a_user_class_per_persona(monkeypatch):
-    monkeypatch.setenv("ARCHIE_W1_NEW_CTO_EMAIL", "x@example.com")
-    spec = importlib.util.spec_from_file_location("w1_locustfile", REPO / "tests" / "load" / "locustfile.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    live = {c.persona.key for c in (module.NewCto, module.InvitedViewer, module.OrgAdministrator) if not c.abstract}
-    assert live == {"new_cto", "invited_viewer", "org_admin"}
-    assert module.Architect.abstract  # no architect credentials in a wave-1 run
+def test_locust_scenario_defines_a_user_class_per_persona():
+    # locust patches the standard library when imported, which deadlocks inside a
+    # pytest process, so the scenario is loaded in a child interpreter.
+    import json
+    import os
+    import subprocess
+
+    code = (
+        "import json, locustfile as l; "
+        "print(json.dumps({'live': sorted(c.persona.key for c in (l.NewCto, l.InvitedViewer, l.OrgAdministrator) "
+        "if not c.abstract), 'architect_abstract': l.Architect.abstract}))"
+    )
+    env = dict(os.environ, ARCHIE_W1_NEW_CTO_EMAIL="x@example.com")
+    out = subprocess.run([sys.executable, "-c", code], cwd=REPO / "tests" / "load", env=env,
+                         capture_output=True, text=True, timeout=120, check=True).stdout
+    result = json.loads(out.strip().splitlines()[-1])
+    assert result["live"] == ["invited_viewer", "new_cto", "org_admin"]
+    assert result["architect_abstract"]  # no architect credentials in a wave-1 run
 
 
 @pytest.fixture
@@ -87,7 +97,6 @@ def seeded_server(app, _schema):
 
     from app import db
     from app.models.organization import Organization
-    from app.models.user import User
 
     slug = "w1-timings-%s" % uuid.uuid4().hex[:8]
     password = "W1-timings-Test-1"
@@ -95,7 +104,6 @@ def seeded_server(app, _schema):
         org = Organization(name="W1 timings %s" % slug, slug=slug)
         db.session.add(org)
         db.session.commit()
-        org_id = org.id
         personas = runner.seed_personas(password, org_slug=slug, app=app)
     server = make_server("127.0.0.1", 0, app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -106,14 +114,8 @@ def seeded_server(app, _schema):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-        with app.app_context():
-            from app.jobs.tenant_safe_job import tenant_scope
-            with tenant_scope(org_id):
-                for info in personas.values():
-                    user = db.session.get(User, info["user_id"])
-                    if user is not None:
-                        db.session.delete(user)
-                db.session.commit()
+    # The organisation and its three users stay, as the smoke harness's do: sign-in leaves audit
+    # rows that reference the users, and every name here carries the per-run slug.
 
 
 def test_runner_writes_a_row_for_every_w1_route_per_persona(seeded_server):

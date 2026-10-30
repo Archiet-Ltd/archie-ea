@@ -90,7 +90,7 @@ def seed_personas(password: str, org_slug: str = DEMO_ORG_SLUG, app=None) -> dic
         with tenant_scope(org_id):
             for persona in w1_routes.PERSONAS:
                 totp_secret = None
-                email = "w1-timings.%s@example.com" % persona.key.replace("_", "-")
+                email = "w1-timings.%s.%s@example.com" % (persona.key.replace("_", "-"), org_slug)
                 user = User.query.filter_by(email=email, organization_id=org_id).first()
                 if user is None:
                     user = User(email=email, first_name="Timing", last_name=persona.key[:12],
