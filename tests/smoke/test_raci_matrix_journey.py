@@ -13,6 +13,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
+from app.commands.seed_demo_company import _RACI_ROWS
 from .fresh_org import create_fresh_org, sign_in
 from .test_seeded_boards_journey import demo_org  # noqa: F401  (fixture)
 
@@ -20,7 +21,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 expect.set_options(timeout=PAGE_TIMEOUT)
 
 RACI = "/organization/raci"
-ARCHITECT = "bryn.businessarch@lantern-quay.example.com"
+from .test_seeded_boards_journey import DEMO_EMAIL as ARCHITECT  # noqa: E402  (the demonstration architect)
 SHOTS = pathlib.Path(os.environ.get("RACI_WALK_DIR", "/tmp/raci-walk"))
 
 
@@ -36,6 +37,39 @@ def _seed_capability(org_id, name="Order Handling"):
     with create_app("testing").app_context():
         cap = UnifiedCapability(name=name, code="RC%d" % (org_id % 100000), level=1, organization_id=org_id)
         db.session.add(cap)
+        db.session.commit()
+
+
+def _handle(cell):
+    from app.models.user import User
+
+    return User.query.get(cell.stakeholder_id).email.split("@")[0]
+
+
+@pytest.fixture
+def architect_may_write(demo_org):
+    """The seeded architects hold the read-only Viewer platform role, which the cell-save route refuses
+    (it admits admin, architect and business architect platform roles). Give the demonstration architect the
+    Architect platform role for the journey and put the seeded role back afterwards."""
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=ARCHITECT).one()
+        seeded_role_id = user.role_id
+        user.role_id = Role.query.filter_by(name="Architect").one().id
+        db.session.commit()
+    yield
+    from app.models.organization_model import EnterpriseRaciAssignment
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=ARCHITECT).one()
+        user.role_id = seeded_role_id
+        # Put the seeded matrix back: the route that clears a cell is for administrators only.
+        seeded_cells = {(code, handle) for code, cells in _RACI_ROWS for handle in cells}
+        for cell in EnterpriseRaciAssignment.query.filter_by(organization_id=user.organization_id).all():
+            if cell.raci == "A" and cell.capability and (cell.capability.code, _handle(cell)) not in seeded_cells:
+                db.session.delete(cell)
         db.session.commit()
 
 
@@ -69,8 +103,9 @@ def test_empty_matrix_keeps_its_shape_and_takes_the_first_stakeholder(browser, l
         assert legend.bounding_box()["y"] + legend.bounding_box()["height"] < 900
         assert example.bounding_box()["y"] + example.bounding_box()["height"] < 900
         # One add control inside the matrix, and the prompt says what to do.
-        add = matrix.locator("[data-testid=raci-add-first]")
+        add = matrix.locator("[data-testid=raci-add-first] button")
         expect(add).to_have_count(1)
+        expect(matrix.get_by_role("button")).to_have_count(1)
         expect(matrix).to_contain_text("Add the roles involved")
         _shot(page, "empty-1440-light.png")
 
@@ -98,7 +133,7 @@ def _row(page, name):
     return page.locator("[data-testid=raci-matrix] tbody tr", has_text=name)
 
 
-def test_architect_sets_a_cell_by_keyboard_and_two_accountable_are_flagged(browser, live_server, demo_org):
+def test_architect_sets_a_cell_by_keyboard_and_two_accountable_are_flagged(browser, live_server, demo_org, architect_may_write):
     context, page = _open(browser, live_server, ARCHITECT)
     try:
         matrix = page.locator("[data-testid=raci-matrix]")
@@ -114,7 +149,8 @@ def test_architect_sets_a_cell_by_keyboard_and_two_accountable_are_flagged(brows
         _shot(page, "populated-1440-light.png")
 
         # An empty cell is empty; set it with the keyboard.
-        empty = row.locator("[data-raci-cell]").filter(has_text=re.compile(r"^\s*$")).first
+        index = letters.index("")
+        empty = row.locator("[data-raci-cell]").nth(index)
         expect(empty).to_have_attribute("aria-label", re.compile(r"not involved"))
         empty.focus()
         page.keyboard.press("A")
@@ -125,11 +161,7 @@ def test_architect_sets_a_cell_by_keyboard_and_two_accountable_are_flagged(brows
         page.reload(wait_until="domcontentloaded")
         page.wait_for_selector("[data-testid=raci-matrix]")
         expect(_row(page, "Sensor Calibration").locator("[data-testid=raci-flag]")).to_contain_text("2 people are accountable")
-        # Clear it again so the demonstration stays as seeded.
-        again = _row(page, "Sensor Calibration").locator("[data-raci-cell]").filter(has_text="A").last
-        again.focus()
-        page.keyboard.press("Delete")
-        expect(_row(page, "Sensor Calibration").locator("[data-testid=raci-flag]")).to_have_count(0)
+        expect(_row(page, "Sensor Calibration").locator("[data-raci-cell]").nth(index)).to_have_text(re.compile(r"^\s*A\s*$"))
     finally:
         context.close()
 

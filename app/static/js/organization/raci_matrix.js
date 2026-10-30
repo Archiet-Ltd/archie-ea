@@ -1,8 +1,8 @@
 /**
- * Enterprise RACI matrix — capabilities (columns) x stakeholders (rows).
+ * Enterprise RACI matrix — capabilities (rows) x stakeholders (columns).
  *
  * Alpine.js component: raciMatrix()
- * Click a cell to cycle it through R -> A -> C -> I -> (cleared).
+ * Click a cell to cycle it through R -> A -> C -> I -> (cleared), or focus it and press R, A, C, I or Delete.
  * Saved via app/modules/organization/routes.py's JSON API:
  *   POST   /organization/raci/api/cell   { stakeholder_type, stakeholder_id, stakeholder_name, capability_id, raci }
  *   DELETE /organization/raci/api/cell   { stakeholder_type, stakeholder_id, capability_id }
@@ -81,16 +81,53 @@ document.addEventListener('alpine:init', () => {
             switch (value) {
                 case 'R': return 'bg-primary/10 text-primary border-primary/30';
                 case 'A': return 'bg-destructive/10 text-destructive border-destructive/30';
-                case 'C': return 'bg-amber-500/10 text-amber-600 border-amber-500/30';
-                case 'I': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30';
-                default: return 'bg-muted text-muted-foreground border-border';
+                case 'C': return 'bg-warning/10 text-warning border-warning/30';
+                case 'I': return 'bg-success/10 text-success border-success/30';
+                default: return 'bg-transparent hover:border-border';
             }
         },
 
-        async cycleCell(stakeholder, capability) {
+        // Capabilities become rows only once there is someone to assign them to.
+        capRows() {
+            return this.stakeholders.length > 0 ? this.capabilities : [];
+        },
+
+        // Words, not colour: one accountable person per row.
+        flagFor(capability) {
+            const n = this.assignments.filter(
+                a => a.capability_id === capability.id && a.raci === 'A'
+            ).length;
+            if (n === 0) return 'No one is accountable';
+            if (n > 1) return `${n} people are accountable`;
+            return '';
+        },
+
+        cellLabel(stakeholder, capability) {
+            const names = { R: 'Responsible', A: 'Accountable', C: 'Consulted', I: 'Informed' };
+            const value = this.cellValue(stakeholder, capability);
+            const state = value ? names[value] : 'not involved';
+            return `${capability.name}, ${stakeholder.name}: ${state}. Press R, A, C or I to set, Delete to clear.`;
+        },
+
+        onCellKey(event, stakeholder, capability) {
+            const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+            if (key !== '' && RACI_CYCLE.includes(key)) {
+                event.preventDefault();
+                this.setCell(stakeholder, capability, key);
+            } else if (key === 'Delete' || key === 'Backspace') {
+                event.preventDefault();
+                this.setCell(stakeholder, capability, null);
+            }
+        },
+
+        cycleCell(stakeholder, capability) {
             const current = this.cellValue(stakeholder, capability);
             const idx = RACI_CYCLE.indexOf(current);
-            const next = RACI_CYCLE[(idx + 1) % RACI_CYCLE.length];
+            return this.setCell(stakeholder, capability, RACI_CYCLE[(idx + 1) % RACI_CYCLE.length]);
+        },
+
+        async setCell(stakeholder, capability, next) {
+            if (next === this.cellValue(stakeholder, capability)) return;
 
             try {
                 if (next === null) {
@@ -116,15 +153,16 @@ document.addEventListener('alpine:init', () => {
                         capability_id: capability.id,
                         raci: next,
                     });
+                    const saved = data.data ?? data;   // success_response wraps in { data }
                     const existingIdx = this.assignments.findIndex(
                         a => a.stakeholder_type === stakeholder.type &&
                              a.stakeholder_id === stakeholder.id &&
                              a.capability_id === capability.id
                     );
                     if (existingIdx >= 0) {
-                        this.assignments[existingIdx] = data;
+                        this.assignments[existingIdx] = saved;
                     } else {
-                        this.assignments.push(data);
+                        this.assignments.push(saved);
                     }
                 }
             } catch (e) {

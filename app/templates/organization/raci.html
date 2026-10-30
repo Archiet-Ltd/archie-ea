@@ -3,6 +3,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Enterprise RACI - Organization{% endblock %}
 
@@ -10,7 +11,7 @@
 <div class="flex-1 overflow-auto" x-data="raciMatrix()" x-init="init()" x-cloak>
   {{ page_header(
       title='Enterprise RACI',
-      description='Stakeholder accountability across enterprise capabilities. Click a cell to cycle R / A / C / I.',
+      description='Stakeholder accountability across enterprise capabilities: who does the work, who is accountable, who is consulted and who is told.',
       breadcrumbs=[
           {'label': 'Home', 'href': url_for('main.index')},
           {'label': 'Organization', 'href': url_for('organization.index')},
@@ -21,78 +22,101 @@
       ]
   ) }}
 
-  <div class="p-6 space-y-6">
+  <div class="p-6 space-y-4">
     <!-- Loading state -->
     <div x-show="loading" x-cloak>
       {{ skeleton_table(rows=6, columns=5) }}
     </div>
 
-    <!-- Empty: no capabilities modeled at all -->
-    <div x-show="!loading && capabilities.length === 0" x-cloak>
-      {{ empty_state(
-          icon='table-2',
-          title='No capabilities to map yet',
-          description='The RACI matrix has capabilities down one axis. Define at least one capability and it becomes a row you can assign R / A / C / I against.',
-          cta_text='Define a capability',
-          cta_href=url_for('unified_low_priority.capability_map_capabilities'),
-          cta_icon='plus',
-      ) }}
-    </div>
+    <div x-show="!loading" x-cloak class="space-y-4">
+      {# Legend above the matrix, so it is on screen without scrolling. The letter is the content; tint is secondary. #}
+      <ul class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="raci-legend" aria-label="Legend">
+        <li class="flex items-center gap-1.5">{{ ui.badge(text='R', variant='outline', class='font-semibold text-primary') }} Responsible: does the work</li>
+        <li class="flex items-center gap-1.5">{{ ui.badge(text='A', variant='outline', class='font-semibold text-destructive') }} Accountable: signs it off, one per row</li>
+        <li class="flex items-center gap-1.5">{{ ui.badge(text='C', variant='outline', class='font-semibold text-warning') }} Consulted: asked first</li>
+        <li class="flex items-center gap-1.5">{{ ui.badge(text='I', variant='outline', class='font-semibold text-success') }} Informed: told afterwards</li>
+        <li>Click a cell or press R, A, C or I. Delete clears it.</li>
+      </ul>
 
-    <!-- Empty: capabilities exist but no stakeholders added yet -->
-    <div x-show="!loading && capabilities.length > 0 && stakeholders.length === 0" x-cloak>
-      {{ empty_state(
-          icon='users',
-          title='No stakeholders in the matrix yet',
-          description='Add an actor, role or user to start assigning R / A / C / I designations against capabilities.',
-          cta_text='Add Stakeholder',
-          cta_onclick="Platform.modal.open('org-raci-add-stakeholder')",
-          cta_icon='user-plus'
-      ) }}
-    </div>
-
-    <!-- Matrix -->
-    <div x-show="!loading && capabilities.length > 0 && stakeholders.length > 0" x-cloak class="rounded-lg border border-border bg-card">
-      <div class="overflow-x-auto">
-        <table class="dense-table min-w-full text-sm" data-testid="raci-matrix-table">
-          <thead>
-            <tr class="border-b border-border bg-muted/40">
-              <th scope="col" class="sticky left-0 bg-muted/40 px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">Stakeholder</th>
-              <template x-for="cap in capabilities" :key="cap.id">
-                <th scope="col" class="px-3 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap" :title="cap.name" x-text="cap.name"></th>
+      <div class="rounded-lg border border-border bg-card">
+        {% call ui.table_container(class='max-h-screen overflow-auto', attrs={'data-testid': 'raci-scroll'}) %}
+        {% call ui.table(attrs={'data-testid': 'raci-matrix'}) %}
+          {% call ui.table_header() %}
+            {% call ui.table_row() %}
+              {{ ui.table_head(text='Capability', scope='col', class='sticky left-0 top-0 z-20 w-36 sm:w-72 bg-card') }}
+              <template x-for="sh in stakeholders" :key="sh.type + ':' + sh.id">
+                {% call ui.table_head(scope='col', class='sticky top-0 z-10 w-24 bg-card text-center whitespace-normal align-top', attrs={':title': 'sh.type'}) %}<span x-text="sh.name"></span>{% endcall %}
               </template>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border">
-            <template x-for="sh in stakeholders" :key="sh.type + ':' + sh.id">
-              <tr>
-                <td class="sticky left-0 bg-card px-4 py-2 whitespace-nowrap">
-                  <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium uppercase bg-muted text-muted-foreground border border-border" x-text="sh.type"></span>
-                    <span class="text-foreground" x-text="sh.name"></span>
-                  </div>
-                </td>
-                <template x-for="cap in capabilities" :key="cap.id">
-                  <td class="px-3 py-2 text-center">
-                    <button type="button"
-                            class="inline-flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold border transition-colors"
-                            :class="cellClass(cellValue(sh, cap))"
-                            :aria-label="'Cycle RACI for ' + sh.name + ' / ' + cap.name"
-                            @click="cycleCell(sh, cap)">
-                      <span x-text="cellValue(sh, cap) || '·'"></span>
-                    </button>
-                  </td>
-                </template>
-              </tr>
+              <template x-if="stakeholders.length === 0">
+                {{ ui.table_head(text='Role or person', scope='col', class='sticky top-0 z-10 w-24 bg-card text-center whitespace-normal text-muted-foreground') }}
+              </template>
+              <template x-if="stakeholders.length === 0">
+                {{ ui.table_head(text='Role or person', scope='col', class='sticky top-0 z-10 w-24 bg-card text-center whitespace-normal text-muted-foreground') }}
+              </template>
+            {% endcall %}
+          {% endcall %}
+          {% call ui.table_body() %}
+            {# Nobody in the matrix yet: one example row with empty cells, and the prompt inside the matrix. #}
+            <template x-if="stakeholders.length === 0">
+              {% call ui.table_row(attrs={'data-testid': 'raci-example-row'}) %}
+                {% call ui.table_cell(class='sticky left-0 z-10 bg-card w-36 sm:w-72 whitespace-normal') %}
+                  <span class="font-medium text-muted-foreground">Approve the production release</span>
+                  <span class="block text-xs text-muted-foreground">Example row</span>
+                {% endcall %}
+                {{ ui.table_cell() }}
+                {{ ui.table_cell() }}
+              {% endcall %}
             </template>
-          </tbody>
-        </table>
-      </div>
-      <div class="flex items-center gap-4 px-4 py-3 border-t border-border text-xs text-muted-foreground">
-        <span class="inline-flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-primary/10 border border-primary/30"></span> R — Responsible</span>
-        <span class="inline-flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-destructive/10 border border-destructive/30"></span> A — Accountable</span>
-        <span class="inline-flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-warning/10 border border-warning/30"></span> C — Consulted</span>
-        <span class="inline-flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-success/10 border border-success/30"></span> I — Informed</span>
+            <template x-if="stakeholders.length === 0">
+              {% call ui.table_row() %}
+                {% call ui.table_cell(attrs={'colspan': '3', 'data-testid': 'raci-add-first'}) %}
+                  {{ empty_state(
+                      icon='users',
+                      title='Who is involved?',
+                      description='Add the roles involved, then decide who does, approves, is asked and is told.',
+                      cta_text='Add stakeholder',
+                      cta_onclick="Platform.modal.open('org-raci-add-stakeholder')",
+                      cta_icon='user-plus',
+                      compact=True
+                  ) }}
+                {% endcall %}
+              {% endcall %}
+            </template>
+
+            <template x-if="stakeholders.length > 0 && capabilities.length === 0">
+              {% call ui.table_row() %}
+                {% call ui.table_cell(attrs={':colspan': 'stakeholders.length + 1'}) %}
+                  {{ empty_state(
+                      icon='table-2',
+                      title='No capabilities to map yet',
+                      description='Each capability becomes a row you can assign R, A, C and I against.',
+                      cta_text='Define a capability',
+                      cta_href=url_for('unified_low_priority.capability_map_capabilities'),
+                      cta_icon='plus',
+                      compact=True
+                  ) }}
+                {% endcall %}
+              {% endcall %}
+            </template>
+
+            <template x-for="cap in capRows()" :key="cap.id">
+              {% call ui.table_row() %}
+                {% call ui.table_cell(class='sticky left-0 z-10 bg-card w-36 sm:w-72 whitespace-normal') %}
+                  <span class="font-medium" x-text="cap.name"></span>
+                  <template x-if="flagFor(cap)">
+                    <span class="block text-xs font-medium text-destructive" data-testid="raci-flag" x-text="flagFor(cap)"></span>
+                  </template>
+                {% endcall %}
+                <template x-for="sh in stakeholders" :key="sh.type + ':' + sh.id">
+                  {% call ui.table_cell(class='text-center') %}
+                    {% call ui.button(variant='ghost', size='icon-sm', class='font-semibold border border-transparent', attrs={'data-raci-cell': '', ':class': 'cellClass(cellValue(sh, cap))', ':aria-label': 'cellLabel(sh, cap)', '@click': 'cycleCell(sh, cap)', '@keydown': 'onCellKey($event, sh, cap)'}) %}<span x-text="cellValue(sh, cap)"></span>{% endcall %}
+                  {% endcall %}
+                </template>
+              {% endcall %}
+            </template>
+          {% endcall %}
+        {% endcall %}
+        {% endcall %}
       </div>
     </div>
   </div>
