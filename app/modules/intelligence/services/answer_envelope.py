@@ -467,9 +467,20 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[int] = None):
+def ask_and_store(
+    kind: str,
+    raw_params: Dict[str, Any],
+    *,
+    user_id: Optional[int] = None,
+    store: bool = True,
+):
     """Compute the answer for the caller's active organisation, wrap it and
     store it at a new permanent address. Returns the stored ``AnswerRecord``.
+
+    With ``store=False`` the same walk runs and the same record is built, but it
+    is not added to the session: nothing is written, and the returned record is
+    transient (its address is not one that can be opened). A page that only
+    shows an answer on GET uses this; a run is stored only when the person saves.
 
     The organisation is the active one (``current_org_id``); with none the
     question is refused and nothing is written.
@@ -499,8 +510,9 @@ def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[in
         computed_at=envelope["computed_at"],
         created_by_id=user_id,
     )
-    db.session.add(record)
-    db.session.commit()
+    if store:
+        db.session.add(record)
+        db.session.commit()
     return record
 
 
@@ -521,20 +533,21 @@ def open_answer(address: str):
     ).scalar_one_or_none()
 
 
-def recent_answers(limit: int = 50) -> List[Any]:
+def recent_answers(limit: int = 50, kind: Optional[str] = None) -> List[Any]:
     """The caller's organisation's most recent answers, newest first (an empty
-    list with no active organisation)."""
+    list with no active organisation). *kind* filters in the query, so the
+    limit counts answers of that kind only."""
     from app.models.answer_record import AnswerRecord
 
     org_id = current_org_id()
     if org_id is None:
         return []
+    query = db.select(AnswerRecord).where(AnswerRecord.organization_id == org_id)
+    if kind is not None:
+        query = query.where(AnswerRecord.question_kind == kind)
     return list(
         db.session.execute(
-            db.select(AnswerRecord)
-            .where(AnswerRecord.organization_id == org_id)
-            .order_by(AnswerRecord.created_at.desc(), AnswerRecord.id.desc())
-            .limit(limit)
+            query.order_by(AnswerRecord.created_at.desc(), AnswerRecord.id.desc()).limit(limit)
         ).scalars()
     )
 

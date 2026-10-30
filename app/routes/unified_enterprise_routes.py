@@ -1046,18 +1046,17 @@ def impact_analysis():
                     envelope.KIND_IMPACT,
                     {"element_id": element_id, "include_derived": True, "max_depth": 3},
                     user_id=current_user.id,
+                    store=False,
                 )
                 answer = envelope.present(record)
             except (envelope.AnswerParamError, envelope.AnswerNotAskable):
                 element_not_found = True
 
-        # The runs this organisation has made, from the one answer store the
-        # answer above was just written to (newest first), so the run just made
-        # is the first row and its figures are the answer's own.
+        # The runs this organisation has saved, from the one answer store
+        # (newest first). Viewing the answer above writes nothing; a run is
+        # stored only by impact_analysis_save.
         recorded_runs = []
-        for stored in envelope.recent_answers(50):
-            if stored.question_kind != envelope.KIND_IMPACT or len(recorded_runs) == 20:
-                continue
+        for stored in envelope.recent_answers(20, kind=envelope.KIND_IMPACT):
             shown = envelope.present(stored, include_rows=False)
             shown["element_name"] = (
                 (stored.elements or {}).get(str((stored.params or {}).get("element_id"))) or {}
@@ -1132,6 +1131,27 @@ def impact_analysis():
             user_message="Unable to load impact analysis.",
             recovery_action="Return to the dashboard and try again.",
         )
+
+
+@enterprise_bp.route("/analysis/impact-analysis/save", methods=["POST"])
+@login_required
+def impact_analysis_save():
+    """Store the impact answer for one element as a recorded run (CSRF-protected
+    by the app-wide protection). The only writer of impact runs on this page."""
+    from app.modules.intelligence.services import answer_envelope as envelope
+
+    element_id = request.form.get("element", type=int)
+    if element_id is None:
+        return redirect(url_for("enterprise.impact_analysis"))
+    try:
+        envelope.ask_and_store(
+            envelope.KIND_IMPACT,
+            {"element_id": element_id, "include_derived": True, "max_depth": 3},
+            user_id=current_user.id,
+        )
+    except (envelope.AnswerParamError, envelope.AnswerNotAskable):
+        pass  # same outcome as the GET: the page says the element was not found
+    return redirect(url_for("enterprise.impact_analysis", element=element_id))
 
 
 @enterprise_bp.route("/analysis/process-optimization")

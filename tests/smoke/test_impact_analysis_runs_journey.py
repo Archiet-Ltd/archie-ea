@@ -47,7 +47,16 @@ def demo(live_server, app):
             ledger = ApplicationComponent.query.filter_by(
                 organization_id=org.id, name="Calibration Ledger"
             ).one()
-            picked = {"org_id": org.id, "ledger_id": ledger.id}
+            from app.models import ArchiMateElement
+
+            element = ArchiMateElement.query.filter_by(
+                organization_id=org.id, name="Calibration Ledger"
+            ).first()
+            picked = {
+                "org_id": org.id,
+                "ledger_id": ledger.id,
+                "element_id": element.id,
+            }
             db.session.remove()
     finally:
         if previous is None:
@@ -70,6 +79,15 @@ def _chat_connected_names(page, live_server):
 _SHOT_DIR = os.environ.get("JOURNEY_SHOT_DIR")
 
 
+def _shot_answer(page, name):
+    """Evidence: the answer with its save control in view."""
+    if not _SHOT_DIR:
+        return
+    os.makedirs(_SHOT_DIR, exist_ok=True)
+    page.get_by_test_id("impact-save-run").scroll_into_view_if_needed()
+    page.screenshot(path=os.path.join(_SHOT_DIR, name + ".png"))
+
+
 def _shot_runs(page, name):
     """Evidence for the report, only when JOURNEY_SHOT_DIR is set: the runs table in view."""
     if not _SHOT_DIR:
@@ -78,6 +96,13 @@ def _shot_runs(page, name):
     table = page.get_by_test_id("impact-runs-table")
     table.scroll_into_view_if_needed()
     page.screenshot(path=os.path.join(_SHOT_DIR, name + ".png"))
+
+
+def _save(page):
+    """Press the page's Save control and wait for the run to be listed."""
+    page.get_by_test_id("impact-save-run").click()
+    page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("impact-run-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
 
 def _pick(page, name):
@@ -109,8 +134,12 @@ def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
         page_names = sorted(t.strip() for t in page_rows.all_inner_texts())
         assert page_names == chat_names, (page_names, chat_names)
 
-        # The run just made is the first row of the recorded-runs table, and its
-        # figures are the answer's: one store, one set of numbers.
+        # Viewing stored nothing; saving the run lists it as the first row of the
+        # recorded-runs table, and its figures are the answer's: one store, one
+        # set of numbers. (Changed with the lead's ruling of 30 Oct: a GET no
+        # longer stores a run, so the run appears on Save, not on picking.)
+        assert page.get_by_test_id("impact-run-row").count() == 0
+        _save(page)
         runs = page.get_by_test_id("impact-run-row")
         expect(runs.first).to_be_visible(timeout=PAGE_TIMEOUT)
         first = runs.first.inner_text()
@@ -134,7 +163,57 @@ def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         before = page.get_by_test_id("impact-run-row").count()
         _pick(page, "Calibration Ledger")
+        assert page.get_by_test_id("impact-run-row").count() == before
+        _save(page)
         assert page.get_by_test_id("impact-run-row").count() == before + 1
+    finally:
+        context.close()
+
+
+def _run_count(app, org_id):
+    from app import db
+    from app.models.answer_record import AnswerRecord
+
+    with app.app_context():
+        count = AnswerRecord.query.filter_by(
+            organization_id=org_id, question_kind="impact"
+        ).count()
+        db.session.remove()
+    return count
+
+
+def test_viewing_never_stores_a_run_and_saving_stores_exactly_one(
+    browser, live_server, app, demo
+):
+    """A CTO opens a shared link, reloads, goes back: the runs table does not grow.
+    Only pressing Save adds a run, and it is the one the answer showed."""
+    context = browser.new_context(viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, DEMO_EMAIL)
+        url = "%s%s?element=%d" % (live_server, PAGE_PATH, demo["element_id"])
+        before = _run_count(app, demo["org_id"])
+        page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        for _ in range(3):
+            page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        answer_links = page.get_by_test_id("impact-answer-element-link")
+        expect(answer_links.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        answered = answer_links.count()
+        prefetch = context.request.get(url, headers={"Sec-Purpose": "prefetch"})
+        assert prefetch.status == 200
+        assert _run_count(app, demo["org_id"]) == before, "viewing stored a run"
+        shown_before = page.get_by_test_id("impact-run-row").count()
+        _shot_answer(page, "impact-page-answer-1440-light")
+
+        _save(page)
+        assert _run_count(app, demo["org_id"]) == before + 1
+        runs = page.get_by_test_id("impact-run-row")
+        assert runs.count() == shown_before + 1
+        cells = [c.strip() for c in runs.first.locator("td").all_inner_texts()]
+        assert "Calibration Ledger" in runs.first.inner_text()
+        assert cells[2] == str(answered), (cells, answered)
+        _shot_runs(page, "impact-runs-table-1440-light")
     finally:
         context.close()
 
@@ -164,7 +243,8 @@ def test_the_runs_table_reads_at_390_in_dark(browser, live_server, demo):
         sign_in(page, live_server, DEMO_EMAIL)
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page, "Calibration Ledger")
-        expect(page.get_by_test_id("impact-run-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        _shot_answer(page, "impact-page-answer-390-dark")
+        _save(page)
         assert "Calibration Ledger" in page.get_by_test_id("impact-run-row").first.inner_text()
         _shot_runs(page, "impact-runs-table-390-dark")
     finally:

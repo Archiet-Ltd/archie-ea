@@ -77,7 +77,12 @@
             {% endcall %}
         {% endcall %}
         {% call card_footer() %}
-            {{ button(text='Open this answer', variant='outline', size='sm', href=answer.page_url, icon='external-link', testid='impact-answer-open') }}
+            <form method="post" action="{{ url_for('enterprise.impact_analysis_save') }}" class="flex items-center gap-3" data-testid="impact-save-form">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                {{ input(type='hidden', name='element', value=answer.params.element_id) }}
+                {{ button(text='Save this run', type='submit', variant='outline', size='sm', icon='save', testid='impact-save-run') }}
+                <span class="text-xs text-muted-foreground">Viewing does not record anything. Save to add it to the runs below.</span>
+            </form>
         {% endcall %}
     {% endcall %}
 
