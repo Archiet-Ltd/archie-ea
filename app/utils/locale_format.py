@@ -157,6 +157,9 @@ def fmt_money(
         out = _numbers.format_compact_currency(number, cur, locale=loc, fraction_digits=1)
         if loc.language == "en":
             out = re.sub(r"(?<=\d)([KMBT])\b", lambda m: _COMPACT_ENGLISH[m.group(1)], out)
+        if not re.search(r"[^\W\d_]", re.sub(r"[\u00a3$\u20ac\u00a5]|[A-Z]{3}", "", out)):
+            # The locale has no short word for this size (German thousands): write it in full.
+            return fmt_money(number, cur, decimals=0, locale=tag)
         return out
     if decimals is None:
         return _numbers.format_currency(number, cur, locale=loc)
@@ -183,7 +186,7 @@ def _as_datetime(value: Any) -> Optional[_dt.datetime]:
 def fmt_date(value: Any, style: str = "medium", locale: Optional[str] = None) -> Optional[str]:
     """A date as the organisation's locale writes it: "25 Oct 2026" (en-GB), "25.10.2026" (de-DE).
 
-    ``style`` is "short", "medium", "long", or a skeleton such as "MMM" or "d MMM" for a chart label. A datetime
+    ``style`` is "short", "medium", "medium0" (the day always two digits in English), "long", or a skeleton such as "MMM" or "d MMM" for a chart label. A datetime
     gets its time as well ("25 Oct 2026, 19:32") when ``style`` is "medium", "short" or "long" and the value
     carries a time; use ``fmt_datetime`` to always include it.
     """
@@ -191,9 +194,16 @@ def fmt_date(value: Any, style: str = "medium", locale: Optional[str] = None) ->
     if when is None:
         return None
     loc = _babel_locale(locale or current_locale())
+    if style == "medium0":
+        # Billing writes the day with two digits ("01 Jan 2030"); locales that do not use month names keep their own form.
+        if loc.language == "en":
+            return _dates.format_date(when.date(), format="dd MMM y", locale=loc)
+        style = "medium"
     if style in ("short", "medium", "long", "full"):
-        return _dates.format_date(when.date(), format=style, locale=loc)
-    return _dates.format_skeleton(style, when.date(), locale=loc)
+        text = _dates.format_date(when.date(), format=style, locale=loc)
+    else:
+        text = _dates.format_skeleton(style, when.date(), locale=loc)
+    return text.replace("Sept", "Sep") if loc.language == "en" else text
 
 
 def fmt_datetime(value: Any, locale: Optional[str] = None) -> Optional[str]:

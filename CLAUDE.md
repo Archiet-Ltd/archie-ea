@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 94 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 95 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -540,6 +540,7 @@ to reconfirm the count before trusting it:**
 | `data-types-retired` | imports of components the data-type register retires | ratchet |
 | `hand-pagination` | page links built by hand from a pagination object | ratchet |
 | `placeholder-content` | signed-in pages that promise content instead of showing it | ratchet |
+| `hand-format` | a number, date or amount of money written by hand in a template instead of `fmt_number`, `fmt_percent`, `fmt_money` or `fmt_date` | ratchet @ 409, only falls |
 | `raw-button` | a hand-written button tag instead of the button component | ratchet @ 2254 |
 | `missing-value-placeholder` | a bare dash, N/A or zero standing in for a missing value instead of `explained_value` | ratchet @ 563 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |

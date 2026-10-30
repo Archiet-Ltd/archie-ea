@@ -236,7 +236,7 @@ def billing_cancel():
         return redirect(url_for("billing.billing_index"))
     from app.utils.locale_format import fmt_date
 
-    when = fmt_date(ends) if ends else "the end of the paid period"
+    when = fmt_date(ends, "medium0") if ends else "the end of the paid period"
     flash(f"Your subscription is cancelled. The plan stays in place until {when}.", "success")
     return redirect(url_for("billing.billing_index"))
 

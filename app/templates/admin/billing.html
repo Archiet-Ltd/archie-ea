@@ -274,7 +274,7 @@
             {% call table_body() %}
             {% for inv in invoices %}
                 {% call table_row() %}
-                    {% call table_cell(class='whitespace-nowrap') %}{{ inv.date | fmt_date if inv.date else '—' }}{% endcall %}
+                    {% call table_cell(class='whitespace-nowrap') %}{{ inv.date | fmt_date('medium0') if inv.date else '—' }}{% endcall %}
                     {% call table_cell() %}{{ inv.number or '—' }}{% endcall %}
                     {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.total is not none %}{{ inv.total | fmt_money(inv.currency, decimals=2, code=true) }}{% else %}—{% endif %}{% endcall %}
                     {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.tax is not none %}{{ inv.tax | fmt_money(inv.currency, decimals=2, code=true) }}{% else %}—{% endif %}{% endcall %}

@@ -51,3 +51,17 @@ def test_named_currency():
 
 def test_missing_is_none():
     assert fmt_money(None) is None and fmt_date(None) is None and fmt_number(None) is None
+
+
+def test_billing_day_keeps_two_digits_in_english_only():
+    assert fmt_date(dt.date(2030, 1, 1), "medium0", "en-GB") == "01 Jan 2030"
+    assert fmt_date(dt.date(2030, 1, 1), "medium0", "de-DE") == "01.01.2030"
+
+
+def test_compact_money_without_a_short_word_is_written_in_full():
+    assert fmt_money(154130, "EUR", compact=True, decimals=0, locale="de-DE") == "154.130" + NB + "€"
+    assert fmt_money(154130, "GBP", compact=True, decimals=0, locale="en-GB") == "£154.1k"
+
+
+def test_september_keeps_its_three_letters_in_english():
+    assert fmt_date(dt.date(2026, 9, 1), "MMM", "en-GB") == "Sep"

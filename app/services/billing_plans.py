@@ -166,7 +166,7 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
         return {"label": "Next renewal", "value": "No renewal yet", "note": None}
     from app.utils.locale_format import fmt_date
 
-    when = fmt_date(sub.current_period_end)
+    when = fmt_date(sub.current_period_end, "medium0")
     status = getattr(getattr(sub, "status", None), "value", None)
     if sub.cancel_at_period_end:
         return {"label": "Ends on", "value": when, "note": None}

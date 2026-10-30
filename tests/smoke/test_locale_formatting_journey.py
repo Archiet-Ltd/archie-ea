@@ -85,6 +85,7 @@ def test_an_administrator_sets_german_and_euros_and_the_screens_follow(browser, 
         german_exact = page.get_by_test_id("monthly-cost-value").get_attribute("title")
         assert german == "1,8" + NB + "Mio." + NB + "\u20ac", german
         assert re.fullmatch(r"\d{1,3}(\.\d{3})*" + NB + "\u20ac", german_exact), german_exact
+        assert re.fullmatch(r"\d{1,3}(\.\d{3})*" + NB + "\u20ac", page.get_by_test_id("monthly-cost-value").inner_text().strip())
         assert "\u00a3" not in page.get_by_test_id("overview-dashboard").inner_text()
 
         _open(page, base, "/solutions/briefings")
