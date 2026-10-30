@@ -1399,7 +1399,7 @@ BEGIN
     IF marker IS NULL OR marker = '' THEN
         RETURN FALSE;
     END IF;
-    IF old_org IS NOT NULL AND old_org <> marker::integer THEN
+    IF old_org IS NULL OR old_org <> marker::integer THEN
         RETURN FALSE;
     END IF;
     RETURN TRUE;

@@ -217,6 +217,12 @@ def _remove_people(sess, plan, people_ids):
     to no organisation (a session, a token) or to another organisation. A row of another organisation
     keeps its place and loses the name where the column allows it; a row that must name a person is
     removed with them.
+
+    A nullable column on an append-only table (``arb_canonical_conditions.responsible_id`` and the
+    like) is neither: its own organisation's rows are already gone by this point, so any row still
+    naming this person belongs to a different organisation, and that organisation's own append-only
+    guard admits neither this UPDATE nor a DELETE -- only a delete of its own organisation, under its
+    own marker, which this is not. The row keeps the name; nothing here is allowed to touch it.
     """
     if not people_ids:
         return
@@ -230,7 +236,7 @@ def _remove_people(sess, plan, people_ids):
         if not_null:
             _remove_pointing_rows(sess, plan, child, where, params, {child, PEOPLE})
             sess.execute(text("DELETE FROM %s WHERE %s" % (_q(child), where)), params)
-        else:
+        elif child not in _APPEND_ONLY_TABLES:
             sess.execute(text("UPDATE %s SET %s = NULL WHERE %s" % (_q(child), _q(child_col), where)), params)
     sess.execute(text("DELETE FROM users WHERE id = ANY(:people)"), params)
 

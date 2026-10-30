@@ -308,7 +308,7 @@ SET legacy_lifecycle_provenance = jsonb_build_object(
       'classification','pre_c3_waiver')
 WHERE status='waived' AND legacy_lifecycle_provenance IS NULL
   AND waiver_prior_status IS NULL AND waiver_scope_json IS NULL;
-SET CONSTRAINTS ALL IMMEDIATE;
+SET CONSTRAINTS {schema}.trg_arb_condition_membership IMMEDIATE;
 ALTER TABLE {schema}.arb_canonical_conditions ALTER COLUMN revision SET DEFAULT 1;
 ALTER TABLE {schema}.arb_canonical_conditions ALTER COLUMN revision SET NOT NULL;
 ALTER TABLE {schema}.arb_canonical_conditions DROP CONSTRAINT IF EXISTS ck_arb_condition_status;
