@@ -25,10 +25,9 @@ That round also removed the old per-line ``# session-replication-role-ok: <reaso
 hatch: it let a future test self-grant the exception by typing a comment, which is exactly how
 one more teardown bypass (``tests/test_schema_migrations.py``) was added in the same branch
 this file was meant to stop. The sites below are the ones the lead has reviewed and ruled
-genuinely not teardown (named with their reason in
-``docs/buckets/entelim-enterprise-intelligence-management-platform-design-the-f/launch-cut/reports/teardown-fk02b-report.md``);
-each file's count here can only fall, and a file or a count not already in this registry fails
-the test outright, comment or no comment.
+genuinely not teardown, each with its reason recorded for that ruling; each file's count here
+can only fall, and a file or a count not already in this registry fails the test outright,
+comment or no comment.
 """
 
 from pathlib import Path
