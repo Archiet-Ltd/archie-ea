@@ -135,3 +135,14 @@ def test_radar_wrapper_names_the_role_when_the_role_check_refuses(app, monkeypat
         with pytest.raises(Forbidden) as exc:
             view()
     assert exc.value.description == routes._PERMISSION_DENIED_MESSAGE
+
+
+def test_organisation_administrator_who_is_not_an_architect_is_refused(app, db_session, login_as, client, world):
+    # Hotfix 440: duplicate detection stays off organisation administrators;
+    # only the Architect role (or platform authority) starts a run.
+    with app.app_context():
+        admin = _user(db_session, _org(db_session, "admin"), "Administrator")
+        admin.is_org_admin = True
+        db_session.commit()
+        login_as(client, admin)
+        assert client.post(RUN_URL, json={"strategy": "bogus"}).status_code == 403
