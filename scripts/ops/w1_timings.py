@@ -70,7 +70,7 @@ def percentile(values: list[float], pct: float) -> float:
     return ordered[rank]
 
 
-def seed_personas(password: str, org_slug: str = DEMO_ORG_SLUG) -> dict[str, dict]:
+def seed_personas(password: str, org_slug: str = DEMO_ORG_SLUG, app=None) -> dict[str, dict]:
     """Create (or reset the password of) one user per persona; return their ids."""
     from app import create_app, db
     from app.jobs.tenant_safe_job import tenant_scope
@@ -79,7 +79,7 @@ def seed_personas(password: str, org_slug: str = DEMO_ORG_SLUG) -> dict[str, dic
     from app.services import mfa_service
     import pyotp
 
-    app = create_app(os.getenv("FLASK_CONFIG") or "default")
+    app = app or create_app(os.getenv("FLASK_CONFIG") or "default")
     out: dict[str, dict] = {}
     with app.app_context():
         org = Organization.query.filter_by(slug=org_slug).first()

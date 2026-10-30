@@ -53,11 +53,24 @@ import gevent
 from locust import HttpUser, between, events, task
 from locust.exception import StopUser
 
+import w1_routes
+
 EMAILS = [e.strip() for e in os.environ.get("ARCHIE_LOAD_EMAILS", "").split(",") if e.strip()]
 PASSWORD = os.environ.get("ARCHIE_LOAD_PASSWORD", "")
 WRITES_ENABLED = os.environ.get("ARCHIE_LOAD_WRITES") == "1"
 
 _email_cycle = itertools.cycle(EMAILS) if EMAILS else None
+
+# Wave-1 scenario: one user class per persona, each reading every wave-1 page.
+# Credentials per persona: ARCHIE_W1_<PERSONA>_EMAIL (+ _TOTP_SECRET for an
+# administrator) and the shared ARCHIE_W1_PASSWORD. The classes are inert unless
+# ARCHIE_W1_NEW_CTO_EMAIL is set, so the original Architect run is unchanged.
+# Ids for pages that need one come from ARCHIE_W1_SAMPLES="key=value,key=value".
+W1_ENABLED = bool(os.environ.get("ARCHIE_W1_NEW_CTO_EMAIL"))
+W1_PASSWORD = os.environ.get("ARCHIE_W1_PASSWORD", "")
+W1_SAMPLES = dict(
+    pair.split("=", 1) for pair in os.environ.get("ARCHIE_W1_SAMPLES", "").split(",") if "=" in pair
+)
 
 # Weighted to match how an architect actually spends a session: mostly reading
 # a handful of screens, occasionally searching, rarely writing. A flat
@@ -76,7 +89,7 @@ READ_PAGES = [
 
 @events.test_start.add_listener
 def _warn_about_configuration(environment, **_kwargs):
-    if not EMAILS or not PASSWORD:
+    if not W1_ENABLED and (not EMAILS or not PASSWORD):
         raise SystemExit(
             "Set ARCHIE_LOAD_EMAILS and ARCHIE_LOAD_PASSWORD. This test signs in "
             "as real users; it deliberately has no default credentials."
@@ -93,6 +106,9 @@ def _warn_about_configuration(environment, **_kwargs):
 
 class Architect(HttpUser):
     """One signed-in architect, reading their own screens."""
+
+    # Inert in a wave-1 run (no architect credentials), so it never signs in blind.
+    abstract = W1_ENABLED and not (EMAILS and PASSWORD)
 
     # A real user reads a page for a few seconds before clicking. Without this
     # the test measures how fast the box can refuse requests, not how many
@@ -186,3 +202,82 @@ class Architect(HttpUser):
                   "description": "Created by tests/load/locustfile.py"},
             name="POST /applications/create",
         )
+
+
+def _w1_sign_in(user: HttpUser, persona: "w1_routes.Persona") -> None:
+    """Sign in as one wave-1 persona, through the two-factor step when asked."""
+    email = os.environ.get("ARCHIE_W1_%s_EMAIL" % persona.key.upper())
+    if not email:
+        raise StopUser()
+    user.client.verify = False
+    page = user.client.get("/account/login", name="/account/login")
+    payload = {"email": email, "password": W1_PASSWORD}
+    match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', page.text or "")
+    if match:
+        payload["csrf_token"] = match.group(1)
+    with user.client.post("/account/login", data=payload, name="POST /account/login",
+                          catch_response=True) as response:
+        if response.status_code == 429:
+            response.success()
+            gevent.sleep(min(float(response.headers.get("Retry-After", 5) or 5), 30)
+                         + random.uniform(0, 2))
+            return _w1_sign_in(user, persona)
+        if "/account/mfa-challenge" in response.url:
+            secret = os.environ.get("ARCHIE_W1_%s_TOTP_SECRET" % persona.key.upper())
+            if not secret:
+                response.failure("two-factor secret missing for %s" % persona.key)
+                raise StopUser()
+            import pyotp
+            form = {"code": pyotp.TOTP(secret).now()}
+            challenge = user.client.get("/account/mfa-challenge", name="/account/mfa-challenge")
+            token = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', challenge.text or "")
+            if token:
+                form["csrf_token"] = token.group(1)
+            user.client.post("/account/mfa-challenge", data=form, name="POST /account/mfa-challenge")
+        elif "/account/login" in response.url:
+            response.failure("sign-in rejected for %s" % persona.key)
+            raise StopUser()
+        response.success()
+
+
+def _w1_read(user: HttpUser) -> None:
+    pattern = random.choice(user.w1_patterns)
+    path, _reason = w1_routes.resolve_route(pattern, w1_routes.Samples(W1_SAMPLES))
+    if path is None:
+        return
+    # grouped by the route pattern, so the statistics are per page
+    with user.client.get(path, name=pattern, catch_response=True) as response:
+        # 403 and 404 are who-can-open-what answers, not failures of this scenario
+        if response.status_code >= 500:
+            response.failure("HTTP %d" % response.status_code)
+        else:
+            response.success()
+
+
+class _W1User(HttpUser):
+    abstract = True
+    wait_time = between(1, 3)
+    persona: "w1_routes.Persona"
+
+    def on_start(self):
+        self.w1_patterns = [pattern for _id, pattern in w1_routes.W1_ROUTES]
+        _w1_sign_in(self, self.persona)
+
+    @task
+    def read_wave_1_page(self):
+        _w1_read(self)
+
+
+class NewCto(_W1User):
+    abstract = not W1_ENABLED
+    persona = w1_routes.PERSONAS[0]
+
+
+class InvitedViewer(_W1User):
+    abstract = not W1_ENABLED
+    persona = w1_routes.PERSONAS[1]
+
+
+class OrgAdministrator(_W1User):
+    abstract = not W1_ENABLED
+    persona = w1_routes.PERSONAS[2]
