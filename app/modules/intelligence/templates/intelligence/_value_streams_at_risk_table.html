@@ -1,34 +1,37 @@
-{% from 'components/table.html' import table, table_cell, table_head, table_header, table_row %}
+{% import 'components/card.html' as card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/table.html' import table_container, table, table_cell, table_head, table_header, table_row %}
 
 {% macro value_streams_at_risk_table() %}
-<div class="rounded-lg border border-border bg-card" data-vsr-table>
+<div data-vsr-table>
+  {% call card.card(class='overflow-hidden') %}
+    {% call table_container() %}
     {% call table() %}
         <caption class="sr-only">Value streams and how many of their capabilities are below the maturity threshold</caption>
-        {% call table_header('border-b border-border bg-muted/30 text-left') %}
-            {% call table_row('hover:bg-transparent') %}
-                {% call table_head('w-full px-3 py-2 sm:px-4') %}Value stream{% endcall %}
-                {% call table_head('whitespace-nowrap px-3 py-2 text-right sm:px-4') %}<span class="sm:hidden">At risk</span><span class="hidden sm:inline">Below threshold</span>{% endcall %}
-                {% call table_head('hidden whitespace-nowrap px-4 py-2 text-right sm:table-cell') %}Not assessed{% endcall %}
-                {% call table_head('hidden whitespace-nowrap px-4 py-2 text-right sm:table-cell') %}Linked capabilities{% endcall %}
+        {% call table_header(class='border-b border-border bg-muted/30 text-left') %}
+            {% call table_row(class='hover:bg-transparent') %}
+                {% call table_head(class='w-full px-3 py-2 sm:px-4') %}Value stream{% endcall %}
+                {% call table_head(class='whitespace-nowrap px-3 py-2 text-right sm:px-4') %}<span class="sm:hidden">At risk</span><span class="hidden sm:inline">Below threshold</span>{% endcall %}
+                {% call table_head(class='hidden whitespace-nowrap px-4 py-2 text-right sm:table-cell') %}Not assessed{% endcall %}
+                {% call table_head(class='hidden whitespace-nowrap px-4 py-2 text-right sm:table-cell') %}Linked capabilities{% endcall %}
             {% endcall %}
         {% endcall %}
         <template x-for="row in rows" :key="row.id">
             <tbody class="border-b border-border last:border-b-0" data-vsr-row :data-vsr-row-id="row.id">
-                {% call table_row('hover:bg-transparent') %}
-                    {% call table_cell('w-full px-3 py-2 text-left sm:px-4') %}
-                        <button type="button" data-vsr-toggle
-                                class="inline-flex w-full items-center gap-2 rounded-md bg-transparent py-2 text-left text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none"
-                                aria-expanded="false" :aria-expanded="isOpen(row) ? 'true' : 'false'"
-                                :aria-controls="'vsr-capabilities-' + row.id"
-                                @click="toggle(row)">
+                {% call table_row(class='hover:bg-transparent') %}
+                    {% call table_cell(class='w-full px-3 py-2 text-left sm:px-4') %}
+                        <div class="flex flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2">
+                        {% call ui.button(type='button', variant='ghost', class='h-auto min-w-0 sm:flex-1 justify-start gap-2 whitespace-normal px-0 py-2 text-left font-normal hover:bg-transparent', attrs={'data-vsr-toggle': '', 'aria-expanded': 'false', ':aria-expanded': "isOpen(row) ? 'true' : 'false'", ':aria-controls': "'vsr-capabilities-' + row.id", '@click': 'toggle(row)'}) %}
                             <span class="inline-flex shrink-0 transition-transform" :class="isOpen(row) ? 'rotate-90' : ''"><i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i></span>
                             <span class="min-w-0 break-words font-medium" data-vsr-name x-text="row.name"></span>
-                            <span x-show="row.atRisk" x-cloak class="inline-flex shrink-0 items-center rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-emphasis">At risk</span>
-                        </button>
+                            {{ ui.badge(text='At risk', variant='destructive', attrs={'x-show': 'row.atRisk', 'x-cloak': ''}) }}
+                        {% endcall %}
+                        {{ ui.button(text='Open value stream', variant='link', size='sm', class='shrink-0', href='#', attrs={':href': "'/value-streams/' + row.id", 'data-vsr-open': ''}) }}
+                        </div>
                     {% endcall %}
-                    {% call table_cell('px-3 py-3 text-right tabular-nums text-foreground sm:px-4') %}<span data-vsr-at-risk-count x-text="row.atRiskCount"></span>{% endcall %}
-                    {% call table_cell('hidden px-4 py-3 text-right tabular-nums text-foreground sm:table-cell') %}<span data-vsr-unassessed-count x-text="row.unassessedCount"></span>{% endcall %}
-                    {% call table_cell('hidden px-4 py-3 text-right tabular-nums text-foreground sm:table-cell') %}<span data-vsr-capability-count x-text="row.capabilityCount"></span>{% endcall %}
+                    {% call table_cell(class='px-3 py-3 text-right tabular-nums text-foreground sm:px-4') %}<span data-vsr-at-risk-count x-text="row.atRiskCount"></span>{% endcall %}
+                    {% call table_cell(class='hidden px-4 py-3 text-right tabular-nums text-foreground sm:table-cell') %}<span data-vsr-unassessed-count x-text="row.unassessedCount"></span>{% endcall %}
+                    {% call table_cell(class='hidden px-4 py-3 text-right tabular-nums text-foreground sm:table-cell') %}<span data-vsr-capability-count x-text="row.capabilityCount"></span>{% endcall %}
                 {% endcall %}
                 <tr x-show="isOpen(row)" x-cloak :id="'vsr-capabilities-' + row.id" data-vsr-capabilities>
                     <td colspan="4" class="bg-muted/30 px-3 pb-4 pt-1 sm:px-4">
@@ -38,9 +41,7 @@
                                 <li class="rounded-md border border-border bg-card p-3" data-vsr-capability :data-at-risk="cap.atRisk ? 'true' : 'false'">
                                     <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
                                         <span class="min-w-0 break-words font-medium text-foreground" x-text="cap.name"></span>
-                                        <span class="inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-xs font-medium"
-                                              :class="cap.atRisk ? 'border-destructive/30 bg-destructive/10 text-destructive-emphasis' : 'border-border bg-muted text-muted-foreground'"
-                                              x-text="cap.statusText"></span>
+                                        {{ ui.badge(variant='outline', attrs={':class': "cap.atRisk ? 'border-destructive/30 bg-destructive/10 text-destructive-emphasis' : 'text-muted-foreground'", 'x-text': 'cap.statusText'}) }}
                                     </div>
                                     <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
                                         <div>
@@ -72,5 +73,7 @@
             </tbody>
         </template>
     {% endcall %}
+    {% endcall %}
+  {% endcall %}
 </div>
 {% endmacro %}

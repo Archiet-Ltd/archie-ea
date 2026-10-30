@@ -2956,7 +2956,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [],
    "components": [
@@ -3013,7 +3013,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/value-streams-at-risk.md",
    "states": [
     "loading",
     "empty-nothing-derived",
@@ -3021,7 +3021,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
