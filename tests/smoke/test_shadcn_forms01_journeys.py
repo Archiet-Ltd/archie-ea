@@ -195,6 +195,26 @@ def test_assessment_choice_is_carried_through_the_steps_and_submitted(page, live
     assert posted.get("application_id"), posted
 
 
+def test_assessment_options_are_native_radios_in_a_labelled_fieldset(page, live_server, seeded):
+    _login(page, live_server, seeded["emails"]["application_manager"])
+    page.goto(live_server + "/dashboard/rationalization/assessment")
+    groups = page.evaluate("""() => {
+        const names = [...new Set([...document.querySelectorAll('input[type=radio]')].map(r => r.name))];
+        return names.map(n => {
+            const radios = [...document.querySelectorAll('input[type=radio][name="' + n + '"]')];
+            return {name: n, count: radios.length,
+                    inFieldset: radios.every(r => { const f = r.closest('fieldset'); return !!f && !!f.querySelector(':scope > legend'); }),
+                    labelled: radios.every(r => r.labels.length > 0 && r.labels[0].innerText.trim().length > 0)};
+        });
+    }""")
+    assert {g["name"] for g in groups} == {"architecture_pattern", "technical_debt", "strategic_importance",
+                                           "process_coverage", "cost_tier", "vendor_health", "has_duplicates"}, groups
+    for g in groups:
+        assert g["inFieldset"] and g["labelled"], g
+    hints = page.locator("fieldset:has(input[name=architecture_pattern])").inner_text()
+    assert "Single codebase, harder to scale" in hints
+
+
 def test_mapping_page_reads_not_set_with_its_reason_and_no_icons_in_stat_cards(page, live_server, seeded):
     from .test_try_sample_company_journey import _empty_organisation_user, _login as _login_plain
 

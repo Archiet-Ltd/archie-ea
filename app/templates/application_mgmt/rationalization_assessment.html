@@ -1,21 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'basecoat/index.html' as ui %}
-
-{% macro _stack_opt(name, value, title, hint) -%}
-<label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-  {{ ui.input(type='radio', name=name, value=value, class='size-4 h-4 w-4 p-0', attrs={'aria-label': title}) }}
-  <div><div class="font-medium">{{ title }}</div><div class="text-xs text-muted-foreground">{{ hint }}</div></div>
-</label>
-{%- endmacro %}
-
-{% macro _seg_opt(name, value, title, hint) -%}
-<label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-  {{ ui.input(type='radio', name=name, value=value, class='hidden peer', attrs={'aria-label': title}) }}
-  <div class="peer-checked:text-primary font-medium">{{ title }}</div>
-  <div class="text-xs text-muted-foreground">{{ hint }}</div>
-</label>
-{%- endmacro %}
+{% from 'components/radio_group.html' import radio_group %}
 
 {% macro _select(id, name, label, options) -%}
 {% call ui.field() %}
@@ -119,23 +105,21 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the current architecture pattern?</label>
-            <div class="grid grid-cols-1 gap-3">
-              {{ _stack_opt('architecture_pattern', 'modern_microservices', 'Modern/Microservices', 'Cloud-native, scalable') }}
-              {{ _stack_opt('architecture_pattern', 'soa', 'Service-Oriented (SOA)', 'Modular but aging') }}
-              {{ _stack_opt('architecture_pattern', 'monolithic', 'Monolithic', 'Single codebase, harder to scale') }}
-              {{ _stack_opt('architecture_pattern', 'legacy', 'Legacy/Mainframe', 'Outdated technology stack') }}
-            </div>
+            {{ radio_group(name='architecture_pattern', label='What is the current architecture pattern?', options=[
+                {'value': 'modern_microservices', 'label': 'Modern/Microservices', 'description': 'Cloud-native, scalable'},
+                {'value': 'soa', 'label': 'Service-Oriented (SOA)', 'description': 'Modular but aging'},
+                {'value': 'monolithic', 'label': 'Monolithic', 'description': 'Single codebase, harder to scale'},
+                {'value': 'legacy', 'label': 'Legacy/Mainframe', 'description': 'Outdated technology stack'}
+            ]) }}
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">How would you rate the technical debt level?</label>
-            <div class="flex gap-2">
-              {{ _seg_opt('technical_debt', 'low', 'Low', 'Clean codebase') }}
-              {{ _seg_opt('technical_debt', 'medium', 'Medium', 'Some refactoring needed') }}
-              {{ _seg_opt('technical_debt', 'high', 'High', 'Significant issues') }}
-              {{ _seg_opt('technical_debt', 'critical', 'Critical', 'Blocking issues') }}
-            </div>
+            {{ radio_group(name='technical_debt', label='How would you rate the technical debt level?', options=[
+                {'value': 'low', 'label': 'Low', 'description': 'Clean codebase'},
+                {'value': 'medium', 'label': 'Medium', 'description': 'Some refactoring needed'},
+                {'value': 'high', 'label': 'High', 'description': 'Significant issues'},
+                {'value': 'critical', 'label': 'Critical', 'description': 'Blocking issues'}
+            ], inline=true) }}
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
@@ -154,13 +138,12 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
-            <div class="flex gap-2">
-              {{ _seg_opt('strategic_importance', 'critical', 'Critical', 'Mission-critical') }}
-              {{ _seg_opt('strategic_importance', 'high', 'High', 'Strategic priority') }}
-              {{ _seg_opt('strategic_importance', 'medium', 'Medium', 'Supporting role') }}
-              {{ _seg_opt('strategic_importance', 'low', 'Low', 'Non-essential') }}
-            </div>
+            {{ radio_group(name='strategic_importance', label='Strategic Importance', options=[
+                {'value': 'critical', 'label': 'Critical', 'description': 'Mission-critical'},
+                {'value': 'high', 'label': 'High', 'description': 'Strategic priority'},
+                {'value': 'medium', 'label': 'Medium', 'description': 'Supporting role'},
+                {'value': 'low', 'label': 'Low', 'description': 'Non-essential'}
+            ], inline=true) }}
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
@@ -174,12 +157,11 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Business Process Coverage</label>
-            <div class="flex gap-2">
-              {{ _seg_opt('process_coverage', 'comprehensive', 'Comprehensive', 'End-to-end') }}
-              {{ _seg_opt('process_coverage', 'partial', 'Partial', 'Key processes') }}
-              {{ _seg_opt('process_coverage', 'limited', 'Limited', 'Single process') }}
-            </div>
+            {{ radio_group(name='process_coverage', label='Business Process Coverage', options=[
+                {'value': 'comprehensive', 'label': 'Comprehensive', 'description': 'End-to-end'},
+                {'value': 'partial', 'label': 'Partial', 'description': 'Key processes'},
+                {'value': 'limited', 'label': 'Limited', 'description': 'Single process'}
+            ], inline=true) }}
           </div>
         </div>
       </div>
@@ -194,13 +176,12 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Annual Operating Cost Tier</label>
-            <div class="grid grid-cols-1 gap-3">
-              {{ _stack_opt('cost_tier', 'very_low', 'Very Low', '< $50K/year') }}
-              {{ _stack_opt('cost_tier', 'low', 'Low', '$50K - $250K/year') }}
-              {{ _stack_opt('cost_tier', 'medium', 'Medium', '$250K - $1M/year') }}
-              {{ _stack_opt('cost_tier', 'high', 'High', '$1M - $5M/year') }}
-            </div>
+            {{ radio_group(name='cost_tier', label='Annual Operating Cost Tier', options=[
+                {'value': 'very_low', 'label': 'Very Low', 'description': '< $50K/year'},
+                {'value': 'low', 'label': 'Low', 'description': '$50K - $250K/year'},
+                {'value': 'medium', 'label': 'Medium', 'description': '$250K - $1M/year'},
+                {'value': 'high', 'label': 'High', 'description': '$1M - $5M/year'}
+            ]) }}
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
@@ -219,13 +200,12 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Vendor Financial Health</label>
-            <div class="flex gap-2">
-              {{ _seg_opt('vendor_health', 'strong', 'Strong', 'Stable, growing') }}
-              {{ _seg_opt('vendor_health', 'stable', 'Stable', 'No concerns') }}
-              {{ _seg_opt('vendor_health', 'at_risk', 'At Risk', 'Some concerns') }}
-              {{ _seg_opt('vendor_health', 'critical', 'Critical', 'High risk') }}
-            </div>
+            {{ radio_group(name='vendor_health', label='Vendor Financial Health', options=[
+                {'value': 'strong', 'label': 'Strong', 'description': 'Stable, growing'},
+                {'value': 'stable', 'label': 'Stable', 'description': 'No concerns'},
+                {'value': 'at_risk', 'label': 'At Risk', 'description': 'Some concerns'},
+                {'value': 'critical', 'label': 'Critical', 'description': 'High risk'}
+            ], inline=true) }}
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
@@ -244,21 +224,8 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Are there duplicate/similar applications?</label>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2">
-                {{ ui.input(type='radio', name='has_duplicates', value='yes', class='size-4 h-4 w-4 p-0', attrs={'aria-label': 'Has duplicates: Yes'}) }}
-                <span>Yes</span>
-              </label>
-              <label class="flex items-center gap-2">
-                {{ ui.input(type='radio', name='has_duplicates', value='no', class='size-4 h-4 w-4 p-0', attrs={'aria-label': 'Has duplicates: No'}) }}
-                <span>No</span>
-              </label>
-              <label class="flex items-center gap-2">
-                {{ ui.input(type='radio', name='has_duplicates', value='unknown', class='size-4 h-4 w-4 p-0', attrs={'aria-label': 'Has duplicates: Unknown'}) }}
-                <span>Unknown</span>
-              </label>
-            </div>
+            {{ radio_group(name='has_duplicates', label='Are there duplicate/similar applications?', options=[
+              {'value': 'yes', 'label': 'Yes'}, {'value': 'no', 'label': 'No'}, {'value': 'unknown', 'label': 'Unknown'}], inline=true) }}
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
