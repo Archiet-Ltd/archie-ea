@@ -487,6 +487,7 @@
                 // the admin-link remedy in context); drop the toast.
                 // A configuration fault is not transient: the server's sentence names the
                 // remedy and the settings link is the way out; a Retry could only reproduce it.
+                _streamErr.message = configFaultSentence();
                 appendError(_streamErr.message, null, { adminLink: true });
                 return;
             }
@@ -577,6 +578,7 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
+                    errorMessage = configFaultSentence();
                     appendError(errorMessage || fullError, null, { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
@@ -660,6 +662,16 @@
         } else {
             el.textContent = 'no model answered';
         }
+    }
+
+    /* The sentence for a missing AI provider, written for the reader: an
+       administrator is told where to fix it (the settings link follows, from
+       appendError), a member is told who can. The server's own text names an
+       internal feature key and is not shown. */
+    function configFaultSentence() {
+        return window.chatIsAdmin
+            ? 'The assistant is not set up yet. Add an AI provider in Settings to start getting answers.'
+            : 'The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider.';
     }
 
     function _retryTurn(message, timestamp) {
