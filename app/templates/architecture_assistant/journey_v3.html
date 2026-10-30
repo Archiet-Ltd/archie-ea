@@ -1,3 +1,4 @@
+{# design-block: form #}
 {# journey_v3.html — shadcn onboarding-flow skin for Architecture Journey
    Visual redesign of journey_v2.html matching https://shadcnexamples.com/onboarding-flow
    Same Alpine.js component (journeyV2Flow), same API endpoints, same step partials.
@@ -10,6 +11,8 @@
    - Uses stepper.html macro (single source of truth)
 #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}{% if solution is defined and solution %}Architecture Journey — {{ solution.name }}{% else %}Architecture Journey{% endif %}{% endblock %}
@@ -66,10 +69,10 @@
 {# ══════════════════════════════════════════════════════════════════
    WIZARD — Wide layout with copilot panel restored
    ══════════════════════════════════════════════════════════════════ #}
-<input type="hidden" id="journey-v2-solution-description" value="{{ solution.description|default('', true)|e if solution is defined and solution else '' }}">
-<input type="hidden" id="journey-v2-solution-name" value="{{ solution.name|default('', true)|e if solution is defined and solution else '' }}">
-<input type="hidden" id="journey-v2-state" value="{{ journey_state_json|default('null', true)|e }}">
-<input type="hidden" id="journey-v2-governance-status" value="{{ (solution.governance_status or 'draft')|e if solution is defined and solution else 'draft' }}">
+{{ hidden_input('journey-v2-solution-description', solution.description|default('', true) if solution is defined and solution else '', id='journey-v2-solution-description') }}
+{{ hidden_input('journey-v2-solution-name', solution.name|default('', true) if solution is defined and solution else '', id='journey-v2-solution-name') }}
+{{ hidden_input('journey-v2-state', journey_state_json|default('null', true), id='journey-v2-state') }}
+{{ hidden_input('journey-v2-governance-status', (solution.governance_status or 'draft') if solution is defined and solution else 'draft', id='journey-v2-governance-status') }}
 
 <div x-data="journeyV2Flow({{ solution_id or 0 }})" x-init="init()" class="space-y-4">
 
@@ -159,18 +162,14 @@
             Saved
         </div>
         {# Ask Entelim button — opens the chat panel #}
-        <button type="button" @click="$dispatch('blueprint-chat-toggle')"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-info-emphasis hover:bg-primary/20 border border-primary/20 transition-colors shrink-0"
-                title="Ask Entelim to add drivers, goals, elements, or run inference">
-            <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
-            Ask Entelim
-        </button>
+        {% call ui.button(type='button', variant='ghost', class='shrink-0', attrs={'@click': "$dispatch('blueprint-chat-toggle')", 'title': 'Ask Entelim to add drivers, goals, elements, or run inference'}) %}<i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
+            Ask Entelim{% endcall %}
     </div>
 
     {# ── Error Banner ── #}
     <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 flex items-center justify-between">
         <p class="text-sm text-destructive-emphasis" x-text="error"></p>
-        <button type="button" @click="error = null" class="text-xs text-destructive-emphasis/70 hover:text-destructive-emphasis font-medium ml-4 shrink-0">Dismiss</button>
+        {% call ui.button(type='button', variant='ghost', class='ml-4 shrink-0', attrs={'@click': 'error = null'}) %}Dismiss{% endcall %}
     </div>
 
     {# ── Blocker warnings — only shown on Step 2 where user can action them ── #}
@@ -217,11 +216,9 @@
 
     {# ── Navigation Buttons ── #}
     <div class="flex items-center justify-between bg-card border border-border rounded-lg px-6 py-3">
-        <button type="button" @click="prevStep()" x-show="currentStep > 1" x-cloak
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+        {% call ui.button(type='button', variant='outline', attrs={'@click': 'prevStep()', 'x-show': 'currentStep > 1', 'x-cloak': ''}) %}
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-            Previous
-        </button>
+            Previous{% endcall %}
         <div x-show="currentStep <= 1" x-cloak></div>
 
         <div class="flex items-center gap-2">
@@ -231,12 +228,8 @@
             <template x-if="currentStep === 6 && !codegenUnlocked()">
                 <span class="text-xs text-warning-emphasis font-medium">Submit to ARB above to unlock code generation</span>
             </template>
-            <button type="button" @click="nextStep()" x-show="currentStep < 8" x-cloak
-                    :disabled="!canProceed()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Next Step
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </button>
+            {% call ui.button(type='button', class='justify-center', attrs={'@click': 'nextStep()', 'x-show': 'currentStep < 8', 'x-cloak': '', ':disabled': '!canProceed()'}) %}Next Step
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>{% endcall %}
         </div>
     </div>
 </div>
@@ -264,7 +257,7 @@
         x-transition:leave-end="opacity-0"
         @click="toggle()"
         class="fixed inset-0 z-40 bg-overlay/50"
-        style="display:none">
+        x-cloak>
     </div>
 
     {# Slide-out panel #}
@@ -277,7 +270,7 @@
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
         class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-card border-l border-border z-50 flex flex-col"
-        style="display:none"
+        x-cloak
         aria-label="Entelim Architecture Assistant">
 
         {# Header #}
@@ -291,9 +284,7 @@
                     <p class="text-xs text-muted-foreground mt-0.5" x-text="solutionName || 'Architecture Assistant'"></p>
                 </div>
             </div>
-            <button type="button" @click="toggle()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close chat">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            {% call ui.button(type='button', variant='ghost', size='icon', class='justify-center', attrs={'@click': 'toggle()', 'aria-label': 'Close chat'}) %}<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>{% endcall %}
         </div>
 
         {# Starter prompts — shown until first message #}
@@ -305,10 +296,7 @@
                 'Add a constraint: £500k budget cap, 12-month deadline',
                 'Run the inference engine to fill missing architecture layers'
             ]" :key="prompt">
-                <button type="button" @click="inputText = prompt; sendMessage()"
-                        class="w-full text-left px-3 py-2.5 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 text-xs text-foreground/80 transition-colors leading-relaxed">
-                    <span x-text="'→ ' + prompt"></span>
-                </button>
+                {% call ui.button(type='button', variant='outline', class='w-full text-left', attrs={'@click': 'inputText = prompt; sendMessage()'}) %}<span x-text="'→ ' + prompt"></span>{% endcall %}
             </template>
         </div>
 
@@ -351,10 +339,7 @@
                                         <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                         <span x-text="action.undone ? 'Undone' : action.message"></span>
                                     </div>
-                                    <button type="button" x-show="!action.undone && !action.undoExpired" @click="undoAction(action)"
-                                            class="text-muted-foreground hover:text-destructive-emphasis text-xs shrink-0 transition-colors">
-                                        Undo
-                                    </button>
+                                    {% call ui.button(type='button', variant='ghost', class='shrink-0', attrs={'x-show': '!action.undone && !action.undoExpired', '@click': 'undoAction(action)'}) %}Undo{% endcall %}
                                 </div>
                             </div>
                         </template>
@@ -366,14 +351,8 @@
                                 <p class="font-medium text-warning-emphasis">Confirm action:</p>
                                 <p class="text-foreground/80" x-text="approval.summary || approval.tool"></p>
                                 <div class="flex gap-2 pt-1">
-                                    <button type="button" @click="approveAction(approval)"
-                                            class="px-2.5 py-1 rounded bg-primary text-primary-foreground text-2xs font-medium hover:bg-primary/90 transition-colors">
-                                        Approve
-                                    </button>
-                                    <button type="button" @click="approval.dismissed = true"
-                                            class="px-2.5 py-1 rounded border border-input text-2xs font-medium hover:bg-accent transition-colors">
-                                        Dismiss
-                                    </button>
+                                    {% call ui.button(type='button', attrs={'@click': 'approveAction(approval)'}) %}Approve{% endcall %}
+                                    {% call ui.button(type='button', variant='outline', attrs={'@click': 'approval.dismissed = true'}) %}Dismiss{% endcall %}
                                 </div>
                             </div>
                         </template>
@@ -395,19 +374,8 @@
         {# Input area #}
         <div class="border-t border-border p-3 shrink-0">
             <div class="flex gap-2 items-end">
-                <textarea
-                    x-ref="chatInput"
-                    x-model="inputText"
-                    @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
-                    rows="2"
-                    placeholder="Describe your problem, goals, constraints… or ask anything."
-                    class="flex-1 text-xs rounded-md border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
-                 aria-label="Describe your problem, goals, constraints… or ask anything."></textarea>
-                <button aria-label="Send message" type="button" @click="sendMessage()"
-                        :disabled="loading || !inputText.trim()"
-                        class="p-2.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                </button>
+                {{ ui.textarea(rows=2, attrs={'x-ref': 'chatInput', 'x-model': 'inputText', '@keydown.enter.prevent': 'if (!$event.shiftKey) sendMessage()', 'placeholder': 'Describe your problem, goals, constraints… or ask anything.', 'aria-label': 'Describe your problem, goals, constraints… or ask anything.'}) }}
+                {% call ui.button(type='button', size='icon', class='shrink-0', attrs={'aria-label': 'Send message', '@click': 'sendMessage()', ':disabled': 'loading || !inputText.trim()'}) %}<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>{% endcall %}
             </div>
             <p class="text-xs text-muted-foreground mt-1.5 px-1">Enter to send · Shift+Enter for new line</p>
         </div>

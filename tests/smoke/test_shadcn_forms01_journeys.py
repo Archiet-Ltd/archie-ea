@@ -613,3 +613,78 @@ def test_architect_reads_the_vision_deliverable_editor(browser, live_server):
             with app.app_context():
                 db.session.query(EAWorkflowDefinition).filter_by(id=created_definition).delete()
                 db.session.commit()
+
+
+def test_architect_moves_a_journey_on_and_attaches_evidence(browser, live_server):
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.architecture_journey import ArchitectureJourney
+
+    app = create_app("testing")
+    with app.app_context():
+        journey = ArchitectureJourney(
+            owner_id=org["user_ids"]["enterprise_architect"], organization_id=org["org_id"],
+            title="Operating model review", intent="architecture_assessment", selected_layers=["business"],
+            selected_deliverables=[], outcome_type="undecided", evidence_manifest=[], journey_state={})
+        db.session.add(journey)
+        db.session.commit()
+        journey_id = journey.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        _open(page, live_server, "/architecture-journey/work/%d" % journey_id)
+        expect(page.get_by_role("heading", name="Operating model review").first).to_be_visible()
+        _shoot(page, "architecture-journey-workspace")
+        stage = page.get_by_text("Stage ", exact=False).first
+        before = stage.inner_text()
+        page.get_by_role("button", name="Complete this stage").click()
+        expect(page.get_by_text(before, exact=True)).to_be_hidden()
+        # Evidence: both fields are required, so the form is refused until they are filled.
+        add = page.get_by_role("button", name="Add evidence")
+        expect(add).to_be_disabled()
+        page.locator("#evidence-name").fill("Operating model v3")
+        page.locator("#evidence-reference").fill("docs/operating-model-v3.pdf")
+        expect(add).to_be_enabled()
+        add.click()
+        expect(page.locator("body")).to_contain_text("Operating model v3")
+        _open(page, live_server, "/architecture-journey/work/%d" % journey_id)
+        expect(page.locator("body")).to_contain_text("Operating model v3")
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
+
+
+def test_architect_opens_the_guided_journey_and_asks_entelim(browser, live_server):
+    org = create_fresh_org("solution_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.solution_models import Solution
+
+    app = create_app("testing")
+    with app.app_context():
+        sol = Solution(name="Customer data platform", description="One view of the customer", status="Planning",
+                       organization_id=org["org_id"], created_by_id=org["user_ids"]["solution_architect"])
+        db.session.add(sol)
+        db.session.commit()
+        solution_id = sol.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["solution_architect"])
+        _open(page, live_server, "/architecture-journey/%d" % solution_id)
+        expect(page.get_by_role("button", name="Next Step")).to_be_visible()
+        _shoot(page, "architecture-journey-guided")
+        expect(page.get_by_role("button", name="Previous")).to_be_hidden()
+        page.get_by_role("button", name="Ask Entelim").click()
+        panel = page.get_by_label("Entelim Architecture Assistant")
+        expect(panel).to_be_visible()
+        expect(panel.get_by_label("Send message")).to_be_disabled()
+        panel.get_by_placeholder("Describe your problem").fill("We need to retire the legacy billing system")
+        expect(panel.get_by_label("Send message")).to_be_enabled()
+        panel.get_by_role("button", name="Close chat").click()
+        expect(panel).to_be_hidden()
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()

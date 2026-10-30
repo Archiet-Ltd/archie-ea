@@ -19373,7 +19373,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -19437,7 +19437,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/architecture-journey-workspace.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -19447,7 +19447,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -19698,7 +19698,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -19765,7 +19765,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/architecture-journey-guided.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -19775,7 +19775,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
