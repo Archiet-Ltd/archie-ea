@@ -1,5 +1,8 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/button.html' import button %}
+{% from 'components/table.html' import table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'components/card.html' as card %}
 {% import 'components/badge.html' as badge %}
@@ -9,7 +12,8 @@
 {% from 'components/detail_meta.html' import detail_meta_item %}
 {% from 'components/skeleton.html' import skeleton_table %}
 
-{% block title %}Import Job: {{ job.name if job else 'Loading...' }}{% endblock %}
+{% set job_label = ((job.name or job.filename or ('Import job ' ~ (job.created_at.strftime('%d %b %Y') if job.created_at else ''))) | trim) if job else 'Import job' %}
+{% block title %}Import Job: {{ job_label }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6" x-data="jobDetail({{ job.id if job else 0 }})">
@@ -18,11 +22,12 @@
        the live status tile, badge, meta row and actions, which are job state, not
        page identity. #}
     {{ page_shell(
-        title=job.name if job else 'Import Job',
+        title=job_label,
+        subtitle=(('From ' ~ job.filename) if job and job.filename else None),
         breadcrumb=[
             ('Home', home_url()),
             ('Batch Import', url_for('batch_import_view.dashboard')),
-            (job.name if job else 'Import Job', None)
+            (job_label, None)
         ]
     ) }}
 
@@ -39,7 +44,7 @@
                             <span
                                 :class="getStatusBadgeClass(job?.status)"
                                 class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                                x-text="job?.status"
+                                x-text="statusLabel(job?.status)" data-testid="job-status"
                             ></span>
                         </div>
                         <div class="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -53,53 +58,34 @@
 
                 <!-- Action Buttons -->
                 <div class="flex items-center gap-2">
-                    <button type="button"
-                        @click="refreshJob()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Refresh">
+                    {% call button(aria_label=("Refresh"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("refreshJob()")}) %}
                         <i data-lucide="refresh-cw" class="mr-2 h-4 w-4" :class="{ 'animate-spin': refreshing }"></i>
                         Refresh
-                    </button>
+                    {% endcall %}
 
                     <!-- Start Button -->
-                    <button type="button"
-                        x-show="_normStatus(job?.status) === 'pending'"
-                        @click="startJob()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors"
-                     aria-label="Start processing import job">
+                    {% call button(aria_label=("Start processing import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors", attrs_dict={"x-show": ("_normStatus(job?.status) === 'pending'"), "@click": ("startJob()")}) %}
                         <i data-lucide="play" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Start Processing
-                    </button>
+                    {% endcall %}
 
                     <!-- Pause Button -->
-                    <button type="button"
-                        x-show="_normStatus(job?.status) === 'processing'"
-                        @click="pauseJob()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-10 px-4 py-2 transition-colors"
-                     aria-label="Pause import job">
+                    {% call button(aria_label=("Pause import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-10 px-4 py-2 transition-colors", attrs_dict={"x-show": ("_normStatus(job?.status) === 'processing'"), "@click": ("pauseJob()")}) %}
                         <i data-lucide="pause" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Pause
-                    </button>
+                    {% endcall %}
 
                     <!-- Resume Button -->
-                    <button type="button"
-                        x-show="_normStatus(job?.status) === 'paused'"
-                        @click="resumeJob()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors"
-                     aria-label="Resume import job">
+                    {% call button(aria_label=("Resume import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2 transition-colors", attrs_dict={"x-show": ("_normStatus(job?.status) === 'paused'"), "@click": ("resumeJob()")}) %}
                         <i data-lucide="play" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Resume
-                    </button>
+                    {% endcall %}
 
                     <!-- Cancel Button -->
-                    <button type="button"
-                        x-show="['pending', 'processing', 'paused'].includes(_normStatus(job?.status))"
-                        @click="showCancelModal = true"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                     aria-label="Cancel">
+                    {% call button(aria_label=("Cancel"), variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"x-show": ("['pending', 'processing', 'paused'].includes(_normStatus(job?.status))"), "@click": ("showCancelModal = true")}) %}
                         <i data-lucide="x-circle" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Cancel
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
         </div>
@@ -181,13 +167,10 @@
                             </p>
                         </div>
                     </div>
-                    <button type="button"
-                        @click="pauseJob()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-9 px-4 transition-colors"
-                     aria-label="Pause import job">
+                    {% call button(aria_label=("Pause import job"), variant='bare', size='bare', class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-warning text-primary-foreground hover:bg-warning h-9 px-4 transition-colors", attrs_dict={"@click": ("pauseJob()")}) %}
                         <i data-lucide="pause" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Pause
-                    </button>
+                    {% endcall %}
                 </div>
 
                 <!-- Current batch progress bar -->
@@ -196,9 +179,7 @@
                         <span>Batch Progress</span>
                         <span x-text="batchProgress + '%'"></span>
                     </div>
-                    <div class="w-full bg-secondary rounded-full h-2">
-                        <div class="bg-primary h-2 rounded-full transition-all duration-300" :style="'width: ' + batchProgress + '%'"></div>
-                    </div>
+                    {{ progress.progress_bound('batchProgress') }}
                 </div>
 
                 <!-- Stream messages log -->
@@ -236,12 +217,7 @@
                             <span class="text-sm font-medium">Overall Progress</span>
                             <span class="text-sm font-bold" x-text="job?.progress + '%'"></span>
                         </div>
-                        <div class="h-4 w-full overflow-hidden rounded-full bg-secondary">
-                            <div
-                                class="h-full bg-primary transition-all duration-500"
-                                :style="'width: ' + (job?.progress || 0) + '%'"
-                            ></div>
-                        </div>
+                        {{ progress.progress_bound('job?.progress || 0', class='h-4') }}
                     </div>
 
                     <div class="grid grid-cols-3 gap-4 pt-4 border-t">
@@ -331,7 +307,7 @@
             </div>
 
             <div class="overflow-x-auto rounded-md border">
-                <table class="dense-table w-full caption-bottom text-sm">
+                {% call table(class="dense-table w-full caption-bottom text-sm") %}
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Batch #</th>
@@ -415,7 +391,7 @@
                             </tr>
                         </template>
                     </tbody>
-                </table>
+                {% endcall %}
             </div>
         </div>
     {% endcall %}
@@ -441,47 +417,21 @@
     </template>
 
     <!-- Cancel Confirmation Modal -->
-    <div
-        x-show="showCancelModal" x-cloak
-        @keydown.escape.window="showCancelModal = false"
-        x-transition
-        class="modal-root fixed inset-0 z-50 flex items-center justify-center"
-        x-cloak
-     role="dialog">
-        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCancelModal = false"></div>
-        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showCancelModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Cancel">
-                <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
-            <div class="flex items-center gap-4 mb-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                    <i data-lucide="alert-triangle" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
-                </div>
-                <div>
-                    <h2 class="text-lg font-semibold">Cancel Import Job</h2>
-                    <p class="text-sm text-muted-foreground">This action cannot be undone</p>
-                </div>
-            </div>
+    {% call dialog(title='Cancel Import Job', description='This action cannot be undone', open_expr='showCancelModal', close_expr='showCancelModal = false', start_hidden=false) %}
             <p class="text-sm text-muted-foreground mb-4">
                 Are you sure you want to cancel this job? Any unprocessed batches will be discarded,
                 but already processed elements can still be reviewed and committed.
             </p>
             <div class="flex justify-end gap-2">
-                <button type="button"
-                    @click="showCancelModal = false"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                 aria-label="Cancel">
+                {% call button(aria_label=("Cancel"), variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("showCancelModal = false")}) %}
                     Keep Job
-                </button>
-                <button type="button"
-                    @click="cancelJob()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                 aria-label="Cancel">
+                {% endcall %}
+                {% call button(aria_label=("Cancel"), variant="destructive", class="justify-center whitespace-nowrap justify-center", attrs_dict={"@click": ("cancelJob()")}) %}
                     Cancel Job
-                </button>
+                {% endcall %}
             </div>
-        </div>
-    </div>
+        
+{% endcall %}
 </div>
 
 <script>
@@ -584,6 +534,21 @@ function jobDetail(jobId) {
                 'cancelled': 'bg-muted-foreground'
             };
             return backgrounds[status] || 'bg-muted-foreground';
+        },
+
+        statusLabel(status) {
+            status = this._normStatus(status);
+            const words = {
+                'pending': 'Waiting to start',
+                'estimating': 'Working out the cost',
+                'awaiting_confirmation': 'Waiting for your confirmation',
+                'processing': 'Importing',
+                'paused': 'Paused',
+                'completed': 'Completed',
+                'failed': 'Failed',
+                'cancelled': 'Cancelled'
+            };
+            return words[status] || (status ? String(status).replace(/_/g, ' ') : '');
         },
 
         getStatusBadgeClass(status) {

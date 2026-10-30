@@ -10,7 +10,7 @@ with Tailwind/shadcn tokens and Alpine.js on the front end.
 **Read `DESIGN.md` before editing any template, CSS, or front-end JS file.** It is the authoritative
 UI contract (color tokens, base templates, component macros, Alpine rules) and is not repeated here.
 
-Layout consistency is enforced by `design/patterns.json`. Do not introduce a new layout pattern from shadcn-examples unless it is explicitly added to this file first. Do not use React. Use only the prescribed patterns for each job.
+Layout consistency is enforced by `docs/design-map.json`, `docs/data-type-register.yml`, `docs/reuse-register.yml`, and `design/patterns.json`, using the canonical `flask-basecoat` library (`C:\flask-basecoat\AGENTS.md`, `C:\flask-basecoat\docs\LAYOUT.md`, `C:\flask-basecoat\docs\MACROS.md`) and `https://ui.shadcn.com/docs`. Before editing any template, look up its block and `data_types` in `docs/design-map.json`, its grid recipe in `C:\flask-basecoat\docs\LAYOUT.md`, and its required component macro in `docs/data-type-register.yml` (`components/list_table.html` / `components/element_table.html` + `basecoat/pagination.html` for tables, `basecoat/card.html` 4-card KPI grid for headline figures, `components/fact_list.html` for key-value facts, `components/risk_matrix.html` + `list_table.html` for risks, `ui.field` + `ui.button(..., type="submit")` for forms). Never write raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>`, `<dialog>`, raw Tailwind colour utilities, or retired macros (`dense_table.html`, `data_table.html`, `workbench_table.html`, `metrics_card.html`, `data_card.html`, `app_stats_grid.html`, `status_badge.html`, `status_indicator.html`, `pagination_controls.html`). Run `python scripts/check_data_types.py`, `python scripts/check_design_map.py`, and `python scripts/qa/entelim_shadcn_compliance.py` before committing.
 
 ## SDLC orchestration subagents — execution mechanism, not a second role system
 
@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 87 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 94 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -534,6 +534,12 @@ to reconfirm the count before trusting it:**
 | `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
 | `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
 | `legacy-macro-calls` | a call to an old macro (`empty_state`, `page_header`, `modal`, `dense_table`, `shadcn_*`) outside the file that defines it | ratchet @ 429 |
+| `second-component-library` | a macro defined outside `components/` and `basecoat/` under a name the library exports, or a page importing such a name from elsewhere | ratchet @ 18, only falls |
+| `data-types-declared` | a page holding a kind of data without the component the data-type register names, or a journey that does not assert it | ratchet |
+| `data-types-undecided` | pages showing a registered kind of data without its component | ratchet |
+| `data-types-retired` | imports of components the data-type register retires | ratchet |
+| `hand-pagination` | page links built by hand from a pagination object | ratchet |
+| `placeholder-content` | signed-in pages that promise content instead of showing it | ratchet |
 | `raw-button` | a hand-written button tag instead of the button component | ratchet @ 2254 |
 | `missing-value-placeholder` | a bare dash, N/A or zero standing in for a missing value instead of `explained_value` | ratchet @ 563 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |
@@ -591,6 +597,7 @@ to reconfirm the count before trusting it:**
 | `dependency-cves` | known CVEs in shipped dependencies (`pip-audit`) | ratchet |
 | `boot-health` | unregistered blueprints; unresolved `url_for` | must pass |
 | `csrf-coverage` | a write route with no CSRF protection or justified opt-out | must pass |
+| `org-administrators` | an organisation with members and no Administrator | must pass (needs DB) |
 | `schema-drift` | ORM/database column drift | must pass (needs DB) |
 | `tests` | behavioural regression | must pass (needs DB) |
 | `nav-verified` | a new sidebar route with no test loading it | ratchet @ 0, carries no tags |

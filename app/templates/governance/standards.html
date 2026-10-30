@@ -6,24 +6,18 @@
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/card.html' import card, card_header, card_content %}
 {% from 'components/badge.html' import badge %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% block title %}Technology Standards{% endblock %}
 {% block content %}
-<div class="flex flex-1 flex-col">
-  <div class="@container/main flex flex-1 flex-col gap-2">
-    <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-      <div class="px-4 lg:px-6">
-        <nav aria-label="Breadcrumb" class="mb-3">
-          <ol class="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <li class="inline-flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="transition-colors hover:text-foreground">Home</a><i data-lucide="chevron-right" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i></li>
-            <li class="inline-flex items-center gap-1.5" aria-current="page"><span class="font-normal text-foreground">Technology Standards</span></li>
-          </ol>
-        </nav>
-        <div class="flex flex-col gap-1">
-          <h1 class="text-2xl font-semibold leading-none tracking-tight text-foreground">Technology Standards</h1>
-          <p class="text-sm text-muted-foreground">Approved technologies per domain, with their radar ring and sunset date</p>
-        </div>
-      </div>
+<div class="flex-1 overflow-auto">
+  {{ page_shell(
+      title='Technology Standards',
+      subtitle='Approved technologies per domain, with their radar ring and sunset date',
+      breadcrumb=[('Home', url_for('main.index')), ('Technology Standards', None)]
+  ) }}
+
+  <div class="p-6 space-y-6">
 
       <div class="px-4 lg:px-6">
         {% call card() %}
@@ -146,7 +140,6 @@
       {% endfor %}
     </div>
   </div>
-</div>
 <script>
   window.standardElementPicker = function () {
     return {

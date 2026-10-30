@@ -1,0 +1,14 @@
+{
+ "posts": [
+  {
+   "uri": "at://did:plc:xyz/app.bsky.feed.post/3kabc",
+   "author": {
+    "handle": "fan.bsky.social"
+   },
+   "record": {
+    "text": "Northwind Freight lost my parcel again",
+    "createdAt": "2026-10-19T10:00:00.000Z"
+   }
+  }
+ ]
+}

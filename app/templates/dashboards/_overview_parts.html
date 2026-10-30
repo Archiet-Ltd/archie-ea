@@ -25,6 +25,29 @@
 {{ ui.chart(class=class, attrs=a) }}
 {%- endmacro %}
 
+{#- Bars read down the page: one row for each category, its name in full on the left, so no name is ever left
+    out under a bar. The rows are drawn from the spec below; the data is also kept on the element. -#}
+{% macro bar_rows(data, name_key, value_key, series_label, color, class='aspect-auto h-[280px] w-full', label='Chart', testid=none, name_width=130) -%}
+{%- set spec = {
+  'type': 'bar', 'component': 'BarChart',
+  'config': {value_key: {'label': series_label, 'color': color}},
+  'data': data,
+  'props': {'accessibilityLayer': true, 'layout': 'vertical', 'margin': {'left': 16, 'right': 12}},
+  'series': [{'component': 'Bar', 'dataKey': value_key, 'fill': color, 'radius': 4, 'labelList': [{'dataKey': value_key, 'position': 'right', 'fill': color, 'offset': 6}]}],
+  'axes': [
+    {'component': 'XAxis', 'type': 'number', 'dataKey': value_key, 'hide': true},
+    {'component': 'YAxis', 'dataKey': name_key, 'type': 'category', 'tickLine': false, 'axisLine': false, 'tickMargin': 8, 'width': name_width, 'interval': 0},
+  ],
+  'grid': none,
+  'tooltip': {'cursor': false, 'content': 'ChartTooltipContent', 'indicator': 'dashed'},
+  'legend': none,
+  'labels': [],
+} -%}
+{%- set a = {'data-chart-type': 'bar', 'data-chart-x': name_key, 'data-chart-data': json_attr(data), 'role': 'img', 'aria-label': label} -%}
+{%- if testid %}{% set _ = a.update({'data-testid': testid}) %}{% endif -%}
+{% call ui.chart(class=class, attrs=a) %}<script type="application/json" data-chart-spec>{{ spec | tojson }}</script>{% endcall %}
+{%- endmacro %}
+
 {#- Small legend row with coloured dots. items: [(label, tone)] -#}
 {% macro legend(items, class='') -%}
 <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground {{ class }}">

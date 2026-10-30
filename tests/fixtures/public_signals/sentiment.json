@@ -1,0 +1,46 @@
+{
+ "query": "Northwind Freight",
+ "overall_sentiment": {
+  "score": 0.35,
+  "label": "positive",
+  "confidence": 0.7
+ },
+ "source_breakdown": [],
+ "trending_topics": [
+  {
+   "topic": "Rotterdam depot",
+   "mention_count": 3,
+   "sentiment": {
+    "score": 0.5,
+    "label": "positive",
+    "confidence": 0.7
+   }
+  }
+ ],
+ "notable_mentions": [
+  {
+   "source": "Tech Daily",
+   "content": "Depot",
+   "sentiment": {
+    "score": 0.6,
+    "label": "positive",
+    "confidence": 0.8
+   },
+   "url": "https://techdaily.example/northwind-rotterdam",
+   "date": "2026-10-20"
+  },
+  {
+   "source": "Ledger",
+   "content": "Breach",
+   "sentiment": {
+    "score": -0.7,
+    "label": "very_negative",
+    "confidence": 0.8
+   },
+   "url": "https://ledger.example/northwind-breach",
+   "date": "2026-10-18"
+  }
+ ],
+ "sentiment_timeline": [],
+ "analysis_period": "Last 30 days"
+}

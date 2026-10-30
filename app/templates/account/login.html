@@ -5,46 +5,23 @@
 {% from 'components/accessibility_helpers.html' import skip_to_main, live_region with context %}
 {% from 'components/loading_state.html' import loading_inline %}
 {% from 'components/error_boundary.html' import error_boundary %}
-
-{% block extra_css %}
-<style>
-    /* Brand panel — explicit colours: the app's purged Tailwind build does
-       not ship slate-950 / these slate shades, so utility classes alone
-       rendered white-on-white. Scoped to the login page. */
-    .login-brand { background-color: #020617; color: #e2e8f0; }
-    .login-brand__wordmark { color: #ffffff; }
-    .login-brand__kicker { color: #93c5fd; }
-    .login-brand__headline { color: #ffffff; }
-    .login-brand__body { color: rgba(203, 213, 225, 0.92); }
-    .login-brand__chip {
-        color: #e2e8f0;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        background-color: rgba(255, 255, 255, 0.06);
-    }
-    .login-brand__ring {
-        position: absolute; width: 24rem; height: 24rem; border-radius: 9999px;
-        filter: blur(72px); pointer-events: none;
-    }
-    .login-brand__ring--tl { left: -8rem; top: -8rem; background-color: hsl(var(--primary) / 0.16); }
-    .login-brand__ring--br { right: -6rem; bottom: -10rem; background-color: hsl(var(--primary) / 0.16); }
-</style>
-{% endblock %}
-
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
 {% block content %}
 {{ live_region('login-status') }}
 
 {# Split-screen login: branded panel (left) + credential form (right).
-   No second <main> landmark — public_base.html already provides one.
-   Brand-panel colours come from the scoped <style> block below: Entelim's
-   purged Tailwind build does NOT include slate-950 / these slate shades,
-   so relying on those utility classes rendered the panel white-on-white. #}
+   No second <main> landmark -- public_base.html already provides one.
+   The brand panel is forced dark regardless of site theme by scoping it
+   with the .dark class, so it reads from the dark-mode token values
+   (shadcn_tokens.css) rather than any hardcoded hex. #}
 <div class="grid min-h-screen lg:grid-cols-2" aria-labelledby="login-title">
 
-    {# ── Brand panel (hidden on small screens) ───────────────────── #}
-    <aside class="login-brand relative hidden lg:flex flex-col justify-between overflow-hidden px-12 py-14"
+    {# Brand panel (hidden on small screens) #}
+    <aside class="dark login-brand relative hidden lg:flex flex-col justify-between overflow-hidden bg-background text-foreground px-12 py-14"
            aria-hidden="true">
-        <div class="login-brand__ring login-brand__ring--tl"></div>
-        <div class="login-brand__ring login-brand__ring--br"></div>
+        <div class="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/15 blur-3xl pointer-events-none"></div>
+        <div class="absolute -right-24 -bottom-40 h-96 w-96 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
 
         <div class="relative">
             <div class="flex items-center gap-3">
@@ -54,25 +31,25 @@
         </div>
 
         <div class="relative max-w-md">
-            <p class="login-brand__kicker text-xs font-semibold uppercase tracking-[0.32em]">Enterprise Intelligence Management</p>
-            <h2 class="login-brand__headline mt-5 text-[2rem] font-bold leading-tight">
+            <p class="text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">Enterprise Intelligence Management</p>
+            <h2 class="mt-5 text-[2rem] font-bold leading-tight text-foreground">
                 Architecture, governed<br>from strategy to code.
             </h2>
-            <p class="login-brand__body mt-4 text-[0.95rem] leading-relaxed">
+            <p class="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground">
                 Discover the estate, design within governance, and prove every
-                decision against live data — the deliverable a consulting bench
+                decision against live data -- the deliverable a consulting bench
                 takes months to assemble, generated continuously.
             </p>
         </div>
 
         <div class="relative flex flex-wrap gap-2">
             {% for chip in ['TOGAF 9.2', 'ArchiMate 3.2', 'AI-Native', 'ARB-Governed'] %}
-            <span class="login-brand__chip rounded-full px-3 py-1 text-xs font-medium">{{ chip }}</span>
+            <span class="rounded-full border border-border bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">{{ chip }}</span>
             {% endfor %}
         </div>
     </aside>
 
-    {# ── Credential form ─────────────────────────────────────────── #}
+    {# Credential form #}
     <div class="flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div class="w-full max-w-md">
             {# mobile-only wordmark (brand panel is hidden < lg) #}
@@ -81,13 +58,14 @@
                 <span class="sr-only">Entelim</span>
             </div>
 
- <div class="rounded-xl border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6 pb-2">
-                    <h1 id="login-title" class="text-2xl font-semibold leading-none tracking-tight">Welcome back</h1>
-                    <p class="text-sm text-muted-foreground">Sign in to your enterprise intelligence workspace</p>
-                </div>
-                <div class="p-6 pt-4"
-                     x-data="{ 
+            {% call card(class='rounded-xl') %}
+                {% call card_header(class='pb-2') %}
+                    {% call card_title() %}<span id="login-title">Welcome back</span>{% endcall %}
+                    {% call card_description() %}Sign in to your enterprise intelligence workspace{% endcall %}
+                {% endcall %}
+                {% call card_content(class='pt-4') %}
+                <div
+                     x-data="{
                        isSubmitting: false,
                        handleSubmit(e) {
                          this.isSubmitting = true;
@@ -104,8 +82,7 @@
                     {{ f.begin_form(form, flashes, action=request.url) }}
                     <form method="post" @submit="handleSubmit" novalidate>
                         {{ form.hidden_tag() }}
-                        
-                        {# Email field with full accessibility #}
+
                         <div class="space-y-2 mb-4">
                             <label for="{{ form.email.id }}" class="text-sm font-medium leading-none block">
                                 {{ form.email.label.text }}
@@ -113,12 +90,12 @@
                             </label>
                             {% if form.email.errors %}
                                 {{ form.email(
-                                    class="flex h-10 w-full rounded-md border border-destructive bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 transition-colors", 
-                                    placeholder="your.email@company.com", 
+                                    class="flex h-10 w-full rounded-md border border-destructive bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 transition-colors",
+                                    placeholder="your.email@company.com",
                                     autofocus='',
                                     autocomplete="email",
                                     **{
-                                        'aria-invalid': 'true', 
+                                        'aria-invalid': 'true',
                                         'aria-describedby': form.email.id ~ '-error',
                                         'aria-required': 'true'
                                     }) }}
@@ -128,8 +105,8 @@
                                 </p>
                             {% else %}
                                 {{ form.email(
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors", 
-                                    placeholder="your.email@company.com", 
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors",
+                                    placeholder="your.email@company.com",
                                     autofocus='',
                                     autocomplete="email",
                                     **{'aria-required': 'true'}) }}
@@ -148,28 +125,23 @@
                         {{ f.form_message(flashes['info'], header='Information', class='info') }}
                         {{ f.form_message(flashes['success'], header='Success!', class='success') }}
 
-                        <button type="submit"
-                                id="submit"
-                                :disabled="isSubmitting"
-                                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
-                                :aria-busy="isSubmitting">
+                        {% call button(type='submit', class='w-full mt-2', attrs_dict={'id': 'submit', ':disabled': 'isSubmitting', ':aria-busy': 'isSubmitting'}) %}
                             <span x-show="!isSubmitting">{{ form.submit.label.text }}</span>
                             <span x-show="isSubmitting" class="inline-flex items-center gap-2">
                                 <span class="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></span>
                                 <span>Logging in...</span>
                             </span>
-                        </button>
+                        {% endcall %}
                     </form>
                     {{ f.end_form(form) }}
 
                     <div class="mt-4 text-center text-sm text-muted-foreground">
-                        Don't have an account?
+                        Don&#39;t have an account?
                         <a href="{{ url_for('account.register', plan=request.args.get('plan'), interval=request.args.get('interval')) if request.args.get('plan') else url_for('account.register') }}" class="text-primary font-medium hover:underline">
                             Register
                         </a>
                     </div>
 
-                    {# SSO login options — shown only when configured #}
                     {% if sso_providers %}
                     <div class="mt-6">
                         <div class="relative">
@@ -182,19 +154,17 @@
                         </div>
                         <div class="mt-4 flex flex-col gap-2">
                             {% for provider in sso_providers %}
-                            <a href="{{ url_for('account.sso_login', provider=provider.key) }}"
-                               class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-full">
-                                {{ provider.name }}
-                            </a>
+                                {{ button(variant='outline', class='w-full', href=url_for('account.sso_login', provider=provider.key, next=request.args.get('next')), text=provider.name) }}
                             {% endfor %}
                         </div>
                     </div>
                     {% endif %}
                 </div>
-            </div>
+                {% endcall %}
+            {% endcall %}
 
             <p class="mt-6 text-center text-xs text-muted-foreground">
-                Protected workspace · Architecture Review Board governed
+                Protected workspace &middot; Architecture Review Board governed
             </p>
         </div>
     </div>

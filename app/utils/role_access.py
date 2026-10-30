@@ -243,9 +243,30 @@ def get_user_role(user) -> str:
     if not user:
         return DEFAULT_ROLE
     try:
-        return getattr(user, "enterprise_role", None) or DEFAULT_ROLE
+        persona = getattr(user, "enterprise_role", None)
     except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
         return DEFAULT_ROLE
+    return _narrowed_persona(user, persona) or DEFAULT_ROLE
+
+
+def _narrowed_persona(user, persona):
+    """A stored persona may narrow what the roles allow, never widen it.
+
+    ``platform_admin`` is the widest persona, and accounts created before it
+    stopped being the default still store it. It counts only for a person who
+    holds platform authority or administers the active organisation; for anyone
+    else it reads as no persona.
+    """
+    if persona != ROLE_PLATFORM_ADMIN:
+        return persona
+    try:
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        if is_platform_admin(user):
+            return persona
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        pass
+    return persona if _is_org_administrator(user) else None
 
 
 def _is_org_administrator(user) -> bool:
@@ -277,6 +298,7 @@ def get_effective_role(user) -> str:
         persona = getattr(user, "enterprise_role", None)
     except Exception:  # noqa: BLE001
         return DEFAULT_ROLE
+    persona = _narrowed_persona(user, persona)
     if persona:
         return persona
     return ROLE_PLATFORM_ADMIN if _is_org_administrator(user) else DEFAULT_ROLE
@@ -374,7 +396,7 @@ def may_load_sample_company(user) -> bool:
     the estate, and administrators."""
     try:
         return bool(
-            getattr(user, "enterprise_role", None)
+            _narrowed_persona(user, getattr(user, "enterprise_role", None))
             in ("enterprise_architect", "solution_architect", "platform_admin")
         ) or bool(user.is_admin())
     except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
@@ -1271,6 +1293,16 @@ def link_requires_satisfied(user, requires):
     if requires.startswith("section:"):
         # A route guarded by can_access_section (the agent registry's _guard).
         return can_access_section(user, requires.split(":", 1)[1])
+    if requires in ("costs", "spend_pages"):
+        # The guards on the Spend group's read-only pages, through the predicates the routes use:
+        # the contract pages (contracts, renewals) and the spend and licence pages. Each admits
+        # whoever may see cost figures (can_see_costs) and the roles its own page was built for.
+        try:
+            from app.decorators.requires_role import may_see_contract_pages, may_see_spend_pages
+
+            return bool((may_see_contract_pages if requires == "costs" else may_see_spend_pages)(user))
+        except Exception:  # anonymous / unexpected user object
+            return False
     if requires in ("procurement", "procurement_or_finance"):
         # The guards on the procurement pages (requires_procurement and
         # requires_procurement_or_finance), through the one predicate the
@@ -1327,4 +1359,5 @@ def role_access_context_processor():
         "is_procurement": is_procurement,
         "is_application_manager": is_application_manager,
         "get_role_display_name": get_role_display_name,
+        "link_requires_satisfied": link_requires_satisfied,
     }

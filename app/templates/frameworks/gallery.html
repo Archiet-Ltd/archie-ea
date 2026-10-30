@@ -1,0 +1,93 @@
+{# design-block: dashboard #}
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell, empty_state as shell_empty %}
+{% import 'components/card.html' as card %}
+{% from 'components/badge.html' import badge %}
+
+{% block title %}Frameworks{% endblock %}
+
+{% macro compliance_card(item) %}
+<li>
+    <a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard') }}"
+       data-framework-card="{{ item.code }}"
+       class="block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {% call card.card(class='h-full hover:border-primary/50 transition-colors') %}
+            {% call card.card_header() %}
+                {% call card.card_title() %}{{ item.name }}{% endcall %}
+                {% call card.card_description() %}{{ item.description or 'A compliance framework with its own set of controls.' }}{% endcall %}
+            {% endcall %}
+            {% call card.card_content() %}
+                <div class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    {% if item.adopted %}{% call badge('default') %}Adopted{% endcall %}{% endif %}
+                    {% if item.jurisdiction %}<span>{{ item.jurisdiction }}</span>{% endif %}
+                    <span>{{ item.controls }} control{{ '' if item.controls == 1 else 's' }}</span>
+                </div>
+            {% endcall %}
+        {% endcall %}
+    </a>
+</li>
+{% endmacro %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Frameworks',
+        subtitle='The frameworks your organisation has chosen come first, then every industry and compliance framework the platform supports.',
+        breadcrumb=[('Home', url_for('dashboard.overview')), ('Model', None), ('Frameworks', None)]
+    ) }}
+
+    {% if load_error %}
+    <div role="alert" class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-destructive-emphasis">{{ load_error }}</div>
+    {% else %}
+
+    <section aria-labelledby="your-frameworks" class="space-y-3" data-testid="frameworks-yours">
+        <h2 id="your-frameworks" class="text-lg font-semibold">Your frameworks</h2>
+        {% if adopted %}
+        <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for item in adopted %}{{ compliance_card(item) }}{% endfor %}
+        </ul>
+        {% else %}
+        {{ shell_empty(icon='library', headline='Your organisation has not adopted a framework yet', body='Open a compliance framework below to see its controls and adopt it.') }}
+        {% endif %}
+    </section>
+
+    <section aria-labelledby="industry-frameworks" class="space-y-3" data-testid="frameworks-industry">
+        <h2 id="industry-frameworks" class="text-lg font-semibold">Industry process frameworks</h2>
+        {% if industries %}
+        <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-framework-list>
+            {% for item in industries %}
+            {% set fw = item.framework %}
+            <li>
+                <a href="{{ url_for('industry_apqc.industry_apqc_framework_detail', industry_code=fw.industry_code) }}"
+                   data-framework-card="{{ fw.industry_code }}"
+                   class="block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    {% call card.card(class='h-full hover:border-primary/50 transition-colors') %}
+                        {% call card.card_header() %}
+                            {% call card.card_title() %}{{ fw.industry_name }}{% endcall %}
+                            {% call card.card_description() %}{{ fw.description }}{% endcall %}
+                        {% endcall %}
+                        {% call card.card_content() %}
+                            <p class="text-sm text-muted-foreground">{{ item.total }} processes in {{ item.categories }} categories</p>
+                        {% endcall %}
+                    {% endcall %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        {{ shell_empty(icon='workflow', headline='No industry frameworks are installed', body='The frameworks load with the platform. Ask a platform administrator to check the installation.') }}
+        {% endif %}
+    </section>
+
+    {% if available %}
+    <section aria-labelledby="compliance-frameworks" class="space-y-3" data-testid="frameworks-compliance">
+        <h2 id="compliance-frameworks" class="text-lg font-semibold">Compliance frameworks you can adopt</h2>
+        <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for item in available %}{{ compliance_card(item) }}{% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}

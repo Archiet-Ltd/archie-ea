@@ -1,16 +1,22 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge, value_or_unset, section %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Investment Matrix{% endblock %}
+{% block title %}Investments{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Investment Matrix', 'current': true}
-]) }}
-{% endblock %}
+{%- set caps = capabilities|default([]) or [] -%}
+{%- set IMPORTANCE = ['critical', 'high', 'medium', 'low'] -%}
+{%- set rated = caps|selectattr('strategic_importance', 'in', IMPORTANCE)|list -%}
+{%- set QUADRANTS = [
+    ('critical', 'Transform', 'Critical to the strategy: change these first'),
+    ('high', 'Invest', 'High importance: fund to reach the target'),
+    ('low', 'Divest', 'Low importance: stop spending, retire or replace'),
+    ('medium', 'Maintain', 'Medium importance: keep running at today\'s level'),
+] -%}
 
 {% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
@@ -19,149 +25,104 @@
    sidebar. Callers keep the <a> in the row itself so the link is visible both to a
    reader and to scripts/check_actionable_rows.py. #}
 {% macro row_href(endpoint) %}{% if endpoint in flask.current_app.view_functions %}{{ url_for(endpoint, **kwargs) }}{% endif %}{% endmacro %}
+{%- set rate_href = row_href('unified_low_priority.capability_map_capabilities')|trim -%}
 
-<div class="flex flex-col space-y-8 animate-in fade-in duration-500">
-    {{ page_header(
-        title='Investment Matrix',
-        description='Prioritize capability investments based on strategic value and risk.'
-    ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Investments', subtitle='Where to put money next, by how much each capability matters to the strategy',
+              breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Investments', none)]) }}
 
-    <!-- Investment Matrix Visualization -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-        <h3 class="font-semibold mb-4">Investment Priority Matrix</h3>
-        <div class="grid grid-cols-2 gap-4 h-96">
-            <!-- High Value / High Risk -->
-            <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2">
-                <div class="text-sm font-medium text-warning-emphasis mb-2">Transform (High Value / High Risk)</div>
-                <div class="space-y-2">
-                    {% for cap in capabilities|default([]) if cap.strategic_importance == 'critical' %}
-                    <div class="text-xs bg-background/50 rounded p-2">{{ cap.name }}</div>
-                    {% endfor %}
-                </div>
-            </div>
-            <!-- High Value / Low Risk -->
-            <div class="rounded-md bg-success/10 border border-success/40 px-3 py-2">
-                <div class="text-sm font-medium text-success-emphasis mb-2">Invest (High Value / Low Risk)</div>
-                <div class="space-y-2">
-                    {% for cap in capabilities|default([]) if cap.strategic_importance == 'high' %}
-                    <div class="text-xs bg-background/50 rounded p-2">{{ cap.name }}</div>
-                    {% endfor %}
-                </div>
-            </div>
-            <!-- Low Value / High Risk -->
-            <div class="rounded-md bg-destructive/10 border border-destructive/40 px-3 py-2">
-                <div class="text-sm font-medium text-destructive-emphasis mb-2">Divest (Low Value / High Risk)</div>
-                <div class="space-y-2">
-                    {% for cap in capabilities|default([]) if cap.strategic_importance == 'low' %}
-                    <div class="text-xs bg-background/50 rounded p-2">{{ cap.name }}</div>
-                    {% endfor %}
-                </div>
-            </div>
-            <!-- Low Value / Low Risk -->
-            <div class="rounded-md bg-primary/10 border border-primary/40 px-3 py-2">
-                <div class="text-sm font-medium text-primary mb-2">Maintain (Low Value / Low Risk)</div>
-                <div class="space-y-2">
-                    {% for cap in capabilities|default([]) if cap.strategic_importance == 'medium' %}
-                    <div class="text-xs bg-background/50 rounded p-2">{{ cap.name }}</div>
-                    {% endfor %}
-                </div>
-            </div>
+{% if not caps %}
+  {% call ui.card(attrs={'data-testid': 'investment-empty'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('layout-grid') }}</span>
+      <p class="text-base font-semibold">No capabilities yet</p>
+      <p class="max-w-[60ch] text-sm text-muted-foreground">Add the capabilities your business runs on and rate how much each matters; this page then shows where to invest.</p>
+      {% if rate_href %}{% call ui.button(href=rate_href) %}{{ lucide('plus') }}Add capabilities{% endcall %}{% endif %}
+    {% endcall %}
+  {% endcall %}
+{% else %}
+  {%- set no_current = caps|selectattr('current_maturity_level', 'none')|list|length -%}
+  {%- set no_target = caps|selectattr('target_maturity_level', 'none')|list|length -%}
+  {%- set show_current = no_current < caps|length -%}
+  {%- set show_target = no_target < caps|length -%}
+  {%- set no_maturity = (caps|selectattr('current_maturity_level', 'none')|list + caps|selectattr('target_maturity_level', 'none')|list)|map(attribute='id')|unique|list|length -%}
+  {%- set columns = [{'label': 'Capability', 'sortable': true}] -%}
+  {%- if rated %}{% set _ = columns.append(('Strategic importance', '')) %}{% endif -%}
+  {%- if show_current %}{% set _ = columns.append({'label': 'Current maturity', 'align': 'right', 'sortable': true}) %}{% endif -%}
+  {%- if show_target %}{% set _ = columns.append({'label': 'Target maturity', 'align': 'right', 'sortable': true}) %}{% endif -%}
+
+  {% macro _rate_action() %}{% if rate_href %}{{ ui.button(text='Rate capabilities', href=rate_href, variant='outline', size='sm') }}{% endif %}{% endmacro %}
+
+  {% macro _matrix() %}
+  {% call section('Investment priority matrix', ('Each rated capability placed by its strategic importance' if rated else 'Capabilities land in a quadrant once they carry a strategic importance rating'), testid='investment-matrix') %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% for key, name, meaning in QUADRANTS %}
+      {%- set inq = rated|selectattr('strategic_importance', 'equalto', key)|list -%}
+      <div class="flex {{ 'min-h-40' if rated else '' }} flex-col gap-3 rounded-lg border p-4" data-testid="investment-quadrant-{{ name|lower }}">
+        <div>
+          <p class="flex items-center justify-between gap-2 text-sm font-semibold"><span>{{ name }}</span>{% if rated %}<span class="text-muted-foreground tabular-nums">{{ inq|length }}</span>{% endif %}</p>
+          <p class="text-sm text-muted-foreground">{{ meaning }}</p>
         </div>
+        {% if inq %}
+        <div class="flex flex-wrap gap-1.5">
+          {% for cap in inq[:24] %}{{ ui.badge(text=cap.name, variant='outline', class='max-w-[220px] truncate font-normal') }}{% endfor %}
+          {% if inq|length > 24 %}<span class="text-sm text-muted-foreground">and {{ inq|length - 24 }} more</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
     </div>
+  {% endcall %}
+  {% endmacro %}
 
-    <!-- 2x2 Investment Bubble Chart (Business Architect visual 3 — TIME quadrant) -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-        <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
-            <div>
-                <h3 class="font-semibold">Investment Bubble — TIME Quadrant</h3>
-                <p class="text-xs text-muted-foreground mt-1">X = strategic importance, Y = maturity gap (target − current), bubble size = business value (1–10 scale, used as an investment-size proxy — this capability data does not carry an annual cost figure).</p>
-            </div>
-            <div class="flex items-center gap-3 text-xs flex-wrap">
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-success"></span> Invest</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-warning"></span> Migrate</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-primary"></span> Tolerate</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-destructive"></span> Eliminate</span>
-            </div>
-        </div>
-        <div id="investment-bubble-empty" class="hidden">
-            {% from 'components/empty_state.html' import empty_state %}
-            {# The x-axis is BusinessCapability.strategic_importance and no screen writes that
-               field: the capability dialog (capability_map/capabilities.html) offers name,
-               category, level, parent, maturity, owner and description, and the capability
-               map renders importance read-only. There is no honest CTA to give, so the copy
-               says what is missing rather than sending the reader somewhere that cannot
-               supply it. Recorded as a product gap, not papered over with a link.
-               empty-state-ok: no screen writes capability strategic_importance #}
-            {{ empty_state(
-                icon='scatter-chart',
-                title='No capability data to plot',
-                description='The bubble chart needs capabilities carrying a strategic importance rating, and none do. That rating is currently set by import or by the API rather than on any screen — ask your platform admin to load it.'
-            ) }}
-        </div>
-        <div id="investment-bubble-container" class="relative h-[420px]">
-            <canvas id="investment-bubble-chart"></canvas>
-        </div>
+  {% if rated %}
+  {{ _matrix() }}
+  {% call section('Importance against maturity gap', 'Further right matters more, higher has further to go; bubble size is business value', testid='investment-bubble') %}
+    <div id="investment-bubble-empty" class="hidden">
+      <p class="text-sm text-muted-foreground">The chart could not be drawn. Reload the page to try again.</p>
     </div>
+    <div id="investment-bubble-container" class="relative h-[360px]">
+      <canvas id="investment-bubble-chart" aria-label="Capabilities by strategic importance and maturity gap" role="img"></canvas>
+    </div>
+  {% endcall %}
+  {% endif %}
 
-    <!-- Capabilities List -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="p-6">
-            <h3 class="font-semibold mb-4">All Capabilities</h3>
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left p-3 font-medium">Capability</th>
-                            <th class="text-left p-3 font-medium">Strategic Importance</th>
-                            <th class="text-left p-3 font-medium">Current Maturity</th>
-                            <th class="text-left p-3 font-medium">Target Maturity</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        {% for cap in capabilities|default([]) %}
-                        <tr class="border-b hover:bg-muted/50">
-                            <td class="p-3">
-                                {% if cap.id %}
-                                {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=cap.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ cap.name|default('N/A') }}</a>{% else %}{{ cap.name|default('N/A') }}{% endif %}
-                                {% else %}{{ cap.name|default('N/A') }}{% endif %}
-                            </td>
-                            <td class="p-3">
-                                <span class="px-2 py-1 text-xs rounded-full
-                                    {% if cap.strategic_importance == 'critical' %}bg-destructive/20 text-destructive-emphasis
-                                    {% elif cap.strategic_importance == 'high' %}bg-warning/20 text-warning-emphasis
-                                    {% else %}bg-muted text-muted-foreground{% endif %}">
-                                    {{ cap.strategic_importance|default('Normal')|title }}
-                                </span>
-                            </td>
-                            <td class="p-3">{{ cap.current_maturity_level|default(1) }}</td>
-                            <td class="p-3">{{ cap.target_maturity_level|default(3) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="p-6 text-center text-muted-foreground">No capabilities found</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+  {% call section('All capabilities', ('Rated by how much each matters to the strategy and how mature it is today' if rated else 'Not one of your ' ~ caps|length ~ ' capabilities has a strategic importance rating yet; rate them on the capability map and each lands in its quadrant below.'),
+                  action=(none if rated else _rate_action), testid='investment-capabilities') %}
+    {% if no_maturity and (show_current or show_target) %}
+    <p class="mb-4 text-sm text-muted-foreground" data-testid="investment-maturity-note">{{ no_maturity }} of {{ caps|length }} capabilities have no maturity level recorded yet; their maturity cells are left blank.</p>
+    {% elif not show_current and not show_target %}
+    <p class="mb-4 text-sm text-muted-foreground" data-testid="investment-maturity-note">No maturity levels are recorded yet, so the maturity columns are hidden.</p>
+    {% endif %}
+    {% call(cap) list_table(rows=caps, columns=columns, caption='All capabilities', testid='investment-capabilities-table', row_testid='capability-row', search_placeholder='Filter capabilities...') %}
+      {% call table_cell(class='max-w-[420px]') %}
+        {% set _h = (row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=cap.id)|trim) if cap.id else '' %}
+        {% if _h %}<a href="{{ _h }}" class="block truncate font-medium text-foreground hover:underline">{{ cap.name or 'Unnamed capability' }}</a>{% else %}<span class="block truncate font-medium">{{ cap.name or 'Unnamed capability' }}</span>{% endif %}
+      {% endcall %}
+      {% if rated %}{% call table_cell() %}{% if cap.strategic_importance %}{{ state_badge(cap.strategic_importance, tone='neutral') }}{% else %}<span class="sr-only">Not rated</span>{% endif %}{% endcall %}{% endif %}
+      {% if show_current %}{% call table_cell(class='text-right tabular-nums', attrs={'data-sort': cap.current_maturity_level if cap.current_maturity_level is not none else -1}) %}{% if cap.current_maturity_level is not none %}{{ cap.current_maturity_level }}{% else %}<span class="sr-only">Not recorded</span>{% endif %}{% endcall %}{% endif %}
+      {% if show_target %}{% call table_cell(class='text-right tabular-nums', attrs={'data-sort': cap.target_maturity_level if cap.target_maturity_level is not none else -1}) %}{% if cap.target_maturity_level is not none %}{{ cap.target_maturity_level }}{% else %}<span class="sr-only">Not recorded</span>{% endif %}{% endcall %}{% endif %}
+    {% endcall %}
+  {% endcall %}
+
+  {% if not rated %}{{ _matrix() }}{% endif %}
+{% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{% if rated is defined and rated %}
 <script>
-// Investment Bubble data — built from the SAME `capabilities` context variable the
-// table above already renders (app/routes/unified_enterprise_routes.py:investment_matrix,
-// BusinessCapability.query.limit(500).all()). No new endpoint or route is introduced;
-// each field is emitted individually via |tojson so the SQLAlchemy model instances
-// themselves never need to be JSON-serialized.
+// Investment Bubble data, built from the same `capabilities` the table renders. Only capabilities carrying a strategic
+// importance rating are plotted, so nothing is placed on a default it was never given.
 window.__investmentBubbleData = [
-    {% for cap in capabilities|default([]) %}
-    {% set gap = cap.maturity_gap if cap.maturity_gap is not none else ((cap.target_maturity_level|default(3, true)) - (cap.current_maturity_level|default(1, true))) %}
+    {% for cap in rated %}
+    {% set current_m = cap.current_maturity_level %}
+    {% set target_m = cap.target_maturity_level %}
+    {% set gap = cap.maturity_gap if cap.maturity_gap is not none else ((target_m if target_m is not none else 3) - (current_m if current_m is not none else 1)) %}
     {
-        name: {{ cap.name|default('Unnamed Capability', true)|tojson }},
-        strategic_importance: {{ (cap.strategic_importance|default('medium', true))|lower|tojson }},
+        name: {{ cap.name|default('Unnamed capability', true)|tojson }},
+        strategic_importance: {{ cap.strategic_importance|lower|tojson }},
         maturity_gap: {{ gap|tojson }},
         business_value: {{ cap.business_value|default(5, true)|tojson }},
         roi_score: {{ cap.roi_score|tojson }}
@@ -169,10 +130,8 @@ window.__investmentBubbleData = [
     {% endfor %}
 ];
 </script>
-{# Business Architect visuals: Chart.js — same CDN/version already used by
-   arb/dashboard.html and applications/rationalization/dashboard.html (RATA-010's
-   TIME quadrant chart). No new external library is introduced. #}
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared/css_color_tokens.js') }}"></script>
 <script src="{{ url_for('static', filename='js/capability_map/investment_bubble.js') }}"></script>
+{% endif %}
 {% endblock %}

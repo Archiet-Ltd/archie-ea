@@ -56,8 +56,8 @@
 
     {# ── ENT-107: Viewpoint tab strip ────────────────────────── #}
     <div class="h-10 items-center px-4 gap-1 border-b border-border bg-muted shrink-0 overflow-x-auto"
-         :class="viewpointTabs.length > 1 ? 'flex' : 'hidden md:flex'"
-         role="tablist" aria-label="Open viewpoints">
+         :class="viewpointTabs.length > 1 ? 'flex' : 'hidden md:flex'">
+        <div role="group" aria-label="Open viewpoints" class="contents">
         <template x-for="tab in viewpointTabs" :key="tab.id">
             <div class="flex items-center gap-1 px-3 h-full text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer select-none"
                  data-tab
@@ -66,7 +66,7 @@
  : 'border-b-[3px] border-transparent text-muted-foreground hover:text-foreground hover:bg-card/50'"
                  @click="activeTabId = tab.id; loadSavedViewpoint(tab.id, tab.name)"
                  @dblclick.stop="$el.querySelector('[data-tab-name]').setAttribute('contenteditable', 'true'); $el.querySelector('[data-tab-name]').focus()">
-                {% call button(variant='bare', size='bare', class="text-xs", attrs_dict={"role": "tab", ":aria-selected": "tab.id === activeTabId"}) %}<span x-text="tab.name" data-tab-name
+                {% call button(variant='bare', size='bare', class="text-xs", attrs_dict={":aria-current": "tab.id === activeTabId ? 'true' : false"}) %}<span x-text="tab.name" data-tab-name
                       @blur="$el.removeAttribute('contenteditable'); tab.name = $el.textContent.trim() || tab.name"
                       @keydown.enter.prevent="$el.blur()"
                       @keydown.escape.prevent="$el.textContent = tab.name; $el.blur()"
@@ -74,6 +74,7 @@
                 {% call button(variant='ghost', size='icon-sm', class="ml-1", aria_label="Close tab", attrs_dict={"@click.stop": "closeViewpointTab(tab)"}) %}<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg>{% endcall %}
             </div>
         </template>
+        </div>
         {# C-04: relabelled from "New blank diagram" — that name and the tab-strip
            position read as "open a new tab" (additive), but the action clears the
            current canvas (destructive). newDiagram() now confirms with the exact

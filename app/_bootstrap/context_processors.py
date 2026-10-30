@@ -729,7 +729,10 @@ def init_context_processors(app):
         current_user = user if user is not None else signed_in
 
         endpoint = request.endpoint if has_request_context() else None
-        nav = registry.sidebar_for(current_user, endpoint)
+        values = {**request.args.to_dict(), **(request.view_args or {})} if has_request_context() else {}
+        remembered = registry.remembered_items(request.cookies, current_user) if has_request_context() else {}
+        nav = registry.sidebar_for(current_user, endpoint, values, remembered)
+        nav["cookie_name"] = registry.remembered_cookie_name(current_user)
         org_id = getattr(g, "current_org_id", None) if has_request_context() else None
         if org_id is None:
             org_id = getattr(current_user, "organization_id", None)
@@ -747,6 +750,24 @@ def init_context_processors(app):
 
     app.jinja_env.globals["sidebar_navigation"] = _template_navigation
     app.jinja_env.globals["nav_trail"] = _template_nav_trail
+
+    def _template_page_trail():
+        from flask import has_request_context, request
+        from flask_login import current_user
+
+        from app.navigation import registry
+
+        if not has_request_context():
+            return {"trail": [], "path": None, "home": None}
+        home = registry.resolve(current_user, registry._by_key("home")) if registry._by_key("home") else None
+        # a page filtered the way a sidebar item filters (?layer=motivation) is a view of its own, not the
+        # unfiltered entry's page, so its address carries the filter when the header compares the two
+        filtered = any(k in request.args for k in registry.filter_keys())
+        path = request.full_path.rstrip("?") if filtered else request.path
+        return {"trail": registry.page_trail(current_user, request.endpoint, request.args), "path": path,
+                "home": registry.href(home) if home is not None else "/"}
+
+    app.jinja_env.globals["page_trail"] = _template_page_trail
 
     # E2E-7: the header's role badge (components/admin_header.html) read
     # current_user.role.name -- the legacy Flask-Base Role/Permission table,

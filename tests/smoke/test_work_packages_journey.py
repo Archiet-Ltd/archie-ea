@@ -43,7 +43,6 @@ def test_work_packages_shows_list_and_links_land(browser, live_server):
             "start_date": "2026-11-01", "target_date": "2027-01-31",
         })
         assert status == 201, wp
-        wp_id = wp["work_package"]["id"]
 
         # Reload and assert the work package appears
         page.goto(live_server + "/enterprise/implementation/work-packages",

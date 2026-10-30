@@ -1,0 +1,123 @@
+{
+  "_doc": "ADR-0022. tools: the entities each read-class tool reads (the read-entity map; a test fails when a registered read tool is missing). restricted_entities: never read through the open rule; a read touching one needs it in the persona's readable_entities. An organisation can add to the list in its settings (restricted_entities).",
+  "restricted_entities": [
+    "billing",
+    "payment",
+    "audit_log",
+    "history_log",
+    "user",
+    "session",
+    "credential",
+    "connector_secret",
+    "connector_token"
+  ],
+  "tools": {
+    "answer": [
+      "archimate_element"
+    ],
+    "ask_accountability": [
+      "archimate_element"
+    ],
+    "ask_impact": [
+      "archimate_element"
+    ],
+    "ask_data_flow": [
+      "archimate_element"
+    ],
+    "ask_portfolio": [
+      "application"
+    ],
+    "ask_risk": [
+      "risk"
+    ],
+    "ask_programme": [
+      "programme"
+    ],
+    "ask_strategy": [
+      "programme"
+    ],
+    "diagnose_chain": [
+      "archimate_element"
+    ],
+    "explain_element": [
+      "archimate_element"
+    ],
+    "simulate_impact": [
+      "archimate_element"
+    ],
+    "get_element": [
+      "archimate_element"
+    ],
+    "search_elements": [
+      "archimate_element"
+    ],
+    "search_archimate_elements": [
+      "archimate_element"
+    ],
+    "infer_schema": [],
+    "find_applications": [
+      "application"
+    ],
+    "find_applications_by_capability": [
+      "application",
+      "capability"
+    ],
+    "find_technical_capabilities": [
+      "capability"
+    ],
+    "search_capabilities_by_problem": [
+      "capability"
+    ],
+    "query_capability_gaps": [
+      "application",
+      "capability"
+    ],
+    "get_investment_priorities": [
+      "capability"
+    ],
+    "propose_rationalization": [
+      "application",
+      "capability"
+    ],
+    "get_arb_status": [
+      "arb_item"
+    ],
+    "get_executive_dashboard": [
+      "application",
+      "capability",
+      "programme",
+      "arb_item"
+    ],
+    "get_solution_summary": [
+      "solution"
+    ],
+    "get_completeness_score": [
+      "solution"
+    ],
+    "validate_sap_clean_core": [
+      "solution"
+    ],
+    "verify_codegen": [
+      "solution"
+    ],
+    "build_architecture_plan": [
+      "solution",
+      "capability"
+    ],
+    "get_canvas": [
+      "canvas"
+    ],
+    "list_canvases": [
+      "canvas"
+    ],
+    "get_genome_slice": [
+      "capability",
+      "application",
+      "archimate_element",
+      "solution",
+      "plateau",
+      "gap",
+      "work_package"
+    ]
+  }
+}

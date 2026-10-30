@@ -26,6 +26,7 @@ SOURCES = ("screen", "import", "connector", "ai_proposal", "system")
 _source: ContextVar[str | None] = ContextVar("change_source", default=None)
 _correlation: ContextVar[str | None] = ContextVar("change_correlation", default=None)
 _actor: ContextVar[int | None] = ContextVar("change_actor", default=None)
+_dating: ContextVar[object | None] = ContextVar("change_dating", default=None)
 
 
 @contextmanager
@@ -48,6 +49,21 @@ def change_source(source: str, *, user_id: int | None = None, correlation_id: st
         _source.reset(tokens[0])
 
 
+@contextmanager
+def dated_when_written(dating):
+    """Let ``dating`` give each new audited record the date its first version is written with.
+
+    For the demonstration and sample loads only: they are built in one sitting, so the audit writer asks
+    ``dating.date_new_record(table_label, record)`` as it writes a record's first version, and the row is
+    sealed once with that date. Nothing already sealed is ever touched.
+    """
+    token = _dating.set(dating)
+    try:
+        yield dating
+    finally:
+        _dating.reset(token)
+
+
 def records_changes_as(source: str):
     """Decorator form of ``change_source`` for a service entry point."""
 
@@ -64,7 +80,7 @@ def records_changes_as(source: str):
 
 
 def current_change_context() -> dict:
-    """``{"source", "correlation_id", "user_id"}`` for the write happening now."""
+    """``{"source", "correlation_id", "user_id", "dating"}`` for the write happening now."""
     source = _source.get()
     correlation = _correlation.get()
     user_id = _actor.get()
@@ -83,4 +99,34 @@ def current_change_context() -> dict:
         "source": source or "system",
         "correlation_id": correlation or uuid.uuid4().hex,
         "user_id": user_id,
+        "dating": _dating.get(),
     }
+
+
+def declared_source() -> tuple[str, int | None] | None:
+    """The (source, user id) of the write happening now, or None when nothing declared one.
+
+    A web request counts as ``screen``; a block opened with ``change_source`` names its own. A bare
+    script, test or seed that declares nothing returns None, so a record written there is never given
+    an origin it did not have.
+    """
+    source = _source.get()
+    try:
+        from flask import has_request_context
+
+        if source is None and has_request_context():
+            source = "screen"
+    except Exception:  # noqa: BLE001 - never block a write on bookkeeping
+        pass
+    if source is None:
+        return None
+    user_id = _actor.get()
+    if user_id is None:
+        try:
+            from flask_login import current_user
+
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.id
+        except Exception:  # noqa: BLE001
+            user_id = None
+    return source, user_id

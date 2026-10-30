@@ -35,6 +35,8 @@ AUDITED_TABLES = {
     "application_component": "Application",
     "unified_capabilities": "Capability",
     "business_capability": "Business capability",
+    "solution": "Solution",
+    "user": "User",
 }
 _MODEL_TABLES = ("archimate_elements", "archimate_relationships")
 _ACTIONS = {"create": "insert", "update": "update", "delete": "delete"}
@@ -165,6 +167,22 @@ class HistoryService:
             user = self.session.get(User, uid)
             if user is not None and user.organization_id == self.organization_id:
                 names[uid] = user.email or str(uid)
+        return names
+
+    def person_names(self, user_ids) -> dict[int, str]:
+        """The names (first and last) of the people who made changes, in this organisation.
+
+        A person with no recorded name is left out; an email address is never given as a name.
+        """
+        from app.models.user import User
+
+        names = {}
+        for uid in {u for u in user_ids if u}:
+            user = self.session.get(User, uid)
+            if user is not None and user.organization_id == self.organization_id:
+                name = " ".join(part for part in (user.first_name, user.last_name) if part).strip()
+                if name:
+                    names[uid] = name
         return names
 
     # ------------------------------------------------------------------ #

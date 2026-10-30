@@ -46,6 +46,37 @@
                       is still the plain string. #}
 {% from 'components/_breadcrumb_root.html' import crumb_label %}
 {% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False, title_caller=None) %}
+{#- The breadcrumb follows the sidebar: Home, the section, the page's entry, then the record the page
+    shows (the last crumb the page passes, or its title). Pages the sidebar does not hold keep their own. -#}
+{%- set _where = page_trail() if page_trail is defined else {'trail': []} -%}
+{%- if _where.trail -%}
+  {%- set _last = _where.trail[-1] -%}
+  {%- set _own = breadcrumb[1:] if breadcrumb and breadcrumb[0][0] == 'Home' else breadcrumb -%}
+  {%- if _last[1] and (_last[1].split('?')[0] == _where.path or _last[1] == _where.path) -%}
+    {#- the entry's own page; a record chosen on it (?initiative=) stays as the last crumb -#}
+    {#- one name per page: the heading of a sidebar entry's own page is the name the sidebar gives it -#}
+    {%- set _given = title or '' -%}
+    {%- set title = _last[0] -%}
+    {#- a list page keeps its plural heading where the sidebar names the thing in the singular -#}
+    {%- if _given and (_given|lower).startswith(title|lower) and _given|length <= title|length + 2 -%}{%- set title = _given -%}{%- set _where = dict(_where, trail=_where.trail[:-1] + [(_given, _last[1])]) -%}{%- set _last = _where.trail[-1] -%}{%- endif -%}
+    {%- if _own|length > 1 and (_own[-1][0]|lower) not in (title|lower) and (_own[-1][0]|lower) not in (_given|lower) -%}
+      {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [(_own[-1][0], none)] -%}
+    {%- else -%}
+      {%- set breadcrumb = [('Home', _where.home)] + _where.trail[:-1] + [(_last[0], none)] -%}
+    {%- endif -%}
+  {%- elif _where.trail|length == 1 and not _last[1] and _own -%}
+    {#- the sidebar knows only the section: the page's own trail below it (Solutions, then the record) -#}
+    {%- set breadcrumb = [('Home', _where.home)] + _where.trail + _own[:-1] + [(_own[-1][0], none)] -%}
+  {%- else -%}
+    {%- set _page = (_own[-1][0] if _own else title) -%}
+    {%- if (_last[0]|lower) == (_page|lower) -%}
+      {#- the sidebar names this page but offers this person no link to it: the name appears once -#}
+      {%- set breadcrumb = [('Home', _where.home)] + _where.trail[:-1] + [(_last[0], none)] -%}
+    {%- else -%}
+      {%- set breadcrumb = [('Home', _where.home)] + _where.trail + [(_page, none)] -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
 <div class="mb-6">
     {% if breadcrumb %}
     {# Full breadcrumb trail on sm+; single back-link below sm when stack_actions #}
@@ -148,8 +179,9 @@
 
 {% macro empty_state(icon, headline, body, cta_label=None, cta_href=None) %}
 <div class="text-center py-12 px-4" role="status">
-    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-        <i data-lucide="{{ icon }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
+    {#- the Overview's icon tile, as in components/empty_state.html -#}
+    <div class="mx-auto mb-4 flex size-10 items-center justify-center rounded-lg bg-muted text-primary">
+        {% if has_lucide is defined and has_lucide(icon) %}{{ lucide(icon, 'size-4') }}{% else %}<i data-lucide="{{ icon }}" class="size-4" aria-hidden="true"></i>{% endif %}
     </div>
 
     <h3 class="text-base font-semibold text-foreground">{{ headline }}</h3>

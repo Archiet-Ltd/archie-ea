@@ -19,9 +19,9 @@
                     {% call label(for='welcome-website') %}Website address{% endcall %}
                     {{ input(id='welcome-website', placeholder='acme.com', value=((org.settings or {}).get('onboarding', {}).get('website', {}).get('url') or '')) }}
                 </div>
-                {{ checkbox(id='welcome-website-consent', label='You may read this website', description='We keep the address and your permission now, and read the site soon. Nothing from it is in your model yet.') }}
+                {{ checkbox(id='welcome-website-consent', label='You may read this website', description='We read up to 30 pages in the background and show you what we found to confirm in the next step. Nothing is added to your model until you confirm it.') }}
                 {{ button(text='Save website', variant='outline', size='sm', testid='signup-website-save', attrs_dict={'data-action': 'website'}) }}
-                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="website" data-source="website" data-testid="signup-status-website">{{ (sources | selectattr('key', 'equalto', 'website') | first).text if (sources | selectattr('key', 'equalto', 'website') | first).state != 'not_given' else '' }}</p>
+                {% include 'account/_website_reading.html' %}
             </div>
 
             <div class="space-y-3 border-t border-border pt-6" data-testid="signup-github">
@@ -61,8 +61,7 @@
                 <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="jira" data-source="jira" data-testid="signup-status-jira">{{ (sources | selectattr('key', 'equalto', 'jira') | first).text if (sources | selectattr('key', 'equalto', 'jira') | first).state != 'not_given' else '' }}</p>
             </div>
         {% endcall %}
-        {% call card_footer(class='sticky bottom-0 justify-between border-t border-border bg-card') %}
-            {{ button(text='Previous', variant='ghost', icon='arrow-left', href=url_for('account.welcome', step=1), testid='signup-previous') }}
+        {% call card_footer(class='sticky bottom-0 justify-end border-t border-border bg-card') %}
             {{ button(text='Continue', icon='arrow-right', icon_position='right', href=url_for('account.welcome', step=3), testid='signup-continue') }}
         {% endcall %}
     {% endcall %}

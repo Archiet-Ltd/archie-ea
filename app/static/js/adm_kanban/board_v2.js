@@ -298,6 +298,13 @@
                 return prefix + name + ', ' + this.plural(n, 'card');
             },
 
+            // The name read aloud starts with the words drawn on the circle ("B 1"), then says what they mean.
+            cycleAria: function (code, short) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                let n = this.cycleCount(code);
+                return short + ' ' + n + ': ' + (p ? p.label : code) + ', ' + this.plural(n, 'card');
+            },
+
             cycleTip: '',
 
             cycleName: function (code) {

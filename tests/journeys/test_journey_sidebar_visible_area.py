@@ -6,8 +6,8 @@ the audit's own script), against a target of at least 730px. The duplicated "Col
 inside the sidebar (the header already carries the same toggle, with the same Ctrl+B hint in its title) and
 the search box living inside the scrolling <nav> both ate into that height for no reason.
 
-Navigation v3: the search box sits above the scrolling list, outside it, and a search with no page match
-offers to ask the AI chat instead.
+Navigation 3.1: the search box sits above the scrolling list, outside it, and a search with no page match
+says so, with no ask control.
 """
 from pathlib import Path
 from urllib.parse import parse_qsl, urlparse
@@ -67,7 +67,7 @@ def browser():
         chromium.close()
 
 
-def _open(browser, client, document, path, width=1440, height=900):
+def _open(browser, client, document, path, width=1440, height=900, drawer=False):
     pg = browser.new_page(viewport={"width": width, "height": height})
 
     def handle(route):
@@ -84,14 +84,19 @@ def _open(browser, client, document, path, width=1440, height=900):
 
     pg.route("http://app.test/**", handle)
     pg.goto("http://app.test" + path)
+    if drawer:
+        # Below 768px the sidebar is a drawer; the header trigger opens it.
+        pg.wait_for_selector('[data-slot="sidebar-trigger"]')
+        pg.click('[data-slot="sidebar-trigger"]')
     pg.wait_for_selector("#sidebar-nav")
     return pg
 
 
-def test_the_scrolling_list_holds_every_entry_at_1440(app, client, browser):
-    """Navigation v3: the search box sits above the list (outside it), so the list is a
-    little shorter than before; it must still hold every entry an architect has with no
-    scrolling at 1440x900."""
+def test_the_scrolling_list_holds_every_collapsed_item_and_reaches_the_last_one_at_1440(app, client, browser):
+    """Navigation 3.1: the search box sits above the list (outside it) and every Work item and Model
+    layer starts shut, so the list is taller than the screen by design. It must stay tall enough to
+    read, hold every item, and scroll to the last entry, Help, with the search box and the account
+    menu still on screen."""
     login(client, _persona(app, "solution_architect"))
     path = "/dashboard/overview"
     document = client.get(path).get_data(as_text=True)
@@ -99,8 +104,22 @@ def test_the_scrolling_list_holds_every_entry_at_1440(app, client, browser):
     try:
         height = pg.eval_on_selector("#sidebar-nav", "el => el.clientHeight")
         assert height >= MIN_NAV_HEIGHT, "sidebar-nav is %dpx tall, expected at least %dpx" % (height, MIN_NAV_HEIGHT)
-        overflow = pg.eval_on_selector("#sidebar-nav", "el => el.scrollHeight - el.clientHeight")
-        assert overflow <= 1, "the architect's entries do not fit without scrolling (%dpx over)" % overflow
+        keys = pg.eval_on_selector_all(
+            '#sidebar-nav [data-slot="sidebar-menu-button"]', "els => els.map(e => e.getAttribute('data-nav-key'))"
+        )
+        for key in ("home", "ai_chat", "approvals", "systems", "impact", "changes", "spend", "compliance",
+                    "layer_strategy", "layer_business", "layer_other", "frameworks", "composer", "connections",
+                    "reports", "help"):
+            assert key in keys, (key, keys)
+        pg.eval_on_selector("#sidebar-nav", "el => { el.scrollTop = el.scrollHeight; }")
+        pg.wait_for_timeout(150)
+        reached = pg.eval_on_selector(
+            '#sidebar-nav a[data-nav-key="help"]',
+            "el => { const r = el.getBoundingClientRect(), n = document.querySelector('#sidebar-nav').getBoundingClientRect();"
+            " return r.top >= n.top && r.bottom <= n.bottom + 1; }",
+        )
+        assert reached, "Help cannot be scrolled into view"
+        assert pg.is_visible("#sidebar-search")
     finally:
         pg.close()
 
@@ -131,9 +150,9 @@ def test_a_no_match_search_still_says_so_after_the_layout_change(app, client, br
     try:
         pg.fill('#sidebar-search', "zzzznomatch")
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        # Navigation v3: nothing matches, so the way out is asking the AI chat.
-        expect(results).to_contain_text("No page matches. Press Enter to ask the AI chat.")
-        expect(results.locator('[data-testid="sidebar-search-ask"]')).to_contain_text("zzzznomatch")
+        # Navigation 3.1: nothing matches, so the box says so; it never asks anything itself.
+        expect(results).to_contain_text("Nothing matches. Try another word.")
+        expect(results.locator('[data-testid="sidebar-search-ask"]')).to_have_count(0)
 
         pg.press('#sidebar-search', "Escape")
         pg.wait_for_timeout(150)
@@ -148,7 +167,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        link = pg.locator('#sidebar-nav a[title="Composer"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[data-nav-key="composer"] > span:last-child')
         link.wait_for(state="visible", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -196,25 +215,27 @@ def test_collapse_still_works_from_the_header_toggle_and_ctrl_b(app, client, bro
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        assert "sidebar-collapsed" not in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
-        pg.click('button[title*="Collapse sidebar (Ctrl+B)"]')
+        def state():
+            return pg.eval_on_selector('[data-testid="sidebar"]', "el => el.getAttribute('data-state')")
+
+        assert state() == "expanded"
+        pg.click('button[title*="Toggle sidebar (Ctrl+B)"]')
         pg.wait_for_timeout(200)
-        assert "sidebar-collapsed" in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
+        assert state() == "collapsed"
 
         pg.keyboard.press("Control+b")
         pg.wait_for_timeout(200)
-        assert "sidebar-collapsed" not in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
+        assert state() == "expanded"
     finally:
         pg.close()
 
 
 def test_the_duplicated_collapse_row_is_gone(app, client, browser):
-    """The sidebar's own "Collapse sidebar (Ctrl+B)" row duplicated the header toggle; removed to reclaim
-    height. Exactly one occurrence of the hint text remains, in the header's own `:title` binding
-    (`'Collapse sidebar (Ctrl+B)'`, present as raw source even though the value is applied by Alpine)."""
+    """The sidebar's own collapse row duplicated the header toggle; removed to reclaim
+    height. Exactly one trigger carries the Ctrl+B hint, in the header."""
     login(client, _persona(app, "solution_architect"))
     document = client.get("/dashboard/overview").get_data(as_text=True)
-    assert document.count("Collapse sidebar (Ctrl+B)") == 1
+    assert document.count("Toggle sidebar (Ctrl+B)") == 1
     assert "sidebar-show-all-btn" not in document
 
 
@@ -223,9 +244,9 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     login(client, _persona(app, "enterprise_architect"))
     path = "/dashboard/overview"
     document = client.get(path).get_data(as_text=True)
-    pg = _open(browser, client, document, path, width=390, height=844)
+    pg = _open(browser, client, document, path, width=390, height=844, drawer=True)
     try:
-        link = pg.locator('#sidebar-nav a[title="Composer"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[data-nav-key="composer"] > span:last-child')
         link.wait_for(state="attached", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -243,7 +264,7 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     "platform_admin",
 ])
 def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
-    """Navigation v3: the rendered sidebar entries are exactly what the navigation
+    """Navigation 3.1: the rendered sidebar entries are exactly what the navigation
     registry gives this persona, in its order, for each of the eleven personas."""
     import html as html_module
     import re
@@ -274,15 +295,19 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     document = client.get("/dashboard/overview").get_data(as_text=True)
     nav = document[document.index('id="sidebar-nav"'):]
     nav = nav[:nav.index("</nav>")]
-    rendered_labels = [html_module.unescape(label) for _, label in re.findall(r'href="([^"]+)"\s+title="([^"]+)"', nav)]
+    rendered_labels = [
+        html_module.unescape(re.sub(r"<[^>]+>", "", inner)).strip()
+        for inner in re.findall(r'<a\b[^>]*data-slot="sidebar-menu(?:-sub)?-button"[^>]*>(.*?)</a>', nav, re.S)
+    ]
     rendered_labels = [label for label in rendered_labels if label != "Connect a source"]
 
     with app.test_request_context("/dashboard/overview"):
         expected = registry.sidebar_for(_StubUser(role), "dashboard.overview")
     expected_labels = []
-    for group in ("main", "architecture", "secondary"):
+    for group in ("main", "work", "model", "secondary"):
         for item in expected[group]:
-            expected_labels.append(item.label)
+            if not item.toggle:  # an item that opens is a button, not a link
+                expected_labels.append(item.label)
             expected_labels.extend(child.label for child in item.children)
 
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)

@@ -12,6 +12,7 @@
 {% from "components/confirmation_dialog.html" import confirmation_dialog %}
 {% import "components/card.html" as ui %}
 {% from "components/dense_table.html" import dense_table %}
+{% from "components/empty_state.html" import empty_state %}
 {% from "macros/page_shell.html" import page_shell %}
 
 {% block content %}
@@ -49,7 +50,7 @@
                 ':disabled': "stepStatus(tab.id) === 'locked'",
                 ':aria-current': "activeTab === tab.id ? 'step' : false",
                 ':aria-disabled': "stepStatus(tab.id) === 'locked'",
-                ':aria-label': "tab.label + ' - Step ' + (idx + 1) + ' of ' + tabs.length"
+                ':aria-label': "(idx + 1) + ' ' + tab.label + ' - Step ' + (idx + 1) + ' of ' + tabs.length"
               }) %}
             <span class="flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0 border border-border bg-muted text-muted-foreground group-data-[state=current]:bg-primary group-data-[state=current]:border-primary group-data-[state=current]:text-primary-foreground group-data-[state=completed]:bg-success/10 group-data-[state=completed]:border-success/30 group-data-[state=completed]:text-success-emphasis">
               <span x-show="stepStatus(tab.id) === 'completed' && activeTab !== tab.id" x-cloak><i data-lucide="check" class="h-3.5 w-3.5"></i></span>
@@ -151,7 +152,7 @@
           </div>
 
           <!-- Capability Selection Panel -->
-          <div x-show="selectionMode === 'capabilities'" x-cloak>
+          <div x-show="selectionMode === 'capabilities'" x-cloak role="tabpanel" id="panel-capabilities" aria-labelledby="tab-capabilities">
             <!-- Capability Type Sub-tabs (ArchiMate layers) -->
             <div class="flex flex-wrap items-center gap-2 mb-4">
               <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-1">ArchiMate Layer:</span>
@@ -181,7 +182,7 @@
                   <i data-lucide="search" class="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground"></i>
                   {{ input(placeholder='Filter ' ~ lvl.n ~ '...', class='pl-8', aria_label='Search ' ~ lvl.n ~ ' capabilities', attrs_dict={'x-model': lvl.search}) }}
                 </div>
-                <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="{{ lvl.n }} capabilities"{% if lvl.n == 'L1' %} x-ref="l1Panel"{% endif %}>
+                <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="group" aria-label="{{ lvl.n }} capabilities"{% if lvl.n == 'L1' %} x-ref="l1Panel"{% endif %}>
                   <template x-if="{{ lvl.loading }}">
                     <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
                   </template>
@@ -236,7 +237,7 @@
           </div>
 
           <!-- APQC Process Selection Panel -->
-          <div x-show="selectionMode === 'processes'" x-cloak>
+          <div x-show="selectionMode === 'processes'" x-cloak role="tabpanel" id="panel-processes" aria-labelledby="tab-processes">
             <p class="text-sm text-muted-foreground mb-4">Select APQC Process Classification Framework (PCF) processes to discover vendors that support them</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               {% for lvl in [
@@ -306,7 +307,7 @@
           </div>
 
           <!-- Value Stream Selection Panel -->
-          <div x-show="selectionMode === 'valuestreams'" x-cloak>
+          <div x-show="selectionMode === 'valuestreams'" x-cloak role="tabpanel" id="panel-valuestreams" aria-labelledby="tab-valuestreams">
             <p class="text-sm text-muted-foreground mb-4">Select value streams and their stages to discover vendors that enable them through mapped capabilities</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               {% call form_group(id='vs-domain', label='Business Domain') %}
@@ -376,14 +377,24 @@
               </template>
             </div>
           </div>
-          <!-- Empty / prompt state -->
-          <div x-show="discoveredVendors.length === 0 && !loadingVendors" x-cloak class="text-center py-8 text-muted-foreground">
+          <!-- Prompt state: nothing searched yet -->
+          <div x-show="discoveredVendors.length === 0 && !loadingVendors && !vendorSearchDone" x-cloak class="text-center py-8 text-muted-foreground">
             <i data-lucide="building-2" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
-            <p class="text-sm" x-text="vendorSearchDone
-              ? 'No matching vendors found. You can proceed without pre-selected vendors.'
-              : hasSelections()
-                ? 'Click &quot;Discover Matching Vendors&quot; to find vendors for your selections'
-                : 'Select capabilities, processes, or value streams above to discover matching vendors'"></p>
+            <p class="text-sm" x-text="hasSelections()
+              ? 'Click &quot;Discover Matching Vendors&quot; to find vendors for your selections'
+              : 'Select capabilities, processes, or value streams above to discover matching vendors'"></p>
+          </div>
+          <!-- Honest empty state: searched, nothing is mapped yet -->
+          <div x-show="discoveredVendors.length === 0 && !loadingVendors && vendorSearchDone" x-cloak>
+            {{ empty_state(
+              icon='building-2',
+              title='No vendor is mapped to this selection yet',
+              description='No vendor product is mapped to the selected capabilities, processes or value streams yet. Record vendor coverage in the vendor catalogue, then search again.',
+              cta_text=('Open vendor catalogue' if vendor_catalogue_url else none),
+              cta_href=vendor_catalogue_url,
+              secondary_cta_text='Proceed without pre-selected vendors',
+              secondary_cta_onclick="attemptSwitchTab('scoring')"
+            ) }}
           </div>
         {% endcall %}
       {% endcall %}

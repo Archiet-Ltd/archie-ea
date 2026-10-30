@@ -1,6 +1,15 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+
 {% block title %}ArchiMate Relationship Review Queue{% endblock %}
+
+{% block head %}
+{# shadcn-reference: example:tasks @e55b60b #}
+<meta name="shadcn-nearest" content="dashboard-01">
+{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
@@ -11,27 +20,27 @@
 ]) }}
 {% endblock %}
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="reviewQueue()">
+<div x-data="reviewQueue()">
     {% macro _ps_actions() %}
-<a href="/capability-map/" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Back to Capabilities</a>
+    {{ button(text='Back to Capabilities', variant='outline', href='/capability-map/') }}
     {% endmacro %}
     {{ page_shell(title='Relationship Review Queue', subtitle='Review AI-suggested ArchiMate relationships. Accept to add to the enterprise graph, reject to discard.', actions_caller=_ps_actions) }}
     <div class="flex items-center gap-3 mb-4 p-3 rounded-lg border border-input bg-card">
-        <button type="button" @click="bulkAccept(0.8)" :disabled="processing" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Accept all &gt; 80%</button>
-        <button type="button" @click="bulkAccept(0.6)" :disabled="processing" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Accept all &gt; 60%</button>
+        {{ button(text='Accept all > 80%', variant='primary', on_click='bulkAccept(0.8)', attrs_dict={':disabled': 'processing'}) }}
+        {{ button(text='Accept all > 60%', variant='outline', on_click='bulkAccept(0.6)', attrs_dict={':disabled': 'processing'}) }}
         <span class="text-xs text-muted-foreground ml-auto" x-text="loadError ? '— pending suggestions' : suggestions.length + ' pending suggestions'"></span>
-        <select x-model="sortBy" @change="loadSuggestions()" class="h-8 px-2 text-xs rounded-md border border-input bg-background" aria-label="Sort By">
+        {% call native_select(aria_label='Sort By', attrs_dict={'x-model': 'sortBy', '@change': 'loadSuggestions()'}) %}
             <option value="confidence">Sort: Confidence</option>
             <option value="layer">Sort: Layer</option>
             <option value="type">Sort: Type</option>
-        </select>
+        {% endcall %}
     </div>
     <template x-if="loading"><div class="text-center py-12 text-muted-foreground">Loading suggestions...</div></template>
     <template x-if="!loading && loadError">
         <div class="text-center py-12 border-2 border-dashed border-destructive/30 rounded-xl bg-destructive/10">
             <div class="text-lg font-medium text-destructive-emphasis mb-2">Could not load the review queue</div>
             <p class="text-sm text-muted-foreground" x-text="loadError"></p>
-            <button type="button" @click="loadSuggestions()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center">Try again</button>
+            {{ button(text='Try again', variant='outline', on_click='loadSuggestions()', class='mt-3') }}
         </div>
     </template>
     <template x-if="!loading && !loadError && suggestions.length === 0">
@@ -60,16 +69,14 @@
                     </div>
                 </div>
                 <div class="shrink-0 w-12 text-center">
-                    <span class="text-xs font-medium" :class="s.confidence >= 0.8 ? 'text-primary' : s.confidence >= 0.5 ? 'text-warning' : 'text-muted-foreground'" x-text="Math.round(s.confidence * 100) + '%'"></span>
+                    <span class="text-xs font-medium" :class="s.confidence >= 0.8 ? 'text-primary' : s.confidence >= 0.5 ? 'text-warning-emphasis' : 'text-muted-foreground'" x-text="Math.round(s.confidence * 100) + '%'"></span>
                 </div>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0" x-text="s.source_method"></span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0">
+                    <span x-text="sourceMethodLabel(s.source_method)"></span>
+                </span>
                 <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" @click="acceptSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-info-emphasis hover:bg-primary/20 disabled:opacity-50" title="Accept">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    </button>
-                    <button type="button" @click="rejectSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20 disabled:opacity-50" title="Reject">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
+                    {{ button(text='Accept', icon='check', variant='outline', size='sm', class='rounded-md border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-50 gap-1', attrs_dict={'@click': 'acceptSuggestion(s.id)', ':disabled': 'processing'}) }}
+                    {{ button(text='Reject', icon='x', variant='outline', size='sm', class='rounded-md border-destructive/30 text-destructive-emphasis hover:bg-destructive/10 disabled:opacity-50 gap-1', attrs_dict={'@click': 'rejectSuggestion(s.id)', ':disabled': 'processing'}) }}
                 </div>
             </div>
         </template>
@@ -87,13 +94,9 @@ function reviewQueue() {
             this.loading = true;
             this.loadError = '';
             try {
-                // Platform.fetch throws on non-ok responses, removing the need to check r.ok.
-                // It returns the parsed JSON directly, so we can destructure the suggestions.
                 const data = await Platform.fetch.get('/capability-map/api/archimate/relationship-suggestions?status=pending&min_confidence=0.3&limit=100&sort=' + this.sortBy, null, { silent: true });
                 this.suggestions = data.suggestions || [];
             } catch(e) {
-                // Platform.fetch throws a structured PlatformError; we preserve the existing
-                // error handling that paints an inline error state.
                 this.suggestions = [];
                 this.loadError = e.message || 'The request did not complete.';
             }
@@ -102,8 +105,6 @@ function reviewQueue() {
         async acceptSuggestion(id) {
             this.processing = true;
             try {
-                // Platform.fetch.post automatically injects CSRF token and serializes body.
-                // Since we don't need a body, we pass undefined.
                 const d = await Platform.fetch.post(`/capability-map/api/archimate/relationship-suggestions/${id}/accept`, undefined, { silent: true });
                 if (d.success) {
                     this.suggestions = this.suggestions.filter(s => s.id !== id);
@@ -112,7 +113,6 @@ function reviewQueue() {
                     this.showStatus(d.error || 'Failed', true);
                 }
             } catch(e) {
-                // Platform.fetch throws on non-ok; we surface the failure via showStatus.
                 this.showStatus('Error', true);
             }
             finally { this.processing = false; }
@@ -120,7 +120,6 @@ function reviewQueue() {
         async rejectSuggestion(id) {
             this.processing = true;
             try {
-                // Platform.fetch.post automatically injects CSRF token and serializes body.
                 const d = await Platform.fetch.post(`/capability-map/api/archimate/relationship-suggestions/${id}/reject`, undefined, { silent: true });
                 if (d.success) {
                     this.suggestions = this.suggestions.filter(s => s.id !== id);
@@ -136,7 +135,6 @@ function reviewQueue() {
         async bulkAccept(mc) {
             this.processing = true;
             try {
-                // Platform.fetch.post serializes plain object body to JSON and injects CSRF token.
                 const d = await Platform.fetch.post('/capability-map/api/archimate/relationship-suggestions/bulk-accept', { min_confidence: mc }, { silent: true });
                 if (d.success) {
                     this.showStatus(`Accepted ${d.accepted_count}`);
@@ -149,10 +147,27 @@ function reviewQueue() {
             }
             finally { this.processing = false; }
         },
-        // ArchiMate layer legend — hues aligned to DESIGN.md's layer-colour table; kept as raw
-        // Tailwind families (not semantic tokens) so each layer stays visually distinct. design-tokens-ok
-        layerClass(l) { const c={'motivation':'bg-violet-500/10 text-violet-600 border-violet-500/30','strategy':'bg-amber-500/10 text-amber-600 border-amber-500/30','business':'bg-emerald-500/10 text-emerald-600 border-emerald-500/30','application':'bg-info/10 text-primary border-info/30','technology':'bg-green-500/10 text-green-600 border-green-500/30','implementation':'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/30'}; return c[(l||'').toLowerCase()]||'bg-muted text-muted-foreground border-input'; }, // design-tokens-ok: ArchiMate layer legend, see DESIGN.md layer-colour table
-        showStatus(m,e=false) { this.statusMessage=m; this.statusError=e; setTimeout(()=>this.statusMessage='',3000); }
+        layerClass(l) {
+            const c = {
+                'motivation': 'bg-layer-motivation/10 text-layer-motivation-emphasis border-layer-motivation/30',
+                'strategy': 'bg-layer-strategy/10 text-layer-strategy-emphasis border-layer-strategy/30',
+                'business': 'bg-layer-business/10 text-layer-business-emphasis border-layer-business/30',
+                'application': 'bg-layer-application/10 text-layer-application-emphasis border-layer-application/30',
+                'technology': 'bg-layer-technology/10 text-layer-technology-emphasis border-layer-technology/30',
+                'implementation': 'bg-layer-implementation/10 text-layer-implementation-emphasis border-layer-implementation/30'
+            };
+            return c[(l||'').toLowerCase()] || 'bg-muted text-muted-foreground border-input';
+        },
+        sourceMethodLabel(m) {
+            const labels = {
+                'llm_semantic': 'Suggested by AI',
+                'knowledge_graph': 'Knowledge Graph',
+                'transitive_inference': 'Inferred',
+                'co_occurrence': 'Co-occurrence',
+                'abacus_import': 'Import'
+            };
+            return labels[m] || m || 'Unknown';
+        },
     };
 }
 </script>

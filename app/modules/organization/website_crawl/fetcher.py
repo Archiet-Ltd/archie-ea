@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
 import requests
+import urllib3
 
 from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
 
@@ -53,6 +54,7 @@ class Fetcher:
         self.timeout = timeout
         self._robots: Optional[RobotFileParser] = None
         self._blocked_everything = False
+        self.robots_unanswered = False  # robots.txt could not be fetched: the site did not answer, which is not a refusal
         self.crawl_delay = 0.0
 
     def get(self, url: str, timeout: Optional[float] = None) -> Page:
@@ -68,7 +70,10 @@ class Fetcher:
                 if response.status_code in (301, 302, 303, 307, 308) and response.headers.get("Location"):
                     current = _checked(urljoin(current, response.headers["Location"]), self.site)
                     continue
-                body = response.raw.read(MAX_BYTES + 1, decode_content=True)
+                try:
+                    body = response.raw.read(MAX_BYTES + 1, decode_content=True)
+                except urllib3.exceptions.HTTPError as exc:  # a body that stops arriving is a failed page, not a crash
+                    raise requests.exceptions.ConnectionError("the page body did not arrive: %s" % exc) from exc
                 encoding = response.encoding or "utf-8"
                 return Page(current, response.status_code, response.headers.get("Content-Type", ""),
                             body[:MAX_BYTES].decode(encoding, errors="replace"))
@@ -83,11 +88,11 @@ class Fetcher:
         try:
             page = self.get(root + "/robots.txt")
         except (FetchRefused, requests.RequestException):
-            self._blocked_everything = True
+            self._blocked_everything = self.robots_unanswered = True
             self._robots = parser
             return
         if page.status >= 500:
-            self._blocked_everything = True
+            self._blocked_everything = self.robots_unanswered = True
         elif page.status == 200:
             parser.parse(page.text.splitlines())
             delay = parser.crawl_delay(USER_AGENT)

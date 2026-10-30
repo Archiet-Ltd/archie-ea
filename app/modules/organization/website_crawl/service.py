@@ -1,10 +1,11 @@
 """Read an organisation's consented website into profile proposals.
 
-``crawl_organization_website`` fetches up to 30 pages of the one site the organisation
-agreed to be read (robots.txt respected, a time limit), has a model read each page with
-OperateIQ's website-analysis prompt, adds what the pages state outright, asks the
-website-inference prompt for the business-level reading, and stores each fact as one
-pending proposal: ``ai_chat_crud_approvals`` rows with ``source_table = "website_crawler"``,
+``crawl_organization_website`` reads in two passes. Pass 1 fetches up to 30 pages of the one site
+the organisation agreed to be read (robots.txt respected, a time limit), takes what the pages state
+outright (name, site name, contact details, links, technologies) with no model, and stores those
+facts at once. Pass 2 hands the pages read to a model in one batched call (OperateIQ's
+website-analysis prompt for every page, and the website-inference reading) and stores what it adds,
+under its own time limit. Each fact is one pending proposal: ``ai_chat_crud_approvals`` rows with ``source_table = "website_crawler"``,
 the same store the GitHub connector's proposals use. Nothing is written to the model or
 to the organisation's settings; a person confirming a proposal is a later step.
 """
@@ -12,9 +13,10 @@ to the organisation's settings; a person confirming a proposal is a later step.
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
@@ -30,11 +32,18 @@ from .rendering import needs_browser, parse_json
 logger = logging.getLogger(__name__)
 
 WEBSITE_TASK = "website_profile_crawl"
+WEBSITE_RETRY_TASK = "website_profile_crawl_more"
+# when the model pass found every provider busy: one more try in 15 minutes, and one in an hour
+RETRY_DELAYS_SECONDS = (15 * 60, 60 * 60)
 PROPOSAL_SOURCE = "website_crawler"
 OP_PROFILE_FACT = "website_profile_fact"
 PROPOSAL_DUE_DAYS = 14
 MAX_PAGES = 30
-TIME_LIMIT_SECONDS = 120.0
+TIME_LIMIT_SECONDS = 120.0  # each pass has its own
+MODEL_TIMEOUT_SECONDS = 120.0  # the one batched model call
+PROMPT_PAGE_CHARS = 15000  # the pages handed to the model in one call, shared between them; one call stays under 40,000 characters
+MODEL_PAGES = 9  # the pages the model pass reads: the home page and the first pages after it
+MODEL_PAGES_PER_CALL = 3
 DEFAULT_CONFIDENCE = 0.3  # the floor of OperateIQ's own scale ("weak inference") when a model gives none
 
 TAXONOMY = (
@@ -76,18 +85,26 @@ Also add these keys to the JSON object, using only what this page states and emp
 
 
 class CrawlRefused(ValueError):
-    """The website was not read; the message says why in words a person can act on."""
+    """The website was not read. ``reason`` is why, as a code the sign-up page turns into a sentence:
+    no_site, no_consent, blocked, robots, no_answer, script_only or nothing_found."""
+
+    def __init__(self, message: str, reason: str = "no_answer", status: Optional[int] = None):
+        super().__init__(message)
+        self.reason = reason
+        self.status = status
 
 
 # ----------------------------------------------------------------------------- model
 
-def default_model() -> Callable[[str], str]:
+def default_model(timeout: float = MODEL_TIMEOUT_SECONDS) -> Callable[[str], str]:
     """The model call: the organisation's own provider first, then the free ones, through the
-    one provider chain the assistant uses."""
+    one provider chain the assistant uses. The call is given ``timeout`` seconds."""
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     def ask(prompt: str) -> str:
-        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=90)
+        # the pages are public text, so free providers may read them
+        # room for the answer about three pages: 4,096 tokens cut the JSON off in the middle
+        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=timeout, public_input=True, max_tokens=8192)
 
     return ask
 
@@ -110,53 +127,85 @@ def _consented_site(org_id: int) -> Tuple[Any, str]:
 
     org = db.session.get(Organization, org_id)
     if org is None:
-        raise CrawlRefused("That organisation does not exist.")
+        raise CrawlRefused("That organisation does not exist.", "no_site")
     site = ((org.settings or {}).get("onboarding") or {}).get("website") or {}
     url, consented = site.get("url"), site.get("consent_at")
     if not url:
-        raise CrawlRefused("No company website is recorded, so there is nothing to read.")
+        raise CrawlRefused("No company website is recorded, so there is nothing to read.", "no_site")
     if not consented:
-        raise CrawlRefused("The website has not been agreed to be read. Record consent first.")
+        raise CrawlRefused("The website has not been agreed to be read. Record consent first.", "no_consent")
     try:
         validate_user_supplied_url(url)
     except BlockedOutboundURL:
-        raise CrawlRefused("That website address cannot be read from here.")
+        raise CrawlRefused("That website address cannot be read from here.", "blocked")
     return org, url
 
 
 # ----------------------------------------------------------------------------- reading pages
 
-def _analyse(page_url: str, html: str, title: str, hint: str, model) -> Dict[str, Any]:
-    prompt = prompts.render("website_analysis", {"url": page_url, "title": title, "html_content": trimmed_html(html)})
-    return parse_json(model(prompt + ADDENDUM + hint))
+BATCH_ADDENDUM = """
+
+## This request holds several pages (Entelim)
+The HTML above is not one page: it is several pages of the same website, each introduced by a line
+"=== PAGE <n>: <address> ===". Read each page on its own and return ONE JSON object of this shape:
+{"pages": [{"url": "<the page address, exactly as given>", <all the keys above, for that page only>}, ...],
+ "inference": {<the business-level reading below>}}
+Use only what each page states. Give a page you learned nothing from an empty object.
+
+### The "inference" object
+- "business_model": {"revenue_model": "", "target_market": "", "market_segment": "", "geographic_focus": "", "confidence": 0.0-1.0}
+- "company_stage": {"stage": "", "confidence": 0.0-1.0}
+- "technology_stack": {"<kind, e.g. frontend>": ["names"]}
+- "competitive_positioning": {"value_proposition": "", "competitive_advantages": [""], "market_position": ""}
+- "data_quality": {"completeness_score": 0.0-1.0, "reliability_score": 0.0-1.0}
+"""
 
 
-def _discover(page_url: str, html: str, title: str, model) -> str:
-    """OperateIQ's structure-discovery step: where on this kind of page the business facts sit.
-    Its answer is handed to the analysis as a hint; a failure only means no hint."""
+PAGES_ONLY_ADDENDUM = BATCH_ADDENDUM[:BATCH_ADDENDUM.index("### The \"inference\" object")].replace(
+    ',\n "inference": {<the business-level reading below>}}', "}")
+
+
+def _batched_prompt(pages: List[Dict[str, Any]], with_inference: bool = True) -> str:
+    """One prompt for a few pages: OperateIQ's analysis prompt over them, then (once per read) the inference."""
+    share = max(1000, min(12000, PROMPT_PAGE_CHARS // max(1, len(pages))))
+    body = "\n\n".join(
+        "=== PAGE %d: %s ===\n%s" % (i, page["url"], trimmed_html(page["html"] or "", share))
+        for i, page in enumerate(pages, 1))
+    first = pages[0]
+    return prompts.render("website_analysis", {"url": first["url"], "title": first["static"]["title"],
+                                               "html_content": body}) + ADDENDUM + (BATCH_ADDENDUM if with_inference else PAGES_ONLY_ADDENDUM)
+
+
+def _model_chunks(pages: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    selected = pages[:MODEL_PAGES]
+    return [selected[i:i + MODEL_PAGES_PER_CALL] for i in range(0, len(selected), MODEL_PAGES_PER_CALL)]
+
+
+def _no_model(prompt: str) -> str:
+    raise RuntimeError("pass 1 reads without a model")
+
+
+def _tell(progress: Optional[Callable[[Dict[str, Any]], None]], **state: Any) -> None:
+    """Report how far the reading has got. A reporter that fails never stops the reading."""
+    if progress is None:
+        return
     try:
-        found = parse_json(model(prompts.render(
-            "html_structure_discovery", {"url": page_url, "title": title, "html_snippet": trimmed_html(html, 30000)})))
-        selectors = ((found.get("extraction_strategy") or {}).get("recommended_selectors") or [])[:10]
+        progress(state)
     except Exception:
-        logger.info("structure discovery unavailable for %s", page_url, exc_info=True)
-        return ""
-    if not selectors:
-        return ""
-    lines = ["- %s (%s)" % (s.get("selector"), s.get("purpose")) for s in selectors if isinstance(s, dict)]
-    return "\n\n## Where the business facts sit on this site (from structure discovery)\n" + "\n".join(lines)
+        logger.info("crawl progress could not be reported", exc_info=True)
 
 
-def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float) -> Dict[str, Any]:
+def _read_site(site: str, max_pages: int, time_limit: float, delay: float,
+               progress: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    """Pass 1: fetch the pages and take what they state outright. No model is called."""
     started = time.monotonic()
     fetcher = Fetcher(site)
     browser = Browser(site)
-    result: Dict[str, Any] = {"pages": [], "rendered": [], "skipped_by_robots": [], "failed": [],
+    result: Dict[str, Any] = {"pages": [], "rendered": [], "unrendered": [], "skipped_by_robots": [], "failed": [],
                               "stopped": None, "model_errors": 0}
     queue: List[str] = [site]
     queued = {site}
     attempts = 0
-    hint = ""
     try:
         while queue and attempts < max_pages:
             remaining = time_limit - (time.monotonic() - started)
@@ -170,6 +219,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
             if attempts and (delay or fetcher.crawl_delay):
                 time.sleep(max(delay, fetcher.crawl_delay))
             attempts += 1
+            _tell(progress, stage="reading", pages_read=len(result["pages"]), limit=max_pages, current=url)
             try:
                 page = fetcher.get(url, timeout=remaining)
             except (FetchRefused, requests.RequestException) as exc:
@@ -179,26 +229,20 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
                 result["failed"].append({"url": url, "reason": "status %s" % page.status})
                 continue
             html, final_url = page.text, page.url
-            if needs_browser(final_url, html, page.status, model):
+            if needs_browser(final_url, html, page.status, _no_model):
                 try:
                     rendered = browser.render(final_url, max(1.0, min(30.0, time_limit - (time.monotonic() - started))))
                     html = rendered.text
                     result["rendered"].append(final_url)
                 except Exception as exc:  # the static page is still read
                     logger.warning("browser render failed for %s: %s", final_url, exc)
+                    result["unrendered"].append(final_url)
             fetched_at = datetime.utcnow().isoformat(timespec="seconds")
             static = extract_static(final_url, html, site)
-            if not result["pages"]:
-                hint = _discover(final_url, html, static["title"], model)
-            try:
-                analysis = _analyse(final_url, html, static["title"], hint, model)
-            except Exception:
-                logger.info("page analysis failed for %s", final_url, exc_info=True)
-                analysis = {}
-                result["model_errors"] += 1
             result["pages"].append({"url": final_url, "fetched_at": fetched_at, "static": static,
-                                    "analysis": analysis, "html": html if not result["pages"] else None})
-            for link in list(static["links"]) + [item for item in (analysis.get("links") or []) if isinstance(item, str)]:
+                                    "analysis": {}, "html": html})
+            _tell(progress, stage="reading", pages_read=len(result["pages"]), limit=max_pages, current=final_url)
+            for link in static["links"]:
                 link = urldefrag(urljoin(final_url, link))[0]
                 if link not in queued and same_site(link, site):
                     queued.add(link)
@@ -207,6 +251,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
             result["stopped"] = "page_limit"
     finally:
         browser.close()
+    result["robots_unanswered"] = fetcher.robots_unanswered
     return result
 
 
@@ -321,29 +366,6 @@ def _from_static(facts: _Facts, url: str, at: str, s: Dict[str, Any]) -> None:
         facts.add("technology", {"name": tech["name"], "type": tech["type"]}, url, at, tech["confidence"], "page")
 
 
-def _merged_for_inference(pages: List[Dict[str, Any]], facts: _Facts) -> Dict[str, Any]:
-    def values(field):
-        return [r["value"] for r in facts.rows.values() if r["field"] == field]
-
-    def one(field):
-        found = values(field)
-        return found[0] if found else None
-
-    size = one("team_size")
-    return {
-        "company": {"name": one("company_name"), "website": pages[0]["url"], "description": one("tagline"),
-                    "founded_year": one("founded_year")},
-        "category": one("category"),
-        "location": {"country": one("hq_country"), "city": one("hq_city"), "region": one("hq_region")},
-        "technologies": values("technology"),
-        "social_media": values("social_profile"),
-        "team_size": size,
-        "people": values("key_person"),
-        "links": [p["url"] for p in pages[1:]][:20],
-        "raw_html_snippet": trimmed_html(pages[0]["html"] or "", 6000) if pages[0].get("html") else None,
-    }
-
-
 def _from_inference(facts: _Facts, url: str, at: str, inferred: Dict[str, Any]) -> None:
     quality = inferred.get("data_quality") if isinstance(inferred.get("data_quality"), dict) else {}
     reliability = _number(quality.get("reliability_score"))
@@ -380,15 +402,16 @@ def _display(value: Any) -> str:
     return str(value)
 
 
-def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str) -> int:
+def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str, replace: bool = True) -> int:
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
     from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
 
-    for old in AIChatCRUDApproval.query.filter_by(
-        organization_id=org_id, source_table=PROPOSAL_SOURCE, status=ApprovalStatus.PENDING
-    ).all():
-        old.status = ApprovalStatus.EXPIRED
-        old.rejected_reason = "Replaced by a newer reading of the website."
+    if replace:
+        for old in AIChatCRUDApproval.query.filter_by(
+            organization_id=org_id, source_table=PROPOSAL_SOURCE, status=ApprovalStatus.PENDING
+        ).all():
+            old.status = ApprovalStatus.EXPIRED
+            old.rejected_reason = "Replaced by a newer reading of the website."
     for fact in facts:
         create_approval_record(
             organization_id=org_id,
@@ -401,6 +424,178 @@ def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str) -> int:
         )
     db.session.commit()
     return len(facts)
+
+
+_HOME_NAME_BREAK = re.compile(r"[|•·–—\-\u2013\u2014\u00b7\u2022]\s*(?:Home|Welcome|Official|Website|Site|\w+\.\w+).*$")
+
+
+_TITLE_SPLIT = re.compile(r"\s+[|\u2013\u2014-]\s+")  # " | ", " - ", " \u2013 ", " \u2014 "
+TITLE_MATCHED_CONFIDENCE = 0.9  # a title part that is the site's own address or declared site name
+TITLE_FIRST_PART_CONFIDENCE = 0.7  # a short first part before a separator, with nothing to match it against
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def _domain_names(url: str) -> set:
+    """What a company's own web address spells: ``cal.com`` is "calcom" and "cal"; ``acme-robotics.test`` is "acmerobotics"."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower() if url else ""
+    host = host[4:] if host.startswith("www.") else host
+    labels = host.split(".")
+    names = {_alnum(host)}
+    if len(labels) >= 2:
+        label = labels[-3] if len(labels) >= 3 and labels[-2] in ("co", "com", "org", "gov", "ac") else labels[-2]
+        names.add(_alnum(label))
+    return {n for n in names if n and not n.isdigit()}
+
+
+def _name_from_title(title: str, url: str, site_name: Optional[str] = None) -> Optional[Tuple[str, Optional[float]]]:
+    """The brand in a home-page title such as "Cal.com | Scheduling Software for Online Meetings".
+
+    The title is split on " | ", " \u2013 ", " - " and " \u2014 ". The part that is the site's address or its declared
+    site name is the name (high confidence). With no such part, the first part of a title that has a separator
+    and is short enough to be a name is offered (lower confidence, still ticked at sign-up). None otherwise."""
+    parts = [p.strip() for p in _TITLE_SPLIT.split(title.strip()) if p.strip()]
+    if len(parts) < 2:
+        only = parts[0] if parts else ""
+        if only and _alnum(only) in (_domain_names(url) | ({_alnum(site_name)} if site_name else set())):
+            return only, TITLE_MATCHED_CONFIDENCE
+        return None
+    known = _domain_names(url) | ({_alnum(site_name)} if site_name else set())
+    for part in parts:
+        if _alnum(part) in known:
+            return part, TITLE_MATCHED_CONFIDENCE
+    if len(parts[0].split()) <= 4:
+        return parts[0], TITLE_FIRST_PART_CONFIDENCE
+    return None
+
+
+def _unmatched_cap(value: str, confidence: Optional[float], url: str, site_name: Optional[str] = None) -> Optional[float]:
+    """A name that is not the site's address is at most TITLE_FIRST_PART_CONFIDENCE sure, whatever the page says
+    about itself (structured data and og:site_name both say "Ifiok" on archiet.dev, and neither is the address)."""
+    known = _domain_names(url)
+    mine = _alnum(value)
+    if mine in known or any(mine.startswith(k) and len(k) >= 3 for k in known):
+        return confidence
+    return min(TITLE_FIRST_PART_CONFIDENCE, confidence if confidence is not None else TITLE_FIRST_PART_CONFIDENCE)
+
+
+def _read_home_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The company name from the home page: ``og:site_name``, organisation name in JSON-LD,
+    or the page title, with the suffix after a separator (|, -, —, etc.) dropped.
+
+    Returns ``{"value", "confidence", "basis"}`` when a name was read, ``None`` when the
+    home page gave no name at all (not even a title), or a dict with ``"confidence": None``
+    when there is a candidate but the page declares no confidence."""
+    static = first_page.get("static") or {}
+    # site_name from meta or organisation name from JSON-LD
+    name = static.get("company_name")
+    if name:
+        value = _HOME_NAME_BREAK.sub("", str(name["value"]).strip()).strip()
+        if value:
+            return {"value": value, "basis": "page",
+                    "confidence": _unmatched_cap(value, name["confidence"], first_page.get("url") or "", static.get("site_name"))}
+    # title as fallback
+    title = static.get("title") or ""
+    if title.strip():
+        brand = _name_from_title(title, first_page.get("url") or "", (static.get("company_name") or {}).get("value"))
+        if brand:
+            return {"value": brand[0], "confidence": brand[1], "basis": "page"}
+        value = _HOME_NAME_BREAK.sub("", title.strip()).strip()
+        if value and static.get("text_length", 0) > 200:
+            return {"value": value, "confidence": None, "basis": "page"}
+    # model analysis of the home page as last resort
+    analysis = first_page.get("analysis") or {}
+    company = analysis.get("company") if isinstance(analysis.get("company"), dict) else {}
+    model_name = _text(company.get("name"))
+    if model_name:
+        value = _HOME_NAME_BREAK.sub("", model_name).strip()
+        if value:
+            confidences = analysis.get("field_confidence") if isinstance(analysis.get("field_confidence"), dict) else {}
+            return {"value": value, "basis": "model",
+                    "confidence": _unmatched_cap(value, _number(confidences.get("company_name")), first_page.get("url") or "",
+                                                 static.get("site_name"))}
+    return None
+
+
+def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The company name of the home page, from whichever part of it gave one, never more than 0.7 sure unless it is
+    the site's own address. This is the one place the proposal's confidence is settled."""
+    got = _read_home_name(first_page)
+    if got and got["confidence"] is not None:
+        got["confidence"] = _unmatched_cap(got["value"], got["confidence"], first_page.get("url") or "")
+    return got
+
+
+def _replace_company_name(facts: _Facts, name: str, url: str, at: str, confidence: Optional[float],
+                          basis: str) -> None:
+    """Replace any company_name fact with one from the home page. Confidence that is None
+    means the page gave no confidence, so it falls to the default floor."""
+    # Remove every existing company_name row
+    keys = [k for k in facts.rows if k[0] == "company_name"]
+    for k in keys:
+        del facts.rows[k]
+    facts.scalar.pop("company_name", None)
+    # Only add when we have a genuine name
+    if name:
+        facts.add("company_name", name, url, at, confidence, basis)
+
+
+def _cap_company_name_confidence(facts: _Facts, home_url: str) -> None:
+    """When the home page gave no name at all, lower the confidence of whatever name was
+    found on another page, so it is never reported at 100%."""
+    for key, row in list(facts.rows.items()):
+        if key[0] != "company_name":
+            continue
+        if row.get("source_url") == home_url:
+            continue
+        if row["confidence"] > DEFAULT_CONFIDENCE:
+            row["confidence"] = DEFAULT_CONFIDENCE
+            row["confidence_basis"] = "default"
+
+
+def _row_key(row: Dict[str, Any]) -> str:
+    value = row["value"]
+    return _norm(value) if not isinstance(value, dict) else _norm(sorted(value.items()))
+
+
+def _facts_from(pages: List[Dict[str, Any]]) -> _Facts:
+    """Every fact the pages give: what they state and, once the model has read them, what it took from them.
+
+    The company name comes from the home page, not a sub-page whose title or heading may differ
+    (e.g. "Cal.com Docs" read from the docs page): the home page's site name or title, with the suffix
+    after a separator ("Acme | Home" becomes "Acme") dropped. When the home page gives no name at all the
+    confidence of any other name is lowered to the default floor rather than reported at 100%."""
+    facts = _Facts()
+    for page in pages:
+        _from_static(facts, page["url"], page["fetched_at"], page["static"])
+        _from_analysis(facts, page["url"], page["fetched_at"], page["analysis"])
+    first = pages[0]
+    home_name = _home_page_company_name(first)
+    if home_name:
+        _replace_company_name(facts, home_name["value"], first["url"], first["fetched_at"],
+                              home_name["confidence"], home_name["basis"])
+    else:
+        _cap_company_name_confidence(facts, first["url"])
+    return facts
+
+
+def _decided_or_pending_proposals(org_id: int) -> List[Dict[str, Any]]:
+    """Every fact read from the website that is waiting or that a person has confirmed or left out.
+    A retry of the model pass proposes none of them again."""
+    import json
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    rows = AIChatCRUDApproval.query.filter(
+        AIChatCRUDApproval.organization_id == org_id, AIChatCRUDApproval.source_table == PROPOSAL_SOURCE,
+        AIChatCRUDApproval.operation_type == OP_PROFILE_FACT,
+        AIChatCRUDApproval.status.in_([ApprovalStatus.PENDING, ApprovalStatus.APPROVED, ApprovalStatus.REJECTED]),
+    ).all()
+    return [json.loads(row.operation_payload or "{}") for row in rows]
 
 
 def pending_website_proposals(org_id: int) -> List[Dict[str, Any]]:
@@ -430,44 +625,157 @@ def crawl_organization_website(
     max_pages: int = MAX_PAGES,
     time_limit_seconds: float = TIME_LIMIT_SECONDS,
     delay_seconds: float = 0.0,
+    progress: Optional[Callable[[Dict[str, Any]], None]] = None,
+    more_only: bool = False,
+    retry_attempt: int = 0,
+    defer_model_pass: bool = False,
 ) -> Dict[str, Any]:
     """Read the organisation's consented website and store what was found as pending proposals.
 
-    Raises CrawlRefused when there is no consented site. Returns what was read, not the pages.
+    ``progress`` is told how far the reading has got (pages read, the limit, the page being read).
+    Raises CrawlRefused, with a reason code, when there is no consented site or nothing could be
+    read or found. Returns what was read, not the pages.
     """
     org, site = _consented_site(org_id)
-    model = _scoped(llm or default_model(), org_id)
+    model = _scoped(llm or default_model(timeout=float(time_limit_seconds)), org_id)
     max_pages = max(1, min(int(max_pages), MAX_PAGES))
-    read = _read_site(site, model, max_pages, float(time_limit_seconds), float(delay_seconds))
+    _tell(progress, stage="reading", pages_read=0, limit=max_pages, current=site)
+    read = _read_site(site, max_pages, float(time_limit_seconds), float(delay_seconds), progress)
+    if not read["pages"] and more_only:
+        raise CrawlRefused("Nothing could be read from %s on the retry." % site, "no_answer")
     if not read["pages"]:
         reason = "; ".join("%s (%s)" % (f["url"], f["reason"]) for f in read["failed"][:3])
-        if read["skipped_by_robots"]:
-            reason = "the site's robots.txt excludes it"
-        raise CrawlRefused("Nothing could be read from %s: %s." % (site, reason or "it did not answer"))
-
-    facts = _Facts()
-    for page in read["pages"]:
-        _from_static(facts, page["url"], page["fetched_at"], page["static"])
-        _from_analysis(facts, page["url"], page["fetched_at"], page["analysis"])
+        if read["skipped_by_robots"] and not read["failed"] and not read["robots_unanswered"]:
+            raise CrawlRefused("Nothing could be read from %s: the site's robots.txt excludes it." % site, "robots")
+        status = next((int(f["reason"].split()[1]) for f in read["failed"]
+                       if f["reason"].startswith("status ") and f["reason"].split()[1].isdigit()), None)
+        raise CrawlRefused("Nothing could be read from %s: %s." % (site, reason or "it did not answer"),
+                           "no_answer", status)
     first = read["pages"][0]
-    inferred: Dict[str, Any] = {}
-    try:
-        inferred = parse_json(model(prompts.render("website_inference", _merged_for_inference(read["pages"], facts))))
-    except Exception:
-        logger.info("website inference failed for organisation %s", org_id, exc_info=True)
-        read["model_errors"] += 1
-    _from_inference(facts, first["url"], first["fetched_at"], inferred)
-
     crawl_id = uuid.uuid4().hex
     from app.jobs.tenant_safe_job import tenant_scope
 
-    with tenant_scope(org_id):
-        stored = _store(org_id, facts.ordered(), crawl_id)
+    # Pass 1 facts: what the pages state outright, proposed now so the person sees them without waiting.
+    facts = _facts_from(read["pages"])
+    stored = 0
+    if more_only:
+        # a retry of the model pass: what is already proposed stays, and only what is new is added
+        with tenant_scope(org_id):
+            existing = _decided_or_pending_proposals(org_id)
+        held = {(row["field"], _row_key(row)) for row in existing}
+        held_scalars = {row["field"] for row in existing if row["field"] not in _MANY}
+    else:
+        if facts.rows:
+            with tenant_scope(org_id):
+                stored = _store(org_id, facts.ordered(), crawl_id)
+        held = {(row["field"], _row_key(row)) for row in facts.rows.values()}
+        held_scalars = {row["field"] for row in facts.rows.values() if row["field"] not in _MANY}
+    if not more_only:
+        _detect_vendors(org_id, site, read["pages"])
+    if not more_only:
+        _detect_vendors(org_id, site, read["pages"])
+    _tell(progress, stage="facts_ready" if stored else "working_out", pages_read=len(read["pages"]),
+          limit=max_pages, current=None)
+
+    if defer_model_pass and not more_only and stored:
+        # The fast facts are in and proposed. The model pass is its own job, after this one, so it never holds the
+        # worker while another organisation's first read waits.
+        _queue_model_pass(org_id)
+        return {
+            "retry_queued": None, "model_pass_queued": True, "model_error": None, "added": 0,
+            "crawl_id": crawl_id, "site": site, "pages_read": len(read["pages"]),
+            "rendered": read["rendered"], "skipped_by_robots": read["skipped_by_robots"], "failed": read["failed"],
+            "stopped": read["stopped"], "model_errors": 0, "proposals": stored,
+        }
+
+    # Pass 2: the model reads the pages a few at a time (the first call also gives the business-level reading);
+    # what it adds is proposed when it arrives.
+    inferred: Dict[str, Any] = {}
+    model_error: Optional[Dict[str, str]] = None
+    for number, chunk in enumerate(_model_chunks(read["pages"])):
+        try:
+            answer = parse_json(model(_batched_prompt(chunk, with_inference=(number == 0))))
+            entries = [entry for entry in (answer.get("pages") or []) if isinstance(entry, dict)]
+            by_url = {str(entry.get("url")): entry for entry in entries}
+            for position, page in enumerate(chunk):
+                entry = by_url.get(page["url"])
+                if entry is None and len(entries) == len(chunk):
+                    entry = entries[position]
+                page["analysis"] = entry or {}
+            if number == 0:
+                inferred = answer.get("inference") if isinstance(answer.get("inference"), dict) else {}
+        except Exception as exc:
+            # the type and a short message go on the job's result, so a failed model pass is visible without the log
+            model_error = model_error or {"type": type(exc).__name__, "message": str(exc)[:200]}
+            logger.warning("website reading by the model failed for organisation %s (pages %d to %d): %s: %s",
+                           org_id, number * MODEL_PAGES_PER_CALL + 1, number * MODEL_PAGES_PER_CALL + len(chunk),
+                           type(exc).__name__, str(exc)[:200], exc_info=True)
+            read["model_errors"] += 1
+            if not isinstance(exc, ValueError):  # a timeout or a busy provider is tried again later; a bad answer is not
+                read["retry_later"] = True
+            if number == 0:
+                break  # the providers are failing: the rest are not asked, and the pass is tried again later
+    facts = _facts_from(read["pages"])
+    _from_inference(facts, first["url"], first["fetched_at"], inferred)
+    added = [row for row in facts.ordered()
+             if (row["field"], _row_key(row)) not in held and row["field"] not in held_scalars]
+    if added:
+        with tenant_scope(org_id):
+            stored += _store(org_id, added, crawl_id, replace=False)
+    retry_queued = None
+    if read.get("retry_later") and retry_attempt < len(RETRY_DELAYS_SECONDS):
+        retry_queued = _queue_retry(org_id, retry_attempt + 1)
+    if not stored and not more_only:
+        raise CrawlRefused(
+            "%d page(s) of %s were read and no fact could be taken from them." % (len(read["pages"]), site),
+            "script_only" if read["unrendered"] else "nothing_found")
     return {
+        "retry_queued": retry_queued, "model_pass_queued": False, "model_error": model_error,
+        "added": len(added) if added else 0,
         "crawl_id": crawl_id, "site": site, "pages_read": len(read["pages"]),
         "rendered": read["rendered"], "skipped_by_robots": read["skipped_by_robots"], "failed": read["failed"],
         "stopped": read["stopped"], "model_errors": read["model_errors"], "proposals": stored,
     }
+
+
+def _detect_vendors(org_id: int, site: str, pages: List[Dict[str, Any]]) -> None:
+    """The vendors the pages load and the site's domain records name, proposed for a person to confirm.
+    A failure here never stops the reading of the website."""
+    from flask import current_app
+
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.services.vendor_detection import detect_for_site
+
+    resolver = None if current_app.config.get("VENDOR_DNS_LOOKUPS", True) else (lambda _name, _type: [])
+    try:
+        with tenant_scope(org_id):
+            detect_for_site(org_id, site, pages, resolver)
+    except Exception:
+        db.session.rollback()
+        logger.warning("vendor detection failed for organisation %s", org_id, exc_info=True)
+
+
+def _queue_model_pass(org_id: int) -> None:
+    """Queue the model pass for one organisation as its own job, unless one is already waiting."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    queue = get_job_queue_service()
+    waiting = queue.list_jobs(org_id, limit=5, task=WEBSITE_RETRY_TASK, statuses=["pending"])
+    if not waiting:
+        queue.create_job("Work out what the company website says", WEBSITE_RETRY_TASK,
+                         {"retry_attempt": 0}, organization_id=org_id)
+
+
+def _queue_retry(org_id: int, attempt: int) -> str:
+    """Queue the model pass to run again later: attempt 1 in 15 minutes, attempt 2 in an hour.
+    Returns when it is due (UTC, ISO)."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    due = (datetime.utcnow() + timedelta(seconds=RETRY_DELAYS_SECONDS[attempt - 1])).isoformat(timespec="seconds")
+    get_job_queue_service().create_job(
+        "Read the company website again", WEBSITE_RETRY_TASK,
+        {"retry_attempt": attempt, "not_before": due}, organization_id=org_id)
+    return due
 
 
 def queue_website_crawl(org_id: int):
@@ -479,17 +787,101 @@ def queue_website_crawl(org_id: int):
         "Read the company website", WEBSITE_TASK, {}, organization_id=org_id)
 
 
+def _job_progress(job_id: Optional[int]) -> Optional[Callable[[Dict[str, Any]], None]]:
+    """A reporter that keeps how far the reading has got on the job's own record, which the sign-up
+    page polls. It holds counts and the address of the page being read, never what the page says."""
+    if job_id is None:
+        return None
+
+    def write(state: Dict[str, Any]) -> None:
+        from app.models.job import Job
+
+        job = db.session.get(Job, job_id)
+        if job is None:
+            return
+        job.result = {"progress": {key: state.get(key) for key in ("stage", "pages_read", "limit", "current")}}
+        db.session.commit()
+
+    return write
+
+
+def _tell_the_bell(org_id: int) -> None:
+    """Post to the notifications bell of the person who gave the website that its facts are ready to
+    confirm, with a link to the screen where they do. Failing to post never fails the reading."""
+    from flask import current_app
+
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.organization import Organization
+    from app.services.notification_service import NotificationService
+
+    from .confirm import proposals
+
+    try:
+        with tenant_scope(org_id):
+            org = db.session.get(Organization, org_id)
+            site = (((org.settings or {}).get("onboarding") or {}).get("website") or {}) if org else {}
+            user_id = site.get("consent_by")
+            facts, _completeness = proposals(org_id)
+            if not user_id or not facts:
+                return
+            url = current_app.url_map.bind("localhost").build("account.welcome", {"step": 3})
+            NotificationService.create(
+                user_id,
+                "We read your website and %d %s ready for you to confirm." % (len(facts), "fact is" if len(facts) == 1 else "facts are"),
+                url,
+                organization_id=org_id,
+                event_type="website_read",
+                entity_type="organization",
+                entity_id=org_id,
+            )
+            db.session.commit()
+    except Exception:
+        logger.warning("could not post the website reading to the bell for organisation %s", org_id, exc_info=True)
+
+
+def run_website_retry_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """The retry job body: read the site again for what the busy model pass missed, and add only that.
+    Another retry is queued (once more, an hour later) if the providers are still busy."""
+    from app.modules.organization import website_crawl
+
+    org_id = payload.get("organization_id")
+    if org_id is None:
+        raise ValueError("%s job requires organization_id in payload" % WEBSITE_RETRY_TASK)
+    try:
+        summary = website_crawl.crawl_organization_website(
+            org_id, llm=website_crawl.default_model(), more_only=True,
+            retry_attempt=int(payload.get("retry_attempt", 1)))
+    except CrawlRefused as refused:
+        return {"success": False, "reason": refused.reason, "status": refused.status}
+    if summary["added"]:
+        _tell_the_bell(org_id)
+    return {"added": summary["added"], "model_errors": summary["model_errors"], "model_error": summary["model_error"],
+            "retry_queued": summary["retry_queued"], "crawl_id": summary["crawl_id"]}
+
+
 def run_website_crawl_job(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """The job body: read one organisation's site. Returns counts only, never page content."""
+    """The job body: read one organisation's site. Returns counts only, never page content.
+
+    A site that cannot be read is an answer, not a crash: the job finishes with ``success: False``
+    and the reason, which the sign-up page turns into a sentence and a next step."""
     from app.modules.organization import website_crawl
 
     org_id = payload.get("organization_id")
     if org_id is None:
         raise ValueError("%s job requires organization_id in payload" % WEBSITE_TASK)
-    summary = website_crawl.crawl_organization_website(org_id, llm=website_crawl.default_model())
+    try:
+        summary = website_crawl.crawl_organization_website(
+            org_id, llm=website_crawl.default_model(), progress=_job_progress(payload.get("job_id")),
+            defer_model_pass=True)
+    except CrawlRefused as refused:
+        logger.info("website not read for organisation %s: %s", org_id, refused.reason)
+        return {"success": False, "reason": refused.reason, "status": refused.status}
+    _tell_the_bell(org_id)
     return {
         "pages_read": summary["pages_read"], "pages_rendered": len(summary["rendered"]),
         "pages_skipped_by_robots": len(summary["skipped_by_robots"]), "pages_failed": len(summary["failed"]),
         "stopped": summary["stopped"], "model_errors": summary["model_errors"], "proposals": summary["proposals"],
-        "crawl_id": summary["crawl_id"],
+        "model_error": summary["model_error"],
+        "crawl_id": summary["crawl_id"], "model_pass_queued": bool(summary["model_pass_queued"]),
+        "more_to_come": bool(summary["retry_queued"] or summary["model_pass_queued"]),
     }

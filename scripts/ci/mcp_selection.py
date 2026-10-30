@@ -38,6 +38,10 @@ MCP_TESTS = (
     "tests/test_api_token_migration.py::test_downgrade_removes_the_added_columns",
     "tests/test_api_token_migration.py::test_backfill_assigns_the_users_org_and_revokes_what_it_cannot_fix",
     "tests/test_row_level_security.py::test_every_api_token_route_denies_the_other_org_under_the_runtime_role",
+    "tests/test_mcp_signin_next_through_sso.py::test_password_sign_in_for_an_sso_domain_keeps_next_for_the_way_back",
+    "tests/test_mcp_signin_next_through_sso.py::test_finishing_an_sso_sign_in_returns_to_the_stored_page",
+    "tests/test_mcp_signin_next_through_sso.py::test_an_outside_address_stored_as_next_is_refused",
+    "tests/test_mcp_signin_next_through_sso.py::test_an_administrator_keeps_next_through_the_two_factor_step",
 )
 MARKER = "mcp"
 

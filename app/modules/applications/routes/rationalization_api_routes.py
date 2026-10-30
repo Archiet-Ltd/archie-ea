@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, jsonify, render_template, render_template_string, request
+from flask import current_app, flash, jsonify, redirect, render_template, render_template_string, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -170,6 +170,25 @@ def rationalization_dashboard():
         # Pipeline counts for workflow stepper
         from sqlalchemy import func, or_
 
+        # The application count is the Overview's: not decommissioned, not a
+        # merged-away duplicate. One query, imported, so the two pages agree.
+        from flask import g
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        org_id = getattr(g, "current_org_id", None)
+        active_q = _active_applications()
+        if org_id:
+            active_q = active_q.where(ApplicationComponent.organization_id == org_id)
+        total_apps = db.session.execute(
+            db.select(func.count()).select_from(active_q.with_only_columns(ApplicationComponent.id).subquery())
+        ).scalar_one()
+        decommissioned_q = ApplicationComponent.query.filter(
+            func.lower(ApplicationComponent.lifecycle_status) == "5. decommissioned"
+        )
+        if org_id:
+            decommissioned_q = decommissioned_q.filter(ApplicationComponent.organization_id == org_id)
+        decommissioned_count = decommissioned_q.count()
+
         from app.models.consolidation_list import ConsolidationListEntry
         from app.models.application_rationalization import ApplicationRationalizationScore
 
@@ -190,6 +209,7 @@ def rationalization_dashboard():
 
         stats = {
             "total_applications": total_apps,
+            "decommissioned_applications": decommissioned_count,
             "duplicate_groups": total_groups,
             "total_groups": total_groups,
             "pending_groups": pending_groups,
@@ -385,28 +405,42 @@ def rationalization_run_detection():
         UnifiedDuplicateDetectionService,
     )
 
+    from_page = bool(request.form.get("from_dashboard"))
+
+    def _reply(payload, status=200):
+        if not from_page:
+            return jsonify(payload), status
+        if payload.get("success"):
+            flash("Detection finished. New duplicate groups are listed below.", "success")
+        else:
+            flash(payload.get("error") or "Detection could not be run. Try again.", "error")
+        return redirect(url_for("unified_applications.rationalization_dashboard"))
+
     try:
-        data = request.get_json() or {}
+        data = request.form if from_page else (request.get_json() or {})
         strategy = data.get("strategy", "hybrid")
         threshold = data.get("similarity_threshold", 0.55)
+        if from_page:
+            try:
+                threshold = float(threshold)
+            except (TypeError, ValueError):
+                threshold = -1.0
 
         if strategy not in ["fast", "hybrid", "enhanced"]:
-            return jsonify({"success": False, "error": "Invalid strategy"}), 400
+            return _reply({"success": False, "error": "Invalid strategy"}, 400)
 
         if not (0.0 <= threshold <= 1.0):
-            return jsonify(
-                {"success": False, "error": "Threshold must be between 0 and 1"}
-            ), 400
+            return _reply({"success": False, "error": "Threshold must be between 0 and 1"}, 400)
 
         service = UnifiedDuplicateDetectionService()
         result = service.run_detection(
             similarity_threshold=threshold, strategy=strategy
         )
 
-        return jsonify(result)
+        return _reply(result)
     except Exception as e:
         current_app.logger.error(f"Detection error: {e}")
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+        return _reply({"success": False, "error": "An internal error occurred"}, 500)
 
 
 @unified_applications_bp.route("/rationalization/api/groups")
@@ -4188,6 +4222,60 @@ def api_check_duplicate_element(app_id):
         return jsonify(
             {"success": False, "error": "Could not check for a duplicate element"}
         ), 500
+
+
+# ── Gap findings: the AI gap analysis, one list at a time ────────────────
+
+_AI_GAP_SECTIONS = {
+    "summary": "get_comprehensive_gap_summary",
+    "critical-gaps": "find_critical_gaps",
+    "uncovered": "find_uncovered_capabilities",
+    "rationalization": "find_rationalization_opportunities",
+    "vendor-lifecycle": "find_vendor_lifecycle_risks",
+}
+_GAP_TABS = [("critical-gaps", "Critical gaps"), ("uncovered", "Capabilities no application covers"),
+             ("rationalization", "Rationalization opportunities"),
+             ("vendor-lifecycle", "Vendor lifecycle risks")]
+# the summary figure behind each list, in the order the page shows them
+_GAP_TAB_COUNTS = [("critical-gaps", "critical_gaps"), ("uncovered", "no_coverage_count"),
+                   ("rationalization", "rationalization_opportunities"),
+                   ("vendor-lifecycle", "vendor_lifecycle_risks")]
+
+
+def _ai_gap_section(key):
+    """One section of the AI gap analysis, or {'error': True} when it cannot be read."""
+    try:
+        from app.modules.ai_chat.services.ai_gap_detection_service import AIGapDetectionService
+
+        return {"data": getattr(AIGapDetectionService(), _AI_GAP_SECTIONS[key])()}
+    except Exception as exc:
+        current_app.logger.warning("AI gap section %s could not be read: %s", key, exc)
+        try:
+            db.session.rollback()
+        except Exception as rollback_exc:
+            logger.debug("suppressed rollback error in _ai_gap_section: %s", rollback_exc)
+        return {"error": True}
+
+
+@unified_applications_bp.route("/rationalization/gaps")
+@login_required
+def rationalization_gaps():
+    """Gap findings: the four headline counts, and the list behind the one the person opens."""
+    summary = _ai_gap_section("summary")
+    gap_tab = request.args.get("gaps")
+    if gap_tab not in dict(_GAP_TABS):
+        # With no list asked for, open the first one that has something in it.
+        counts = (summary or {}).get("data") or {} if not (summary or {}).get("error") else {}
+        gap_tab = next((key for key, count_key in _GAP_TAB_COUNTS if counts.get(count_key)), "critical-gaps")
+    return render_template(
+        "applications/rationalization/gaps.html",
+        active_tab="gaps",
+        gap_tabs=_GAP_TABS,
+        gap_tab=gap_tab,
+        gap_label=dict(_GAP_TABS)[gap_tab],
+        summary=summary,
+        gaps=_ai_gap_section(gap_tab),
+    )
 
 
 # ── RAT-001: Bulk data enrichment page and API ───────────────────────────

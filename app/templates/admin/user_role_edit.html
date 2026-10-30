@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import hidden_input, input %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Edit User Role - {{ user.email }}{% endblock %}
 
@@ -13,7 +15,7 @@
         </div>
 
         <form method="POST" action="{{ url_for('user_role.update_user_role', user_id=user.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
 
             <div class="space-y-6">
                 <div>
@@ -26,9 +28,7 @@
                         {% for role_id, role_name in roles %}
                         <label class="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 cursor-pointer transition-colors
                             {% if user.enterprise_role == role_id %}bg-primary/5 border-primary{% endif %}">
-                            <input type="radio" name="enterprise_role" value="{{ role_id }}"
-                                   {% if user.enterprise_role == role_id %}checked{% endif %}
-                                   class="mt-1">
+                            {{ input(type="radio", name=("enterprise_role"), value=(role_id)|string, class="h-4 w-4 shrink-0 !h-4 !w-4 !p-0", attrs_dict={"checked": ("checked" if (user.enterprise_role == role_id) else none)}) }}
                             <div>
                                 <div class="font-medium">{{ role_name }}</div>
                             </div>
@@ -38,10 +38,9 @@
                 </div>
 
                 <div class="flex items-center gap-3 pt-6 border-t border-border">
-                    <button type="submit"
-                            class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                    {% call button(type="submit", variant="default") %}
                         Save Changes
-                    </button>
+                    {% endcall %}
                     <a href="{{ url_for('admin.user_info', user_id=user.id) }}"
                        class="px-4 py-2 rounded-md border border-border hover:bg-accent transition-colors">
                         Cancel

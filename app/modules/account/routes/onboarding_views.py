@@ -16,6 +16,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.models.organization import Organization
 from app.modules.account.services import onboarding_service as onboarding
+from app.modules.organization.website_crawl import confirm
 
 _log = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ def add_routes(bp, access) -> None:
         org = _org()
         step = request.args.get("step", type=int)
         step = step if step in (3, 4) else 2
+        facts, completeness = (confirm.proposals(org.id) if step == 3 else ([], None))
         return render_template(
             "account/register.html",
             form=None,
@@ -51,7 +53,17 @@ def add_routes(bp, access) -> None:
             kinds=onboarding.KINDS,
             industries=onboarding.INDUSTRIES,
             frameworks=onboarding.FRAMEWORKS,
-            chosen=onboarding.choices(org),
+            chosen={**onboarding.choices(org), **confirm.asked(org.settings)},
+            size_bands=confirm.SIZE_BANDS,
+            goals=confirm.GOALS,
+            facts=facts,
+            more_coming=onboarding.more_facts_coming(org) if step == 3 else None,
+            completeness=completeness,
+            suggested=onboarding.suggested_frameworks(
+                onboarding.choices(org).get("kind"), confirm.asked(org.settings).get("goal")),
+            goal_frameworks=onboarding.FRAMEWORKS_FOR_GOAL,
+            kind_frameworks=onboarding.FRAMEWORKS_FOR_KIND,
+            website=((org.settings or {}).get("onboarding") or {}).get("website"),
             sources=onboarding.sources(org),
             providers=onboarding.PROVIDERS,
             paying=onboarding.on_paying_plan(org),
@@ -115,6 +127,41 @@ def add_routes(bp, access) -> None:
         except ValueError as exc:
             return _problem(str(exc))
         return jsonify({"ok": True, **saved})
+
+    @bp.route("/welcome/profile", methods=["POST"])
+    @login_required
+    @access
+    def welcome_profile():
+        """The three questions asked up front, and the person's decision on each fact read from the site."""
+        data = request.get_json(silent=True) or {}
+        org = _org()
+        try:
+            confirm.save_answers(org, data.get("size_band"), data.get("role"), data.get("goal"))
+            result = confirm.confirm(org, current_user, data.get("facts") or [])
+        except ValueError as exc:
+            return _problem(str(exc))
+        from app.modules.organization.public_signals import queue_signals_refresh
+
+        onboarding.mark_profile_confirmed(org)
+        queue_signals_refresh(org.id)  # the public sources, read for the company just confirmed
+        return jsonify({"ok": True, **result})
+
+    @bp.route("/signals/refresh", methods=["POST"])
+    @login_required
+    def signals_refresh():
+        """Read the public sources again now, for the organisation that agreed to it. It reads public pages
+        only and is held to once a day, so anyone shown the button on their account page may press it."""
+        from flask import flash
+
+        from app.modules.organization.public_signals import company_name, queue_signals_refresh
+
+        if not company_name(_org()):
+            flash("Confirm your company name first; the public sources are searched for that name.", "error")
+        elif queue_signals_refresh(g.current_org_id) is None:
+            flash("Your company has not agreed to its public footprint being read, so there is nothing to refresh.", "error")
+        else:
+            flash("Reading the public sources now. New signals appear here in a few minutes.", "success")
+        return redirect(url_for("account.manage"))
 
     @bp.route("/welcome/ai/test", methods=["POST"])
     @login_required

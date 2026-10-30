@@ -1,0 +1,19 @@
+{# resizable: port of shadcn/ui resizable.tsx (pinned in compliance/upstream). Macros: resizable_panel_group, resizable_panel, resizable_handle #}
+
+{#- ResizablePanelGroup -#}
+{% macro resizable_panel_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('resizable-panel-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ResizablePanel -#}
+{% macro resizable_panel(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('resizable-panel', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ResizableHandle -#}
+{% macro resizable_handle(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('resizable-handle', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

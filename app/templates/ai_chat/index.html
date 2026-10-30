@@ -78,12 +78,20 @@
                     {{ button(variant='ghost', size='icon', icon='panel-left', aria_label='Show or hide chat history', class='hidden lg:inline-flex', attrs_dict={'@click': 'railOpen = !railOpen', ':aria-expanded': 'railOpen.toString()'}) }}
                 </div>
                 {# The options trigger carries the count of approvals waiting, so it is seen without opening anything. #}
+                {% if link_requires_satisfied(current_user, "general") %}
                 <div x-data="approvalManager()" x-cloak data-testid="chat-overflow-menu">
                     {% call button(variant='outline', aria_label='Chat options', class='relative', attrs_dict={'@click': "openDrawer('chat-options')", 'aria-haspopup': 'dialog', 'data-testid': 'chat-options-trigger'}) %}
                         <i data-lucide="sliders-horizontal" class="h-4 w-4 sm:mr-2" aria-hidden="true"></i><span class="hidden sm:inline">Chat options</span>
                         <span x-show="pendingCount > 0" x-cloak class="ml-2">{% call badge('info') %}<span x-text="pendingCount"></span>{% endcall %}</span>
                     {% endcall %}
                 </div>
+                {% else %}
+                <div data-testid="chat-overflow-menu">
+                    {% call button(variant='outline', aria_label='Chat options', class='relative', attrs_dict={'@click': "openDrawer('chat-options')", 'aria-haspopup': 'dialog', 'data-testid': 'chat-options-trigger'}) %}
+                        <i data-lucide="sliders-horizontal" class="h-4 w-4 sm:mr-2" aria-hidden="true"></i><span class="hidden sm:inline">Chat options</span>
+                    {% endcall %}
+                </div>
+                {% endif %}
             </header>
 
             <div id="messages-container" class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite" aria-relevant="additions">
@@ -102,9 +110,10 @@
                                 {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
                                 {% endif %}
                                 {% if startup_first_steps.sample %}
-                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}">
+                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-sample-form data-testid="chat-first-sample-form">
                                     {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                                     {{ button(text='See a sample company', type='submit', variant='outline' if startup_first_steps.connect else 'default', testid='chat-first-sample') }}
+                                    <p class="mt-2 text-sm text-muted-foreground" role="status" hidden data-sample-busy data-testid="chat-first-sample-busy">Loading the sample company. This takes a few seconds.</p>
                                 </form>
                                 {% endif %}
                             </div>
@@ -126,9 +135,9 @@
                not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
             <div class="shrink-0 px-4 pb-2">
                 {% if current_user.is_admin() %}
-                {{ alert('warning', text='No AI model. Records still answer.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Records still answer.'), link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% else %}
-                {{ alert('warning', text='No AI model. Ask an administrator.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Ask an administrator.'), testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% endif %}
             </div>
             {% endif %}
@@ -248,12 +257,14 @@
 
         <div class="space-y-2 border-t border-border pt-4">
             {# Approvals for review: the pending count is read from the one shared approvals store. #}
+            {% if link_requires_satisfied(current_user, "general") %}
             <div x-data="approvalManager()" x-cloak>
                 {% call button(variant='outline', aria_label='Approvals for review', class='w-full justify-between', attrs_dict={'data-modal-open': 'ai-chat-approvals-modal', '@click': "closeDrawer('chat-options')", 'data-testid': 'chat-options-approvals'}) %}
                     <span class="flex items-center"><i data-lucide="shield-check" class="mr-2 h-4 w-4" aria-hidden="true"></i>Approvals for review</span>
                     <span x-show="pendingCount > 0" x-cloak>{% call badge('info') %}<span x-text="pendingCount"></span>{% endcall %}</span>
                 {% endcall %}
             </div>
+            {% endif %}
             {{ button(text='Export conversation', variant='outline', icon='download', class='w-full justify-start', attrs_dict={'@click': 'exportConversation()'}) }}
             {{ button(text='Export context log', variant='outline', icon='upload', class='w-full justify-start', attrs_dict={'@click': 'exportContextLog()'}) }}
             {{ button(text='Match entities', variant='outline', icon='git-compare', class='w-full justify-start', href=url_for('unified_ai_chat.entity_matching_view')) }}
@@ -356,6 +367,7 @@
 {% endcall %}
 
 {# Approvals for review (ENT-077). Outside every collapsing container, so the dialog is never hidden with its parent. #}
+{% if link_requires_satisfied(current_user, "general") %}
 <div x-data="{}" x-cloak>
 {% call modal(id='ai-chat-approvals-modal', title='Approvals for review', size='default') %}
     <div class="max-h-[60vh] space-y-3 overflow-y-auto" tabindex="0">
@@ -379,15 +391,15 @@
                 {% call card(class='space-y-2 p-4') %}
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs font-medium capitalize"
+                            <span class="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs font-medium"
                                   :class="item.operation_type === 'create' ? 'bg-success/10 text-success-emphasis' : (item.operation_type === 'delete' ? 'bg-destructive/10 text-destructive-emphasis' : 'bg-warning/10 text-warning-emphasis')"
-                                  x-text="item.operation_type"></span>
-                            <span class="text-sm font-medium capitalize text-foreground" x-text="item.entity_type"></span>
+                                  x-text="item.operation_label"></span>
+                            <span class="text-sm font-medium text-foreground" x-text="item.entity_label"></span>
                         </div>
                         <span class="text-xs text-muted-foreground" x-text="$store.approvals.formatDate(item.created_at)"></span>
                     </div>
                     <p class="text-sm text-muted-foreground" x-text="item.summary"></p>
-                    <p class="text-xs text-muted-foreground">Requested by: <span class="text-foreground" x-text="item.requester?.display_name || 'Unknown requester'"></span></p>
+                    <p class="text-xs text-muted-foreground">Requested by: <span class="text-foreground" x-text="item.requester?.display_name"></span></p>
                     <p class="text-xs text-muted-foreground">Expires: <span x-text="$store.approvals.formatDate(item.expires_at)"></span></p>
                     {# The arguments that will run stay behind a disclosure, never as the primary text. #}
                     <details class="text-xs" x-show="item.arguments !== null">
@@ -420,6 +432,7 @@
     </div>
 {% endcall %}
 </div>
+{% endif %}
 
 <script>
     // Domain configuration from server - embedded as JSON
@@ -440,6 +453,8 @@
 
 <script src="{{ url_for('static', filename='js/ai_chat/app.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_chat/document_upload.js') }}"></script>
+{% if link_requires_satisfied(current_user, "general") %}
 <script src="{{ url_for('static', filename='js/ai_chat/approval_modal.js') }}"></script>
+{% endif %}
 {% endblock %}
 {# design-block: chat #}
