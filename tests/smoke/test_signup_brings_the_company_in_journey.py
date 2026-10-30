@@ -543,7 +543,11 @@ def test_a_slow_model_does_not_keep_the_founder_from_seeing_their_company_name(b
         assert time.monotonic() - asked_at < 30, "the name took %.0f s" % (time.monotonic() - asked_at)
         expect(name.get_by_role("checkbox")).to_be_checked()
         expect(_fact(page, "Contact email").locator("[data-fact-value]")).to_have_value("info@acme-robotics.test")
-        expect(page.get_by_test_id("signup-facts-more")).to_contain_text("More facts are still being worked out")
+        # Whichever notice the page is on says plainly that more is coming: "still being worked out" while the read
+        # job runs, or the model pass's own sentence once the read job has finished and the model pass is queued.
+        more = page.locator('[data-testid="signup-facts-more"], [data-testid="more-facts-coming"]')
+        expect(more).to_have_count(1)
+        expect(more).to_contain_text(re.compile(r"More facts (are still being worked out|follow|will be added)"))
         assert _fact(page, "Category").count() == 0, "a model-only fact appeared before the model answered"
         shoot(page, "slow-model-first-facts")
 
