@@ -889,13 +889,19 @@ def _github_state(org_id: int) -> dict:
 @login_required
 @connections_access
 def github_connect():
-    """The one page that connects GitHub: paste a read-only token, and the first read starts at once."""
+    """The one page that connects GitHub: one click through the Entelim GitHub App, or
+    paste a read-only token, and the first read starts at once either way."""
+    from app.connectors import github_app
+
     org_id = _require_active_org()
+    configured = github_app.app_configured()
     return render_template(
         "admin/connectors/github.html",
         status=_github_state(org_id),
         review_url=url_for("m365_connector.github_review"),
         status_url=url_for("m365_connector.github_status"),
+        github_app_configured=configured,
+        github_app_install_url=github_app.install_url(org_id) if configured else None,
     )
 
 
@@ -928,6 +934,101 @@ def github_connect_save():
         return redirect(url_for("m365_connector.github_connect"))
     flash("Connected. Reading your repositories now; this page shows when it is done.", "success")
     return redirect(url_for("m365_connector.github_connect"))
+
+
+@m365_connector_bp.route("/github/installed", methods=["GET"])
+@login_required
+@connections_access
+def github_installed():
+    """Where GitHub sends a person back after they install the Entelim GitHub App.
+
+    The query string a browser redirect carries is never trusted on its own:
+    ``state`` must be a value this server signed for the signed-in organisation,
+    within its 30-minute window, and the ``installation_id`` GitHub sends is
+    independently confirmed with GitHub's own API before anything is stored. An
+    installation that is cancelled, has no repositories selected, or whose state
+    is forged or expired is refused with a plain message -- never a stack trace.
+    """
+    from app.connectors import github as gh
+    from app.connectors import github_app
+    from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    org_id = _require_active_org()
+
+    def _back(return_to: str):
+        if return_to == "welcome":
+            return redirect(url_for("account.welcome", step=2))
+        return redirect(url_for("m365_connector.github_connect"))
+
+    try:
+        return_to = github_app.read_state(request.args.get("state", ""), org_id)
+    except github_app.GitHubAppStateError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.github_connect"))
+
+    setup_action = request.args.get("setup_action")
+    if setup_action == "request":
+        flash(
+            "The installation is waiting for an owner of that GitHub organisation "
+            "to approve it. Try again once it is approved.",
+            "info",
+        )
+        return _back(return_to)
+
+    raw_id = request.args.get("installation_id", "")
+    if not raw_id.isdigit():
+        flash("GitHub did not send a valid installation. Try Connect GitHub again.", "error")
+        return _back(return_to)
+    installation_id = int(raw_id)
+
+    code = request.args.get("code", "")
+    if not code:
+        flash(
+            "GitHub did not say who completed this installation. Start again from Connect GitHub.",
+            "error",
+        )
+        return _back(return_to)
+
+    try:
+        user_token = github_app.exchange_code(code)
+        if not github_app.user_can_see_installation(user_token, installation_id):
+            flash(
+                "Your GitHub account can't see that GitHub installation, so it was not connected. "
+                "Install the app yourself from Connect GitHub.",
+                "error",
+            )
+            return _back(return_to)
+        if github_app.installation_bound_elsewhere(org_id, installation_id):
+            flash(
+                "That GitHub installation is already connected to another organisation.",
+                "error",
+            )
+            return _back(return_to)
+        confirmed = github_app.confirm_installation(installation_id)
+    except github_app.GitHubAppError as exc:
+        flash(str(exc), "error")
+        return _back(return_to)
+
+    account = confirmed["account"]
+    if not gh.is_valid_github_name(account):
+        flash("GitHub did not name a valid organisation or account for this installation.", "error")
+        return _back(return_to)
+
+    # Stored in the open transaction only: connect_and_start commits it once the
+    # connection is made, and a refusal rolls it back, so a refused connection
+    # leaves no installation in the vault.
+    OrgCredentialVault().store(
+        org_id=org_id, connector_type="github", credential_type="installation_id", value=str(installation_id)
+    )
+    try:
+        gh.connect_and_start(org_id, account, None)
+    except gh.ConnectRefused as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return _back(return_to)
+    flash("Connected through the GitHub App. Reading your repositories now; this page shows when it is done.", "success")
+    return _back(return_to)
 
 
 @m365_connector_bp.route("/github/sync", methods=["POST"])
