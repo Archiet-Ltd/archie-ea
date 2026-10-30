@@ -192,7 +192,16 @@ def test_an_administrator_deletes_an_organisation_holding_append_only_rows(
         record = platform_rows[0]
         assert record.user_id == platform_admin.id
         assert record.new_value["name"] == doomed["name"]
-        assert isinstance(record.new_value.get("row_counts"), dict) and record.new_value["row_counts"]
+        row_counts = record.new_value.get("row_counts")
+        assert isinstance(row_counts, dict) and row_counts
+        # entity_history.organization_id carries no foreign key to organizations (it predates
+        # that key's enforcement), so it is removed by its own explicit step rather than the
+        # foreign-key-driven plan every other table here goes through -- named here to prove
+        # that step actually ran and was counted, not merely that some table was.
+        assert row_counts.get("entity_history", 0) > 0, (
+            "the application write this fixture seeds versions into entity_history; "
+            "its removal must be named in the audit record's row_counts: %r" % row_counts
+        )
         db.session.remove()
 
 
