@@ -33,6 +33,48 @@
       {{ ui.card_title(text='Portfolio dependency risk') }}
       {{ ui.card_description(text='Applications whose retirement is blocked or affects others') }}
       {% call ui.card_action(class='flex items-center gap-2') %}
+        {# The dialog is lifted to the page body when it opens, so its content carries its own import state
+           and tells the table to reload when it closes. #}
+        {% call ui.dialog() %}
+          {{ ui.dialog_trigger(text='Import', class='h-8 px-3', attrs={'data-testid': 'import-open'}) }}
+          {% call ui.dialog_content(attrs={'x-data': 'trackingApp()', 'data-testid': 'import-dialog'}) %}
+            {% call ui.dialog_header() %}{{ ui.dialog_title(text='Import dependencies') }}{{ ui.dialog_description(text='Upload a JSON or CSV file of application dependencies.') }}{% endcall %}
+            <div x-show="!importResult" class="space-y-4">
+              {% call ui.field() %}
+                {{ ui.field_label(text='Upload JSON or CSV file', attrs={'for': 'import-file'}) }}
+                {{ ui.input(id='import-file', attrs={'type': 'file', 'accept': '.json,.csv', '@change': 'handleImportFile($event)'}) }}
+              {% endcall %}
+              <div x-show="importPreview.length > 0" x-cloak>
+                <p class="text-sm font-medium">Preview (first 10 rows)</p>
+                {% call ui.table_container() %}{% call ui.table() %}
+                  {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Source') }}{{ ui.table_head(text='Target') }}{{ ui.table_head(text='Type') }}{{ ui.table_head(text='Strength') }}{% endcall %}{% endcall %}
+                  {% call ui.table_body() %}
+                    <template x-for="row in importPreview" :key="row.source_app_id + '-' + row.target_app_id">
+                      {% call ui.table_row() %}
+                        {% call ui.table_cell(attrs={'x-text': 'row.source_app_id'}) %}{% endcall %}
+                        {% call ui.table_cell(attrs={'x-text': 'row.target_app_id'}) %}{% endcall %}
+                        {% call ui.table_cell(attrs={'x-text': "row.dependency_type || 'Not recorded'"}) %}{% endcall %}
+                        {% call ui.table_cell(attrs={'x-text': "row.dependency_strength || 'medium'"}) %}{% endcall %}
+                      {% endcall %}
+                    </template>
+                  {% endcall %}
+                {% endcall %}{% endcall %}
+              </div>
+            </div>
+            <div x-show="importResult" x-cloak class="space-y-2" data-testid="import-result">
+              <p class="text-sm font-medium" x-text="importResult && importResult.success ? 'Import complete' : 'Import failed'"></p>
+              <p class="text-sm text-muted-foreground" x-show="importResult && importResult.success">Imported <span class="tabular-nums" x-text="importResult && importResult.imported"></span>, skipped <span class="tabular-nums" x-text="importResult && importResult.skipped"></span> duplicates.</p>
+              <template x-for="e in ((importResult && importResult.errors) || []).slice(0, 5)" :key="e.row">
+                <p class="text-sm text-destructive" x-text="'Row ' + e.row + ': ' + e.reason"></p>
+              </template>
+              <p class="text-sm text-muted-foreground" x-show="importResult && !importResult.success" x-text="importResult && importResult.error"></p>
+            </div>
+            {% call ui.dialog_footer() %}
+              {{ ui.button(text='Confirm import', attrs={'type': 'button', 'x-show': 'importPreview.length > 0 && !importResult', '@click': 'submitImport()', ':disabled': 'importLoading', 'data-testid': 'import-confirm'}) }}
+              {{ ui.dialog_close(text='Close', attrs={'type': 'button', '@click': "importResult = null; importPreview = []; importFile = null; $dispatch('dependencies-changed')"}) }}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
         {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='dep-risk-filter', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by risk level', 'x-model': 'depRiskFilter', '@change': 'depPage = 1; loadDependencyRisk()', 'data-testid': 'dep-risk-filter'}) %}
           {{ ui.native_select_option(text='All risk levels', value='') }}
           {% for level in ['critical', 'high', 'medium', 'low'] %}{{ ui.native_select_option(text=level | capitalize, value=level) }}{% endfor %}
@@ -95,48 +137,6 @@
   {% endcall %}
   </div>
 
-  {# Dependency import. The dialog is lifted to the page body when it opens, so its content carries its own import state
-     and tells the table to reload when it closes. #}
-  {% call ui.dialog() %}
-    {{ ui.dialog_trigger(text='Import dependencies', attrs={'data-testid': 'import-open'}) }}
-    {% call ui.dialog_content(attrs={'x-data': 'trackingApp()', 'data-testid': 'import-dialog'}) %}
-      {% call ui.dialog_header() %}{{ ui.dialog_title(text='Import dependencies') }}{{ ui.dialog_description(text='Upload a JSON or CSV file of application dependencies.') }}{% endcall %}
-      <div x-show="!importResult" class="space-y-4">
-        {% call ui.field() %}
-          {{ ui.field_label(text='Upload JSON or CSV file', attrs={'for': 'import-file'}) }}
-          {{ ui.input(id='import-file', attrs={'type': 'file', 'accept': '.json,.csv', '@change': 'handleImportFile($event)'}) }}
-        {% endcall %}
-        <div x-show="importPreview.length > 0" x-cloak>
-          <p class="text-sm font-medium">Preview (first 10 rows)</p>
-          {% call ui.table_container() %}{% call ui.table() %}
-            {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Source') }}{{ ui.table_head(text='Target') }}{{ ui.table_head(text='Type') }}{{ ui.table_head(text='Strength') }}{% endcall %}{% endcall %}
-            {% call ui.table_body() %}
-              <template x-for="row in importPreview" :key="row.source_app_id + '-' + row.target_app_id">
-                {% call ui.table_row() %}
-                  {% call ui.table_cell(attrs={'x-text': 'row.source_app_id'}) %}{% endcall %}
-                  {% call ui.table_cell(attrs={'x-text': 'row.target_app_id'}) %}{% endcall %}
-                  {% call ui.table_cell(attrs={'x-text': "row.dependency_type || 'Not recorded'"}) %}{% endcall %}
-                  {% call ui.table_cell(attrs={'x-text': "row.dependency_strength || 'medium'"}) %}{% endcall %}
-                {% endcall %}
-              </template>
-            {% endcall %}
-          {% endcall %}{% endcall %}
-        </div>
-      </div>
-      <div x-show="importResult" x-cloak class="space-y-2" data-testid="import-result">
-        <p class="text-sm font-medium" x-text="importResult && importResult.success ? 'Import complete' : 'Import failed'"></p>
-        <p class="text-sm text-muted-foreground" x-show="importResult && importResult.success">Imported <span class="tabular-nums" x-text="importResult && importResult.imported"></span>, skipped <span class="tabular-nums" x-text="importResult && importResult.skipped"></span> duplicates.</p>
-        <template x-for="e in ((importResult && importResult.errors) || []).slice(0, 5)" :key="e.row">
-          <p class="text-sm text-destructive" x-text="'Row ' + e.row + ': ' + e.reason"></p>
-        </template>
-        <p class="text-sm text-muted-foreground" x-show="importResult && !importResult.success" x-text="importResult && importResult.error"></p>
-      </div>
-      {% call ui.dialog_footer() %}
-        {{ ui.button(text='Confirm import', attrs={'type': 'button', 'x-show': 'importPreview.length > 0 && !importResult', '@click': 'submitImport()', ':disabled': 'importLoading', 'data-testid': 'import-confirm'}) }}
-        {{ ui.dialog_close(text='Close', attrs={'type': 'button', '@click': "importResult = null; importPreview = []; importFile = null; $dispatch('dependencies-changed')"}) }}
-      {% endcall %}
-    {% endcall %}
-  {% endcall %}
 </div>
 {% endblock %}
 
