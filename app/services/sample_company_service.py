@@ -22,7 +22,6 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm.attributes import flag_modified
 
 from app import db
-from app.services.billing_plans import SAMPLE_ACCOUNT_SUFFIX
 
 SAMPLE_MODEL_NAME = "Sample company"
 # Written on every relationship and element the file brings in, so the first answer cites it.
@@ -30,7 +29,6 @@ SOURCE_LABEL = "Sample company"
 # The origin kind of everything the sample brings in: never 'connector', so a sample record cannot be
 # presented as evidence a connector read (the answers read the kind and say "Sample data").
 SOURCE_KIND = "sample"
-SAMPLE_OWNER_DOMAIN = SAMPLE_ACCOUNT_SUFFIX.lstrip("@")  # not a seat on any plan
 _ROWS_KEY = "sample_rows"
 _LOCK_KEY = 74510  # first half of the advisory-lock pair; the organisation id is the second
 
@@ -91,34 +89,18 @@ _CAPABILITY_TYPES = {
     "Run customer support": "supporting",
 }
 
-# The named owners of the sample applications. They are labelled sample people: accounts that
-# cannot sign in, removed with the sample, never the person who loaded it.
+# The named owners of the sample applications: plain text labelled "(sample owner)", never a user
+# account, never the person who loaded the sample. A name that matches no user stays text on the
+# application, so nobody can sign in as them, they are in no member list and they take no seat.
 _OWNERS = [
-    ("Alex", "(sample owner)", ("Payments service", "Finance system", "Identity provider")),
-    ("Sam", "(sample owner)", ("Customer web app", "Notification service", "Monitoring dashboard")),
-    ("Jo", "(sample owner)", ("Order management system", "Inventory system", "Data warehouse", "Document management")),
+    ("Alex", ("Payments service", "Finance system", "Identity provider")),
+    ("Sam", ("Customer web app", "Notification service", "Monitoring dashboard")),
+    ("Jo", ("Order management system", "Inventory system", "Data warehouse", "Document management")),
 ]
-
-
-def _sample_owner_users(org_id: int) -> tuple:
-    """The sample owner accounts for ``org_id``, keyed by application name; created once."""
-    from app.models.user import User
-
-    by_app: Dict[str, Any] = {}
-    created = []
-    for index, (first, last, application_names) in enumerate(_OWNERS, start=1):
-        email = "sample-owner-%d-%d@%s" % (org_id, index, SAMPLE_OWNER_DOMAIN)
-        user = User.query.filter_by(email=email, organization_id=org_id).first()
-        if user is None:
-            # "!" is not a valid password hash, so the account can never sign in.
-            user = User(email=email, first_name=first, last_name=last, password_hash="!",
-                        organization_id=org_id, confirmed=False)
-            db.session.add(user)
-            created.append(user)
-        for name in application_names:
-            by_app[name] = user
-    db.session.flush()
-    return by_app, created
+_OWNER_LABEL = "%s (sample owner)"
+_OWNER_BY_APPLICATION = {
+    application: _OWNER_LABEL % first for first, applications in _OWNERS for application in applications
+}
 
 
 # (title, likelihood, impact, owner role, mitigation, element name)
@@ -259,7 +241,6 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.commands.project_capabilities import SOURCE_TABLE
     from app.models.unified_capability import UnifiedCapability
     from app.services.application_cost_accessor import state_contract, sync_cost_fact
-    from app.services.element_ownership_service import set_element_owner
 
     elements = {
         e.name: e
@@ -326,7 +307,8 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             health_status="healthy",
             archimate_element_id=element.id if element else None,
             application_code="SAMPLE-%d-" % org_id + name.upper().replace(" ", "-")[:20],
-            # No owner: see the capability above — never the loading person by default.
+            application_owner=_OWNER_BY_APPLICATION.get(name),
+            business_owner=_OWNER_BY_APPLICATION.get(name),
             license_cost_annual=licence,
             infrastructure_cost_monthly=infra,
             total_cost_of_ownership=licence + 12 * infra,
@@ -365,23 +347,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             db.session.add(mapping)
             mappings.append(mapping)
 
-    # Each application is owned by one of the labelled sample owners, never by the person
-    # loading the sample.
     db.session.flush()
-    owners_by_app, owner_users = _sample_owner_users(org_id)
-    owner_rows = []
-    for user_row in owner_users:
-        note("users", user_row)
-    for app, _ in applications:
-        owner_user = owners_by_app.get(app.name)
-        if owner_user is not None:
-            owner_rows.append(set_element_owner(
-                element_type="application", element_id=app.id, user_id=owner_user.id,
-                organization_id=org_id, ownership_type="primary", commit=False,
-            ))
-    db.session.flush()
-    for owner_row in owner_rows:
-        note("application_owners", owner_row)
     for mapping in mappings:
         note("application_capability_mapping", mapping)
     applications = [a for a, _ in applications]
@@ -440,7 +406,6 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk
     from app.models.solution_models import Solution
-    from app.models.user import User
     from app.services import import_restore_service
     from app.services.application_cost_accessor import sync_cost_fact
 
@@ -475,10 +440,6 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         db.session.delete(app)
     for model, table in ((BusinessCapability, "business_capability"), (Risk, "risks"), (Solution, "solutions")):
         for row in rows(model, table):
-            db.session.delete(row)
-    db.session.flush()
-    for row in rows(User, "users"):
-        if (row.email or "").endswith("@" + SAMPLE_OWNER_DOMAIN):
             db.session.delete(row)
     db.session.flush()
     return import_restore_service.restore(org_id, user_id, log.id, [])

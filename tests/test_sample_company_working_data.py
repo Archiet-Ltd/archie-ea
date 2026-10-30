@@ -61,15 +61,16 @@ def test_loading_the_sample_gives_applications_with_owners_and_costs(
     assert client.post("/architecture/sample-company/load").status_code == 302
     counts = _counts(org.id)
     assert 8 <= counts["applications"] <= 12
-    assert counts["owners"] >= counts["applications"]
+    # Owners are labelled names on the application (lead's ruling, 30 Oct 2026): no owner account is
+    # created, so the count of owner records is 0 and each application carries a "(sample owner)" name.
+    assert counts["owners"] == 0
     assert counts["cost_facts"] >= counts["applications"]
     assert counts["mappings"] > 0 and counts["risks"] > 0
     rows = db.session.execute(
         db.text(
             "SELECT count(*) FROM application_components WHERE organization_id = :o "
-            "AND total_cost_of_ownership > 0 AND lifecycle_status <> '' AND EXISTS ("
-            "SELECT 1 FROM application_owners ao WHERE ao.application_id = application_components.id "
-            "AND ao.ownership_type = 'primary')"
+            "AND total_cost_of_ownership > 0 AND lifecycle_status <> '' "
+            "AND application_owner LIKE '% (sample owner)' AND business_owner LIKE '% (sample owner)'"
         ),
         {"o": org.id},
     ).scalar()
@@ -148,23 +149,37 @@ def test_sample_records_carry_the_sample_origin_never_a_connector(client, login_
     assert ArchiMateElement.query.filter_by(organization_id=org.id, source_kind="sample").count() > 0
 
 
-def test_sample_owners_are_named_sample_people_and_take_no_plan_place(client, login_as, make_org):
-    """Every sample application has a named sample owner, and loading it on a full plan still works."""
+def test_sample_owners_are_labelled_names_never_accounts(client, login_as, make_org):
+    """Sample owners are plain text "<name> (sample owner)": no user account, no seat, never the loader.
+
+    Changed from asserting three sample owner accounts, on the lead's ruling of 30 Oct 2026: the
+    sample creates no user rows at all.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.user import User
+
     org = make_org()
     user = _architect(org, "founder-f@example.com")
     login_as(client, user)
+    users_before = User.query.filter_by(organization_id=org.id).count()
     client.post("/architecture/sample-company/load")
-    names = [
-        row[0] for row in db.session.execute(
-            db.text(
-                "SELECT DISTINCT u.first_name || ' ' || u.last_name FROM application_owners ao "
-                "JOIN users u ON u.id = ao.user_id WHERE ao.organization_id = :o AND ao.ownership_type = 'primary'"
-            ),
-            {"o": org.id},
-        )
-    ]
-    assert names and all("(sample owner)" in name for name in names)
-    assert user.email not in names
+    db.session.expire_all()
+    assert User.query.filter_by(organization_id=org.id).count() == users_before
+    assert not db.session.execute(
+        db.text("SELECT 1 FROM users WHERE email LIKE '%@sample.invalid'")
+    ).first()
+    apps = ApplicationComponent.query.filter(
+        ApplicationComponent.organization_id == org.id, ApplicationComponent.application_code.like("SAMPLE-%")
+    ).all()
+    assert len(apps) >= 10
+    loader = " ".join(p for p in (user.first_name, user.last_name) if p) or user.email
+    for app in apps:
+        for owner in (app.business_owner, app.application_owner):
+            assert owner and owner.endswith(" (sample owner)")
+            assert loader not in owner
+    assert not db.session.execute(
+        db.text("SELECT 1 FROM application_owners WHERE organization_id = :o"), {"o": org.id}
+    ).first()
     from app.services.billing_plans import _count_members
 
     assert _count_members(db.session.connection(), org.id, "all") == 1
