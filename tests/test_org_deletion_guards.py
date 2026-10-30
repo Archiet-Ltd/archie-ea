@@ -134,6 +134,34 @@ def test_delete_of_an_arb_evidence_snapshot_is_admitted_by_the_same_marker(db_se
     ).first() is None
 
 
+def test_delete_of_a_null_organisation_row_is_refused_even_with_a_marker_set(db_session, make_org):
+    """A platform row with no organisation names no organisation's deletion.
+
+    archie_org_deletion_admits(NULL) must refuse, not admit: a guarded table's row with a NULL
+    organization_id belongs to no organisation's delete, however the marker is set.
+    """
+    from app.models.arb_submission_evidence import ARBSubmissionEvidenceSnapshot
+
+    org = make_org("guard-null-org")
+    snapshot = ARBSubmissionEvidenceSnapshot(organization_id=None)
+    db_session.add(snapshot)
+    db_session.flush()
+    snapshot_id = snapshot.id
+
+    _set_marker(db_session, org.id)
+    with pytest.raises(Exception, match="append-only"):
+        with db_session.begin_nested():
+            db_session.execute(
+                text("DELETE FROM arb_submission_evidence_snapshots WHERE id = :id"),
+                {"id": snapshot_id},
+            )
+
+    _clear_marker(db_session)
+    assert db_session.execute(
+        text("SELECT 1 FROM arb_submission_evidence_snapshots WHERE id = :id"), {"id": snapshot_id}
+    ).first() is not None, "a NULL-organisation row was deleted by a marker naming a real organisation"
+
+
 def test_delete_with_the_marker_set_to_its_own_organisation_is_admitted(db_session, make_org):
     org = make_org("guard-admitted")
     row_id = _insert_outbox_event(db_session, org.id)

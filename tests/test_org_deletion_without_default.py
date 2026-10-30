@@ -89,3 +89,84 @@ def test_deleting_an_organisation_needs_no_default_organisation(app, no_default_
             if leftover is not None:
                 OrganizationDeletionService.delete_organization(ids["doomed"])
             db.session.remove()
+
+
+def test_a_departing_person_named_by_another_organisations_append_only_row_is_never_updated(app):
+    """``_remove_people`` never issues an UPDATE against an append-only table.
+
+    arb_submission_evidence_snapshots is append-only (``reject_archie_evidence_mutation``
+    admits a DELETE under the deletion marker, never an UPDATE) and its ``actor_id`` is a
+    nullable foreign key to ``users`` with no tenant check of its own, so a person leaving
+    one organisation can still be named by another, surviving organisation's snapshot row.
+    Before this fix, deleting the person's own organisation tried to NULL that column and the
+    append-only guard refused the UPDATE outright -- a defect, since nulling an append-only
+    row's column is never admitted no matter which organisation's delete is in progress.
+
+    The column is still a real foreign key with no cascade of its own, so a person a surviving
+    organisation's append-only row insists on still naming cannot be deleted either (deleting
+    them would leave that row's own reference dangling) -- that half is a genuine, pre-existing
+    referential-integrity conflict between the two organisations' data, not something a trigger
+    or a retry can paper over, and it now surfaces as the database's own plain foreign-key
+    refusal naming the row that is holding on, never as the append-only guard's misleading
+    "is append-only" exception.
+    """
+    from app import db
+    from app.models.arb_submission_evidence import ARBSubmissionEvidenceSnapshot
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.services.org_deletion_service import OrganizationDeletionService
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed = Organization(name="Doomed append %s" % marker, slug="doomed-append-%s" % marker)
+        other = Organization(name="Other append %s" % marker, slug="other-append-%s" % marker)
+        db.session.add_all([doomed, other])
+        db.session.flush()
+        departing = User(email="departing-%s@example.com" % marker, organization_id=doomed.id)
+        db.session.add(departing)
+        db.session.flush()
+        snapshot = ARBSubmissionEvidenceSnapshot(organization_id=other.id, actor_id=departing.id)
+        db.session.add(snapshot)
+        db.session.commit()
+        ids = {"doomed": doomed.id, "other": other.id, "departing": departing.id, "snapshot": snapshot.id}
+        db.session.remove()
+
+    try:
+        with app.app_context():
+            with pytest.raises(Exception) as excinfo:
+                OrganizationDeletionService.delete_organization(ids["doomed"])
+            message = str(excinfo.value)
+            assert "append-only" not in message, (
+                "the guard rejected an UPDATE this code must no longer attempt: " + message
+            )
+            assert "arb_submission_evidence_snapshots" in message, (
+                "expected the database's own foreign-key refusal naming the citing row: " + message
+            )
+            db.session.rollback()
+            db.session.remove()
+
+        # Rolled back whole: the organisation, the person and the citing row all still stand.
+        with app.app_context():
+            assert db.session.get(Organization, ids["doomed"]) is not None
+            row = db.session.execute(
+                text("SELECT actor_id FROM arb_submission_evidence_snapshots WHERE id = :id"),
+                {"id": ids["snapshot"]},
+            ).one()
+            assert row[0] == ids["departing"]
+            db.session.remove()
+    finally:
+        with app.app_context():
+            db.session.execute(
+                text("SELECT set_config('archie.deleting_organisation', :org_id, true)"),
+                {"org_id": str(ids["other"])},
+            )
+            db.session.execute(
+                text("DELETE FROM arb_submission_evidence_snapshots WHERE id = :id"),
+                {"id": ids["snapshot"]},
+            )
+            db.session.commit()
+            db.session.remove()
+            for org_id in (ids["other"], ids["doomed"]):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
