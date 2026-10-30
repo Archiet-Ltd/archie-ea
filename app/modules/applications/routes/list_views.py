@@ -566,7 +566,7 @@ def application_list():
         try:
             from config import CurrencyConfig
 
-            currency_symbol = CurrencyConfig.get_currency_config().get("symbol", "\u00a3")
+            currency_symbol = CurrencyConfig.get_org_currency_config().get("symbol", "\u00a3")
         except Exception:
             current_app.logger.debug(
                 "CurrencyConfig unavailable, using default symbol", exc_info=True

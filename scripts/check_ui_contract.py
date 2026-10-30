@@ -45,7 +45,7 @@ definitions, so the canonical macros are never counted against themselves:
 Usage:
     python scripts/check_ui_contract.py            # list violations by rule
     python scripts/check_ui_contract.py --count    # print only the total (gate)
-    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value|second-library [--count|--list]
+    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value|second-library|hand-format [--count|--list]
 """
 from __future__ import annotations
 
@@ -391,7 +391,19 @@ def _rule_second_library(rel: str, text: str, view: str):
     return out
 
 
+_HAND_FORMAT = re.compile(
+    r"\"\{:,|'\{:,|%\.\d+f|\bround\(|\|\s*round\b|[\u00a3\u20ac]|\$(?=\s?(?:\d|{{))|strftime\(")
+
+
+def _rule_hand_format(rel: str, text: str, view: str):
+    """Text built by hand from a number, date or amount: use fmt_number, fmt_percent, fmt_money or fmt_date."""
+    return [(_line_of(text, m.start()),
+             "number, date or money written by hand; use the fmt_* filter (app/utils/locale_format.py)")
+            for m in _HAND_FORMAT.finditer(view)]
+
+
 COMPONENT_RULES = {
+    "hand-format": _rule_hand_format,
     "dialog-title": _rule_dialog_title,
     "empty-state": _rule_empty_state,
     "form-field": _rule_form_field,

@@ -50,7 +50,7 @@
             <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
             {% endif %}
             {% if freshness.stale_rows %}
-            <p class="text-sm text-muted-foreground" role="status" data-stale-notice>The connections we worked out may be out of date: {{ freshness.stale_rows }} {{ 'was' if freshness.stale_rows == 1 else 'were' }} worked out before the model last changed.</p>
+            <p class="text-sm text-muted-foreground" role="status" data-stale-notice>The connections we worked out may be out of date: {{ freshness.stale_rows|fmt_number }} {{ 'was' if freshness.stale_rows == 1 else 'were' }} worked out before the model last changed.</p>
             <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
             {% endif %}
         {% endcall %}
@@ -159,19 +159,19 @@
             {% else %}
             {% set last = derivation.last_run %}
             <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
-                <div><dt class="text-muted-foreground">Last worked out</dt><dd class="text-foreground" data-derivation-last-run>{{ last.finished_at | format_datetime if last and last.finished_at else '—' }}</dd></div>
-                <div><dt class="text-muted-foreground">Current</dt><dd class="text-foreground" data-derivation-current>{{ derivation.current_count if last else '—' }}</dd></div>
-                <div><dt class="text-muted-foreground">May be out of date</dt><dd class="text-foreground" data-derivation-stale>{{ derivation.stale_count if last else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">Last worked out</dt><dd class="text-foreground" data-derivation-last-run>{{ last.finished_at | fmt_datetime if last and last.finished_at else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">Current</dt><dd class="text-foreground" data-derivation-current>{{ derivation.current_count|fmt_number if last else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">May be out of date</dt><dd class="text-foreground" data-derivation-stale>{{ derivation.stale_count|fmt_number if last else '—' }}</dd></div>
             </dl>
             {% for reason, count in derivation.stale_reasons %}
             {% if loop.first %}<ul class="mt-2 space-y-1 text-xs text-foreground" data-derivation-stale-reasons>{% endif %}
-                <li>{{ count }} out of date because {{ stale_reason_words.get(reason, 'the model changed') }}</li>
+                <li>{{ count|fmt_number }} out of date because {{ stale_reason_words.get(reason, 'the model changed') }}</li>
             {% if loop.last %}</ul>{% endif %}
             {% endfor %}
             {% if derivation.runs %}
             <ol class="mt-2 space-y-1 text-xs text-muted-foreground" aria-label="Recent runs">
                 {% for run in derivation.runs %}
-                <li data-derivation-run>{{ run.finished_at | format_datetime if run.finished_at else '—' }} · {{ run.explicit_count if run.explicit_count is not none else '—' }} relationships read · {{ run.derived_count if run.derived_count is not none else '—' }} connections found</li>
+                <li data-derivation-run>{{ run.finished_at | fmt_datetime if run.finished_at else '—' }} · {{ run.explicit_count|fmt_number if run.explicit_count is not none else '—' }} relationships read · {{ run.derived_count|fmt_number if run.derived_count is not none else '—' }} connections found</li>
                 {% endfor %}
             </ol>
             {% else %}
@@ -183,7 +183,7 @@
 
     {% if answer.rows | length > shown_limit %}
     <p class="text-sm text-muted-foreground" data-answer-more>
-        Showing {{ shown_limit }} of {{ answer.rows | length }}.
+        Showing {{ shown_limit|fmt_number }} of {{ answer.rows | length | fmt_number }}.
         <a class="underline underline-offset-4" href="{{ answer.page_url }}">See every connection</a>
     </p>
     {% endif %}

@@ -22,25 +22,12 @@ from sqlalchemy import func, or_
 
 from app import db
 
+from app.utils.locale_format import fmt_date
+
 logger = logging.getLogger(__name__)
 
 RANGES = (("90d", "Last 3 months", 90), ("30d", "Last 30 days", 30), ("7d", "Last 7 days", 7))
 CONNECTED_KINDS = ("import", "connector")
-
-
-def _currency():
-    """The organisation's currency symbol and whether it comes before the amount."""
-    from flask import has_request_context
-
-    from app.middleware.tenant_context import current_org
-    from config import CurrencyConfig
-
-    try:
-        organization = current_org() if has_request_context() else None
-    except Exception:
-        organization = None
-    cfg = CurrencyConfig.get_org_currency_config(organization)
-    return cfg["symbol"], cfg["position"] == "prefix", cfg["code"]
 
 
 def _currency_code():
@@ -59,20 +46,10 @@ def _currency_code():
 
 
 def _money(amount, compact=False):
-    """An amount in whole pounds, or short ("£250k", "£20.8k") for a card; the table keeps the whole figure."""
-    if amount is None:
-        return None
-    symbol, prefix, _code = _currency()
-    amount = float(amount)
-    if compact and abs(amount) >= 1000:
-        for size, suffix in ((1_000_000, "m"), (1_000, "k")):
-            if abs(amount) >= size:
-                number = ("%.1f" % (amount / size)).rstrip("0").rstrip(".")
-                text = number + suffix
-                break
-    else:
-        text = "{:,.0f}".format(amount)
-    return symbol + text if prefix else text + symbol
+    """An amount in the organisation's currency and locale: whole units, or short for a card; the table keeps the whole figure."""
+    from app.utils.locale_format import fmt_money
+
+    return fmt_money(amount, compact=compact, decimals=0)
 
 
 def _percent_change(now_value, before_value):
@@ -250,7 +227,7 @@ def _run_cost(org_id, now):
             for c in contracts
             if c.start_date < nxt and (c.end_date is None or c.end_date >= first)
         )
-        series.append({"month": first.strftime("%b"), "value": round(monthly)})
+        series.append({"month": fmt_date(first, "MMM"), "value": round(monthly)})
     this_month, last_month = series[-1]["value"], series[-2]["value"]
     top = summary["top_vendors"][0] if summary["top_vendors"] else None
     share = None
@@ -429,7 +406,7 @@ def _bars(inserts, today, days):
                     bucket[2 if _is_connected(change) else 3] += 1
                     break
     return [
-        {"day": "%d %s" % (b[0].day, b[0].strftime("%b")), "connected": b[2], "manual": b[3]}
+        {"day": fmt_date(b[0], "d MMM"), "connected": b[2], "manual": b[3]}
         for b in reversed(buckets)
     ]
 
@@ -460,7 +437,7 @@ def _activity(changes, now, org_id):
     for change in week:
         per_weekday[change.valid_from.date()] += 1
     weekly_rows = [
-        {"day": (week_start + timedelta(days=i)).strftime("%a"), "changes": per_weekday[week_start + timedelta(days=i)]}
+        {"day": fmt_date(week_start + timedelta(days=i), "E"), "changes": per_weekday[week_start + timedelta(days=i)]}
         for i in range(7)
     ]
     recent_all = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)

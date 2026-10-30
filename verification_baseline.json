@@ -56,6 +56,7 @@
     "fetch_guards": 0,
     "form_field_macro": 583,
     "interface_contract_unimplemented": 0,
+    "hand_format": 409,
     "legacy_macro_calls": 429,
     "data_types_declared": 0,
     "data_types_undecided": 252,

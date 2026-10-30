@@ -27,6 +27,9 @@ class Organization(db.Model):  # migration-exempt
     # Currency the organisation reports costs in; NULL means the platform default
     # (read through application_cost_accessor.get_reporting_currency).
     reporting_currency = db.Column(db.String(3), server_default="GBP")
+    # How the organisation's dates, numbers and money are written (app/utils/locale_format.py);
+    # NULL means the platform default, en-GB.
+    locale = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 

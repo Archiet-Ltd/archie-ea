@@ -76,7 +76,9 @@ def recorded_text(iso: Any) -> Optional[str]:
         return None
     if when.tzinfo is not None:
         when = when.astimezone(timezone.utc)
-    return "%d %s" % (when.day, when.strftime("%b %Y, %H:%M"))
+    from app.utils.locale_format import fmt_datetime
+
+    return fmt_datetime(when)
 
 
 def explanations_for(answer: Dict[str, Any], limit: int) -> Dict[int, Dict[str, Any]]:

@@ -132,7 +132,9 @@ def get_plan(key: Optional[str]) -> Plan:
 
 
 def _money(amount: int, currency: str = "USD") -> str:
-    return "%s %s" % (currency, "{:,}".format(amount))
+    from app.utils.locale_format import fmt_money
+
+    return fmt_money(amount, currency, code=True)
 
 
 def price_lines(plan: Plan) -> Tuple[str, ...]:
@@ -162,7 +164,9 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
         return {"label": "Next renewal", "value": "Nothing to renew", "note": None}
     if not live or sub is None or sub.current_period_end is None:
         return {"label": "Next renewal", "value": "No renewal yet", "note": None}
-    when = sub.current_period_end.strftime("%d %b %Y")
+    from app.utils.locale_format import fmt_date
+
+    when = fmt_date(sub.current_period_end)
     status = getattr(getattr(sub, "status", None), "value", None)
     if sub.cancel_at_period_end:
         return {"label": "Ends on", "value": when, "note": None}

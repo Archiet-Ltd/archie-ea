@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.utils.locale_format import fmt_date, fmt_date_range
 
 #: Items shown in a section before it points at the page holding the rest.
 ITEMS_PER_SECTION = 5
@@ -440,11 +441,11 @@ def build(org_id: int, week: Optional[date] = None, now: Optional[datetime] = No
     return {
         "week": week,
         "is_current": is_current,
-        "label": f"{week:%-d %b} to {last_day:%-d %b %Y}",
+        "label": fmt_date_range(week, last_day),
         "headline": headline,
         "sections": sections,
         "earlier": [
-            {"week": w, "label": f"Week of {w:%-d %b %Y}"}
+            {"week": w, "label": f"Week of {fmt_date(w)}"}
             for w in _active_weeks(org_id, current)
         ],
     }

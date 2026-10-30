@@ -167,21 +167,21 @@
   {% call quiet_alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
                 link_href=url_for('enterprise_crud.data_freshness_cockpit'), link_text='View full data-freshness report', class='flex-wrap') %}
     {%- if stats.no_owner > 0 -%}
-    <a href="{{ url_for('unified_applications.application_list', no_owner='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-owner">{{ stats.no_owner }} of {{ total_n }} have no owner</a>
+    <a href="{{ url_for('unified_applications.application_list', no_owner='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-owner">{{ stats.no_owner|fmt_number }} of {{ total_n|fmt_number }} have no owner</a>
     {%- else -%}
-    <span>All {{ total_n }} have an owner</span>
+    <span>All {{ total_n|fmt_number }} have an owner</span>
     {%- endif -%}
     <span class="text-muted-foreground"> · </span>
     {%- if stats.no_capability > 0 -%}
-    <a href="{{ url_for('unified_applications.application_list', no_capability='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-capability">{{ stats.no_capability }} of {{ total_n }} have no capability</a>
+    <a href="{{ url_for('unified_applications.application_list', no_capability='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-capability">{{ stats.no_capability|fmt_number }} of {{ total_n|fmt_number }} have no capability</a>
     {%- else -%}
-    <span>All {{ total_n }} have a capability</span>
+    <span>All {{ total_n|fmt_number }} have a capability</span>
     {%- endif -%}
     <span class="text-muted-foreground"> · </span>
     {%- if stats.no_vendor > 0 -%}
-    <a href="{{ url_for('unified_applications.application_list', no_vendor='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-vendor">{{ stats.no_vendor }} of {{ total_n }} have no vendor</a>
+    <a href="{{ url_for('unified_applications.application_list', no_vendor='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-vendor">{{ stats.no_vendor|fmt_number }} of {{ total_n|fmt_number }} have no vendor</a>
     {%- else -%}
-    <span>All {{ total_n }} have a vendor</span>
+    <span>All {{ total_n|fmt_number }} have a vendor</span>
     {%- endif -%}
   {% endcall %}
   {% endif %}
@@ -230,7 +230,7 @@
         {# This counts the rows in the current (filtered) view, which by default
            hides decommissioned applications, so it is not the portfolio total:
            it is labelled "shown" and names the portfolio size when they differ. #}
-        {% if total_count %}{% call badge('neutral', class='tabular-nums') %}<span data-testid="total-count-badge">{{ total_count }} shown{% if portfolio_total and portfolio_total != total_count %} of {{ portfolio_total }}{% endif %}</span>{% endcall %}{% endif %}
+        {% if total_count %}{% call badge('neutral', class='tabular-nums') %}<span data-testid="total-count-badge">{{ total_count|fmt_number }} shown{% if portfolio_total and portfolio_total != total_count %} of {{ portfolio_total|fmt_number }}{% endif %}</span>{% endcall %}{% endif %}
         {# active filter chips #}
         {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor %}
         <span class="text-xs font-medium text-muted-foreground" data-testid="active-filters">Active filters:
@@ -245,13 +245,13 @@
     {% if bu_filter_active and not show_all_override %}
     <div class="flex items-center gap-2 border-b border-border bg-primary/5 px-4 py-2" data-testid="bu-scope-indicator" role="status" aria-live="polite">
         <i data-lucide="filter" class="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true"></i>
-        <span class="text-xs font-medium text-primary">Showing: {{ bu_name }} ({{ total_count|dash }} app{{ 's' if total_count != 1 else '' }})</span>
+        <span class="text-xs font-medium text-primary">Showing: {{ bu_name }} ({{ total_count|fmt_number }} app{{ 's' if total_count != 1 else '' }})</span>
         <a href="{{ request.path }}?bu=all" class="ml-auto text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground" aria-label="Show all applications across all business units">Show all</a>
     </div>
     {% elif show_all_override %}
     <div class="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2" data-testid="bu-scope-indicator-all" role="status">
         <i data-lucide="globe" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true"></i>
-        <span class="text-xs text-muted-foreground">Showing: All ({{ total_count|dash }} app{{ 's' if total_count != 1 else '' }})</span>
+        <span class="text-xs text-muted-foreground">Showing: All ({{ total_count|fmt_number }} app{{ 's' if total_count != 1 else '' }})</span>
     </div>
     {% endif %}
     <div x-show="loading" x-cloak class="p-6" aria-hidden="true" data-testid="skeleton-loader">
@@ -267,7 +267,7 @@
     {%- for d in filter_options.domains -%}{%- set _ = domain_options.append((d, d)) -%}{%- endfor -%}
     {%- set level_options = [] -%}
     {%- for l in filter_options.capability_levels -%}{%- set _ = level_options.append((l, l)) -%}{%- endfor -%}
-    {%- set decom_label -%}Include decommissioned (<span data-testid="decom-count-label">{{ stats.decommissioned|dash }}</span>){%- endset -%}
+    {%- set decom_label -%}Include decommissioned (<span data-testid="decom-count-label">{{ stats.decommissioned|fmt_number }}</span>){%- endset -%}
     <div class="border-b border-border bg-muted/20 px-4 py-3" data-testid="filter-bar">
       <div class="flex flex-wrap items-end gap-3">
         <div class="min-w-[180px] max-w-xs flex-1">
@@ -421,7 +421,7 @@
             <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id)) }}</td>
             <td class="px-2 text-center align-middle">
               {% if app.completeness_score is not none %}
-                {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
+                {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ ((app.completeness_score / 100)|fmt_percent) ~ ' complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
               {% else %}
                 <span class="text-xs text-muted-foreground">—</span>
               {% endif %}
@@ -485,7 +485,7 @@
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Record</p>
               {% if app.completeness_score is not none %}
-              {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
+              {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ ((app.completeness_score / 100)|fmt_percent) ~ ' complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
               {% else %}<span class="text-xs text-muted-foreground">—</span>{% endif %}
             </div>
           </div>
@@ -502,7 +502,7 @@
           {% if total_count == 0 %}
           0 results
           {% elif total_count and applications %}
-          Showing <span class="font-medium text-foreground">{{ ((current_page-1)*page_size+1) if applications|length>0 else 0 }}</span>–<span class="font-medium text-foreground">{{ (current_page-1)*page_size+applications|length }}</span> of <span class="font-medium text-foreground">{{ total_count }}</span>
+          Showing <span class="font-medium text-foreground">{{ (((current_page-1)*page_size+1) if applications|length>0 else 0)|fmt_number }}</span>–<span class="font-medium text-foreground">{{ ((current_page-1)*page_size+applications|length)|fmt_number }}</span> of <span class="font-medium text-foreground">{{ total_count|fmt_number }}</span>
           {% elif applications %}<span class="font-medium text-foreground">{{ applications|length }}</span> application{{ 's' if applications|length!=1 else '' }}
           {% else %}No applications{% endif %}
         </div>
@@ -516,7 +516,7 @@
             {{ button(icon='chevron-left', variant='outline', size='icon-sm', aria_label='Previous page', testid='btn-prev-page', disabled=not has_prev,
                       on_click='goToPage(' ~ (current_page - 1) ~ ')', attrs_dict={'id': 'prev-page'}) }}
             <span class="min-w-[90px] px-2 text-center text-sm text-muted-foreground" data-testid="page-indicator">
-              Page <span class="font-medium text-foreground">{{ current_page }}</span> of <span class="font-medium text-foreground">{{ total_pages }}</span>
+              Page <span class="font-medium text-foreground">{{ current_page|fmt_number }}</span> of <span class="font-medium text-foreground">{{ total_pages|fmt_number }}</span>
             </span>
             {{ button(icon='chevron-right', variant='outline', size='icon-sm', aria_label='Next page', testid='btn-next-page', disabled=not has_next,
                       on_click='goToPage(' ~ (current_page + 1) ~ ')', attrs_dict={'id': 'next-page'}) }}
@@ -679,7 +679,7 @@
   window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
   window.__APP_CONFIG__.createApplicationUrl = '{{ url_for("unified_applications.application_create") }}';
   if (document.body) {
-    document.body.dataset.currencySymbol = '{{ currency_symbol | default("£") | e }}';
+    document.body.dataset.currencySymbol = '{{ currency_symbol | default('') | e }}';
   }
 </script>
 <script>

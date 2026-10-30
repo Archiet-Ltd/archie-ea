@@ -802,6 +802,10 @@ def init_context_processors(app):
             return value.strftime(fmt)
         return str(value)
 
+    # One formatter for dates, numbers, percentages and money (reads the organisation's locale).
+    from app.utils.locale_format import register_locale_filters
+    register_locale_filters(app)
+
     app.jinja_env.filters["format_date"] = _filter_format_date
     app.jinja_env.filters["format_datetime"] = _filter_format_datetime
 

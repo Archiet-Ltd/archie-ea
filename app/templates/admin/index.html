@@ -182,6 +182,19 @@
                         </div>
                     </a>
                     {% endif %}
+                    {% if current_user.is_org_admin %}
+                    <a href="{{ url_for('regional.regional') }}" class="block group" data-testid="admin-regional-tile">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                            <div class="p-2.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
+                                <i data-lucide="globe" class="w-5 h-5 text-primary" aria-hidden="true"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Regional settings</p>
+                                <p class="text-xs text-muted-foreground mt-1">Dates, numbers and currency</p>
+                            </div>
+                        </div>
+                    </a>
+                    {% endif %}
                     {# Abacus and Jira settings are platform-wide configuration
                        (ExternalSystem/Job carry no tenant column) and their
                        routes are @platform_admin_required -- same rule as

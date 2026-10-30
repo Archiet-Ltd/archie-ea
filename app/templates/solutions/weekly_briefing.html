@@ -22,7 +22,7 @@
                 {% for item in section.entries %}
                 <li class="py-3 first:pt-0 last:pb-0">
                     <a href="{{ item.href }}" class="text-sm font-medium text-primary hover:underline">{{ item.title }}</a>
-                    <p class="text-sm text-muted-foreground mt-1">{{ item.detail }} · <time datetime="{{ item.date.isoformat() }}">{{ item.date.strftime('%-d %b %Y') }}</time></p>
+                    <p class="text-sm text-muted-foreground mt-1">{{ item.detail }} · <time datetime="{{ item.date.isoformat() }}">{{ item.date | fmt_date }}</time></p>
                 </li>
                 {% endfor %}
             </ul>
