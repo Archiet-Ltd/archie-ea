@@ -119,6 +119,7 @@ _ANCHOR = re.compile(r"""(<a\b[^>]*?\bhref=)(["'])(/[^"'#?]*)([^"']*)\2""")
 def early_access_target(path: str) -> str | None:
     """The early-access address for a closed page, or None when the address is open, unknown or not a page."""
     from flask import current_app
+    from werkzeug.exceptions import HTTPException
 
     wave = configured_wave()
     if wave is None or path.startswith(("/early-access", "/static/", "/api/", "/oauth", "/mcp", "/.well-known")):
@@ -129,16 +130,30 @@ def early_access_target(path: str) -> str | None:
 
         @lru_cache(maxsize=4096)
         def get_target(path, wave):
-            target = None
             try:
                 rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
+            except HTTPException:
+                # the address matches no route, or only the wrong method: not ours to rewrite.
+                return None
+
+            try:
                 entry = entry_for(rule.rule, rule.endpoint)
                 if state_for(entry, wave) in (CLOSED, REDIRECT):
                     code, _info = group_for(entry)
-                    target = f"/early-access/{code_slug(code)}"
-            except Exception:  # noqa: BLE001 - an address the router cannot read is left as written
-                target = None
-            return target
+                    return f"/early-access/{code_slug(code)}"
+                return None
+            except Exception:
+                # The router matched a real rule but the wave map cannot read it: a
+                # wrong mapping, not an absent one. Surface it in testing so a bad
+                # map entry fails the build instead of quietly leaving the link
+                # exactly as written; outside testing, log and degrade rather than
+                # take the whole page down over one link.
+                if current_app.testing:
+                    raise
+                current_app.logger.exception(
+                    "release_waves: wrong mapping for %r (endpoint %r)", rule.rule, rule.endpoint,
+                )
+                return None
 
         cache = get_target
         current_app.extensions["release_waves_link_cache"] = cache
