@@ -31,10 +31,13 @@ def test_the_chat_answers_what_breaks_with_a_cited_card_for_every_connection(cli
     assert html.count("data-citation>") == rows
     assert "Source not recorded" not in html
     assert "Imported from Sample company" in html
-    # Applications carry the health the dashboard shows, and an owner named once.
+    # Applications carry the health the dashboard shows. Corrected: this already
+    # failed on the line, asserting an owner "named once" -- the signed-in person,
+    # Sam Founder, who merely clicked Load the sample company. The sample names no
+    # real owner, so none is invented; every row reads "No owner recorded" instead.
     assert 'aria-label="Health: Healthy"' in html
-    assert 'aria-label="Owner: Sam Founder"' in html
-    assert "Sam Founder, Sam Founder" not in html
+    assert "No owner recorded" in html
+    assert "Sam Founder" not in html
     # The card opens the stored answer, which has content.
     assert body["page_url"] == "/intelligence/answers/" + body["address"]
     page = client.get(body["page_url"])
@@ -63,8 +66,12 @@ def test_another_organisation_gets_no_answer_and_cannot_open_the_address(client,
     # The outsider's organisation has no such service: the chat says it cannot answer, with
     # no stored answer, no connection from the owner's organisation and no record to open.
     assert "page_url" not in theirs and "address" not in theirs
-    assert "data-answer-row" not in theirs.get("html", "") and "Payments service" not in theirs.get("html", "")
+    assert "data-answer-row" not in theirs.get("html", "")
     assert "data-catalogue-record" not in theirs.get("html", "")
+    # Corrected: the empty reply now offers to add the named service to the model (the
+    # next step this bucket adds), so its own name legitimately appears there -- naming
+    # it back in that one offer is not the owner's organisation's data leaking across.
+    assert "Add &#34;Payments service&#34; to your model" in theirs.get("html", "")
     assert client.get(mine["page_url"]).status_code == 404
 
 

@@ -93,6 +93,16 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
         if citation["type"] == "page":
             record["external"] = True
         records.append(record)
+    complete = bool(result.get("complete"))
+    reason = result.get("reason") or ""
+    # The name the question gave that matched nothing in the model (never a guess at
+    # what it meant): only set when the records truly hold nothing to answer from, so
+    # the empty reply can offer to add that one thing rather than the general next step.
+    named_not_found = None
+    if not records and not complete and reason.startswith("nothing recorded matches '"):
+        service = (interpretation.get("params") or {}).get("service")
+        if service:
+            named_not_found = service
     return {
         "entry_id": entry_id,
         "title": result.get("title") or CATALOGUE[entry_id].title,
@@ -100,9 +110,10 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
         "total": result.get("total"),
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.
-        "complete": bool(result.get("complete")),
-        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not result.get("complete") else None,
+        "complete": complete,
+        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete else None,
         "next_url": result.get("next_url") if not records else None,
         "next_label": result.get("next_label") if not records else None,
+        "named_not_found": named_not_found,
         "records": records,
     }

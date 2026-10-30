@@ -26,7 +26,11 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
 
-#: Audit table labels, with the plain name a person reads for each.
+#: Audit table labels, with the plain name a person reads for each. An account's own
+#: table (the signed-in person's row, their membership, their organisation) is never
+#: here: creating an account is not a change to the model, and it stays in the audit
+#: trail (``soc2_audit_log`` itself) without being read into the model's own history
+#: or counted as a model record added.
 AUDITED_TABLES = {
     "archimate_elements": "Element",
     "archimate_relationships": "Relationship",
@@ -36,7 +40,6 @@ AUDITED_TABLES = {
     "unified_capabilities": "Capability",
     "business_capability": "Business capability",
     "solution": "Solution",
-    "user": "User",
 }
 _MODEL_TABLES = ("archimate_elements", "archimate_relationships")
 _ACTIONS = {"create": "insert", "update": "update", "delete": "delete"}

@@ -67,6 +67,30 @@ def _lens_line(lens):
     return "Answer from your records about %s: %d %s%s recorded." % (name, count, noun, "" if count == 1 else "s")
 
 
+def _empty_steps(answer, organization_id):
+    """What a 'cannot answer yet' reply offers as its next step, as buttons: naming
+    the one thing the question asked about when that is what is missing, or the
+    general next steps (connect a source, or see them working with a sample) when
+    the records hold nothing at all yet. ``None`` once there is anything to show
+    instead, or a finding that needs no next step (CLAUDE.md "never invent data" —
+    no button is shown unless the person it opens for could actually use it)."""
+    if answer["records"] or answer.get("complete"):
+        return None
+    if answer.get("named_not_found"):
+        from app.core.auth.permissions import can as _can
+
+        if _can(current_user, "create", "application"):
+            return {"kind": "add_application", "name": answer["named_not_found"]}
+        return None
+    from app.utils.role_access import may_connect_github, may_load_sample_company
+
+    connect = may_connect_github(current_user, organization_id)
+    sample = may_load_sample_company(current_user)
+    if not connect and not sample:
+        return None
+    return {"kind": "connect_or_sample", "connect": connect, "sample": sample}
+
+
 def _catalogue_response(message, thread_id, keep):
     """The catalogue's cited answer to a plain startup question, or ``found: false``."""
     organization_id = current_org_id()
@@ -84,7 +108,11 @@ def _catalogue_response(message, thread_id, keep):
             "found": True,
             "thread_id": _remember(thread_id, message, line, keep=keep),
             "entry_id": answer["entry_id"],
-            "html": render_template("ai_chat/_catalogue_answer.html", answer=answer),
+            "html": render_template(
+                "ai_chat/_catalogue_answer.html",
+                answer=answer,
+                empty_steps=_empty_steps(answer, organization_id),
+            ),
         }
     )
 
