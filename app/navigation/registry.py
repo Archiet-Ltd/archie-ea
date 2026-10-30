@@ -321,6 +321,8 @@ PLATFORM_ADMIN_TOOLS: tuple = (
        requires="platform_admin", aliases=("Error log", "Exceptions")),
     _l("signups", "Sign-ups", "platform_area.signups", "user-plus", job="platform",
        requires="platform_admin", aliases=("New accounts", "Registrations", "Sign ups")),
+    _l("rate_limits", "Rate limits", "rate_limits.index", "gauge", job="platform",
+       requires="platform_admin", aliases=("Allow list", "Deny list", "Blocked addresses", "Throttling")),
     _l("feature_flags", "Feature flags", "admin.feature_flags", "toggle-right", job="platform",
        requires="platform_admin", aliases=("Flags", "Features")),
     _l("platform_health", "Platform health", "service_status.status_page", "activity", job="platform",

@@ -30,8 +30,8 @@
                 </svg>
             </div>
             <h1 class="code">403</h1>
-            <h2 class="title">You do not have access to this page</h2>
-            <p class="copy">Your role does not include this page. Ask an administrator of your organisation to give you access.</p>
+            <h2 class="title">{{ error_title|default('You do not have access to this page') }}</h2>
+            <p class="copy">{{ error_message|default('Your role does not include this page. Ask an administrator of your organisation to give you access.') }}</p>
             <div class="actions">
                 <a href="/" class="button button-primary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>

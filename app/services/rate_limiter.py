@@ -312,3 +312,363 @@ def track_api_usage(user_id: int, endpoint: str):
 def cleanup_rate_limiters():
     """Clean up old rate limiter buckets (call periodically)."""
     _rate_limiter.cleanup_old_buckets(max_age_seconds=7200)  # 2 hours
+
+
+# ---------------------------------------------------------------------------------------------
+# Shared limit, allow and deny lists, violations (T-limits01)
+#
+# The request limiter itself is Flask-Limiter, installed once for the whole application in
+# app/_bootstrap/rate_limiting.py. What lives here is everything that limiter stands on:
+#   * DatabaseStorage      its counters, in the database, so two workers count one limit;
+#   * the allow and deny lists, read through a cache keyed by a version of the list so a change
+#     made on one worker is honoured by every worker on its next request;
+#   * the violation log, kept thirty days.
+# ---------------------------------------------------------------------------------------------
+import ipaddress  # noqa: E402
+import threading  # noqa: E402
+
+from sqlalchemy import text  # noqa: E402
+
+try:  # the limits package ships with Flask-Limiter; without it there is no shared storage to offer
+    from limits.storage import Storage as _LimitsStorage
+except ImportError:  # pragma: no cover - dependency is pinned
+    _LimitsStorage = None
+
+DENIED_MESSAGE = (
+    "Requests from this address are blocked; ask the administrator of this service to lift "
+    "the block if that is a mistake."
+)
+STORAGE_URI = "archiedb://"
+_ENTRY_ERRORS = {
+    "address": "Enter an address such as 203.0.113.7 or a range such as 203.0.113.0/24.",
+    "user": "No user has that email address.",
+    "action": "Choose whether the entry allows or denies.",
+    "duplicate": "That entry is already on the list.",
+    "own_address": "That would block the address you are using now, so you would lose access.",
+}
+
+
+def _engine():
+    from app import db
+
+    return db.engine
+
+
+if _LimitsStorage is not None:
+
+    class DatabaseStorage(_LimitsStorage):
+        """Flask-Limiter / limits storage that counts in the rate_limit_counters table.
+
+        Every call runs on its own connection and commits, so the count is shared by every worker and
+        survives a restart, and a request that later rolls back does not give its count back.
+        """
+
+        STORAGE_SCHEME = ["archiedb"]
+
+        def __init__(self, uri=None, wrap_exceptions=False, engine=None, **options):
+            super().__init__(uri, wrap_exceptions=wrap_exceptions, **options)
+            self._engine_override = engine  # a test gives each simulated worker its own connection pool
+
+        def _db(self):
+            return self._engine_override or _engine()
+
+        @property
+        def base_exceptions(self):
+            return Exception
+
+        def incr(self, key: str, expiry: int, amount: int = 1) -> int:
+            now = time.time()
+            with self._db().begin() as connection:
+                count = connection.execute(
+                    text(
+                        "INSERT INTO rate_limit_counters (key, count, expires_at) "
+                        "VALUES (:k, :a, :until) "
+                        "ON CONFLICT (key) DO UPDATE SET "
+                        "count = CASE WHEN rate_limit_counters.expires_at <= :now "
+                        "THEN :a ELSE rate_limit_counters.count + :a END, "
+                        "expires_at = CASE WHEN rate_limit_counters.expires_at <= :now "
+                        "THEN :until ELSE rate_limit_counters.expires_at END "
+                        "RETURNING count"
+                    ),
+                    {"k": key[:255], "a": amount, "until": now + expiry, "now": now},
+                ).scalar()
+                if int(now * 1000) % 200 == 0:  # occasional sweep of finished windows
+                    connection.execute(
+                        text("DELETE FROM rate_limit_counters WHERE expires_at <= :cutoff"),
+                        {"cutoff": now - 3600},
+                    )
+            return int(count)
+
+        def get(self, key: str) -> int:
+            with self._db().connect() as connection:
+                value = connection.execute(
+                    text("SELECT count FROM rate_limit_counters WHERE key = :k AND expires_at > :now"),
+                    {"k": key[:255], "now": time.time()},
+                ).scalar()
+            return int(value or 0)
+
+        def get_expiry(self, key: str) -> float:
+            with self._db().connect() as connection:
+                value = connection.execute(
+                    text("SELECT expires_at FROM rate_limit_counters WHERE key = :k"),
+                    {"k": key[:255]},
+                ).scalar()
+            return float(value if value is not None else time.time())
+
+        def check(self) -> bool:
+            with self._db().connect() as connection:
+                connection.execute(text("SELECT 1"))
+            return True
+
+        def reset(self):
+            with self._db().begin() as connection:
+                return connection.execute(text("DELETE FROM rate_limit_counters")).rowcount
+
+        def clear(self, key: str) -> None:
+            with self._db().begin() as connection:
+                connection.execute(text("DELETE FROM rate_limit_counters WHERE key = :k"), {"k": key[:255]})
+
+else:  # pragma: no cover
+    DatabaseStorage = None
+
+
+# ---- allow and deny lists --------------------------------------------------------------------
+
+_rules_lock = threading.Lock()
+_rules_cache = {"version": None, "rules": ()}
+
+
+def _compile_rule(row):
+    """(action, kind, matcher, id, label) for one stored entry; None for an entry that cannot match."""
+    action, kind, value, rule_id = row
+    if kind == "address":
+        try:
+            return (action, kind, ipaddress.ip_network(value, strict=False), rule_id, value)
+        except ValueError:
+            return None
+    return (action, kind, str(value), rule_id, "user " + str(value))
+
+
+def current_rules():
+    """The entries in force, re-read only when the list has changed since this worker last looked.
+
+    The version is (highest id, number of rows): ids are never reused, so adding or removing an
+    entry always changes it, and one aggregate over a tiny table is the whole per-request cost.
+    """
+    with _engine().connect() as connection:
+        version = tuple(
+            connection.execute(text("SELECT COALESCE(MAX(id), 0), COUNT(*) FROM rate_limit_rules")).one()
+        )
+        if version == _rules_cache["version"]:
+            return _rules_cache["rules"]
+        rows = connection.execute(text("SELECT action, kind, value, id FROM rate_limit_rules")).all()
+    compiled = tuple(rule for rule in (_compile_rule(tuple(row)) for row in rows) if rule is not None)
+    with _rules_lock:
+        _rules_cache["version"] = version
+        _rules_cache["rules"] = compiled
+    return compiled
+
+
+def _rule_matches(rule, address, user_id) -> bool:
+    _action, kind, matcher, _rule_id, _label = rule
+    if kind == "user":
+        return user_id is not None and matcher == str(user_id)
+    if address is None:
+        return False
+    try:
+        return ipaddress.ip_address(address) in matcher
+    except ValueError:
+        return False
+
+
+def access_verdict(address, user_id=None):
+    """("deny" | "allow" | None, label of the entry that decided). A deny entry beats any allow entry."""
+    rules = current_rules()
+    for wanted in ("deny", "allow"):
+        for rule in rules:
+            if rule[0] == wanted and _rule_matches(rule, address, user_id):
+                return wanted, rule[4]
+    return None, None
+
+
+class RuleError(ValueError):
+    """An allow or deny entry that cannot be saved; the message is the sentence to show."""
+
+
+def add_rule(action, kind, value, *, note=None, created_by_id=None, own_address=None):
+    """Save one entry. Returns the new row's id. Raises RuleError with a plain sentence."""
+    from app.models.rate_limit import ACTIONS
+
+    if action not in ACTIONS:
+        raise RuleError(_ENTRY_ERRORS["action"])
+    value = (value or "").strip()
+    if kind == "user":
+        with _engine().connect() as connection:
+            user_id = connection.execute(
+                text("SELECT id FROM users WHERE lower(email) = lower(:e)"), {"e": value}
+            ).scalar()
+        if user_id is None:
+            raise RuleError(_ENTRY_ERRORS["user"])
+        stored = str(user_id)
+    else:
+        kind = "address"
+        try:
+            network = ipaddress.ip_network(value, strict=False)
+        except ValueError:
+            raise RuleError(_ENTRY_ERRORS["address"]) from None
+        stored = str(network.network_address) if network.num_addresses == 1 else str(network)
+        if action == "deny" and own_address:
+            try:
+                own = ipaddress.ip_address(own_address)
+            except ValueError:
+                own = None
+            if own is not None and own in network:
+                raise RuleError(_ENTRY_ERRORS["own_address"])
+    with _engine().begin() as connection:
+        existing = connection.execute(
+            text("SELECT 1 FROM rate_limit_rules WHERE action = :a AND kind = :k AND value = :v"),
+            {"a": action, "k": kind, "v": stored},
+        ).scalar()
+        if existing:
+            raise RuleError(_ENTRY_ERRORS["duplicate"])
+        return connection.execute(
+            text(
+                "INSERT INTO rate_limit_rules (action, kind, value, note, created_by_id, created_at) "
+                "VALUES (:a, :k, :v, :n, :by, :now) RETURNING id"
+            ),
+            {"a": action, "k": kind, "v": stored, "n": (note or "")[:255] or None,
+             "by": created_by_id, "now": datetime.utcnow()},
+        ).scalar()
+
+
+def remove_rule(rule_id) -> bool:
+    with _engine().begin() as connection:
+        return connection.execute(
+            text("DELETE FROM rate_limit_rules WHERE id = :i"), {"i": rule_id}
+        ).rowcount > 0
+
+
+def list_rules():
+    """Every entry for the page, with the email of a user entry."""
+    with _engine().connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT r.id, r.action, r.kind, r.value, r.note, r.created_at, u.email "
+                "FROM rate_limit_rules r LEFT JOIN users u "
+                "ON r.kind = 'user' AND r.value = CAST(u.id AS VARCHAR) "
+                "ORDER BY r.id DESC"
+            )
+        ).all()
+    return [
+        {"id": r[0], "action": r[1], "kind": r[2], "value": r[3], "note": r[4], "created_at": r[5],
+         "subject": (r[6] or ("user " + r[3])) if r[2] == "user" else r[3]}
+        for r in rows
+    ]
+
+
+# ---- violations ------------------------------------------------------------------------------
+
+_last_purge = {"at": 0.0}
+
+
+def purge_violations(now=None) -> int:
+    """Delete refusals older than the retention period; returns how many went."""
+    from app.models.rate_limit import VIOLATION_RETENTION_DAYS
+
+    cutoff = (now or datetime.utcnow()) - timedelta(days=VIOLATION_RETENTION_DAYS)
+    with _engine().begin() as connection:
+        connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+        return connection.execute(
+            text("DELETE FROM rate_limit_violations WHERE created_at < :c"), {"c": cutoff}
+        ).rowcount
+
+
+def record_violation(*, address, user_id, route, rule):
+    """Log one refusal. Never raises: a log that fails must not turn a refusal into an error."""
+    try:
+        with _engine().begin() as connection:
+            # A refusal can happen before any organisation is known, so the row is written in the
+            # platform scope; the organisation recorded on it is the signed-in user's home one.
+            connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+            organization_id = None
+            if user_id is not None:
+                organization_id = connection.execute(
+                    text("SELECT organization_id FROM users WHERE id = :u"), {"u": user_id}
+                ).scalar()
+            connection.execute(
+                text(
+                    "INSERT INTO rate_limit_violations "
+                    "(organization_id, address, user_id, route, rule, created_at) "
+                    "VALUES (:o, :a, :u, :r, :rule, :now)"
+                ),
+                {"o": organization_id, "a": (address or "")[:64], "u": user_id,
+                 "r": (route or "")[:255], "rule": (rule or "")[:120], "now": datetime.utcnow()},
+            )
+        if time.time() - _last_purge["at"] > 3600:
+            _last_purge["at"] = time.time()
+            purge_violations()
+    except Exception as exc:
+        logger.warning("rate limit violation not logged: %s", exc)
+
+
+def violation_page(*, organization_id=None, address=None, user=None, since=None, until=None,
+                   page=1, per_page=25):
+    """One page of the violation log, newest first, inside the retention period.
+
+    organization_id=None reads every organisation (the platform administrator's view, which also
+    includes refusals of people who were not signed in). A number reads only that organisation's
+    own users' refusals, in the database as well as in the query.
+    """
+    from app.models.rate_limit import VIOLATION_RETENTION_DAYS
+
+    where = ["v.created_at >= :floor"]
+    params = {"floor": datetime.utcnow() - timedelta(days=VIOLATION_RETENTION_DAYS)}
+    if organization_id is not None:
+        where.append("v.organization_id = :org")
+        params["org"] = organization_id
+    if address:
+        where.append("v.address LIKE :addr")
+        params["addr"] = "%" + address.strip() + "%"
+    if user:
+        where.append("lower(u.email) LIKE :usr")
+        params["usr"] = "%" + user.strip().lower() + "%"
+    if since:
+        where.append("v.created_at >= :since")
+        params["since"] = since
+    if until:
+        where.append("v.created_at < :until")
+        params["until"] = until
+    clause = " AND ".join(where)
+    page = max(1, int(page or 1))
+    with _engine().begin() as connection:
+        if organization_id is None:
+            connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+        else:
+            connection.execute(
+                text("SELECT set_config('archie.organization_id', :o, true)"), {"o": str(organization_id)}
+            )
+        total = connection.execute(
+            text(  # nosec B608 - clause is built from fixed fragments, values are bound
+                "SELECT COUNT(*) FROM rate_limit_violations v "
+                "LEFT JOIN users u ON u.id = v.user_id WHERE " + clause
+            ),
+            params,
+        ).scalar()
+        rows = connection.execute(
+            text(  # nosec B608 - clause is built from fixed fragments, values are bound
+                "SELECT v.id, v.created_at, v.address, u.email, v.route, v.rule "
+                "FROM rate_limit_violations v LEFT JOIN users u ON u.id = v.user_id WHERE "
+                + clause + " ORDER BY v.created_at DESC, v.id DESC LIMIT :lim OFFSET :off"
+            ),
+            {**params, "lim": per_page, "off": (page - 1) * per_page},
+        ).all()
+    return {
+        "rows": [
+            {"id": r[0], "at": r[1], "address": r[2], "user": r[3], "route": r[4], "rule": r[5]}
+            for r in rows
+        ],
+        "total": int(total or 0),
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, -(-int(total or 0) // per_page)),
+    }
