@@ -336,3 +336,124 @@ def test_impact_scenario_comparison_warns_without_a_console_error(browser, live_
     close_buttons.last.click()
     expect(content).to_be_hidden()
     page.context.close()
+
+
+# ---------------------------------------------------------------------------
+# 8. llm_recommendations -- the Generate button must stay inside its card on
+#    a phone, not run past the card's right edge.
+# ---------------------------------------------------------------------------
+
+
+def test_llm_generate_button_stays_inside_its_card_on_phone(browser, live_server, linked_portfolio):
+    """An architect on a phone must be able to see and reach the whole Generate
+    recommendations button inside its own card -- not have it pushed past the
+    card's right edge by the header's long description."""
+    page = browser.new_context(viewport={"width": 390, "height": 844}, ignore_https_errors=True).new_page()
+    _login(page, live_server, linked_portfolio["emails"]["enterprise_architect"])
+    page.goto(live_server + "/strategic/capability-health", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.evaluate("document.documentElement.classList.add('dark')")
+
+    panel = page.get_by_test_id("llm-recommendations")
+    card = panel.locator("[data-slot='card']").first
+    expect(card).to_be_visible()
+    button = page.get_by_test_id("llm-generate")
+    expect(button).to_be_visible()
+
+    card_box = card.bounding_box()
+    button_box = button.bounding_box()
+    assert card_box and button_box, "both the card and the button must have a real layout box"
+    assert button_box["x"] >= card_box["x"] - 0.5, (
+        "the Generate recommendations button must not start left of its card: "
+        "button x %.1f, card x %.1f" % (button_box["x"], card_box["x"])
+    )
+    assert button_box["x"] + button_box["width"] <= card_box["x"] + card_box["width"] + 0.5, (
+        "the Generate recommendations button must not run past its card's right edge: "
+        "button right %.1f, card right %.1f" % (
+            button_box["x"] + button_box["width"], card_box["x"] + card_box["width"]
+        )
+    )
+
+    button.click()
+    page.wait_for_timeout(600)
+    # No LLM provider is configured for this journey: the real endpoint
+    # degrades to zero recommendations, so clicking must show either a
+    # generated card or the panel's own plain error -- never a dead click.
+    showed_recommendations = page.get_by_test_id("llm-recommendation-card").count() > 0
+    showed_error = panel.locator(
+        "text=/No recommendations generated|Failed to generate recommendations|Network error/i"
+    ).count() > 0
+    assert showed_recommendations or showed_error, (
+        "clicking Generate recommendations must show a recommendation or a plain error"
+    )
+    page.context.close()
+
+
+# ---------------------------------------------------------------------------
+# 9. roi_calculator_modal -- Save as scenario and Close stay visible without
+#    scrolling, at a laptop and a phone width, and the inputs stack on a
+#    phone.
+# ---------------------------------------------------------------------------
+
+
+def test_roi_dialog_actions_stay_in_view_at_both_widths(browser, live_server, linked_portfolio):
+    """Opening the ROI calculator from the investment matrix's own control
+    must show Save as scenario and Close without scrolling, at 1440x900 and
+    at 390x844, and saving a scenario must show the confirming toast."""
+    page = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True).new_page()
+    _login(page, live_server, linked_portfolio["emails"]["enterprise_architect"])
+    page.goto(live_server + "/strategic/investment-matrix", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    page.get_by_role("button", name="Calculate ROI").first.click()
+    content = page.get_by_test_id("roi-calculator-content")
+    expect(content).to_be_visible()
+    page.wait_for_selector("#roiChart")
+    page.wait_for_timeout(300)
+
+    save_button = page.get_by_test_id("roi-save-scenario")
+    close_button = page.get_by_role("button", name="Close").last
+    expect(save_button).to_be_visible()
+    expect(close_button).to_be_visible()
+
+    for label, locator in (("Save as scenario", save_button), ("Close", close_button)):
+        box = locator.bounding_box()
+        assert box, "%s must have a real layout box" % label
+        assert box["y"] + box["height"] <= 900 + 0.5, (
+            "%s must be visible without scrolling at 1440x900: bottom %.1f exceeds the 900-tall window"
+            % (label, box["y"] + box["height"])
+        )
+
+    save_button.click()
+    toast = page.locator("text=Scenario saved successfully")
+    expect(toast).to_be_visible()
+    page.context.close()
+
+    page2 = browser.new_context(viewport={"width": 390, "height": 844}, ignore_https_errors=True).new_page()
+    _login(page2, live_server, linked_portfolio["emails"]["enterprise_architect"])
+    page2.goto(live_server + "/strategic/investment-matrix", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page2.evaluate("document.documentElement.classList.add('dark')")
+
+    page2.get_by_role("button", name="Calculate ROI").first.click()
+    content2 = page2.get_by_test_id("roi-calculator-content")
+    expect(content2).to_be_visible()
+    page2.wait_for_selector("#roiChart")
+    page2.wait_for_timeout(300)
+
+    investment_box = page2.locator("#roi-investment").bounding_box()
+    timeline_box = page2.locator("#roi-timeline").bounding_box()
+    assert investment_box and timeline_box, "the investment and timeline inputs must have a real layout box"
+    assert timeline_box["y"] >= investment_box["y"] + investment_box["height"] - 0.5, (
+        "at 390 wide the inputs must stack one per row, not sit side by side: "
+        "investment y %.1f height %.1f, timeline y %.1f"
+        % (investment_box["y"], investment_box["height"], timeline_box["y"])
+    )
+
+    save_button2 = page2.get_by_test_id("roi-save-scenario")
+    close_button2 = page2.get_by_role("button", name="Close").last
+    for label, locator in (("Save as scenario", save_button2), ("Close", close_button2)):
+        box = locator.bounding_box()
+        assert box, "%s must have a real layout box" % label
+        assert box["y"] + box["height"] <= 844 + 0.5, (
+            "%s must still be in view at 390x844: bottom %.1f exceeds the 844-tall window"
+            % (label, box["y"] + box["height"])
+        )
+    page2.context.close()
