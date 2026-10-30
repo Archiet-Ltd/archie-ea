@@ -23,7 +23,7 @@ from alembic import op
 from app.commands.schema_migrations import relax_not_null, tighten_not_null
 
 revision = "20261029_deliv_wp_nullable"
-down_revision = "20261029_llm_spend_ledger"
+down_revision = "20261029_persona_default_unset"
 branch_labels = None
 depends_on = None
 
