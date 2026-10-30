@@ -76,6 +76,9 @@
 } -%}
 {%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level -%}
 {%- set can_populate = current_user.is_admin() -%}
+{#- Asked once for the page: each row's menu and owner cell used to ask again, two queries a row. -#}
+{%- set can_edit_app = can('edit', 'application') -%}
+{%- set can_delete_app = can('delete', 'application') -%}
 
 {# One actions menu per application: the same items on the table row and the phone card. #}
 {% macro row_menu(app, sfx='') %}
@@ -83,7 +86,7 @@
   {%- set name_js = app.name | tojson | forceescape -%}
   {%- set _ = items.append({'text': 'View', 'icon': 'eye', 'href': url_for('unified_applications.application_detail', id=app.id), 'testid': 'btn-view' ~ sfx ~ '-' ~ app.id}) -%}
   {%- set _ = items.append({'text': 'Fact sheet', 'icon': 'file-text', 'href': url_for('unified_applications.application_fact_sheet', id=app.id), 'testid': 'btn-factsheet' ~ sfx ~ '-' ~ app.id, 'title': 'Fact sheet: the single source of truth'}) -%}
-  {%- if can('edit', 'application') -%}
+  {%- if can_edit_app -%}
   {%- set _ = items.append({'text': 'Edit', 'icon': 'pencil', 'href': url_for('unified_applications.application_edit', id=app.id), 'testid': 'btn-edit' ~ sfx ~ '-' ~ app.id}) -%}
   {%- endif -%}
   {%- set _ = items.append({'divider': true}) -%}
@@ -91,7 +94,7 @@
   {%- set _ = items.append({'text': 'Map to APQC', 'icon': 'git-branch', 'onclick': 'openMappingForApp(' ~ app.id ~ ', ' ~ name_js ~ ", 'apqc')"}) -%}
   {%- set _ = items.append({'text': 'Map to Vendors', 'icon': 'package', 'onclick': 'openMappingForApp(' ~ app.id ~ ', ' ~ name_js ~ ", 'vendor')"}) -%}
   {%- set _ = items.append({'text': 'Map to ArchiMate', 'icon': 'layers', 'onclick': 'openMappingForApp(' ~ app.id ~ ', ' ~ name_js ~ ", 'archimate')"}) -%}
-  {%- if can('delete', 'application') -%}
+  {%- if can_delete_app -%}
   {%- set _ = items.append({'divider': true}) -%}
   {%- set _ = items.append({'text': 'Delete', 'icon': 'trash-2', 'variant': 'destructive', 'aria_label': 'Delete ' ~ app.name, 'onclick': 'deleteApplication(' ~ (url_for('unified_applications.application_delete', id=app.id) | tojson | forceescape) ~ ', ' ~ name_js ~ ')', 'testid': 'btn-delete' ~ sfx ~ '-' ~ app.id}) -%}
   {%- endif -%}
@@ -106,7 +109,7 @@
     {%- for owner_name in owner_names -%}
     <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
     {%- endfor -%}
-  {%- elif can('edit', 'application') -%}
+  {%- elif can_edit_app -%}
     <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
   {%- else -%}
     <span data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner') }}</span>

@@ -558,10 +558,14 @@ def _table(org_id, with_cost=True):
             "owner": ", ".join(names) if names else None,
             "cost": get_annual_cost_float(app) if with_cost else None,
         })
-        rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
     costed = [r["cost"] for r in rows if r["cost"] is not None]
-    return {"rows": rows[:10], "total": len(rows), "cost_total": sum(costed) if costed else None}
+    shown = rows[:10]
+    # Only the ten rows the table shows are formatted: formatting reads the organisation's currency, and doing it
+    # for every application in the estate cost one query each (two thousand on a large estate).
+    for row in shown:
+        row["cost_label"] = _money(row["cost"])
+    return {"rows": shown, "total": len(rows), "cost_total": sum(costed) if costed else None}
 
 
 def _name_the_basis(run_cost, applications_cost):

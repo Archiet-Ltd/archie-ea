@@ -429,8 +429,21 @@ def application_list():
                 .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
                 .all()
             }
+        # One grouped count for the page, so each row's completeness ring does not ask for its own.
+        owner_record_counts = {}
+        if application_ids:
+            owner_record_counts = dict(
+                db.session.query(ApplicationOwner.application_id, db.func.count(ApplicationOwner.id))
+                .filter(
+                    ApplicationOwner.application_id.in_(application_ids),
+                    ApplicationOwner.organization_id.in_({i.organization_id for i in pagination.items}),
+                )
+                .group_by(ApplicationOwner.application_id)
+                .all()
+            )
         owner_names_by_app = {}
         for listed in pagination.items:
+            listed.owner_record_count = owner_record_counts.get(listed.id, 0)
             if listed.id not in owned_ids:
                 continue
             names = [

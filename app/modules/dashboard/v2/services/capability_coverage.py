@@ -55,18 +55,18 @@ def compute_l1_capability_coverage() -> dict:
                 stack.extend(children.get(cur, []))
             return ids
 
-        covered = 0
-        for cap in l1_caps:
-            subtree = _subtree_ids(cap.id)
-            # tenant-scoping-ok: scoped via TenantMixin FK parent BusinessCapability,
-            # ApplicationCapabilityMapping.organization_id is NULL in prod (see e622d36).
-            app_count = (
-                db.session.query(db.func.count(ApplicationCapabilityMapping.id))
-                .filter(ApplicationCapabilityMapping.business_capability_id.in_(subtree))
-                .scalar()
-            ) or 0
-            if app_count >= 1:
-                covered += 1
+        # One query for every capability that has a mapped application, then each L1 asks its own subtree;
+        # this used to count the mappings of every L1 subtree with a query apiece.
+        # tenant-scoping-ok: scoped via TenantMixin FK parent BusinessCapability,
+        # ApplicationCapabilityMapping.organization_id is NULL in prod (see e622d36).
+        mapped_ids = {
+            row[0]
+            for row in db.session.query(ApplicationCapabilityMapping.business_capability_id)
+            .filter(ApplicationCapabilityMapping.business_capability_id.in_(list(all_caps)))
+            .distinct()
+            .all()
+        }
+        covered = sum(1 for cap in l1_caps if mapped_ids.intersection(_subtree_ids(cap.id)))
 
         total = len(l1_caps)
         return {
