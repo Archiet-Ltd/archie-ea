@@ -119,6 +119,20 @@
 
             init: function () {
                 let self = this;
+                // A return address is kept only when it is a path on this site: one
+                // leading slash, then neither a slash nor a backslash (a browser
+                // reads "/\host" as "//host"), and it resolves to this origin.
+                function sameSiteReturn(raw, fallback) {
+                    if (typeof raw !== 'string' || raw.charAt(0) !== '/') return fallback;
+                    let second = raw.charAt(1);
+                    if (second === '/' || second === '\\') return fallback;
+                    try {
+                        let url = new URL(raw, global.location.origin);
+                        return url.origin === global.location.origin ? url.pathname + url.search + url.hash : fallback;
+                    } catch (e) {
+                        return fallback;
+                    }
+                }
                 let query = global.matchMedia('(min-width: 1280px)');
                 self.wide = query.matches;
                 query.addEventListener('change', function (e) { self.wide = e.matches; });
@@ -129,8 +143,20 @@
                 _fetch('/api/adm-kanban/v2/metrics').then(function (m) {
                     if (m && m.phase_metrics) self.cycleMetrics = m;
                 });
+                // A link from another page can open the New Architecture Task form
+                // with an element type chosen, and ask to come back after saving.
+                let q = new URLSearchParams(global.location.search);
+                if (q.get('new') === 'Gap') {
+                    self.pendingCreate = {
+                        arch_element_type: 'Gap',
+                        phase: 'E',
+                        next: sameSiteReturn(q.get('next'), '/adm-kanban/gap-analysis'),
+                    };
+                }
                 this.reload();
             },
+
+            pendingCreate: null,
 
             // WIP helpers
             wipLimit: function (colId) {
@@ -202,6 +228,11 @@
                     self.phaseCounts = data.phase_counts || {};
                     self.columnCounts = data.column_counts || {};
                     self.totalCardCount = self.cards.length;
+                    if (self.pendingCreate) {
+                        let preset = self.pendingCreate;
+                        self.pendingCreate = null;
+                        self.openCreateTask(null, 'proposed', preset);
+                    }
                 }).catch(function (err) {
                     self.loading = false;
                     self.error = 'The board could not load. Try again.';
@@ -523,9 +554,10 @@
 
             // -- Create task modal -----------------------------------
 
-            openCreateTask: function (phaseCode, colId) {
+            openCreateTask: function (phaseCode, colId, preset) {
                 window.dispatchEvent(new CustomEvent('adm-create-task-open', {
                     detail: {
+                        preset: preset || null,
                         phases: this.phases,
                         columns: this.columns,
                         lockedPhase: phaseCode || null,
@@ -741,6 +773,7 @@
                 principle_ids: [],
             },
             domainOverridden: false,
+            preset: null,
             error: null,
             loading: false,
             assigneeSearch: '',
@@ -759,6 +792,7 @@
                 this.columns = (e.detail && e.detail.columns) || [];
                 this.lockedPhase = (e.detail && e.detail.lockedPhase) || null;
                 this.lockedColumn = (e.detail && e.detail.lockedColumn) || null;
+                this.preset = (e.detail && e.detail.preset) || null;
                 let phase = this.lockedPhase || (this.phases.length ? this.phases[0].code : 'A');
                 this.domainOverridden = false;
                 this.form = {
@@ -799,6 +833,13 @@
                 this.assigneeSearch = '';
                 this.userResults = [];
                 this.error = null;
+                if (this.preset) {
+                    this.form.arch_element_type = this.preset.arch_element_type;
+                    if (this.preset.phase && this.phases.some(function (p) { return p.code === this.preset.phase; }, this)) {
+                        this.form.phase = this.preset.phase;
+                        this.form.arch_domain = _domainForPhase(this.form.phase);
+                    }
+                }
                 this.show = true;
             },
 
@@ -850,6 +891,7 @@
                             detail: data.card,
                         }));
                         self.show = false;
+                        if (self.preset && self.preset.next) global.location.href = self.preset.next;
                     } else {
                         self.error = (data && data.error) || 'Failed to create task';
                     }
