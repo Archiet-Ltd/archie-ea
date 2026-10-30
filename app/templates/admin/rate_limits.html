@@ -53,13 +53,15 @@
 {% endmacro %}
 
 {% macro _filters() %}
-<form method="GET" action="{{ url_for('rate_limits.index') }}" class="flex flex-wrap items-center gap-2" data-testid="rate-limit-filters">
-  {{ ui.input(name='address', value=filters.address, placeholder='Address', class='h-8 w-[130px]', attrs={'aria-label': 'Filter by address'}) }}
-  {{ ui.input(name='user', value=filters.user, placeholder='User email', class='h-8 w-[160px]', attrs={'aria-label': 'Filter by user'}) }}
-  {{ ui.input(name='since', value=filters.since, type='date', class='h-8 w-[140px]', attrs={'aria-label': 'From date'}) }}
-  {{ ui.input(name='until', value=filters.until, type='date', class='h-8 w-[140px]', attrs={'aria-label': 'To date'}) }}
-  {{ ui.button(text='Filter', variant='outline', size='sm', attrs={'type': 'submit', 'class': 'h-8'}) }}
-  {% if filtered %}{{ ui.button(text='Clear', href=url_for('rate_limits.index'), variant='ghost', size='sm') }}{% endif %}
+<form method="GET" action="{{ url_for('rate_limits.index') }}" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center" data-testid="rate-limit-filters">
+  {{ ui.input(name='address', value=filters.address, placeholder='Address', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'Filter by address'}) }}
+  {{ ui.input(name='user', value=filters.user, placeholder='User email', class='h-8 w-full lg:w-[200px]', attrs={'aria-label': 'Filter by user'}) }}
+  {{ ui.input(name='since', value=filters.since, type='date', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'From date'}) }}
+  {{ ui.input(name='until', value=filters.until, type='date', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'To date'}) }}
+  <div class="flex items-center gap-2">
+    {{ ui.button(text='Filter', variant='outline', size='sm', attrs={'type': 'submit', 'class': 'h-8'}) }}
+    {% if filtered %}{{ ui.button(text='Clear', href=url_for('rate_limits.index'), variant='ghost', size='sm') }}{% endif %}
+  </div>
 </form>
 {% endmacro %}
 
@@ -98,9 +100,10 @@
 
 <section class="space-y-3" data-testid="rate-limit-violations">
   <h2 class="text-lg font-semibold">Refused requests</h2>
+  {{ _filters() }}
   {% call(item) list_table(rows=violations.rows, columns=[('Time', ''), ('Address', ''), {'label': 'User', 'class': 'hidden md:table-cell'}, {'label': 'Route', 'class': 'hidden md:table-cell'}, ('Rule', '')],
                               caption='Requests the limiter refused', testid='rate-limit-violations-table', row_testid='rate-limit-violation-row',
-                              toolbar=true, toolbar_actions=_filters, page_size=25, server_pagination=_pager,
+                              toolbar=false, page_size=25, server_pagination=_pager,
                               empty_message=('No refused request matches these filters.' if filtered else ('No request has been refused in the last 30 days.' if platform else 'No request from your organisation has been refused in the last 30 days.')),
                               empty_action=(_clear if filtered else none)) %}
     {% call table_cell(class='whitespace-nowrap tabular-nums') %}{{ item.at.strftime('%Y-%m-%d %H:%M:%S') }} UTC{% endcall %}
