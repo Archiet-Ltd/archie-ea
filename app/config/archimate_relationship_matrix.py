@@ -1087,7 +1087,9 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Goal", "Goal"): ["composition", "aggregation", "influence", "specialization", "association"],
     ("Goal", "Outcome"): ["realization", "influence", "association"],
     ("Goal", "Principle"): ["realization", "influence", "association"],
-    ("Goal", "Requirement"): ["realization", "influence", "association"],
+    # ArchiMate 3.2 §6.4: a requirement realizes a goal, never the reverse, so a goal
+    # may only influence a requirement.
+    ("Goal", "Requirement"): ["influence", "association"],
     ("Goal", "Constraint"): ["realization", "influence", "association"],
     ("Goal", "Value"): ["association"],
     ("Goal", "Meaning"): ["association"],
@@ -1123,7 +1125,7 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Principle", "Constraint"): ["realization", "influence", "association"],
     # Requirement relationships
     ("Requirement", "Stakeholder"): ["association"],
-    ("Requirement", "Goal"): ["association"],
+    ("Requirement", "Goal"): ["realization", "influence", "association"],
     ("Requirement", "Outcome"): ["influence", "association"],
     ("Requirement", "Principle"): ["association"],
     ("Requirement", "Requirement"): [
@@ -1437,6 +1439,18 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
         _types.remove("realization")
 
 del _pair, _types, _tgt
+
+# A core element realizes a requirement (ArchiMate 3.2 §6.4 and Appendix B): this is how
+# a control, a process or a service traces to the obligation it satisfies. The pass
+# above removes realization only where an ACTIVE core element is the TARGET; a
+# requirement is a motivation element, so the source side here is unaffected.
+# Added to the finished table, in front of association, and only ever added.
+for _src in BUSINESS_ELEMENTS + APPLICATION_ELEMENTS + TECHNOLOGY_ELEMENTS + PHYSICAL_ELEMENTS:
+    _types = VALID_RELATIONSHIPS.setdefault((_src, "Requirement"), [])
+    if "realization" not in _types:
+        _types.insert(0, "realization")
+
+del _src, _types
 
 # Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
 # Appendix B). Applied last, over the finished table, and only ever added: no
