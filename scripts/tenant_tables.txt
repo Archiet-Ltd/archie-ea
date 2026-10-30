@@ -178,6 +178,7 @@ org_connector_credentials
 organization_encryption_keys
 organization_signals
 organization_units
+outcome_measurements
 outcomes
 permission_grants
 physical_data_models
@@ -260,6 +261,7 @@ tech_radar_entries
 technical_debt
 technology_artifacts
 technology_collaborations
+technology_collaborations_full
 technology_communication_networks
 technology_devices
 technology_events
