@@ -61,7 +61,6 @@ from app.services.ai_chat_extensions import (
     AdvancedAnalyticsService,
     AutomatedActionsService,
     ComplianceStandardsService,
-    PredictiveInsightsService,
     ScenarioAnalysisService,
     VisualGenerationService,
 )
@@ -597,7 +596,6 @@ class MultiDomainChatService:
         self.automated_actions = AutomatedActionsService()
         self.advanced_analytics = AdvancedAnalyticsService()
         self.compliance_standards = ComplianceStandardsService()
-        self.predictive_insights = PredictiveInsightsService()
 
         # Use a stable session ID based on user_id for DB-backed chat history
         # This ensures history persists across page refreshes and server restarts
@@ -2797,14 +2795,13 @@ class MultiDomainChatService:
             },
             "predictive_insights": {
                 "name": "Predictive Insights",
-                "description": "Forecasting and early warning system",
+                "description": "Five present-tense heuristic checks over the model, with evidence",
                 "capabilities": [
-                    "lifecycle_prediction",
-                    "technology_trends",
-                    "risk_prediction",
-                    "capacity_planning",
-                    "investment_outcomes",
-                    "failure_probability",
+                    "unfunded_objective",
+                    "zombie_project",
+                    "bus_factor",
+                    "domino_effect",
+                    "cost_to_serve",
                 ],
             },
         }
@@ -3072,55 +3069,26 @@ class MultiDomainChatService:
         """
         Get predictive insights and forecasts.
 
+        Routes to the one predictive engine (app.services.predictive_engine):
+        the per-prediction_type forecasters this method used to call against
+        PredictiveInsightsService are retired (section 12/25 — one engine for
+        the concept, not two). ``prediction_type`` and ``parameters`` are kept
+        for this method's existing callers' contract; the engine answers with
+        its own five evidence-backed checks regardless of their value, except
+        ``parameters["topic"]`` which narrows them (financial/hr/security).
+
         Args:
-            prediction_type: Type of prediction
-            parameters: Prediction parameters
+            prediction_type: accepted, unused by the engine
+            parameters: may carry "topic" (financial/hr/security); omit for all five checks
 
         Returns:
-            Predictive analysis results
+            The engine's answer: alerts with evidence, source and an as-of date.
         """
         parameters = parameters or {}
         try:
-            if prediction_type == "lifecycle":
-                return self.predictive_insights.predict_application_lifecycle(
-                    app_id=parameters.get("app_id"),
-                    scope=parameters.get("scope", "all"),
-                )
-            elif prediction_type == "technology_trends":
-                return self.predictive_insights.predict_technology_trends(
-                    technology_area=parameters.get("technology_area"),
-                    time_horizon=parameters.get("time_horizon", "24m"),
-                )
-            elif prediction_type == "risks":
-                return self.predictive_insights.predict_risks(
-                    risk_category=parameters.get("risk_category"),
-                    entity_type=parameters.get("entity_type", "portfolio"),
-                )
-            elif prediction_type == "capacity":
-                return self.predictive_insights.predict_capacity_needs(
-                    resource_type=parameters.get("resource_type", "all"),
-                    time_horizon=parameters.get("time_horizon", "12m"),
-                )
-            elif prediction_type == "investment":
-                return self.predictive_insights.predict_investment_outcomes(
-                    investment_scenario=parameters.get("scenario", {}),
-                )
-            elif prediction_type == "failure":
-                return self.predictive_insights.predict_failure_probability(
-                    entity_type=parameters.get("entity_type", "application"),
-                    entity_id=parameters.get("entity_id"),
-                )
-            elif prediction_type == "adoption":
-                return self.predictive_insights.predict_adoption_curve(
-                    technology=parameters.get("technology", ""),
-                    target_adoption=parameters.get("target_adoption", 80),
-                )
-            elif prediction_type == "dashboard":
-                return self.predictive_insights.generate_predictive_dashboard(
-                    persona=parameters.get("persona"),
-                )
-            else:
-                return {"success": False, "error": f"Unknown prediction type: {prediction_type}"}
+            from app.services.predictive_engine import get_predictive_insights as run_predictive_engine
+
+            return run_predictive_engine(topic=parameters.get("topic"))
         except Exception as e:
             self.logger.error(f"Error getting predictive insights: {e}")
             return {"success": False, "error": str(e)}

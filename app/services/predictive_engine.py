@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from flask import current_app
+
 from app.extensions import db
 from app.middleware.tenant_context import current_org_id  # reuse-ok: canonical org id accessor
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
@@ -24,7 +26,15 @@ from app.models.cost_fact import CostFact, KIND_ACTUAL
 # Configuration
 # --------------------------------------------------------------------------- #
 
-BUS_FACTOR_THRESHOLD = 5  # default X from brief; can be overridden by setting
+BUS_FACTOR_THRESHOLD = 5  # default, overridden by the BUS_FACTOR_THRESHOLD app setting
+
+
+def _bus_factor_threshold() -> int:
+    """BUS_FACTOR_THRESHOLD, or the app config override of the same name."""
+    return int(current_app.config.get("BUS_FACTOR_THRESHOLD", BUS_FACTOR_THRESHOLD))
+
+
+NO_DATE_RECORDED = "no date recorded"
 
 
 # --------------------------------------------------------------------------- #
@@ -38,6 +48,9 @@ class PredictiveAlert:
     target_element: str  # "<Type>: <name>"
     evidence: List[str]  # fact lines with source and date
     recommendation: str
+    element_id: Optional[int] = None  # the real element/record the alert is about
+    source: Optional[str] = None  # the record type the alert's "as of" date rests on
+    as_of: Optional[str] = None  # that record's own date (ISO, date-only), or None
 
 
 # --------------------------------------------------------------------------- #
@@ -98,6 +111,8 @@ def check_unfunded_objectives(org_id: int) -> List[PredictiveAlert]:
             .where(ArchiMateElement.type.in_(["Capability", "Resource", "CourseOfAction"]))
         ).all()
 
+        elem_date = elem.recorded_at.date().isoformat() if elem.recorded_at else None
+
         if not cap_rels:
             # No capability link at all
             alerts.append(PredictiveAlert(
@@ -106,9 +121,12 @@ def check_unfunded_objectives(org_id: int) -> List[PredictiveAlert]:
                 target_element=f"Motivation: {elem.name}",
                 evidence=[
                     _fmt_missing_evidence(elem.name, elem.type, "capability link",
-                                          "ArchiMateRelationship", elem.recorded_at.isoformat() if elem.recorded_at else None)
+                                          "ArchiMateRelationship", elem_date)
                 ],
-                recommendation=f"Link objective '{elem.name}' to at least one capability or course of action."
+                recommendation=f"Link objective '{elem.name}' to at least one capability or course of action.",
+                element_id=elem.id,
+                source="ArchiMateElement",
+                as_of=elem_date,
             ))
             continue
 
@@ -141,11 +159,14 @@ def check_unfunded_objectives(org_id: int) -> List[PredictiveAlert]:
                     target_element=f"Motivation: {elem.name}",
                     evidence=[
                         _fmt_evidence(elem.name, elem.type, rel.type, cap.name,
-                                      "ArchiMateRelationship", rel.updated_at.isoformat() if rel.updated_at else None),
+                                      "ArchiMateRelationship", rel.updated_at.date().isoformat() if rel.updated_at else None),
                         _fmt_missing_evidence(cap.name, cap.type, "work package or application link",
-                                              "ArchiMateRelationship", cap.recorded_at.isoformat() if cap.recorded_at else None)
+                                              "ArchiMateRelationship", cap.recorded_at.date().isoformat() if cap.recorded_at else None)
                     ],
-                    recommendation=f"Map work packages or applications to capability '{cap.name}' that realises objective '{elem.name}'."
+                    recommendation=f"Map work packages or applications to capability '{cap.name}' that realises objective '{elem.name}'.",
+                    element_id=elem.id,
+                    source="ArchiMateElement",
+                    as_of=elem_date,
                 ))
 
     return alerts
@@ -283,6 +304,8 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
                 end_date = solution.planned_end_date
                 end_date_source = f"Solution '{solution.name}'"
 
+        bc_date = bc.updated_at.date().isoformat() if bc.updated_at else NO_DATE_RECORDED
+
         if bc.financial_benefit_annual is not None:
             benefit = float(bc.financial_benefit_annual)
             if total_actual_cost > benefit:
@@ -290,10 +313,10 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
                 reason = f"Actual cost ({total_actual_cost:,.0f}) exceeds forecast benefit ({benefit:,.0f})"
                 evidence_lines.append(
                     f"BusinessCase '{bc.title or bc.id}' linked work packages actual cost: {total_actual_cost:,.0f} "
-                    f"[CostFact, as of {cost_fact_date.isoformat() if cost_fact_date else 'unknown'}]"
+                    f"[CostFact, as of {cost_fact_date.isoformat() if cost_fact_date else NO_DATE_RECORDED}]"
                 )
                 evidence_lines.append(
-                    f"BusinessCase forecast benefit: {benefit:,.0f} [BusinessCase, as of {bc.updated_at.date().isoformat() if bc.updated_at else 'unknown'}]"
+                    f"BusinessCase forecast benefit: {benefit:,.0f} [BusinessCase, as of {bc_date}]"
                 )
 
         if end_date and (today - end_date).days > 180:
@@ -301,7 +324,7 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
             reason = f"End date {end_date.isoformat()} is more than 6 months past"
             evidence_lines.append(
                 f"BusinessCase '{bc.title or bc.id}' linked {end_date_source} target end date: {end_date.isoformat()} "
-                f"[BusinessCase, as of {bc.updated_at.date().isoformat() if bc.updated_at else 'unknown'}]"
+                f"[BusinessCase, as of {bc_date}]"
             )
             evidence_lines.append(
                 f"Today: {today.isoformat()}, days past end: {(today - end_date).days} [system date]"
@@ -313,7 +336,10 @@ def check_zombie_projects(org_id: int) -> List[PredictiveAlert]:
                 severity="HIGH",
                 target_element=f"BusinessCase: {bc.title or f'#{bc.id}'}",
                 evidence=evidence_lines,
-                recommendation=f"Review business case '{bc.title or bc.id}': {reason}. Consider re-scoping, re-baselining, or retiring."
+                recommendation=f"Review business case '{bc.title or bc.id}': {reason}. Consider re-scoping, re-baselining, or retiring.",
+                element_id=bc.id,
+                source="BusinessCase",
+                as_of=bc_date if bc_date != NO_DATE_RECORDED else None,
             ))
 
     return alerts
@@ -392,20 +418,28 @@ def check_bus_factor(org_id: int) -> List[PredictiveAlert]:
                 owner_counts[user_id]["latest_owner_date"] = owner_date
 
     # Check for bus factor violations
+    threshold = _bus_factor_threshold()
     for user_id, data in owner_counts.items():
-        if data["critical_count"] > BUS_FACTOR_THRESHOLD:
+        if data["critical_count"] > threshold:
+            owner_date = (
+                data["latest_owner_date"].date().isoformat()
+                if data["latest_owner_date"] else None
+            )
             alerts.append(PredictiveAlert(
                 prediction_type="BUS_FACTOR",
                 severity="MEDIUM",
                 target_element=f"Person: {data['name']} ({data['role']})",
                 evidence=[
                     f"Person '{data['name']}' owns {data['critical_count']} critical elements "
-                    f"(threshold: {BUS_FACTOR_THRESHOLD}) [ApplicationOwner, as of "
-                    f"{data['latest_owner_date'].date().isoformat() if data['latest_owner_date'] else 'unknown'}]",
+                    f"(threshold: {threshold}) [ApplicationOwner, as of "
+                    f"{owner_date or NO_DATE_RECORDED}]",
                     f"Elements: {', '.join(data['element_names'][:10])}"
                     + (f" and {len(data['element_names']) - 10} more" if len(data['element_names']) > 10 else "")
                 ],
-                recommendation=f"Distribute ownership of critical elements away from '{data['name']}' to reduce single point of failure."
+                recommendation=f"Distribute ownership of critical elements away from '{data['name']}' to reduce single point of failure.",
+                element_id=user_id,
+                source="ApplicationOwner",
+                as_of=owner_date,
             ))
 
     return alerts
@@ -503,11 +537,15 @@ def check_domino_effect(org_id: int) -> List[PredictiveAlert]:
                                 evidence_lines.append(
                                     _fmt_evidence(source_name, "Element", rel.type, target_name,
                                                   "ArchiMateRelationship",
-                                                  rel.updated_at.isoformat() if rel.updated_at else None)
+                                                  rel.updated_at.date().isoformat() if rel.updated_at else None)
                                 )
+                        data_date = (
+                            current_elem.recorded_at.date().isoformat()
+                            if current_elem.recorded_at else None
+                        )
                         evidence_lines.append(
                             f"DataObject '{current_elem.name}' classification: {classification} "
-                            f"[ArchiMateElement, as of {current_elem.recorded_at.isoformat() if current_elem.recorded_at else 'unknown'}]"
+                            f"[ArchiMateElement, as of {data_date or NO_DATE_RECORDED}]"
                         )
                         evidence_lines.append(
                             "No security control requirement found on path [ArchiMateRelationship]"
@@ -518,7 +556,10 @@ def check_domino_effect(org_id: int) -> List[PredictiveAlert]:
                             severity="HIGH",
                             target_element=f"DataObject: {current_elem.name}",
                             evidence=evidence_lines,
-                            recommendation=f"Add security control requirements on the path from internet-facing element '{start_elem.name}' to data object '{current_elem.name}'."
+                            recommendation=f"Add security control requirements on the path from internet-facing element '{start_elem.name}' to data object '{current_elem.name}'.",
+                            element_id=current_elem.id,
+                            source="ArchiMateElement",
+                            as_of=data_date,
                         ))
                     break  # Found a sensitive data object, don't continue this path
 
@@ -626,6 +667,9 @@ def check_cost_to_serve(org_id: int) -> List[PredictiveAlert]:
                 # For now, assume flat if we can't measure revenue
                 # In reality, would check BusinessCase.financial_benefit_annual for linked cases
 
+                realization_evidence_date = (
+                    realization_date.date().isoformat() if realization_date else None
+                )
                 alerts.append(PredictiveAlert(
                     prediction_type="COST_TO_SERVE",
                     severity="MEDIUM",
@@ -633,13 +677,16 @@ def check_cost_to_serve(org_id: int) -> List[PredictiveAlert]:
                     evidence=[
                         f"Service '{svc.name}' realised by {len(app_ids)} application(s) "
                         f"[ArchiMateRelationship, as of "
-                        f"{realization_date.date().isoformat() if realization_date else 'unknown'}]",
+                        f"{realization_evidence_date or NO_DATE_RECORDED}]",
                         f"Cost period {periods[0]}: {prev_cost:,.0f} [CostFact]",
                         f"Cost period {periods[1]}: {curr_cost:,.0f} [CostFact]",
                         f"Cost increase: {pct_change:.1f}% (threshold: 10%)",
                         f"Linked work packages: {wp_count} [ArchiMateRelationship]"
                     ],
-                    recommendation=f"Investigate cost drivers for service '{svc.name}' — cost rose {pct_change:.1f}% with no corresponding work package or revenue increase."
+                    recommendation=f"Investigate cost drivers for service '{svc.name}' — cost rose {pct_change:.1f}% with no corresponding work package or revenue increase.",
+                    element_id=svc.id,
+                    source="ArchiMateRelationship",
+                    as_of=realization_evidence_date,
                 ))
 
     return alerts
@@ -702,43 +749,21 @@ def get_predictive_insights(topic: Optional[str] = None) -> Dict[str, Any]:
         raise RuntimeError("No organisation context")
     alerts = run_all_checks(org_id, topic)
 
-    # Convert alerts to answer envelope rows
-    rows = []
-    for alert in alerts:
-        rows.append({
-            "element_id": 0,  # synthetic
-            "relation": {
-                "kind": "derived",
-                "type": alert.prediction_type,
-                "depth": 1,
-                "rule_id": "predictive_check",
-                "chain": [],
-                "chain_elements": [],
-                "confidence": 0.8,
-                "provenance": {"basis": "derived", "kind": "heuristic", "label": alert.prediction_type,
-                               "text": alert.recommendation, "recorded_at": None},
-                "computed_at": datetime.utcnow().isoformat(),
-                "stale": False,
-                "derived_id": None,
-                "engine_version": "1.0",
-                "plain_terms": alert.recommendation,
-            },
-            "prediction_type": alert.prediction_type,
-            "severity": alert.severity,
-            "target_element": alert.target_element,
-            "evidence": alert.evidence,
-            "recommendation": alert.recommendation,
-        })
-
-    # Build a minimal envelope-like response
     return {
         "alerts": [
             {
                 "prediction_type": a.prediction_type,
                 "severity": a.severity,
                 "target_element": a.target_element,
+                "element_id": a.element_id,
                 "evidence": a.evidence,
                 "recommendation": a.recommendation,
+                # No governed formula computes a numeric confidence for a
+                # heuristic alert yet (CLAUDE.md's rule against an invented
+                # composite score) — never fabricated, so left out.
+                "confidence": None,
+                "source": a.source,
+                "as_of": a.as_of or NO_DATE_RECORDED,
             }
             for a in alerts
         ],
