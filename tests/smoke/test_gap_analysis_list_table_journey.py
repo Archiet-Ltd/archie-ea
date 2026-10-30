@@ -71,6 +71,34 @@ def _make_gaps(org_id, suffix, count, board_name):
         db.session.commit()
         return board.id, phase.id, ids
 
+def _make_closers(org_id, gap_ids, count):
+    """`count` WorkPackage cards in `org_id` closing gaps from `gap_ids`."""
+    from app import create_app, db
+    from app.models.adm_kanban import KanbanCard
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        creator = User.query.filter_by(organization_id=org_id).first()
+        board_id = KanbanCard.query.get(gap_ids[0]).board_id
+        phase_id = KanbanCard.query.get(gap_ids[0]).adm_phase_id
+        ids = []
+        for i in range(count):
+            card = KanbanCard(
+                title="Closing WP %d" % i,
+                description="Work package for gap %d" % i,
+                adm_phase_id=phase_id,
+                board_id=board_id,
+                card_type="work_package",
+                closes_gap_id=gap_ids[i],
+                organization_id=org_id,
+                created_by_id=creator.id,
+            )
+            db.session.add(card)
+            db.session.flush()
+            ids.append(card.id)
+        db.session.commit()
+        return ids
+
 
 def _cleanup(board_id, phase_id, card_ids):
     from app import create_app, db
@@ -78,9 +106,12 @@ def _cleanup(board_id, phase_id, card_ids):
 
     with create_app("testing").app_context():
         db.session.rollback()
-        KanbanCard.query.filter(KanbanCard.id.in_(card_ids)).delete(synchronize_session=False)
-        KanbanBoard.query.filter_by(id=board_id).delete(synchronize_session=False)
-        ADMPhase.query.filter_by(id=phase_id).delete(synchronize_session=False)
+        if card_ids:
+            KanbanCard.query.filter(KanbanCard.id.in_(card_ids)).delete(synchronize_session=False)
+        if board_id:
+            KanbanBoard.query.filter_by(id=board_id).delete(synchronize_session=False)
+        if phase_id:
+            ADMPhase.query.filter_by(id=phase_id).delete(synchronize_session=False)
         db.session.commit()
 
 
@@ -91,6 +122,7 @@ def gap_data(app, seeded):
     suffix = uuid.uuid4().hex[:6]
     org_id = seeded["ids"]["org"]
     board_id, phase_id, ids = _make_gaps(org_id, suffix, 9, "Trace Board %s" % suffix)
+    closer_ids = _make_closers(org_id, ids, 3)
 
     from app import create_app, db
     from app.models.organization import Organization
@@ -113,7 +145,7 @@ def gap_data(app, seeded):
 
     yield {"suffix": suffix, "org_id": org_id}
 
-    _cleanup(board_id, phase_id, ids)
+    _cleanup(board_id, phase_id, ids + closer_ids)
     _cleanup(other_board_id, other_phase_id, other_ids)
     with create_app("testing").app_context():
         from sqlalchemy import text
@@ -191,6 +223,19 @@ def test_gap_analysis_list_table(browser, live_server, seeded, gap_data, viewpor
         page.go_back(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
         assert "Foreign Board" not in page.content()
+
+        # The progress bar attribute reflects the percentage shown.
+        progress_bar = page.locator('progress').first
+        expect(progress_bar).to_be_visible()
+        bar_value = progress_bar.get_attribute('value')
+        percentage_text = page.locator('[data-testid="gap-row"] >> text=/%/').first.inner_text()
+        percentage_value = re.search(r'(\d+)%', percentage_text).group(1)
+        assert abs(float(bar_value) - float(percentage_value)) < 2
+
+        # The table caption is correct.
+        caption = page.locator('caption')
+        expect(caption).to_have_text("Gap records and the work packages that close them")
+
     finally:
         context.close()
 

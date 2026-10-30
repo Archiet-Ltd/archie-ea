@@ -108,10 +108,10 @@
     {# -- Gap table ------------------------------------------------------ #}
     {% macro _gap_record_empty_action() %}{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('archimate_crud.create_element', layer='implementation', element_type='Gap')) }}{% endmacro %}
     {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Closing WorkPackages', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
-                          caption='ArchiMate Gap elements and the WorkPackages that close them', testid='gaps-table', row_testid='gap-row',
-                          search_placeholder='Filter gaps...',
-                          empty_message='No gap record has been made yet. The gaps shown above are computed from the capability map.',
-                          empty_action=(_gap_record_empty_action if can_change_model() else none)) %}
+                           caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
+                           search_placeholder='Filter gaps...',
+                           empty_message='No gap record has been made yet. The gaps shown above are computed from the capability map.',
+                           empty_action=(_gap_record_empty_action if can_change_model() else none)) %}
     {% set closers = gap_closers.get(gap.id, []) %}
     {% call table_cell(attrs={'data-sort': gap.title}) %}
         {# A Gap is a KanbanCard. There is no per-card page; the board is
@@ -175,6 +175,8 @@
     {% endcall %}
     {% endcall %}
 
+    {% from 'basecoat/progress.html' import progress, progress_indicator %}
+
     {# -- Coverage summary bar ------------------------------------------- #}
     {% if gaps %}
     {% set covered = gaps|length - unclosed_count %}
@@ -184,9 +186,9 @@
             <span class="font-medium text-foreground">Gap Coverage</span>
             <span class="text-muted-foreground">{{ covered }} / {{ gaps|length }} gaps have a closing WorkPackage ({{ pct }}%)</span>
         </div>
-        <div class="w-full bg-muted rounded-full h-2">
-            <div class="bg-primary h-2 rounded-full transition-all w-[{{ pct }}%]" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
+        {% call progress(value=pct, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': 'Gap coverage'}) %}
+            {{ progress_indicator(value=pct) }}
+        {% endcall %}
     </div>
     {% endif %}
 
