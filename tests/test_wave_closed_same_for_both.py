@@ -43,7 +43,17 @@ def _address(rule, record_id):
     path = rule.rule
     for name, converter in rule._converters.items():
         kind = type(converter).__name__
-        value = str(record_id) if kind == "IntegerConverter" else "x"
+        if kind == "IntegerConverter":
+            value = str(record_id)
+        elif kind == "AnyConverter":
+            # "x" is not one of the converter's own literals (e.g. the ArchiMate
+            # layer segment), so it never matches this rule at all and the request
+            # falls through to the app's ordinary signed-in 404 instead of this
+            # rule's own closed-route answer. Use one of the converter's real
+            # values so the probe actually exercises the rule being checked.
+            value = sorted(converter.items)[0]
+        else:
+            value = "x"
         path = re.sub(r"<[^>]*\b%s>" % re.escape(name), value, path)
     return path
 
