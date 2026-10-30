@@ -126,16 +126,17 @@ class RlsEnv:
 
 
 @pytest.fixture(scope="module")
-def rls(app, _schema, request):
+def rls(app, _schema, request, run_id):
     from app import db
 
     with app.app_context():
         url = db.engine.url
     
-    # Get worker ID for unique role name (roles are cluster-level, not database-level)
+    # Roles are cluster-level, not database-level: the name carries the worker id and
+    # this run's id so concurrent runs never share one, and teardown drops it.
     worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
-    role_name = f"{RUNTIME_ROLE_BASE}_{worker_id}"
-    
+    role_name = f"{RUNTIME_ROLE_BASE}_{worker_id}_{run_id}"
+
     owner = create_engine(url, poolclass=NullPool)
     with owner.begin() as connection:
         exists = connection.execute(
@@ -162,9 +163,14 @@ def rls(app, _schema, request):
     runtime = create_engine(
         url.set(username=role_name, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
-    yield RlsEnv(owner, runtime, role_name)
-    runtime.dispose()
-    owner.dispose()
+    try:
+        yield RlsEnv(owner, runtime, role_name)
+    finally:
+        runtime.dispose()
+        with owner.begin() as connection:
+            connection.execute(text(f"DROP OWNED BY {role_name}"))  # nosec B608 - test-only role
+            connection.execute(text(f"DROP ROLE IF EXISTS {role_name}"))  # nosec B608 - test-only role
+        owner.dispose()
 
 
 # --------------------------------------------------------------------------- #

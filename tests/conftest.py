@@ -21,81 +21,11 @@ Requires PostgreSQL: ``TestingConfig`` rejects SQLite outright. Set
 from __future__ import annotations
 
 import os
-import re
-import time
 import uuid
 
 import pytest
-from playwright.sync_api import expect
-from sqlalchemy import create_engine
-from sqlalchemy_utils import database_exists, create_database, drop_database
-
-# --- Shared constants and helper functions from smoke tests ---
-# These are moved here to be available globally to all test modules.
-
-WALK = os.environ.get("ONB_WALK_DIR")
-QUESTION = "What breaks if Payments service fails"
-SIZES = [("1440", {"width": 1440, "height": 900}), ("390", {"width": 390, "height": 844})]
-STEPS = ("Your account", "Your sources", "Your company", "Your AI provider")
-
-@pytest.fixture(scope="session")
-def page_timeout():
-    # PAGE_TIMEOUT from tests/smoke/conftest.py
-    return 30000
-
-@pytest.fixture
-def open_browser_context(browser, page_timeout):
-    def _open(viewport, locale=None):
-        context = browser.new_context(viewport=viewport, **({'locale': locale} if locale else {}))
-        context.set_default_timeout(page_timeout)
-        context.set_default_navigation_timeout(page_timeout)
-        if os.environ.get("ONB_THEME") == "dark":
-            context.add_init_script(
-                "try { localStorage.setItem('theme', 'dark'); } catch (e) {} "
-                "document.documentElement.classList.add('dark');"
-            )
-        return context, context.new_page()
-    return _open
-
-@pytest.fixture
-def screenshot_helper():
-    def _shot(page, name, size):
-        if WALK:
-            os.makedirs(WALK, exist_ok=True)
-            page.screenshot(path=os.path.join(WALK, "%s-%s.png" % (name, size)), full_page=True)
-    return _shot
-
-@pytest.fixture
-def skip_to_dashboard_helper():
-    def _skip(page):
-        page.get_by_test_id("signup-continue").click()
-        page.wait_for_url("**/account/welcome?step=3")
-        page.get_by_test_id("signup-continue").click()
-        page.wait_for_url("**/account/welcome?step=4")
-        page.get_by_role("button", name="Finish").click()
-        page.wait_for_url("**/dashboard/**")
-    return _skip
-
-@pytest.fixture
-def assert_owner_has_organisation_helper(app):
-    def _assert(email):
-        with app.app_context():
-            from app import db
-            from app.models.organization import Organization
-            from app.models.user import User
-
-            user = User.query.filter_by(email=email).one()
-            assert user.organization_id is not None
-            org = db.session.get(Organization, user.organization_id)
-            members = [u.email for u in User.query.filter_by(organization_id=org.id).all()]
-            assert members == [email], members
-            name = org.name
-            org_id = org.id
-            db.session.remove()
-        return org_id, name
-    return _assert
-
-# --- End shared components ---
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 
 # Tests must never inherit a developer's or deployment agent's LLM credentials.
@@ -130,13 +60,28 @@ for _llm_api_key_env_var in _LLM_API_KEY_ENV_VARS:
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 
 
+def _quote(connection, name):
+    return connection.dialect.identifier_preparer.quote(name)
+
+
 @pytest.fixture(scope="session")
-def worker_database(request):
+def run_id():
+    """A short id unique to this pytest process.
+
+    Roles are cluster-wide and database names are shared by every run on the
+    cluster, so two runs (or two seats) with the same xdist worker id must not
+    share either.
+    """
+    return uuid.uuid4().hex[:8]
+
+
+@pytest.fixture(scope="session")
+def worker_database(request, run_id):
     """Create a per-worker database if running in parallel, otherwise use the default.
 
     The database is created from the seat template (archie_tmpl_main) at session start
-    and dropped at session end. The worker database name is derived from
-    TEST_DATABASE_URL with the worker id appended (e.g. archie_test_xdist01_gw0).
+    and dropped at session end. Its name is TEST_DATABASE_URL's database with the worker
+    id and a run id appended (e.g. archie_test_xdist01_gw0_1a2b3c4d).
     """
     worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
 
@@ -149,11 +94,9 @@ def worker_database(request):
     if not db_url:
         pytest.skip("TEST_DATABASE_URL not set, skipping parallel database setup.")
 
-    # The base test database name (e.g. archie_test_xdist01)
-    base_db_name = db_url.split("/")[-1]
-    # Worker database name carries the worker id
-    worker_db_name = f"{base_db_name}_{worker_id}"
-    worker_db_url = db_url.replace(base_db_name, worker_db_name)
+    base_url = make_url(db_url)
+    worker_db_name = f"{base_url.database}_{worker_id}_{run_id}"
+    worker_db_url = base_url.set(database=worker_db_name).render_as_string(hide_password=False)
 
     # The seat template database (created by mkseat.sh)
     template_db_name = os.environ.get("TEST_TEMPLATE_DATABASE", "archie_tmpl_main")
@@ -161,26 +104,34 @@ def worker_database(request):
     # Connect to the postgres database (not the template) to create the worker database.
     # This avoids "source database is being accessed by other users" when multiple
     # workers try to create from the same template simultaneously.
-    postgres_db_url = db_url.replace(base_db_name, "postgres")
-    engine = create_engine(postgres_db_url)
-    conn = engine.connect()
-    conn.execution_options(isolation_level="AUTOCOMMIT")
+    admin = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            worker_q = _quote(connection, worker_db_name)
+            template_q = _quote(connection, template_db_name)
+            connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
+            connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+    finally:
+        admin.dispose()
 
-    if database_exists(worker_db_url):
-        drop_database(worker_db_url)
-
-    create_database(worker_db_url, template=template_db_name)
-
-    original_url = os.environ["TEST_DATABASE_URL"]
+    original_url = db_url
     os.environ["TEST_DATABASE_URL"] = worker_db_url
 
     def finalizer():
         os.environ["TEST_DATABASE_URL"] = original_url
-        drop_database(worker_db_url)
+        cleanup = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+        try:
+            with cleanup.connect() as connection:
+                connection.execute(
+                    text(f"DROP DATABASE IF EXISTS {_quote(connection, worker_db_name)} WITH (FORCE)")  # nosec B608 - quoted identifier
+                )
+        finally:
+            cleanup.dispose()
 
     request.addfinalizer(finalizer)
 
     yield
+
 
 @pytest.fixture(scope="session")
 def app(request, worker_database):
