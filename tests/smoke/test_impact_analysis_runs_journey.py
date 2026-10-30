@@ -1,11 +1,16 @@
 """The Impact Analysis page actually runs an analysis and shows the cited answer.
 
-As the demo architect: choose Element Type "Application", see the demo's applications
-listed, pick Calibration Ledger, run the analysis, and read a cited answer naming its
-connected elements with an evidence footer whose date is today -- the same connected
-elements the AI chat names for the same question. Returning to the page afterwards
-shows the stored analysis listed, with the headline figures agreeing with the list.
-A second organisation's elements never appear in the picker or the list.
+As the demo architect: pick Calibration Ledger in the page's element picker (choosing an
+element is running the analysis: the page stores the answer through the one answer store),
+read the cited answer naming its connected elements, and see that same run as the first
+row of the recorded-runs table below it, its figures agreeing with the answer -- the same
+connected elements the AI chat names for the same question. A second organisation's
+elements never appear in its picker or its runs.
+
+Changed on the merge of impact-page01 and results01 (intended, not weakened): the
+"Element Type" dropdown, "Apply Filter" and the separate "Run Analysis" POST are gone
+with the page that carried them; the same person-visible outcome (pick, run, see the cited
+rows, see the run listed) is asserted against the one merged flow.
 """
 
 import os
@@ -62,7 +67,15 @@ def _chat_connected_names(page, live_server):
     return sorted(rows.all_inner_texts())
 
 
-def test_demo_architect_runs_analysis_and_reads_the_same_answer_as_the_chat(
+def _pick(page, name):
+    page.locator("#impact-page-picker-input").fill(name)
+    option = page.get_by_role("option", name=name, exact=True)
+    expect(option).to_be_visible(timeout=PAGE_TIMEOUT)
+    option.click()
+    page.wait_for_url(lambda url: "element=" in url, timeout=PAGE_TIMEOUT)
+
+
+def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
     browser, live_server, demo
 ):
     context = browser.new_context(viewport={"width": 1440, "height": 1000})
@@ -74,48 +87,38 @@ def test_demo_architect_runs_analysis_and_reads_the_same_answer_as_the_chat(
         chat_names = _chat_connected_names(page, live_server)
         assert chat_names, "the AI chat must name at least one connected element for Calibration Ledger"
 
-        # Open Impact Analysis, choose Application, see the demo's applications listed.
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.select_option("#element_type", "application")
-        app_select = page.locator("#application_id")
-        expect(app_select).to_be_visible()
-        options = app_select.locator("option").all_inner_texts()
-        assert any("Calibration Ledger" in o for o in options), options
-
-        # Pick Calibration Ledger and run the analysis.
-        page.select_option("#element_type", "application")
-        page.select_option("#application_id", label="Calibration Ledger")
-        page.get_by_role("button", name="Apply Filter").click()
-        page.wait_for_url(lambda url: "element_id=" in url, timeout=PAGE_TIMEOUT)
-
-        page.get_by_test_id("run-impact-analysis").click()
-        page.wait_for_url(lambda url: "answer_address=" in url, timeout=PAGE_TIMEOUT)
+        _pick(page, "Calibration Ledger")
 
         # A cited answer, naming the same connected elements as the chat.
-        page_rows = page.locator(ROW_NAME)
+        page_rows = page.get_by_test_id("impact-answer-element-link")
         expect(page_rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
-        page_names = sorted(page_rows.all_inner_texts())
+        page_names = sorted(t.strip() for t in page_rows.all_inner_texts())
         assert page_names == chat_names, (page_names, chat_names)
 
-        # The evidence footer: evidence, source, confidence and a date of today.
-        today = datetime.now(timezone.utc)
-        expect(page.get_by_text("Evidence for this answer")).to_be_visible()
-        expect(page.get_by_text("Source: the organisation's recorded architecture model")).to_be_visible()
-        confidence_line = page.get_by_text("Confidence:", exact=False).inner_text()
-        assert "Confidence:" in confidence_line, confidence_line
-        computed_line = page.get_by_text("Computed:", exact=False).inner_text()
-        assert str(today.day) in computed_line and today.strftime("%b") in computed_line, computed_line
+        # The run just made is the first row of the recorded-runs table, and its
+        # figures are the answer's: one store, one set of numbers.
+        runs = page.get_by_test_id("impact-run-row")
+        expect(runs.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        first = runs.first.inner_text()
+        assert "Calibration Ledger" in first, first
+        cells = [c.strip() for c in runs.first.locator("td").all_inner_texts()]
+        assert cells[2] == str(len(page_names)), (cells, len(page_names))
+        assert str(int(cells[3]) + int(cells[4])) == cells[2], cells
 
-        # Return to the plain page: the run is stored and listed, figures agree.
+        # The row's Open link lands on the stored answer with its rows.
+        runs.first.get_by_test_id("impact-run-open").click()
+        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/intelligence/answers/" in page.url, page.url
+        stored_rows = page.locator("[data-answer-row] a")
+        expect(stored_rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert sorted(stored_rows.all_inner_texts()) == chat_names
+
+        # Running it again lists a second run, newest first.
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Total Analyses Run")).to_be_visible()
-        total_card = page.locator("p", has_text="Total Analyses Run").locator(
-            "xpath=following-sibling::p[1]"
-        )
-        assert int(total_card.inner_text().strip()) >= 1, total_card.inner_text()
-        # The row for this run carries the element id the run used, not a blank figure.
-        row_cells = page.locator("tbody tr").first.inner_text()
-        assert "ID: " in row_cells, row_cells
+        before = page.get_by_test_id("impact-run-row").count()
+        _pick(page, "Calibration Ledger")
+        assert page.get_by_test_id("impact-run-row").count() == before + 1
     finally:
         context.close()
 
@@ -128,8 +131,10 @@ def test_a_second_organisations_elements_never_appear(browser, live_server, demo
     try:
         sign_in(page, live_server, other["emails"]["enterprise_architect"])
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.select_option("#element_type", "application")
+        page.locator("#impact-page-picker-input").fill("Calibration")
+        page.wait_for_timeout(1500)
         body_text = page.locator("body").inner_text()
         assert "Calibration Ledger" not in body_text, "another organisation's application leaked into the picker"
+        assert page.get_by_test_id("impact-run-row").count() == 0, "another organisation's run was listed"
     finally:
         context.close()

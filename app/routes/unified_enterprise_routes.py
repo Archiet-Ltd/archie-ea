@@ -1051,6 +1051,19 @@ def impact_analysis():
             except (envelope.AnswerParamError, envelope.AnswerNotAskable):
                 element_not_found = True
 
+        # The runs this organisation has made, from the one answer store the
+        # answer above was just written to (newest first), so the run just made
+        # is the first row and its figures are the answer's own.
+        recorded_runs = []
+        for stored in envelope.recent_answers(50):
+            if stored.question_kind != envelope.KIND_IMPACT or len(recorded_runs) == 20:
+                continue
+            shown = envelope.present(stored, include_rows=False)
+            shown["element_name"] = (
+                (stored.elements or {}).get(str((stored.params or {}).get("element_id"))) or {}
+            ).get("name")
+            recorded_runs.append(shown)
+
         # The record of formal impact-analysis runs (Analyze Impact / the v1
         # endpoint) -- a different, already-correctly-scoped concern from the
         # live answer above. Impact analyses have no organisation column: they
@@ -1110,6 +1123,7 @@ def impact_analysis():
             critical_count=critical_count,
             high_count=high_count,
             avg_affected_applications=avg_affected_applications,
+            recorded_runs=recorded_runs,
         )
     except Exception as e:
         current_app.logger.error(f"Error loading impact analysis: {e}")

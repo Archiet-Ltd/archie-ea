@@ -2,6 +2,7 @@
 {# design-block: record-detail #}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/element_table.html' import element_table %}
+{% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
@@ -122,6 +123,27 @@
         {% set empty.icon = 'git-branch' %}
         {% set empty.title = 'Nothing is modelled yet' %}
         {% set empty.description = 'Add at least one application to your model, and you can ask what breaks if it fails.' %}
+    {% endif %}
+
+    {% if recorded_runs %}
+    {% call section_card(title='Your recorded runs') %}
+        {% set run_columns = [
+            ('Run', ''),
+            ('Element', ''),
+            {'label': 'Connections', 'class': 'text-center'},
+            {'label': 'Recorded by people', 'class': 'text-center'},
+            {'label': 'Worked out', 'class': 'text-center'},
+            ('Answer', ''),
+        ] %}
+        {% call(run) list_table(rows=recorded_runs, columns=run_columns, caption='Impact analyses run for your organisation, newest first', testid='impact-runs-table', row_testid='impact-run-row', empty_message='No impact analyses have been run yet. Choose an element above.') %}
+            {% call table_cell(attrs={'data-sort': run.computed_at}) %}<span class="whitespace-nowrap text-sm text-foreground">{{ run.computed_at[:16] | replace('T', ' ') }}</span>{% endcall %}
+            {% call table_cell(class='font-medium') %}{{ run.element_name or '—' }}{% endcall %}
+            {% call table_cell(class='text-center') %}{{ run.summary.total or 0 }}{% endcall %}
+            {% call table_cell(class='text-center') %}{{ run.summary.explicit_count or 0 }}{% endcall %}
+            {% call table_cell(class='text-center') %}{{ run.summary.derived_count or 0 }}{% endcall %}
+            {% call table_cell() %}<a href="{{ run.page_url }}" class="font-medium text-primary hover:underline" data-testid="impact-run-open">Open</a>{% endcall %}
+        {% endcall %}
+    {% endcall %}
     {% endif %}
 
     {% if empty.title %}
