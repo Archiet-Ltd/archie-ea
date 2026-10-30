@@ -753,7 +753,10 @@ def jira_config_save():
     email = (request.form.get("email") or "").strip()
     api_token_raw = (request.form.get("api_token") or "").strip()
     default_project_key = (request.form.get("default_project_key") or "ARCH").strip().upper()
-    enabled = request.form.get("enabled") == "on"
+    # The shadcn switch macro posts "true"/"false" (an Alpine :value binding),
+    # not a native checkbox's "on" -- accept both so the control's real
+    # submitted value is read correctly.
+    enabled = request.form.get("enabled") in ("on", "true")
 
     if not instance_url or not email:
         flash("Instance URL and email are required.", "error")
