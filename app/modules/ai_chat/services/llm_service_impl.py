@@ -83,7 +83,7 @@ PAUSED_MESSAGE = "Answers are paused for now. Your model and your data are untou
 DEFAULT_PROVIDER_ORDER = ("gemini", "nvidia")
 
 # Providers that bill per token. A priced provider is never called without a spend ceiling.
-PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek"})
+PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek", "watsonx"})
 
 # List prices in USD per million tokens (input, output) used when no price is configured.
 _BUILT_IN_PRICES = {"gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)}}
@@ -260,6 +260,10 @@ class LLMService:
         "huggingface": {
             "models": [],  # NO HARDCODED MODELS - Database only
             "base_url": None,  # Local models, no API endpoint
+        },
+        "watsonx": {
+            "models": [],  # Granite models are listed from the service itself
+            "base_url": None,  # The service address is set per organisation or by WATSONX_URL
         },
         "openrouter": {
             "models": [],  # NO HARDCODED MODELS - Database only
@@ -1042,6 +1046,7 @@ class LLMService:
             "nvidia": "NVIDIA_API_KEY",
             "azure": "AZURE_API_KEY",
             "huggingface": "HUGGINGFACE_API_KEY",
+            "watsonx": "WATSONX_API_KEY",
         }
         for provider, env_var in env_key_map.items():
             if provider not in configured_in_db:
@@ -2350,6 +2355,19 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     response_text, token_input, token_output, cost = LLMService._call_huggingface(
                         prompt, model, api_key, max_tokens=max_tokens
                     )
+                elif provider == "watsonx":
+                    from app.modules.ai_chat.services import watsonx_client
+
+                    body = watsonx_client.complete(
+                        api_key, model, [{"role": "user", "content": prompt}], max_tokens=max_tokens or 4096
+                    )["raw"]
+                    response_text = ((body.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                    if not response_text:
+                        raise watsonx_client.WatsonxError("IBM watsonx.ai sent an empty answer.")
+                    usage = body.get("usage") or {}
+                    token_input = int(usage.get("prompt_tokens") or 0)
+                    token_output = int(usage.get("completion_tokens") or 0)
+                    cost = 0.0
                 elif provider == "openrouter":
                     # OpenRouter supports multiple backup models (comma-separated in default_model
                     # plus the curated free-tier fallback list in model_defaults.FALLBACK_MODELS).
@@ -2444,6 +2462,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 # Continue to next key
                 continue
         
+        # IBM watsonx.ai was chosen on purpose: its failure is reported as itself, not answered by another provider.
+        if provider == "watsonx" and last_error is not None and type(last_error).__name__ == "WatsonxError":
+            raise last_error
+
         # All keys failed for primary provider — try cross-provider fallback
         logger.error(f"❌ All {len(api_keys)} API key(s) failed for {provider}")
 
@@ -3494,6 +3516,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             "openrouter": {
                 "name": "OpenRouter (65+ Models)",
                 "default_models": ["google/gemma-4-31b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"]
+            },
+            "watsonx": {
+                "name": "IBM watsonx.ai (Granite)",
+                "default_models": [DEFAULT_MODELS["watsonx"]]
             }
         }
         
@@ -3943,6 +3969,12 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
             )
 
             return {"success": True, "message": f"Connection successful. Model: {response.model}"}
+
+        elif provider == "watsonx":
+            from app.modules.ai_chat.services import watsonx_client
+
+            url, project = watsonx_client.connection()
+            return watsonx_client.check_connection(api_key, url, project, _resolve_model("watsonx", model))
 
         elif provider == "huggingface":
             # Hugging Face Inference API test

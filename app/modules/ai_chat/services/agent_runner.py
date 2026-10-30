@@ -119,6 +119,9 @@ def sanitize_agent_error(reason) -> "Optional[str]":
     text = str(reason)
     lowered = text.lower()
 
+    if "ibm watsonx.ai" in lowered:
+        return text.replace("LLM call failed: ", "", 1)  # already plain, names the provider and carries no key or response body
+
     status = ""
     m = _re.search(r"\b(4\d\d|5\d\d)\b", text)
     if m:
@@ -151,9 +154,11 @@ _PROVIDER_BASE_URLS = {
     "nvidia": "https://integrate.api.nvidia.com/v1",
 }
 # Providers whose tool-calling the loop can drive.
-_TOOL_PROVIDERS = ("anthropic", "openai", "openrouter", "nvidia")
+_TOOL_PROVIDERS = ("anthropic", "openai", "openrouter", "nvidia", "watsonx")
 _FREE_PROVIDERS = ("nvidia", "openrouter")
-_PROVIDER_PRIORITY = ("openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface")
+# IBM watsonx.ai is a paid provider: it is never in the free list and is only offered to an
+# organisation that has its own key or is on a paid plan (see watsonx_client.entitled).
+_PROVIDER_PRIORITY = ("openai", "anthropic", "gemini", "watsonx", "openrouter", "nvidia", "azure", "huggingface")
 
 
 def _error_status(exc) -> Optional[int]:
@@ -170,6 +175,10 @@ def is_retryable_llm_error(exc) -> bool:
     model or function the provider does not have. Anything else (a malformed
     request, a rejected key) would fail the same way elsewhere.
     """
+    from app.modules.ai_chat.services.watsonx_client import WatsonxError
+
+    if isinstance(exc, WatsonxError):
+        return False  # IBM watsonx.ai was chosen on purpose; its failure is reported, not answered elsewhere
     status = _error_status(exc)
     text = str(exc).lower()
     if "answers are paused" in text:
@@ -230,14 +239,18 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     except Exception:
         logger.warning("AgentRunner: could not read provider settings", exc_info=True)
 
+    from app.modules.ai_chat.services import watsonx_client
+
+    watsonx_allowed = watsonx_client.entitled()
     own = [p for p in _PROVIDER_PRIORITY if p in _TOOL_PROVIDERS and p in rows]
     # The platform's own keys count only for the providers in the configured order, each within its ceiling.
     platform = [
         p for p in LLMService.provider_order()
         if p in _TOOL_PROVIDERS and p not in rows and os.getenv(p.upper() + "_API_KEY") and LLMService.has_headroom(p)
+        and (p != "watsonx" or watsonx_allowed)
     ]
     names = own + [p for p in platform if p not in own]
-    has_paid = any(p in rows for p in ("anthropic", "openai", "azure", "gemini"))
+    has_paid = any(p in rows for p in ("anthropic", "openai", "azure", "gemini", "watsonx"))
 
     configured = (
         [p for p in LLMService.provider_order()]
@@ -260,6 +273,8 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
 
     chain = []
     for provider in order:
+        if provider == "watsonx" and not watsonx_allowed:
+            continue
         row = rows.get(provider)
         models = _models_of(row.default_model if row else None)
         if provider == first_provider and first_model:
@@ -1200,7 +1215,9 @@ class AgentRunner:
             allowed, reason = LLMService.platform_call_allowed(provider)
             if not allowed:
                 raise AnswersPaused(reason)
-        if provider == "anthropic":
+        if provider == "watsonx":
+            result = self._call_watsonx(model, api_key, system_prompt, messages, tools, stream)
+        elif provider == "anthropic":
             if stream:
                 result = self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
             else:
@@ -1332,6 +1349,19 @@ class AgentRunner:
 
             return {"provider": dict(OPENROUTER_PROVIDER_POLICY)}
         return None
+
+    def _call_watsonx(self, model, api_key, system_prompt, messages, tools, stream=False) -> dict:
+        """IBM watsonx.ai chat with tools; the answer arrives whole, so a streamed turn emits it as one piece."""
+        from app.modules.ai_chat.services import watsonx_client
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+        LLMService._guard_provider_call("watsonx", model, prompt=system_prompt)
+        result = watsonx_client.complete(
+            api_key, model, [{"role": "system", "content": system_prompt}] + messages, tools=tools
+        )
+        if stream and result.get("text") and not result.get("tool_calls"):
+            self._emit_token(result["text"])
+        return result
 
     def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
         from openai import OpenAI
@@ -1644,7 +1674,9 @@ class AgentRunner:
 
     def _fallback(self, reason: str, busy: bool = False) -> dict:
         reason_l = (reason or "").lower()
-        if "answers are paused" in reason_l:
+        if "ibm watsonx.ai" in reason_l:
+            msg = str(reason).replace("LLM call failed: ", "", 1)
+        elif "answers are paused" in reason_l:
             from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
 
             msg = PAUSED_MESSAGE

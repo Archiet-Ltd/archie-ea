@@ -1262,6 +1262,9 @@ class APISettings(TenantMixin, db.Model):
     custom_auth_method = db.Column(db.String(50), default="bearer")  # Auth method
     custom_headers = db.Column(db.Text)  # Additional headers in JSON
 
+    # IBM watsonx.ai: the project the model runs in (the service address is custom_endpoint_url)
+    watsonx_project_id = db.Column(db.String(100))
+
     # Common fields
     last_tested_at = db.Column(db.DateTime)
     test_status = db.Column(db.String(20))  # success, failed, pending

@@ -809,6 +809,11 @@ def api_settings():
             )
             db.session.add(settings)
 
+        if provider == "watsonx":
+            from app.modules.ai_chat.services import watsonx_client
+
+            watsonx_client.apply_form(settings, form)
+
         api_key_to_test = (
             form.api_key.data
             if form.api_key.data and form.api_key.data.strip()
@@ -855,6 +860,9 @@ def api_settings():
         form.custom_endpoint_url.data = edit_settings.custom_endpoint_url or ""
         form.custom_auth_method.data = edit_settings.custom_auth_method or "bearer"
         form.custom_headers.data = edit_settings.custom_headers or ""
+        from app.modules.ai_chat.services import watsonx_client
+
+        watsonx_client.fill_form(edit_settings, form)
 
     return render_template(
         "admin/api_settings.html",
@@ -891,10 +899,13 @@ def test_api_settings(settings_id):
     settings = APISettings.query.get_or_404(settings_id)
 
     try:
-        result = test_api_key(settings.api_key, settings.api_provider)
-        flash(f"API test successful: {result}", "success")
+        result = test_api_key(settings.provider, settings.api_key, model=settings.default_model or None)
     except Exception:
-        flash("API test failed. Please try again.", "error")
+        result = {"success": False, "message": "The test could not be run. Please try again."}
+    if result.get("success"):
+        flash(f"Connection test successful: {result.get('message', '')}", "success")
+    else:
+        flash(f"Connection test failed: {result.get('message', 'Unknown error')}", "error")
 
     return redirect(url_for("admin.api_settings"))
 

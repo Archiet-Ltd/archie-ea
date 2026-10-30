@@ -140,7 +140,7 @@ def set_user_preference():
             }), 400
         
         # Validate provider
-        valid_providers = ["none", "openai", "anthropic", "gemini", "nvidia", "huggingface", "azure", "custom", "openrouter"]
+        valid_providers = ["none", "openai", "anthropic", "gemini", "nvidia", "huggingface", "azure", "custom", "openrouter", "watsonx"]
         if provider not in valid_providers:
             return jsonify({
                 "success": False,
@@ -284,6 +284,24 @@ def get_openrouter_models():
             "error": "An internal error occurred. Please try again.",
             "message": "Failed to retrieve OpenRouter models"
         }), 500
+
+
+@llm_bp.route("/watsonx/models", methods=["GET"])
+@login_required
+def get_watsonx_models():
+    """The Granite instruct models the organisation's watsonx.ai service offers for chat.
+
+    The service address is the ``url`` query parameter when given (so the form can ask before it is
+    saved), otherwise the organisation's saved address, otherwise the platform's WATSONX_URL.
+    """
+    from app.modules.ai_chat.services import watsonx_client
+
+    url = (request.args.get("url") or "").strip() or watsonx_client.connection()[0]
+    try:
+        models = watsonx_client.list_granite_models(url)
+    except watsonx_client.WatsonxError as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    return jsonify({"success": True, "models": models, "count": len(models)})
 
 
 @llm_bp.route("/test/<provider>", methods=["POST"])

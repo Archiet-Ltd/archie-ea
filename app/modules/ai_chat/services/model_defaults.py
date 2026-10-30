@@ -58,6 +58,7 @@ DEFAULT_MODELS = {
     "huggingface": "meta-llama/Llama-2-7b-chat-hf",
     "openrouter": "google/gemma-4-31b-it:free",
     "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
+    "watsonx": "ibm/granite-3-8b-instruct",
 }
 
 # Ordered free fallback models tried within OpenRouter and NVIDIA before

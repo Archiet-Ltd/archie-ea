@@ -146,6 +146,7 @@ class APISettingsForm(FlaskForm):
             ("azure", "Azure OpenAI"),
             ("huggingface", "Hugging Face"),
             ("nvidia", "NVIDIA (free models)"),
+            ("watsonx", "IBM watsonx.ai (Granite)"),
             ("openrouter", "OpenRouter (65+ Models)"),
             ("custom", "Custom API"),
             ("jira", "JIRA"),
@@ -219,6 +220,18 @@ class APISettingsForm(FlaskForm):
         "Hugging Face Endpoint URL",
         validators=[Optional(), Length(0, 500)],
         description="Custom endpoint URL (optional, uses default Hugging Face API if not provided)",
+    )
+
+    # IBM watsonx.ai specific fields (the service address is stored in custom_endpoint_url)
+    watsonx_url = StringField(
+        "watsonx.ai Service Address",
+        validators=[Optional(), Length(0, 500)],
+        description="The regional address of your watsonx.ai service (e.g., https://us-south.ml.cloud.ibm.com)",
+    )
+    watsonx_project_id = StringField(
+        "watsonx.ai Project ID",
+        validators=[Optional(), Length(0, 100)],
+        description="The id of the watsonx.ai project the model runs in",
     )
 
     # Custom API specific fields

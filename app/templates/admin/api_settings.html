@@ -2,12 +2,15 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}API Settings{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/button.html' import button %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='API Settings',
-        description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, OpenRouter, NVIDIA), custom web APIs, and other services.',
+        description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, OpenRouter, NVIDIA, IBM watsonx.ai), custom web APIs, and other services.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
@@ -318,7 +321,7 @@
                             </div>
 
                             <!-- Default Model -->
-                            <div>
+                            <div id="default-model-field">
                                 {{ form.default_model.label(class="block text-sm font-medium mb-2") }}
                                 {{ form.default_model(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
                                 {% if form.default_model.errors %}
@@ -452,6 +455,23 @@
                                 </div>
                             </div>
 
+                            <!-- IBM watsonx.ai Fields (only show for IBM watsonx.ai provider) -->
+                            <div id="watsonx-fields" class="hidden space-y-4" data-testid="watsonx-fields">
+                                {{ form_field(id='watsonx_url', label='Service address', value=form.watsonx_url.data or '', placeholder='https://us-south.ml.cloud.ibm.com',
+                                              help_text='The regional address of your watsonx.ai service. Leave the platform address in place if your administrator set one.') }}
+                                {{ form_field(id='watsonx_project_id', label='Project ID', value=form.watsonx_project_id.data or '',
+                                              help_text='The id of the watsonx.ai project the Granite model runs in.') }}
+                                {% call form_group(id='watsonx-model', label='Granite model', help_text='Granite instruct models the service offers. Load them after entering the service address.') %}
+                                    <div class="flex items-center gap-2">
+                                        {% call native_select(id='watsonx-model', aria_label='Granite model', class='flex-1', attrs_dict={'data-testid': 'watsonx-model'}) %}
+                                            {% if form.default_model.data %}<option value="{{ form.default_model.data }}" selected>{{ form.default_model.data }}</option>{% else %}<option value="">Load the models to choose one</option>{% endif %}
+                                        {% endcall %}
+                                        {{ button(text='Load models', variant='outline', icon='refresh-cw', testid='watsonx-load-models') }}
+                                    </div>
+                                {% endcall %}
+                                <p id="watsonx-status" class="text-sm text-muted-foreground" role="status" aria-live="polite"></p>
+                            </div>
+
                             <!-- Submit Buttons -->
                             <div class="flex gap-3 pt-4">
                                 {{ form.submit(class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2") }}
@@ -472,6 +492,7 @@
                     <p><strong>Azure:</strong> Configure through Azure Portal and set endpoint via environment variable</p>
                     <p><strong>Hugging Face:</strong> Get your API key from <a href="https://huggingface.co/settings/tokens" target="_blank" class="text-primary underline">huggingface.co/settings/tokens</a>. Choose from thousands of models including Llama, Mistral, Gemma, and more.</p>
                     <p><strong>NVIDIA:</strong> Get your API key from <a href="https://build.nvidia.com/" target="_blank" class="text-primary underline">build.nvidia.com</a>. Free hosted models, used when OpenRouter is unavailable.</p>
+                    <p><strong>IBM watsonx.ai:</strong> Create an IBM Cloud API key and a watsonx.ai project, then enter the key, the project id and the regional service address of your instance, load the Granite models and pick one. Press Test Connection to confirm the key works. Unlike the free providers it is used only with your own key or on a paid plan.</p>
                     <p><strong>OpenRouter:</strong> Get your API key from <a href="https://openrouter.ai/keys" target="_blank" class="text-primary underline">openrouter.ai/keys</a>. Access 65+ models from multiple providers through a single API key, including free models.</p>
                     <p><strong>Custom API:</strong> Connect to any REST API with flexible authentication options (Bearer token, API key header, Basic auth, or no auth).</p>
                     <p><strong>JIRA:</strong> Configure JIRA integration for project management</p>
@@ -485,6 +506,7 @@
                         <p><strong>Gemini:</strong> gemini-2.0-flash, gemini-2.0-flash-lite</p>
                         <p><strong>Hugging Face:</strong> meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct-v0.2, google/gemma-2-9b-it</p>
                         <p><strong>NVIDIA:</strong> nvidia/nemotron-3-ultra-550b-a55b</p>
+                        <p><strong>IBM watsonx.ai:</strong> ibm/granite-3-8b-instruct, ibm/granite-3-3-8b-instruct</p>
                         <p><strong>OpenRouter:</strong> google/gemma-4-31b-it:free, nvidia/nemotron-3-super-120b-a12b:free</p>
                     </div>
                 </div>

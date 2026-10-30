@@ -437,6 +437,7 @@ def api_settings():
         "gemini":      ("AIza",),
         "nvidia":      ("nvapi-",),
         "openrouter":  ("sk-or-",),
+        "watsonx":     (),          # IBM Cloud API keys have no fixed prefix
         "azure":       (),          # Azure uses a 32-char GUID-style key — no reliable prefix
         "jira":        (),          # JIRA tokens vary; skip prefix check
     }
@@ -515,6 +516,11 @@ def api_settings():
             )
             db.session.add(settings)
 
+        if provider == "watsonx":
+            from app.modules.ai_chat.services import watsonx_client
+
+            watsonx_client.apply_form(settings, form)
+
         # Use the just-validated raw_key for the connection test so we're testing
         # what was submitted, not whatever was already in the DB.
         api_key_to_test = raw_key if raw_key else settings.api_key
@@ -557,6 +563,9 @@ def api_settings():
         form.custom_endpoint_url.data = settings.custom_endpoint_url or ""
         form.custom_auth_method.data = settings.custom_auth_method or "bearer"
         form.custom_headers.data = settings.custom_headers or ""
+        from app.modules.ai_chat.services import watsonx_client
+
+        watsonx_client.fill_form(settings, form)
 
     return render_template(
         "admin/api_settings.html",

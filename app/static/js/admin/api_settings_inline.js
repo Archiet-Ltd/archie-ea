@@ -9,6 +9,8 @@
     const huggingFaceFields = document.getElementById('huggingface-fields');
     const customApiFields = document.getElementById('custom-api-fields');
     const openrouterFields = document.getElementById('openrouter-fields');
+    const watsonxFields = document.getElementById('watsonx-fields');
+    const defaultModelField = document.getElementById('default-model-field');
 
     function toggleProviderFields() {
         const provider = providerSelect.value;
@@ -16,16 +18,62 @@
         huggingFaceFields.style.display = 'none';
         customApiFields.style.display = 'none';
         openrouterFields.style.display = 'none';
+        watsonxFields.style.display = 'none';
+        defaultModelField.style.display = provider === 'watsonx' ? 'none' : '';
 
         if (provider === 'jira') jiraFields.style.display = 'block';
         else if (provider === 'huggingface') huggingFaceFields.style.display = 'block';
         else if (provider === 'custom') customApiFields.style.display = 'block';
+        else if (provider === 'watsonx') {
+            watsonxFields.style.display = 'block';
+            if (!watsonxLoaded && document.getElementById('watsonx_url').value.trim()) loadWatsonxModels();
+        }
         else if (provider === 'openrouter') {
             openrouterFields.style.display = 'block';
             // Auto-load models when OpenRouter is selected/edited
             if (inlineModelsCache.length === 0) fetchInlineModels();
         }
     }
+
+    // ===== IBM watsonx.ai: Granite model dropdown =====
+    const watsonxModel = document.getElementById('watsonx-model');
+    const watsonxStatus = document.getElementById('watsonx-status');
+    const watsonxLoad = document.querySelector('[data-testid="watsonx-load-models"]');
+    const defaultModelInput = document.getElementById(window.__PAGE_CONFIG__.formDefaultModelId);
+    let watsonxLoaded = false;
+
+    function loadWatsonxModels() {
+        const url = document.getElementById('watsonx_url').value.trim();
+        watsonxStatus.textContent = 'Loading Granite models...';
+        watsonxStatus.classList.remove('text-destructive');
+        const current = defaultModelInput.value;
+        return Platform.fetch.get('/api/v1/llm/watsonx/models', url ? { url: url } : {}, { silent: true })
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'IBM watsonx.ai models could not be loaded.');
+                if (!data.models.length) {
+                    watsonxStatus.textContent = 'IBM watsonx.ai lists no Granite chat models at this address.';
+                    return;
+                }
+                watsonxModel.replaceChildren();
+                data.models.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m.id;
+                    option.textContent = m.id;
+                    if (m.id === current) option.selected = true;
+                    watsonxModel.appendChild(option);
+                });
+                defaultModelInput.value = watsonxModel.value;
+                watsonxLoaded = true;
+                watsonxStatus.textContent = data.models.length + ' Granite models loaded.';
+            })
+            .catch(err => {
+                watsonxStatus.textContent = err.message;
+                watsonxStatus.classList.add('text-destructive');
+            });
+    }
+
+    watsonxLoad.addEventListener('click', loadWatsonxModels);
+    watsonxModel.addEventListener('change', () => { defaultModelInput.value = watsonxModel.value; });
 
     providerSelect.addEventListener('change', toggleProviderFields);
     toggleProviderFields(); // Initial check
