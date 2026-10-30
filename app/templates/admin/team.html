@@ -9,6 +9,7 @@
 {% from 'basecoat/dropdown-menu.html' import dropdown_menu_item, dropdown_menu_separator, dropdown_menu_label %}
 
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/input.html' import hidden_input %}
 
 {% block title %}Team{% endblock %}
 
@@ -39,7 +40,7 @@
   {% call ui.alert(class='mb-6 max-w-2xl', attrs={'data-team-mail-unavailable': ''}) %}{{ lucide('info') }}{{ ui.alert_description(text='Invitation e-mails are switched off on this server, so people without an account cannot be invited until e-mail is set up.') }}{% endcall %}
   {% endif %}
   <form method="POST" action="{{ url_for('team.team_invite') }}" class="max-w-2xl space-y-6" data-testid="team-invite-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ hidden_input('csrf_token', csrf_token()) }}
     {% call ui.field() %}
       {{ ui.field_label(text='Email', attrs={'for': 'email'}) }}
       {{ ui.input(id='email', name='email', type='email', required=true, autocomplete='off', placeholder='name@company.com') }}
@@ -114,9 +115,9 @@
       {{ dropdown_menu_label(text='Change role') }}
       {% for r in valid_roles if r != current_role %}
       <form method="POST" action="{{ url_for('team.team_change_role') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="user_id" value="{{ member.id }}">
-        <input type="hidden" name="role" value="{{ r }}">
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        {{ hidden_input('user_id', member.id) }}
+        {{ hidden_input('role', r) }}
         {{ dropdown_menu_item(text='Make ' ~ _role_label(r)|lower, tag='button', type='submit', class='w-full', attrs={'data-testid': 'member-role-' ~ r}) }}
       </form>
       {% endfor %}

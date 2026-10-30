@@ -209,6 +209,9 @@ def test_an_invited_person_joins_through_the_e_mail_and_is_signed_in(browser, ma
             has=page.locator('[data-invitation-email="%s"]' % invitee))
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
         assert row.locator('[data-invitation-delivery="sent"]').count() == 1
+        # The role chosen on the invite form is the role the new row shows -- not a
+        # default, and not silently dropped by the table conversion.
+        expect(row).to_contain_text("Architect")
         message = smtp_sink.text_to(invitee)
         assert owner["org_name"] in message, message
         link = _link_in(message, "/account/join/")
