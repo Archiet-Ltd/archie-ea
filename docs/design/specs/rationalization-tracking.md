@@ -7,7 +7,8 @@ A portfolio manager sees what rationalisation has saved against what was project
 retirement risk, and the order they can retire in.
 
 ## What moves
-- The two savings figures become the Stat card row (two cards, tabular figure, one-sentence meaning).
+- The portfolio's application count (the Applications list's own) and the two savings figures become the Stat card row (three cards, tabular figure, one-sentence meaning).
+- The risk filter sits under the card title so it is whole at 390 wide.
 - Dependency risk becomes a card with the library table, a risk filter and the card footer paging.
 - The retirement waves become library items inside one card.
 - The import form becomes the library dialog with a labelled file field and a preview table.

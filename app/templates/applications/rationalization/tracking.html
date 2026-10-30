@@ -11,17 +11,22 @@
 
   {% include 'applications/rationalization/_sub_nav.html' %}
 
-  {# Stat card row: the two savings figures, read from the same benefits tracker the application pages read. #}
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-testid="tracking-stats">
-    {% for testid, label, value, sentence in [
-      ('tracking-projected', 'Projected savings', financial_summary.projected, 'Aggregate projected annual savings from all tracked applications'),
-      ('tracking-actual', 'Actual savings', financial_summary.actual, 'Realized annual savings from completed rationalization actions')] %}
+  {# Stat card row: the portfolio count is the Applications list's; the savings come from the benefits tracker the application pages read. #}
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-3" data-testid="tracking-stats">
+    {% for testid, label, value, sentence, money in [
+      ('portfolio-applications', 'Applications', portfolio_applications, 'In the portfolio, as the Applications list counts them', false),
+      ('tracking-projected', 'Projected savings', financial_summary.projected, 'Aggregate projected annual savings from all tracked applications', true),
+      ('tracking-actual', 'Actual savings', financial_summary.actual, 'Realized annual savings from completed rationalization actions', true)] %}
     {% call ui.card(attrs={'data-testid': testid}) %}
       {% call ui.card_header() %}
         {{ ui.card_description(text=label) }}
-        {{ ui.card_title(text=currency_symbol ~ '{:,.0f}'.format(value or 0), class='text-2xl font-semibold tabular-nums', attrs={'data-testid': testid ~ '-value'}) }}
+        {% if value is none %}
+        {{ ui.card_title(text='Not available', class='text-lg font-semibold', attrs={'data-testid': testid ~ '-value'}) }}
+        {% else %}
+        {{ ui.card_title(text=(currency_symbol ~ '{:,.0f}'.format(value or 0)) if money else value, class='text-2xl font-semibold tabular-nums', attrs={'data-testid': testid ~ '-value'}) }}
+        {% endif %}
       {% endcall %}
-      {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{{ sentence }}</p>{% endcall %}
+      {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{% if value is none %}The figure could not be read. Reload the page to try again.{% else %}{{ sentence }}{% endif %}</p>{% endcall %}
     {% endcall %}
     {% endfor %}
   </div>
@@ -32,7 +37,7 @@
     {% call ui.card_header() %}
       {{ ui.card_title(text='Portfolio dependency risk') }}
       {{ ui.card_description(text='Applications whose retirement is blocked or affects others') }}
-      {% call ui.card_action(class='flex items-center gap-2') %}
+      {% call ui.card_action(class='col-start-1 row-start-3 justify-self-start flex flex-wrap items-center gap-2') %}
         {# The dialog is lifted to the page body when it opens, so its content carries its own import state
            and tells the table to reload when it closes. #}
         {% call ui.dialog() %}
@@ -75,7 +80,7 @@
             {% endcall %}
           {% endcall %}
         {% endcall %}
-        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='dep-risk-filter', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by risk level', 'x-model': 'depRiskFilter', '@change': 'depPage = 1; loadDependencyRisk()', 'data-testid': 'dep-risk-filter'}) %}
+        {% call ui.native_select_wrapper(class='relative w-48') %}{% call ui.native_select(id='dep-risk-filter', class='h-8 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by risk level', 'x-model': 'depRiskFilter', '@change': 'depPage = 1; loadDependencyRisk()', 'data-testid': 'dep-risk-filter'}) %}
           {{ ui.native_select_option(text='All risk levels', value='') }}
           {% for level in ['critical', 'high', 'medium', 'low'] %}{{ ui.native_select_option(text=level | capitalize, value=level) }}{% endfor %}
         {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}

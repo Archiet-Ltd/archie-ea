@@ -1,401 +1,245 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_rationalization_family_journey.py #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% import 'dashboards/_overview_parts.html' as d %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'applications/rationalization/_disposition_tooltip.html' import disposition_badge %}
 {% block title %}Decision Workbench — Rationalization{% endblock %}
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-chart.js') }}" defer></script>
+{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 
 {% block content %}
-<div x-data="workbenchApp()" x-init="load()">
+<div class="p-6 space-y-6" x-data="workbenchApp()" x-init="load()" data-testid="workbench-dashboard">
+  {{ page_shell(title='Decision Workbench', subtitle='Triage scored applications by readiness, disposition, and confidence', breadcrumb=[('Dashboard', '/dashboard'), ('Rationalization', url_for('unified_applications.rationalization_dashboard')), ('Workbench', none)]) }}
 
-    {# ── Breadcrumbs ──────────────────────────────────────────────── #}
+  {% include 'applications/rationalization/_sub_nav.html' %}
 
-    {# ── Page Header ──────────────────────────────────────────────── #}
-    {% macro _ps_actions() %}
-<div class="flex items-center gap-3 text-sm text-muted-foreground">
-            <span x-show="totalCount > 0" x-cloak
-                  x-text="results.length < totalCount ? 'Showing ' + results.length + ' of ' + totalCount + ' applications' : totalCount + ' applications'"></span>
-            <button type="button" x-show="results.length < totalCount" x-cloak
-                    @click="perPage = totalCount; page = 1; load()"
-                    class="text-xs text-primary hover:underline font-medium">Load all</button>
-        </div>
-    {% endmacro %}
-    {{ page_shell(title='Decision Workbench', subtitle='Triage scored applications by readiness, disposition, and confidence', actions_caller=_ps_actions, breadcrumb=[('Dashboard', '/dashboard'), ('Rationalization', url_for('unified_applications.rationalization_dashboard')), ('Workbench', none)]) }}
+  {# Stat card row: the portfolio count is the Applications list's; the others count the scores. #}
+  {% if summary %}
+  {% set stat_items = [
+    ('portfolio-applications', 'Applications', portfolio_applications, 'In the portfolio, as the Applications list counts them'),
+    ('workbench-scored', 'Scored', summary.scored, 'Applications with a rationalization score'),
+    ('workbench-ready', 'Decision ready', summary.ready, 'Scored applications with enough evidence to decide'),
+    ('workbench-awaiting', 'Awaiting review', summary.awaiting, 'Scores still in draft or reviewed, not yet approved or rejected')] %}
+  {% else %}
+  {% set stat_items = [('portfolio-applications', 'Applications', portfolio_applications, 'In the portfolio, as the Applications list counts them')] %}
+  {% endif %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="workbench-stats">
+    {% for testid, label, value, sentence in stat_items %}
+    {% call ui.card(attrs={'data-testid': testid}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_description(text=label) }}
+        {% if value is not none %}
+        {{ ui.card_title(text=value, class='text-2xl font-semibold tabular-nums', attrs={'data-testid': testid ~ '-value'}) }}
+        {% else %}
+        {{ ui.card_title(text='Not available', class='text-lg font-semibold', attrs={'data-testid': testid ~ '-value'}) }}
+        {% endif %}
+      {% endcall %}
+      {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{% if value is none %}The figure could not be read. Reload the page to try again.{% else %}{{ sentence }}{% endif %}</p>{% endcall %}
+    {% endcall %}
+    {% endfor %}
+  </div>
 
-    {% include 'applications/rationalization/_sub_nav.html' %}
+  {# Chart grid: dispositions as the primary chart, review state as the side panel. #}
+  <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+    {% call ui.card(class='xl:col-span-2', attrs={'data-testid': 'workbench-dispositions'}) %}
+      {% call ui.card_header() %}{{ ui.card_title(text='Scored applications by disposition') }}{{ ui.card_description(text='The recommendation each scored application carries') }}{% endcall %}
+      {% call ui.card_content(class='flex flex-col gap-4') %}
+        {% if summary and summary.dispositions %}
+        {{ d.bar_rows(summary.dispositions, 'disposition', 'applications', 'Applications', 'hsl(var(--chart-1))', label='Scored applications by disposition', testid='workbench-disposition-chart') }}
+        {% call ui.table_container() %}{% call ui.table() %}
+          {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Disposition') }}{{ ui.table_head(text='Applications', class='text-right') }}{% endcall %}{% endcall %}
+          {% call ui.table_body() %}
+          {% for row in summary.dispositions %}
+            {% call ui.table_row(attrs={'data-testid': 'workbench-disposition-row'}) %}{{ ui.table_cell(text=row.disposition) }}{{ ui.table_cell(text=row.applications, class='text-right tabular-nums') }}{% endcall %}
+          {% endfor %}
+          {% endcall %}
+        {% endcall %}{% endcall %}
+        {% elif summary %}
+        <p class="text-sm text-muted-foreground" data-testid="workbench-disposition-empty">No application is scored yet. Run detection and scoring from the <a href="{{ url_for('unified_applications.rationalization_dashboard') }}" class="font-medium underline underline-offset-2">Dashboard</a> and the dispositions appear here.</p>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="workbench-disposition-error">The scores could not be read. Reload the page to try again.</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+    {% call ui.card(class='') %}
+      {% call ui.card_header() %}{{ ui.card_title(text='What the dispositions mean') }}{{ ui.card_description(text='The seven options a score recommends') }}{% endcall %}
+      {% call ui.card_content() %}
+        {% call ui.item_group(class='gap-1') %}
+          {% for name, desc in [('Retain', 'Keep as-is, no action needed'), ('Rehost', 'Move to new infrastructure without code changes'), ('Replatform', 'Move with minor optimizations'), ('Refactor', 'Re-architect for cloud-native or modernization'), ('Replace', 'Substitute with a different product or service'), ('Consolidate', 'Merge functionality into another application'), ('Retire', 'Decommission and remove from portfolio')] %}
+          {% call ui.item(size='sm', class='px-0', attrs={'role': 'listitem'}) %}{% call ui.item_content() %}{{ ui.item_title(text=name) }}{{ ui.item_description(text=desc) }}{% endcall %}{% endcall %}
+          {% endfor %}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+  </div>
 
-    {# ── Filter Bar ───────────────────────────────────────────────── #}
-    <div class="rounded-lg border border-border bg-card p-4 mb-6">
-        <div class="flex flex-wrap gap-3">
-            <div class="flex-1 min-w-[200px]">
-                <input type="text" placeholder="Search applications..."
-                       x-model.debounce.300ms="filters.search" @input="load()"
-                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search applications..."><!-- entity-picker-ok -->
-            </div>
-            <select x-model="filters.readiness" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Readiness">
-                <option value="">All Readiness</option>
-                <option value="ready">Decision Ready</option>
-                <option value="not_ready">Not Ready</option>
-            </select>
-            <select x-model="filters.disposition" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Disposition">
-                <option value="">All Dispositions</option>
-                <template x-for="f in facets.dispositions" :key="f.value">
-                    <option :value="f.value" x-text="f.label"></option>
-                </template>
-            </select>
-            <select x-model="filters.reviewStatus" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Review Status">
-                <option value="">All Review Status</option>
-                <option value="draft">Draft</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-            </select>
-            <select x-model="filters.lifecycle" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Lifecycle">
-                <option value="">All Lifecycle</option>
-                <template x-for="[ls, count] in Object.entries(facets.lifecycle_statuses || {})" :key="ls">
-                    <option :value="ls" x-text="ls + ' (' + count + ')'"></option>
-                </template>
-            </select>
-            <select x-model="filters.businessUnit" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Business Unit">
-                <option value="">All Business Units</option>
-                <template x-for="bu in facets.business_units" :key="bu.value">
-                    <option :value="bu.value" x-text="bu.label"></option>
-                </template>
-            </select>
-            <select x-model="filters.sort" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Sort">
-                <option value="health_desc">Health (High → Low)</option>
-                <option value="health_asc">Health (Low → High)</option>
-                <option value="confidence_desc">Confidence (High → Low)</option>
-                <option value="name_asc">Name (A → Z)</option>
-            </select>
-            {# All-apps toggle: show unscored apps too #}
-            <label class="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background text-sm cursor-pointer select-none">
-                <input type="checkbox" x-model="filters.includeUnscored" @change="page=1; load()"
-                       class="rounded border-border">
-                <span class="text-muted-foreground">Include unscored</span>
-            </label>
-        </div>
-    </div>
+  {# The workbench table: filters, bulk actions and the scored applications. #}
+  {% call ui.card(attrs={'data-testid': 'workbench-table'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Scored applications') }}
+      {% call ui.card_description() %}<span x-show="totalCount > 0" x-cloak x-text="results.length < totalCount ? 'Showing ' + results.length + ' of ' + totalCount + ' scored applications' : totalCount + ' scored applications'"></span><span x-show="totalCount === 0" x-cloak>Filter and triage the scored applications</span>{% endcall %}
+      {% call ui.card_action() %}{{ ui.button(text='Load all', variant='link', size='sm', attrs={'type': 'button', 'x-show': 'results.length < totalCount', 'x-cloak': '', '@click': 'perPage = totalCount; page = 1; load()'}) }}{% endcall %}
+    {% endcall %}
+    {% call ui.card_content(class='flex flex-col gap-4') %}
+      <div class="flex flex-wrap items-center gap-2" data-testid="workbench-filters">
+        {{ ui.input(class='h-8 w-full sm:w-64', attrs={'type': 'search', 'placeholder': 'Search applications…', 'aria-label': 'Search applications', 'x-model.debounce.300ms': 'filters.search', '@input': 'load()'}) }}
+        {% for model, label, all_label, options in [
+          ('readiness', 'Filter by readiness', 'All readiness', [('ready', 'Decision ready'), ('not_ready', 'Not ready')]),
+          ('reviewStatus', 'Filter by review status', 'All review states', [('draft', 'Draft'), ('reviewed', 'Reviewed'), ('approved', 'Approved'), ('rejected', 'Rejected')])] %}
+        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': label, 'x-model': 'filters.' ~ model, '@change': 'load()'}) %}
+          {{ ui.native_select_option(text=all_label, value='') }}
+          {% for value, text in options %}{{ ui.native_select_option(text=text, value=value) }}{% endfor %}
+        {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+        {% endfor %}
+        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by disposition', 'x-model': 'filters.disposition', '@change': 'load()'}) %}
+          {{ ui.native_select_option(text='All dispositions', value='') }}
+          <template x-for="f in facets.dispositions" :key="f.value"><option :value="f.value" x-text="f.label"></option></template>
+        {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by lifecycle', 'x-model': 'filters.lifecycle', '@change': 'load()'}) %}
+          {{ ui.native_select_option(text='All lifecycle', value='') }}
+          <template x-for="[ls, count] in Object.entries(facets.lifecycle_statuses || {})" :key="ls"><option :value="ls" x-text="ls + ' (' + count + ')'"></option></template>
+        {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by business unit', 'x-model': 'filters.businessUnit', '@change': 'load()'}) %}
+          {{ ui.native_select_option(text='All business units', value='') }}
+          <template x-for="bu in facets.business_units" :key="bu.value"><option :value="bu.value" x-text="bu.label"></option></template>
+        {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Sort', 'x-model': 'filters.sort', '@change': 'load()'}) %}
+          {{ ui.native_select_option(text='Health (high to low)', value='health_desc') }}
+          {{ ui.native_select_option(text='Health (low to high)', value='health_asc') }}
+          {{ ui.native_select_option(text='Confidence (high to low)', value='confidence_desc') }}
+          {{ ui.native_select_option(text='Name (A to Z)', value='name_asc') }}
+        {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+        <label class="flex h-8 items-center gap-2 text-sm text-muted-foreground">
+          {{ ui.input(attrs={'type': 'checkbox', 'x-model': 'filters.includeUnscored', '@change': 'page = 1; load()', 'data-testid': 'include-unscored'}) }}Include unscored
+        </label>
+      </div>
 
-    {# ── Bulk Action Bar ──────────────────────────────────────────── #}
-    <div x-show="selectedCount > 0" x-cloak
-         class="rounded-xl border border-primary/30 bg-primary/5 p-3 mb-4 flex items-center justify-between">
+      {# Bulk actions appear once rows are selected. #}
+      <div x-show="selectedCount > 0" x-cloak class="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-3" data-testid="bulk-actions">
         <span class="text-sm font-medium" x-text="selectedCount + ' selected'"></span>
-        <div class="flex gap-2">
-            <button type="button" @click="bulkAction('approve')"
-                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-success text-success-foreground hover:bg-success/90">
-                Approve Selected
-            </button>
-            <button type="button" @click="bulkAction('defer')"
-                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-warning text-warning-foreground hover:bg-warning/90">
-                Defer Selected
-            </button>
-            <button type="button" @click="bulkAction('request_data')"
-                    class="px-3 py-1.5 text-xs font-medium rounded-md border border-border text-foreground hover:bg-muted">
-                Request Data
-            </button>
-            <div class="flex items-center gap-1.5 ml-2 pl-2 border-l border-border">
-                <select aria-label="Bulk disposition" x-model="bulkDisposition"
-                        class="px-2 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground">
-                    <option value="">Disposition...</option>
-                    <option value="retire">Retire</option>
-                    <option value="replace">Replace</option>
-                    <option value="consolidate">Consolidate</option>
-                    <option value="migrate">Migrate</option>
-                    <option value="retain">Retain</option>
-                    <option value="invest">Invest</option>
-                </select>
-                <button type="button" @click="bulkAction('set_disposition')"
-                        :disabled="!bulkDisposition"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Set Disposition
-                </button>
-            </div>
-        </div>
-    </div>
+        <span class="flex flex-wrap items-center gap-2">
+          {{ ui.button(text='Approve selected', size='sm', attrs={'type': 'button', '@click': "bulkAction('approve')"}) }}
+          {{ ui.button(text='Defer selected', size='sm', variant='secondary', attrs={'type': 'button', '@click': "bulkAction('defer')"}) }}
+          {{ ui.button(text='Request data', size='sm', variant='outline', attrs={'type': 'button', '@click': "bulkAction('request_data')"}) }}
+          {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Bulk disposition', 'x-model': 'bulkDisposition'}) %}
+            {{ ui.native_select_option(text='Disposition…', value='') }}
+            {% for value, text in [('retire', 'Retire'), ('replace', 'Replace'), ('consolidate', 'Consolidate'), ('migrate', 'Migrate'), ('retain', 'Retain'), ('invest', 'Invest')] %}{{ ui.native_select_option(text=text, value=value) }}{% endfor %}
+          {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+          {{ ui.button(text='Set disposition', size='sm', variant='outline', attrs={'type': 'button', '@click': "bulkAction('set_disposition')", ':disabled': '!bulkDisposition'}) }}
+        </span>
+      </div>
 
-    {# ── Results Table ────────────────────────────────────────────── #}
-    <div class="rounded-lg border border-border bg-card overflow-hidden mb-8">
-        {# Loading skeleton #}
-        <template x-if="loading">
-            <div class="p-6 space-y-4 animate-pulse">
-                <div class="h-8 bg-muted rounded w-full"></div>
-                <div class="h-6 bg-muted rounded w-full"></div>
-                <div class="h-6 bg-muted rounded w-full"></div>
-                <div class="h-6 bg-muted rounded w-full"></div>
-                <div class="h-6 bg-muted rounded w-4/5"></div>
-            </div>
-        </template>
+      <p class="text-sm text-muted-foreground" x-show="loading" x-cloak data-testid="workbench-loading">Loading the scored applications…</p>
+      <div x-show="error && !loading" x-cloak class="flex items-center gap-2 text-sm text-destructive" data-testid="workbench-error">Failed to load workbench data. {{ ui.button(text='Retry', variant='link', size='sm', attrs={'type': 'button', '@click': 'load()'}) }}</div>
+      <p class="text-sm text-muted-foreground" x-show="!loading && !error && results.length === 0" x-cloak data-testid="workbench-empty">No scored applications match. Run detection and scoring from the <a href="{{ url_for('unified_applications.rationalization_dashboard') }}" class="font-medium underline underline-offset-2">Dashboard</a> to populate this workbench, or tick Include unscored to list every application.</p>
 
-        {# Error state #}
-        <template x-if="error && !loading">
-            <div class="p-8 text-center">
-                <i data-lucide="alert-circle" class="h-8 w-8 text-destructive mx-auto mb-2"></i>
-                <p class="text-sm text-destructive-emphasis mb-2">Failed to load workbench data.</p>
-                <button type="button" @click="load()" class="text-xs text-primary hover:underline">Retry</button>
-            </div>
-        </template>
+      <div x-show="!loading && !error && results.length > 0" x-cloak>
+        {% call ui.table_container() %}{% call ui.table() %}
+          {% call ui.table_header() %}{% call ui.table_row() %}
+            {% call ui.table_head(class='w-8') %}{{ ui.input(attrs={'type': 'checkbox', 'aria-label': 'Select all applications', '@change': 'toggleAll($event.target.checked)', ':checked': 'allSelected'}) }}{% endcall %}
+            {{ ui.table_head(text='Application') }}{{ ui.table_head(text='Health') }}{{ ui.table_head(text='Disposition') }}{{ ui.table_head(text='Ready') }}{{ ui.table_head(text='Review') }}{{ ui.table_head(text='Confidence') }}{{ ui.table_head(text='Business unit') }}{{ ui.table_head(text='Actions', class='text-right') }}
+          {% endcall %}{% endcall %}
+          {% call ui.table_body() %}
+            <template x-for="app in results" :key="app.id">
+              {% call ui.table_row(class='cursor-pointer', attrs={'data-testid': 'workbench-row', '@click': "if (!$event.target.closest('input, button, a')) goToPlanning(app.id)"}) %}
+                {% call ui.table_cell() %}{{ ui.input(attrs={'type': 'checkbox', 'aria-label': 'Select application', ':value': 'app.id', ':checked': 'selectedIds[app.id]', '@change': 'toggleSelect(app.id)'}) }}{% endcall %}
+                {% call ui.table_cell(class='font-medium') %}<a :href="'/applications/rationalization/planning/' + app.id" class="hover:underline" x-text="app.name"></a>{% endcall %}
+                {% call ui.table_cell(class='tabular-nums') %}<span x-text="app.health == null ? 'Not scored' : app.health"></span>{% endcall %}
+                {% call ui.table_cell() %}{% call ui.badge(variant='outline', attrs={':title': 'app.disposition_desc'}) %}<span x-text="app.disposition_label || 'Not scored'"></span>{% endcall %}{% endcall %}
+                {% call ui.table_cell() %}<span x-text="app.is_ready ? 'Ready' : 'Not ready'"></span>{% endcall %}
+                {% call ui.table_cell() %}{% call ui.badge(variant='secondary') %}<span x-text="app.review_status || 'draft'"></span>{% endcall %}{% endcall %}
+                {% call ui.table_cell(class='tabular-nums') %}<span x-text="app.confidence ? (typeof app.confidence === 'number' ? app.confidence + '%' : app.confidence) : 'Not set'"></span>{% endcall %}
+                {% call ui.table_cell() %}<span x-text="app.business_unit || 'Not set'"></span>{% endcall %}
+                {% call ui.table_cell(class='text-right') %}
+                  {{ ui.button(text='View', variant='link', size='sm', attrs={'type': 'button', 'data-fb-open': 'breakdown-sheet', '@click': 'openBreakdown(app.id)'}) }}
+                  {{ ui.button(variant='link', size='sm', attrs={'type': 'button', '@click.stop': 'toggleCompare(app)', 'x-text': "compareIds.indexOf(app.id) >= 0 ? 'Added' : 'Compare'"}) }}
+                {% endcall %}
+              {% endcall %}
+            </template>
+          {% endcall %}
+        {% endcall %}{% endcall %}
+      </div>
+    {% endcall %}
+    {% call ui.card_footer(class='justify-between text-sm text-muted-foreground') %}
+      <span x-text="'Page ' + page + ' of ' + totalPages"></span>
+      <span class="flex gap-2">
+        {{ ui.button(text='Previous', variant='outline', size='sm', attrs={'type': 'button', '@click': 'page--; load()', ':disabled': 'page <= 1'}) }}
+        {{ ui.button(text='Next', variant='outline', size='sm', attrs={'type': 'button', '@click': 'page++; load()', ':disabled': 'page >= totalPages'}) }}
+      </span>
+    {% endcall %}
+  {% endcall %}
 
-        {# Empty state #}
-        <template x-if="!loading && !error && results.length === 0">
-            <div class="p-8 text-center">
-                <i data-lucide="inbox" class="h-10 w-10 text-muted-foreground/50 mx-auto mb-3"></i>
-                <p class="text-sm font-medium text-foreground mb-1">No scored applications found</p>
-                <p class="text-xs text-muted-foreground">Run detection and scoring from the <a href="{{ url_for('unified_applications.rationalization_dashboard') }}" class="text-primary underline underline-offset-2">Dashboard</a> to populate this workbench.</p>
-            </div>
-        </template>
+  {# Comparison of two or more chosen applications. #}
+  <div x-show="compareApps.length >= 2" x-cloak data-testid="comparison-panel">
+  {% call ui.card() %}
+    {% call ui.card_header() %}
+      {% call ui.card_title() %}Comparing <span x-text="compareApps.length"></span> applications{% endcall %}
+      {% call ui.card_action() %}{{ ui.button(text='Clear', variant='outline', size='sm', attrs={'type': 'button', '@click': 'clearComparison()'}) }}{% endcall %}
+    {% endcall %}
+    {% call ui.card_content(class='flex flex-col gap-4') %}
+      <div class="relative max-h-[300px]"><canvas id="comparisonRadarChart" role="img" aria-label="Radar chart comparing the chosen applications"></canvas></div>
+      {% call ui.table_container() %}{% call ui.table() %}
+        {% call ui.table_header() %}{% call ui.table_row() %}
+          {{ ui.table_head(text='Dimension') }}
+          <template x-for="ca in compareApps" :key="ca.id">{{ ui.table_head(attrs={'x-text': 'ca.name'}) }}</template>
+        {% endcall %}{% endcall %}
+        {% call ui.table_body() %}
+          <template x-for="dimName in ['Technical Health', 'Business Value', 'Cost Efficiency', 'Vendor Risk']" :key="dimName">
+            {% call ui.table_row() %}
+              {{ ui.table_cell(class='font-medium', attrs={'x-text': 'dimName'}) }}
+              <template x-for="ca in compareApps" :key="ca.id + dimName">{{ ui.table_cell(class='tabular-nums', attrs={'x-text': "ca.dims[dimName] == null ? 'Not measured' : ca.dims[dimName]"}) }}</template>
+            {% endcall %}
+          </template>
+        {% endcall %}
+      {% endcall %}{% endcall %}
+    {% endcall %}
+  {% endcall %}
+  </div>
 
-        {# Data table #}
-        <template x-if="!loading && !error && results.length > 0">
-            <div>
-                <table class="dense-table w-full text-sm">
-                    <thead class="bg-muted/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left w-8">
-                                <input aria-label="Select all applications" type="checkbox" @change="toggleAll($event.target.checked)"
-                                       :checked="allSelected"
-                                       class="rounded border-border">
-                            </th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Application</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-20">Health</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Disposition</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-20">Ready</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Review</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-16">Conf.</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Business Unit</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-16"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <template x-for="app in results" :key="app.id">
-                            <tr class="hover:bg-muted/30 cursor-pointer transition-colors"
-                                @click="if (!$event.target.closest('input')) goToPlanning(app.id)">
-                                <td class="px-4 py-3">
-                                    <input aria-label="Select application" type="checkbox" :value="app.id"
-                                           :checked="selectedIds[app.id]"
-                                           @change="toggleSelect(app.id)"
-                                           class="rounded border-border">
-                                </td>
-                                <td class="px-4 py-3 font-medium text-foreground" x-text="app.name"></td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold"
-                                          :class="app.health >= 70 ? 'bg-success/10 text-success-emphasis' : app.health >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-destructive/10 text-destructive-emphasis'"
-                                          x-text="app.health"></span>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
-                                          :title="app.disposition_desc"
-                                          x-text="app.disposition_label"></span>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <i :data-lucide="app.is_ready ? 'check-circle-2' : 'circle'"
-                                       :class="app.is_ready ? 'text-success-emphasis' : 'text-muted-foreground'"
-                                       class="h-4 w-4"></i>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground"
-                                          x-text="app.review_status || 'draft'"></span>
-                                </td>
-                                <td class="px-4 py-3 text-muted-foreground" x-text="app.confidence ? (typeof app.confidence === 'number' ? app.confidence + '%' : app.confidence) : '—'"></td>
-                                <td class="px-4 py-3 text-muted-foreground" x-text="app.business_unit || '—'"></td>
-                                <td class="px-4 py-3 flex gap-1">
-                                    <button type="button" @click.stop="openBreakdown(app.id)"
-                                            class="text-xs text-primary hover:underline">View</button>
-                                    <button type="button" @click.stop="toggleCompare(app)"
-                                            class="text-xs hover:underline"
-                                            :class="compareIds.indexOf(app.id) >= 0 ? 'text-success-emphasis font-semibold' : 'text-muted-foreground'"
-                                            x-text="compareIds.indexOf(app.id) >= 0 ? 'Added' : 'Compare'"></button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-
-                {# Pagination #}
-                <div class="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30">
-                    <span class="text-xs text-muted-foreground" x-text="'Page ' + page + ' of ' + totalPages"></span>
-                    <div class="flex gap-2">
-                        <button type="button" @click="page--; load()" :disabled="page <= 1"
-                                class="px-3 py-1 text-xs rounded-md border border-border hover:bg-muted disabled:opacity-50">
-                            Previous
-                        </button>
-                        <button type="button" @click="page++; load()" :disabled="page >= totalPages"
-                                class="px-3 py-1 text-xs rounded-md border border-border hover:bg-muted disabled:opacity-50">
-                            Next
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </template>
-    </div>
-
-    {# ── RATA-019: Comparison Panel ──────────────────────────────── #}
-    <div x-show="compareApps.length >= 2" x-cloak
-         class="rounded-xl border-2 border-primary/20 bg-card p-5 mb-8" x-transition>
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-foreground">Comparing <span x-text="compareApps.length"></span> Applications</h3>  <!-- frontend-quality-ok -->
-            <button type="button" @click="clearComparison()" class="text-xs text-muted-foreground hover:text-foreground">Clear</button>
-        </div>
-
-        {# Overlaid radar chart #}
-        <div class="relative max-h-[300px] mb-4">
-            <canvas id="comparisonRadarChart"></canvas>
-        </div>
-
-        {# Dimension comparison table #}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-xs">
-                <thead class="bg-muted/50">
-                    <tr>
-                        <th class="px-3 py-2 text-left font-medium text-muted-foreground">Dimension</th>
-                        <template x-for="ca in compareApps" :key="ca.id">
-                            <th class="px-3 py-2 text-left font-medium text-foreground" x-text="ca.name"></th>
-                        </template>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    <template x-for="dimName in ['Technical Health', 'Business Value', 'Cost Efficiency', 'Vendor Risk']" :key="dimName">
-                        <tr>
-                            <td class="px-3 py-2 font-medium text-muted-foreground" x-text="dimName"></td>
-                            <template x-for="ca in compareApps" :key="ca.id + dimName">
-                                <td class="px-3 py-2">
-                                    {# null = the server did not report this dimension. An em
-                                       dash, never 0 — a 0 here reads as a measured worst score. #}
-                                    <span class="font-bold"
-                                          :class="ca.dims[dimName] == null ? 'text-muted-foreground' : (ca.dims[dimName] >= 70 ? 'text-success-emphasis' : ca.dims[dimName] >= 40 ? 'text-warning-emphasis' : 'text-destructive')"
-                                          x-text="ca.dims[dimName] == null ? '—' : ca.dims[dimName]"></span>
-                                </td>
-                            </template>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    {# ── Disposition Taxonomy (collapsible) ───────────────────────── #}
-    <div x-data="dispositionTaxonomyPanel()" class="rounded-lg border border-border bg-card mb-8">
-        <button type="button" @click="open = !open"
-                class="w-full flex items-center justify-between p-4 text-left">
-            <span class="text-sm font-semibold text-foreground">What do the 7R dispositions mean?</span>
-            <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform"
-               :class="open ? 'rotate-180' : ''"></i>
-        </button>
-        <div x-show="open" x-cloak x-collapse class="px-4 pb-4"> <!-- modal-a11y-ok -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {% set dispositions = [
-                    ('Retain', 'Keep as-is, no action needed', 'emerald'),
-                    ('Rehost', 'Move to new infrastructure without code changes', 'blue'),
-                    ('Replatform', 'Move with minor optimizations', 'sky'),
-                    ('Refactor', 'Re-architect for cloud-native or modernization', 'violet'),
-                    ('Replace', 'Substitute with a different product or service', 'amber'),
-                    ('Consolidate', 'Merge functionality into another application', 'orange'),
-                    ('Retire', 'Decommission and remove from portfolio', 'red')
-                ] %}
-                {% for name, desc, color in dispositions %}
-                <div class="rounded-lg border p-3">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-{{ color }}-500/10 text-{{ color }}-600 border border-{{ color }}-500/30 mb-1.5">{{ name }}</span>
-                    <p class="text-xs text-muted-foreground">{{ desc }}</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    {# ── RATA-008: Score Breakdown Slide-over ──────────────────────── #}
-    <!-- modal-a11y-ok -->
-    <div x-show="breakdownOpen" x-cloak
-         class="fixed inset-0 z-50" @keydown.escape.window="breakdownOpen = false"
-         role="dialog" aria-modal="true">
-        {# Backdrop #}
-        <div class="absolute inset-0 bg-overlay/50" @click="breakdownOpen = false"></div>
-        {# Panel #}
-        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card border-l border-border overflow-y-auto border"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-            <div class="p-5">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-base font-semibold text-foreground" x-text="breakdownAppName || 'Score Breakdown'"></h3>
-                    <button type="button" @click="breakdownOpen = false"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close breakdown">
-                        <i data-lucide="x" class="h-4 w-4 text-muted-foreground"></i>
-                    </button>
-                </div>
-
-                <template x-if="breakdownLoading">
-                    <div class="space-y-4 animate-pulse">
-                        <div class="h-48 bg-muted rounded"></div>
-                        <div class="h-4 bg-muted rounded w-3/4"></div>
-                        <div class="h-4 bg-muted rounded w-1/2"></div>
-                    </div>
+  {# Score breakdown: the library sheet, opened by a row's View button. The runtime moves it to the page body,
+     so it reads the workbench's state through wb rather than through its parent scope. #}
+  {{ ui.sheet_overlay() }}
+  {% call ui.sheet_content(id='breakdown-sheet', attrs={'data-testid': 'breakdown-sheet', 'data-side': 'right', 'x-data': "{ wb: Alpine.$data(document.querySelector('[data-testid=workbench-dashboard]')) }"}) %}
+    {% call ui.sheet_header() %}{{ ui.sheet_title(text='Score breakdown', attrs={'x-text': "wb.breakdownAppName || 'Score breakdown'"}) }}{{ ui.sheet_description(text='How the four dimensions add up to the overall score') }}{% endcall %}
+    <div class="flex flex-col gap-4 overflow-y-auto px-4">
+      <p class="text-sm text-muted-foreground" x-show="wb.breakdownLoading" x-cloak>Loading the breakdown…</p>
+      <template x-if="!wb.breakdownLoading && wb.breakdownData">
+        <div class="flex flex-col gap-4" data-testid="breakdown-body">
+          <div class="relative max-h-[220px]"><canvas id="breakdownRadarChart" role="img" aria-label="Radar chart of the four score dimensions"></canvas></div>
+          <p class="text-sm text-muted-foreground" x-show="wb.breakdownData.inputs_measured != null && wb.breakdownData.inputs_measured < wb.breakdownData.inputs_total" x-text="'Overall score weighted from ' + wb.breakdownData.inputs_measured + ' of ' + wb.breakdownData.inputs_total + ' measured inputs. Inputs not measured read Not measured.'"></p>
+          {% call ui.table_container() %}{% call ui.table() %}
+            {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Dimension') }}{{ ui.table_head(text='Score', class='text-right') }}{% endcall %}{% endcall %}
+            {% call ui.table_body() %}
+              <template x-for="dim in wb.breakdownData.dimensions" :key="dim.name">
+                {% call ui.table_row(attrs={'data-testid': 'breakdown-dimension'}) %}{{ ui.table_cell(attrs={'x-text': 'dim.label'}) }}{{ ui.table_cell(class='text-right tabular-nums', attrs={'x-text': "dim.score === null ? 'Not measured' : dim.score"}) }}{% endcall %}
+              </template>
+            {% endcall %}
+          {% endcall %}{% endcall %}
+          <div class="flex flex-col gap-3">
+            <p class="text-sm font-medium">Key contributing factors</p>
+            <template x-for="dim in wb.breakdownData.top_factors" :key="dim.dimension">
+              <div class="flex flex-col gap-1">
+                <p class="text-sm" x-text="dim.dimension"></p>
+                <template x-for="f in dim.factors" :key="f.name">
+                  <p class="flex items-center gap-2 pl-2 text-sm text-muted-foreground"><span class="truncate" x-text="f.name"></span><span class="tabular-nums" x-text="f.raw_value != null ? f.raw_value : 'Not recorded'"></span><span class="ml-auto tabular-nums" x-text="f.contribution == null ? 'Not set' : '+' + f.contribution"></span></p>
                 </template>
-
-                <template x-if="!breakdownLoading && breakdownData">
-                    <div class="space-y-5">
-                        {# Mini radar chart #}
-                        <div class="relative max-h-[220px]">
-                            <canvas id="breakdownRadarChart"></canvas>
-                        </div>
-
-                        {# Measured-input statement: an unmeasured input renders
-                           as a dash and the overall score states how many of
-                           its four inputs were actually measured #}
-                        <p x-show="breakdownData.inputs_measured != null && breakdownData.inputs_measured < breakdownData.inputs_total"
-                           class="text-xs text-muted-foreground -mt-1"
-                           x-text="'Overall score weighted from ' + breakdownData.inputs_measured + ' of ' + breakdownData.inputs_total + ' measured inputs (dash = input not measured)'"></p>
-
-                        {# Dimension bars #}
-                        <div class="space-y-2">
-                            <template x-for="dim in breakdownData.dimensions" :key="dim.name">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-medium text-muted-foreground w-28" x-text="dim.label"></span>
-                                    <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                        <div class="h-full rounded-full"
-                                             :class="dim.score === null ? 'bg-muted' : (dim.score >= 70 ? 'bg-success' : dim.score >= 40 ? 'bg-warning' : 'bg-destructive')"
-                                             :style="'width:' + (dim.score === null ? 0 : dim.score) + '%'"></div>
-                                    </div>
-                                    <span class="text-xs font-bold w-8 text-right"
-                                          :class="dim.score === null ? 'text-muted-foreground' : (dim.score >= 70 ? 'text-success-emphasis' : dim.score >= 40 ? 'text-warning-emphasis' : 'text-destructive')"
-                                          x-text="dim.score === null ? '—' : dim.score"></span>
-                                </div>
-                            </template>
-                        </div>
-
-                        {# Top factors per dimension #}
-                        <div class="space-y-3 pt-3 border-t border-border">
-                            <p class="text-xs font-semibold text-muted-foreground uppercase">Key Contributing Factors</p>
-                            <template x-for="dim in breakdownData.top_factors" :key="dim.dimension">
-                                <div>
-                                    <p class="text-xs font-medium text-foreground mb-1" x-text="dim.dimension"></p>
-                                    <template x-for="f in dim.factors" :key="f.name">
-                                        <div class="flex items-center gap-2 text-xs text-muted-foreground pl-2">
-                                            <span class="w-28 truncate" x-text="f.name"></span>
-                                            <span class="font-mono" x-text="f.raw_value != null ? f.raw_value : '—'"></span>
-                                            <span class="ml-auto" x-text="f.contribution == null ? '—' : '+' + f.contribution"></span>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-            </div>
+              </div>
+            </template>
+          </div>
         </div>
+      </template>
     </div>
-
+    {% call ui.sheet_footer() %}{{ ui.sheet_close(text='Close', variant='outline', attrs={'type': 'button', '@click': 'wb.breakdownOpen = false'}) }}{% endcall %}
+  {% endcall %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/applications/rationalization_workbench.js') }}"></script><!-- entity-picker-ok -->
-<script>
-function dispositionTaxonomyPanel() { return { open: false }; }
-</script>
 {% endblock %}

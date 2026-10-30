@@ -14957,7 +14957,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [
     "chart-radar-lines-only"
@@ -15011,7 +15011,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/rationalization-planning.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -15019,7 +15019,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -15158,7 +15158,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [
     "chart-radar-multiple"
@@ -15225,7 +15225,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/rationalization-workbench.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -15235,7 +15235,7 @@
     "export-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": true
   },

@@ -170,18 +170,13 @@ def rationalization_dashboard():
         # Pipeline counts for workflow stepper
         from sqlalchemy import func, or_
 
-        # The application count is the Overview's: not decommissioned, not a
-        # merged-away duplicate. One query, imported, so the two pages agree.
+        # The application count is the Overview's, read by one helper so the pages agree.
         from flask import g
-        from app.modules.dashboard.services.overview_figures import _active_applications
 
         org_id = getattr(g, "current_org_id", None)
-        active_q = _active_applications()
-        if org_id:
-            active_q = active_q.where(ApplicationComponent.organization_id == org_id)
-        total_apps = db.session.execute(
-            db.select(func.count()).select_from(active_q.with_only_columns(ApplicationComponent.id).subquery())
-        ).scalar_one()
+        total_apps = _portfolio_application_count()
+        if total_apps is None:
+            raise RuntimeError("The application count could not be read")
         decommissioned_q = ApplicationComponent.query.filter(
             func.lower(ApplicationComponent.lifecycle_status) == "5. decommissioned"
         )
@@ -310,6 +305,56 @@ def rationalization_dashboard():
                 ), 200
 
 
+def _portfolio_application_count():
+    """The applications the Applications list shows by default (the Overview's count).
+
+    One query, imported from the Overview, so the dashboard, workbench, planning and tracking
+    pages and the list all agree. None when it cannot be read."""
+    from flask import g
+    from sqlalchemy import func
+
+    from app.modules.dashboard.services.overview_figures import _active_applications
+
+    try:
+        org_id = getattr(g, "current_org_id", None)
+        active_q = _active_applications()
+        if org_id:
+            active_q = active_q.where(ApplicationComponent.organization_id == org_id)
+        return db.session.execute(
+            db.select(func.count()).select_from(active_q.with_only_columns(ApplicationComponent.id).subquery())
+        ).scalar_one()
+    except Exception as exc:
+        current_app.logger.error("Portfolio application count could not be read: %s", exc)
+        db.session.rollback()
+        return None
+
+
+def _workbench_summary():
+    """Scored applications by readiness, review state and disposition, for the workbench's figures."""
+    from sqlalchemy import func
+
+    from app.models.application_rationalization import ApplicationRationalizationScore as S
+
+    try:
+        scored = S.query.count()
+        ready = S.query.filter(S.is_decision_ready.is_(True)).count()
+        awaiting = S.query.filter(func.coalesce(S.review_status, "draft").in_(("draft", "reviewed"))).count()
+        rows = (
+            db.session.query(S.disposition_action, func.count(S.id))
+            .group_by(S.disposition_action)
+            .order_by(func.count(S.id).desc())
+            .all()
+        )
+        dispositions = [
+            {"disposition": str(name or "Not recorded").replace("_", " ").capitalize(), "applications": count} for name, count in rows
+        ]
+        return {"scored": scored, "ready": ready, "awaiting": awaiting, "dispositions": dispositions}
+    except Exception as exc:
+        current_app.logger.error("Workbench summary could not be read: %s", exc)
+        db.session.rollback()
+        return None
+
+
 @unified_applications_bp.route("/rationalization/workbench")
 @login_required
 def rationalization_workbench():
@@ -324,6 +369,8 @@ def rationalization_workbench():
         "applications/rationalization/workbench.html",
         currency_symbol=currency_symbol,
         active_tab="workbench",
+        portfolio_applications=_portfolio_application_count(),
+        summary=_workbench_summary(),
     )
 
 
@@ -351,6 +398,7 @@ def rationalization_planning(app_id):
         currency_symbol=currency_symbol,
         active_tab="planning",
         planning_app=app,
+        portfolio_applications=_portfolio_application_count(),
     )
 
 
@@ -391,6 +439,7 @@ def rationalization_tracking():
         currency_symbol=currency_symbol,
         active_tab="tracking",
         financial_summary=financial,
+        portfolio_applications=_portfolio_application_count(),
     )
 
 

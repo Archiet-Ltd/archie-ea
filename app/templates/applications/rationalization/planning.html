@@ -1,394 +1,228 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_rationalization_family_journey.py #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'applications/rationalization/_disposition_tooltip.html' import disposition_badge %}
 {% block title %}{{ app.name }} — Planning{% endblock %}
 
 {% block content %}
-<div x-data="planningApp()" x-init="loadTab('overview')">
+<div class="p-6 space-y-6" x-data="planningApp()" x-init="loadTab('overview')" data-testid="planning-dashboard">
+  {% macro _ps_actions() %}
+    {{ ui.button(variant='default', attrs={'type': 'button', '@click': 'scoreThisApp()', ':disabled': 'isScoringApp', 'x-text': "isScoringApp ? 'Scoring…' : 'Score this application'", 'data-testid': 'score-this-app'}) }}
+    {{ ui.button(text='Back to workbench', variant='outline', href=url_for('unified_applications.rationalization_workbench')) }}
+  {% endmacro %}
+  {{ page_shell(title=app.name, breadcrumb=[('Rationalization', url_for('unified_applications.rationalization_dashboard')), ('Workbench', url_for('unified_applications.rationalization_workbench')), (app.name|truncate(40), None)], actions_caller=_ps_actions) }}
 
-    {# ── Breadcrumbs + page header ────────────────────────────────── #}
-    {% macro _ps_actions() %}
-                <button type="button" @click="scoreThisApp()"
-                        :disabled="isScoringApp"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    <span x-show="isScoringApp" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-                    <span x-text="isScoringApp ? 'Scoring...' : 'Score This App'"></span>
-                </button>
-                <a href="{{ url_for('unified_applications.rationalization_workbench') }}"
-                   class="text-sm text-primary hover:underline flex items-center gap-1">
-                    <i data-lucide="arrow-left" class="h-3.5 w-3.5"></i> Back to Workbench
-                </a>
-    {% endmacro %}
-    {{ page_shell(
-        title=app.name,
-        breadcrumb=[
-            ('Rationalization', url_for('unified_applications.rationalization_dashboard')),
-            ('Workbench', url_for('unified_applications.rationalization_workbench')),
-            (app.name|truncate(40), None)
-        ],
-        actions_caller=_ps_actions
-    ) }}
+  {% include 'applications/rationalization/_sub_nav.html' %}
 
-    {% include 'applications/rationalization/_sub_nav.html' %}
-
-    {# ── App Header ───────────────────────────────────────────────── #}
-    <div class="rounded-lg border border-border bg-card p-5 mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <div class="flex flex-wrap items-center gap-2">
-                    {% if score %}
-                    {{ disposition_badge(score.disposition_action or 'unknown') }}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
-                                 {{ 'bg-success/10 text-success-emphasis border border-success/30' if score.overall_health_score and score.overall_health_score >= 70
-                                    else 'bg-warning/10 text-warning-emphasis border border-warning/30' if score.overall_health_score and score.overall_health_score >= 40
-                                    else 'bg-destructive/10 text-destructive-emphasis border border-destructive/30' }}">
-                        Health: {{ score.overall_health_score or '—' }}
-                    </span>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-                        {{ (score.review_status or 'draft')|capitalize }}
-                    </span>
-                    {% if score.is_decision_ready %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                        <i data-lucide="shield-check" class="h-3 w-3 mr-1"></i>Decision Ready
-                    </span>
-                    {% endif %}
-                    {% else %}
-                    <span class="text-sm text-muted-foreground">No rationalization score available</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        {# ── Review Workflow Strip ────────────────────────────────── #}
-        {% if score %}
-        <div class="mt-4 pt-4 border-t border-border flex flex-wrap items-center gap-3">
-            <span class="text-xs font-medium text-muted-foreground">Review:</span>
-            <span class="text-xs font-semibold text-foreground" x-text="reviewStatus || '{{ score.review_status or 'draft' }}'"></span>
-            <div class="flex gap-2 ml-auto">
-                <button type="button" @click="transitionReview('reviewed')" x-show="reviewStatus === 'draft' || (!reviewStatus && '{{ score.review_status or 'draft' }}' === 'draft')" x-cloak
-                        class="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-muted">
-                    Mark Reviewed
-                </button>
-                <button type="button" @click="transitionReview('approved')" x-show="reviewStatus === 'reviewed' || (!reviewStatus && '{{ score.review_status or 'draft' }}' === 'reviewed')" x-cloak
-                        class="px-3 py-1 text-xs font-medium rounded-md bg-success text-success-foreground hover:bg-success/90">
-                    Approve
-                </button>
-                <button type="button" @click="transitionReview('rejected')" x-show="reviewStatus === 'reviewed' || (!reviewStatus && '{{ score.review_status or 'draft' }}' === 'reviewed')" x-cloak
-                        class="px-3 py-1 text-xs font-medium rounded-md bg-destructive text-primary-foreground hover:bg-destructive/90">
-                    Reject
-                </button>
-            </div>
-        </div>
+  {# Stat card row: the portfolio count is the Applications list's; the rest read this application's score. #}
+  {% set review_word = ((score.review_status or 'draft') | capitalize) if score else none %}
+  {% set stat_items = [
+    ('portfolio-applications', 'Applications', portfolio_applications, 'In the portfolio, as the Applications list counts them'),
+    ('planning-health', 'Health score', (score.overall_health_score if score else none), 'This application\'s overall health, out of 100'),
+    ('planning-ready', 'Decision readiness', (('Ready' if score.is_decision_ready else 'Not ready') if score else none), 'Whether the evidence is enough to decide'),
+    ('planning-review', 'Review', review_word, 'Where the score is in the review workflow')] %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="planning-stats">
+    {% for testid, label, value, sentence in stat_items %}
+    {% call ui.card(attrs={'data-testid': testid}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_description(text=label) }}
+        {% if value is not none %}
+        {{ ui.card_title(text=value, class='text-2xl font-semibold tabular-nums', attrs={'data-testid': testid ~ '-value'}) }}
+        {% else %}
+        {{ ui.card_title(text='Not scored' if testid != 'portfolio-applications' else 'Not available', class='text-lg font-semibold', attrs={'data-testid': testid ~ '-value'}) }}
         {% endif %}
-    </div>
+      {% endcall %}
+      {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{% if value is none and testid == 'portfolio-applications' %}The figure could not be read. Reload the page to try again.{% elif value is none %}No rationalization score exists for this application yet. Choose Score this application.{% else %}{{ sentence }}{% endif %}</p>{% endcall %}
+    {% endcall %}
+    {% endfor %}
+  </div>
 
-    {# ── Tab Navigation ───────────────────────────────────────────── #}
-    <div class="border-b border-border mb-6">
-        <nav class="-mb-px flex space-x-1 overflow-x-auto" role="tablist">
-            {% set tabs = [('overview', 'Overview'), ('options', 'Options'), ('replacement', 'Replacement'), ('retirement', 'Retirement'), ('overrides', 'Overrides')] %}
-            {% for tab_id, tab_label in tabs %}
-            <button type="button" @click="switchTab('{{ tab_id }}')"
-                    :class="activeTab === '{{ tab_id }}' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
-                    class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors"
-                    role="tab" :aria-selected="activeTab === '{{ tab_id }}'">
-                {{ tab_label }}
-            </button>
-            {% endfor %}
-        </nav>
-    </div>
+  {% if score %}
+  {% call ui.card(attrs={'data-testid': 'review-workflow'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Review workflow') }}
+      {% call ui.card_description() %}Review status: <span class="font-medium text-foreground" x-text="reviewStatus || '{{ score.review_status or 'draft' }}'"></span>{% endcall %}
+      {% call ui.card_action(class='flex flex-wrap items-center gap-2') %}
+        {{ ui.button(text='Mark reviewed', variant='outline', size='sm', attrs={'type': 'button', '@click': "transitionReview('reviewed')", 'x-show': "reviewStatus === 'draft' || (!reviewStatus && '" ~ (score.review_status or 'draft') ~ "' === 'draft')", 'x-cloak': ''}) }}
+        {{ ui.button(text='Approve', size='sm', attrs={'type': 'button', '@click': "transitionReview('approved')", 'x-show': "reviewStatus === 'reviewed' || (!reviewStatus && '" ~ (score.review_status or 'draft') ~ "' === 'reviewed')", 'x-cloak': ''}) }}
+        {{ ui.button(text='Reject', variant='destructive', size='sm', attrs={'type': 'button', '@click': "transitionReview('rejected')", 'x-show': "reviewStatus === 'reviewed' || (!reviewStatus && '" ~ (score.review_status or 'draft') ~ "' === 'reviewed')", 'x-cloak': ''}) }}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
 
-    {# ── Tab Panels ───────────────────────────────────────────────── #}
+  {# Tabs: one panel at a time, loaded when first opened. #}
+  <div class="flex flex-wrap gap-2" role="group" aria-label="Planning sections" data-testid="planning-tabs">
+    {% for tab_id, tab_label in [('overview', 'Overview'), ('options', 'Options'), ('replacement', 'Replacement'), ('retirement', 'Retirement'), ('overrides', 'Overrides')] %}
+    {{ ui.button(text=tab_label, variant='outline', size='sm', attrs={'type': 'button', '@click': "switchTab('" ~ tab_id ~ "')", ':aria-pressed': "activeTab === '" ~ tab_id ~ "'", ':class': "activeTab === '" ~ tab_id ~ "' ? 'bg-accent' : ''", 'data-testid': 'tab-' ~ tab_id}) }}
+    {% endfor %}
+  </div>
 
-    {# Overview Tab #}
-    <div x-show="activeTab === 'overview'" x-cloak role="tabpanel">
-        <template x-if="tabLoading.overview">
-            <div class="space-y-4 animate-pulse">
-                <div class="h-6 bg-muted rounded w-1/3"></div>
-                <div class="h-4 bg-muted rounded w-full"></div>
-                <div class="h-4 bg-muted rounded w-4/5"></div>
-                <div class="h-4 bg-muted rounded w-2/3"></div>
-            </div>
-        </template>
-        <template x-if="!tabLoading.overview && tabData.overview">
-            <div class="space-y-6">
-
-                {# RATA-007: Score Breakdown Panel — radar chart + dimensions #}
-                <div class="rounded-lg border border-border bg-card p-5" x-show="evidenceData" x-cloak>
-                    <h3 class="text-sm font-semibold text-foreground mb-4">Score Breakdown</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {# Radar Chart #}
-                        <div class="relative max-h-[280px]">
-                            <canvas id="scoreRadarChart"></canvas>
-                        </div>
-                        {# Dimension Summary + TIME Badge #}
-                        <div class="space-y-3">
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="inline-flex items-center px-3 py-1 rounded-md text-sm font-bold"
-                                      :class="{'bg-primary/10 text-primary border border-primary/30': evidenceData.time_action === 'TOLERATE',
-                                               'bg-success/10 text-success-emphasis border border-success/30': evidenceData.time_action === 'INVEST',
-                                               'bg-warning/10 text-warning-emphasis border border-warning/30': evidenceData.time_action === 'MIGRATE',
-                                               'bg-destructive/10 text-destructive-emphasis border border-destructive/30': evidenceData.time_action === 'ELIMINATE'}"
-                                      x-text="evidenceData.time_action || '—'"></span>
-                                <span class="text-xs text-muted-foreground"
-                                      :title="(evidenceData.confidence_reasons || []).join('; ')"
-                                      x-text="'Confidence: ' + (evidenceData.disposition_confidence || '—')"></span>
-                            </div>
-                            <template x-for="dim in evidenceData.dimension_summary" :key="dim.name">
-                                <div class="flex items-center gap-3">
-                                    <span class="text-xs font-medium text-muted-foreground w-28" x-text="dim.label"></span>
-                                    {# A null score means the server did not report this dimension.
-                                       It must not draw an empty red bar, which reads as a measured 0. #}
-                                    <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                        <div class="h-full rounded-full transition-all"
-                                             :class="dim.score === null ? 'bg-muted' : (dim.score >= 70 ? 'bg-success' : dim.score >= 40 ? 'bg-warning' : 'bg-destructive')"
-                                             :style="'width:' + (dim.score === null ? 0 : dim.score) + '%'"></div>
-                                    </div>
-                                    <span class="text-xs font-bold w-8 text-right"
-                                          :class="dim.score === null ? 'text-muted-foreground' : (dim.score >= 70 ? 'text-success' : dim.score >= 40 ? 'text-warning' : 'text-destructive')"
-                                          x-text="dim.score === null ? '—' : dim.score"></span>
-                                </div>
-                            </template>
-                            {# Readiness Indicators #}
-                            <div class="pt-3 border-t border-border">
-                                <p class="text-xs font-medium text-muted-foreground mb-2">Data Readiness</p>
-                                <div class="flex flex-wrap gap-2">
-                                    <template x-for="(satisfied, dimName) in (evidenceData.readiness_dimensions || {})" :key="dimName">
-                                        <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md"
-                                              :class="satisfied ? 'bg-success/10 text-success-emphasis' : 'bg-destructive/10 text-destructive-emphasis'">
-                                            <i :data-lucide="satisfied ? 'check' : 'x'" class="h-3 w-3"></i>
-                                            <span x-text="dimName"></span>
-                                        </span>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {# Expandable Evidence Trail per dimension #}
-                    <div class="mt-6 space-y-2">
-                        <template x-for="dim in evidenceData.evidence_trail" :key="dim.dimension">
-                            <details class="group border rounded-lg">
-                                <summary class="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/30">
-                                    <span class="text-xs font-semibold text-foreground" x-text="dim.dimension"></span>
-                                    <span class="text-xs font-bold"
-                                          :class="dim.score === null ? 'text-muted-foreground' : (dim.score >= 70 ? 'text-success' : dim.score >= 40 ? 'text-warning' : 'text-destructive')"
-                                          x-text="dim.score === null ? '—' : dim.score + '/100'"></span>
-                                </summary>
-                                <div class="px-4 pb-3 space-y-1.5">
-                                    <template x-for="factor in dim.sub_factors" :key="factor.name">
-                                        <div class="flex items-center gap-2 text-xs">
-                                            <span class="text-muted-foreground w-32 truncate" x-text="factor.name"></span>
-                                            <span class="font-mono text-foreground w-16 text-right" x-text="factor.raw_value || '—'"></span>
-                                            <span class="text-muted-foreground w-12 text-right" x-text="factor.contribution === null ? '—' : '+' + factor.contribution"></span>
-                                            <span class="text-muted-foreground/60 text-xs truncate flex-1" x-text="factor.source || ''"></span>
-                                        </div>
-                                    </template>
-                                </div>
-                            </details>
-                        </template>
-                    </div>
+  {# Overview #}
+  <div x-show="activeTab === 'overview'" x-cloak class="space-y-4">
+    <p class="text-sm text-muted-foreground" x-show="tabLoading.overview" x-cloak>Loading the score and dossier…</p>
+    <template x-if="!tabLoading.overview && tabData.overview">
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3" x-show="evidenceData" x-cloak>
+          {% call ui.card(class='xl:col-span-2') %}
+            {% call ui.card_header() %}{{ ui.card_title(text='Score breakdown') }}{{ ui.card_description(text='The four dimensions behind the overall score') }}{% endcall %}
+            {% call ui.card_content(class='flex flex-col gap-4') %}
+              <div class="relative max-h-[280px]"><canvas id="scoreRadarChart" role="img" aria-label="Radar chart of the four score dimensions"></canvas></div>
+              {% call ui.table_container() %}{% call ui.table() %}
+                {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Dimension') }}{{ ui.table_head(text='Score', class='text-right') }}{% endcall %}{% endcall %}
+                {% call ui.table_body() %}
+                  <template x-for="dim in evidenceData.dimension_summary" :key="dim.name">
+                    {% call ui.table_row(attrs={'data-testid': 'planning-dimension'}) %}{{ ui.table_cell(attrs={'x-text': 'dim.label'}) }}{{ ui.table_cell(class='text-right tabular-nums', attrs={'x-text': "dim.score === null ? 'Not measured' : dim.score"}) }}{% endcall %}
+                  </template>
+                {% endcall %}
+              {% endcall %}{% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% call ui.card(class='') %}
+            {% call ui.card_header() %}{{ ui.card_title(text='Recommendation') }}{{ ui.card_description(text='What the score recommends and how sure it is') }}{% endcall %}
+            {% call ui.card_content(class='flex flex-col gap-4') %}
+              <div class="flex flex-wrap items-center gap-2">
+                {% call ui.badge(variant='outline') %}<span x-text="evidenceData.time_action || 'No recommendation'"></span>{% endcall %}
+                <span class="text-sm text-muted-foreground" :title="(evidenceData.confidence_reasons || []).join('; ')" x-text="'Confidence: ' + (evidenceData.disposition_confidence || 'Not set')"></span>
+              </div>
+              <div class="flex flex-col gap-2">
+                <p class="text-sm font-medium">Data readiness</p>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="(satisfied, dimName) in (evidenceData.readiness_dimensions || {})" :key="dimName">
+                    {% call ui.badge(variant='outline') %}<span x-text="dimName + (satisfied ? ': ready' : ': missing')"></span>{% endcall %}
+                  </template>
                 </div>
-
-                <div class="rounded-lg border border-border bg-card p-5">
-                    <h3 class="text-sm font-semibold text-foreground mb-3">Decision Dossier</h3>
-                    <div class="prose prose-sm max-w-none text-muted-foreground" x-html="tabData.overview.dossier_html || '<p>No dossier data available.</p>'"></div>
+              </div>
+            {% endcall %}
+          {% endcall %}
+        </div>
+        {% call ui.card(class='') %}
+          {% call ui.card_header() %}{{ ui.card_title(text='Evidence trail') }}{{ ui.card_description(text='Every factor behind each dimension, with where it came from') }}{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-2') %}
+            <template x-for="dim in (evidenceData ? evidenceData.evidence_trail : [])" :key="dim.dimension">
+              <details class="group rounded-lg border">
+                <summary class="flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm"><span class="font-medium" x-text="dim.dimension"></span><span class="tabular-nums" x-text="dim.score === null ? 'Not measured' : dim.score + '/100'"></span></summary>
+                <div class="flex flex-col gap-1 px-4 pb-3">
+                  <template x-for="factor in dim.sub_factors" :key="factor.name">
+                    <p class="flex items-center gap-2 text-sm text-muted-foreground"><span class="w-32 truncate" x-text="factor.name"></span><span class="w-16 text-right tabular-nums" x-text="factor.raw_value || 'Not recorded'"></span><span class="w-12 text-right tabular-nums" x-text="factor.contribution === null ? 'Not set' : '+' + factor.contribution"></span><span class="flex-1 truncate" x-text="factor.source || ''"></span></p>
+                  </template>
                 </div>
-            </div>
-        </template>
-    </div>
+              </details>
+            </template>
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+          {% call ui.card_header() %}{{ ui.card_title(text='Decision dossier') }}{% endcall %}
+          {% call ui.card_content() %}<div class="prose prose-sm max-w-none text-muted-foreground" x-html="tabData.overview.dossier_html || '<p>No dossier data is available for this application yet.</p>'"></div>{% endcall %}
+        {% endcall %}
+      </div>
+    </template>
+  </div>
 
-    {# Options Tab #}
-    <div x-show="activeTab === 'options'" x-cloak role="tabpanel">
-        <template x-if="tabLoading.options">
-            <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-32 bg-muted rounded"></div></div>
-        </template>
-        <template x-if="!tabLoading.options && tabData.options">
-            <div class="space-y-6">
-                <div class="rounded-lg border border-border bg-card p-5">
-                    <h3 class="text-sm font-semibold text-foreground mb-3">ARB Governance</h3>
-                    <div class="text-sm text-muted-foreground">
-                        <p>ARB Status: <span class="font-medium text-foreground" x-text="tabData.options.arb_status || 'Not submitted'"></span></p>
-                        <template x-if="tabData.options.arb_decision">
-                            <p class="mt-1">Decision: <span class="font-medium text-foreground" x-text="tabData.options.arb_decision"></span></p>
-                        </template>
-                        <template x-if="!tabData.options.arb_submitted">
-                            <button type="button" @click="submitToARB()"
-                                    class="mt-3 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
-                                Submit to ARB
-                            </button>
-                        </template>
-                    </div>
-                </div>
-            </div>
-        </template>
-    </div>
+  {# Options #}
+  <div x-show="activeTab === 'options'" x-cloak>
+    <p class="text-sm text-muted-foreground" x-show="tabLoading.options" x-cloak>Loading the options…</p>
+    <template x-if="!tabLoading.options && tabData.options">
+      {% call ui.card() %}
+        {% call ui.card_header() %}{{ ui.card_title(text='ARB governance') }}{{ ui.card_description(text='Whether the architecture review board has seen this decision') }}{% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-2 text-sm text-muted-foreground') %}
+          <p>ARB status: <span class="font-medium text-foreground" x-text="tabData.options.arb_status || 'Not submitted'"></span></p>
+          <p x-show="tabData.options.arb_decision">Decision: <span class="font-medium text-foreground" x-text="tabData.options.arb_decision"></span></p>
+          <div x-show="!tabData.options.arb_submitted">{{ ui.button(text='Submit to ARB', attrs={'type': 'button', '@click': 'submitToARB()'}) }}</div>
+        {% endcall %}
+      {% endcall %}
+    </template>
+  </div>
 
-    {# Replacement Tab #}
-    <div x-show="activeTab === 'replacement'" x-cloak role="tabpanel">
-        <template x-if="tabLoading.replacement">
-            <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-48 bg-muted rounded"></div></div>
-        </template>
-        <template x-if="!tabLoading.replacement">
-            <div class="rounded-lg border border-border bg-card p-5">
-                <h3 class="text-sm font-semibold text-foreground mb-4">Replacement Plan</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1">Migration Strategy</label>
-                        <select x-model="replacementForm.replacement_type"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Migration Strategy">
-                            <option value="">Select strategy</option>
-                            <option value="direct_replacement">Direct Replacement</option>
-                            <option value="phased_migration">Phased Migration</option>
-                            <option value="multi_app_consolidation">Multi-App Consolidation</option>
-                            <option value="cloud_migration">Cloud Migration</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1">Estimated Cost</label>
-                        <input type="number" x-model="replacementForm.estimated_cost" placeholder="0"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Estimated Cost">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1">Planned Start</label>
-                        <input type="date" x-model="replacementForm.planned_start_date"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Planned Start">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1">Planned Cutover</label>
-                        <input type="date" x-model="replacementForm.planned_cutover_date"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Planned Cutover">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1">Business Risk</label>
-                        <select x-model="replacementForm.business_risk_level"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Business Risk">
-                            <option value="">Select level</option>
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1">Est. Annual Savings</label>
-                        <input type="number" x-model="replacementForm.estimated_savings_annual" placeholder="0"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Est. Annual Savings">
-                    </div>
-                </div>
-                <div class="mt-4 flex justify-end">
-                    <button type="button" @click="saveReplacementPlan()"
-                            :disabled="savingReplacement"
-                            class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                        <span x-show="!savingReplacement" x-cloak>Save Plan</span>
-                        <span x-show="savingReplacement" x-cloak>Saving...</span>
-                    </button>
-                </div>
-            </div>
-        </template>
-    </div>
+  {# Replacement #}
+  <div x-show="activeTab === 'replacement'" x-cloak>
+    <p class="text-sm text-muted-foreground" x-show="tabLoading.replacement" x-cloak>Loading the replacement plan…</p>
+    <template x-if="!tabLoading.replacement">
+      {% call ui.card(class='max-w-2xl') %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Replacement plan') }}{{ ui.card_description(text='How and when this application is replaced') }}{% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-4') %}
+          {% call ui.field() %}{{ ui.field_label(text='Migration strategy', attrs={'for': 'replacement-type'}) }}
+            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='replacement-type', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'replacementForm.replacement_type'}) %}
+              {{ ui.native_select_option(text='Select a strategy', value='') }}
+              {% for value, text in [('direct_replacement', 'Direct replacement'), ('phased_migration', 'Phased migration'), ('multi_app_consolidation', 'Multi-app consolidation'), ('cloud_migration', 'Cloud migration')] %}{{ ui.native_select_option(text=text, value=value) }}{% endfor %}
+            {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+          {% endcall %}
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {% call ui.field() %}{{ ui.field_label(text='Estimated cost', attrs={'for': 'replacement-cost'}) }}{{ ui.input(id='replacement-cost', attrs={'type': 'number', 'x-model': 'replacementForm.estimated_cost'}) }}{% endcall %}
+            {% call ui.field() %}{{ ui.field_label(text='Estimated annual savings', attrs={'for': 'replacement-savings'}) }}{{ ui.input(id='replacement-savings', attrs={'type': 'number', 'x-model': 'replacementForm.estimated_savings_annual'}) }}{% endcall %}
+            {% call ui.field() %}{{ ui.field_label(text='Planned start', attrs={'for': 'replacement-start'}) }}{{ ui.input(id='replacement-start', attrs={'type': 'date', 'x-model': 'replacementForm.planned_start_date'}) }}{% endcall %}
+            {% call ui.field() %}{{ ui.field_label(text='Planned cutover', attrs={'for': 'replacement-cutover'}) }}{{ ui.input(id='replacement-cutover', attrs={'type': 'date', 'x-model': 'replacementForm.planned_cutover_date'}) }}{% endcall %}
+          </div>
+          {% call ui.field() %}{{ ui.field_label(text='Business risk', attrs={'for': 'replacement-risk'}) }}
+            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='replacement-risk', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'replacementForm.business_risk_level'}) %}
+              {{ ui.native_select_option(text='Select a level', value='') }}
+              {% for value, text in [('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')] %}{{ ui.native_select_option(text=text, value=value) }}{% endfor %}
+            {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card_footer(class='justify-end') %}
+          {{ ui.button(attrs={'type': 'button', '@click': 'saveReplacementPlan()', ':disabled': 'savingReplacement', 'x-text': "savingReplacement ? 'Saving…' : 'Save plan'"}) }}
+        {% endcall %}
+      {% endcall %}
+    </template>
+  </div>
 
-    {# Retirement Tab #}
-    <div x-show="activeTab === 'retirement'" x-cloak role="tabpanel">
-        <template x-if="tabLoading.retirement">
-            <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-32 bg-muted rounded"></div></div>
-        </template>
-        <template x-if="!tabLoading.retirement && tabData.retirement">
-            <div class="space-y-6">
-                <div class="rounded-lg border border-border bg-card p-5">
-                    <h3 class="text-sm font-semibold text-foreground mb-3">Retirement Blockers</h3>
-                    <template x-if="tabData.retirement.blockers && tabData.retirement.blockers.length > 0">
-                        <div class="space-y-2">
-                            <template x-for="(b, idx) in tabData.retirement.blockers" :key="idx">
-                                <div class="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                                    <i data-lucide="alert-triangle" class="h-4 w-4 text-warning shrink-0"></i>
-                                    <span class="text-sm text-foreground" x-text="b.description || b.reason || b"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                    <template x-if="!tabData.retirement.blockers || tabData.retirement.blockers.length === 0">
-                        <p class="text-sm text-success-emphasis flex items-center gap-2">
-                            <i data-lucide="check-circle-2" class="h-4 w-4"></i> No retirement blockers found.
-                        </p>
-                    </template>
-                </div>
-                <div class="rounded-lg border border-border bg-card p-5">
-                    <h3 class="text-sm font-semibold text-foreground mb-3">Dependency Impact</h3>
-                    <template x-if="tabData.retirement.impact">
-                        <div class="text-sm text-muted-foreground space-y-1">
-                            <p>Downstream apps affected: <span class="font-medium text-foreground" x-text="tabData.retirement.impact.downstream_count || 0"></span></p>
-                            <p>Critical dependencies: <span class="font-medium text-foreground" x-text="tabData.retirement.impact.critical_count || 0"></span></p>
-                        </div>
-                    </template>
-                    <template x-if="!tabData.retirement.impact">
-                        <p class="text-sm text-muted-foreground">No impact data available.</p>
-                    </template>
-                </div>
-            </div>
-        </template>
-    </div>
+  {# Retirement #}
+  <div x-show="activeTab === 'retirement'" x-cloak>
+    <p class="text-sm text-muted-foreground" x-show="tabLoading.retirement" x-cloak>Loading the retirement view…</p>
+    <template x-if="!tabLoading.retirement && tabData.retirement">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {% call ui.card() %}
+          {% call ui.card_header() %}{{ ui.card_title(text='Retirement blockers') }}{{ ui.card_description(text='What stops this application retiring today') }}{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-2') %}
+            <template x-for="(b, idx) in (tabData.retirement.blockers || [])" :key="idx"><p class="rounded-lg bg-muted/50 p-2 text-sm" x-text="b.description || b.reason || b"></p></template>
+            <p class="text-sm text-muted-foreground" x-show="!tabData.retirement.blockers || tabData.retirement.blockers.length === 0">No retirement blockers found.</p>
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+          {% call ui.card_header() %}{{ ui.card_title(text='Dependency impact') }}{{ ui.card_description(text='Applications that depend on this one') }}{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-1 text-sm text-muted-foreground') %}
+            <template x-if="tabData.retirement.impact">
+              <div class="flex flex-col gap-1">
+                <p>Downstream applications affected: <span class="font-medium tabular-nums text-foreground" x-text="tabData.retirement.impact.downstream_count == null ? 'Not set' : tabData.retirement.impact.downstream_count"></span></p>
+                <p>Critical dependencies: <span class="font-medium tabular-nums text-foreground" x-text="tabData.retirement.impact.critical_count == null ? 'Not set' : tabData.retirement.impact.critical_count"></span></p>
+              </div>
+            </template>
+            <p x-show="!tabData.retirement.impact">No dependency impact is recorded. Import dependencies on the Tracking page to see it.</p>
+          {% endcall %}
+        {% endcall %}
+      </div>
+    </template>
+  </div>
 
-    {# Overrides Tab #}
-    <div x-show="activeTab === 'overrides'" x-cloak role="tabpanel">
-        <template x-if="tabLoading.overrides">
-            <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-32 bg-muted rounded"></div></div>
-        </template>
-        <template x-if="!tabLoading.overrides">
-            <div class="rounded-lg border border-border bg-card p-5">
-                <h3 class="text-sm font-semibold text-foreground mb-4">Disposition Override</h3>
-                <template x-if="tabData.overrides && tabData.overrides.override_active">
-                    <div class="space-y-3">
-                        <div class="px-3 py-2 rounded-md bg-warning/10 border border-warning/40">
-                            <p class="text-sm font-medium text-warning-emphasis">Active override: <span x-text="tabData.overrides.override_disposition"></span></p>
-                            <p class="text-xs text-warning-emphasis mt-1" x-text="'Rationale: ' + (tabData.overrides.override_rationale || '—')"></p>
-                            <p class="text-xs text-warning-emphasis" x-text="'Expires: ' + (tabData.overrides.override_expiry || 'No expiry')"></p>
-                        </div>
-                        <button type="button" @click="removeOverride()"
-                                class="px-3 py-1.5 text-xs font-medium rounded-md border border-destructive text-destructive-emphasis hover:bg-destructive/10">
-                            Remove Override
-                        </button>
-                    </div>
-                </template>
-                <template x-if="!tabData.overrides || !tabData.overrides.override_active">
-                    <div class="space-y-4">
-                        <p class="text-sm text-muted-foreground">No active override. Create one to manually set the disposition.</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Override Disposition</label>
-                                <select x-model="overrideForm.disposition"
-                                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Override Disposition">
-                                    <option value="">Select disposition</option>
-                                    <option value="retain">Retain</option>
-                                    <option value="rehost">Rehost</option>
-                                    <option value="replatform">Replatform</option>
-                                    <option value="refactor">Refactor</option>
-                                    <option value="replace">Replace</option>
-                                    <option value="consolidate">Consolidate</option>
-                                    <option value="retire">Retire</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Expiry Date</label>
-                                <input type="date" x-model="overrideForm.expiry"
-                                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Expiry Date">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Rationale</label>
-                            <textarea x-model="overrideForm.rationale" rows="3" placeholder="Explain why this override is needed..."
-                                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Rationale"></textarea>
-                        </div>
-                        <button type="button" @click="saveOverride()"
-                                :disabled="!overrideForm.disposition || !overrideForm.rationale"
-                                class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                            Create Override
-                        </button>
-                    </div>
-                </template>
-            </div>
-        </template>
-    </div>
-
+  {# Overrides #}
+  <div x-show="activeTab === 'overrides'" x-cloak>
+    <p class="text-sm text-muted-foreground" x-show="tabLoading.overrides" x-cloak>Loading the override…</p>
+    <template x-if="!tabLoading.overrides">
+      {% call ui.card(class='max-w-2xl') %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Disposition override') }}{{ ui.card_description(text='Set the disposition by hand, with the reason') }}{% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-4') %}
+          <div x-show="tabData.overrides && tabData.overrides.override_active" x-cloak class="flex flex-col gap-2">
+            {% call ui.alert() %}{% call ui.alert_title() %}Active override: <span x-text="tabData.overrides.override_disposition"></span>{% endcall %}{% call ui.alert_description() %}<span x-text="'Rationale: ' + (tabData.overrides.override_rationale || 'Not set')"></span>. <span x-text="'Expires: ' + (tabData.overrides.override_expiry || 'No expiry')"></span>{% endcall %}{% endcall %}
+            <div>{{ ui.button(text='Remove override', variant='outline', size='sm', attrs={'type': 'button', '@click': 'removeOverride()'}) }}</div>
+          </div>
+          <div x-show="!tabData.overrides || !tabData.overrides.override_active" x-cloak class="flex flex-col gap-4">
+            <p class="text-sm text-muted-foreground">No override is active. Create one to set the disposition by hand.</p>
+            {% call ui.field() %}{{ ui.field_label(text='Override disposition', attrs={'for': 'override-disposition'}) }}
+              {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='override-disposition', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'overrideForm.disposition'}) %}
+                {{ ui.native_select_option(text='Select a disposition', value='') }}
+                {% for value, text in [('retain', 'Retain'), ('rehost', 'Rehost'), ('replatform', 'Replatform'), ('refactor', 'Refactor'), ('replace', 'Replace'), ('consolidate', 'Consolidate'), ('retire', 'Retire')] %}{{ ui.native_select_option(text=text, value=value) }}{% endfor %}
+              {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+            {% endcall %}
+            {% call ui.field() %}{{ ui.field_label(text='Expiry date', attrs={'for': 'override-expiry'}) }}{{ ui.input(id='override-expiry', attrs={'type': 'date', 'x-model': 'overrideForm.expiry'}) }}{% endcall %}
+            {% call ui.field() %}{{ ui.field_label(text='Rationale', attrs={'for': 'override-rationale'}) }}{{ ui.textarea(id='override-rationale', attrs={'rows': '3', 'placeholder': 'Explain why this override is needed', 'x-model': 'overrideForm.rationale'}) }}{% endcall %}
+            <div>{{ ui.button(text='Create override', attrs={'type': 'button', '@click': 'saveOverride()', ':disabled': '!overrideForm.disposition || !overrideForm.rationale'}) }}</div>
+          </div>
+        {% endcall %}
+      {% endcall %}
+    </template>
+  </div>
 </div>
 {% endblock %}
 
