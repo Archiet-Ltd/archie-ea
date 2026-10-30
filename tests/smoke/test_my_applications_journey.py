@@ -64,7 +64,12 @@ def test_application_manager_numbers_agree(page, live_server, seeded):
     _login(page, live_server, seeded["emails"]["application_manager"])
 
     dashboard = _visit(page, live_server, "/my-applications/")
-    total, healthy, at_risk, critical, not_assessed = _tiles(dashboard, "Total Apps")
+    # The dashboard's figures are stat cards (total, healthy, at risk, critical) and the health chart's table
+    # (not assessed); the text run "Total Apps n Healthy n ..." no longer exists, so each figure is read by its
+    # test id. The assertions below are unchanged.
+    figure = lambda testid: int(page.get_by_test_id(testid).inner_text().strip())
+    total, healthy, at_risk, critical = (figure("my-apps-%s-value" % key) for key in ("total", "healthy", "at-risk", "critical"))
+    not_assessed = figure("my-apps-health-count-not-assessed")
     assert total >= 1
     assert healthy + at_risk + critical + not_assessed == total
     assert page.locator("a[href*='/my-applications/app/']").count() == total

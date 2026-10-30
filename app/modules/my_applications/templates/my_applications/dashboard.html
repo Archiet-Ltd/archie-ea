@@ -1,9 +1,21 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_my_applications_dashboard_journey.py #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% import 'dashboards/_overview_parts.html' as d %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}My Applications{% endblock %}
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-chart.js') }}" defer></script>
+{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto">
+<div class="p-6 space-y-6 mx-auto" data-testid="my-apps-dashboard">
     <nav class="flex items-center gap-1 mb-4 border-b border-border" aria-label="My Applications">
         <a href="{{ url_for('my_applications.dashboard') }}" {% if request.endpoint == 'my_applications.dashboard' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.dashboard' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Dashboard</a>
         <a href="{{ url_for('my_applications.app_list') }}" {% if request.endpoint == 'my_applications.app_list' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.app_list' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Applications</a>
@@ -11,170 +23,96 @@
         <a href="{{ url_for('my_applications.roadmap_impact') }}" {% if request.endpoint == 'my_applications.roadmap_impact' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.roadmap_impact' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Roadmap</a>
     </nav>
     {% macro _ps_actions() %}
-<a href="{{ url_for('my_applications.app_list') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="list" class="w-4 h-4"></i>
-            View All
-        </a>
+        {{ ui.button(text='My portfolio', href=url_for('my_applications.app_list')) }}
+        {{ ui.button(text='All applications', href=url_for('unified_applications.application_list'), variant='outline') }}
     {% endmacro %}
     {{ page_shell(title='My Applications Dashboard', breadcrumb=[('Home', '/'), ('My Applications Dashboard', none)], subtitle='Overview of applications you own and manage', actions_caller=_ps_actions) }}
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
-        <div class="bg-card border border-border rounded-lg p-4">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="package" class="w-5 h-5 text-primary"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Total Apps</div>
-            </div>
-            <div class="text-3xl font-bold">{{ ownership_summary.total }}</div>
-        </div>
-        <div class="bg-card border border-success/50 rounded-lg p-4">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="check-circle" class="w-5 h-5 text-success"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Healthy</div>
-            </div>
-            <div class="text-3xl font-bold text-success">{{ health_summary.healthy }}</div>
-        </div>
-        <div class="bg-card border border-warning/50 rounded-lg p-4">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">At Risk</div>
-            </div>
-            <div class="text-3xl font-bold text-warning">{{ health_summary.at_risk }}</div>
-        </div>
-        <div class="bg-card border border-destructive/50 rounded-lg p-4">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="alert-circle" class="w-5 h-5 text-destructive-emphasis"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Critical</div>
-            </div>
-            <div class="text-3xl font-bold text-destructive-emphasis">{{ health_summary.critical }}</div>
-        </div>
-        {# Applications with no health status recorded. Without this tile
-           Healthy + At Risk + Critical would fall short of Total Apps with nothing to say why. #}
-        <div class="col-span-2 md:col-span-1 bg-card border border-border rounded-lg p-4">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                    <i data-lucide="help-circle" class="w-5 h-5 text-muted-foreground"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Not assessed</div>
-            </div>
-            <div class="text-3xl font-bold">{{ health_summary.unknown }}</div>
-            {% if health_summary.unknown > 0 %}
-            <a href="{{ url_for('my_applications.health_overview') }}#not-assessed"
-               class="mt-2 inline-block py-1 text-sm text-primary hover:underline">Record a health status</a>
-            {% endif %}
-        </div>
+    {# Stat card row: every figure is the service's own count of the applications this person owns. #}
+    {% set stat_items = [
+        ('my-apps-total', 'Applications', ownership_summary.total, 'Applications you own, as your list counts them'),
+        ('my-apps-healthy', 'Healthy', health_summary.healthy, 'Owned applications with a healthy status recorded'),
+        ('my-apps-at-risk', 'At risk', health_summary.at_risk, 'Owned applications recorded as at risk'),
+        ('my-apps-critical', 'Critical', health_summary.critical, 'Owned applications recorded as critical')] %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="my-apps-stats">
+        {% for testid, label, value, sentence in stat_items %}
+        {% call ui.card(attrs={'data-testid': testid}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text=label) }}
+                {{ ui.card_title(text=value, class='text-2xl font-semibold tabular-nums', attrs={'data-testid': testid ~ '-value'}) }}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{{ sentence }}</p>{% endcall %}
+        {% endcall %}
+        {% endfor %}
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- My Applications -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold">My Applications</h2>
-                <a href="{{ url_for('my_applications.app_list') }}" class="text-sm text-primary hover:underline">View all</a>
-            </div>
+    {# Chart grid: health of the owned applications as the primary chart, the roadmap beside it. #}
+    {% set chart_colour = 'hsl(var(--chart-1))' %}
+    {% set health_rows = [
+        {'status': 'Healthy', 'applications': health_summary.healthy},
+        {'status': 'At risk', 'applications': health_summary.at_risk},
+        {'status': 'Critical', 'applications': health_summary.critical},
+        {'status': 'Not assessed', 'applications': health_summary.unknown}] %}
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        {% call ui.card(class='xl:col-span-2', attrs={'data-testid': 'my-apps-health'}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='Applications by health') }}
+                {{ ui.card_description(text='The status recorded on each application you own') }}
+                {% call ui.card_action() %}{{ ui.button(text='Health overview', href=url_for('my_applications.health_overview'), variant='outline', size='sm') }}{% endcall %}
+            {% endcall %}
+            {% call ui.card_content(class='flex flex-col gap-4') %}
+                {% if ownership_summary.total > 0 %}
+                {{ d.bar_rows(health_rows, 'status', 'applications', 'Applications', chart_colour, label='Owned applications by recorded health', testid='my-apps-health-chart') }}
+                {% call ui.table_container() %}{% call ui.table() %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Health') }}{{ ui.table_head(text='Applications', class='text-right') }}{% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
+                    {% for row in health_rows %}
+                        {% call ui.table_row(attrs={'data-testid': 'my-apps-health-row'}) %}
+                            {{ ui.table_cell(text=row.status) }}
+                            {{ ui.table_cell(text=row.applications, class='text-right tabular-nums', attrs={'data-testid': 'my-apps-health-count-' ~ (row.status|lower|replace(' ', '-'))}) }}
+                        {% endcall %}
+                    {% endfor %}
+                    {% endcall %}
+                {% endcall %}{% endcall %}
+                {% if health_summary.unknown > 0 %}
+                <p class="text-sm text-muted-foreground">{{ health_summary.unknown }} of your applications have no health status recorded yet. <a href="{{ url_for('my_applications.health_overview') }}#not-assessed" class="text-primary underline underline-offset-2">Record a health status</a></p>
+                {% endif %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="my-apps-health-empty">Health appears here once you own applications.</p>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='Roadmap impact') }}
+                {{ ui.card_description(text='Sunsets and lifecycle changes that touch your applications') }}
+            {% endcall %}
+            {% call ui.card_content(class='flex flex-col gap-4') %}
+                <p class="text-sm text-muted-foreground">See which of your applications are leaving service, and when, on the roadmap page.</p>
+                {{ ui.button(text='Roadmap impact', href=url_for('my_applications.roadmap_impact'), variant='outline', class='w-fit') }}
+            {% endcall %}
+        {% endcall %}
+    </div>
+
+    {# The applications this person owns, on the list table (the first ten; the full list is one click away). #}
+    {% call ui.card(attrs={'data-testid': 'my-apps-list'}) %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='My applications') }}
+            {% if recent_apps %}{{ ui.card_description(text=('Showing ' ~ recent_apps|length ~ ' of ' ~ ownership_summary.total) if recent_apps|length < ownership_summary.total else (ownership_summary.total ~ (' application' if ownership_summary.total == 1 else ' applications'))) }}{% endif %}
+            {% call ui.card_action() %}{{ ui.button(text='View all', href=url_for('my_applications.app_list'), variant='outline', size='sm') }}{% endcall %}
+        {% endcall %}
+        {% call ui.card_content() %}
             {% if recent_apps %}
-            <div class="space-y-3">
-                {% for item in recent_apps %}
-                <div class="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                            <i data-lucide="package" class="w-5 h-5 text-primary"></i>
-                        </div>
-                        <div>
-                            <div class="font-medium">{{ item.application.name }}</div>
-                            <div class="text-sm text-muted-foreground">{{ item.ownership_type or 'Owner' }}</div>
-                        </div>
-                    </div>
-                    <a href="{{ url_for('my_applications.app_detail', app_id=item.application.id) }}"
-                       class="text-primary hover:underline text-sm">View</a>
-                </div>
-                {% endfor %}
-            </div>
-            {% if recent_apps|length < ownership_summary.total %}
-            <p class="text-sm text-muted-foreground mt-3">Showing {{ recent_apps|length }} of {{ ownership_summary.total }}.</p>
-            {% endif %}
+            {% call(item) list_table(rows=recent_apps, columns=[('Application', ''), ('Ownership', ''), ('Health', ''), {'label': 'Details', 'class': 'text-right', 'sortable': false}], caption='Applications you own', testid='my-apps-table', row_testid='my-apps-row', page_size=10) %}
+                {% call ui.table_cell(class='font-medium') %}{{ item.application.name }}{% endcall %}
+                {% call ui.table_cell() %}{{ value_or_unset((item.ownership_type or 'owner')|capitalize) }}{% endcall %}
+                {% call ui.table_cell() %}{{ state_badge(item.application.health_status or 'Not assessed', tone=(none if item.application.health_status else 'neutral')) }}{% endcall %}
+                {% call ui.table_cell(class='text-right') %}<a href="{{ url_for('my_applications.app_detail', app_id=item.application.id) }}" class="text-primary underline underline-offset-2">View</a>{% endcall %}
+            {% endcall %}
             {% else %}
             {% include 'my_applications/_no_owned_applications.html' %}
             {% endif %}
-        </div>
-
-        <!-- Roadmap Impact -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold">Roadmap Impacts</h2>
-                <a href="{{ url_for('my_applications.roadmap_impact') }}" class="text-sm text-primary hover:underline">View all</a>
-            </div>
-            {% if roadmap_impacts %}
-            <div class="space-y-3">
-                {% for impact in roadmap_impacts %}
-                <div class="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
-                        {% if impact.impact_type == 'sunset' %}bg-warning/10 text-warning-emphasis
-                        {% else %}bg-info/10 text-info-emphasis{% endif %}">
-                        <i data-lucide="{% if impact.impact_type == 'sunset' %}sunset{% else %}calendar{% endif %}" class="w-4 h-4"></i>
-                    </div>
-                    <div>
-                        <div class="font-medium">{{ impact.application.name }}</div>
-                        <div class="text-sm text-muted-foreground">{{ impact.description }}</div>
-                        {% if impact.date %}
-                        <div class="text-xs text-muted-foreground mt-1">{{ impact.date.strftime('%d %b %Y') }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="text-center py-8">
-                <div class="w-12 h-12 mx-auto mb-3 bg-success/10 rounded-full flex items-center justify-center">
-                    <i data-lucide="check-circle" class="w-6 h-6 text-success"></i>
-                </div>
-                <p class="text-muted-foreground">No upcoming roadmap impacts</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <a href="{{ url_for('my_applications.app_list') }}"
-           class="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors group">
-            <div class="flex items-center gap-3">
-                <i data-lucide="list" class="w-5 h-5 text-muted-foreground group-hover:text-primary"></i>
-                <span class="font-medium">My Portfolio</span>
-            </div>
-        </a>
-        <a href="{{ url_for('my_applications.health_overview') }}"
-           class="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors group">
-            <div class="flex items-center gap-3">
-                <i data-lucide="heart-pulse" class="w-5 h-5 text-muted-foreground group-hover:text-primary"></i>
-                <span class="font-medium">Health Overview</span>
-            </div>
-        </a>
-        <a href="{{ url_for('my_applications.roadmap_impact') }}"
-           class="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors group">
-            <div class="flex items-center gap-3">
-                <i data-lucide="map" class="w-5 h-5 text-muted-foreground group-hover:text-primary"></i>
-                <span class="font-medium">Roadmap Impact</span>
-            </div>
-        </a>
-        <a href="{{ url_for('unified_applications.application_list') }}"
-           class="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors group">
-            <div class="flex items-center gap-3">
-                <i data-lucide="layers" class="w-5 h-5 text-muted-foreground group-hover:text-primary"></i>
-                <span class="font-medium">All Applications</span>
-            </div>
-        </a>
-    </div>
+        {% endcall %}
+    {% endcall %}
 </div>
-
-<script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 {% endblock %}
