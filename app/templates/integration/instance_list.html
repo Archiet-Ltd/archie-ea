@@ -1,138 +1,139 @@
-{% extends 'layouts/admin_base.html' %}
+{# shadcn-reference: example:tasks@e55b60b #}
+{# design-block: data-table #}
+{% extends "layouts/admin_base.html" %}
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Workflow Instances{% endblock %}
 
 {% block content %}
+{# Status label and badge variant per workflow instance status (pattern P23). #}
+{% set status_variants = {
+    'pending': 'neutral',
+    'running': 'info',
+    'paused': 'neutral',
+    'waiting_approval': 'warning',
+    'completed': 'success',
+    'failed': 'danger',
+    'cancelled': 'neutral',
+} %}
+{% set status_options = [
+    ('all', 'All statuses'),
+    ('pending', 'Pending'),
+    ('running', 'Running'),
+    ('paused', 'Paused'),
+    ('waiting_approval', 'Waiting approval'),
+    ('completed', 'Completed'),
+    ('failed', 'Failed'),
+    ('cancelled', 'Cancelled'),
+] %}
+{% set has_filters = selected_status != 'all' or selected_workflow %}
+
 <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        {{ page_header(
-        title='Workflow Instances', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Workflow Instances'}],
-        description='Monitor and manage workflow executions.'
+    {{ page_header(
+        title='Workflow Instances',
+        description='Monitor and manage workflow executions across the estate.',
+        breadcrumbs=[
+            {'label': 'Home', 'href': url_for('main.index')},
+            {'label': 'Workflow Instances'}
+        ],
+        actions=[
+            {'text': 'Back to Dashboard', 'icon': 'layout-dashboard', 'href': url_for('integration.workflow_dashboard'), 'variant': 'outline'},
+            {'text': 'New Workflow', 'icon': 'play', 'href': url_for('integration.list_workflows'), 'variant': 'default'}
+        ]
     ) }}
-        <div class="flex gap-2">
-            <a href="{{ url_for('integration.workflow_dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Back to Dashboard
-            </a>
-            <a href="{{ url_for('integration.list_workflows') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                New Workflow
-            </a>
-        </div>
-    </div>
 
-    <!-- Filters -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
-        <div class="p-6">
-            <form action="{{ url_for('integration.list_instances') }}" method="get" class="flex flex-col md:flex-row gap-4">
-                <div class="flex-1">
-                    <label for="status" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Status</label>
-                    <select name="status" id="status" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
-                        <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
-                        <option value="running" {% if selected_status == 'running' %}selected{% endif %}>Running</option>
-                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
-                        <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>Failed</option>
-                        <option value="waiting_approval" {% if selected_status == 'waiting_approval' %}selected{% endif %}>Waiting Approval</option>
-                        <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-                    </select>
-                </div>
-                <div class="flex-1">
-                    <label for="workflow_code" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Workflow Definition</label>
-                    <select name="workflow_code" id="workflow_code" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
-                        <option value="">All Workflows</option>
-                        {% for def in definitions %}
-                        <option value="{{ def.workflow_code }}" {% if selected_workflow == def.workflow_code %}selected{% endif %}>
-                            {{ def.workflow_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full md:w-auto" aria-label="Submit">
-                        Filter
-                    </button>
-                </div>
-            </form>
+    {# Filter and search toolbar (pattern P04). #}
+    <form method="get" action="{{ url_for('integration.list_instances') }}" class="flex flex-col gap-4 rounded-lg border border-border bg-muted/30 p-4 lg:flex-row lg:items-end">
+        <div class="w-full lg:w-56">
+            {% call form_group(id='status', label='Status') %}
+                {% call native_select(id='status', name='status', options=status_options, selected=selected_status) %}{% endcall %}
+            {% endcall %}
         </div>
-    </div>
+        <div class="w-full lg:w-72">
+            {% call form_group(id='workflow_code', label='Workflow') %}
+                {% call native_select(id='workflow_code', name='workflow_code', selected=selected_workflow or '') %}
+                    <option value="">All workflows</option>
+                    {% for defn in definitions %}
+                    <option value="{{ defn.workflow_code }}"{% if selected_workflow == defn.workflow_code %} selected{% endif %}>{{ defn.workflow_name }}</option>
+                    {% endfor %}
+                {% endcall %}
+            {% endcall %}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {{ button(text='Filter', type='submit', icon='filter') }}
+            {{ button(text='Clear', variant='ghost', href=url_for('integration.list_instances')) }}
+        </div>
+    </form>
 
-    <!-- Instances Table -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
-        <div class="p-6 pt-0 mt-6">
-            <div class="relative w-full overflow-auto">
-                <table class="dense-table w-full caption-bottom text-sm">
-                    <thead class="[&_tr]:border-b">
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Instance ID</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Workflow</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Current Step</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Started</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Duration</th>
-                            <th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="[&_tr:last-child]:border-0">
-                        {% if instances %}
-                            {% for instance in instances %}
-                            <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                <td class="p-4 align-middle font-medium">
-                                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}" class="hover:underline">
-                                        {{ instance.instance_code[:12] }}...
-                                    </a>
-                                </td>
-                                <td class="p-4 align-middle">
-                                    <div class="font-medium">{{ instance.workflow_definition.workflow_name }}</div>
-                                    <div class="text-xs text-muted-foreground">{{ instance.workflow_code }}</div>
-                                </td>
-                                <td class="p-4 align-middle">
-                                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2
-                                        {% if instance.status == 'running' %}border-transparent bg-primary/10 text-info-emphasis hover:bg-primary/20
-                                        {% elif instance.status == 'completed' %}border-transparent bg-success/10 text-success-emphasis hover:bg-success/20
-                                        {% elif instance.status == 'failed' %}border-transparent bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20
-                                        {% elif instance.status == 'waiting_approval' %}border-transparent bg-warning/10 text-warning-emphasis hover:bg-warning/20
-                                        {% else %}border-transparent bg-muted text-foreground hover:bg-muted{% endif %}">
-                                        {{ instance.status|replace('_', ' ')|title }}
-                                    </span>
-                                </td>
-                                <td class="p-4 align-middle">
-                                    <div class="flex flex-col gap-1">
-                                        <span class="text-sm">
-                                            {% if instance.current_step_id %}
-                                                {{ instance.current_step_id|replace('_', ' ')|title }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </span>
-                                        <div class="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                                            <div class="h-full bg-primary transition-all duration-300" style="width: {{ instance.progress_percent }}%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="p-4 align-middle text-muted-foreground">
-                                    {{ instance.started_at.strftime('%Y-%m-%d %H:%M') if instance.started_at else '-' }}
-                                </td>
-                                <td class="p-4 align-middle text-muted-foreground">
-                                    {{ instance.duration_seconds }}s
-                                </td>
-                                <td class="p-4 align-middle text-right">
-                                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                        View
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="7" class="p-8 text-center text-muted-foreground">
-                                    No workflow instances found matching your filters.
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
+    {% if instances %}
+    {# The standard list table (data-type register: record-list), shadcn's Data Table as the library ports it. #}
+    {% set columns = [('Instance', ''), ('Workflow', ''), {'label': 'Status', 'sortable': false}, {'label': 'Progress', 'sortable': false}, ('Started', ''), ('Duration', ''), {'label': 'Actions', 'class': 'text-right', 'sortable': false}] %}
+    {% call(instance) list_table(rows=instances, columns=columns, caption='Workflow instances', testid='instances-table', row_testid='instance-row', search_placeholder='Filter instances...', empty_message='No workflow instances yet.') %}
+        {% call table_cell() %}
+            <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}"
+               class="font-medium text-foreground hover:underline">{{ instance.instance_code }}</a>
+        {% endcall %}
+        {% call table_cell() %}
+            <span class="text-muted-foreground">{{ instance.definition.workflow_name|dash }}</span>
+        {% endcall %}
+        {% call table_cell() %}
+            {% call badge(variant=status_variants.get(instance.status, 'neutral')) %}{{ instance.status|replace('_', ' ')|title }}{% endcall %}
+        {% endcall %}
+        {% call table_cell() %}
+            <span class="text-muted-foreground">{{ instance.current_step_id|dash }}</span>
+            <span class="ml-2 text-xs text-muted-foreground">{{ instance.progress_percent|dash }}%</span>
+        {% endcall %}
+        {% call table_cell() %}
+            {{ instance.started_at.strftime('%Y-%m-%d %H:%M') if instance.started_at else 'Pending' }}
+        {% endcall %}
+        {% call table_cell() %}
+            {{ instance.duration_seconds|dash('s') }}
+        {% endcall %}
+        {% call table_cell(class='text-right') %}
+            {{ button(text='View', variant='ghost', icon='arrow-right', href=url_for('integration.instance_detail', instance_id=instance.id)) }}
+        {% endcall %}
+    {% endcall %}
+    {% elif load_error %}
+        <div>
+            {{ empty_state(
+                icon='triangle-alert',
+                title='Workflow instances could not be read',
+                description='The list could not be loaded. Refresh the page to try again.',
+                cta_text='Try again',
+                cta_href=url_for('integration.list_instances'),
+                cta_icon='refresh-cw'
+            ) }}
         </div>
-    </div>
+    {% elif has_filters %}
+        <div>
+            {{ empty_state(
+                icon='search-x',
+                title='No instances match these filters',
+                description='Change or clear the filters to see more workflow executions.',
+                cta_text='Clear filters',
+                cta_href=url_for('integration.list_instances'),
+                cta_icon='x'
+            ) }}
+        </div>
+    {% else %}
+        <div>
+            {{ empty_state(
+                icon='play-circle',
+                title='No workflow instances yet',
+                description='Run a workflow from the catalog and its execution will appear here.',
+                cta_text='Browse workflows',
+                cta_href=url_for('integration.list_workflows'),
+                cta_icon='play'
+            ) }}
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

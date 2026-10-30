@@ -465,8 +465,9 @@ class Solution(TenantMixin, db.Model, OptimisticLockMixin):
                 logging.getLogger(__name__).debug("Could not check capabilities for readiness")
 
         try:
-            from app.models.solution_lifecycle_models import SolutionRisk
-            has_risks = SolutionRisk.query.filter_by(solution_id=self.id).count() > 0
+            from app.services import risk_service
+            canonical_risks, legacy_risks = risk_service.solution_risk_sources(self.id)
+            has_risks = bool(canonical_risks or legacy_risks)
         except Exception:  # fabricated-ok: on error the readiness flag stays False, rendering the check as not-passed; invents no value
             import logging
             logging.getLogger(__name__).debug("Could not check risks for readiness")
@@ -1276,7 +1277,7 @@ class SolutionComment(db.Model):
     VALID_SECTIONS = [
         "phase_a", "phase_bcd", "phase_e", "risks",
         "phase_h", "tco", "phase_f", "archimate",
-        "phase_g", "capabilities",
+        "phase_g", "capabilities", "record",
     ]
 
     def to_dict(self):

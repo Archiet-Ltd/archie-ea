@@ -1,0 +1,17 @@
+{
+ "quoteResponse": {
+  "result": [
+   {
+    "symbol": "NWF",
+    "longName": "Northwind Freight Inc.",
+    "regularMarketPrice": 48.2,
+    "regularMarketChangePercent": 1.5,
+    "marketCap": 12500000000,
+    "trailingPE": 18.4,
+    "currency": "USD",
+    "regularMarketTime": 1760900000
+   }
+  ],
+  "error": null
+ }
+}

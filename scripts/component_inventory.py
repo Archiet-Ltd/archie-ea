@@ -982,22 +982,110 @@ def template_index(template_files_list):
     return index
 
 
+def _is_guard_function(func_node: _ast.FunctionDef) -> bool:
+    """Check if a function is a guard function by analyzing its body.
+    
+    A guard function is one that ENFORCES access control by:
+    - Calling abort(401) or abort(403)
+    - Returning a response tuple with status 401 or 403 (e.g., jsonify(...), 403)
+    
+    Simply checking current_user.is_authenticated is not enough - the function
+    must take action (abort or return error) when the check fails.
+    """
+    has_auth_check = False
+    has_enforcement = False
+    
+    for node in _ast.walk(func_node):
+        # Check for abort(401) or abort(403) calls
+        if isinstance(node, _ast.Call):
+            if isinstance(node.func, _ast.Name) and node.func.id == "abort":
+                for arg in node.args:
+                    if isinstance(arg, _ast.Constant) and arg.value in (401, 403):
+                        has_enforcement = True
+        
+        # Check for current_user attribute access patterns
+        if isinstance(node, _ast.Attribute):
+            if isinstance(node.value, _ast.Name) and node.value.id == "current_user":
+                if node.attr in ("is_authenticated", "is_org_admin", "is_platform_admin", "has_role"):
+                    has_auth_check = True
+        
+        # Check for return statements with 401/403 status (tuple return)
+        if isinstance(node, _ast.Return):
+            if isinstance(node.value, _ast.Tuple):
+                for elt in node.value.elts:
+                    if isinstance(elt, _ast.Constant) and elt.value in (401, 403):
+                        has_enforcement = True
+    
+    # A guard function must have BOTH an auth check AND enforcement
+    return has_auth_check and has_enforcement
+
+
+def _get_guard_functions_from_module(module) -> dict[str, bool]:
+    """Get a mapping of function name -> is_guard for all functions in a module."""
+    import inspect
+    guard_map = {}
+    try:
+        src = inspect.getsource(module)
+        tree = _ast.parse(src)
+        for node in _ast.walk(tree):
+            if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                guard_map[node.name] = _is_guard_function(node)
+    except (TypeError, OSError, SyntaxError):
+        pass
+    return guard_map
+
+
 def view_guards(view_func):
-    """Names of the decorators on a view that gate access (login, role, permission)."""
+    """Names of the decorators and in-function calls that gate access (login, role, permission)."""
     import textwrap
+    import inspect
     try:
         src = textwrap.dedent(inspect.getsource(inspect.unwrap(view_func)))
         tree = _ast.parse(src)
     except (TypeError, OSError, SyntaxError):
         return []
+    
     guards = []
+    view_module = inspect.getmodule(view_func)
+    guard_func_map = _get_guard_functions_from_module(view_module) if view_module else {}
+    
     for node in _ast.walk(tree):
         if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            # Check decorators
             for dec in node.decorator_list:
                 target = dec.func if isinstance(dec, _ast.Call) else dec
                 name = target.attr if isinstance(target, _ast.Attribute) else getattr(target, "id", "")
                 if name and GUARD_RE.search(name):
                     guards.append(name)
+            
+            # Check in-function calls in the first 10 statements
+            for stmt in node.body[:10]:
+                # Direct call: _require_org_admin()
+                if isinstance(stmt, _ast.Expr) and isinstance(stmt.value, _ast.Call):
+                    call = stmt.value
+                    if isinstance(call.func, _ast.Name):
+                        func_name = call.func.id
+                        if guard_func_map.get(func_name, False):
+                            guards.append(func_name)
+                # Assignment with call: err = _require_org_admin()
+                elif isinstance(stmt, _ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(stmt.value, _ast.Call) and isinstance(stmt.value.func, _ast.Name):
+                            func_name = stmt.value.func.id
+                            if guard_func_map.get(func_name, False):
+                                guards.append(func_name)
+                # If statement with call: if err := _require_org_admin(): ...
+                elif isinstance(stmt, _ast.If):
+                    if isinstance(stmt.test, _ast.Call) and isinstance(stmt.test.func, _ast.Name):
+                        func_name = stmt.test.func.id
+                        if guard_func_map.get(func_name, False):
+                            guards.append(func_name)
+                    # Walrus operator: if (err := _require_org_admin()):
+                    elif isinstance(stmt.test, _ast.NamedExpr) and isinstance(stmt.test.value, _ast.Call):
+                        if isinstance(stmt.test.value.func, _ast.Name):
+                            func_name = stmt.test.value.func.id
+                            if guard_func_map.get(func_name, False):
+                                guards.append(func_name)
             break
     return sorted(set(guards))
 

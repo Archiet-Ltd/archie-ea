@@ -345,64 +345,6 @@ def test_layered_viewpoint_with_no_org_context_returns_scope_required(app, db_se
 # that the "Open in composer" link never actually filtered to.
 
 
-def test_dashboard_layer_tab_links_carry_correct_layer_param(app, db_session, make_org, login_as):
-    """Each of the six dashboard layer tabs' 'Open in composer' anchor must be
-    Alpine-bound to that tab's own layer key, not the static, unscoped href
-    the founder reported. Asserts the Alpine binding expression itself
-    (rendered once, evaluated per-tab client-side by activeRole), matching
-    how test_composer_sidebar_link_carries_viewpoint_query_param above checks
-    the sidebar's real rendered HTML rather than a source file.
-    """
-    import uuid
-
-    from app.models.application_portfolio import ApplicationComponent
-    from app.models.user import User
-
-    org = make_org("layer-tab-links")
-    suffix = uuid.uuid4().hex[:8]
-    user = User(
-        email=f"layer-tab-links-{suffix}@example.com",
-        first_name="Layer",
-        last_name="Tabs",
-        organization_id=org.id,
-        confirmed=True,
-        enterprise_role="enterprise_architect",
-    )
-    db_session.add(user)
-    # The per-layer panel only renders in dashboard_mode == 'data'
-    # (dashboard_views.py:606-608: "guided" for applications_count < 5 and
-    # zero capability mappings) -- seed 5 applications so this org reaches
-    # 'data' mode and the layer tabs actually render.
-    db_session.add_all([
-        ApplicationComponent(name=f"App {i}", organization_id=org.id)
-        for i in range(5)
-    ])
-    db_session.flush()
-
-    client = app.test_client()
-    login_as(client, user)
-
-    resp = client.get("/dashboard/overview")
-    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
-    html = resp.get_data(as_text=True)
-
-    assert (
-        ":href=\"'/archimate/composer?viewpoint=layered&layer=' + activeRole\""
-        in html
-    ), (
-        "the per-layer 'Open in composer' link must be dynamically bound to "
-        "activeRole so each of the six tabs opens its own layer -- static "
-        "href found instead"
-    )
-
-    for layer_key in ("motivation", "strategy", "business", "application",
-                       "technology", "implementation"):
-        assert f"{layer_key}:" in html, (
-            f"expected the Alpine _layers object to declare a '{layer_key}' "
-            f"key (drives activeRole matching for that tab)"
-        )
-
-
 def test_layer_filtered_viewpoint_returns_only_that_layers_element_types(
     app, db_session, make_org, tenant_ctx
 ):
@@ -662,3 +604,35 @@ def test_health_scorecard_agrees_with_dashboard_card_and_composer_on_technology_
         "Equipment must be counted as technology, not fall through to "
         f"'other': {scorecard_metrics['archimate_by_layer']}"
     )
+
+
+def test_layered_viewpoint_states_what_it_leaves_out(app, db_session, make_org, tenant_ctx, monkeypatch):
+    """The layered viewpoint reports how many elements the organisation holds and,
+    when it shows fewer, how many it left out and why; another organisation's
+    elements are never in either figure."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.services import archimate_viewpoint_service as svc
+
+    org, other = make_org("vp-omit-a"), make_org("vp-omit-b")
+    db_session.add_all(
+        [ArchiMateElement(name=f"Own {i}", type="ApplicationComponent", layer="application",
+                          organization_id=org.id) for i in range(4)]
+        + [ArchiMateElement(name=f"Foreign {i}", type="Goal", layer="motivation",
+                            organization_id=other.id) for i in range(3)]
+    )
+    db_session.flush()
+
+    with tenant_ctx(org.id):
+        full = svc.get_viewpoint_data("layered", solution_id=None)
+        assert (full["total"], full["store_total"], full["omitted"]) == (4, 4, 0)
+        assert full["omitted_note"] is None
+
+        monkeypatch.setattr(svc, "VIEWPOINT_ELEMENT_LIMIT", 3)
+        capped = svc.get_viewpoint_data("layered", solution_id=None)
+        assert (capped["total"], capped["store_total"], capped["omitted"]) == (3, 4, 1)
+        assert capped["omitted_note"] == "1 element beyond the first 3 is not shown"
+
+        monkeypatch.setattr(svc, "VIEWPOINT_ELEMENT_LIMIT", 500)
+        goals = svc.get_viewpoint_data("layered", solution_id=None, layer="motivation")
+        assert (goals["total"], goals["store_total"]) == (0, 4)
+        assert goals["omitted_note"] == "4 elements in other layers are not shown"

@@ -17,6 +17,7 @@ import pytest
 from playwright.sync_api import expect, sync_playwright
 
 from scripts.build_js import BUNDLES, render
+from tests.chat_opening_fixture import APPLICATIONS, APPLICATIONS_PATH, open_chat_options
 from tests.test_ai_model_selector_display import ROOT, html
 
 
@@ -67,7 +68,7 @@ def context_page(lifecycle_browser):
             pass
 
         def respond(self, body, content_type='application/json', status=200):
-            if isinstance(body, dict):
+            if isinstance(body, (dict, list)):
                 body = json.dumps(body)
             if isinstance(body, str):
                 body = body.encode()
@@ -131,6 +132,7 @@ def context_page(lifecycle_browser):
                 '/ai-chat/threads': {'threads': []}, '/ai-chat/approvals/queue': {'success': True, 'approvals': []},
                 '/ai-chat/recommendations': {'alerts': [], 'recommendations': [], 'summary': {'total': 0}},
                 '/account/session/keepalive': {'success': True},
+                APPLICATIONS_PATH: APPLICATIONS,
             }
             if path in bodies:
                 return self.respond(bodies[path])
@@ -191,7 +193,7 @@ def test_reload_cancels_owned_pending_context_without_false_error(context_page):
 def test_domain_switch_cancels_old_load_and_keeps_newest_context(context_page):
     page = context_page.start('delayed')
     assert context_page.started.wait(5)
-    page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
+    open_chat_options(page)
     page.locator('#domain-selector').select_option('technology')
     expect(page.locator('#domain-context')).to_contain_text('Newest technology fixture')
     expect(page.locator('#domain-context')).to_contain_text('Technology Stacks')
@@ -211,11 +213,11 @@ def test_context_empty_and_failure_states_remain_distinct(context_page, mode, do
     if domain == 'technology':
         expect(page.locator('#domain-context')).to_contain_text('Recorded architecture fixture')
         context_page.state.mode = mode
-        page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
+        open_chat_options(page)
         page.locator('#domain-selector').select_option('technology')
     panel = page.locator('#domain-context')
     if mode == 'empty':
-        expect(panel).to_contain_text('No specific context available')
+        expect(panel).to_contain_text('so the answer uses your whole portfolio')
         assert not context_page.state.errors
     else:
         expect(panel).to_contain_text("Couldn't load context")
@@ -228,7 +230,7 @@ def test_context_empty_and_failure_states_remain_distinct(context_page, mode, do
 @pytest.mark.parametrize('null_reason', [False, True])
 def test_explicit_cancellation_rejects_and_keeps_loading_and_csrf_contracts(context_page, null_reason):
     page = context_page.start('empty')
-    expect(page.locator('#domain-context')).to_contain_text('No specific context available')
+    expect(page.locator('#domain-context')).to_contain_text('so the answer uses your whole portfolio')
     page.evaluate("""() => {
       // The layout fixture has no loading store; use a real Alpine store to observe the API balance.
       Alpine.store('loading', {pending: 0, start() {this.pending++;}, stop() {this.pending--;}});

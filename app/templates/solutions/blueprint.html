@@ -1,4 +1,6 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from "components/gantt_timeline.html" import gantt_timeline %}
 
@@ -248,6 +250,7 @@ function archieShowBanner(msg, type) {
                 <div x-show="bpHdrMoreOpen" x-cloak
                      class="absolute right-0 mt-1 w-52 rounded-md border border-border bg-popover z-50 py-1 text-sm"
                      role="menu">
+                    {% if can_open_code_workbench(solution) %}
                     <a href="{{ url_for('codegen.workbench_page', solution_id=solution.id) }}"
                        role="menuitem"
                        class="flex items-center gap-2 px-3 py-2 text-foreground hover:bg-accent transition-colors"
@@ -256,6 +259,12 @@ function archieShowBanner(msg, type) {
                         <svg class="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
                         Code Workbench
                     </a>
+                    {% else %}
+                    <span role="menuitem" aria-disabled="true" class="flex flex-col px-3 py-2 text-muted-foreground">
+                        <span>Code Workbench</span>
+                        <span class="text-xs">Only the person who made this solution or an administrator can open it. Ask an administrator in Team settings.</span>
+                    </span>
+                    {% endif %}
                     <button type="button"
                             id="bp-header-save-template-btn"
                             role="menuitem"

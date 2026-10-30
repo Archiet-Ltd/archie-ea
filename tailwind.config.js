@@ -10,6 +10,8 @@ module.exports = {
     // `focus:ring-2 focus:ring-ring` and `-translate-y-1/2` were unbuilt.
     './app/modules/**/templates/**/*.html',
     './app/static/js/**/*.js',
+    // The class lists of the vendored component macros (the Overview dashboard).
+    './app/basecoat_kit/data/recipes.json',
   ],
   theme: {
     container: {
@@ -20,6 +22,21 @@ module.exports = {
       },
     },
     extend: {
+      // The strategy canvases (components/canvas) lay boxes on a ten-column grid
+      // and the value proposition canvas on a twenty-by-twenty one, and keep their
+      // natural width so a phone scrolls sideways: the spans, starts and widths
+      // Tailwind 3 stops short of.
+      gridTemplateColumns: { '20': 'repeat(20, minmax(0, 1fr))' },
+      gridTemplateRows: { '20': 'repeat(20, minmax(0, 1fr))' },
+      gridColumnStart: { '14': '14' },
+      gridRowStart: { '12': '12' },
+      gridRow: {
+        'span-7': 'span 7 / span 7',
+        'span-8': 'span 8 / span 8',
+        'span-10': 'span 10 / span 10',
+        'span-18': 'span 18 / span 18',
+      },
+      minWidth: { '200': '50rem', '240': '60rem', '260': '65rem', '270': '67.5rem' },
       // Pilot type scale (design register: typography). Plain sizes: the line
       // height stays inherited, as it was with the arbitrary text-[Npx] values.
       // The 11px tier is .text-2xs in shadcn_tokens.css (16px line height).
@@ -30,6 +47,14 @@ module.exports = {
         '28': '28px',
       },
       colors: {
+        chart: {
+          1: "hsl(var(--chart-1) / <alpha-value>)",
+          2: "hsl(var(--chart-2) / <alpha-value>)",
+          3: "hsl(var(--chart-3) / <alpha-value>)",
+          4: "hsl(var(--chart-4) / <alpha-value>)",
+          5: "hsl(var(--chart-5) / <alpha-value>)",
+          tint: "hsl(var(--chart-tint) / <alpha-value>)",
+        },
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
         ring: "hsl(var(--ring) / <alpha-value>)",
@@ -39,6 +64,8 @@ module.exports = {
         primary: {
           DEFAULT: "hsl(var(--primary) / <alpha-value>)",
           foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
+          surface: "hsl(var(--primary-surface) / <alpha-value>)",
+          "surface-foreground": "hsl(var(--primary-surface-foreground) / <alpha-value>)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
@@ -80,6 +107,50 @@ module.exports = {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",
         },
+        // ArchiMate notation: the fill and hairline stroke each layer is drawn in. Defined once in
+        // shadcn_tokens.css (light and dark); the composer's palette, canvas and legend use these classes.
+        notation: {
+          strategy: {
+            DEFAULT: "hsl(var(--notation-strategy) / <alpha-value>)",
+            stroke: "hsl(var(--notation-strategy-stroke) / <alpha-value>)",
+          },
+          business: {
+            DEFAULT: "hsl(var(--notation-business) / <alpha-value>)",
+            stroke: "hsl(var(--notation-business-stroke) / <alpha-value>)",
+          },
+          application: {
+            DEFAULT: "hsl(var(--notation-application) / <alpha-value>)",
+            stroke: "hsl(var(--notation-application-stroke) / <alpha-value>)",
+          },
+          technology: {
+            DEFAULT: "hsl(var(--notation-technology) / <alpha-value>)",
+            stroke: "hsl(var(--notation-technology-stroke) / <alpha-value>)",
+          },
+          physical: {
+            DEFAULT: "hsl(var(--notation-physical) / <alpha-value>)",
+            stroke: "hsl(var(--notation-physical-stroke) / <alpha-value>)",
+          },
+          motivation: {
+            DEFAULT: "hsl(var(--notation-motivation) / <alpha-value>)",
+            stroke: "hsl(var(--notation-motivation-stroke) / <alpha-value>)",
+          },
+          implementation: {
+            DEFAULT: "hsl(var(--notation-implementation) / <alpha-value>)",
+            stroke: "hsl(var(--notation-implementation-stroke) / <alpha-value>)",
+          },
+          migration: {
+            DEFAULT: "hsl(var(--notation-migration) / <alpha-value>)",
+            stroke: "hsl(var(--notation-migration-stroke) / <alpha-value>)",
+          },
+          location: {
+            DEFAULT: "hsl(var(--notation-location) / <alpha-value>)",
+            stroke: "hsl(var(--notation-location-stroke) / <alpha-value>)",
+          },
+          other: {
+            DEFAULT: "hsl(var(--notation-other) / <alpha-value>)",
+            stroke: "hsl(var(--notation-other-stroke) / <alpha-value>)",
+          },
+        },
         // ArchiMate layer hues. The DEFAULT is the fill/border colour; the
         // `-emphasis` twin is the only one legible as text on a /10 tint.
         // See DESIGN.md "ArchiMate Layer Colors".
@@ -112,6 +183,27 @@ module.exports = {
             DEFAULT: "hsl(var(--layer-risk) / <alpha-value>)",
             emphasis: "hsl(var(--layer-risk-emphasis) / <alpha-value>)",
           },
+        },
+      },
+      // Text role of the status tokens. --destructive, --success and --warning are FILL colours (a dark red,
+      // a mid green, an amber): as text they score 1.4 to 3.3 against the page in one theme or the other.
+      // Their -emphasis twin is the text colour, tuned per theme, so `text-destructive`, `text-success` and
+      // `text-warning` resolve to it. bg-*, border-* and ring-* keep the fill value.
+      textColor: {
+        destructive: {
+          DEFAULT: "hsl(var(--destructive-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--destructive-emphasis) / <alpha-value>)",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--success-emphasis) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--warning-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--warning-emphasis) / <alpha-value>)",
         },
       },
       borderRadius: {
@@ -190,5 +282,5 @@ module.exports = {
   },
   // Bundled in the standalone CLI at scripts/bin/tailwindcss[.exe] — resolves
   // with no npm install and no network, so the air-gap posture is unaffected.
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [require('@tailwindcss/typography'), require('@tailwindcss/container-queries')],
 }

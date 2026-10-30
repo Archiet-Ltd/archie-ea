@@ -71,22 +71,32 @@ You authorise us to use sub-processors to provide the service. They fall into th
 - cloud hosting and infrastructure, for running the service and storing its data;
 - transactional email delivery, for password resets and notifications;
 - payment processing, for taking subscription payments;
-- AI model providers, only where your organisation uses the AI features of the service.
+- AI model providers, only where your organisation uses the AI features of the service. They are
+  named in the [sub-processor list](/privacy#sub-processors).
 
-We will give you our current list of sub-processors on request. We will tell you at least 30 days
+The AI model providers are named in the [sub-processor list](/privacy#sub-processors); we will give
+you the list of the other sub-processors on request. We will tell you at least 30 days
 before we add or replace a sub-processor. If you object on reasonable data protection grounds, we
 will discuss it with you in good faith; if we cannot resolve it, you may end the affected part of
 the subscription and we will refund any fees you have paid in advance for the period after it ends.
 
-Each sub-processor is bound by written terms that protect your personal data at least as well as
-this agreement does. We remain responsible to you for what our sub-processors do.
+Our hosting, email and payment sub-processors are bound by written terms that protect your personal
+data at least as well as this agreement does. **The AI model providers in the sub-processor list are
+not:** we have no data processing agreement with them, and their terms may let them keep prompts
+and use them to train their models. We remain responsible to you for what our sub-processors do.
 
 ## 7. International transfers
 
-We will not transfer your personal data outside the United Kingdom unless the transfer is covered by
-UK adequacy regulations or by appropriate safeguards, such as the International Data Transfer
-Agreement or the UK Addendum to the EU Standard Contractual Clauses, together with any additional
-measures the transfer needs.
+Our hosting, email and payment sub-processors will not receive your personal data outside the United
+Kingdom unless the transfer is covered by UK adequacy regulations or by appropriate safeguards, such
+as the International Data Transfer Agreement or the UK Addendum to the EU Standard Contractual
+Clauses.
+
+**This does not apply to the AI features.** When your users use them, content that can include
+personal data is sent to the AI model providers in the [sub-processor list](/privacy#sub-processors),
+in the United States and the People's Republic of China, without an adequacy regulation or a
+safeguard of the kind above. If you do not want that, do not use the AI features with personal data,
+or ask an administrator to turn them off.
 
 ## 8. Helping you meet your obligations
 

@@ -4,6 +4,7 @@ Extracts text from documents, sends to LLM for structured extraction,
 creates SolutionBlueprintProposal rows for architect review.
 """
 
+from app.services.change_source import records_changes_as
 import json
 import logging
 import re
@@ -281,6 +282,7 @@ class DocumentIngestionService:
             for p in query.all()
         ]
 
+    @records_changes_as("ai_proposal")
     def accept_proposal(self, proposal_id, solution_id):
         """Accept a single proposal — create ArchiMateElement + run inference chain.
 
@@ -387,6 +389,7 @@ class DocumentIngestionService:
         db.session.commit()
         return {"proposal_id": proposal_id, "status": "rejected"}
 
+    @records_changes_as("ai_proposal")
     def batch_accept(self, proposal_ids, solution_id):
         """Batch accept multiple proposals.
 

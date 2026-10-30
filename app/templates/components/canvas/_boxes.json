@@ -1,0 +1,491 @@
+{
+ "business-model-canvas": {
+  "key-partners": {
+   "zone": 3,
+   "zone_label": "Infrastructure",
+   "element": "Business Actor",
+   "guidance": "Name the suppliers, alliances and outsourcers you could not run without, and what each one gives you."
+  },
+  "key-activities": {
+   "zone": 3,
+   "zone_label": "Infrastructure",
+   "element": "Business Process",
+   "guidance": "List the few things you must do well every day for the value proposition to work. Leave out routine admin."
+  },
+  "key-resources": {
+   "zone": 3,
+   "zone_label": "Infrastructure",
+   "element": "Resource",
+   "guidance": "List the assets the offer depends on: people, vehicles, sites, data, money, brand."
+  },
+  "value-propositions": {
+   "zone": 1,
+   "zone_label": "Offer",
+   "element": "Value",
+   "guidance": "State the problem solved or the need met for each segment, in their words, and what bundle they get."
+  },
+  "customer-relationships": {
+   "zone": 2,
+   "zone_label": "Customers",
+   "element": "Business Service",
+   "guidance": "Say how each segment expects to be treated: personal, self-service, community, automated."
+  },
+  "channels": {
+   "zone": 2,
+   "zone_label": "Customers",
+   "element": "Business Interface",
+   "guidance": "Name how each segment finds you, buys, receives and gets help."
+  },
+  "customer-segments": {
+   "zone": 2,
+   "zone_label": "Customers",
+   "element": "Business Actor (market segment)",
+   "guidance": "Name the groups of people or organisations you serve. A group is separate when its needs or channel differ."
+  },
+  "cost-structure": {
+   "zone": 5,
+   "zone_label": "Finance",
+   "element": "Cost driver",
+   "guidance": "List the biggest costs the model brings, fixed and variable, tied to the activities and resources above."
+  },
+  "revenue-streams": {
+   "zone": 5,
+   "zone_label": "Finance",
+   "element": "Revenue stream",
+   "guidance": "List what each segment pays for, how, and at what price or rule."
+  }
+ },
+ "lean-canvas": {
+  "problem": {
+   "zone": 2,
+   "zone_label": "Problem",
+   "element": "Assessment",
+   "guidance": "List the top one to three problems the segment has, in their words."
+  },
+  "existing-alternatives": {
+   "zone": 2,
+   "zone_label": "Problem",
+   "element": "Business Actor (competitor)",
+   "guidance": "List how they solve each problem today, including doing nothing."
+  },
+  "solution": {
+   "zone": 3,
+   "zone_label": "Solution",
+   "element": "Business Service",
+   "guidance": "Outline the simplest feature for each problem. Not a full spec."
+  },
+  "key-metrics": {
+   "zone": 3,
+   "zone_label": "Solution",
+   "element": "Metric definition",
+   "guidance": "List the few numbers that tell you the model is working."
+  },
+  "unfair-advantage": {
+   "zone": 3,
+   "zone_label": "Solution",
+   "element": "Resource",
+   "guidance": "Name what cannot be copied or bought easily: data, insider access, community."
+  },
+  "unique-value-proposition": {
+   "zone": 1,
+   "zone_label": "Offer",
+   "element": "Value",
+   "guidance": "One clear sentence on why you are different and worth buying."
+  },
+  "high-level-concept": {
+   "zone": 1,
+   "zone_label": "Offer",
+   "element": "Note",
+   "guidance": "The \"X for Y\" analogy that makes the idea easy to grasp."
+  },
+  "channels": {
+   "zone": 4,
+   "zone_label": "Customers",
+   "element": "Business Interface",
+   "guidance": "Name the path to customers: how they find and reach you."
+  },
+  "customer-segments": {
+   "zone": 4,
+   "zone_label": "Customers",
+   "element": "Business Actor (market segment)",
+   "guidance": "Name your target customers."
+  },
+  "early-adopters": {
+   "zone": 4,
+   "zone_label": "Customers",
+   "element": "Business Actor (sub-segment)",
+   "guidance": "Describe the specific group who feel the problem most and will try you first."
+  },
+  "cost-structure": {
+   "zone": 5,
+   "zone_label": "Finance",
+   "element": "Cost driver",
+   "guidance": "List the fixed and variable costs to reach customers and deliver the solution."
+  },
+  "revenue-streams": {
+   "zone": 5,
+   "zone_label": "Finance",
+   "element": "Revenue stream",
+   "guidance": "List the revenue model, lifetime value, revenue and gross margin."
+  }
+ },
+ "value-proposition-canvas": {
+  "products-services": {
+   "zone": 1,
+   "zone_label": "Value map",
+   "element": "Product",
+   "guidance": "List the products and services your offer is built around."
+  },
+  "gain-creators": {
+   "zone": 1,
+   "zone_label": "Value map",
+   "element": "Value",
+   "guidance": "Say how the offer creates the gains the customer wants."
+  },
+  "pain-relievers": {
+   "zone": 1,
+   "zone_label": "Value map",
+   "element": "Value",
+   "guidance": "Say how the offer removes the pains the customer has."
+  },
+  "gains": {
+   "zone": 2,
+   "zone_label": "Customer profile",
+   "element": "Goal",
+   "guidance": "Write the outcomes and benefits the customer wants, required, expected or desired."
+  },
+  "pains": {
+   "zone": 2,
+   "zone_label": "Customer profile",
+   "element": "Assessment",
+   "guidance": "Write what annoys the customer before, during and after the job: costs, risks, obstacles."
+  },
+  "customer-jobs": {
+   "zone": 2,
+   "zone_label": "Customer profile",
+   "element": "Business Process",
+   "guidance": "Write the tasks the customer is trying to get done, functional, social or emotional."
+  }
+ },
+ "swot-analysis": {
+  "strengths": {
+   "zone": 3,
+   "zone_label": "Helpful",
+   "element": "Assessment",
+   "guidance": "Internal. What you do well or have that others do not."
+  },
+  "weaknesses": {
+   "zone": 2,
+   "zone_label": "Harmful",
+   "element": "Assessment",
+   "guidance": "Internal. Where you fall short of what you need or of rivals."
+  },
+  "opportunities": {
+   "zone": 3,
+   "zone_label": "Helpful",
+   "element": "Assessment",
+   "guidance": "External. Trends or gaps outside the company you could use."
+  },
+  "threats": {
+   "zone": 2,
+   "zone_label": "Harmful",
+   "element": "Assessment",
+   "guidance": "External. Trends or actors outside the company that could hurt you."
+  }
+ },
+ "pestle-analysis": {
+  "political": {
+   "zone": 1,
+   "zone_label": "External factor",
+   "element": "Driver",
+   "guidance": "Government action, policy and stability that touch the business."
+  },
+  "economic": {
+   "zone": 1,
+   "zone_label": "External factor",
+   "element": "Driver",
+   "guidance": "Growth, inflation, exchange rates, costs and demand in your markets."
+  },
+  "social": {
+   "zone": 1,
+   "zone_label": "External factor",
+   "element": "Driver",
+   "guidance": "Demographics, habits, expectations and culture of customers and staff."
+  },
+  "technological": {
+   "zone": 1,
+   "zone_label": "External factor",
+   "element": "Driver",
+   "guidance": "New technology, automation and the pace of change in your field."
+  },
+  "legal": {
+   "zone": 1,
+   "zone_label": "External factor",
+   "element": "Driver",
+   "guidance": "Laws and regulation you must comply with, now and coming."
+  },
+  "environmental": {
+   "zone": 1,
+   "zone_label": "External factor",
+   "element": "Driver",
+   "guidance": "Climate, resources and sustainability pressures and rules."
+  }
+ },
+ "porters-five-forces": {
+  "new-entrants": {
+   "zone": 2,
+   "zone_label": "Threat from outside",
+   "element": "Driver",
+   "guidance": "How easily could a new rival enter, and what keeps them out?"
+  },
+  "substitutes": {
+   "zone": 2,
+   "zone_label": "Threat from outside",
+   "element": "Driver",
+   "guidance": "What different product could do the same job for the customer?"
+  },
+  "suppliers": {
+   "zone": 4,
+   "zone_label": "Bargaining power",
+   "element": "Driver",
+   "guidance": "How much can suppliers raise prices or cut quality, and why?"
+  },
+  "buyers": {
+   "zone": 4,
+   "zone_label": "Bargaining power",
+   "element": "Driver",
+   "guidance": "How much can customers push prices down or demand more, and why?"
+  },
+  "rivalry": {
+   "zone": 1,
+   "zone_label": "Rivalry",
+   "element": "Driver",
+   "guidance": "How hard do existing competitors fight, and on what?"
+  }
+ },
+ "ansoff-matrix": {
+  "market-penetration": {
+   "zone": 3,
+   "zone_label": "Existing product, existing market",
+   "element": "Course of Action",
+   "guidance": "Sell more of what you have to the customers you have."
+  },
+  "product-development": {
+   "zone": 1,
+   "zone_label": "New product, existing market",
+   "element": "Course of Action",
+   "guidance": "Sell something new to the customers you have."
+  },
+  "market-development": {
+   "zone": 4,
+   "zone_label": "Existing product, new market",
+   "element": "Course of Action",
+   "guidance": "Sell what you have to a new market or segment."
+  },
+  "diversification": {
+   "zone": 5,
+   "zone_label": "New product, new market",
+   "element": "Course of Action",
+   "guidance": "Sell something new to a new market. The highest risk."
+  }
+ },
+ "mckinsey-7s": {
+  "shared-values": {
+   "zone": 5,
+   "zone_label": "Core",
+   "element": "Principle",
+   "guidance": "The core beliefs and purpose that the other six elements rest on."
+  },
+  "strategy": {
+   "zone": 1,
+   "zone_label": "Hard S",
+   "element": "Course of Action",
+   "guidance": "The plan to win and how resources are allocated."
+  },
+  "structure": {
+   "zone": 1,
+   "zone_label": "Hard S",
+   "element": "Business Actor (organisation unit)",
+   "guidance": "How the company is organised and who reports to whom."
+  },
+  "systems": {
+   "zone": 1,
+   "zone_label": "Hard S",
+   "element": "Business Process",
+   "guidance": "The routines, processes and tools by which work gets done."
+  },
+  "skills": {
+   "zone": 2,
+   "zone_label": "Soft S",
+   "element": "Capability",
+   "guidance": "What the company does best, as a whole."
+  },
+  "style": {
+   "zone": 2,
+   "zone_label": "Soft S",
+   "element": "Assessment",
+   "guidance": "How leaders behave and what the culture rewards."
+  },
+  "staff": {
+   "zone": 2,
+   "zone_label": "Soft S",
+   "element": "Resource",
+   "guidance": "The people, their numbers, mix and development."
+  }
+ },
+ "empathy-map": {
+  "user": {
+   "zone": 1,
+   "zone_label": "Who",
+   "element": "Persona",
+   "guidance": "Name the person you are mapping, their role and context."
+  },
+  "says": {
+   "zone": 4,
+   "zone_label": "What they express",
+   "element": "Evidence record",
+   "guidance": "Quote what they say out loud, in their words."
+  },
+  "thinks": {
+   "zone": 4,
+   "zone_label": "What they express",
+   "element": "Note",
+   "guidance": "Write what they may think but not say."
+  },
+  "does": {
+   "zone": 4,
+   "zone_label": "What they express",
+   "element": "Business Process",
+   "guidance": "Write what they actually do, including workarounds."
+  },
+  "feels": {
+   "zone": 4,
+   "zone_label": "What they express",
+   "element": "Note",
+   "guidance": "Write the emotions they have: worries and excitements."
+  },
+  "pains": {
+   "zone": 2,
+   "zone_label": "Result",
+   "element": "Assessment",
+   "guidance": "Write the fears, frustrations and obstacles."
+  },
+  "gains": {
+   "zone": 2,
+   "zone_label": "Result",
+   "element": "Goal",
+   "guidance": "Write the wants, needs and measures of success."
+  }
+ },
+ "product-vision-board": {
+  "vision": {
+   "zone": 1,
+   "zone_label": "Vision",
+   "element": "Goal",
+   "guidance": "One sentence on why you are creating the product and the change you want."
+  },
+  "target-group": {
+   "zone": 2,
+   "zone_label": "Customers",
+   "element": "Business Actor (market segment)",
+   "guidance": "Name the market and the users the product serves."
+  },
+  "needs": {
+   "zone": 2,
+   "zone_label": "Customers",
+   "element": "Goal",
+   "guidance": "List the problem solved or the benefit given to them."
+  },
+  "product": {
+   "zone": 3,
+   "zone_label": "Product",
+   "element": "Product",
+   "guidance": "List the key features that make it stand out."
+  },
+  "business-goals": {
+   "zone": 5,
+   "zone_label": "Business",
+   "element": "Goal",
+   "guidance": "List how the product helps the company: revenue, cost, reach."
+  }
+ },
+ "balanced-scorecard": {
+  "financial": {
+   "zone": 5,
+   "zone_label": "Results",
+   "element": "Goal",
+   "guidance": "Objectives for how the company should look to its owners, each with a measure, a target and an initiative.",
+   "example": "Grow revenue per shipment 6 percent"
+  },
+  "customer": {
+   "zone": 2,
+   "zone_label": "Results",
+   "element": "Goal",
+   "guidance": "Objectives for how the company should look to its customers.",
+   "example": "Next-day delivery on time for 97 percent of parcels"
+  },
+  "internal": {
+   "zone": 3,
+   "zone_label": "Drivers",
+   "element": "Goal",
+   "guidance": "Objectives for the processes the company must excel at to satisfy owners and customers.",
+   "example": "Cut cross-dock dwell time"
+  },
+  "learning": {
+   "zone": 4,
+   "zone_label": "Drivers",
+   "element": "Goal",
+   "guidance": "Objectives for the people, systems and culture that sustain the ability to change and improve.",
+   "example": "Train every driver on the new handheld"
+  },
+  "vision": {
+   "zone": 1,
+   "zone_label": "Centre",
+   "element": "Goal",
+   "guidance": "The vision and the strategy the four perspectives serve.",
+   "example": ""
+  }
+ },
+ "okr": {
+  "objective": {
+   "zone": 1,
+   "zone_label": "Objective",
+   "element": "Goal",
+   "guidance": "One qualitative objective for the quarter that is ambitious and gives direction.",
+   "example": ""
+  },
+  "key-results": {
+   "zone": 3,
+   "zone_label": "Key results",
+   "element": "Metric definition",
+   "guidance": "Two to five measurable key results that show the objective is met. Score each from 0.0 to 1.0.",
+   "example": ""
+  }
+ },
+ "blue-ocean": {
+  "eliminate": {
+   "zone": 2,
+   "zone_label": "Cost side",
+   "element": "Course of Action",
+   "guidance": "Which factors the industry takes for granted should be eliminated?"
+  },
+  "reduce": {
+   "zone": 2,
+   "zone_label": "Cost side",
+   "element": "Course of Action",
+   "guidance": "Which factors should be reduced well below the industry standard?"
+  },
+  "raise": {
+   "zone": 1,
+   "zone_label": "Value side",
+   "element": "Course of Action",
+   "guidance": "Which factors should be raised well above the industry standard?"
+  },
+  "create": {
+   "zone": 1,
+   "zone_label": "Value side",
+   "element": "Course of Action",
+   "guidance": "Which factors the industry has never offered should be created?"
+  }
+ }
+}

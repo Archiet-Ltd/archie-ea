@@ -12,6 +12,8 @@ Covers:
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_page
@@ -106,8 +108,11 @@ def test_home_page_navbar_links_key_site_pages(app):
     with app.test_client() as client:
         rv = client.get("/")
         html = rv.data.decode()
-        for slug in ("features", "pricing", "about", "docs"):
+        # /docs joins the Resources menu once it is a real guide (it is a held
+        # placeholder today, and the registry lists it only while it is live).
+        for slug in ("features", "pricing", "about"):
             assert f'href="/{slug}"' in html, f"navbar missing link to /{slug}"
+        assert 'href="/docs"' not in html, "the held /docs placeholder is linked"
 
 
 def test_signup_redirects_to_real_register_form(app):
@@ -171,7 +176,10 @@ def test_contact_page_has_no_waiting_list_or_launch_framing(app):
     pre-launch framing (the product is live and priced)."""
     with app.test_client() as client:
         html = client.get("/contact").data.decode()
-        assert "waiting list" not in html.lower()
+        # The page's own content: the navbar menus (Coming soon: "Join the waiting
+        # list") and the footer are the site shell, read from the registry.
+        content = re.sub(r"<footer.*?</footer>", "", re.sub(r"<header.*?</header>", "", html, flags=re.DOTALL), flags=re.DOTALL)
+        assert "waiting list" not in content.lower()
         assert "when Entelim launches" not in html
         assert "/#waitlist" not in html
 
@@ -236,17 +244,18 @@ def test_no_page_links_to_the_private_repository(app):
             )
 
 
-def test_navbar_has_roles_and_footer_has_roles_and_connectors(app):
+def test_navbar_has_a_roles_menu_and_footer_links_the_roles_hub(app):
+    """The Roles menu and the footer both read the site registry; /connectors joins
+    them once a connector page is published (the AI assistant page is live)."""
     import re
 
     with app.test_client() as client:
         html = client.get("/").data.decode()
-    nav = re.search(r'<nav aria-label="Primary".*?</nav>', html, re.DOTALL).group(0)
-    hrefs = re.findall(r'<a href="([^"]+)"', nav)
-    assert len(hrefs) == 7
-    assert hrefs[hrefs.index("/use-cases") + 1] == "/roles"
-    assert "/connectors" not in hrefs
+    header = re.search(r"<header\b.*?</header>", html, re.DOTALL).group(0)
+    assert 'aria-controls="menu-roles"' in header
+    header_hrefs = re.findall(r'href="([^"]+)"', header)
+    assert "/roles" in header_hrefs
     footer = re.search(r"<footer\b.*?</footer>", html, re.DOTALL).group(0)
     footer_hrefs = re.findall(r'href="([^"]+)"', footer)
-    at = footer_hrefs.index("/use-cases")
-    assert footer_hrefs[at + 1:at + 3] == ["/roles", "/connectors"]
+    assert "/roles" in footer_hrefs
+    assert "/connectors" in header_hrefs + footer_hrefs

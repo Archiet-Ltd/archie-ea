@@ -1,0 +1,19 @@
+{# Renders a value that could not be measured, with its basis (why unmeasured) and next step.
+
+   Args:
+     basis: Plain-words sentence explaining why the value is not measured
+     action: Optional next step to measure it (e.g., "Record a risk", "Decide a review item")
+     testid: Optional data-testid attribute value
+
+   Example:
+     {% from 'components/explained_value.html' import explained_value %}
+     {{ explained_value(basis="No risks recorded yet", action="Record your first risk in the register") }}
+#}
+{% macro explained_value(basis, action=none, testid=none) -%}
+<div class="space-y-1"{% if testid %} data-testid="{{ testid }}"{% endif %}>
+    <p class="text-sm text-muted-foreground">{{ basis }}</p>
+    {% if action %}
+    <p class="text-sm text-foreground">{{ action }}</p>
+    {% endif %}
+</div>
+{%- endmacro %}

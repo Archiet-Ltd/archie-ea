@@ -145,6 +145,110 @@ def list_vendors():
     })
 
 
+def _register_org_id():
+    from app.utils.tenant_sql import current_org_id
+
+    return current_org_id()
+
+
+def can_set_vendor(user) -> bool:
+    """Who may record a supplier on a system: administrators and the procurement and finance personas."""
+    from app.utils.role_access import can_access_section, is_admin
+
+    return bool(is_admin(user) or can_access_section(user, "procurement"))
+
+
+@unified_vendors_api_bp.route("/register", methods=["GET"])
+@login_required
+def vendor_register_list():
+    """The organisation's vendors: those named on its systems and contracts."""
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.services import vendor_register
+    org_id = _register_org_id()
+    if org_id is None:
+        return api_error("No organisation is selected.", "NO_ORGANISATION", 400)
+    term = (request.args.get("q") or request.args.get("search") or "").strip().lower()
+    page = safe_int_arg("page", 1, minimum=1)
+    per_page = min(safe_int_arg("per_page", 25, minimum=1, maximum=500), 100)
+    rows = vendor_register.register(org_id)
+    if term:
+        rows = [r for r in rows if term in r["name"].lower()]
+    # The Costs page's rule decides the cost here too, so the API never says more than the page.
+    show_cost = may_see_spend_pages(current_user)
+    total = len(rows)
+    pages = max(1, -(-total // per_page))
+    window = rows[(page - 1) * per_page: page * per_page]
+    for idx, row in enumerate(window):
+        row["row_number"] = (page - 1) * per_page + idx + 1
+        if not show_cost:
+            row["annual_cost"] = None
+        row["cost_visible"] = show_cost
+    return jsonify({
+        "success": True,
+        "vendors": window,
+        "total": total,
+        "page": page,
+        "pages": pages,
+        "per_page": per_page,
+        "pagination": {"page": page, "per_page": per_page, "total": total, "pages": pages,
+                       "has_prev": page > 1, "has_next": page < pages},
+    })
+
+
+@unified_vendors_api_bp.route("/choices", methods=["GET"])
+@login_required
+def vendor_choices():
+    """Vendors to pick from when setting a system's vendor: this organisation's and the catalogue's."""
+    from app.services import vendor_register
+
+    org_id = _register_org_id()
+    term = (request.args.get("q") or "").strip()
+    if org_id is None:
+        return api_error("No organisation is selected.", "NO_ORGANISATION", 400)
+    query = VendorOrganization.query.filter(
+        db.or_(VendorOrganization.named_by_organization_id.is_(None), VendorOrganization.id.in_(
+            vendor_register.vendor_ids(org_id) or [0])))
+    if term:
+        query = query.filter(VendorOrganization.name.ilike(f"%{term}%"))
+    found = query.order_by(func.lower(VendorOrganization.name)).limit(8).all()
+    return jsonify({"success": True, "vendors": [{"id": v.id, "name": v.name} for v in found]})
+
+
+@unified_vendors_api_bp.route("/map-system", methods=["POST"])
+@login_required
+@rate_limit(60, "1m")
+def map_system_to_vendor():
+    """Record which vendor supplies a system (by vendor id, or by a name that creates it)."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services import vendor_register
+
+    if not can_set_vendor(current_user):
+        return api_error("Your role cannot change a system's vendor.", "FORBIDDEN", 403)
+    org_id = _register_org_id()
+    data = request.get_json(silent=True) or {}
+    application = None
+    if str(data.get("application_id") or "").isdigit() and org_id is not None:
+        application = ApplicationComponent.query.filter_by(
+            id=int(data["application_id"]), organization_id=org_id).filter(
+            ApplicationComponent.deleted_at.is_(None)).first()
+    if application is None:
+        return api_error("System not found.", "NOT_FOUND", 404)
+    if str(data.get("vendor_id") or "").isdigit():
+        vendor = db.session.get(VendorOrganization, int(data["vendor_id"]))
+        if vendor is None or vendor.id not in set(vendor_register.vendor_ids(org_id)) | {
+                v.id for v in VendorOrganization.query.filter(VendorOrganization.named_by_organization_id.is_(None))}:
+            return api_error("Vendor not found.", "NOT_FOUND", 404)
+    else:
+        name = vendor_register.clean_name(data.get("vendor_name"))
+        if not name or len(name) > 100:
+            return api_error("Give the vendor a name of up to 100 characters.", "INVALID_INPUT", 400)
+        vendor = vendor_register.resolve_vendor(name, org_id)
+    vendor_register.set_application_vendor(application, vendor)
+    db.session.commit()
+    return jsonify({"success": True, "application_id": application.id,
+                    "vendor": {"id": vendor.id, "name": vendor.name}})
+
+
 @unified_vendors_api_bp.route("/bulk", methods=["DELETE"])
 @login_required
 @platform_admin_required

@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 
@@ -25,7 +26,7 @@
             <p class="text-2xl font-bold mt-1
                 {% if rollup.fit_gap.clean_core_score >= 70 %}text-success{% elif rollup.fit_gap.clean_core_score >= 40 %}text-warning{% else %}text-destructive{% endif %}">
                 {{ rollup.fit_gap.clean_core_score }}%</p>
-            {% else %}<p class="text-lg text-muted-foreground mt-1">No data</p>{% endif %}
+            {% else %}<p class="text-lg text-muted-foreground mt-1">Not scored yet. Run the fit-gap analysis to see it.</p>{% endif %}
         </div>
         <div class="border border-border rounded-lg bg-card p-4" data-testid="cc-target">
             <p class="text-xs text-muted-foreground uppercase tracking-wider">Target</p>

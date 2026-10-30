@@ -1,0 +1,29 @@
+{# The company kind, industry and frameworks a company works with: sign-up step 3 and Settings share these fields. #}
+<div class="grid gap-4 sm:grid-cols-2">
+    <div class="space-y-1.5" data-testid="signup-kind">
+        {% call label(for='welcome-kind') %}What kind of company are you?{% endcall %}
+        {% call native_select(id='welcome-kind', name='kind', class='w-full') %}
+            {% for key, name in kinds %}
+            <option value="{{ key }}"{% if (chosen.kind or 'startup') == key %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        {% endcall %}
+    </div>
+    <div class="space-y-1.5" data-testid="signup-industry">
+        {% call label(for='welcome-industry') %}Your industry{% endcall %}
+        {% call native_select(id='welcome-industry', name='industry', class='w-full') %}
+            <option value="">Not sure yet</option>
+            {% for key, name, model in industries %}
+            <option value="{{ key }}"{% if chosen.industry == key %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        {% endcall %}
+    </div>
+</div>
+<fieldset class="space-y-2" data-testid="signup-frameworks"{% if suggested is defined %} data-suggest="{{ {'goal': goal_frameworks, 'kind': kind_frameworks} | tojson | forceescape }}"{% endif %}>
+    <legend class="text-sm font-medium">{% if suggested is defined %}Frameworks that suit your goal{% else %}Frameworks you already work with{% endif %}</legend>
+    <div class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+        {% for key, name, note in frameworks %}
+        {{ checkbox(id='welcome-framework-' ~ key, value=key, label=name, checked=(key in chosen.frameworks), class=('hidden' if suggested is defined and key not in suggested and key not in chosen.frameworks else ''), attrs_dict={'data-framework': '', 'title': note}) }}
+        {% endfor %}
+    </div>
+    {% if suggested is defined %}{{ button(text='Show all frameworks', variant='link', size='sm', testid='signup-frameworks-all', attrs_dict={'data-action': 'show-frameworks'}) }}{% endif %}
+</fieldset>

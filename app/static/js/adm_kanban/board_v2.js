@@ -29,9 +29,15 @@
                 card_type: '',
             },
 
-            // Drag state
-            draggingCard: null,
-            dragOverColumn: null,
+            // Requirements: the panel beside the board (a sheet when narrow), the one picked, the phase shown
+            requirements: [],
+            requirementsLoaded: false,
+            requirementsError: null,
+            linkError: null,
+            selectedReq: null,
+            phaseFilter: '',
+            wide: false,
+            panelOpen: true,
 
             // Detail modal
             detailCard: null,
@@ -104,19 +110,19 @@
                 });
             },
 
-            // Swimlane state
-            viewMode: 'swimlane',
-            collapsedPhases: {},
-
-            // Deliverable checklist state
-            phaseDeliverables: {},
-            expandedDeliverablePhase: null,
+            // Deliverables dialog: the solution card it was opened from, or null when closed
+            deliverableSolution: null,
+            deliverableState: { loading: false, error: null, phase: null, checklist: [], also_produced: [], total: 0, complete: 0 },
 
 
             // -- Init ------------------------------------------------
 
             init: function () {
                 let self = this;
+                let query = global.matchMedia('(min-width: 1280px)');
+                self.wide = query.matches;
+                query.addEventListener('change', function (e) { self.wide = e.matches; });
+                self.loadRequirements();
                 _fetch('/api/adm-kanban/v2/config').then(function (cfg) {
                     if (cfg && cfg.wip_limits) self.wipLimits = cfg.wip_limits;
                 });
@@ -130,8 +136,9 @@
             wipLimit: function (colId) {
                 return this.wipLimits[colId] || 0;
             },
+            // Counted from the cards the board shows, so the summary and the lanes agree.
             wipCount: function (colId) {
-                return this.columnCounts[colId] || 0;
+                return this.cards.filter(function (c) { return c.card_type !== 'deliverable' && c.column === colId; }).length;
             },
             wipAtLimit: function (colId) {
                 let lim = this.wipLimit(colId);
@@ -152,9 +159,10 @@
                 return s && s[colId] ? s[colId] : null;
             },
 
-            reload: function () {
+            // quiet: refresh the cards in place, without the loading skeleton
+            reload: function (quiet) {
                 let self = this;
-                self.loading = true;
+                if (quiet !== true) self.loading = true;
                 self.error = null;
 
                 let params = new URLSearchParams();
@@ -167,22 +175,19 @@
                 if (self.filters.priority) {
                     params.set('priority', self.filters.priority);
                 }
-                if (self.filters.card_type) {
-                    params.set('card_type', self.filters.card_type);
-                }
 
                 let url = '/api/adm-kanban/v2/cards';
                 let qs = params.toString();
                 if (qs) url += '?' + qs;
 
-                _fetch(url).then(function (data) {
+                _fetch(url, { silent: true }).then(function (data) {
                     self.loading = false;
                     if (!data) {
-                        self.error = 'Failed to load board';
+                        self.error = 'The board could not load. Try again.';
                         return;
                     }
                     if (data.success === false) {
-                        self.error = (data && data.error) || 'Failed to load board';
+                        self.error = 'The board could not load. Try again.';
                         return;
                     }
                     self.cards = Array.isArray(data)
@@ -199,7 +204,274 @@
                     self.totalCardCount = self.cards.length;
                 }).catch(function (err) {
                     self.loading = false;
-                    self.error = (err && err.message) || 'Network error';
+                    self.error = 'The board could not load. Try again.';
+                });
+            },
+
+            // -- Lanes: the ADM cycle, one lane per phase --------------
+
+            // -- Requirements and the cycle ----------------------------
+
+            loadRequirements: function () {
+                let self = this;
+                self.requirementsError = null;
+                _fetch('/api/adm-kanban/v2/requirements', { silent: true }).then(function (data) {
+                    if (!data || data.success === false) throw new Error('load');
+                    self.requirements = data.requirements || [];
+                    self.requirementsLoaded = true;
+                }).catch(function () {
+                    self.requirementsError = 'The requirements could not load. Try again.';
+                });
+            },
+
+            requirementTotal: function () {
+                return this.requirements.length;
+            },
+
+            solutionCards: function () {
+                return this.cards.filter(function (c) { return c.card_type === 'solution'; });
+            },
+
+            // The line on a card: its count, then its two highest-priority names.
+            requirementChipText: function (card) {
+                let n = card.requirement_total || 0;
+                return n ? this.plural(n, 'requirement') : 'No requirements';
+            },
+
+            topRequirements: function (card) {
+                return (card.requirements || []).slice(0, 2);
+            },
+
+            requirementPhaseText: function (r) {
+                return r.phase_label ? r.phase_label : 'No phase set';
+            },
+
+            isHighlighted: function (card) {
+                if (this.selectedReq === null || card.card_type !== 'solution') return false;
+                let r = this.requirements.find(function (x) { return x.id === this.selectedReq; }, this);
+                return !!r && r.solution_id === card.entity_id;
+            },
+
+            selectRequirement: function (r) {
+                this.selectedReq = this.selectedReq === r.id ? null : r.id;
+                if (!this.wide) global.closeDrawer('adm-requirements');
+            },
+
+            openRequirements: function () {
+                if (this.wide) {
+                    this.panelOpen = !this.panelOpen;
+                } else {
+                    global.openDrawer('adm-requirements');
+                }
+            },
+
+            linkRequirement: function (r, value) {
+                let self = this;
+                self.linkError = null;
+                _fetch('/api/adm-kanban/v2/requirements/' + r.id + '/solution', {
+                    method: 'PATCH',
+                    body: { solution_id: value === '' ? null : parseInt(value, 10) },
+                    silent: true,
+                }).then(function (data) {
+                    if (!data || data.success === false || !data.requirement) throw new Error('save');
+                    Object.assign(r, data.requirement);
+                    self.reload(true);
+                }).catch(function () {
+                    self.linkError = 'The link could not be saved. Try again.';
+                    self.loadRequirements();
+                });
+            },
+
+            cycleCards: function (code) {
+                return this.visibleCards().filter(function (c) { return c.phase === code; });
+            },
+
+            cycleCount: function (code) {
+                return this.cycleCards(code).length;
+            },
+
+            cycleLabel: function (code) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                let n = this.cycleCount(code);
+                let name = p ? p.label : code;
+                let prefix = (code === 'PRELIM') ? '' : code + ': ';
+                return prefix + name + ', ' + this.plural(n, 'card');
+            },
+
+            // The name read aloud starts with the words drawn on the circle ("B 1"), then says what they mean.
+            cycleAria: function (code, short) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                let n = this.cycleCount(code);
+                return short + ' ' + n + ': ' + (p ? p.label : code) + ', ' + this.plural(n, 'card');
+            },
+
+            cycleTip: '',
+
+            cycleName: function (code) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                return (code === 'PRELIM' ? '' : code + ': ') + (p ? p.label : code);
+            },
+
+            chooseCycle: function (code) {
+                this.phaseFilter = this.phaseFilter === code ? '' : code;
+            },
+
+            // The lanes on the board: the whole cycle, or the one phase chosen in the ring.
+            // Requirements Management is the panel, not a lane; a lane appears for it only
+            // while cards recorded against it exist.
+            lanes: function () {
+                let self = this;
+                return this.phases.filter(function (p) {
+                    if (self.phaseFilter) return p.code === self.phaseFilter;
+                    return p.code !== 'REQ' || self.cycleCount('REQ') > 0;
+                });
+            },
+
+            shownCards: function () {
+                let f = this.phaseFilter;
+                return this.visibleCards().filter(function (c) { return !f || c.phase === f; });
+            },
+
+            plural: function (n, word) {
+                return n + ' ' + word + (n === 1 ? '' : 's');
+            },
+
+            columnLabel: function (colId) {
+                let col = this.columns.find(function (c) { return c.id === colId; });
+                return col ? col.label : colId;
+            },
+
+            phaseKicker: function (code) {
+                if (code === 'PRELIM') return 'Before the cycle';
+                if (code === 'REQ') return 'Centre of the cycle';
+                return 'Phase ' + code;
+            },
+
+            viewpointUrl: function (code) {
+                let map = { A: 'stakeholder', B: 'business_process', C: 'application_cooperation', D: 'technology', E: 'implementation_deployment', F: 'migration', G: 'motivation', H: 'motivation' };
+                return '/archimate/viewpoints?active=' + (map[code] || 'basic');
+            },
+
+            // What the board shows: solutions and tasks by default, one type when filtered.
+            visibleCards: function () {
+                let type = this.filters.card_type;
+                return this.cards.filter(function (c) {
+                    return type ? c.card_type === type : c.card_type !== 'deliverable';
+                });
+            },
+
+            // 'board' when there is something to lay out; otherwise why the board is empty.
+            emptyKind: function () {
+                if (this.visibleCards().length > 0) return 'board';
+                if (this.filters.card_type === 'deliverable') return 'no-deliverables';
+                if (this.filters.assignee !== 'all' || this.filters.priority || this.filters.card_type) return 'filtered';
+                return 'nothing';
+            },
+
+            visibleNoun: function () {
+                return { solution: 'solution', task: 'task', deliverable: 'deliverable' }[this.filters.card_type] || 'card';
+            },
+
+            clearFilters: function () {
+                this.filters.assignee = 'all';
+                this.filters.priority = '';
+                this.filters.card_type = '';
+                this.reload();
+            },
+
+            laneCards: function (phaseCode) {
+                return this.visibleCards().filter(function (c) { return c.phase === phaseCode; });
+            },
+
+            // Cards of one lane grouped by status; deliverables are not a status, so they form their own group.
+            laneGroups: function (phaseCode) {
+                let cards = this.laneCards(phaseCode);
+                let groups = [];
+                this.columns.forEach(function (col) {
+                    let inCol = cards.filter(function (c) { return c.card_type !== 'deliverable' && c.column === col.id; });
+                    if (inCol.length) groups.push({ id: col.id, label: col.label, cards: inCol });
+                });
+                let deliverables = cards.filter(function (c) { return c.card_type === 'deliverable'; });
+                if (deliverables.length) groups.push({ id: 'deliverables', label: 'Deliverables', cards: deliverables });
+                return groups;
+            },
+
+            laneCountText: function (phaseCode) {
+                let cards = this.laneCards(phaseCode);
+                if (!cards.length) return '';
+                let self = this;
+                let parts = [];
+                [['solution', 'solution'], ['task', 'task'], ['deliverable', 'deliverable']].forEach(function (t) {
+                    let n = cards.filter(function (c) { return c.card_type === t[0]; }).length;
+                    if (n) parts.push(self.plural(n, t[1]));
+                });
+                return parts.join(', ');
+            },
+
+            laneEmptyText: function () {
+                let type = this.filters.card_type;
+                if (type === 'deliverable') return 'No deliverables in this phase';
+                if (type === 'task') return 'No tasks in this phase';
+                return 'No solutions in this phase';
+            },
+
+            // The chip on a solution: its own deliverables and how many are complete.
+            deliverableChipText: function (card) {
+                let total = (card.meta && card.meta.deliverables_total) || 0;
+                if (!total) return 'No deliverables';
+                return (card.meta.deliverables_complete || 0) + ' of ' + this.plural(total, 'deliverable') + ' complete';
+            },
+
+            stateLabel: function (item) {
+                return item.complete ? 'Complete' : ({ planned: 'Planned', in_progress: 'In progress', delayed: 'Delayed' }[item.status] || 'In progress');
+            },
+
+            stateLabelFor: function (colId) {
+                return { proposed: 'Planned', done: 'Complete' }[colId] || 'In progress';
+            },
+
+            deliverableTitle: function () {
+                return this.deliverableSolution ? 'Deliverables — ' + this.deliverableSolution.title : '';
+            },
+
+            deliverableSummary: function () {
+                let st = this.deliverableState;
+                if (st.loading || st.error) return '';
+                let phase = st.phase ? this.phaseLabel(st.phase) : 'its phase';
+                return st.complete + ' of ' + this.plural(st.total, 'deliverable') + ' complete, set against the TOGAF checklist for ' + phase;
+            },
+
+            openDeliverables: function (card) {
+                this.deliverableSolution = card;
+                this.loadSolutionDeliverables(card);
+            },
+
+            closeDeliverables: function () {
+                this.deliverableSolution = null;
+            },
+
+            // Change a card's status from the select on the card.
+            moveStatus: function (card, toColumn) {
+                if (!card || card.column === toColumn) return;
+                let self = this;
+                let prev = card.column;
+                card.column = toColumn;
+                _fetch('/api/adm-kanban/v2/cards/' + card.id + '/move', {
+                    method: 'POST',
+                    body: { to_column: toColumn },
+                    silent: true,
+                }).then(function (data) {
+                    if (data && data.card) Object.assign(card, data.card);
+                }).catch(function (err) {
+                    card.column = prev;
+                    let errData = err && err.data;
+                    let msg = (errData && errData.error) || (err && err.message) || 'Move failed';
+                    if (errData && errData.wip_exceeded) {
+                        msg = '⚠ WIP limit reached: ' + msg;
+                    }
+                    if (global.Platform && global.Platform.toast) {
+                        global.Platform.toast.error(msg);
+                    }
                 });
             },
 
@@ -209,87 +481,9 @@
                 return this.cards.filter(function (c) { return c.column === colId; });
             },
 
-            // -- Drag and drop ---------------------------------------
-
-            onDragStart: function (event, card) {
-                this.draggingCard = card;
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', card.id);
-            },
-
-            onDragEnd: function () {
-                this.draggingCard = null;
-                this.dragOverColumn = null;
-            },
-
-            onDragOver: function (event, colId) {
-                if (!this.draggingCard) return;
-                event.dataTransfer.dropEffect = 'move';
-                this.dragOverColumn = colId;
-            },
-
-            onDragLeave: function (event) {
-                if (!event.currentTarget.contains(event.relatedTarget)) {
-                    this.dragOverColumn = null;
-                }
-            },
-
-            onDrop: function (event, toColumn) {
-                let self = this;
-                self.dragOverColumn = null;
-
-                if (!self.draggingCard) return;
-                if (self.draggingCard.column === toColumn) {
-                    self.draggingCard = null;
-                    return;
-                }
-
-                let cardRef = self.draggingCard.id;
-                let prevColumn = self.draggingCard.column;
-                self.draggingCard = null;
-
-                // Optimistic UI: move card immediately
-                let card = self.cards.find(function (c) { return c.id === cardRef; });
-                if (card) {
-                    card.column = toColumn;
-                    // Landing animation: find the card element and add bounce class
-                    self.$nextTick(function () {
-                        let el = document.querySelector('[data-card-id="' + cardRef + '"]');
-                        if (el) {
-                            el.classList.add('kanban-card-landed');
-                            setTimeout(function () { el.classList.remove('kanban-card-landed'); }, 300);
-                        }
-                    });
-                }
-
-                _fetch('/api/adm-kanban/v2/cards/' + cardRef + '/move', {
-                    method: 'POST',
-                    body: { to_column: toColumn },
-                    silent: true,
-                }).then(function (data) {
-                    if (data && data.card && card) {
-                        Object.assign(card, data.card);
-                    }
-                    self.columnCounts = Object.assign({}, self.columnCounts);
-                }).catch(function (err) {
-                    // Revert optimistic move
-                    if (card) card.column = prevColumn;
-                    let errData = err && err.data;
-                    let msg = (errData && errData.error) || (err && err.message) || 'Move failed';
-                    if (errData && errData.wip_exceeded) {
-                        msg = '\u26a0 WIP limit reached: ' + msg;
-                    }
-                    if (global.Platform && global.Platform.toast) {
-                        global.Platform.toast.error(msg);
-                    }
-                });
-            },
-
             // -- Card detail -----------------------------------------
 
             openDetail: function (card) {
-                // Don't open detail while dragging
-                if (this.draggingCard) return;
                 this.detailCard = card;
                 this.loadArtifacts(card);
                 window.dispatchEvent(new CustomEvent('adm-card-open', {
@@ -434,145 +628,60 @@
                 return p ? p.label : code;
             },
 
-            // -- Swimlane helpers ------------------------------------
-
-            togglePhase: function (phaseCode) {
-                this.collapsedPhases[phaseCode] = !this.collapsedPhases[phaseCode];
-            },
-
-            isPhaseCollapsed: function (phaseCode) {
-                return !!this.collapsedPhases[phaseCode];
-            },
-
-            swimlaneCards: function (phaseCode, colId) {
-                return this.cards.filter(function (c) {
-                    return c.phase === phaseCode && c.column === colId;
-                });
-            },
-
             solutionCount: function () {
                 return this.cards.filter(function (c) { return c.card_type === 'solution'; }).length;
             },
 
-            phaseTotal: function (phaseCode) {
-                return this.cards.filter(function (c) { return c.phase === phaseCode; }).length;
-            },
-
             // -- Deliverable checklist helpers ---------------------------
 
-            loadPhaseDeliverables: function (phaseCode) {
+            loadSolutionDeliverables: function (card) {
                 let self = this;
-                if (self.phaseDeliverables[phaseCode]) return; // already loaded
-                self.phaseDeliverables[phaseCode] = {
-                    loading: true, total: 0, checked: 0, deliverables: [],
-                };
-                _fetch('/api/adm-kanban/v2/phases/' + phaseCode + '/deliverables')
+                self.deliverableState = { loading: true, error: null, phase: null, checklist: [], also_produced: [], total: 0, complete: 0 };
+                _fetch('/api/adm-kanban/v2/solutions/' + card.entity_id + '/deliverables')
                     .then(function (data) {
-                        if (data && data.success) {
-                            self.phaseDeliverables[phaseCode] = {
-                                loading: false,
-                                total: data.total,
-                                checked: data.checked,
-                                deliverables: data.deliverables,
-                            };
-                        } else {
-                            self.phaseDeliverables[phaseCode] = {
-                                loading: false, total: 0, checked: 0, deliverables: [],
-                            };
+                        if (self.deliverableSolution !== card) return;
+                        if (!data || !data.success) {
+                            self.deliverableState.loading = false;
+                            self.deliverableState.error = (data && data.error) || 'The deliverables could not be loaded.';
+                            return;
                         }
+                        self.deliverableState = {
+                            loading: false, error: null, phase: data.phase, checklist: data.checklist,
+                            also_produced: data.also_produced, total: data.total, complete: data.complete,
+                        };
+                        // The chip on the card reads the same figures.
+                        card.meta.deliverables_total = data.total;
+                        card.meta.deliverables_complete = data.complete;
                     })
                     .catch(function () {
-                        self.phaseDeliverables[phaseCode] = {
-                            loading: false, total: 0, checked: 0, deliverables: [],
-                        };
+                        self.deliverableState.loading = false;
+                        self.deliverableState.error = 'The deliverables could not be loaded.';
                     });
             },
 
-            toggleDeliverableDropdown: function (event, phaseCode) {
-                event.stopPropagation();
-                if (this.expandedDeliverablePhase === phaseCode) {
-                    this.expandedDeliverablePhase = null;
-                } else {
-                    this.expandedDeliverablePhase = phaseCode;
-                    this.loadPhaseDeliverables(phaseCode);
-                }
-            },
-
-            toggleDeliverable: function (deliverableId, phaseCode, newChecked) {
+            // The tick is the deliverable's own status: save it, then show what was saved.
+            toggleDeliverable: function (item, newComplete) {
                 let self = this;
-                let pd = self.phaseDeliverables[phaseCode];
-                if (!pd) return;
-                let item = pd.deliverables.find(function (d) { return d.id === deliverableId; });
-                if (item) {
-                    item.checked = newChecked;
-                    pd.checked = pd.deliverables.filter(function (d) { return d.checked; }).length;
-                }
-                _fetch('/api/adm-kanban/v2/deliverables/' + deliverableId + '/check', {
+                let card = self.deliverableSolution;
+                _fetch('/api/adm-kanban/v2/deliverables/' + item.id + '/complete', {
                     method: 'PATCH',
-                    body: { checked: newChecked },
+                    body: { complete: newComplete },
+                }).then(function (data) {
+                    if (!data || !data.success) throw new Error((data && data.error) || 'not saved');
+                    self.loadSolutionDeliverables(card);
+                    self.syncDeliverableCard(item.id, data.deliverable);
                 }).catch(function () {
-                    if (item) {
-                        item.checked = !newChecked;
-                        pd.checked = pd.deliverables.filter(function (d) { return d.checked; }).length;
-                    }
+                    item.complete = !newComplete;
+                    self.deliverableState.error = 'That change could not be saved. Try again.';
                 });
             },
 
-            deliverableBadgeClass: function (phaseCode) {
-                let pd = this.phaseDeliverables[phaseCode];
-                if (!pd || pd.total === 0) return 'bg-muted/60 text-muted-foreground border border-border';
-                if (pd.checked === pd.total) return 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30';
-                if (pd.checked > 0) return 'bg-amber-500/10 text-amber-600 border border-amber-500/30';
-                return 'bg-muted/60 text-muted-foreground border border-border';
+            // Keep the deliverable's own card (the Deliverables view) in step with what was saved.
+            syncDeliverableCard: function (deliverableId, saved) {
+                let own = this.cards.find(function (c) { return c.id === 'deliverable:' + deliverableId; });
+                if (own) own.column = saved.complete ? 'done' : 'under_development';
             },
 
-            deliverableBadgeText: function (phaseCode) {
-                let pd = this.phaseDeliverables[phaseCode];
-                if (!pd || pd.loading) return '✓ …';
-                return '✓ ' + pd.checked + '/' + pd.total;
-            },
-
-            // -- SA-003: suggested element guide --------------------------
-
-            phaseElements: {},
-
-            loadPhaseElements: function (phaseCode) {
-                let self = this;
-                if (self.phaseElements[phaseCode]) return;
-                self.phaseElements[phaseCode] = { loading: true, total_suggested: 0, created: 0, pct: 0, elements: [] };
-                _fetch('/api/adm-kanban/v2/phases/' + phaseCode + '/suggested-elements')
-                    .then(function (data) {
-                        if (data && data.success) {
-                            self.phaseElements[phaseCode].elements = data.elements || [];
-                            self.phaseElements[phaseCode].total_suggested = (data.elements || []).length;
-                        }
-                        self.phaseElements[phaseCode].loading = false;
-                    })
-                    .catch(function () {
-                        self.phaseElements[phaseCode].loading = false;
-                        self.phaseElements[phaseCode].elementsFailed = true;
-                    });
-                _fetch('/api/adm-kanban/v2/phases/' + phaseCode + '/completion')
-                    .then(function (data) {
-                        if (data && data.success) {
-                            self.phaseElements[phaseCode].created = data.created || 0;
-                            self.phaseElements[phaseCode].pct = data.pct || 0;
-                        }
-                    })
-                    .catch(function () {
-                        // Platform.fetch already toasted the failure; mark completion as
-                        // unknown so the badge shows "—" instead of a fabricated 0/N.
-                        self.phaseElements[phaseCode].completionFailed = true;
-                    });
-            },
-
-            phaseElementBadgeText: function (phaseCode) {
-                let pe = this.phaseElements[phaseCode];
-                if (!pe || pe.loading) return '';
-                let created = pe.completionFailed ? '—' : pe.created;
-                let total = pe.elementsFailed ? '—' : pe.total_suggested;
-                return created + '/' + total + ' elements';
-            },
         };
     };
 

@@ -1,31 +1,23 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
 
 {% from 'components/button.html' import button %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
 
 {% block title %}EA Automated Workflows{% endblock %}
 
 {% macro _ea_workflows_actions() %}
-<div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
-    <button type="button" @click="seedWorkflows()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Seed default workflows">
-        <i data-lucide="database" class="h-4 w-4" aria-hidden="true"></i>
-        <span class="hidden sm:inline">Seed Defaults</span>
-    </button>
-    <a href="{{ url_for('main.ea_workflows_approvals') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <i data-lucide="check-square" class="h-4 w-4" aria-hidden="true"></i>
-        <span class="hidden sm:inline">Pending Approvals</span>
-        {% if status_counts.waiting_approval %}
-        <span class="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-warning text-primary-foreground text-xs">
-            {{ status_counts.waiting_approval }}
-        </span>
-        {% endif %}
-    </a>
-    <a href="{{ url_for('main.ea_workflows_definitions') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <i data-lucide="list" class="h-4 w-4" aria-hidden="true"></i>
-        <span class="hidden sm:inline">All Workflows</span>
-    </a>
+<div class="flex flex-wrap items-start gap-2" data-testid="page-actions">
+    {% if is_platform_administrator() %}
+    {% call button(variant='outline', on_click='seedWorkflows()', aria_label='Seed default workflows', icon='database') %}<span class="hidden sm:inline">Seed Defaults</span>{% endcall %}
+    {% else %}
+    {{ disabled_action('Seed Defaults', 'Only a platform administrator can add the default workflows.', 'seed-defaults-reason', icon='database') }}
+    {% endif %}
+    {% call button(variant='outline', href=url_for('main.ea_workflows_approvals'), icon='check-square', aria_label='Pending approvals') %}<span class="hidden sm:inline">Pending Approvals</span>{% if status_counts.waiting_approval %} <span class="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-warning text-primary-foreground text-xs">{{ status_counts.waiting_approval }}</span>{% endif %}{% endcall %}
+    {% call button(variant='default', href=url_for('main.ea_workflows_definitions'), icon='list', aria_label='All workflows') %}<span class="hidden sm:inline">All Workflows</span>{% endcall %}
 </div>
 {% endmacro %}
 
@@ -648,7 +640,7 @@
                             Cancel
                         </button>
                         <button type="submit" id="startWorkflowBtn"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center" aria-label="Submit">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
                             <i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i>
                             Start Workflow
                         </button>
@@ -1322,7 +1314,7 @@ async function seedWorkflows() {
         }
     } catch (error) {
         if (window.Platform && window.Platform.toast) {
-            Platform.toast.error('Network error: ' + error.message);
+            Platform.toast.error(error.message || 'The default workflows could not be added.');
         }
     }
 }

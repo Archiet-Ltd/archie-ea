@@ -9,7 +9,6 @@ adm_audit_summaries
 adm_board_portfolio_links
 adm_compliance_checkpoints
 adm_data_retention_policies
-adm_deliverable_checks
 adm_deliverables
 adm_phase_steps
 adm_phases
@@ -385,7 +384,6 @@ spec_webhooks
 sprints
 sso_configs
 staging_elements
-stakeholder_communications
 stakeholder_inputs
 strategy_resources
 structural_groupings

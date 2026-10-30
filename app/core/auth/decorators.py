@@ -204,6 +204,35 @@ def require_permission(action, object_type):
 
             return f(*args, **kwargs)
 
+        # A blueprint-wide write floor reads this to let a matrix grant through (it cannot
+        # refuse what the route's own matrix check admits); the check above still runs.
+        decorated_function.matrix_guard = (action, object_type)
+        return decorated_function
+
+    return decorator
+
+
+def admit_model_changers(existing_guard):
+    """Wrap ``existing_guard`` so a person who may change the model is admitted too.
+
+    ``can_change_model`` is the permission-matrix answer the screens use to draw
+    "New", "Edit" and "Import" controls; routes that only asked a role name
+    refused the architect persona those controls were drawn for. Everyone the
+    existing guard admitted is still admitted.
+    """
+
+    def decorator(f):
+        guarded = existing_guard(f)
+
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if current_user.is_authenticated:
+                from app.core.auth.permissions import can_change_model
+
+                if can_change_model(current_user):
+                    return f(*args, **kwargs)
+            return guarded(*args, **kwargs)
+
         return decorated_function
 
     return decorator

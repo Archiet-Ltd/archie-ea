@@ -133,6 +133,18 @@ def _check_solution_access(solution, user=None) -> bool:
             )
     if getattr(user, "is_platform_admin", False):
         return True
+    # A persona the permission matrix lets read every solution (an architect,
+    # the reviewer, the CTO, a viewer) opens the solutions of their own
+    # organisation, the same answer the solutions list is drawn from.
+    org_id = getattr(solution, "organization_id", None)
+    if org_id is not None and getattr(user, "organization_id", None) == org_id:
+        try:
+            from app.core.auth.permissions import can
+
+            if can(user, "view_all", "solution", org_id):
+                return True
+        except Exception:  # noqa: BLE001 - an unreadable grant is no ability
+            logger.exception("view_all check failed in _check_solution_access")
     _stakeholder_emails = [
         solution.solution_owner,
         solution.business_sponsor,
@@ -3058,33 +3070,16 @@ def view_solution(solution_id: int):
     if not _check_solution_access(solution):
         abort(403)
 
-    # Blueprint page ships ON by default (wired, reachable). Explicit config/env
-    # value can opt OUT; ?edit=1 forces the legacy detail/editor view.
-    _bp_setting = current_app.config.get("USE_BLUEPRINT_PAGE")
-    if _bp_setting is None:
-        _bp_setting = os.environ.get("USE_BLUEPRINT_PAGE", "true")
-    use_blueprint = (
-        str(_bp_setting).strip().lower() in ("true", "1", "yes", "on")
-        and request.args.get("edit") != "1"
-    )
+    # The solution record: one record page with seven tabs (the solutions
+    # rethink, slice 5). ?edit=1 still opens the legacy editor.
+    if request.args.get("edit") != "1":
+        from app.modules.solutions_strategic.v2.services import solution_record_service
 
-    if use_blueprint:
-        try:
-            ctx = _build_blueprint_context(solution)
-
-            # Fire proactive analysis in background — does not block page render
-            import threading as _t
-            _t.Thread(
-                target=_run_proactive_analysis,
-                args=(current_app._get_current_object(), solution.id, solution.organization_id),
-                daemon=True,
-            ).start()
-
-            ctx["show_created_banner"] = request.args.get("created") == "1"
-            return render_template("solutions/blueprint.html", **ctx)
-        except Exception as e:
-            logger.error("Blueprint page failed for solution %s: %s. Falling back to legacy.", solution.id, e, exc_info=True)
-            # Fall through to legacy detail page
+        ctx = solution_record_service.build(
+            solution, tab=request.args.get("tab"), user=current_user,
+        )
+        ctx["show_created_banner"] = request.args.get("created") == "1"
+        return render_template("solutions/record.html", **ctx)
 
     # AIC-312: Check for active workbench workspace linked to this solution
     active_workspace_id = None
@@ -4480,6 +4475,41 @@ def list_solution_comments(solution_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@solution_design_bp.route("/<int:solution_id>/notes", methods=["POST"])
+@login_required
+def create_solution_note(solution_id: int):
+    """A typed note on the solution record: meeting, email, decision, escalation or
+    status update (the solutions rethink, slice 5b; the old communication log)."""
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        abort(403)
+    from app.modules.solutions_strategic.v2.services.solution_record_service import NOTE_KINDS
+    from app.services import communication_log_service
+
+    data = request.get_json(silent=True) or {}
+    kind = (data.get("kind") or data.get("comm_type") or "").strip().lower()
+    subject = (data.get("subject") or "").strip()
+    if kind not in dict(NOTE_KINDS):
+        return jsonify({"error": "kind must be one of " + ", ".join(k for k, _ in NOTE_KINDS)}), 400
+    if not subject:
+        return jsonify({"error": "subject is required"}), 400
+    try:
+        entry = communication_log_service.log_communication(
+            solution_id=solution.id,
+            stakeholder_id=None,
+            comm_type=kind,
+            subject=subject[:255],
+            summary=(data.get("summary") or "").strip() or None,
+            outcome=(data.get("outcome") or "").strip() or None,
+            action_items=[],
+            logged_by=current_user.id,
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"success": True, "note": entry.to_dict()}), 201
+
+
 @solution_design_bp.route("/<int:solution_id>/comments", methods=["POST"])
 @login_required
 def create_solution_comment(solution_id: int):
@@ -4524,7 +4554,8 @@ def export_archimate_oef(solution_id):
     from app.services.archimate_oef_export_service import archimate_oef_export_service
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    # Exporting reads what the person may already open.
+    if not _check_solution_access(solution):
         abort(403)
 
     try:
@@ -10829,7 +10860,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
             "description": elem.description or "",
             "scope": elem.scope,
             "building_block_type": getattr(elem, "building_block_type", None),
-            "plateau": elem.plateau,
+            "plateau": elem.togaf_plateau,
             "status": "linked",
             # Contextual intelligence fields (empty for non-app elements)
             "lifecycle": ctx.get("lifecycle", ""),
@@ -10888,7 +10919,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
                 "description": getattr(elem, "description", "") or "",
                 "scope": getattr(elem, "scope", None),
                 "building_block_type": getattr(elem, "building_block_type", None),
-                "plateau": getattr(elem, "plateau", None),
+                "plateau": getattr(elem, "togaf_plateau", None),
                 "status": "context",
                 "lifecycle": "",
                 "other_solutions": 0,

@@ -65,3 +65,20 @@ python scripts/guardrails/analyze_deprecated_usage.py --by-macro
 **+ 93 more components** in components/ and macros/ directories.
 
 See full catalog in [docs/design-system/components.md](../../docs/design-system/components.md)
+
+---
+
+## shadcn_compat.html: component substrate reference
+
+`{% from 'macros/shadcn_compat.html' import shadcn_select %}`. One new macro: the native select. A dialog is
+`components/modal.html` (`modal`), a card is `section_card` in `macros/page_shell.html`, a badge is
+`components/badge.html` (`badge`, status values through `components/status_badge.html`); none is defined a second time.
+`attrs` is a dict of extra attributes, rendered through `xmlattr` so keys and values are escaped.
+
+| Macro | Signature | Notes |
+|---|---|---|
+| `shadcn_select` | `(name, label="", options=None, selected=None, help_text="", error="", id=None, required=false, disabled=false, placeholder=None, bare=false, class="", attrs=None)` | Native select. Options as `(value, label)` pairs or a `{% call %}` body of `<option>`. Error sets `aria-invalid` and `aria-describedby`. `bare=true` renders the control alone. |
+| `shadcn_button` | `(text, variant="primary", size="md", href=None)` | Existing, unchanged (deprecated in favour of `components/button.html`). |
+| `shadcn_input` | `(name, value="", type="text", placeholder="", required=false)` | Existing, unchanged. |
+| `shadcn_table` | `(headers, rows, striped=true)` | Existing, unchanged. |
+| `metric_card` | `(label, value, delta, trend="up", footer_label="", footer_text="")` | Existing, unchanged. |

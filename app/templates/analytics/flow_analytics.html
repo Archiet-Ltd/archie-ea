@@ -1,173 +1,185 @@
+{# design-block: dashboard #}
+{# shadcn-reference: dashboard-01@e55b60b #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% import 'components/breadcrumb.html' as breadcrumb %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/button.html' import button %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/card.html' import card, card_header, card_title, card_content, card_description %}
 
 {% block title %}Flow Analytics — Throughput &amp; Cycle Time{% endblock %}
 
 {% block content %}
-<!-- modal-a11y-ok -->
+<meta name="shadcn-nearest" content="dashboard-01">
+
 <div class="space-y-6"
-     x-data="flowAnalytics({{ selected_board_id or 'null' }})"
-     x-init="init()">
+     x-data="flowAnalytics({{ selected_board_id or 'null' }})">
 
-    <!-- Breadcrumb -->
-    {% call breadcrumb.breadcrumb() %}
-        {% call breadcrumb.breadcrumb_item(href=url_for('admin.dashboard')) %}
-            <i data-lucide="home" class="h-4 w-4"></i>
-        {% endcall %}
-        {{ breadcrumb.breadcrumb_separator() }}
-        {% call breadcrumb.breadcrumb_item(active=true) %}
-            Flow Analytics
-        {% endcall %}
-    {% endcall %}
-
-    <!-- Page Header + Board Selector -->
     {% macro _ps_actions() %}
-<div>
-            {% if boards %}
-            <label for="board-selector" class="sr-only">Select Board</label>
-            <select id="board-selector"
-                    class="border rounded-md px-3 py-2 text-sm bg-background"
-                    x-model="boardId"
-                    @change="loadAll()">
-                {% for board in boards %}
-                <option value="{{ board.id }}"
-                        {% if selected_board_id is not none and board.id|string == selected_board_id|string %}selected{% endif %}>
-                    {{ board.name }}
-                </option>
-                {% endfor %}
-            </select>
-            {% else %}
-            <span class="text-sm text-muted-foreground">No boards found</span>
-            {% endif %}
-        </div>
+    {% if boards %}
+    {% call native_select(id='board-selector', size='sm', aria_label='Select Board', attrs_dict={'x-model': 'boardId', '@change': 'loadAll()'}) %}
+        {% for board in boards %}
+        <option value="{{ board.id }}"
+                {% if selected_board_id is not none and board.id|string == selected_board_id|string %}selected{% endif %}>
+            {{ board.name }}
+        </option>
+        {% endfor %}
+    {% endcall %}
+    {% else %}
+    <span class="text-sm text-muted-foreground">No boards found</span>
+    {% endif %}
     {% endmacro %}
     {{ page_shell(title='Flow Analytics', breadcrumb=[('Home', '/'), ('Flow Analytics', none)], subtitle='Throughput, cycle time, and WIP metrics from Kanban card flow.', actions_caller=_ps_actions) }}
 
     <!-- Metric Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Avg Cycle Time -->
-        <div class="bg-background rounded-lg border p-5">
-            <p class="text-sm text-muted-foreground">Avg Cycle Time</p>
-            <p class="text-3xl font-bold text-primary mt-1"
-               x-text="cycleData ? cycleData.average_cycle_time_days + 'd' : '—'"></p>
-            <p class="text-xs text-muted-foreground mt-1">P85:
-                <span x-text="cycleData ? cycleData.percentile_85 + 'd' : '—'"></span>
-            </p>
-        </div>
-
-        <!-- Avg Throughput -->
-        <div class="bg-background rounded-lg border p-5">
-            <p class="text-sm text-muted-foreground">Avg Throughput / Week</p>
-            <p class="text-3xl font-bold text-success mt-1"
-               x-text="throughputData ? throughputData.average_throughput : '—'"></p>
-            <p class="text-xs text-muted-foreground mt-1">cards / period</p>
-        </div>
-
-        <!-- Avg Lead Time -->
-        <div class="bg-background rounded-lg border p-5">
-            <p class="text-sm text-muted-foreground">Avg Lead Time</p>
-            <p class="text-3xl font-bold text-warning mt-1"
-               x-text="leadData ? leadData.average_lead_time_days + 'd' : '—'"></p>
-            <p class="text-xs text-muted-foreground mt-1">creation → done</p>
-        </div>
-
-        <!-- Flow Efficiency -->
-        <div class="bg-background rounded-lg border p-5">
-            <p class="text-sm text-muted-foreground">Flow Efficiency</p>
-            <p class="text-3xl font-bold text-primary mt-1"
-               x-text="flowEfficiency !== null ? flowEfficiency + '%' : '—'"></p>
-            <p class="text-xs text-muted-foreground mt-1">active / total lead time</p>
-        </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 lg:px-6">
+        {{ metrics_card(
+            title='Avg Cycle Time',
+            value_alpine="cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'",
+            value_class='text-primary',
+            description_alpine="'P85: ' + (cycleData ? cycleData.percentile_85 + 'd' : '\u2014')",
+            icon='clock'
+        ) }}
+        {{ metrics_card(
+            title='Avg Throughput / Week',
+            value_alpine="throughputData ? throughputData.average_throughput : '\u2014'",
+            value_class='text-success-emphasis',
+            description='cards / period',
+            icon='trending-up'
+        ) }}
+        {{ metrics_card(
+            title='Avg Lead Time',
+            value_alpine="leadData ? leadData.average_lead_time_days + 'd' : '\u2014'",
+            value_class='text-warning-emphasis',
+            description='creation to done',
+            icon='calendar-clock'
+        ) }}
+        {{ metrics_card(
+            title='Flow Efficiency',
+            value_alpine="flowEfficiency !== null ? flowEfficiency + '%' : '\u2014'",
+            value_class='text-primary',
+            description='active / total lead time',
+            icon='gauge'
+        ) }}
     </div>
 
     <!-- Empty State -->
     <template x-if="!loading && noData">
-        <div class="rounded-lg border border-dashed p-12 text-center">
-            <i data-lucide="bar-chart-2" class="h-12 w-12 mx-auto text-muted-foreground mb-4"></i>
-            <h2 class="text-lg font-semibold">No flow data yet</h2>
-            <p class="text-muted-foreground mt-1 text-sm">
-                Move cards through <em>In Progress → Done</em> to start tracking metrics.
-            </p>
-        </div>
+        {{ empty_state(
+            icon='bar-chart-2',
+            title='No flow data yet',
+            description='Move cards through In Progress to Done to start tracking metrics.'
+        ) }}
     </template>
 
-    <!-- Load Failure — a dashed "no data yet" panel and a failed request must
-         not look alike; the cards above already read as em dashes, not zeros. -->
+    <!-- Error State -->
     <template x-if="loadError">
-        <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-12 text-center">
-            <i data-lucide="alert-triangle" class="h-12 w-12 mx-auto text-destructive mb-4"></i>
-            <h2 class="text-lg font-semibold text-destructive-emphasis">Flow metrics could not be loaded</h2>
-            <p class="text-muted-foreground mt-1 text-sm" x-text="loadError"></p>
-            <button type="button" @click="loadAll()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center justify-center">
-                Retry
-            </button>
+        <div class="px-4 lg:px-6">
+            {% call card() %}
+                {% call card_header() %}
+                    {% call card_description() %}Flow metrics could not be loaded{% endcall %}
+                    <div class="mt-1 text-sm text-muted-foreground" x-text="loadError"></div>
+                    <div class="mt-4">
+                        {{ button(text='Retry', variant='outline', on_click='loadAll()') }}
+                    </div>
+                {% endcall %}
+            {% endcall %}
         </div>
     </template>
 
     <!-- Charts Row -->
     <template x-if="!noData && !loadError">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            <!-- Cycle Time Chart -->
-            <div class="bg-background rounded-lg border p-5">
-                <h2 class="text-lg font-semibold mb-3">Cycle Time Distribution</h2>
-                <div class="relative h-[260px]">
-                    <canvas id="cycleTimeChart"></canvas>
-                </div>
-                <template x-if="cycleData && cycleData.data_points.length === 0">
-                    <p class="text-sm text-muted-foreground mt-2">No completed cards in range.</p>
-                </template>
-            </div>
-
-            <!-- Throughput Chart -->
-            <div class="bg-background rounded-lg border p-5">
-                <h2 class="text-lg font-semibold mb-3">Throughput per Period</h2>
-                <div class="relative h-[260px]">
-                    <canvas id="throughputChart"></canvas>
-                </div>
-                <template x-if="throughputData && throughputData.periods.length === 0">
-                    <p class="text-sm text-muted-foreground mt-2">No completed cards to chart.</p>
-                </template>
-            </div>
-        </div>
-    </template>
-
-    <!-- WIP Table -->
-    <template x-if="wipData && wipData.columns && wipData.columns.length > 0">
-        <div class="bg-background rounded-lg border p-5">
-            <h2 class="text-lg font-semibold mb-3">WIP Snapshot
-                <span class="text-sm font-normal text-muted-foreground ml-2">
-                    (total: <span x-text="wipData.total_wip"></span>)
-                </span>
-            </h2>
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left py-2 pr-4 font-medium text-muted-foreground">Board column</th>
-                            <th class="text-right py-2 font-medium text-muted-foreground">Cards</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="col in wipData.columns" :key="col.column">
-                            <tr class="border-b last:border-0">
-                                <td class="py-2 pr-4 capitalize" x-text="col.column.replace('_',' ')"></td>
-                                <td class="py-2 text-right font-semibold" x-text="col.card_count"></td>
-                            </tr>
+        <div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-4 lg:px-6">
+                <!-- Cycle Time Chart -->
+                {% call card() %}
+                    {% call card_header() %}
+                        {% call card_title() %}Cycle Time Distribution{% endcall %}
+                    {% endcall %}
+                    {% call card_content() %}
+                        <div class="relative h-64">
+                            <canvas id="cycleTimeChart"></canvas>
+                        </div>
+                        <template x-if="cycleData && cycleData.data_points.length === 0">
+                            <p class="text-sm text-muted-foreground mt-2">No completed cards in range.</p>
                         </template>
-                    </tbody>
-                </table>
+                    {% endcall %}
+                {% endcall %}
+
+                <!-- Throughput Chart -->
+                {% call card() %}
+                    {% call card_header() %}
+                        {% call card_title() %}Throughput per Period{% endcall %}
+                    {% endcall %}
+                    {% call card_content() %}
+                        <div class="relative h-64">
+                            <canvas id="throughputChart"></canvas>
+                        </div>
+                        <template x-if="throughputData && throughputData.periods.length === 0">
+                            <p class="text-sm text-muted-foreground mt-2">No completed cards to chart.</p>
+                        </template>
+                    {% endcall %}
+                {% endcall %}
+            </div>
+
+            <!-- WIP Table -->
+            <div class="mt-6 px-4 lg:px-6">
+                <template x-if="wipData && wipData.columns && wipData.columns.length > 0">
+                    {% call card() %}
+                        {% call card_header() %}
+                            {% call card_title() %}
+                                WIP Snapshot
+                                <span class="text-sm font-normal text-muted-foreground ml-2">
+                                    (total: <span x-text="wipData.total_wip"></span>)
+                                </span>
+                            {% endcall %}
+                        {% endcall %}
+                        {% call card_content() %}
+                            {% call table() %}
+                                {% call table_header() %}
+                                    {% call table_row() %}
+                                        {% call table_head() %}Board column{% endcall %}
+                                        {% call table_head(class='text-right') %}Cards{% endcall %}
+                                    {% endcall %}
+                                {% endcall %}
+                                {% call table_body(attrs_dict={'x-data': ''}) %}
+                                    <template x-for="col in wipData.columns" :key="col.column">
+                                        {% call table_row() %}
+                                            {% call table_cell() %}
+                                                <span x-text="columnLabel(col.column)"></span>
+                                            {% endcall %}
+                                            {% call table_cell(class='text-right font-semibold') %}
+                                                <span x-text="col.card_count"></span>
+                                            {% endcall %}
+                                        {% endcall %}
+                                    </template>
+                                {% endcall %}
+                            {% endcall %}
+                        {% endcall %}
+                    {% endcall %}
+                </template>
             </div>
         </div>
     </template>
 
 </div>
 
+<script src="{{ url_for('static', filename='js/shared/css_color_tokens.js') }}"></script>
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script>
 function flowAnalytics(initialBoardId) {
+    // Chart instances live outside Alpine's reactive state: a proxied
+    // Chart.js instance loses its canvas context mid-draw.
+    const charts = { cycle: null, throughput: null };
+    let loadSeq = 0;
+    function destroyCharts() {
+        if (charts.cycle) { charts.cycle.destroy(); charts.cycle = null; }
+        if (charts.throughput) { charts.throughput.destroy(); charts.throughput = null; }
+    }
     return {
         boardId: initialBoardId ? String(initialBoardId) : null,
         cycleData: null,
@@ -194,17 +206,16 @@ function flowAnalytics(initialBoardId) {
             if (!lead) return 0;
             return Math.round((cycle / lead) * 100 * 10) / 10;
         },
-        _cycleChart: null,
-        _throughputChart: null,
+        columnLabel(status) {
+            const text = String(status || '').replace(/_/g, ' ');
+            return text.charAt(0).toUpperCase() + text.slice(1);
+        },
 
+        // Alpine calls init() itself; it must not also be called from x-init.
         async init() {
             if (this.boardId) await this.loadAll();
         },
 
-        // `fetch` resolves on 4xx/5xx, so every leg needs its own .ok check —
-        // without one, an error body parses fine and Promise.all "succeeds".
-        // Platform.fetch throws on non‑ok, so we catch and re‑throw with the same
-        // user‑visible message the previous inline .ok check produced.
         _leg(url, what) {
             return Platform.fetch(url, { silent: true })
                 .then(d => {
@@ -212,27 +223,26 @@ function flowAnalytics(initialBoardId) {
                     return d;
                 })
                 .catch(error => {
-                    // Platform.fetch throws on non‑ok responses; preserve the
-                    // exact error wording the UI already expects.
                     if (error.status) {
                         throw new Error('Could not load ' + what + ' (HTTP ' + error.status + ')');
                     }
-                    // Network errors etc. keep their original message.
                     throw error;
                 });
         },
 
         async loadAll() {
             if (!this.boardId) return;
+            const seq = ++loadSeq;
             this.loading = true;
             this.loadError = null;
             try {
                 const [cycle, throughput, lead, wip] = await Promise.all([
-                    this._leg(`/api/analytics/cycle-time?board_id=${this.boardId}&days=90`, 'cycle time'),
-                    this._leg(`/api/analytics/throughput?board_id=${this.boardId}&granularity=week`, 'throughput'),
-                    this._leg(`/api/analytics/lead-time?board_id=${this.boardId}&days=90`, 'lead time'),
-                    this._leg(`/api/analytics/wip?board_id=${this.boardId}`, 'WIP'),
+                    this._leg('/api/analytics/cycle-time?board_id=' + this.boardId + '&days=90', 'cycle time'),
+                    this._leg('/api/analytics/throughput?board_id=' + this.boardId + '&granularity=week', 'throughput'),
+                    this._leg('/api/analytics/lead-time?board_id=' + this.boardId + '&days=90', 'lead time'),
+                    this._leg('/api/analytics/wip?board_id=' + this.boardId, 'WIP'),
                 ]);
+                if (seq !== loadSeq) return;  // a newer load superseded this one
                 this.cycleData = cycle;
                 this.throughputData = throughput;
                 this.leadData = lead;
@@ -240,18 +250,16 @@ function flowAnalytics(initialBoardId) {
                 await this.$nextTick();
                 this._renderCharts();
             } catch (e) {
-                // null, never 0: a measured zero cycle time and a metric that
-                // failed to load must not render as the same number. null → —.
+                if (seq !== loadSeq) return;
                 this.cycleData = null;
                 this.throughputData = null;
                 this.leadData = null;
                 this.wipData = null;
-                if (this._cycleChart) { this._cycleChart.destroy(); this._cycleChart = null; }
-                if (this._throughputChart) { this._throughputChart.destroy(); this._throughputChart = null; }
+                destroyCharts();
                 this.loadError = e.message || 'Flow metrics could not be loaded.';
                 Platform.toast.error(this.loadError);
             } finally {
-                this.loading = false;
+                if (seq === loadSeq) this.loading = false;
             }
         },
 
@@ -263,17 +271,18 @@ function flowAnalytics(initialBoardId) {
         _renderCycleChart() {
             const ctx = document.getElementById('cycleTimeChart');
             if (!ctx || !this.cycleData) return;
-            if (this._cycleChart) this._cycleChart.destroy();
+            if (charts.cycle) charts.cycle.destroy();
+            const tokens = window.ArchieColorTokens;
             const labels = this.cycleData.data_points.map(d => d.card_title.substring(0, 20));
             const values = this.cycleData.data_points.map(d => d.cycle_days);
-            this._cycleChart = new Chart(ctx, {
+            charts.cycle = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels,
                     datasets: [{
                         label: 'Cycle Days',
                         data: values,
-                        backgroundColor: 'rgba(99,102,241,0.7)',
+                        backgroundColor: tokens ? tokens.cssHSL('--chart-1', '0.7') : null,
                         borderRadius: 4,
                     }]
                 },
@@ -289,17 +298,18 @@ function flowAnalytics(initialBoardId) {
         _renderThroughputChart() {
             const ctx = document.getElementById('throughputChart');
             if (!ctx || !this.throughputData) return;
-            if (this._throughputChart) this._throughputChart.destroy();
+            if (charts.throughput) charts.throughput.destroy();
+            const tokens = window.ArchieColorTokens;
             const labels = this.throughputData.periods.map(p => p.label);
             const values = this.throughputData.periods.map(p => p.completed);
-            this._throughputChart = new Chart(ctx, {
+            charts.throughput = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels,
                     datasets: [{
                         label: 'Cards Completed',
                         data: values,
-                        backgroundColor: 'rgba(16,185,129,0.7)',
+                        backgroundColor: tokens ? tokens.cssHSL('--chart-2', '0.7') : null,
                         borderRadius: 4,
                     }]
                 },

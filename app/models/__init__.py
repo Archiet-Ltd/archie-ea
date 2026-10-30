@@ -135,6 +135,7 @@ else:
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)
+    from .price_plan import *  # noqa - PricePlan (one price store)
     from .change_feed_offset import *  # noqa - ChangeFeedOffset (change feed consumer position)
     from .graph_projection_snapshot import *  # noqa - GraphProjectionSnapshot (per-organisation graph projection copy)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
@@ -144,6 +145,7 @@ else:
     from .integration_metadata import *  # noqa - ApplicationInterfaceMetadata, SystemDependency (Integration Architecture)
     from .miscellaneous import *  # noqa
     from .models import *  # noqa
+    from .llm_spend_ledger import LlmSpendLedger  # noqa - the platform's answer spend per provider per month
 
     # EA Intelligence Enhancement Models
     from .motivation import *  # noqa - Driver, Goal models (Strategy-to-Implementation traceability)
@@ -389,7 +391,7 @@ else:
     from .rate_card import RateCard  # noqa: F401
 
     # SA-009: TOGAF ADM deliverable checklists per phase
-    from .adm_deliverable import ADMDeliverable, ADMDeliverableCheck  # noqa: F401
+    from .adm_deliverable import ADMDeliverable  # noqa: F401
 
     # RRT-001: Requirement templates with 16 seeded architecture-layer templates
     from .requirement_template import RequirementTemplate  # noqa: F401
@@ -497,6 +499,15 @@ else:
 
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401
+
+    # Every relationship written under a declared source records its origin as it is written.
+    from app.services.relationship_origin import register as _register_relationship_origin
+
+    _register_relationship_origin()
+
+    # Cited public signals per organisation. Imported at boot so create_all()/reconcile-schema
+    # know about the table; before this the tests that read it ran on a database without it.
+    from .organization_signal import OrganizationSignal  # noqa: F401
 
     # The one audit store. Imported at boot so its integrity-chain and
     # copy-from-other-audit-stores hooks are registered before any insert.

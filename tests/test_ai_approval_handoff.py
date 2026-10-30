@@ -94,6 +94,9 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
                 "id": approval_id,
                 "operation_type": "create",
                 "entity_type": "capability",
+                "operation_label": "Create",
+                "entity_label": "Capability",
+                "source_label": None,
                 "summary": "Create capability Handoff",
                 "arguments": {"name": "Handoff"},
                 "created_at": approval.created_at.isoformat(),
@@ -500,7 +503,7 @@ def test_approval_modal_is_a_reviewer_queue_with_requester_attribution():
     assert 'data-testid="approval-queue-unavailable"' in template
     assert 'data-testid="approval-queue-loading"' in template
     assert 'data-testid="approval-queue-empty"' in template
-    assert 'aria-label="Retry approval queue"' in template
+    assert "aria_label='Retry approval queue'" in template
     assert (
         "$store.approvals.hasLoaded && !$store.approvals.loading"
         " && !$store.approvals.error && $store.approvals.approvals.length === 0"

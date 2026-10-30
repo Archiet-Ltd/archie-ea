@@ -17,6 +17,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app import db
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 
 # D-5 (admin-rbac-active-org continuation): repointed from
 # app.core.auth.decorators.admin_required (one of three duplicate
@@ -378,8 +379,8 @@ def login_redirect():
 
 @main.route("/roadmaps")
 def roadmaps_redirect():
-    """Redirect /roadmaps to canonical /capability-roadmap."""
-    return redirect(url_for("main.capability_roadmap"), code=301)
+    """Redirect /roadmaps to the one roadmap."""
+    return redirect_to_roadmap("strategic")
 
 
 @main.route("/favicon.ico")
@@ -715,6 +716,12 @@ def public_module(slug):
     if merge_target:
         return redirect(merge_target, code=301)
 
+    # The product menu's "Digital twin" entry opens the working screen for a
+    # signed-in person; the public feature page is for visitors.
+    if slug == "digital-twin":
+        if current_user.is_authenticated:
+            return redirect(url_for("intelligence_ui.twin_map"), code=302)
+
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
@@ -788,12 +795,20 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             if p.url not in seen:
                 seen.add(p.url)
                 listed.append(p)
+    role_catalogue = None
+    if family == "role":
+        # Every role in the Roles menu has a place here: a role with a page
+        # links to it, the rest are listed so the menu never lands on a blank.
+        from app.services.site_registry import site_registry
+
+        role_catalogue = site_registry()["roles"]
     return render_template(
         "public/hub_index.html",
         title=title,
         canonical_url=f"https://entelim.org{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
+        role_catalogue=role_catalogue,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,
@@ -810,6 +825,8 @@ def public_roles_index():
     """The /roles hub: every live role page, grouped, from the feed."""
     from app.services.public_pages import ROLE_HUB_EXTRA_ENTRIES
 
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard.overview"))
     return _render_family_hub("role", "/roles", "Roles", ROLE_HUB_EXTRA_ENTRIES)
 
 
@@ -819,9 +836,11 @@ def public_role(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_screenshot,
         load_page,
         role_siblings,
+        get_role_more_screens,
     )
 
     merge_target = MERGED_PAGES.get(f"/roles/{slug}")
@@ -835,6 +854,8 @@ def public_role(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+        more_screens=get_role_more_screens(page),
+        landing=build_landing(page),
     )
 
 
@@ -1035,6 +1056,9 @@ def public_site_page(slug):
     template = "public/page.html"
     if page.front_matter.get("template") == "pricing":
         template = "public/pricing.html"
+        from app.services import billing_plans
+        plan_data = {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS}
+        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data)
     return render_template(template, page=page, jsonld=build_jsonld(page))
 
 
@@ -1425,6 +1449,9 @@ def save_system_settings():
                 {"key": str(key), "value": json.dumps(value)},
             )
         db.session.commit()
+        from app.services import activity_record
+
+        activity_record.clear_setting_cache()
         return jsonify({"status": "saved", "count": len(settings_data)})
     except Exception as e:
         db.session.rollback()

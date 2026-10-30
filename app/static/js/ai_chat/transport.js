@@ -66,6 +66,38 @@
         });
     }
 
+    /* A question about the organisation's own estate is answered from its recorded
+       connections, as cited cards, before the model is asked. Resolves to the
+       answer ({found: true, html, page_url}) or {found: false}; rejects when the
+       answer could not be worked out, so the chat shows an error rather than
+       handing a grounded question to a model. */
+    async function askEstate(message, options) {
+        var remember = !(options && options.remember === false);
+        var resp = await apiFetch('/ai-chat/estate-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
+        return data;
+    }
+
+    /* Work out the indirect connections of the whole organisation. A run already in
+       progress (409) is reported by status so the caller can say so in plain words. */
+    async function recomputeConnections() {
+        var resp = await apiFetch('/api/v1/intelligence/derivation/recompute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: 'tenant' })
+        });
+        if (!resp.ok) {
+            var err = new Error('recompute ' + resp.status);
+            err.status = resp.status;
+            throw err;
+        }
+    }
+
     var _controller = null;
 
     /* No SSE event — not even a keepalive — for this long means the
@@ -219,6 +251,9 @@
                             full = ev.response; /* partial tokens of a failed call are not shown */
                         } else if (ev.citation_gate && ev.citation_gate.refused && ev.response) {
                             full = ev.response;
+                        } else if (ev.genome_answer && ev.response) {
+                            /* Checked and drawn on the server; nothing streamed is kept. */
+                            full = ev.response;
                         } else if (!full && ev.response) {
                             full = ev.response;
                         }
@@ -231,6 +266,9 @@
                             sources: ev.sources,
                             actions: ev.actions_taken || [],
                             pendingApprovals: ev.pending_approvals || [],
+                            answeredBy: ev.answered_by || null,
+                            genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
+                            paused: !!ev.paused,
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -267,6 +305,9 @@
             sources: meta.sources,
             actions: meta.actions || [],
             pendingApprovals: meta.pendingApprovals || [],
+            answeredBy: meta.answeredBy || null,
+            genomeHtml: meta.genomeHtml || null,
+            paused: !!meta.paused,
             error: meta.error || null
         });
         return true;
@@ -335,6 +376,8 @@
         jsonHeaders: jsonHeaders,
         isProviderConfigurationFault: isProviderConfigurationFault,
         sendMessage: sendMessage,
+        askEstate: askEstate,
+        recomputeConnections: recomputeConnections,
         streamMessage: streamMessage,
         abort: abort,
         isStreaming: isStreaming,

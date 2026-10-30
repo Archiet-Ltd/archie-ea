@@ -8,6 +8,7 @@ function vendorAnalysisDetail(analysisId) {
     loadingVendors: false,
     completedSteps: new Set(),
     manualScoreOpen: true,
+    manualScoreRequested: false,
     manualScoreSaving: {},
     reqMatrixOpen: true,
     requirements: [],
@@ -46,10 +47,10 @@ function vendorAnalysisDetail(analysisId) {
 
     capabilityTypes: [
       { value: '', label: 'All Types', color: 'bg-foreground/40' },
-      { value: 'BUSINESS', label: 'Business', color: 'bg-amber-500' },
+      { value: 'BUSINESS', label: 'Business', color: 'bg-warning' },
       { value: 'APPLICATION', label: 'Application', color: 'bg-primary' },
       { value: 'TECHNICAL', label: 'Technical', color: 'bg-primary' },
-      { value: 'MANUFACTURING', label: 'Manufacturing', color: 'bg-orange-500' }
+      { value: 'MANUFACTURING', label: 'Manufacturing', color: 'bg-info' }
     ],
 
     analysis: { name: '', status: 'new' },
@@ -143,10 +144,10 @@ function vendorAnalysisDetail(analysisId) {
     archimateLayerClass(type) {
       if (!type) return 'border-border text-muted-foreground';
       switch (type.toUpperCase()) {
-        case 'BUSINESS': return 'border-amber-500/50 text-amber-600 bg-amber-500/10';
+        case 'BUSINESS': return 'border-warning/50 text-warning-emphasis bg-warning/10';
         case 'APPLICATION': return 'border-primary/50 text-primary bg-primary/10';
         case 'TECHNICAL': return 'border-primary/50 text-primary bg-primary/10';
-        case 'MANUFACTURING': return 'border-orange-500/50 text-orange-600 bg-orange-500/10';
+        case 'MANUFACTURING': return 'border-info/50 text-info-emphasis bg-info/10';
         default: return 'border-border text-muted-foreground';
       }
     },
@@ -294,6 +295,20 @@ function vendorAnalysisDetail(analysisId) {
       this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
     },
 
+    statusTone() {
+      const a = this.analysis || {};
+      if (a.approval_status === 'approved') return 'success';
+      if (a.approval_status === 'rejected') return 'destructive';
+      if (a.status === 'draft' || a.status === 'running') return 'warning';
+      if (a.status === 'completed' && !a.approval_status) return 'info';
+      return 'neutral';
+    },
+
+    vendorMatchTone(v) {
+      const pct = this.vendorMatchPct(v);
+      return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low';
+    },
+
     stepStatus(tabId) {
       if (this.activeTab === tabId) return 'current';
       if (this.completedSteps.has(tabId)) return 'completed';
@@ -327,6 +342,38 @@ function vendorAnalysisDetail(analysisId) {
         case 'export': return 'Create an analysis before exporting';
         default: return '';
       }
+    },
+
+    unlockHint(tabId) {
+      switch (tabId) {
+        case 'scoring': return 'Unlocks once the analysis has a name and at least one capability, process or value stream is chosen.';
+        case 'comparison': return 'Unlocks once the analysis has been run, because the comparison is built from its vendors.';
+        case 'decision': return 'Unlocks once the analysis has been run and the vendors are ranked.';
+        case 'export': return 'Unlocks once the analysis has been created.';
+        default: return '';
+      }
+    },
+
+    lockedTabs() {
+      const self = this;
+      return this.tabs.filter(function(t) { return self.stepStatus(t.id) === 'locked'; });
+    },
+
+    scoreText(value) {
+      return value ? Number(value).toFixed(1) : 'Not recorded';
+    },
+
+    pluralise(count, one, many) {
+      return count + ' ' + (count === 1 ? one : many);
+    },
+
+    get showScoringRubric() {
+      if (this.comparisonVendors.length === 0) return false;
+      const scored = this.comparisonVendors.some(function(v) { return v.total_score != null; });
+      const rated = this.comparisonVendors.some(function(v) {
+        return Object.values(v.manual_scores || {}).some(function(n) { return n; });
+      });
+      return !scored || rated || this.manualScoreRequested;
     },
 
     attemptSwitchTab(tabId) {
@@ -510,6 +557,8 @@ function vendorAnalysisDetail(analysisId) {
         await this.discoverVendorsByCaps();
       } else if (this.selectionMode === 'processes') {
         await this.discoverVendorsByProcs();
+      } else if (this.selectionMode === 'valuestreams') {
+        await this.discoverVendorsByValueStreams();
       } else {
         await this.discoverVendorsByCaps();
       }
@@ -548,6 +597,22 @@ function vendorAnalysisDetail(analysisId) {
             total_products: v.total_products || v.product_count || 0
           };
         });
+        this.vendorSearchDone = true;
+        this.selectedVendorIds = new Set();
+        this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
+      } catch (e) {
+        this.showToast(e && e.type === 'NetworkError' ? 'Vendor discovery error' : 'Vendor discovery failed', 'error');
+      }
+      finally { this.loadingVendors = false; }
+    },
+
+    async discoverVendorsByValueStreams() {
+      if (this.vsSelectedStream.length === 0) return;
+      this.loadingVendors = true;
+      try {
+        this.discoveredVendors = await Platform.fetch.post('/dashboard/api/vendors/by-value-streams', {
+          value_stream_ids: this.vsSelectedStream.map(function(id) { return parseInt(id); })
+        }, { silent: true });
         this.vendorSearchDone = true;
         this.selectedVendorIds = new Set();
         this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
@@ -623,6 +688,22 @@ function vendorAnalysisDetail(analysisId) {
       }
     },
 
+    async resolveValueStreamCapabilityIds() {
+      if (this.selectionMode !== 'valuestreams' || this.vsSelectedStream.length === 0) return [];
+      try {
+        const caps = await Platform.fetch.post('/dashboard/api/value-stream-capabilities', {
+          value_stream_ids: this.vsSelectedStream.map(function(id) { return parseInt(id); })
+        }, { silent: true });
+        return caps.map(function(c) { return c.id; });
+      } catch (e) {
+        // Same reasoning as resolveProcessCapabilityIds: a failed lookup is not
+        // "nothing mapped", so report it and let the caller abort rather than
+        // read an empty array as an empty result.
+        this.showToast((e && e.data && e.data.error) || 'Could not resolve capabilities for the selected value streams', 'error');
+        return null;
+      }
+    },
+
     async getCapabilityIdsForPayload() {
       if (this.selectionMode === 'capabilities') {
         const caps = this.allCapabilities;
@@ -638,7 +719,17 @@ function vendorAnalysisDetail(analysisId) {
         }
         return resolved;
       }
-      this.showToast('Please select capabilities or processes', 'error');
+      if (this.selectionMode === 'valuestreams') {
+        if (this.vsSelectedStream.length === 0) { this.showToast('Select at least one value stream', 'error'); return null; }
+        const resolved = await this.resolveValueStreamCapabilityIds();
+        if (resolved === null) return null;   // load failed; already reported
+        if (resolved.length === 0) {
+          this.showToast('No capabilities could be resolved from selected value streams', 'error');
+          return null;
+        }
+        return resolved;
+      }
+      this.showToast('Select capabilities, processes, or value streams', 'error');
       return null;
     },
 
@@ -783,7 +874,7 @@ function vendorAnalysisDetail(analysisId) {
     },
 
     formatCell(value, format) {
-      if (value == null) return 'N/A';
+      if (value == null) return 'Not recorded';
       if (format === 'score') return parseFloat(value).toFixed(1);
       if (format === 'currency') {
         if (window.currencyManager) return window.currencyManager.format(parseFloat(value));

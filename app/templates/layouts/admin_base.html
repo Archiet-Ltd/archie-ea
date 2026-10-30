@@ -7,6 +7,10 @@
                strategic/*, governance/*, and all other authenticated pages.
    See also: public_base.html (unauthenticated), base.html (legacy, avoid).
 #}
+{% from 'components/button.html' import button as _layout_button %}
+{% from 'components/dialog.html' import dialog as _layout_dialog %}
+{% from 'components/input.html' import input as _layout_input %}
+{% from 'components/ui_sidebar.html' import sidebar_wrapper, sidebar_inset %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -27,8 +31,9 @@
     </script>
     
     <!-- Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) -->
-    <!-- Sidebar collapsed mode CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/shadcn-sidebar.css') }}">
+    <!-- Sidebar shell: the library's sidebar-07 rules (components/ui_sidebar.html) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/sidebar-shell.css') }}">
     <!-- Global component normalization (tables, badges, skeletons) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/shadcn-components.css') }}">
     <!-- Card pattern normalization (bg-background legacy, .card, alerts, list-groups) -->
@@ -39,21 +44,13 @@
     [x-cloak] { display: none !important; }
 
     @media print {
-      .admin-sidebar, .admin-header, [x-data], button, .no-print { display: none !important; }
+      .admin-sidebar, .admin-header, #admin-sidebar, #admin-header, button, .no-print { display: none !important; }
+      /* The shell pins itself to one screen and scrolls inside; on paper it must flow. */
+      .app-shell, .app-shell > div { display: block !important; height: auto !important; overflow: visible !important; }
       main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
       body { background: white !important; color: black !important; font-size: 12pt; }
       table { border-collapse: collapse; width: 100%; }
-      th, td { border: 1px solid #ccc; padding: 4px; }
-    }
-
-    /* Below lg breakpoint the sticky header must not intercept pointer
-       events in its left padding area, where the mobile sidebar opener
-       sits. The header itself is pointer-events:none; every direct child
-       restores pointer-events:auto so search, notifications and the user
-       menu remain interactive. */
-    @media (max-width: 1023px) {
-      #admin-header { pointer-events: none; }
-      #admin-header > * { pointer-events: auto; }
+      th, td { border: 1px solid hsl(var(--border)); padding: 4px; }
     }
     </style>
     
@@ -74,17 +71,22 @@
     <script src="{{ url_for('static', filename='js/ui/filter.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/selection.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/table.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui/dropdown_menu.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/data_table.js') }}"></script>
 
     <!-- ═══ Legacy shim layer (modal-system.js removed - ui/modal.js provides all shims) ═══ -->
     <!-- NOTE: api-fetch.js removed — Platform.fetch (03-fetch.js) already provides window.apiFetch -->
     <script src="{{ url_for('static', filename='js/shared/debounce.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alpine-architecture.js') }}"></script>
+    {# flask-basecoat behaviour for library menus, selects, tabs and dialogs (data-slot elements only) #}
+    <script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-ui.js') }}" defer></script>
+    {# the list table's filter, column visibility, sorting and paging (components/list_table.html) #}
+    <script src="{{ url_for('static', filename='js/data-table.js') }}" defer></script>
 
     <!-- Page-specific Alpine registrations (after Platform, before Alpine defer fires) -->
     {% block extra_head_js %}{% endblock %}
 </head>
-<body class="h-full bg-background text-foreground antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
+<body class="style-vega h-full bg-background text-foreground antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
     {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
     <!-- Skip navigation links for keyboard users -->
     <a href="#main-content"
@@ -95,71 +97,17 @@
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md">
         Skip to sidebar navigation
     </a>
-    <a href="#search-modal-trigger"
+    <a href="#sidebar-search"
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md">
         Skip to search
     </a>
     
-    <!-- Global mobile sidebar opener (works even when pages override the header block) -->
-    {#
-      .stop is load-bearing, not tidiness. This button sits OUTSIDE the
-      sidebar element, so without it the same click both opens the sidebar
-      here and reaches the sidebar's own @click.away, which closes it again
-      in the same tick. Instrumenting the event path showed exactly that:
-      ["btn:true", "doc:false"], final state false. Below 1024px the sidebar
-      could never be opened, and the only way to reach another page was to
-      type a URL -- the application was effectively desktop-only.
-      aria-expanded is bound so assistive technology is told the state too.
-
-      Rendered OUTSIDE the overflow-hidden layout container so it is never
-      trapped in a stacking context below the sticky header. Carries its own
-      isDesktop so it does not depend on the container's x-data scope.
-    #}
-    <button type="button"
-            x-data="{ isDesktop: window.innerWidth >= 1024 }"
-            x-init="window.addEventListener('resize', () => { isDesktop = window.innerWidth >= 1024; if (isDesktop) { $store.sidebar.open = false; } })"
-            x-show="!isDesktop && !$store.sidebar.open" x-cloak
-            @click.stop="$store.sidebar.open = true"
-            :aria-expanded="$store.sidebar.open ? 'true' : 'false'"
-            class="fixed top-4 left-4 z-40 lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground hover:bg-accent transition-colors"
-            aria-controls="admin-sidebar"
-            aria-label="Open sidebar">
-        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-    </button>
-
-    <div class="relative flex h-screen overflow-hidden"
-         @keydown.ctrl.b.window.prevent="$store.sidebar.toggle()"
-         x-data="{
-            isDesktop: window.innerWidth >= 1024,
-            init() {
-                this.isDesktop = window.innerWidth >= 1024;
-                window.addEventListener('resize', () => {
-                    this.isDesktop = window.innerWidth >= 1024;
-                    if (this.isDesktop) {
-                        $store.sidebar.open = false;
-                    }
-                });
-            }
-         }">
-        <!-- Mobile sidebar backdrop -->
-        <div x-show="$store.sidebar.open && !isDesktop" x-cloak
-             @click="$store.sidebar.open = false"
-             x-transition:enter="transition-opacity ease-out duration-200"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="transition-opacity ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             class="fixed inset-0 z-40 lg:hidden bg-overlay/50" aria-hidden="true"
-             x-cloak></div>
-
-        <!-- Sidebar -->
+    {% call sidebar_wrapper(class='h-svh overflow-hidden') %}
+        <!-- Sidebar: the library's sidebar-07 shell; below 768px it is the drawer the trigger opens -->
         {% include 'components/admin_sidebar.html' %}
 
         <!-- Main Content -->
-        <div class="relative flex-1 flex flex-col overflow-x-hidden overflow-y-auto">
+        {% call sidebar_inset(class='overflow-x-hidden overflow-y-auto') %}
             <!-- Header -->
             {% block header %}
             {% include 'components/admin_header.html' %}
@@ -181,6 +129,18 @@
                        and never reaches a screenshot or an export, so an empty page
                        needs a persistent marker that its data failed to load. #}
                     {% include 'partials/_data_load_error.html' %}
+                    {# Sample company indicator: shows when the sample is loaded #}
+                    {% if sample_company_restore_point_id %}
+                    <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-testid="sample-company-indicator">
+                        <p class="text-muted-foreground">You are looking at the sample company.</p>
+                        {% call _layout_dialog(trigger_text='Remove it', trigger_label='Remove it', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
+                        <form method="post" action="{{ url_for('architect_ui.remove_sample_company') }}" class="flex justify-end">
+                            {{ _layout_input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                            {{ _layout_button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
+                        </form>
+                        {% endcall %}
+                    </div>
+                    {% endif %}
                     {# Inline page hints — templates fill this block with the inline_hint macro #}
                     {% block page_hint %}{% endblock %}
                     {% block content %}{% endblock %}
@@ -188,7 +148,8 @@
                        history, subscribe) for every signed-in user. Outside the sidebar
                        so it does not spend a navigation slot. #}
                     {% if current_user.is_authenticated and 'service_status.status_page' in flask.current_app.view_functions %}
-                    <footer class="flex h-8 items-center text-xs text-muted-foreground" data-testid="app-footer">
+                    {# The footer link sits on the content column; the Overview keeps the placement the founder approved. #}
+                    <footer class="flex h-8 items-center{% if request.path != '/dashboard/overview' %} px-6{% endif %} text-xs text-muted-foreground" data-testid="app-footer">
                         <a href="{{ url_for('service_status.status_page') }}"
                            class="inline-flex items-center gap-1.5 hover:text-foreground"
                            data-testid="footer-service-status">
@@ -199,223 +160,14 @@
                     {% endif %}
                 </div>
             </main>
-        </div>
-    </div>
+        {% endcall %}
+    {% endcall %}
 
     {# Modal portal — renders OUTSIDE the overflow-hidden layout so fixed modals are clickable #}
     {% block modals %}{% endblock %}
     
     {# ENT-101: Global Search (Ctrl+K) — handled by admin_header.html unified command palette #}
 
-    {# PLT-040: First-login onboarding modal — shows once when onboarding_completed_at is NULL.
-       Completing it POSTs enterprise_role, so the picker below MUST offer every role the
-       product assigns and MUST preselect the user's current one: a role missing from the
-       list leaves its holder no correct answer, and submitting then overwrites the real
-       value and re-scopes their sidebar. business_architect was assignable but absent.
-       (Gating on enterprise_role being empty does not work — the column is nullable=False
-       with a platform_admin default, so it is never empty.) #}
-    {# ARCH-107 / ARCH-040: also require an EMPTY workspace. onboarding_completed_at
-       alone put a full-viewport `fixed inset-0 z-[100]` overlay in front of instances
-       that already held data, which had two costs: the primary landing page addressed
-       an established user as a first-run visitor, and — because the card dismisses on
-       @click.away — the overlay silently ate the user's first click anywhere on the
-       page. That is what made "Add Application" and "Import" look inert: the modal
-       system was healthy and the first click was simply being spent dismissing this.
-       nav_counts is already computed per tenant for this request, so gating
-       on it costs no extra query. #}
-    {% set _ob_counts = nav_counts | default({}) %}
-    {% set _workspace_is_empty = not (
-        (_ob_counts.get('applications', 0) or 0)
-        + (_ob_counts.get('elements', 0) or 0)
-        + (_ob_counts.get('capabilities', 0) or 0)
-        + (_ob_counts.get('vendors', 0) or 0)
-    ) %}
-    {% if current_user.is_authenticated and not current_user.onboarding_completed_at and _workspace_is_empty %}
-    <div x-data="{
-            {# The localStorage read is load-bearing: the server persist in
-               completeOnboarding() is best-effort, so without this check a
-               failed POST meant the modal reopened on every page forever. #}
-            showOnboarding: !localStorage.getItem('archie_onboarding_ts'),
-            step: 1,
-            selectedRole: '{{ current_user.enterprise_role or 'solution_architect' }}',
-            roleCards: {
-                solution_architect: [
-                    {icon: 'compass', title: 'Architecture Journey', desc: 'Walk through TOGAF ADM phases with guided steps', href: '/architecture-journey/'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Create and manage solution architecture documents', href: '/solutions/'},
-                    {icon: 'pen-tool', title: 'ArchiMate Composer', desc: 'Build architecture diagrams visually', href: '/archimate/composer'},
-                ],
-                enterprise_architect: [
-                    {icon: 'package', title: 'Application Portfolio', desc: 'View and manage all applications in the estate', href: '/applications/'},
-                    {icon: 'map', title: 'Capability Map', desc: 'Explore business capability landscape', href: '/capability-map/'},
-                    {icon: 'table', title: 'ArchiMate Elements', desc: 'Browse and manage architecture elements', href: '/architecture/dashboard'},
-                ],
-                business_architect: [
-                    {icon: 'map', title: 'Capability Map', desc: 'Explore the business capability landscape', href: '/capability-map/'},
-                    {icon: 'git-branch', title: 'Value Streams', desc: 'Map end-to-end value delivery and its stages', href: '/value-streams/'},
-                    {icon: 'package', title: 'Application Portfolio', desc: 'See which applications support each capability', href: '/applications/'},
-                ],
-                arb_member: [
-                    {icon: 'shield-check', title: 'ARB Dashboard', desc: 'Review pending architecture decisions', href: '/arb/dashboard'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Browse solution designs under review', href: '/solutions/'},
-                    {icon: 'git-branch', title: 'ARB Sessions', desc: 'View all governance review sessions', href: '/arb/sessions'},
-                ],
-                portfolio_manager: [
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Analyse application portfolio for optimization', href: '/dashboard/rationalization'},
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Manage vendor relationships', href: '/vendors/'},
-                    {icon: 'package', title: 'Applications', desc: 'Browse the full application portfolio', href: '/applications/'},
-                ],
-                platform_admin: [
-                    {icon: 'building-2', title: 'Organizations', desc: 'Set up tenant organizations', href: '/admin/organizations'},
-                    {icon: 'users', title: 'Users', desc: 'Manage platform users and roles', href: '/admin/users'},
-                    {icon: 'key', title: 'API Settings', desc: 'Configure LLM and integration keys', href: '/admin/api-settings'},
-                ],
-                cto: [
-                    {icon: 'layout-dashboard', title: 'Architecture Health', desc: 'Monitor portfolio health and strategic alignment', href: '/dashboard/overview'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Application lifecycle and consolidation pipeline', href: '/dashboard/rationalization'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Track solutions from design to approval', href: '/solutions/'},
-                ],
-                application_manager: [
-                    {icon: 'package', title: 'Application Portfolio', desc: 'Manage all applications in the estate', href: '/applications/'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Analyse portfolio for consolidation opportunities', href: '/dashboard/rationalization'},
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Track vendor relationships and contracts', href: '/vendors/'},
-                ],
-                procurement: [
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Review vendor relationships and spend', href: '/vendors/'},
-                    {icon: 'package', title: 'Application Portfolio', desc: 'See which applications are in use', href: '/applications/'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Identify consolidation and cost-saving opportunities', href: '/dashboard/rationalization'},
-                ],
-            },
-            primaryCTA: {
-                solution_architect: {label: 'Start Architecture Journey', href: '/architecture-journey/'},
-                enterprise_architect: {label: 'View Application Portfolio', href: '/applications/'},
-                business_architect: {label: 'Open the Capability Map', href: '/capability-map/'},
-                arb_member: {label: 'Go to ARB Dashboard', href: '/arb/dashboard'},
-                portfolio_manager: {label: 'Open Rationalization', href: '/dashboard/rationalization'},
-                platform_admin: {label: 'Manage Organizations', href: '/admin/organizations'},
-                cto: {label: 'View Architecture Health', href: '/dashboard/overview'},
-                application_manager: {label: 'View Application Portfolio', href: '/applications/'},
-                procurement: {label: 'Go to Vendor Dashboard', href: '/vendors/'},
-                security_architect: {label: 'Open Regulatory Compliance', href: '/dashboard/compliance'},
-                data_architect: {label: 'Open Data Architecture', href: '/architecture/data-architecture'},
-            },
-            roleLabels: {
-                solution_architect: 'Solution Architect',
-                enterprise_architect: 'Enterprise Architect',
-                business_architect: 'Business Architect',
-                arb_member: 'ARB Member',
-                portfolio_manager: 'Portfolio Manager',
-                cto: 'CTO / CIO',
-                application_manager: 'Application Manager',
-                procurement: 'Procurement',
-                platform_admin: 'Platform Admin',
-                security_architect: 'Security Architect',
-                data_architect: 'Data Architect',
-            },
-            /* Promise chain, not async/await: Alpine attribute expressions are
-               evaluated by the CSP-safe interpreter (app/static/js/csp/csp-evaluator.js),
-               which cannot parse `async` and throws on `await`. */
-            persistOnboarding() {
-                const self = this;
-                const _f = (window.Platform && window.Platform.fetch) || window.apiFetch || fetch;
-                const csrfMeta = document.querySelector('meta[name=csrf-token]');
-                return Promise.resolve()
-                    .then(function () {
-                        return _f('/dashboard/api/onboarding-complete', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': (csrfMeta && csrfMeta.content) || ''},
-                            body: JSON.stringify({enterprise_role: self.selectedRole}),
-                        });
-                    });
-            },
-            dismissOnboarding() {
-                localStorage.setItem('archie_onboarding_ts', Date.now().toString());
-                this.showOnboarding = false;
-            },
-            completeOnboarding() {
-                const self = this;
-                return this.persistOnboarding()
-                    .then(function () { self.dismissOnboarding(); })
-                    .catch(function () { self.dismissOnboarding(); });
-            }
-        }"
-        x-show="showOnboarding" x-cloak
-        class="fixed inset-0 z-[200] flex items-start sm:items-center justify-center p-4 overflow-y-auto bg-overlay/50"
-        @keydown.escape.window="completeOnboarding()"
-        @keydown.enter.prevent>
-        <div class="bg-card rounded-lg border border-border w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto"
-             @click.away="completeOnboarding()">
-            {# Step 1: Welcome + Role Selection #}
-            <div x-show="step === 1" class="p-8 space-y-6">
-                <div class="text-center space-y-2">
-                    <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                        <i data-lucide="layout-dashboard" class="h-6 w-6 text-primary" aria-hidden="true"></i>
-                    </div>
-                    <h2 class="text-xl font-bold text-foreground">Welcome to {{ config.APP_NAME }}</h2>
-                    <p class="text-sm text-muted-foreground">Your enterprise architecture platform. Let's personalize your experience.</p>
-                </div>
-                <div>
-                    <label class="text-sm font-medium text-foreground mb-3 block">What's your role?</label>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <template x-for="(label, key) in roleLabels" :key="key">
-                            <label class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors"
-                                   :class="selectedRole === key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
-                                <input type="radio" name="onboard_role" :value="key" x-model="selectedRole" class="accent-primary">
-                                <span class="text-sm font-medium text-foreground" x-text="label"></span>
-                            </label>
-                        </template>
-                    </div>
-                </div>
-                <button type="button" @click="step = 2"
-                        class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">
-                    Continue
-                </button>
-            </div>
-            {# Step 2: Role-specific feature cards #}
-            <div x-show="step === 2" x-cloak class="p-8 space-y-6">
-                <div class="text-center space-y-1">
-                    <h2 class="text-lg font-bold text-foreground">Key features for you</h2>
-                    <p class="text-sm text-muted-foreground">As a <span class="font-medium text-foreground" x-text="roleLabels[selectedRole]"></span>, here's where to start:</p>
-                </div>
-                <div class="space-y-3">
-                    <template x-for="card in (roleCards[selectedRole] || [])" :key="card.title">
-                        <a :href="card.href" tabindex="-1" class="flex items-start gap-3 rounded-xl border border-border bg-background p-4 hover:border-primary/30 transition-colors block">
-                            <div class="shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                                <i :data-lucide="card.icon" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-foreground" x-text="card.title"></p>
-                                <p class="text-xs text-muted-foreground mt-0.5" x-text="card.desc"></p>
-                            </div>
-                        </a>
-                    </template>
-                </div>
-                <div class="flex gap-3">
-                    <button type="button" @click="step = 1" class="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors">Back</button>
-                    <button type="button" @click="persistOnboarding().then(function() { step = 3; })" class="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">Continue</button>
-                </div>
-            </div>
-            {# Step 3: You're all set #}
-            <div x-show="step === 3" x-cloak class="p-8 space-y-6 text-center">
-                <div class="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto">
-                    <i data-lucide="check-circle-2" class="h-7 w-7 text-success" aria-hidden="true"></i>
-                </div>
-                <div class="space-y-2">
-                    <h2 class="text-xl font-bold text-foreground">You're all set!</h2>
-                    <p class="text-sm text-muted-foreground">Your workspace has been personalized. You can always change your role in Settings.</p>
-                </div>
-                <button type="button" @click="dismissOnboarding(); window.location.href = (primaryCTA[selectedRole]?.href || '/dashboard/overview')"
-                        class="inline-flex items-center justify-center w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">
-                    <span x-text="primaryCTA[selectedRole]?.label || 'Go to Dashboard'"></span>
-                    <i data-lucide="arrow-right" class="h-4 w-4 ml-2" aria-hidden="true"></i>
-                </button>
-                <button type="button" @click="dismissOnboarding()"
-                        class="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Skip for now
-                </button>
-            </div>
-        </div>
-    </div>
-    {% endif %}
     {% if resolved_page_guide_context.enabled %}
         <script>window.pageGuideContext = {{ resolved_page_guide_context | tojson }};</script>
         {% include 'components/page_guide_drawer.html' %}
@@ -469,7 +221,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-4"
-             class="fixed bottom-20 right-6 z-30 w-80 rounded-xl border border-border bg-card"
+             class="fixed bottom-20 right-6 z-30 w-80 rounded-lg border border-border bg-card"
              @keydown.escape.window="exit()">
             <div class="flex items-center justify-between border-b border-border px-4 py-3">
                 <span class="text-sm font-semibold text-foreground">Guided Walkthrough</span>
@@ -488,11 +240,8 @@
                 </div>
             </div>
             <div class="flex items-center justify-between border-t border-border px-4 py-3">
-                <button type="button" @click="exit()" class="text-xs text-muted-foreground hover:text-foreground transition-colors">Exit</button>
-                <button type="button" @click="next()"
-                        class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-                        x-text="currentIndex === steps.length - 1 ? 'Done' : 'Next'">
-                </button>
+                {{ _layout_button(text='Exit', variant='ghost', on_click='exit()') }}
+                {{ _layout_button(text='Next', variant='default', on_click='next()', attrs_dict={'x-text': "currentIndex === steps.length - 1 ? 'Done' : 'Next'"}) }}
             </div>
         </div>
     </div>
@@ -528,15 +277,6 @@
     <script>
         window.pageGuideContext = {{ resolved_page_guide_context | tojson }};
         document.addEventListener('alpine:init', () => {
-            Alpine.store('sidebar', {
-                open: false,
-                collapsed: localStorage.getItem('archie_sidebar_collapsed') === '1',
-                toggle() {
-                    this.collapsed = !this.collapsed;
-                    localStorage.setItem('archie_sidebar_collapsed', this.collapsed ? '1' : '0');
-                }
-            });
-
             Alpine.store('loading', {
                 active: false,
                 count: 0,

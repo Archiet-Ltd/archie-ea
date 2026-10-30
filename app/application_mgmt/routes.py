@@ -2296,9 +2296,31 @@ def render_application_detail(id):
         logger.exception("Could not load unified work packages for application %s", app_obj.id)
         db.session.rollback()
 
+    # --- Owner: the one owner record's display rows for this application, so
+    # the Ownership card can offer the same "Assign owner" next step the
+    # element page does and show the assigned owner by name after.
+    owner_rows = []
+    owner_assign_url = url_for("unified_applications.add_owner", app_id=app_obj.id)
+    try:
+        from app.models.application_owner import ApplicationOwner
+
+        owner_rows = [
+            dict(row, remove_url=url_for(
+                "unified_applications.remove_owner", app_id=app_obj.id, owner_id=row["id"],
+            ))
+            for row in ApplicationOwner.get_display_rows_for_application(
+                app_obj.id, getattr(g, "current_org_id", None)
+            )
+        ]
+    except Exception:
+        logger.exception("Could not load owner rows for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        owner_rows=owner_rows,
+        owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
         # renders an em dash instead of asserting a measured score of zero —
         # a literal 0.0 here rendered every application as red/non-compliant.

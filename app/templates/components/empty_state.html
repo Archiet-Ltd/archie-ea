@@ -49,29 +49,33 @@
     heading_testid=None,
     description_testid=None,
     class='',
-    padding='py-12'
+    padding='py-4 md:py-8',
+    compact=False
 ) %}
+{#- compact: for an empty box inside a card or canvas box. No icon disc, a small title and description, and a call to action that wraps. Default output is unchanged. -#}
+{%- set cta_fit = ' !h-auto !whitespace-normal !px-3 !py-1.5 !text-xs' if compact else '' -%}
 <div class="text-center {{ padding }} px-4 {{ class }}" role="status">
     <!-- Icon -->
-    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-        <i data-lucide="{{ icon }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
-    </div>
+    {% if not compact %}<div class="mx-auto mb-4 flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
+        {#- drawn on the server when it knows the icon: the browser set is older and lacks some names -#}
+        {% if has_lucide is defined and has_lucide(icon) %}{{ lucide(icon, 'size-6') }}{% else %}<i data-lucide="{{ icon }}" class="size-6" aria-hidden="true"></i>{% endif %}
+    </div>{% endif %}
 
     <!-- Title -->
-    <h3 class="mt-4 text-lg font-medium text-foreground"{% if heading_testid %} data-testid="{{ heading_testid }}"{% endif %}>
+    <h3 class="{{ 'text-sm font-medium' if compact else 'text-base font-semibold' }} text-foreground"{% if heading_testid %} data-testid="{{ heading_testid }}"{% endif %}>
         {{ title }}
     </h3>
 
     <!-- Description -->
     {% if description %}
-    <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto"{% if description_testid %} data-testid="{{ description_testid }}"{% endif %}>
+    <p class="{{ 'mt-1 text-xs' if compact else 'mt-2 text-sm' }} text-muted-foreground max-w-md mx-auto"{% if description_testid %} data-testid="{{ description_testid }}"{% endif %}>
         {{ description }}
     </p>
     {% endif %}
 
     <!-- CTA Button -->
     {% if cta_text %}
-    <div class="mt-6">
+    <div class="{{ 'mt-3' if compact else 'mt-6' }}">
         {% if cta_href and cta_method|lower == 'post' %}
         {# A CTA that CHANGES something must not be an anchor: a link is
            followed by prefetchers and scanners, and GET carries no CSRF
@@ -79,7 +83,7 @@
         <form method="post" action="{{ cta_href }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center{{ cta_fit }}">
                 {% if cta_icon %}
                 <i data-lucide="{{ cta_icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                 {% endif %}
@@ -88,7 +92,7 @@
         </form>
         {% elif cta_href %}
         <a href="{{ cta_href }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center{{ cta_fit }}">
             {% if cta_icon %}
             <i data-lucide="{{ cta_icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
             {% endif %}
@@ -96,7 +100,7 @@
         </a>
         {% elif cta_onclick %}
         <button type="button" @click="{{ cta_onclick }}"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="{{ cta_text }}">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center{{ cta_fit }}" aria-label="{{ cta_text }}">
             {% if cta_icon %}
             <i data-lucide="{{ cta_icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
             {% endif %}

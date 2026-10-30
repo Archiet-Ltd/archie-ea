@@ -3,7 +3,6 @@ Architecture CRUD Routes
 Unified dashboard for managing Motivation, Strategy, and Business layer elements
 """
 
-import copy
 import re
 from datetime import datetime
 
@@ -11,16 +10,18 @@ from flask import (
     abort,
     current_app,
     flash,
+    g,
     jsonify,
     redirect,
     render_template,
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import or_
 
 from app import db
+from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud
@@ -111,14 +112,14 @@ from app.models.technology_layer import (
 from app.models.unified_capability import ValueStream
 import logging
 from app.utils.pagination import safe_int_arg
-from app.models.archimate_element_types import StandardTypeTable
+from app.models.archimate_element_types import StandardTypeTable, is_application_kind
 
 logger = logging.getLogger(__name__)
 
 # One write-role gate for every mutating route in this module, matching the
 # generic Elements page (architecture_crud_routes.py): admin or architect.
 # Reads stay open to any signed-in user.
-write_role_required = require_roles("admin", "architect")
+write_role_required = admit_model_changers(require_roles("admin", "architect"))
 
 # Model registry mapping element types to model classes
 MODEL_REGISTRY = StandardTypeTable({
@@ -451,6 +452,231 @@ _SKIP_FIELDS = frozenset(
 )
 
 
+# Columns a person never needs to read; administrators see them under "Technical details".
+_TECHNICAL_FIELDS = frozenset({"color", "auto_generated"})
+_SNAKE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
+_ACRONYMS = ("Acm", "Api", "Id", "Url", "Sap", "Rfc", "Bapi", "Arb")
+
+
+def _plain_label(text):
+    """snake_case key or enum-like value -> words ("gap_kind" -> "Gap kind"); acronyms stay upper case."""
+    words = str(text).replace("_", " ").strip()
+    if not words:
+        return words
+    words = words[0].upper() + words[1:].lower()
+    for acronym in _ACRONYMS:
+        words = re.sub(rf"\b{acronym}\b", acronym.upper(), words, flags=re.I)
+    return words
+
+
+def _plain_value(value):
+    """Enum-like database values (snake_case strings) read as plain words; anything else is unchanged."""
+    return _plain_label(value) if isinstance(value, str) and _SNAKE.match(value) else value
+
+
+def _readable(value):
+    """Any column value as words: nested dicts and lists recurse, a named object shows its name, nothing is a repr."""
+    if isinstance(value, dict):
+        named = value.get("name") or value.get("title")
+        if named and isinstance(named, str) and len(value) <= 3:
+            return named
+        return "; ".join(f"{_plain_label(k)}: {_readable(v)}" for k, v in value.items())
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(_readable(v) for v in value)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return str(_plain_value(value))
+    return str(getattr(value, "name", None) or getattr(value, "title", None) or "")
+
+
+def _element_owner_target(element, element_type, organization_id):
+    """The owner record this element's owner lives on: ``(kind, id)`` or None.
+
+    Resolves the concrete element first: a page opened on the generic
+    ``archimate_elements`` row of an application is the application whose
+    ``archimate_element_id`` points at it, and an AI system is owned under its
+    own element id. None means this type has no owner field.
+    """
+    from app.modules.enterprise_genome.services.ai_system_profile import is_ai_system
+
+    if organization_id is None:
+        return None
+    if isinstance(element, ApplicationComponent):
+        return ("application", element.id)
+    if is_application_kind(element_type):
+        if is_ai_system(element):
+            return ("ai_system", element.id)
+        component = ApplicationComponent.query.filter_by(
+            archimate_element_id=element.id, organization_id=organization_id,
+        ).first()
+        return ("application", component.id) if component is not None else None
+    if element_type == "BusinessProcess":
+        if isinstance(element, BusinessProcess):
+            return ("business_process", element.id)
+        # A page opened on the generic element is the process that points at
+        # it; a process modelled only as an element gets its record on the
+        # first assignment.
+        process = BusinessProcess.query.filter_by(
+            archimate_element_id=element.id, organization_id=organization_id,
+        ).first()
+        return ("business_process", process.id) if process is not None else ("process_element", element.id)
+    if element_type == "Capability":
+        # Capability owners are recorded on the unified capability this row
+        # projects into (by provenance), never on the source row's own id.
+        from app.models.unified_capability import UnifiedCapability
+
+        unified = UnifiedCapability.query.filter_by(
+            source_table="business_capability", source_id=str(element.id),
+            organization_id=organization_id,
+        ).first()
+        return ("capability", unified.id) if unified is not None else None
+    return None
+
+
+def _element_owner_rows(element, element_type, organization_id):
+    """Owner rows for the detail page, through the one ownership record's existing readers."""
+    from app.models.application_owner import ApplicationOwner
+
+    target = _element_owner_target(element, element_type, organization_id)
+    if target is None:
+        return []
+    kind, target_id = target
+    if kind == "application":
+        return ApplicationOwner.get_display_rows_for_application(target_id, organization_id)
+    if kind == "process_element":
+        return []
+    return ApplicationOwner.get_display_rows_for_element(kind, target_id, organization_id)
+
+
+def _element_owner_url(element, element_type, organization_id):
+    """Where the owner picker saves an owner for this element, or None."""
+    target = _element_owner_target(element, element_type, organization_id)
+    if target is None:
+        return None
+    kind, target_id = target
+    if kind == "application":
+        return url_for("unified_applications.add_owner", app_id=target_id)
+    if kind == "capability":
+        return url_for("capability_map.api_set_capability_owner", capability_id=target_id)
+    if kind == "business_process":
+        return url_for("archimate_crud.process_set_owner", process_id=target_id)
+    if kind == "process_element":
+        return url_for("archimate_crud.process_element_set_owner", element_id=target_id)
+    return url_for("ai_systems_genome.ai_system_set_owner", element_id=target_id)
+
+
+def _element_owner_remove_urls(element, element_type, organization_id, owner_rows):
+    """Owner rows with the address that clears each one, from the same target the picker saves on."""
+    target = _element_owner_target(element, element_type, organization_id)
+    if target is None:
+        return owner_rows
+    kind, target_id = target
+    if kind == "process_element":
+        return owner_rows
+    endpoints = {
+        "application": ("unified_applications.remove_owner", "app_id"),
+        "capability": ("capability_map.api_delete_capability_owner", "capability_id"),
+        "ai_system": ("ai_systems_genome.ai_system_delete_owner", "element_id"),
+        "business_process": ("archimate_crud.process_delete_owner", "process_id"),
+    }
+    endpoint, key = endpoints[kind]
+    return [
+        dict(row, remove_url=url_for(endpoint, owner_id=row["id"], **{key: target_id}))
+        for row in owner_rows
+    ]
+
+
+@archimate_crud.route("/business-process/element/<int:element_id>/owners", methods=["POST"])
+@login_required
+def process_element_set_owner(element_id):
+    """Record the first owner of a process that so far exists only as an element."""
+    from app.core.auth.permissions import can
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    element = ArchiMateElement.query.filter_by(
+        id=element_id, type="BusinessProcess", organization_id=org_id,
+    ).first()
+    if element is None:
+        return jsonify({"message": "Business process not found"}), 404
+    process = BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org_id).first()
+    if process is None:
+        process = BusinessProcess(
+            name=element.name, description=element.description, organization_id=org_id,
+            archimate_element_id=element.id, status="active",
+        )
+        db.session.add(process)
+        db.session.commit()
+    return process_set_owner(process.id)
+
+
+@archimate_crud.route("/business-process/<int:process_id>/owners", methods=["POST"])
+@login_required
+def process_set_owner(process_id):
+    """Record an owner for a business process (a new primary replaces the old)."""
+    from app.core.auth.permissions import can
+    from app.services.element_ownership_service import set_element_owner
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    data = request.get_json(silent=True) or {}
+    if not data.get("user_id"):
+        return jsonify({"message": "user_id is required"}), 400
+    try:
+        record = set_element_owner(
+            element_type="business_process",
+            element_id=process_id,
+            user_id=data["user_id"],
+            organization_id=org_id,
+            ownership_type=data.get("ownership_type", "primary"),
+            assigned_by=current_user.id,
+            replace_primary=bool(data.get("replace")),
+        )
+    except ValueError as exc:  # includes CrossOrganisationElementOwner
+        db.session.rollback()
+        return jsonify({"message": str(exc)}), 400
+    _mirror_process_owner(process_id, org_id)
+    return jsonify({"owner": record.to_dict()}), 201
+
+
+@archimate_crud.route(
+    "/business-process/<int:process_id>/owners/<int:owner_id>", methods=["DELETE"]
+)
+@login_required
+def process_delete_owner(process_id, owner_id):
+    """Clear one owner of a business process."""
+    from app.core.auth.permissions import can
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    record = ApplicationOwner.query.filter_by(
+        id=owner_id, element_type="business_process", element_id=process_id,
+        organization_id=org_id,
+    ).first()
+    if record is None:
+        return jsonify({"message": "Owner record not found"}), 404
+    db.session.delete(record)
+    db.session.commit()
+    _mirror_process_owner(process_id, org_id)
+    return "", 204
+
+
+def _mirror_process_owner(process_id, org_id):
+    """Keep the process's owner text equal to its recorded primary owner (the owner record is the authority)."""
+    from app.models.application_owner import ApplicationOwner
+
+    process = BusinessProcess.query.filter_by(id=process_id, organization_id=org_id).first()
+    if process is None:
+        return
+    rows = ApplicationOwner.get_display_rows_for_element("business_process", process_id, org_id)
+    named = [r["user_name"] for r in rows if r["ownership_type"] == "primary" and r["user_name"] != "—"]
+    process.process_owner = named[0] if named else None
+    db.session.commit()
+
+
 def _get_display_fields(element, model_class):
     """Introspect a model instance and return a list of (label, value) tuples
     for all non-empty, non-private, non-FK columns worth displaying."""
@@ -488,9 +714,7 @@ def _get_display_fields(element, model_class):
         # Build a human-readable label from snake_case, correcting acronyms
         # that .title() mangles (Acm -> ACM) rather than leaving the wrong
         # case on a screen a real architect reads.
-        label = col_name.replace("_", " ").title()
-        for acronym in ("Acm", "Api", "Id", "Url", "Sap", "Rfc", "Bapi", "Arb"):
-            label = re.sub(rf"\b{acronym}\b", acronym.upper(), label)
+        label = _plain_label(col_name)
 
         # Format special types
         if isinstance(value, bool):
@@ -503,11 +727,13 @@ def _get_display_fields(element, model_class):
             # A dict column is internal structure, not prose -- render its
             # entries as "key: value" pairs rather than Python's repr(), which
             # leaked as a literal {'source_model': 'Risk'} on real screens.
-            value = "; ".join(f"{k}: {v}" for k, v in value.items())
-        elif isinstance(value, list):
-            value = ", ".join(str(v) for v in value)
+            value = _readable(value)
+        elif isinstance(value, (list, tuple)):
+            value = _readable(value)
+        else:
+            value = _plain_value(value)
 
-        fields.append({"label": label, "value": str(value)})
+        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS})
 
     return fields
 
@@ -877,6 +1103,19 @@ def api_layer_elements(layer):
     if sort_by in ("name", "element_type", "description", "status"):
         all_elements.sort(key=lambda x: (x.get(sort_by) or "").lower(), reverse=reverse)
 
+    # A kind filter narrows the whole list before it is paged, so an Epic on a
+    # later page is found and the total counts only what matches.
+    if kind_filter:
+        from app.services.element_profile_service import read_profile as _read_kind
+        matching = []
+        for el in all_elements:
+            if el.get("element_type") != "WorkPackage":
+                continue
+            ae = db.session.get(ArchiMateElement, el["id"])
+            if ae is not None and _read_kind(ae).get("kind") == kind_filter:
+                matching.append(el)
+        all_elements = matching
+
     total = len(all_elements)
     pages = math.ceil(total / per_page) if per_page > 0 else 1
     start = (page - 1) * per_page
@@ -1228,7 +1467,13 @@ def detail_element(layer, element_type, element_id):
     # filter_by always emits SQL, so the tenant filter applies even when the row
     # is already in the session identity map (Query.get would skip it).
     element = None
-    if model_class:
+    # ?ae=1 means the id is an archimate_elements id, which is what a connection row carries; without it
+    # the id is the dedicated table's own id, which is what the lists carry. The two number spaces overlap,
+    # so a connection must say which one it holds or it can open another element's page.
+    if model_class and request.args.get("ae") == "1":
+        if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
+            element = model_class.query.filter_by(archimate_element_id=element_id).first()
+    elif model_class:
         element = model_class.query.filter_by(id=element_id).first()
 
     # Fall back to archimate_elements table (native ArchiMate elements)
@@ -1249,8 +1494,51 @@ def detail_element(layer, element_type, element_id):
         ae_id = element.id
 
     # Auto-discover displayable fields from the model
-    display_fields = _get_display_fields(element, model_class)
+    all_fields = _get_display_fields(element, model_class)
+    display_fields = [f for f in all_fields if not f["technical"]]
+    # These two are the element's own dates; the owner's assignment date is
+    # shown with the owner, so the labels say whose date each is.
+    for field in display_fields:
+        if field["label"] in ("Valid from", "Recorded at"):
+            field["label"] = "Element " + field["label"][0].lower() + field["label"][1:]
+    technical_fields = [f for f in all_fields if f["technical"]]
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
+    owner_rows = _element_owner_remove_urls(
+        element, element_type, getattr(element, "organization_id", None),
+        _element_owner_rows(element, element_type, getattr(element, "organization_id", None)),
+    )
+    owner_assign_url = _element_owner_url(
+        element, element_type, getattr(element, "organization_id", None)
+    )
+    # A capability not yet projected into the one capability store has no
+    # record to save an owner on here; it keeps the link to the capability map.
+    owner_assign_link = None
+    if owner_assign_url is None and element_type == "Capability":
+        owner_assign_link = url_for("capability_map.index", cap=element.id)
+    # Only a type that has an owner field shows an Owner row at all; one that
+    # has none must not claim a missing owner.
+    has_owner_field = (
+        owner_assign_url is not None or element_type == "Capability" or bool(owner_rows)
+    )
+    # A business process written before the owner record existed keeps its owner as text.
+    legacy_owner_text = (
+        getattr(element, "process_owner", None) if element_type == "BusinessProcess" else None
+    )
+    if element_type == "BusinessProcess":
+        # The Owner row above is the one place the owner is shown.
+        display_fields = [f for f in display_fields if f["label"] != "Process owner"]
+
+    # The external-identifiers help names only connectors this organisation
+    # can use today, read from the one connector registry. When none are live
+    # it points at the Connectors page instead.
+    from app.models.connector_config import ConnectorConfig
+
+    live_connectors = ConnectorConfig.live_connector_types(
+        getattr(element, "organization_id", None)
+    )
+    connectors_url = url_for("m365_connector.connectors_index")
+
+    page = _element_page(element, element_type, ae_id, relationships)
 
     return render_template(
         "archimate_crud/detail.html",
@@ -1259,10 +1547,50 @@ def detail_element(layer, element_type, element_id):
         element=element,
         relationships=relationships,
         source_ae_id=ae_id,
+        page=page,
         display_fields=display_fields,
+        technical_fields=technical_fields,
+        owner_rows=owner_rows,
+        legacy_owner_text=legacy_owner_text,
+        has_owner_field=has_owner_field,
+        owner_assign_url=owner_assign_url,
+        owner_assign_link=owner_assign_link,
         external_links=external_links,
+        live_connectors=live_connectors,
+        connectors_url=connectors_url,
         layer_config=LAYER_CONFIG,
     )
+
+
+def _element_page(element, element_type, ae_id, relationships):
+    """Everything the detail page says about this element in words, from the one impact walk."""
+    from flask_login import current_user
+
+    from app.modules.architecture.routes.archimate_crud import element_page
+    from app.template_helpers import _plain_layer, _plain_name
+
+    def href_for(layer_key, kind, target_ae_id):
+        if layer_key not in LAYER_CONFIG or not kind or not target_ae_id:
+            return None
+        return url_for(
+            "archimate_crud.detail_element", layer=layer_key, element_type=kind, element_id=target_ae_id, ae=1
+        )
+
+    ae_row = element if isinstance(element, ArchiMateElement) else (
+        ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
+    )
+    common = dict(user=current_user, plain_name=_plain_name)
+    connections = element_page.build_connections(
+        ae_id, relationships, plain_layer=_plain_layer, layer_aliases=LAYER_ALIASES, href_for=href_for, **common
+    )
+    return {
+        "subtitle": element_page.subtitle_for(element_type, current_user, _plain_name),
+        # The dedicated table may hold no description while the model-graph row does; show whichever has words.
+        "description": (getattr(element, "description", None) or getattr(ae_row, "description", None) or "").strip(),
+        "connections": connections,
+        "lines": element_page.answer_lines(element_type, connections, **common),
+        **element_page.plateau_facts(element, element_type, ae_row, href_for=href_for),
+    }
 
 
 @archimate_crud.route(
@@ -1293,7 +1621,6 @@ def update_element(layer, element_type, element_id):
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
-            _ae_before = _archimate_element_state(element, _from_ae)
 
             # Update basic fields
             if hasattr(
@@ -1331,8 +1658,6 @@ def update_element(layer, element_type, element_id):
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
             # Works for a native ArchiMateElement (element itself) and a linked one.
             _apply_architecture_state(element, data)
-
-            _record_element_update(_ae_before, _archimate_element_state(element, _from_ae))
 
             db.session.commit()
 
@@ -1373,53 +1698,6 @@ def update_element(layer, element_type, element_id):
         selected_layer=_selected_layer_for(layer),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
     )
-
-
-def _archimate_element_state(element, from_ae):
-    """(id, name, description, custom_properties) of the ArchiMate element behind ``element``."""
-    target = element
-    if not from_ae:
-        linked = getattr(element, "archimate_element_id", None)
-        target = ArchiMateElement.query.get(linked) if linked else None
-    if target is None or not isinstance(target, ArchiMateElement):
-        return None
-    return {
-        "id": target.id,
-        "name": target.name,
-        "description": target.description,
-        "custom_properties": copy.deepcopy(target.custom_properties or {}),
-    }
-
-
-def _record_element_update(before, after):
-    """Record an edit of an ArchiMate element in the organisation's audit trail.
-
-    Same transaction as the edit; the restore-before-import screen reads these
-    entries to offer later changes for applying again.
-    """
-    if not before or not after or before == after:
-        return
-    from flask import g
-    from flask_login import current_user
-
-    from app.models.audit_log import AuditLog
-    from app.services.audit_log_service import AuditLogService
-
-    changed = [k for k in ("name", "description", "custom_properties") if before.get(k) != after.get(k)]
-    if not changed:
-        return
-    org_id = getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
-    db.session.add(AuditLog(
-        organization_id=org_id,
-        user_id=getattr(current_user, "id", None),
-        action="update",
-        table_name="archimate_elements",
-        record_id=after["id"],
-        old_value={k: before[k] for k in changed},
-        new_value={k: after[k] for k in changed},
-        ip_address=AuditLogService._resolve_ip(),
-        user_agent=(AuditLogService._resolve_ua() or None),
-    ))
 
 
 @archimate_crud.route(

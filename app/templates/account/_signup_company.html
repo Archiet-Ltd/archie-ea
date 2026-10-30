@@ -1,0 +1,31 @@
+{# Sign-up step 3: the company profile read from its website to confirm, the few questions a website cannot answer, and the frameworks that suit the first goal. All optional. #}
+<div data-signup-steps
+     data-url-choices="{{ url_for('account.welcome_choices') }}"
+     data-url-profile="{{ url_for('account.welcome_profile') }}"
+     data-url-status="{{ url_for('account.welcome_status') }}"
+     {% set site_row = sources | selectattr('key', 'equalto', 'website') | first %}
+     {% if website and not facts and site_row.state in ('waiting', 'reading') %}data-reload-when-read="true"{% endif %}
+     class="space-y-6" data-testid="signup-company">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}About your company{% endcall %}
+            {% call card_description() %}Optional. Confirm what we read, answer three questions, and change any of it later in Settings.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-6') %}
+            {% if facts %}
+            {% include 'account/_company_facts.html' %}
+            {% if more_coming %}<p class="text-sm text-muted-foreground" role="status" data-testid="more-facts-coming">{{ more_coming }}</p>{% endif %}
+            {% elif website %}
+            {% include 'account/_website_reading.html' %}
+            {% endif %}
+            {% include 'account/_company_asked.html' %}
+            {% include 'account/_company_choices.html' %}
+            <p class="text-sm text-destructive-emphasis" role="status" aria-live="polite" data-say="choices"></p>
+        {% endcall %}
+        {% call card_footer(class='sticky bottom-0 justify-between border-t border-border bg-card') %}
+            {{ button(text='Previous', variant='ghost', icon='arrow-left', href=url_for('account.welcome'), testid='signup-previous') }}
+            {{ button(text='Continue', icon='arrow-right', icon_position='right', testid='signup-continue', attrs_dict={'data-action': 'continue', 'data-next': url_for('account.welcome', step=4)}) }}
+        {% endcall %}
+    {% endcall %}
+</div>
+<script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>

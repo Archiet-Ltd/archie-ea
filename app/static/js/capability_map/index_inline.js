@@ -212,7 +212,7 @@ function renderACMDomains(data) {
         return '<div class="' + colors.bg + ' ' + colors.border + ' border-2 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"' +
                      ' role="button" tabindex="0" data-acm-action="filter-acm-domain"' +
                      ' data-domain="' + acmEscapeAttr(domain.domain) + '"' +
-                     ' aria-label="Filter capabilities to ' + acmEscapeAttr(domain.name) + '">' +
+                     ' title="Filter capabilities to ' + acmEscapeAttr(domain.name) + '">' +
                 '<div class="flex items-start justify-between mb-3">' +
                     '<div class="p-2 rounded-lg ' + colors.bg + '">' +
                         '<i data-lucide="' + colors.icon + '" class="w-6 h-6 ' + colors.text + '"></i>' +
@@ -414,7 +414,7 @@ async function openCapabilityDetail(capabilityId, capabilityName) {
         html += '<div class="mb-4 space-y-1">';
         if (cap.code) html += '<p class="text-xs text-muted-foreground">' + cap.code + '</p>';
         html += '<div class="flex items-center gap-2">';
-        html += '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">Level ' + (cap.level || '?') + '</span>';
+        html += '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30">Level ' + (cap.level || '?') + '</span>';
         html += '<span class="text-sm text-muted-foreground">' + (data.mapped_count || 0) + ' of ' + (data.total_count || 0) + ' apps mapped</span>';
         html += '</div></div>';
         if (cap.current_maturity !== undefined) {
@@ -1324,7 +1324,7 @@ function renderBusinessDomainCards(domains) {
         return '<div class="' + cs.bg + ' border-2 ' + cs.border + ' rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"' +
                      ' role="button" tabindex="0" data-acm-action="filter-unified-domain"' +
                      ' data-domain-code="' + acmEscapeAttr(domain.code) + '"' +
-                     ' aria-label="Filter capabilities to domain ' + acmEscapeAttr(domain.code) + '">' +
+                     ' title="Filter capabilities to domain ' + acmEscapeAttr(domain.code) + '">' +
                 '<div class="flex items-start justify-between mb-3">' +
                     '<span class="text-xs font-bold ' + cs.textBold + ' ' + cs.badge + ' px-2 py-0.5 rounded">' + escapeHtml(domain.code) + '</span>' +
                     '<div class="w-2 h-2 rounded-full ' + statusColor + '"></div>' +

@@ -1,0 +1,70 @@
+{# Sign-up step 2: the company's sources. Every part is optional; each source starts its import the
+   moment it is given. #}
+<div data-signup-steps
+     data-url-github="{{ url_for('account.welcome_github') }}"
+     data-url-jira="{{ url_for('account.welcome_jira') }}"
+     data-url-website="{{ url_for('account.welcome_website') }}"
+     data-url-choices="{{ url_for('account.welcome_choices') }}"
+     data-url-status="{{ url_for('account.welcome_status') }}"
+     class="space-y-6" data-testid="signup-company">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}Bring in your company{% endcall %}
+            {% call card_description() %}Give {{ config.APP_NAME }} a source and it starts reading in the background. You can carry on straight away, and every fact it finds names where it came from. Each one is optional.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-6') %}
+            <div class="space-y-3" data-testid="signup-website">
+                <h2 class="text-sm font-semibold">Company website</h2>
+                <div class="space-y-1.5">
+                    {% call label(for='welcome-website') %}Website address{% endcall %}
+                    {{ input(id='welcome-website', placeholder='acme.com', value=((org.settings or {}).get('onboarding', {}).get('website', {}).get('url') or '')) }}
+                </div>
+                {{ checkbox(id='welcome-website-consent', label='You may read this website', description='We read up to 30 pages in the background and show you what we found to confirm in the next step. Nothing is added to your model until you confirm it.') }}
+                {{ button(text='Save website', variant='outline', size='sm', testid='signup-website-save', attrs_dict={'data-action': 'website'}) }}
+                {% include 'account/_website_reading.html' %}
+            </div>
+
+            <div class="space-y-3 border-t border-border pt-6" data-testid="signup-github">
+                <h2 class="text-sm font-semibold">GitHub</h2>
+                <p class="text-sm text-muted-foreground">A read-only token is enough. It is stored encrypted for your organisation and never shown again.</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="space-y-1.5">
+                        {% call label(for='welcome-github-org') %}GitHub organisation{% endcall %}
+                        {{ input(id='welcome-github-org', placeholder='acme', attrs_dict={'autocomplete': 'off'}) }}
+                    </div>
+                    <div class="space-y-1.5">
+                        {% call label(for='welcome-github-token') %}Read-only token{% endcall %}
+                        {{ input(id='welcome-github-token', type='password', placeholder='Read-only token', attrs_dict={'autocomplete': 'off'}) }}
+                    </div>
+                </div>
+                {{ button(text='Connect GitHub', icon='github', size='sm', testid='signup-github-connect', attrs_dict={'data-action': 'github'}) }}
+                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="github" data-source="github" data-testid="signup-status-github">{{ (sources | selectattr('key', 'equalto', 'github') | first).text if (sources | selectattr('key', 'equalto', 'github') | first).state != 'not_given' else '' }}</p>
+            </div>
+
+            <div class="space-y-3 border-t border-border pt-6" data-testid="signup-jira">
+                <h2 class="text-sm font-semibold">Jira</h2>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="space-y-1.5">
+                        {% call label(for='welcome-jira-url') %}Jira site address{% endcall %}
+                        {{ input(id='welcome-jira-url', placeholder='https://acme.atlassian.net', attrs_dict={'autocomplete': 'off'}) }}
+                    </div>
+                    <div class="space-y-1.5">
+                        {% call label(for='welcome-jira-email') %}Jira email{% endcall %}
+                        {{ input(id='welcome-jira-email', type='email', placeholder='you@acme.com', attrs_dict={'autocomplete': 'off'}) }}
+                    </div>
+                </div>
+                <div class="space-y-1.5">
+                    {% call label(for='welcome-jira-token') %}Jira API token{% endcall %}
+                    {{ input(id='welcome-jira-token', type='password', placeholder='API token', attrs_dict={'autocomplete': 'off'}) }}
+                </div>
+                {{ button(text='Connect Jira', variant='outline', size='sm', testid='signup-jira-connect', attrs_dict={'data-action': 'jira'}) }}
+                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="jira" data-source="jira" data-testid="signup-status-jira">{{ (sources | selectattr('key', 'equalto', 'jira') | first).text if (sources | selectattr('key', 'equalto', 'jira') | first).state != 'not_given' else '' }}</p>
+            </div>
+        {% endcall %}
+        {% call card_footer(class='sticky bottom-0 justify-end border-t border-border bg-card') %}
+            {{ button(text='Continue', icon='arrow-right', icon_position='right', href=url_for('account.welcome', step=3), testid='signup-continue') }}
+        {% endcall %}
+    {% endcall %}
+
+</div>
+<script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>

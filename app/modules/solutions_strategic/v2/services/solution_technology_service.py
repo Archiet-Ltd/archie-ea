@@ -74,7 +74,7 @@ class SolutionTechnologyService:
                             "type": elem_type,
                             "layer": getattr(elem, "layer", None),
                             "description": getattr(elem, "description", None),
-                            "plateau": getattr(elem, "plateau", None),
+                            "plateau": getattr(elem, "togaf_plateau", None),
                             "building_block_type": getattr(
                                 elem, "building_block_type", None
                             ),

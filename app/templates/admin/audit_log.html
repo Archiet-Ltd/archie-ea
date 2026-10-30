@@ -1,4 +1,8 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import hidden_input, input %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/table.html' import table %}
 {% from "components/page_header.html" import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 
@@ -21,51 +25,44 @@
         <div class="grid grid-cols-1 gap-3">
             <div>
                 <label for="date_from" class="block text-sm font-medium text-muted-foreground mb-1">From Date</label>
-                <input type="date" id="date_from" name="date_from" value="{{ date_from }}"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {{ input(type="date", id=("date_from"), name=("date_from"), value=(date_from)|string, size='sm', class="w-full") }}
             </div>
             <div>
                 <label for="date_to" class="block text-sm font-medium text-muted-foreground mb-1">To Date</label>
-                <input type="date" id="date_to" name="date_to" value="{{ date_to }}"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {{ input(type="date", id=("date_to"), name=("date_to"), value=(date_to)|string, size='sm', class="w-full") }}
             </div>
             <div>
                 <label for="user_email" class="block text-sm font-medium text-muted-foreground mb-1">User Email</label>
                 <!-- entity-picker-ok: search filter, not entity creation -->
-                <input type="text" id="user_email" name="user_email" value="{{ user_email }}" placeholder="Search by email"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {{ input(type="text", id=("user_email"), name=("user_email"), value=(user_email)|string, placeholder=("Search by email"), size='sm', class="w-full") }}
             </div>
             <div>
                 <label for="action" class="block text-sm font-medium text-muted-foreground mb-1">Action</label>
-                <select id="action" name="action"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {% call native_select(id=("action"), name=("action"), size='sm', class="w-full") %}
                     <option value="">All Actions</option>
                     {% for a in action_types %}
                     <option value="{{ a }}" {{ 'selected' if action_filter == a else '' }}>{{ a }}</option>
                     {% endfor %}
-                </select>
+                {% endcall %}
             </div>
             <div>
                 <label for="entity_type" class="block text-sm font-medium text-muted-foreground mb-1">Entity Type</label>
-                <select id="entity_type" name="entity_type"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {% call native_select(id=("entity_type"), name=("entity_type"), size='sm', class="w-full") %}
                     <option value="">All Types</option>
                     {% for et in entity_types %}
                     <option value="{{ et }}" {{ 'selected' if entity_type_filter == et else '' }}>{{ et }}</option>
                     {% endfor %}
-                </select>
+                {% endcall %}
             </div>
             <div>
                 <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
-                <input type="text" id="q" name="q" value="{{ search_q }}" placeholder="Search description..."
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {{ input(type="text", id=("q"), name=("q"), value=(search_q)|string, placeholder=("Search description..."), size='sm', class="w-full") }}
             </div>
         </div>
         <div class="flex items-center gap-3 mt-3">
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            {% call button(type="submit", variant="default", class="justify-center whitespace-nowrap justify-center") %}
                 <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
-            </button>
+            {% endcall %}
             <a href="{{ url_for('admin.audit_log_viewer') }}"
                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
@@ -110,11 +107,10 @@
                 </div>
             </div>
             <form method="post" action="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}" class="shrink-0">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button id="audit-verify" type="submit"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
+                {% call button(type="submit", variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"id": ("audit-verify")}) %}
                     <i data-lucide="shield-check" class="h-4 w-4 mr-1.5"></i> Verify integrity
-                </button>
+                {% endcall %}
             </form>
         </div>
     </section>
@@ -137,7 +133,7 @@
     <!-- Results table -->
     <div class="rounded-lg border border-border bg-card overflow-hidden" x-data="{ expanded: {} }">
         <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
+            {% call table(class="dense-table w-full text-sm") %}
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground w-8"></th>
@@ -257,7 +253,7 @@
                     {% endif %}
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
         </div>
     </div>
 

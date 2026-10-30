@@ -690,6 +690,11 @@ def _should_send_digest(user):
     return True
 
 
+def _is_alert(notification) -> bool:
+    """Whether a notification is an alert from the rules in change_rules.py."""
+    return (notification.event_type or "").startswith("alert.")
+
+
 def _already_sent_today(user_id: int) -> bool:
     """Whether a digest was already sent to this user today (per-day idempotency)."""
     from app.models.models import Notification
@@ -734,10 +739,18 @@ def send_owner_digest(organization_id: int) -> dict:
 
     for uid, data in user_notifications.items():
         user = data["user"]
-        items = data["items"]
 
         try:
-            if not _should_send_digest(user):
+            # One email a day carries both: the alerts about what the person
+            # owns (switch: alert_email) and their other notifications (the
+            # digest preference). Either can be off without stopping the other.
+            digest_on = _should_send_digest(user)
+            alerts_on = user.get_notification_preference("alert_email")
+            items = [
+                item for item in data["items"]
+                if (alerts_on if _is_alert(item) else digest_on)
+            ]
+            if not items:
                 logger.info(
                     "Owner digest: user %s in org %s opted out (preferences)",
                     user.id, organization_id,

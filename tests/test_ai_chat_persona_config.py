@@ -127,8 +127,13 @@ def test_the_compliance_and_data_architecture_scopes_are_offered():
 
     tpl = (Path(__file__).resolve().parents[1]
            / "app/templates/ai_chat/index.html").read_text(encoding="utf-8")
+    import re
+
+    # The scope selector is built from the select macro's option pairs
+    # ('key', 'Label'); a raw <option value="key"> is the other way to offer one.
     for domain in ("compliance", "data_architecture"):
-        assert 'value="%s"' % domain in tpl, (
+        offered = re.search(r"\(\s*'%s'\s*,\s*'[^']+'\s*\)" % domain, tpl) or ('value="%s"' % domain) in tpl
+        assert offered, (
             f"the {domain} scope has a server-side loader and no way to reach it"
         )
 
@@ -160,3 +165,24 @@ def test_the_dead_template_selector_is_gone():
         "the page still queries prompt templates for a control that no longer "
         "exists: %s" % offenders
     )
+
+
+def test_a_self_serve_owner_gets_the_technical_founders_assistant():
+    """The "cto" lens set at sign-up opens the CTO / technical founder assistant; the assigned
+    "cto" role keeps the executive briefing, and a lens other than "cto" still follows its role."""
+    from app.modules.ai_chat.services.architect_persona_charters import (
+        ARCHITECT_PERSONAS,
+        build_architect_prompt,
+        get_default_chat_persona,
+    )
+
+    assert PERSONA_CONFIGS["cto_founder"]["name"] == "CTO / technical founder"
+    assert "cto_founder" in ARCHITECT_PERSONAS
+    assert get_default_chat_persona(None, "cto") == "cto_founder"
+    assert get_default_chat_persona("enterprise_architect", "cto") == "cto_founder"
+    assert get_default_chat_persona("cto") == "cio"
+    assert get_default_chat_persona(None, "security_architect") == "security_architect"
+    assert get_default_chat_persona(None, None) == "enterprise_architect"
+    charter = build_architect_prompt("cto_founder")
+    for question in ("what breaks", "who owns it", "what it costs", "what to fix first"):
+        assert question in charter.lower()

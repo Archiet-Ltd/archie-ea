@@ -18,7 +18,7 @@ Routes:
 
 import logging
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import csrf
@@ -66,6 +66,7 @@ def billing_index():
             "admin/billing.html",
             subscription=None,
             error="No organisation found for your account.",
+            contact_sales_url=billing_plans.CONTACT_SALES_URL,
         )
 
     refresh_error = None
@@ -78,6 +79,9 @@ def billing_index():
                 refresh_error = str(exc)
     else:
         config = billing_plans.configuration_status()
+
+    # The buy form on this page is answered with a redirect to the provider's hosted checkout.
+    g.csp_form_action_extra = " ".join(BillingService.checkout_origins())
 
     sub = billing_plans.current_subscription(org)
     selected = request.args.get("plan")
@@ -105,16 +109,20 @@ def billing_index():
         except BillingError as exc:
             details_error = str(exc)
 
+    current = billing_plans.effective_plan(sub)
+    live = BillingService.has_live_subscription(sub)
     return render_template(
         "admin/billing.html",
         subscription=sub,
         org=org,
-        plan=billing_plans.effective_plan(sub),
+        plan=current,
+        renewal=billing_plans.renewal_summary(sub, current, live),
+        plan_prices={p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS},
         limits=billing_plans.user_limit_status(org.id),
         plans=billing_plans.PLANS,
-        config=config,
-        stripe_configured=config["ready"],
-        has_live_subscription=BillingService.has_live_subscription(sub),
+        payment=config,
+        payment_ready=config["ready"],
+        has_live_subscription=live,
         error=refresh_error,
         selected_plan=selected_plan,
         selected_interval=interval,

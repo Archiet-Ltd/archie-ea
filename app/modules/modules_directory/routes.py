@@ -132,19 +132,11 @@ _MORE_TOOLS_REQUIRES = {
 }
 
 _MORE_TOOLS = [
-    # A-20 (readiness table 5.1, 2026-09-22): Ask already has a real sidebar
-    # link in every persona's My-work zone (role_access.py's _ASK_LINK), so
-    # it needs no entry here -- the directory already unions every zone's
-    # links. Twin map deliberately has no sidebar link of its own (its own
-    # code comment: reached from an Ask result, kept out of the sidebar
-    # budget) -- this is its one findable home. "network" matches the icon
-    # already used for the Twin map button inside ask.html.
-    ("Twin Map", "intelligence_ui.twin_map", "network"),
-    # Reached from a Twin map element or an Element properties missing-value
+    # Reached from a Composer element or an Element properties missing-value
     # row as well; this is its findable home, outside the sidebar budget.
     ("Traceability Check", "intelligence_ui.traceability", "route"),
     # An organisation's governed element properties and the elements missing
-    # them; kept out of the sidebar budget like Twin map.
+    # them; kept out of the sidebar budget.
     ("Element Properties", "metamodel_properties.index", "sliders-horizontal"),
     ("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
     ("Capability Health", "strategic.capability_health", "heart-pulse"),
@@ -153,9 +145,8 @@ _MORE_TOOLS = [
     ("Batch Import", "batch_import_view.dashboard", "upload"),
     ("Consolidation List", "consolidation_list.dashboard", "combine"),
     ("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
-    ("EA Briefings", "solution_design.ea_briefings", "newspaper"),
+    ("Weekly Briefing", "solution_design.ea_briefings", "newspaper"),
     ("Data Stewardship", "solution_design.data_stewardship", "database"),
-    ("Chief Architect Synthesis", "solution_design.architect_synthesis", "layout-dashboard"),
     # Hidden from this list on 30 Aug 2026 after every entry was requested with
     # a logged-in client and its status recorded:
     #   main.capability_framework.dashboard - 302 to /framework-management/,
@@ -215,6 +206,7 @@ _MORE_TOOLS = [
     ("Usage Analytics", "usage_analytics.analytics_root", "bar-chart-3"),
     ("Vendor Analysis", "main.vendor_archimate_analysis", "building"),
     ("Integrations", "main.integrations", "cloud"),
+    ("Roadmap", "genome_roadmap.index", "map"),
     ("Architecture Roadmap", "main.archimate_roadmap", "map"),
     ("Enterprise Dashboard", "enterprise.enterprise_dashboard", "layout-dashboard"),
     # Every signed-in user can already open this from the sidebar footer
@@ -235,10 +227,12 @@ _NOT_RENDERED = {
     "main.capability_framework.dashboard": "302 -> Framework Management",
     "dashboard.index": "302 -> Dashboard Overview",
     "unified_duplicate.enterprise_dashboard": "302 -> Duplicate Detection",
-    "architect_ui.roadmap_builder": "302 -> Roadmaps",
+    "architect_ui.roadmap_builder": "302 -> Roadmap",
+    # The older ArchiMate roadmap address, a 302 to the one roadmap.
+    "main.archimate_roadmap": "302 -> Roadmap",
 }
 
-_ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
+_ZONE_ORDER = ["home", "my_work", "library", "workspace", "governance", "admin"]
 
 # Separate preference order used ONLY to break a same-endpoint tie across two
 # different zone buckets (e.g. arb.dashboard living in both a persona's
@@ -249,7 +243,7 @@ _ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
 # every persona's zones) and would otherwise win over the shared,
 # canonical "governance" placement - which is exactly the bug that dropped
 # "ARB Dashboard" off the Governance section entirely.
-_TIE_BREAK_ZONE_ORDER = ["home", "governance", "library", "my_work", "admin"]
+_TIE_BREAK_ZONE_ORDER = ["home", "governance", "library", "my_work", "workspace", "admin"]
 
 
 def all_module_links():

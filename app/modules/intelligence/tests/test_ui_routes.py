@@ -24,7 +24,7 @@ import pytest
 # Fixtures (app, db_session, make_org, client, login_as) come from this
 # directory's conftest, which re-exports the shared ones.
 
-PAGES = ["/intelligence/ask", "/intelligence/twin-map"]
+PAGES = ["/intelligence/ask"]
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 TEMPLATE_DIR = REPO_ROOT / "app" / "modules" / "intelligence" / "templates" / "intelligence"
@@ -119,23 +119,6 @@ def _rendered_templates(app):
 # --- the routes -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path,template", [
-    ("/intelligence/ask", "intelligence/ask.html"),
-    ("/intelligence/twin-map", "intelligence/twin_map.html"),
-])
-def test_page_renders_for_a_signed_in_user_with_its_own_template(
-    app, db_session, make_org, client, login_as, path, template
-):
-    org = make_org("ui-render")
-    user = _user(db_session, org.id)
-    seen, stop = _rendered_templates(app)
-    try:
-        login_as(client, user)
-        response = client.get(path)
-    finally:
-        stop()
-    assert response.status_code == 200
-    assert template in seen
 
 
 @pytest.mark.parametrize("path", PAGES)
@@ -164,44 +147,76 @@ def test_the_read_only_pages_are_the_only_routes_this_blueprint_serves(app):
         "/intelligence/api/history/element/<int:element_id>": ["GET"],
         "/intelligence/answers": ["GET"],
         "/intelligence/answers/<address>": ["GET"],
+        "/intelligence/answers/element/<int:element_id>": ["GET"],
     }
     assert not [r for r in rules if r.startswith("/api/")]
 
 
-def test_pages_have_a_breadcrumb_and_the_page_shell_wrapper(
-    app, db_session, make_org, client, login_as
-):
-    org = make_org("ui-shell")
-    user = _user(db_session, org.id)
-    for path, title in (("/intelligence/ask", "Ask"), ("/intelligence/twin-map", "Twin map")):
-        login_as(client, user)
-        html = client.get(path).get_data(as_text=True)
-        assert 'aria-label="Breadcrumb"' in html
-        assert f'<h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{title}</h1>' in html
-        assert "p-6 space-y-6" in html
-        assert "container mx-auto" not in _main_html(html)
 
 
-def test_twin_map_hands_a_whole_number_element_to_the_page(
+def test_twin_map_address_redirects_to_the_composer_on_the_same_element(
     app, db_session, make_org, client, login_as
 ):
     org = make_org("ui-handoff")
     user = _user(db_session, org.id)
     login_as(client, user)
-    html = client.get("/intelligence/twin-map?element=42").get_data(as_text=True)
-    assert 'data-initial-element="42"' in html
+    response = client.get("/intelligence/twin-map?element=42")
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/archimate/composer?element=42")
+
+
+def test_twin_map_address_without_an_element_opens_the_composer(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("ui-no-element")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    response = client.get("/intelligence/twin-map")
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/archimate/composer")
+
+
+def _connect(db_session, org_id, hub_name, spokes):
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    hub = ArchiMateElement(name=hub_name, type="ApplicationComponent", layer="application", organization_id=org_id)
+    db_session.add(hub)
+    db_session.flush()
+    for n in range(spokes):
+        spoke = ArchiMateElement(name=f"{hub_name} spoke {n}", type="Node", layer="technology", organization_id=org_id)
+        db_session.add(spoke)
+        db_session.flush()
+        db_session.add(ArchiMateRelationship(type="Serving", source_id=hub.id, target_id=spoke.id, organization_id=org_id))
+    db_session.flush()
+    return hub.id
+
+
+def test_twin_map_address_without_an_element_opens_the_most_connected_one_of_this_organisation(
+    app, db_session, make_org, client, login_as
+):
+    mine = make_org("ui-hub-mine")
+    theirs = make_org("ui-hub-theirs")
+    small = _connect(db_session, mine.id, "Small hub", 1)
+    big = _connect(db_session, mine.id, "Big hub", 3)
+    rival = _connect(db_session, theirs.id, "Rival hub", 8)
+    login_as(client, _user(db_session, mine.id))
+    response = client.get("/intelligence/twin-map")
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert f"element={big}" in location and "most_connected=1" in location
+    assert f"element={small}" not in location and f"element={rival}" not in location
 
 
 @pytest.mark.parametrize("value", ["abc", "", "4 2", "1e3", "-"])
-def test_twin_map_ignores_an_element_that_is_not_a_whole_number(
+def test_twin_map_address_ignores_an_element_that_is_not_a_whole_number(
     app, db_session, make_org, client, login_as, value
 ):
     org = make_org("ui-bad-element")
     user = _user(db_session, org.id)
     login_as(client, user)
     response = client.get("/intelligence/twin-map", query_string={"element": value})
-    assert response.status_code == 200
-    assert 'data-initial-element=""' in response.get_data(as_text=True)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/archimate/composer")
 
 
 def test_ui_blueprint_registration_is_non_fatal_and_leaves_the_api_registered(monkeypatch):
@@ -250,97 +265,14 @@ def _patch_counts(monkeypatch, counts):
         )
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_an_empty_workspace_shows_the_setup_state_instead_of_the_picker(
-    app, db_session, make_org, client, login_as, monkeypatch, path
-):
-    _patch_counts(monkeypatch, {"applications": 0, "elements": 0, "capabilities": 0, "vendors": 0})
-    org = make_org("ui-empty")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    text = _visible_text(html)
-    assert "Nothing is modelled yet" in text
-    assert "Add your systems and teams, and this is where you will ask questions about them." in text
-    assert "Set up your workspace" in text
-    assert 'href="/dashboard/overview"' in html
-    assert 'role="combobox"' not in html
-    assert 'role="status"' in html
-    assert not re.search(r"connector", text, re.I)
-    assert "onboarding" not in html.lower()
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_the_gate_reads_counts_taken_now_not_a_cached_empty_workspace(
-    app, db_session, make_org, client, login_as, path
-):
-    """A new organisation opens a page while empty, then models its first
-    element: the very next Ask or Twin map page must see it."""
-    org = make_org("ui-fresh-counts")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    # Open the page first, as the new organisation would, so any count read
-    # before the element exists has had its chance to be kept and reused.
-    assert client.get(path).status_code == 200
-    from app.models.archimate_core import ArchiMateElement
-
-    db_session.add(ArchiMateElement(
-        name="Fresh element %s" % uuid.uuid4().hex[:6], type="ApplicationComponent",
-        layer="application", organization_id=org.id,
-    ))
-    db_session.flush()
-    html = _main_html(client.get(path).get_data(as_text=True))
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
-@pytest.mark.parametrize("counts", [
-    {"applications": 1, "elements": 0, "capabilities": 0, "vendors": 0},
-    {"applications": 0, "elements": 5, "capabilities": 0, "vendors": 0},
-    {"applications": 0, "elements": 0, "capabilities": 2, "vendors": 0},
-])
-def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
-    app, db_session, make_org, client, login_as, monkeypatch, path, counts
-):
-    _patch_counts(monkeypatch, counts)
-    org = make_org("ui-populated")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_global_vendor_counts_do_not_hide_the_empty_workspace_state(
-    app, db_session, make_org, client, login_as, monkeypatch, path
-):
-    _patch_counts(monkeypatch, {"applications": 0, "elements": 0, "capabilities": 0, "vendors": 3})
-    org = make_org("ui-vendors-only")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    text = _visible_text(html)
-    assert "Nothing is modelled yet" in text
-    assert 'role="combobox"' not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_unreadable_counts_never_read_as_an_empty_workspace(
-    app, db_session, make_org, client, login_as, monkeypatch, path
-):
-    """The shell answers a failed count with zeros; the pages must not take that
-    for an empty workspace."""
-    _patch_counts(monkeypatch, RuntimeError("counts unavailable"))
-    org = make_org("ui-counts-down")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    response = client.get(path)
-    assert response.status_code == 200
-    html = _main_html(response.get_data(as_text=True))
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html
 
 
 def test_unknown_organisation_makes_workspace_counts_unavailable(app):
@@ -365,19 +297,6 @@ FORBIDDEN_SHAPES = re.compile(
 )
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_page_text_carries_no_status_labels_paths_or_ids_outside_full_detail(
-    app, db_session, make_org, client, login_as, path
-):
-    org = make_org("ui-copy")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    html = re.sub(r"<[^>]*data-full-detail-region[^>]*>.*?</dl>\s*</div>", "", html, flags=re.S)
-    text = _visible_text(html)
-    assert text, "the page rendered no text at all"
-    assert STATUS_LABELS.findall(text) == []
-    assert FORBIDDEN_SHAPES.findall(text) == []
 
 
 def test_script_strings_carry_no_status_labels():
@@ -456,12 +375,12 @@ def test_every_network_call_goes_through_platform_fetch():
 # --- one disclosure control -------------------------------------------------
 
 
-def test_full_detail_is_defined_once_and_called_from_exactly_three_places():
+def test_full_detail_is_defined_once_and_called_from_exactly_two_places():
     templates = _templates()
     definitions = [n for n, t in templates.items() for _ in re.findall(r"\{%\s*macro\s+full_detail\(", t)]
     assert definitions == ["_full_detail.html"]
     calls = [n for n, t in templates.items() for _ in re.findall(r"\{\{\s*full_detail\(", t)]
-    assert sorted(calls) == ["_provenance_drawer.html", "ask.html", "twin_map.html"]
+    assert sorted(calls) == ["_provenance_drawer.html", "ask.html"]
 
 
 def test_the_disclosure_label_is_full_detail_and_it_starts_collapsed():
@@ -486,7 +405,7 @@ def test_no_second_show_more_affordance_exists():
         assert not re.search(r"Show more|More questions", source, re.I), name
     # The only controls that carry aria-expanded: the one disclosure control,
     # the combobox, the question card that opens the picker, the button
-    # that collapses the Twin map's side panel, and the Value streams at risk
+    # and the Value streams at risk
     # row toggle that opens one value stream's own capabilities.
     owners = {}
     for name, source in _templates().items():
@@ -494,22 +413,17 @@ def test_no_second_show_more_affordance_exists():
             key = ("full-detail" if "data-full-detail-toggle" in tag else
                    "combobox" if 'role="combobox"' in tag else
                    "question" if "ask-question-" in tag else
-                   "rail" if "twin-rail-toggle" in tag else
                    "vsr-row" if "data-vsr-toggle" in tag else "OTHER")
             owners.setdefault(key, []).append(name)
-    assert set(owners) == {"full-detail", "combobox", "question", "rail", "vsr-row"}, owners
+    assert set(owners) == {"full-detail", "combobox", "question", "vsr-row"}, owners
     assert owners["vsr-row"] == ["_value_streams_at_risk_table.html"], owners
 
 
-def test_the_map_table_is_present_without_a_toggle():
-    source = _templates()["twin_map.html"]
-    region = re.search(r"<div ([^>]*)data-map-table-region([^>]*)>", source)
-    assert region, "the table region is missing from the Twin map page"
-    attributes = region.group(1) + region.group(2)
-    assert not re.search(r"x-show|x-if|x-cloak|hidden|:class|@click", attributes)
-    table = _templates()["_map_table.html"]
-    assert "<caption" in table and "<thead" in table
-    assert re.search(r"tabindex", table) is None
+def test_the_composer_lists_the_connections_it_draws_in_a_table():
+    """The text alternative to the drawing now lives in the Composer's focus view."""
+    source = (REPO_ROOT / "app" / "templates" / "archimate" / "composer.html").read_text(encoding="utf-8")
+    assert "id=\"composer-focus-list\"" in source
+    assert "<caption" in source and "<thead" in source and "data-focus-row" in source
 
 
 def test_level_three_terms_appear_only_inside_full_detail():
@@ -574,46 +488,23 @@ def test_no_hard_coded_colour_values_and_no_per_domain_palette():
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", re.sub(r"&#\d+;", "", source)), name
         assert not re.search(r"\.domain-[a-z]+", source), name
         assert not re.search(r"\brgba?\(|\bhsla?\(\s*\d", source), name
-    graph = _scripts()["graph.js"]
-    for layer in ("motivation", "strategy", "business", "application", "technology", "implementation"):
-        assert f"layer-{layer}" in graph
-    assert "layer-risk" not in graph
 
 
-def test_derived_edges_are_dashed_and_badged_and_explicit_edges_are_solid():
-    graph = _scripts()["graph.js"]
-    assert "var DASH = '5,5'" in graph
-    assert re.search(r"stroke-dasharray.*d\.edge\.kind === 'derived' \? DASH : null", graph)
-    assert "Intelligence.WORKED_OUT" in graph
+def test_worked_out_wording_is_defined_once_in_the_shared_core():
     assert "var WORKED_OUT = 'Worked out';" in _code(_scripts()["core.js"])
 
 
-def test_the_map_text_is_written_with_text_never_html():
-    graph = _scripts()["graph.js"]
-    assert ".html(" not in graph
-    assert "innerHTML" not in graph
+def test_the_page_text_is_written_with_text_never_html():
     for name, source in _scripts().items():
         assert "innerHTML" not in source and "insertAdjacentHTML" not in source, name
 
 
-def test_the_hop_depth_control_is_a_native_range_input_from_one_to_five():
-    source = _templates()["twin_map.html"]
-    control = re.search(r"<input type=\"range\"[^>]*>", source, re.S)
-    assert control
-    tag = control.group(0)
-    for attribute in ('id="twin-hop-depth"', 'min="1"', 'max="5"', 'step="1"'):
-        assert attribute in tag
-    assert re.search(r'<label for="twin-hop-depth"[^>]*>Hop depth</label>', source)
-
-
 def test_the_page_scripts_are_top_level_factories_not_alpine_data_registrations():
-    for name in ("ask.js", "twin_map.js"):
+    for name in ("ask.js",):
         source = _code(_scripts()[name])
         assert "Alpine.data(" not in source, name
     assert "window.askSurface = askSurface;" in _scripts()["ask.js"]
-    assert "window.twinMapSurface = twinMapSurface;" in _scripts()["twin_map.js"]
     assert 'x-data="askSurface()"' in _templates()["ask.html"]
-    assert 'x-data="twinMapSurface()"' in _templates()["twin_map.html"]
 
 
 def test_the_shipped_macros_are_the_named_ones_with_the_right_keywords():
@@ -711,7 +602,7 @@ def test_the_accessibility_audit_this_work_extends_checks_wcag_22_and_fails_rath
     assert re.search(r"def axe_module\(browser\):.*?pytest\.fail\(", source, re.S)
     assert '"target-size": "wcag22aa"' in source
     assert '("solution_architect", "/intelligence/ask")' in source
-    assert '("enterprise_architect", "/intelligence/twin-map")' in source
+    assert '("enterprise_architect", "/intelligence/twin-map")' not in source
     baseline = (REPO_ROOT / "tests" / "smoke" / "a11y_baseline.json").read_text(encoding="utf-8")
     assert "/intelligence/" not in baseline
 
@@ -729,7 +620,7 @@ def test_worked_out_connections_are_asked_for_together_with_out_of_date_ones():
     assert re.search(r"include_derived:\s*options\.includeDerived", request.group(1))
     assert re.search(r"include_stale:\s*options\.includeDerived", request.group(1))
     # Both pages go through that one request.
-    for name in ("ask.js", "twin_map.js"):
+    for name in ("ask.js",):
         assert "Intelligence.fetchImpact(" in _code(_scripts()[name]), name
 
 
@@ -743,7 +634,7 @@ def test_an_out_of_date_answer_gets_a_notice_that_is_text_and_a_clock_with_the_a
     # The same action as the not-worked-out state, from one definition.
     assert len(re.findall(r"\{\{ recompute_action\(\) \}\}", states)) == 2
     assert len(re.findall(r"Work them out now", states)) == 1
-    for name in ("ask.js", "twin_map.js"):
+    for name in ("ask.js",):
         source = _code(_scripts()[name])
         assert "answerState(" in source and "this.stale = answer.stale" in source, name
 
@@ -762,13 +653,9 @@ def test_the_row_kind_in_the_drawer_title_is_true_of_the_row_and_adds_no_badge_k
     assert "provenance_badge('derived')" not in title
 
 
-def test_the_map_badge_and_table_say_when_a_worked_out_connection_may_be_out_of_date():
-    graph = _code(_scripts()["graph.js"])
-    assert "WORKED_OUT_STALE" in graph and "GLYPH_CLOCK" in graph
+def test_the_stale_wording_is_defined_once_in_the_shared_core():
     core = _code(_scripts()["core.js"])
     assert "var WORKED_OUT_STALE = 'Worked out, may be out of date';" in core
-    table = _templates()["_map_table.html"]
-    assert "stale_clock('row.stale')" in table and 'x-text="row.kindLabel"' in table
 
 
 def test_the_status_region_reads_results_for_a_search_and_connections_for_a_choice():
@@ -776,17 +663,10 @@ def test_the_status_region_reads_results_for_a_search_and_connections_for_a_choi
     assert "' result' : ' results'" in core
     assert "' connection' : ' connections'" in core
     assert "resultsText(this.options.length, typed)" in _code(_scripts()["picker.js"])
-    for name in ("ask.js", "twin_map.js"):
+    for name in ("ask.js",):
         source = _code(_scripts()[name])
         assert "connectionsText(" in source, name
         assert "results for" not in source, name
-
-
-def test_the_side_panel_control_is_named_for_the_panel():
-    twin = _templates()["twin_map.html"]
-    assert re.search(r'id="twin-rail-toggle".*?Selected element\s*</button>', twin, re.S)
-    assert 'aria-label="Selected element"' in twin
-    assert ">Details<" not in twin and "Details</button>" not in twin
 
 
 # --- nav-cache invalidation -------------------------------------
@@ -927,33 +807,3 @@ def test_nav_counts_cache_evicts_two_orgs_in_one_flush(
     assert after_b["capabilities"] == 1
 
 
-def test_ask_page_updates_after_element_write(
-    app, db_session, make_org, client, login_as
-):
-    """A signed-in user on an empty organisation sees the empty-workspace gate.
-    After adding one element through the ORM and flushing, the next GET shows
-    the populated page body."""
-    from app.models.archimate_core import ArchiMateElement
-
-    org = make_org("ui-flush-test")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-
-    # First read: empty workspace gate.
-    html = client.get("/intelligence/ask").get_data(as_text=True)
-    main = _main_html(html)
-    text = _visible_text(main)
-    assert "Nothing is modelled yet" in text
-
-    # Write one element through the ORM and flush.
-    db_session.add(ArchiMateElement(
-        name="Route-Test Element",
-        type="ApplicationComponent",
-        organization_id=org.id,
-    ))
-    db_session.flush()
-
-    # Second read: populated page with combobox and no gate text.
-    html = client.get("/intelligence/ask").get_data(as_text=True)
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html

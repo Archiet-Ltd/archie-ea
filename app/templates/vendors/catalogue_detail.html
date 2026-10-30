@@ -1,0 +1,171 @@
+{# design-block: record-detail #}
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
+{% from "components/table.html" import table, table_header, table_body, table_head %}
+{% from "components/badge.html" import badge %}
+{% from "components/button.html" import button %}
+{% from "components/select.html" import native_select %}
+{% from "components/input.html" import input %}
+{% from "components/alert.html" import alert %}
+
+{% block title %}{{ product.product_name }} · Vendor catalogue{% endblock %}
+
+{% macro source_cell(fact) %}
+<td class="px-2 py-2 align-top text-xs">
+  <a class="text-primary hover:underline underline-offset-4" href="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url|replace('https://', '')|truncate(28, true, '…') }}</a>
+  <span class="block text-muted-foreground" data-testid="fact-checked">Checked {{ fact.checked_on.strftime('%-d %b %Y') }}</span>
+</td>
+{% endmacro %}
+
+{% block content %}
+<div class="space-y-6" data-testid="catalogue-product" data-slug="{{ product.catalogue_slug }}">
+  {{ page_shell(
+      title=product.product_name,
+      subtitle=(grouped.summary[0].detail if grouped.summary else None),
+      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', url_for('unified_applications.vendor_catalogue')), (product.product_name, None)],
+      tabs=[('Vendors', url_for('unified_applications.vendors'), False), ('Mapping', url_for('unified_applications.vendors', tab='mapping'), False), ('Catalogue', url_for('unified_applications.vendor_catalogue'), True)]
+  ) }}
+
+  <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+    <span>Vendor <span class="text-foreground font-medium">{{ vendor.name if vendor else '' }}</span></span>
+    {% if category %}<span>Category {% call badge(variant='secondary') %}{{ category }}{% endcall %}</span>{% endif %}
+    {% if grouped.summary %}<span data-testid="summary-source">Summary from <a class="text-primary underline underline-offset-2" href="{{ grouped.summary[0].source_url }}" target="_blank" rel="noopener noreferrer">{{ grouped.summary[0].source_url|replace('https://', '')|truncate(40, true, '…') }}</a>, checked {{ grouped.summary[0].checked_on.strftime('%-d %b %Y') }}</span>{% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+    <div class="space-y-6 xl:col-span-2 min-w-0">
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title() %}Architecture{% endcall %}
+          {% call card_description() %}The product's parts as ArchiMate elements: the components it is made of, the services they offer and the interfaces you reach them through.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-4') %}
+          {% set arch = grouped.component + grouped.service + grouped.interface %}
+          {% if arch %}
+          <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
+          {% call table(attrs_dict={'data-testid': 'catalogue-architecture'}) %}{% call table_header() %}<tr>{% call table_head() %}Element{% endcall %}{% call table_head() %}What it is{% endcall %}{% call table_head() %}Protocol{% endcall %}{% call table_head() %}Source{% endcall %}</tr>{% endcall %}{% call table_body() %}
+            {% for fact in arch %}
+            <tr class="h-12" data-testid="fact-{{ fact.kind }}">
+              <td class="px-2 py-2 align-top"><span class="block font-medium text-foreground">{{ fact.name }}</span><span class="mt-1 inline-block">{% call badge(variant='outline') %}{{ fact.archimate_type }}{% endcall %}</span></td>
+              <td class="px-2 py-2 align-top text-muted-foreground"><div class="w-48">{{ fact.detail or '' }}</div></td>
+              <td class="px-2 text-muted-foreground">{{ (fact.attributes or {}).get('protocol', '') }}</td>
+              {{ source_cell(fact) }}
+            </tr>
+            {% endfor %}
+          {% endcall %}{% endcall %}
+          </div></div>
+          {% else %}
+          <p class="text-sm text-muted-foreground">No architecture elements have been reviewed for this product yet.</p>
+          {% endif %}
+          {% if grouped.relationship %}
+          <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
+          {% call table(attrs_dict={'data-testid': 'catalogue-relationships'}) %}{% call table_header() %}<tr>{% call table_head() %}From{% endcall %}{% call table_head() %}Relationship{% endcall %}{% call table_head() %}To{% endcall %}{% call table_head() %}Source{% endcall %}</tr>{% endcall %}{% call table_body() %}
+            {% for fact in grouped.relationship %}
+            <tr class="h-12" data-testid="fact-relationship">
+              <td class="px-2 text-foreground">{{ (fact.attributes or {}).get('source', '') }}</td>
+              <td class="px-2">{% call badge(variant='outline') %}{{ fact.archimate_type }}{% endcall %}</td>
+              <td class="px-2 text-foreground">{{ (fact.attributes or {}).get('target', '') }}</td>
+              {{ source_cell(fact) }}
+            </tr>
+            {% endfor %}
+          {% endcall %}{% endcall %}
+          </div></div>
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+
+      {% for kind, heading in sections if kind not in ('component', 'service', 'interface', 'relationship') %}
+        {% if grouped[kind] %}
+        {% call card() %}
+          {% call card_header() %}{% call card_title() %}{{ heading }}{% endcall %}{% endcall %}
+          {% call card_content() %}
+            {% if kind == 'price_tier' %}
+              {% set cols = ['Tier', 'List price', 'What it includes', 'Source'] %}
+            {% elif kind == 'capability' %}
+              {% set cols = ['Capability', 'APQC reference', 'How the product supports it', 'Source'] %}
+            {% elif kind == 'integration' %}
+              {% set cols = ['Connects to', 'In the catalogue', 'How', 'Source'] %}
+            {% elif kind == 'certification' %}
+              {% set cols = ['Certification', 'Scope', 'Detail', 'Source'] %}
+            {% elif kind == 'data_region' %}
+              {% set cols = ['Region', 'Scope', 'Detail', 'Source'] %}
+            {% else %}
+              {% set cols = ['Sub-processor', 'Scope', 'Purpose', 'Source'] %}
+            {% endif %}
+            <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
+          {% call table(attrs_dict={'data-testid': 'catalogue-' ~ kind}) %}{% call table_header() %}<tr>{% for c in cols %}{% call table_head() %}{{ c }}{% endcall %}{% endfor %}</tr>{% endcall %}{% call table_body() %}
+              {% for fact in grouped[kind] %}
+              {% set a = fact.attributes or {} %}
+              <tr class="h-12" data-testid="fact-{{ kind }}">
+                <td class="px-2 font-medium text-foreground">{{ fact.name }}</td>
+                <td class="px-2 text-muted-foreground whitespace-nowrap">
+                  {%- if kind == 'price_tier' %}{{ a.get('price', '') }}{% if a.get('unit') %} <span class="text-xs">{{ a.get('unit') }}</span>{% endif %}
+                  {%- elif kind == 'capability' %}{{ a.get('apqc', '') }}
+                  {%- elif kind == 'integration' %}{% if a.get('related_slug') in related %}<a class="text-primary hover:underline underline-offset-4" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=a.get('related_slug')) }}">{{ related[a.get('related_slug')] }}</a>{% else %}Not in the catalogue yet{% endif %}
+                  {%- else %}{{ a.get('scope', '') }}{% endif -%}
+                </td>
+                <td class="px-2 py-2 align-top text-muted-foreground"><div class="w-48">{{ fact.detail or '' }}</div></td>
+                {{ source_cell(fact) }}
+              </tr>
+              {% endfor %}
+            {% endcall %}{% endcall %}
+          </div></div>
+          {% endcall %}
+        {% endcall %}
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="space-y-6 min-w-0">
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title() %}Lifecycle{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-2 text-sm') %}
+          <div data-testid="catalogue-lifecycle">
+          {% if lifecycle.end_of_life_date %}
+            <p class="text-foreground">End of life {{ lifecycle.end_of_life_date.strftime('%-d %b %Y') }}</p>
+          {% else %}
+            <p class="text-foreground">No end-of-life date published.</p>
+          {% endif %}
+            <p class="text-xs text-muted-foreground">From the end-of-life register at <a class="text-primary underline underline-offset-2" href="{{ lifecycle.source_url }}" target="_blank" rel="noopener noreferrer">endoflife.date</a>{% if lifecycle.last_synced %}, synced {{ lifecycle.last_synced.strftime('%-d %b %Y') }}{% else %}; not yet synced for this product{% endif %}.</p>
+          </div>
+        {% endcall %}
+      {% endcall %}
+
+      {% call card() %}
+        {% call card_header() %}
+          {% call card_title() %}Your use of it{% endcall %}
+          {% call card_description() %}Link a vendor product your organisation uses to this catalogue entry. Only your organisation sees its links.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-4') %}
+          {% if link_message %}
+            {% call alert(link_message.kind, testid='catalogue-link-message') %}{{ link_message.text }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+          {% endif %}
+          {% if links %}
+          <ul class="space-y-1 text-sm" data-testid="catalogue-links">
+            {% for link in links %}
+            <li class="flex items-center justify-between gap-2"><span class="text-foreground">{{ link.vendor_product.name }}</span><span class="text-xs text-muted-foreground">linked {{ link.linked_at.strftime('%-d %b %Y') }}</span></li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if not can_link %}
+            <p class="text-sm text-muted-foreground" data-testid="catalogue-link-read-only">Linking needs permission to edit applications. Someone who edits your applications can link it.</p>
+          {% elif org_options %}
+          <form method="post" action="{{ url_for('unified_applications.vendor_catalogue_link', slug=product.catalogue_slug) }}" class="space-y-2" data-testid="catalogue-link-form">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            <label for="vendor_product_id" class="text-sm font-medium text-foreground">Vendor product</label>
+            {{ native_select(id='vendor_product_id', name='vendor_product_id', class='w-full', options=org_options) }}
+            {{ button(text='Link to ' ~ product.product_name, type='submit', variant='default', class='w-full', testid='catalogue-link-submit') }}
+          </form>
+          {% else %}
+            <p class="text-sm text-muted-foreground">None of your applications or contracts names a vendor product yet, so there is nothing to link. Vendor products appear here once one does.</p>
+            {{ button(text='Go to your vendors', href=url_for('unified_applications.vendors'), variant='outline', class='w-full') }}
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

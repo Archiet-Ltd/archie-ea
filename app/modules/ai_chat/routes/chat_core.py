@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -144,8 +145,8 @@ def _get_configured_chat_models():
                 model_info["recommended_for"] = ["Complex reasoning", "Analysis"]
             elif provider_name == "gemini":
                 model_info["recommended_for"] = ["Multi-modal", "General tasks"]
-            elif provider_name == "deepseek":
-                model_info["recommended_for"] = ["Code analysis", "Technical tasks"]
+            elif provider_name == "nvidia":
+                model_info["recommended_for"] = ["General conversation", "Technical tasks"]
 
             models.append(model_info)
 
@@ -611,6 +612,7 @@ def send_message():
         # Falls back to text-only mode automatically for unsupported providers.
         from app.modules.ai_chat.services.agent_runner import (
             AgentRunner,
+            is_pause,
             sanitize_agent_error,
         )
 
@@ -675,6 +677,8 @@ def send_message():
         agent_failure = agent_result.get("error")
         if agent_failure:
             logger.warning("send_message agent failure: %s", agent_failure)
+        # The pause is the whole reply: the person reads it as the answer, with nothing hanging under it.
+        agent_error = None if is_pause(agent_failure) else sanitize_agent_error(agent_failure)
 
         return jsonify(
             {
@@ -688,6 +692,10 @@ def send_message():
                 # reader can check the answer against the rows rather than
                 # trusting it.
                 "sources": agent_result.get("sources", []),
+                # The provider and model that answered; absent when none did.
+                "answered_by": agent_result.get("answered_by"),
+                # An answer that read the model, checked and drawn on the server.
+                "genome_answer": agent_result.get("genome_answer"),
                 # AgentRunner._fallback() persists a friendly "couldn't be
                 # completed" response AND keeps the raw failure reason on the
                 # same dict; without this field the UI could not tell an
@@ -698,7 +706,9 @@ def send_message():
                 # for OpenRouter's 402 contains the provider account's user_id.
                 # That was reaching the browser verbatim. The full reason is in
                 # the server log line above.
-                "agent_error": sanitize_agent_error(agent_failure),
+                "agent_error": agent_error,
+                # The platform's pause: the reply is the pause itself, built from nothing.
+                "paused": bool(agent_failure) and is_pause(agent_failure),
                 # Was hardcoded True on every response regardless of whether any
                 # context was built - _build_system_prompt swallows a context
                 # failure into an empty string, so the API asserted grounding
@@ -722,7 +732,7 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": "Unable to connect to AI service. Please check your API configuration in Admin > API Settings.",
+                    "error": ASSISTANT_UNAVAILABLE,
                     "error_type": "connection",
                 }
             ),
@@ -750,7 +760,7 @@ def send_message():
             return (
                 jsonify(
                     {
-                        "error": "AI service authentication failed. Please verify your API key in Admin > API Settings.",
+                        "error": ASSISTANT_UNAVAILABLE,
                         "error_type": "auth",
                     }
                 ),
@@ -963,6 +973,7 @@ def send_message_stream():
 
                 from app.modules.ai_chat.services.agent_runner import (
                     AgentRunner,
+                    is_pause,
                     sanitize_agent_error,
                 )
                 runner = AgentRunner(
@@ -1003,7 +1014,9 @@ def send_message_stream():
                 # provider account's user_id). Log it, send a category.
                 if result.get("error"):
                     logger.warning("stream agent failure: %s", result["error"])
-                    result["error"] = sanitize_agent_error(result["error"])
+                    # The pause is the whole reply; no error rides beside it, and the footer names the pause.
+                    result["paused"] = is_pause(result["error"])
+                    result["error"] = None if result["paused"] else sanitize_agent_error(result["error"])
                 event_queue.put({"type": "done", **result})
         except Exception as exc:
             logger.exception("send_message_stream: agent error")

@@ -46,72 +46,194 @@
     }
 
     // ── Instance-based picker (for [data-owner-picker] roots) ─────────────────
+    // A combobox: the search box owns a listbox of people; arrow keys move
+    // through them, Enter chooses, Escape closes, and a status line says how
+    // many people matched.
+    var pickerCount = 0;
+    var SAVED_KEY = 'ownerStepSaved';
+
+    // A save reloads the page so every figure on it follows; the confirmation
+    // is kept across the reload and shown once the page is back.
+    function reloadWithConfirmation(message) {
+        try { window.sessionStorage.setItem(SAVED_KEY, message); } catch (e) { /* storage blocked: the page still reloads */ }
+        window.location.reload();
+    }
+
+    (function showPendingConfirmation() {
+        var message = null;
+        try {
+            message = window.sessionStorage.getItem(SAVED_KEY);
+            window.sessionStorage.removeItem(SAVED_KEY);
+        } catch (e) { return; }
+        if (message && window.Platform.toast && window.Platform.toast.success) {
+            window.Platform.toast.success(message);
+        }
+    })();
+
     function initPicker(root) {
         var url = root.getAttribute('data-owners-url');
         var input = root.querySelector('[data-owner-search]');
         var results = root.querySelector('[data-owner-results]');
         var saveBtn = root.querySelector('[data-owner-save]');
+        var status = root.querySelector('[data-owner-status]');
         if (!url || !input || !results || !saveBtn) return;
 
+        var replace = root.hasAttribute('data-owner-replace');
         var selectedId = null;
+        var active = -1;
+        var options = [];
+        var wantFirst = false;
+        pickerCount += 1;
+        var listId = 'owner-results-' + pickerCount;
+
+        results.id = listId;
+        results.setAttribute('role', 'listbox');
+        results.setAttribute('aria-label', 'People matching your search');
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-controls', listId);
+        input.setAttribute('aria-expanded', 'false');
+
+        function say(text) {
+            if (status) status.textContent = text;
+        }
+
+        function setActive(index) {
+            if (active >= 0 && options[active]) options[active].setAttribute('aria-selected', 'false');
+            active = index;
+            if (active >= 0 && options[active]) {
+                options[active].setAttribute('aria-selected', 'true');
+                input.setAttribute('aria-activedescendant', options[active].id);
+                options[active].scrollIntoView({ block: 'nearest' });
+            } else {
+                input.removeAttribute('aria-activedescendant');
+            }
+        }
 
         function hideResults() {
             results.textContent = '';
             results.classList.add('hidden');
+            options = [];
+            setActive(-1);
+            input.setAttribute('aria-expanded', 'false');
+        }
+
+        function choose(u, label) {
+            selectedId = u.id;
+            input.value = label;
+            saveBtn.disabled = false;
+            hideResults();
+            say(label + ' chosen. Save owner to record them.');
         }
 
         function render(users) {
+            results.textContent = '';
+            options = [];
+            setActive(-1);
             if (!users.length) {
-                results.textContent = '';
                 var div = document.createElement('div');
                 div.className = 'px-3 py-2 text-xs text-muted-foreground';
                 div.textContent = 'No matching users';
                 results.appendChild(div);
                 results.classList.remove('hidden');
+                input.setAttribute('aria-expanded', 'true');
+                say('No matching people');
                 return;
             }
-            results.textContent = '';
-            users.forEach(function (u) {
+            users.forEach(function (u, i) {
                 var label = u.name || u.email || '';
                 var btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'block w-full px-3 py-2 text-left text-xs hover:bg-accent hover:text-accent-foreground';
+                btn.id = listId + '-' + i;
+                btn.setAttribute('role', 'option');
+                btn.setAttribute('aria-selected', 'false');
+                btn.tabIndex = -1;
+                btn.className = 'block w-full px-3 py-2 text-left text-xs hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground';
                 btn.setAttribute('data-user-id', String(u.id));
                 btn.textContent = label + (u.email && u.email !== label ? ' — ' + u.email : '');
-                btn.addEventListener('click', function () {
-                    selectedId = u.id;
-                    input.value = label;
-                    saveBtn.disabled = false;
-                    hideResults();
-                });
+                btn.addEventListener('click', function () { choose(u, label); });
+                btn._owner = { user: u, label: label };
                 results.appendChild(btn);
+                options.push(btn);
             });
             results.classList.remove('hidden');
+            input.setAttribute('aria-expanded', 'true');
+            if (wantFirst) {
+                wantFirst = false;
+                setActive(0);
+            }
+            say(users.length + (users.length === 1 ? ' person' : ' people') + ' found. Use the arrow keys to choose.');
         }
 
-        var search = debounce(function (query) {
+        function runSearch(query) {
             query = (query || '').trim();
             if (query.length < 2) {
+                wantFirst = false;
                 hideResults();
                 return;
             }
             Platform.fetch.get('/api/users', { q: query, limit: 10 }, { silent: true })
                 .then(function (data) { render(data.users || []); })
                 .catch(function () { hideResults(); });
-        }, 300);
+        }
+        var search = debounce(runSearch, 300);
 
         input.addEventListener('input', function () {
             selectedId = null;
+            wantFirst = false;
             saveBtn.disabled = true;
             search(input.value);
+        });
+
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown' && !options.length && input.value.trim().length >= 2 && !selectedId) {
+                // The list is still on its way: ask now and land on the first person when it arrives.
+                event.preventDefault();
+                wantFirst = true;
+                runSearch(input.value);
+            } else if (event.key === 'ArrowDown' && options.length) {
+                event.preventDefault();
+                setActive((active + 1) % options.length);
+            } else if (event.key === 'ArrowUp' && options.length) {
+                event.preventDefault();
+                setActive(active <= 0 ? options.length - 1 : active - 1);
+            } else if (event.key === 'Enter') {
+                if (active >= 0 && options[active]) {
+                    event.preventDefault();
+                    choose(options[active]._owner.user, options[active]._owner.label);
+                } else if (selectedId) {
+                    event.preventDefault();
+                    saveBtn.click();
+                }
+            } else if (event.key === 'Escape' && options.length) {
+                event.preventDefault();
+                hideResults();
+            }
         });
 
         saveBtn.addEventListener('click', function () {
             if (!selectedId) return;
             saveBtn.disabled = true;
-            Platform.fetch.post(url, { user_id: selectedId, ownership_type: 'primary' })
-                .then(function () { window.location.reload(); })
+            var body = { user_id: selectedId, ownership_type: 'primary' };
+            if (replace) body.replace = true;
+            Platform.fetch.post(url, body)
+                .then(function () { reloadWithConfirmation('Owner saved'); })
                 .catch(function () { saveBtn.disabled = false; });
+        });
+    }
+
+    // ── Clearing an owner: one confirmation, then the row is removed ──────────
+    function initClear(btn) {
+        btn.addEventListener('click', function () {
+            var url = btn.getAttribute('data-owner-clear');
+            if (!url) return;
+            Platform.confirm('Clear this owner? The record will show no owner until you assign one.').then(function (ok) {
+                if (!ok) return;
+                btn.disabled = true;
+                Platform.fetch.delete(url)
+                    .then(function () { reloadWithConfirmation('Owner cleared'); })
+                    .catch(function () { btn.disabled = false; });
+            });
         });
     }
 
@@ -324,5 +446,6 @@
 
     // ── Instance-based pickers (AI Systems Register rows) ─────────────────────
     document.querySelectorAll('[data-owner-picker]').forEach(initPicker);
+    document.querySelectorAll('[data-owner-clear]').forEach(initClear);
 
 })();

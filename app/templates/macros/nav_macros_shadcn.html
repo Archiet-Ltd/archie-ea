@@ -16,7 +16,7 @@
                 id="tab-{{ tab.id }}"
                 aria-controls="panel-{{ tab.id }}"
                 {% if is_empty %}aria-disabled="true" title="No {{ tab.label }} data yet"{% endif %}
-                aria-label="{{ tab.label }}{% if is_empty %} (no data yet){% endif %}">
+                >
                 {{ tab.label }}{% if count is not none and count > 0 %}<span class="ml-1 text-xs font-semibold rounded-full bg-primary/10 text-info-emphasis px-1.5 py-0.5">{{ count }}</span>{% endif %}
             </button>
         {% endfor %}
@@ -95,7 +95,7 @@
                 <div class="flex items-center space-x-4">
                     {{ header_items(current_user, mobile=True) }}
                 </div>
-                <button @click="mobileMenuOpen = !mobileMenuOpen" @keydown.escape.window="mobileMenuOpen = false" type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Open">
+                <button @click="mobileMenuOpen = !mobileMenuOpen" @keydown.escape.window="mobileMenuOpen = false" type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center">
                     <span class="sr-only">Open main menu</span>
                     <!-- Hamburger icon -->
                     <i data-lucide="menu" class="h-5 w-5" x-show="!mobileMenuOpen" x-cloak></i>
@@ -130,7 +130,7 @@
       {{ render_menu_items([item], mobile) }}
     {% elif item | length == 2 %}
       <div class="{% if mobile %}block{% else %}relative inline-block{% endif %}" x-data="{ dropdownOpen: false }">
-        <button @click="dropdownOpen = !dropdownOpen" type="button" class="{% if mobile %}w-full text-left px-4 py-3 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between{% else %}inline-flex items-center px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors{% endif %}" aria-label="Open">
+        <button @click="dropdownOpen = !dropdownOpen" type="button" class="{% if mobile %}w-full text-left px-4 py-3 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between{% else %}inline-flex items-center px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors{% endif %}">
           {{ item[0] }}
           <i data-lucide="chevron-down" class="ml-2 h-4 w-4 transition-transform" :class="{ 'rotate-180': dropdownOpen }"></i>
         </button>

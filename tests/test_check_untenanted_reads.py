@@ -231,11 +231,14 @@ def test_a_new_unfenced_table_is_reported_by_name(tmp_path, monkeypatch):
 
 def test_the_committed_table_list_is_current():
     """The list in the repository matches the models today, so a table that was
-    removed or gained the mixin does not leave a stale entry hiding a new one."""
+    removed or gained the mixin does not leave a stale entry hiding a new one. A
+    table declared shared reference data, with its reason, is covered as the
+    table gate covers it: the unfenced list can only shrink."""
     classes = gate.discover_models()
     actual = set(gate.unfenced_tables(classes, gate.unfenced_models(classes)))
+    shared, _bare = gate.shared_reference_tables()
 
-    assert actual - gate.listed_tables() == set()
+    assert actual - gate.listed_tables() - shared == set()
 
 def test_a_model_listed_as_global_with_a_reason_is_not_flagged(tmp_path, monkeypatch):
     monkeypatch.setitem(gate.GLOBAL_MODELS, "NoColumn", "shared reference data (test)")

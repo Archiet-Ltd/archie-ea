@@ -68,7 +68,7 @@
                         </a>
                         <form method="POST" action="{{ url_for('admin.trigger_abacus_sync') }}" class="inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" {% if not sync_status.enabled %}disabled{% endif %} aria-label="Submit">
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" {% if not sync_status.enabled %}disabled{% endif %}>
                                 <i data-lucide="refresh-cw" class="w-4 h-4" aria-hidden="true"></i>
                                 Sync Now
                             </button>

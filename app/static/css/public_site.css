@@ -17,7 +17,6 @@
   border-radius: calc(var(--radius) + 4px);
   font-size: 0.875rem; line-height: 1.25rem; font-weight: 500;
   white-space: nowrap; text-decoration: none;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
 }
@@ -150,7 +149,7 @@
 .public-site .home-hero__figure { margin: 0; }
 .public-site .home-frame {
   border: 1px solid hsl(var(--border)); border-radius: 0.75rem; overflow: hidden;
-  background: hsl(var(--card)); box-shadow: 0 20px 45px -12px rgb(15 23 42 / 0.22), 0 4px 10px -4px rgb(15 23 42 / 0.12);
+  background: hsl(var(--card));
   width: fit-content; max-width: 100%; margin-inline: auto;
 }
 .public-site .home-frame__bar {
@@ -251,6 +250,10 @@
   margin: 1.5rem auto 0; max-width: 48rem; font-size: 1.125rem; line-height: 2rem;
   color: hsl(var(--muted-foreground)); text-wrap: balance;
 }
+/* Role pages: their headlines are sentences, so the home scale steps down one size. */
+.public-site .home-display--compact { font-size: 2.25rem; line-height: 1.1; }
+@media (min-width: 640px) { .public-site .home-display--compact { font-size: 3rem; } }
+@media (min-width: 1024px) { .public-site .home-display--compact { font-size: 3.25rem; } }
 @media (min-width: 640px) {
   .public-site .home-display { font-size: 3.75rem; }
   .public-site .home-lead { font-size: 1.25rem; }
@@ -263,6 +266,20 @@
 }
 @media (min-width: 640px) { .public-site .home-hero::before { display: block; } }
 @media (min-width: 1024px) { .public-site .home-hero { padding-block: 8rem; } }
+
+/* Home first screen: the headline, one sentence, two buttons and the cited answer card all end above the
+   bottom edge of a 1440 by 900 screen and a 375 by 812 phone, so the hero sits tight under the navigation bar. */
+.public-site .home-hero--fold { padding-block: 2rem 2.5rem; }
+.public-site .home-hero--fold .home-display { margin-top: 0; font-size: 2.25rem; line-height: 1.1; }
+.public-site .home-hero--fold .home-lead { margin-top: 1rem; font-size: 1rem; line-height: 1.5rem; }
+@media (min-width: 640px) {
+  .public-site .home-hero--fold .home-display { font-size: 3rem; }
+  .public-site .home-hero--fold .home-lead { font-size: 1.125rem; line-height: 1.75rem; }
+}
+@media (min-width: 1024px) {
+  .public-site .home-hero--fold { padding-block: 2.5rem 8.5rem; }
+  .public-site .home-hero--fold .home-display { font-size: 3.5rem; }
+}
 
 /* layout_rhythm.home_section (80px), section_divider (1px border colour), rails (1px, from 640px) */
 .public-site .home-section { border-top: 1px solid hsl(var(--border)); padding-block: 5rem; background: hsl(var(--background)); }

@@ -3,6 +3,8 @@
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/button.html' import button %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {# Consolidated governance queue - typed queue is the single code path.
    Make queue available to all blocks (content, extra_head_js, etc.) #}
@@ -78,12 +80,10 @@
                     {% call card_title(class='text-lg') %}AI queue triage{% endcall %}
                     <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-info-emphasis">AI-suggested draft</span>
                 </div>
-                <button type="button" @click="generate()" :disabled="loading"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap"
-                        aria-label="Generate AI queue triage">
+                {% call button(type='button', attrs_dict={'@click': 'generate()', ':disabled': 'loading', 'aria_label': 'Generate AI queue triage'}) %}
                     <i data-lucide="loader" x-show="loading" x-cloak class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>
-                    <span x-text="loading ? 'Triaging…' : (triage ? 'Regenerate' : 'Triage pending queue')"></span>
-                </button>
+                    <span x-text="loading ? 'Triaging\u2026' : (triage ? 'Regenerate' : 'Triage pending queue')"></span>
+                {% endcall %}
             </div>
         {% endcall %}
         {% call card_content(class='space-y-3') %}
@@ -98,26 +98,26 @@
         <div x-show="triage" x-cloak class="space-y-3">
             <p class="text-sm text-foreground" x-text="triage && triage.summary"></p>
             <div class="overflow-x-auto">
-                <table class="dense-table w-full border-collapse text-sm">
-                    <thead>
-                        <tr>
-                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Review #</th>
-                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Title</th>
-                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Complexity</th>
-                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
-                            <tr>
-                                <td class="px-3 py-2 text-foreground" x-text="item.review_number"></td>
-                                <td class="px-3 py-2 text-foreground" x-text="item.title"></td>
-                                <td class="px-3 py-2 text-foreground" x-text="item.complexity"></td>
-                                <td class="px-3 py-2 text-muted-foreground" x-text="item.reason"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+            {% call table(class='border-collapse') %}
+                {% call table_header() %}
+                    {% call table_row() %}
+                        {% call table_head(class='text-xs font-medium') %}Review #{% endcall %}
+                        {% call table_head(class='text-xs font-medium') %}Title{% endcall %}
+                        {% call table_head(class='text-xs font-medium') %}Complexity{% endcall %}
+                        {% call table_head(class='text-xs font-medium') %}Reason{% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% call table_body() %}
+                    <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
+                        {% call table_row() %}
+                            {% call table_cell() %}<span x-text="item.review_number"></span>{% endcall %}
+                            {% call table_cell() %}<span x-text="item.title"></span>{% endcall %}
+                            {% call table_cell() %}<span x-text="item.complexity"></span>{% endcall %}
+                            {% call table_cell() %}<span x-text="item.reason" class="text-muted-foreground"></span>{% endcall %}
+                        {% endcall %}
+                    </template>
+                {% endcall %}
+            {% endcall %}
             </div>
             <div x-show="triage && triage.suggested_order && triage.suggested_order.length" x-cloak>
                 <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested order</h3>
@@ -132,12 +132,12 @@
     {% set completed_reviews = dashboard_data.metrics.approved_items + dashboard_data.metrics.rejected_items %}
     {% set approval_rate_display = (("%.1f"|format(dashboard_data.metrics.approval_rate)) ~ '%') if completed_reviews > 0 else '—' %}
     {% set cycle_time_display = (("%.1f"|format(cycle_time.avg_days)) ~ ' days') if cycle_time.get('total_reviews', 0) > 0 else '—' %}
-    <section aria-label="Governance performance" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Governance performance" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {{ metrics_card(
             title='Total reviews',
             value=dashboard_data.metrics.total_items,
             icon='clipboard-list',
-            description='Governed review items in this tenant'
+            description='Governed review items in your organisation'
         ) }}
         {{ metrics_card(
             title='Pending',
@@ -230,10 +230,10 @@
         datasets: [{
           data: [pending, approved, rejected, other],
           backgroundColor: [
-            cssHSL('--warning') || '#f59e0b',
-            cssHSL('--success') || '#10b981',
-            cssHSL('--destructive') || '#ef4444',
-            cssHSL('--muted-foreground') || '#9ca3af'
+            cssHSL('--warning'),
+            cssHSL('--success'),
+            cssHSL('--destructive'),
+            cssHSL('--muted-foreground')
           ],
           borderWidth: 2,
           borderColor: 'transparent'

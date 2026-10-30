@@ -1,15 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import hidden_input, input %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}My Application Portfolio{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto">
-    <div class="flex items-center gap-1 mb-4 border-b border-border" role="tablist" aria-label="My Applications">
-        <a href="{{ url_for('my_applications.dashboard') }}" role="tab" aria-selected="{{ 'true' if request.endpoint == 'my_applications.dashboard' else 'false' }}" class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.dashboard' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Dashboard</a>
-        <a href="{{ url_for('my_applications.app_list') }}" role="tab" aria-selected="{{ 'true' if request.endpoint == 'my_applications.app_list' else 'false' }}" class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.app_list' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Applications</a>
-        <a href="{{ url_for('my_applications.health_overview') }}" role="tab" aria-selected="{{ 'true' if request.endpoint == 'my_applications.health_overview' else 'false' }}" class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.health_overview' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Health</a>
-        <a href="{{ url_for('my_applications.roadmap_impact') }}" role="tab" aria-selected="{{ 'true' if request.endpoint == 'my_applications.roadmap_impact' else 'false' }}" class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.roadmap_impact' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Roadmap</a>
-    </div>
+    <nav class="flex items-center gap-1 mb-4 border-b border-border" aria-label="My Applications">
+        <a href="{{ url_for('my_applications.dashboard') }}" {% if request.endpoint == 'my_applications.dashboard' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.dashboard' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Dashboard</a>
+        <a href="{{ url_for('my_applications.app_list') }}" {% if request.endpoint == 'my_applications.app_list' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.app_list' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Applications</a>
+        <a href="{{ url_for('my_applications.health_overview') }}" {% if request.endpoint == 'my_applications.health_overview' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.health_overview' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Health</a>
+        <a href="{{ url_for('my_applications.roadmap_impact') }}" {% if request.endpoint == 'my_applications.roadmap_impact' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.roadmap_impact' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Roadmap</a>
+    </nav>
     {% macro _ps_actions() %}
 <a href="{{ url_for('my_applications.dashboard') }}"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
@@ -51,15 +53,13 @@
     <!-- Search -->
     <div class="bg-card border border-border rounded-lg p-4 mb-6">
         <form method="get" class="flex items-center gap-4">
-            {% if ownership_type %}<input type="hidden" name="type" value="{{ ownership_type }}">{% endif %}
+            {% if ownership_type %}{{ hidden_input(("type"), value=(ownership_type)) }}{% endif %}
             <div class="flex-1">
-                <input type="text" name="search" value="{{ search or '' }}"
-                       placeholder="Search applications..."
-                       class="h-9 w-full px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search applications...">
+                {{ input(type="text", name=("search"), value=(search or ''), placeholder=("Search applications..."), aria_label=("Search applications..."), size='sm', class="w-full") }}
             </div>
-            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+            {% call button(type="submit", variant="default") %}
                 Search
-            </button>
+            {% endcall %}
         </form>
     </div>
 

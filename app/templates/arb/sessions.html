@@ -1,76 +1,48 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from "components/page_header.html" import page_header %}
 {% from 'components/status_badge.html' import status_badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
 
 {% block title %}{{ 'ARB Reviews' if is_reviews_view else 'ARB Sessions' }}{% endblock %}
 
-
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {% if is_reviews_view %}
-    {% macro _arb_reviews_actions() %}
-    <button type="button" @click="Platform.modal.open('create-arb-review')"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap"
-            aria-label="New Review">
-        <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>New Review
-    </button>
-    {% endmacro %}
-    {# duplicate-breadcrumb-ok: this page_shell() and the one in the else branch below are mutually exclusive render paths (is_reviews_view), so exactly one page_shell -- and one breadcrumb -- ever renders per request. #}
-    {{ page_shell(
-        title='ARB Reviews',
-        subtitle='Architecture review items submitted for governance assessment',
-        breadcrumb=[('Home', url_for('main.index')), ('Governance', None), ('ARB Reviews', None)],
-        actions_caller=_arb_reviews_actions
+    {{ page_header(
+        title='ARB Reviews' if is_reviews_view else 'ARB Sessions',
+        description='Architecture review items submitted for governance assessment' if is_reviews_view else 'Scheduled Architecture Review Board meetings',
+        breadcrumbs=[{'label': 'Home', 'href': url_for('main.index')}, {'label': 'Governance'}, {'label': 'ARB Reviews' if is_reviews_view else 'ARB Sessions'}]
     ) }}
-    {% else %}
-    {% macro _arb_sessions_actions() %}
-    <button type="button" @click="Platform.modal.open('create-arb-session')"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap"
-            aria-label="New Session">
-        <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>New Session
-    </button>
-    {% endmacro %}
-    {{ page_shell(
-        title='ARB Sessions',
-        subtitle='Scheduled Architecture Review Board meetings',
-        breadcrumb=[('Home', url_for('main.index')), ('Governance', None), ('ARB Sessions', None)],
-        actions_caller=_arb_sessions_actions
-    ) }}
-    {% endif %}
 
     <!-- Filters -->
     <div class="bg-card border border-border rounded-lg p-4 mb-6" x-data>
         <form method="GET" action="{{ request.path }}" class="flex flex-wrap gap-4">
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-                <select name="status" class="h-9 rounded-md border border-input bg-background px-3 text-sm" @change="$el.form.submit()" aria-label="Status">
-                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Statuses</option>
-                    {% if is_reviews_view %}
-                    <option value="submitted" {% if status == 'submitted' %}selected{% endif %}>Submitted</option>
-                    <option value="under_review" {% if status == 'under_review' %}selected{% endif %}>Under Review</option>
-                    <option value="approved" {% if status == 'approved' %}selected{% endif %}>Approved</option>
-                    <option value="approved_with_conditions" {% if status == 'approved_with_conditions' %}selected{% endif %}>Approved with Conditions</option>
-                    <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>Rejected</option>
-                    <option value="deferred" {% if status == 'deferred' %}selected{% endif %}>Deferred</option>
-                    {% else %}
-                    <option value="scheduled" {% if status == 'scheduled' %}selected{% endif %}>Scheduled</option>
-                    <option value="in_progress" {% if status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                    <option value="completed" {% if status == 'completed' %}selected{% endif %}>Completed</option>
-                    <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-                    {% endif %}
-                </select>
+                {% set _status_opts = [('all', 'All Statuses')] %}
+                {% if is_reviews_view %}
+                {% set _ = _status_opts.append(('submitted', 'Submitted')) %}
+                {% set _ = _status_opts.append(('under_review', 'Under Review')) %}
+                {% set _ = _status_opts.append(('approved', 'Approved')) %}
+                {% set _ = _status_opts.append(('approved_with_conditions', 'Approved with Conditions')) %}
+                {% set _ = _status_opts.append(('rejected', 'Rejected')) %}
+                {% set _ = _status_opts.append(('deferred', 'Deferred')) %}
+                {% else %}
+                {% set _ = _status_opts.append(('scheduled', 'Scheduled')) %}
+                {% set _ = _status_opts.append(('in_progress', 'In Progress')) %}
+                {% set _ = _status_opts.append(('completed', 'Completed')) %}
+                {% set _ = _status_opts.append(('cancelled', 'Cancelled')) %}
+                {% endif %}
+                {{ native_select(name='status', aria_label='Status', options=_status_opts, selected=status, attrs_dict={'@change': '$el.form.submit()'}) }}
             </div>
             {% if is_reviews_view %}
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Review Type</label>
-                <select name="review_type" class="h-9 rounded-md border border-input bg-background px-3 text-sm" @change="$el.form.submit()" aria-label="Review Type">
-                    <option value="all" {% if review_type == 'all' %}selected{% endif %}>All Types</option>
-                    <option value="solution" {% if review_type == 'solution' %}selected{% endif %}>Solution</option>
-                    <option value="architecture" {% if review_type == 'architecture' %}selected{% endif %}>Architecture</option>
-                    <option value="standard" {% if review_type == 'standard' %}selected{% endif %}>Standard</option>
-                    <option value="change_request" {% if review_type == 'change_request' %}selected{% endif %}>Change Request</option>
-                </select>
+                {% set _type_opts = [('all', 'All Types'), ('solution', 'Solution'), ('architecture', 'Architecture'), ('standard', 'Standard'), ('change_request', 'Change Request')] %}
+                {{ native_select(name='review_type', aria_label='Review Type', options=_type_opts, selected=review_type, attrs_dict={'@change': '$el.form.submit()'}) }}
             </div>
             {% endif %}
         </form>
@@ -84,11 +56,6 @@
                 <div class="flex justify-between items-start">
                     <div class="flex-1">
                         <div class="flex items-center gap-3 mb-2">
-                            {# F-23, Capgemini dry-run: this rendered a synthetic
-                               SESSION-{{ id }} instead of the board's real,
-                               unique board_number (ARB-2026-001 style), which
-                               collided in spirit with the ARB-numbered boards
-                               list elsewhere in the app. #}
                             <span class="text-sm font-mono text-primary">{% if is_reviews_view %}{{ session.review_number or ('REV-' ~ session.id) }}{% else %}{{ session.board_number or ('SESSION-' ~ session.id) }}{% endif %}</span>
                             {% if is_reviews_view %}
                                 {% if session.status == 'approved' %}
@@ -120,97 +87,40 @@
                                 {% endif %}
                             {% endif %}
                         </div>
-                        {# DEF-055, Capgemini dry-run: ArchitectureReviewBoard's
-                           real name column is `name`, not `title` — reading
-                           `session.title` here always returned None (that
-                           model has no such column), so every session's own
-                           name was silently discarded in favour of the
-                           generic "ARB Session" fallback. Reviews (ARBReviewItem)
-                           genuinely do use `title`. #}
                         <h3 class="font-semibold text-foreground">{{ (session.title if is_reviews_view else session.name) or ('Review Item' if is_reviews_view else 'ARB Session') }}</h3>
                         <p class="text-sm text-muted-foreground mt-1">{{ session.description | truncate(150) if session.description else 'No description' }}</p>
                         <div class="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
                             {% if is_reviews_view %}
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="file-text" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ session.review_type|default('General', true)|replace('_', ' ')|title }}
-                            </span>
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="flag" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ session.priority|default('Medium', true)|title }}
-                            </span>
-                            {% if session.submitted_at %}
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                Submitted {{ session.submitted_at.strftime('%Y-%m-%d') }}
-                            </span>
-                            {% elif session.created_at %}
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                Created {{ session.created_at.strftime('%Y-%m-%d') }}
-                            </span>
-                            {% endif %}
-                            {% if session.submitter %}
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="user" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ session.submitter.full_name() }}
-                            </span>
-                            {% endif %}
+                            <span class="flex items-center gap-1"><i data-lucide="file-text" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.review_type|default('General', true)|replace('_', ' ')|title }}</span>
+                            <span class="flex items-center gap-1"><i data-lucide="flag" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.priority|default('Medium', true)|title }}</span>
+                            {% if session.submitted_at %}<span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>Submitted {{ session.submitted_at.strftime('%Y-%m-%d') }}</span>{% elif session.created_at %}<span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>Created {{ session.created_at.strftime('%Y-%m-%d') }}</span>{% endif %}
+                            {% if session.submitter %}<span class="flex items-center gap-1"><i data-lucide="user" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.submitter.full_name() }}</span>{% endif %}
                             {% else %}
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ (session.scheduled_date|string)[:16] if session.scheduled_date else 'TBD' }}
-                            </span>
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="map-pin" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ session.location or 'Virtual' }}
-                            </span>
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="users" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ session.members | length if session.members else 0 }} Members
-                            </span>
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="clipboard-list" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ session.review_items | length if session.review_items else 0 }} Items
-                            </span>
+                            <span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ (session.scheduled_date|string)[:16] if session.scheduled_date else 'TBD' }}</span>
+                            <span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.location or 'Virtual' }}</span>
+                            <span class="flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.members | length if session.members else 0 }} Members</span>
+                            <span class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.review_items | length if session.review_items else 0 }} Items</span>
                             {% if session.review_items %}
                             {% set solution_items = session.review_items | selectattr('solution_id') | list %}
-                            {% if solution_items %}
-                            <span class="flex items-center gap-1">
-                                <i data-lucide="lightbulb" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                {{ solution_items | length }} Solution{{ 's' if solution_items | length > 1 }}
-                            </span>
-                            {% endif %}
+                            {% if solution_items %}<span class="flex items-center gap-1"><i data-lucide="lightbulb" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ solution_items | length }} Solution{{ 's' if solution_items | length > 1 }}</span>{% endif %}
                             {% endif %}
                             {% endif %}
                         </div>
                     </div>
                     <div class="flex gap-2 ml-4">
-                        <a href="{{ url_for('arb.review_detail', id=session.id) if is_reviews_view else url_for('arb.session_detail', id=session.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                            <i data-lucide="eye" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>
-                            View
-                        </a>
+                        <a href="{{ url_for('arb.review_detail', id=session.id) if is_reviews_view else url_for('arb.session_detail', id=session.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"><i data-lucide="eye" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>View</a>
                         {% if not is_reviews_view and session.status == 'scheduled' %}
-                        <form action="{{ url_for('arb.complete_session', id=session.id) }}" method="POST" class="inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit"
-                                    class="inline-flex items-center px-3 py-1.5 text-sm bg-success text-primary-foreground rounded-md hover:bg-success transition-colors" aria-label="Submit">
-                                <i data-lucide="check" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>
-                                Complete
-                            </button>
-                        </form>
+                        {{ button(text='Complete', type='button', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'@click': "Platform.fetch.post('/arb/sessions/" ~ session.id ~ "/complete', {}, {silent: true}).then(function(){location.reload()})", 'aria_label': 'Complete Session'}) }}
                         {% endif %}
                     </div>
                 </div>
             </div>
             {% endfor %}
         {% else %}
-            {% from 'components/empty_state.html' import empty_state %}
             {% if is_reviews_view %}
-            {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New Review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus') }}
+            {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus', padding='py-8') }}
             {% else %}
-            {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='Schedule Session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus') }}
+            {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='New session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus', padding='py-8') }}
             {% endif %}
         {% endif %}
     </div>
@@ -221,21 +131,11 @@
         <nav class="flex items-center gap-2">
             {% set pagination_endpoint = 'arb.reviews' if is_reviews_view else 'arb.sessions' %}
             {% if sessions.has_prev %}
-            <a href="{{ url_for(pagination_endpoint, page=sessions.prev_num, status=status) }}"
-               class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">
-                Previous
-            </a>
+            <a href="{{ url_for(pagination_endpoint, page=sessions.prev_num, status=status) }}" class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">Previous</a>
             {% endif %}
-
-            <span class="px-3 py-2 text-sm text-muted-foreground">
-                Page {{ sessions.page }} of {{ sessions.pages }}
-            </span>
-
+            <span class="px-3 py-2 text-sm text-muted-foreground">Page {{ sessions.page }} of {{ sessions.pages }}</span>
             {% if sessions.has_next %}
-            <a href="{{ url_for(pagination_endpoint, page=sessions.next_num, status=status) }}"
-               class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">
-                Next
-            </a>
+            <a href="{{ url_for(pagination_endpoint, page=sessions.next_num, status=status) }}" class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">Next</a>
             {% endif %}
         </nav>
     </div>
@@ -243,88 +143,33 @@
 </div>
 
 {% call modal(id='create-arb-session', title='Schedule ARB Session', description='Create a new Architecture Review Board meeting', size='lg') %}
-{#
-  Progressive enhancement, deliberately. Alpine intercepts the submit and posts
-  JSON when it is bound; when it is NOT bound the browser posts this form
-  natively to the same endpoint and the server's flash reaches the user as a
-  toast. Before 01 Sep 2026 the form carried no method/action and no name
-  attributes, so an unbound Alpine meant a native GET-shaped submit that lost
-  every field: the modal closed, the page returned to /arb/sessions and nothing
-  at all was reported. There is no third outcome now -- a session is created, or
-  the reason is on screen.
-#}
-<form method="POST" action="{{ url_for('arb.create_session') }}"
-      @submit.prevent="submitCreateSession()" class="space-y-4" x-data="arbSessionModal()">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div>
-        <label for="cas-name" class="block text-sm font-medium text-muted-foreground mb-1">Session Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" id="cas-name" name="name" x-model="formData.name" required
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-               placeholder="e.g. ARB Session Q1 2026">
+<form method="POST" action="{{ url_for('arb.create_session') }}" @submit.prevent="submitCreateSession()" class="space-y-4" x-data="arbSessionModal()">
+    {{ form_field(id='cas-name', label='Session Name', name='name', required=true, placeholder='e.g. ARB Session Q1 2026') }}
+    {{ form_field(id='cas-description', label='Description', name='description', input_type='textarea', rows=2, placeholder='Agenda and objectives for this session') }}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {{ form_field(id='cas-date', label='Schedule Date & Time', name='scheduled_date', type='datetime-local', required=true) }}
+        {{ form_field(id='cas-duration', label='Duration (minutes)', name='duration_minutes', type='number', value='120', attrs_dict={'min': 30, 'max': 480}) }}
     </div>
-    <div>
-        <label for="cas-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-        <textarea id="cas-description" name="description" x-model="formData.description" rows="2"
-                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Agenda and objectives for this session"></textarea>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% call form_group(id='cas-chair', label='Chair', required=true) %}
+        {% set _chair_opts = [('', 'Select chair...')] %}
+        {% for user in users %}{% set _ = _chair_opts.append((user.id|string, user.full_name())) %}{% endfor %}
+        {{ native_select(id='cas-chair', name='chair_id', aria_label='Chair', options=_chair_opts, attrs_dict={'x-model': 'formData.chair_id'}) }}
+        {% endcall %}
+        {% call form_group(id='cas-secretary', label='Secretary (optional)') %}
+        {% set _sec_opts = [('', 'Select secretary...')] %}
+        {% for user in users %}{% set _ = _sec_opts.append((user.id|string, user.full_name())) %}{% endfor %}
+        {{ native_select(id='cas-secretary', name='secretary_id', aria_label='Secretary', options=_sec_opts, attrs_dict={'x-model': 'formData.secretary_id'}) }}
+        {% endcall %}
     </div>
-    <div class="grid grid-cols-1 gap-4">
-        <div>
-            <label for="cas-date" class="block text-sm font-medium text-muted-foreground mb-1">Scheduled Date &amp; Time <span class="text-destructive-emphasis">*</span></label>
-            <input type="datetime-local" id="cas-date" name="scheduled_date" x-model="formData.scheduled_date" required
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        </div>
-        <div>
-            <label for="cas-duration" class="block text-sm font-medium text-muted-foreground mb-1">Duration (minutes)</label>
-            <input type="number" id="cas-duration" name="duration_minutes" x-model="formData.duration_minutes" min="30" max="480" value="120"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        </div>
-    </div>
-    <div class="grid grid-cols-1 gap-4">
-        <div>
-            <label for="cas-chair" class="block text-sm font-medium text-muted-foreground mb-1">Chair <span class="text-destructive-emphasis">*</span></label>
-            <select id="cas-chair" name="chair_id" x-model="formData.chair_id" required
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <option value="">Select chair...</option>
-                {% for user in users %}
-                <option value="{{ user.id }}">{{ user.full_name() }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label for="cas-secretary" class="block text-sm font-medium text-muted-foreground mb-1">Secretary (optional)</label>
-            <select id="cas-secretary" name="secretary_id" x-model="formData.secretary_id"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <option value="">Select secretary...</option>
-                {% for user in users %}
-                <option value="{{ user.id }}">{{ user.full_name() }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-    <div class="grid grid-cols-1 gap-4">
-        <div>
-            <label for="cas-location" class="block text-sm font-medium text-muted-foreground mb-1">Location</label>
-            <input type="text" id="cas-location" name="location" x-model="formData.location"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                   placeholder="Room or building name">
-        </div>
-        <div>
-            <label for="cas-link" class="block text-sm font-medium text-muted-foreground mb-1">Meeting Link</label>
-            <input type="url" id="cas-link" name="meeting_link" x-model="formData.meeting_link"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                   placeholder="https://teams.microsoft.com/...">
-        </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {{ form_field(id='cas-location', label='Location', name='location', placeholder='Room or building name') }}
+        {{ form_field(id='cas-link', label='Meeting Link', name='meeting_link', type='url', placeholder='https://teams.microsoft.com/...') }}
     </div>
     <div x-cloak x-show="errorMsg" class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
     <div class="flex justify-end gap-3 pt-2 border-t border-border">
-        <button type="button" data-modal-close="create-arb-session"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
-        <button type="submit" :disabled="submitting"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
-            <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-cloak x-show="submitting"></i>
-            <span x-text="submitting ? 'Scheduling...' : 'Schedule Session'"></span>
-        </button>
+        {{ button(text='Cancel', type='button', variant='ghost', attrs_dict={'data-modal-close': 'create-arb-session', 'aria_label': 'Cancel'}) }}
+        {{ button(text='Schedule Session', type='submit', attrs_dict={':disabled': 'submitting'}) }}
     </div>
 </form>
 {% endcall %}
@@ -337,21 +182,9 @@
 <script>
   window.__ARB_CONFIG__ = window.__ARB_CONFIG__ || {};
   window.__ARB_CONFIG__.createSessionUrl = '{{ url_for("arb.create_session") }}';
-  {#
-    This template serves BOTH /arb/sessions and /arb/reviews, and it includes
-    arb/_create_review_modal.html and loads dashboard.js -- but it used to declare
-    only createSessionUrl. dashboard.js's loadFormData() reads
-    __ARB_CONFIG__.formDataUrl and returns immediately when it is absent, so on
-    these two pages the Review Type and Decision Type dropdowns were permanently
-    empty while formOptions.loadError stayed false: the app never knew it had
-    failed. The QA audit of 30 Aug 2026 (High #8) recorded it as "No user can
-    create a new ARB review through the UI ... blocking a core governance
-    workflow entirely." Both URLs the shared modal needs are declared here now.
-  #}
   window.__ARB_CONFIG__.createReviewUrl = '{{ url_for("arb.create_review") }}';
   window.__ARB_CONFIG__.formDataUrl = '{{ url_for("arb.api_form_data") }}';
 </script>
 <script src="{{ url_for('static', filename='js/arb/sessions.js') }}"></script>
-{# dashboard.js provides arbReviewCreateModal() for the shared Create Review modal #}
 <script src="{{ url_for('static', filename='js/arb/dashboard.js') }}"></script>
 {% endblock %}

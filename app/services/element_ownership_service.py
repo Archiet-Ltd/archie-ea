@@ -54,6 +54,14 @@ def _tenant_ai_system(element_id: int, organization_id: int):
     return element if element is not None and is_ai_system(element) else None
 
 
+def _tenant_business_process(element_id: int, organization_id: int):
+    from app.models.process_data import BusinessProcess
+
+    return BusinessProcess.query.filter_by(
+        id=element_id, organization_id=organization_id,
+    ).first()
+
+
 def _tenant_application(element_id: int, organization_id: int):
     from app.models.application_portfolio import ApplicationComponent
 
@@ -67,6 +75,7 @@ _ELEMENTS: dict[str, tuple[Callable, str]] = {
     "application": (_tenant_application, "That application does not belong to this organisation."),
     "capability": (_tenant_capability, "That capability does not belong to this organisation."),
     "ai_system": (_tenant_ai_system, "That AI system does not belong to this organisation."),
+    "business_process": (_tenant_business_process, "That business process does not belong to this organisation."),
 }
 
 
@@ -129,7 +138,19 @@ def set_element_owner(
         return existing
 
     if replace_type or (replace_primary and ownership_type == "primary"):
-        _delete_other_owners_of_type(key, organization_id, ownership_type)
+        # A change of owner is one update of the existing record (so the change
+        # history shows who it was and who it became), not a delete and a create.
+        current = ApplicationOwner.query.filter_by(
+            organization_id=organization_id, ownership_type=ownership_type, **key,
+        ).order_by(ApplicationOwner.id).all()
+        if current:
+            record = current[0]
+            record.user_id = user_id
+            record.assigned_by = assigned_by
+            _delete_other_owners_of_type(key, organization_id, ownership_type, keep=record)
+            if commit:
+                db.session.commit()
+            return record
 
     record = ApplicationOwner(
         user_id=user_id,

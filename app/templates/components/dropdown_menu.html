@@ -44,6 +44,22 @@
        ]
    ) }}
    
+   Keyboard: ui/dropdown_menu.js gives every menu the arrow-key model. Pass
+   subject_attr='data-card-id' where choosing an item moves the thing the menu
+   belongs to (a board card): focus then lands on that subject, found again by
+   that attribute, instead of on the trigger.
+
+   transition='opacity' fades the menu without scaling it, for toolbars where items must not move
+   under the cursor while it opens. Default 'default' keeps the scale-and-fade every caller has.
+
+   5. Custom trigger content (the sidebar's organisation switcher and user menu):
+   {% call dropdown_menu(id='user-menu', trigger_bare=true, trigger_class='w-full ...',
+                         panel_class='bottom-full left-0 mb-2', items=[...]) %}
+       ...avatar, name and email...
+   {% endcall %}
+   trigger_bare drops the default size and variant classes so the call block's
+   content decides the trigger's look; panel_class replaces the panel's position.
+
    4. Icon-Only Trigger:
    {{ dropdown_menu(
        trigger_icon='more-vertical',
@@ -52,6 +68,7 @@
    ) }}
 #}
 
+{% from 'components/switch.html' import switch as _switch %}
 {% macro dropdown_menu(
     id='',
     trigger_text='',
@@ -62,9 +79,20 @@
     position='right',
     class='',
     trigger_class='',
-    menu_width='w-48'
+    menu_width='w-48',
+    trigger_size='default',
+    trigger_testid=none,
+    trigger_aria_label=none,
+    trigger_title=none,
+    trigger_attrs_dict={},
+    subject_attr=none,
+    transition='default',
+    trigger_bare=false,
+    panel_class=none
 ) %}
 {% set unique_id = id or 'dropdown-' ~ range(1000, 9999) | random %}
+{# A caller-supplied trigger id (trigger_attrs_dict) replaces the default one: two id attributes on one tag leave the second ignored. #}
+{% set trigger_id = trigger_attrs_dict.get('id') or unique_id ~ '-trigger' %}
 
 {% set trigger_variants = {
     'default': 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
@@ -77,12 +105,14 @@
 {% set positions = {
     'left': 'left-0',
     'right': 'right-0',
-    'center': 'left-1/2 transform -translate-x-1/2'
+    'center': 'left-1/2 transform -translate-x-1/2',
+    'board': 'left-0 [.kanban-column:last-child_&]:left-auto [.kanban-column:last-child_&]:right-0'
 } %}
 
 <div 
     id="{{ unique_id }}"
     class="relative {{ class }}"
+    data-dropdown-menu{% if subject_attr %} data-menu-subject="{{ subject_attr }}"{% endif %}
     x-data="{ menuOpen: false }"
     @click.away="menuOpen = false"
     @keydown.escape.window="menuOpen = false"
@@ -90,11 +120,20 @@
     {# Trigger Button #}
     <button
         type="button"
+        {% if 'id' not in trigger_attrs_dict %}id="{{ trigger_id }}"{% endif %}
+        data-menu-trigger
         @click="menuOpen = !menuOpen"
         :aria-expanded="menuOpen"
-        aria-haspopup="true"
-        class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 {{ 'w-10' if trigger_icon_only else 'px-4 py-2' }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
-     aria-label="Open">
+        aria-haspopup="menu"
+        {% if trigger_bare %}
+        class="flex items-center rounded-md text-left ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {{ trigger_class }}"
+        {% else %}
+        class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 {{ 'h-8' if trigger_size == 'sm' else ('h-9' if trigger_size == 'md' else 'h-10') }} {{ ('w-8' if trigger_size == 'sm' else ('w-9' if trigger_size == 'md' else 'w-10')) if trigger_icon_only else ('px-3' if trigger_size in ('sm', 'md') else 'px-4 py-2') }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
+        {% endif %}
+     {% if trigger_aria_label %} aria-label="{{ trigger_aria_label }}"{% endif %}{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}{% for attr_name, attr_value in trigger_attrs_dict.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
+        {% if caller %}
+        {{ caller() }}
+        {% else %}
         {% if trigger_icon %}
         <i data-lucide="{{ trigger_icon }}" class="{% if not trigger_icon_only %}mr-2{% endif %} w-4 h-4" aria-hidden="true"></i>
         {% endif %}
@@ -107,21 +146,23 @@
         <i data-lucide="chevron-down" class="ml-2 w-4 h-4" aria-hidden="true"></i>
         {% endif %}
         
-        <span class="sr-only">{% if trigger_text %}{{ trigger_text }} menu{% else %}Open menu{% endif %}</span>
+        {% if trigger_icon_only or not trigger_text %}<span class="sr-only">{% if trigger_text %}{{ trigger_text }} menu{% else %}Open menu{% endif %}</span>{% endif %}
+        {% endif %}
     </button>
 
     {# Dropdown Menu #}
     <div 
-        x-show="menuOpen" x-cloak @keydown.escape.window="menuOpen = false" role="dialog" aria-modal="true"
-        x-transition:enter="transition ease-out duration-100"
+        x-show="menuOpen" x-cloak @keydown.escape.window="menuOpen = false"
+        {% if transition == 'opacity' %}x-transition.opacity.duration.120ms{% else %}x-transition:enter="transition ease-out duration-100"
         x-transition:enter-start="transform opacity-0 scale-95"
         x-transition:enter-end="transform opacity-100 scale-100"
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="transform opacity-100 scale-100"
-        x-transition:leave-end="transform opacity-0 scale-95"
+        x-transition:leave-end="transform opacity-0 scale-95"{% endif %}
         x-cloak
-        class="absolute {{ positions.get(position, 'right-0') }} mt-2 {{ menu_width }} rounded-lg border border-border bg-card z-50"
+        class="absolute {{ panel_class or (positions.get(position, 'right-0') ~ ' mt-2') }} {{ menu_width }} rounded-lg border border-border bg-card z-50"
         role="menu"
+        aria-labelledby="{{ trigger_id }}"
         aria-orientation="vertical"
     >
         <div class="py-1" role="none">
@@ -149,6 +190,7 @@
                             @click="menuOpen = false"
                             class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors {{ item_variants.get(item.variant, item_variants['default']) }} {% if loop.first %}rounded-t-lg{% endif %} {% if loop.last %}rounded-b-lg{% endif %} {{ item.class|default('') }}"
                             role="menuitem"
+                            {% if item.testid %}data-testid="{{ item.testid }}"{% endif %} {% if item.title %}title="{{ item.title }}"{% endif %} {% if item.aria_label %}aria-label="{{ item.aria_label }}"{% endif %}
                             {% if item.disabled %}aria-disabled="true" class="opacity-50 cursor-not-allowed pointer-events-none"{% endif %}
                         >
                             {% if item.icon %}
@@ -156,6 +198,43 @@
                             {% endif %}
                             {{ item.text }}
                         </a>
+                    {% elif item.checkbox %}
+                        {# A menu item that is an on/off setting (the dark theme): item.checked is
+                           the Alpine expression it reflects, item.onclick what choosing it does. #}
+                        <button
+                            type="button"
+                            role="menuitemcheckbox"
+                            :aria-checked="{{ item.checked }} ? 'true' : 'false'"
+                            @click="{{ item.onclick }}"
+                            class="w-full text-left px-4 py-2 text-sm flex items-center justify-between gap-2 transition-colors {{ item_variants['default'] }} {{ item.class|default('') }}"
+                            {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                            <span class="flex items-center gap-2">
+                                {% if item.icon %}<i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>{% endif %}
+                                {{ item.text }}
+                            </span>
+                            {{ _switch(bind_checked=item.checked, span_only=true) }}
+                        </button>
+                    {% elif item.post %}
+                        {# A menu item that sends a form (switching organisation): item.post is the
+                           action URL, item.fields the hidden values; the CSRF token is added here. #}
+                        <form method="post" action="{{ item.post }}" role="none" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {% for field_name, field_value in (item.fields or {}).items() %}
+                            <input type="hidden" name="{{ field_name }}" value="{{ field_value }}">
+                            {% endfor %}
+                            <button
+                                type="submit"
+                                class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors {{ item_variants.get(item.variant, item_variants['default']) }} {{ item.class|default('') }}"
+                                role="menuitem"
+                                {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}
+                                {% if item.current %}aria-current="true"{% endif %}>
+                                {% if item.icon %}
+                                <i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>
+                                {% endif %}
+                                <span class="min-w-0 flex-1 truncate">{{ item.text }}</span>
+                                {% if item.current %}<span class="text-xs text-muted-foreground">Current</span>{% endif %}
+                            </button>
+                        </form>
                     {% elif item.data_action %}
                         <button
                             type="button"
@@ -175,8 +254,9 @@
                             @click="{{ item.onclick }}; menuOpen = false"
                             class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors {{ item_variants.get(item.variant, item_variants['default']) }} {% if loop.first %}rounded-t-lg{% endif %} {% if loop.last %}rounded-b-lg{% endif %} {{ item.class|default('') }}"
                             role="menuitem"
+                            {% if item.testid %}data-testid="{{ item.testid }}"{% endif %} {% if item.title %}title="{{ item.title }}"{% endif %}
                             {% if item.disabled %}disabled class="opacity-50 cursor-not-allowed"{% endif %}
-                         aria-label="Open">
+                         aria-label="{{ item.aria_label or item.text }}">
                             {% if item.icon %}
                             <i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>
                             {% endif %}

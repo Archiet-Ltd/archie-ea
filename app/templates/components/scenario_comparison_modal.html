@@ -5,7 +5,16 @@
    double-quoted x-data="..." attribute truncates the attribute at the first
    inner quote (breaking the whole component). Hoist it to a script variable and
    reference that, the same pattern investment_matrix.html uses. #}
-<script nonce="{{ csp_nonce }}">window.__SCENARIO_CAPS = {{ capability_scores | tojson }};</script>
+{# The investment service names its rows capability_id and capability_name; the picker
+   and the x-for key read id and name. Normalise once here so every row has a key. #}
+<script nonce="{{ csp_nonce }}">window.__SCENARIO_CAPS = ({{ capability_scores | tojson }} || []).map(function (c) {
+    var need = c.investment_need || {};
+    return Object.assign({}, c, {
+        id: c.id != null ? c.id : c.capability_id,
+        name: c.name != null ? c.name : c.capability_name,
+        estimated_cost: c.estimated_cost != null ? c.estimated_cost : (need.estimated_cost || 0)
+    });
+});</script>
 <div
     x-data="{
         capabilities: (window.__SCENARIO_CAPS || []),
@@ -244,7 +253,7 @@
                 </template>
             </div>
             <div class="mt-3 flex justify-end">
-                <button type="button" @click="clearAll()" class="text-sm text-muted-foreground hover:text-foreground" aria-label="Action">
+                <button type="button" @click="clearAll()" class="text-sm text-muted-foreground hover:text-foreground">
                     Clear All
                 </button>
             </div>

@@ -75,7 +75,7 @@
 {# USAGE: {{ label(for=name, text=placeholder) }}{{ input(id=name, name=name, type=type, required=required) }} #}
 {# GUIDE: See docs/design-system/components.md#input #}
 {# Removal: v2.0 #}
-    <button type="button" class="{{ classes }}" aria-label="Action">{{ text }}</button>
+    <button type="button" class="{{ classes }}">{{ text }}</button>
 {% endif %}
 {% endmacro %}
 
@@ -127,4 +127,50 @@
         </tbody>
     </table>
 </div>
+{% endmacro %}
+
+
+{# ------------------------------------------------------------------------------------------------
+   Component substrate: the native select.
+   Dialog, card and badge are not repeated here: use components/modal.html (modal), page_shell.html
+   (section_card) and components/badge.html (badge), which already ship. Colours come from the token
+   classes in app/static/css/shadcn_tokens.css only; no shadows (design/patterns.json ban).
+   ------------------------------------------------------------------------------------------------ #}
+
+{# shadcn_select: native <select> with label, help text and error state.
+   Options come from `options` (list of (value, label) pairs) or from a {% call %} body of <option> elements.
+   `attrs` is a dict of extra attributes for the select (data-*, hx-*, x-model, @change); keys and values are escaped by xmlattr.
+   bare=true renders only the control (for toolbar filters that supply their own label) and adds an id only when one is passed.
+   A class containing h-* or w-* / flex-1 replaces the default height / width. #}
+{% macro shadcn_select(name, label="", options=None, selected=None, help_text="", error="", id=None, required=false, disabled=false, placeholder=None, bare=false, class="", attrs=None) %}
+{% set _id = id if bare else (id or name) %}
+{% set _desc = (_id ~ "-error") if (error and _id) else ((_id ~ "-help") if (help_text and _id) else "") %}
+{% set _cls = " " ~ class %}
+{% set _select %}
+<select {% if _id %}id="{{ _id }}" {% endif %}name="{{ name }}"
+    {% if required %}required aria-required="true"{% endif %}
+    {% if disabled %}disabled{% endif %}
+    {% if error %}aria-invalid="true"{% endif %}
+    {% if _desc %}aria-describedby="{{ _desc }}"{% endif %}
+    {% if attrs %}{{ attrs|xmlattr }}{% endif %}
+    class="flex {{ '' if ' h-' in _cls else 'h-10' }} {{ '' if (' w-' in _cls or ' flex-1' in _cls) else 'w-full' }} rounded-md border {{ 'border-destructive' if error else 'border-input' }} bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}">
+    {% if placeholder is not none %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% if options %}
+        {% for opt in options %}
+            {% set _v = opt[0] %}{% set _l = opt[1] %}
+            <option value="{{ _v }}"{% if selected is not none and selected|string == _v|string %} selected{% endif %}>{{ _l }}</option>
+        {% endfor %}
+    {% elif caller is defined %}{{ caller() }}{% endif %}
+</select>
+{% endset %}
+{% if bare %}{{ _select }}{% else %}
+<div class="flex flex-col space-y-2">
+    {% if label %}
+    <label for="{{ _id }}" class="text-sm font-medium leading-none">{{ label }}{% if required %}<span class="text-destructive-emphasis ml-1">*</span>{% endif %}</label>
+    {% endif %}
+    {{ _select }}
+    {% if error %}<p id="{{ _id }}-error" class="text-sm text-destructive-emphasis" role="alert">{{ error }}</p>
+    {% elif help_text %}<p id="{{ _id }}-help" class="text-sm text-muted-foreground">{{ help_text }}</p>{% endif %}
+</div>
+{% endif %}
 {% endmacro %}

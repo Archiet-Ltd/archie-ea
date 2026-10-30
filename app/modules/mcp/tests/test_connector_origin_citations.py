@@ -48,7 +48,9 @@ def test_ask_impact_carries_the_repository_and_commit_of_a_connector_written_lin
 
     out = _ask(client, token, supplier.id)
 
-    rows = {row["element_id"]: row["relation"] for row in out.get("data", out)["rows"]}
+    body = out.get("data", out)
+    body = body.get("result", body)
+    rows = {row["element_id"]: row["relation"] for row in body["rows"]}
     origin = rows[consumer.id]["origins"][str(written.id)]
     assert origin["repository"] == "acme/consumer" and origin["commit"] == commit and origin["file"] == "go.mod"
     assert origin["detail"] == "go.mod names github.com/acme/supplier"

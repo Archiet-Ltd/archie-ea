@@ -1,3 +1,14 @@
 # Tables that are shared reference data on purpose, excluded from the protection requirement.
 # One table per line with a reason after the hash, e.g.  apqc_process  # shared catalogue, seeded only by commands
 # A line with no reason fails the unfenced-tables gate.
+vendor_catalogue_facts  # the public vendor catalogue (ADR-0021): the same for every organisation, read-only to them, written only by the research and review commands
+exchange_rates  # platform FX reference: units of to_currency per from_currency on a date, no organisation column, written only by the platform administrator and seed commands, read by every organisation alike
+model_providers  # platform provider register (hybrid): platform rows have no organisation and are shared; per-organisation override rows carry organization_id and are fenced by the hybrid tenant mixin
+service_incidents  # platform status history: a fact about the platform being degraded or down, no organisation, user or personal data, opened and resolved by the platform operator, read identically by every signed-in user
+public_visitor_events  # cookieless public-site analytics: a marketing-page visitor has no organisation or user, no personal data is stored (only a daily-rotating salted hash), written by the public route and read only in aggregate
+product_inquiries  # public lead capture for paid offer pages: a visitor has no organisation or user, rows are read only by the platform operator, never scoped to an organisation
+reference_number_counters  # platform-wide allocation counters (one row per table/column/prefix family): no organisation column by design, the families it numbers are unique across every organisation, a tenant fence would be the very bug it exists to remove
+oauth_clients  # user-scoped auth, not organisation-scoped: a client is registered before any user or organisation exists (dynamic registration) and is read only by its unique client_id; which organisation issued a token through it is recorded on the token
+oauth_authorization_codes  # user-scoped auth: a single-use code redeemed by its 256-bit hash at the token endpoint before any organisation is known, read only by that hash, never listed across users
+oauth_tokens  # user-scoped auth: looked up only by access- or refresh-token hash, or revoked by user_id or grant_id bound to the signed-in user; the issuing organisation is recorded on the row and checked on every use, never listed across users
+llm_spend_ledger  # platform answer-spend ledger: one row per provider per month for the keys the platform pays for, no organisation column by design (an organisation's own keys never reach it), written only by the answer service and read only on the platform administrator's API settings page

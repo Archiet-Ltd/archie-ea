@@ -1,7 +1,22 @@
-{# smoke-coverage-ok: account settings page — display preferences toggle is a non-visual preference, tested by tests/test_plain_language.py unit tests #}
+{# smoke-coverage-ok: account settings page -- display preferences toggle is a non-visual preference, tested by tests/test_plain_language.py unit tests #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Account Settings{% endblock %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/company_kind.html' import company_kind_picker %}
+{% from 'components/card.html' import card, card_content with context %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/switch.html' import switch %}
+{% from 'components/badge.html' import badge %}
+{% block extra_head_js %}<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>{% endblock %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import label %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
 
@@ -26,9 +41,9 @@
 {% endmacro %}
 
 {% macro user_info(user) %}
-    <div class="rounded-lg border border-border bg-card text-card-foreground">
-        <div class="p-6">
-            <div class="space-y-4">
+    {% call card() %}
+    {% call card_content() %}
+            <dl class="space-y-4">
                 <div class="flex justify-between items-start py-3 border-b border-border">
                     <dt class="font-medium text-sm text-muted-foreground">Full name</dt>
                     <dd class="text-sm">{{ user.full_name() }}</dd>
@@ -42,74 +57,166 @@
                     <dd class="text-sm">
                         {{ user.role.name }}
                         {% if user.is_admin() %}
-                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Admin</span>
+                            {% call badge(variant='warning', class='ml-2') %}Admin{% endcall %}
                         {% endif %}
                     </dd>
                 </div>
-            </div>
-        </div>
-    </div>
+            </dl>
+    {% endcall %}
+    {% endcall %}
 
-    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6" data-testid="organization-memberships-card">
-        <div class="p-6">
+    <div class="mt-6" data-testid="organization-memberships-card">
+    {% call card() %}
+    {% call card_content() %}
             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h3 class="text-sm font-semibold">Organisation memberships</h3>
                     <p class="text-xs text-muted-foreground">Choose the organisation you are currently working in.</p>
                 </div>
                 {% if active_organization_name %}
-                <span class="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-info-emphasis"
-                      data-testid="active-organization-badge">
-                    Active: {{ active_organization_name }}
-                </span>
+                {% call badge(variant='info') %}<span data-testid="active-organization-badge">Active: {{ active_organization_name }}</span>{% endcall %}
                 {% endif %}
             </div>
 
             {% if organization_memberships %}
             <form method="POST" action="{{ url_for('account.switch_organization') }}" class="mt-5 space-y-4">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                 <fieldset class="space-y-3">
                     <legend class="sr-only">Select active organisation</legend>
                     {% for org in organization_memberships %}
                     <label class="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-accent/40">
                         <span class="flex min-w-0 items-center gap-3">
-                            <input type="radio"
-                                   name="organization_id"
-                                   value="{{ org.id }}"
-                                   class="h-4 w-4 border-input text-primary focus:ring-ring"
-                                   {% if active_organization and org.id == active_organization.id %}checked{% endif %}>
+                            {{ input(type='radio', name='organization_id', value=org.id,
+                                      class='h-4 w-4 border-input text-primary focus:ring-ring',
+                                      attrs_dict={'checked': 'checked'} if (active_organization and org.id == active_organization.id) else {}) }}
                             <span class="min-w-0">
                                 <span class="block text-sm font-medium text-foreground">{{ org.name }}</span>
                                 <span class="block text-xs text-muted-foreground">{{ org.slug }}</span>
                             </span>
                         </span>
                         {% if active_organization and org.id == active_organization.id %}
-                        <span class="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success">Current</span>
+                        {% call badge(variant='success') %}Current{% endcall %}
                         {% endif %}
                     </label>
                     {% endfor %}
                 </fieldset>
                 <div class="flex justify-end">
-                    <button type="submit"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Switch organisation
-                    </button>
+                    {{ button(type='submit', text='Switch organisation') }}
                 </div>
             </form>
             {% else %}
             <p class="mt-4 text-sm text-muted-foreground">No organisation memberships are available for this account.</p>
             {% endif %}
-        </div>
+    {% endcall %}
+    {% endcall %}
     </div>
 
-    {# Security Information — Last Login #}
-    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
-        <div class="p-6">
+    {# T-onb-03: Company Kind Setting #}
+    <div class="mt-6" data-testid="company-kind-card">
+    {% call card() %}
+    {% call card_content() %}
+            <h3 class="text-sm font-semibold mb-1">Company Type</h3>
+            <p class="text-xs text-muted-foreground mb-5">This helps us tailor canvas suggestions and guidance to your organisation's stage.</p>
+            {{ company_kind_picker(kind=(user.organization.settings or {}).get('company_context', {}).get('kind', 'startup')) }}
+    {% endcall %}
+    {% endcall %}
+    </div>
+
+    {# Industry and frameworks: chosen at sign-up, changed here. #}
+    {% if company %}
+    <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-testid="company-choices-card">
+        {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Company, industry and frameworks{% endcall %}
+                {% call card_description() %}Your industry picks the starter capability model. The frameworks are the ones your company already works with.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='space-y-6') %}
+                {% include 'account/_company_choices.html' %}
+                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="choices"></p>
+            {% endcall %}
+            {% call card_footer() %}
+                {{ button(text='Save', testid='company-choices-save', attrs_dict={'data-action': 'save-choices'}) }}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    <script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>
+
+    {% if company.profile %}
+    <div class="mt-6" data-testid="company-profile-card">
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Company profile{% endcall %}
+                {% call card_description() %}What you confirmed from your website, and the page each fact came from.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                {% call dense_table(columns=[('Fact', ''), ('Value', ''), ('Source', '')], caption='Company profile', testid='company-profile-table', rows=company.profile|length, max_height='24rem', flush=true) %}
+                    {% for entry in company.profile %}
+                    <tr class="h-12">
+                        <td class="px-2 align-middle font-medium whitespace-nowrap">{{ entry.label }}</td>
+                        <td class="px-2 align-middle">{{ entry.text }}</td>
+                        <td class="px-2 align-middle max-w-64 truncate">{% if entry.source == 'person' %}Corrected by {{ entry.confirmed_by_name }}{% else %}<a href="{{ entry.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ entry.source_url | replace('https://', '') | replace('http://', '') }}</a>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+
+    {# Public signals: news, filings, patents, research and public mentions about the company, each with its source and date. #}
+    {% set sig_state = company.signals_state %}
+    {% if sig_state.agreed %}
+    <div class="mt-6" data-testid="company-signals-card">
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Public signals{% endcall %}
+                {% call card_description() %}What the public sources say about {{ company.company_name or current_user.organization.name }}, with where each came from and when. Read once a day{% if sig_state.refreshed_at %}; last read {{ sig_state.refreshed_at.strftime('%d %b %Y') }}{% endif %}.{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                {% if company.signals %}
+                {% call dense_table(columns=[('Signal', ''), ('Informs', '')], caption='Public signals', testid='company-signals-table', rows=company.signals|length, max_height='28rem', flush=true) %}
+                    {% for sig in company.signals %}
+                    <tr class="min-h-12 border-b border-border last:border-0" data-signal-kind="{{ sig.kind }}">
+                        <td class="px-2 py-2 align-top">
+                            {% if sig.url %}<a href="{{ sig.url }}" class="font-medium text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ sig.title }}</a>{% else %}<span class="font-medium">{{ sig.title }}</span>{% endif %}
+                            <p class="mt-0.5 text-xs text-muted-foreground" data-testid="signal-cite">{{ sig.source }} &middot; {% if sig.published_at %}{{ sig.published_at.strftime('%d %b %Y') }}{% else %}read {{ sig.fetched_at.strftime('%d %b %Y') }}{% endif %}</p>
+                            {% if sig.reports > 1 %}<p class="text-xs text-muted-foreground" data-testid="signal-reports">{{ sig.reports }} reports of this story</p>{% endif %}
+                        </td>
+                        <td class="px-2 py-2 align-top">
+                            <div class="flex flex-wrap gap-1"{% if sig.pestle_reason %} title="Tagged {{ sig.pestle_factor | capitalize }} because {{ sig.pestle_reason }}"{% endif %}>
+                            {% if sig.pestle_factor %}{% call badge('neutral') %}{{ sig.pestle_factor | capitalize }}{% endcall %}{% endif %}
+                            {% if sig.swot_quadrant %}{% call badge('info') %}{{ sig.swot_quadrant | capitalize }}{% endcall %}{% endif %}
+                            {% if sig.pestle_reason %}<p class="w-full text-xs text-muted-foreground" data-testid="signal-reason">Because {{ sig.pestle_reason }}</p>{% endif %}
+                            {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-xs text-muted-foreground" data-testid="signal-informs-none">Not matched to PESTLE or SWOT</span>{% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endcall %}
+                {% elif not company.company_name %}
+                {{ empty_state(icon='newspaper', title='Confirm your company name first', description='The public sources are searched for the company name you confirm from your website, so nothing has been read yet.', compact=True, class='py-6') }}
+                {% else %}
+                {{ empty_state(icon='newspaper', title='No public signals have been read yet', description='Your company agreed to its public footprint being read. The sources are read once a day, and again when you confirm your profile. Read them now to see the first signals.', cta_text='Read the public sources now', cta_href=url_for('account.signals_refresh'), cta_method='post', compact=True, class='py-6') }}
+                {% endif %}
+                {% if sig_state.some_unread %}
+                <p class="mt-3 text-xs text-muted-foreground" data-testid="company-signals-left-out">Some public sources could not be read today; we try again tomorrow.</p>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {# Security Information -- Last Login #}
+    <div class="mt-6">
+    {% call card() %}
+    {% call card_content() %}
             <h3 class="text-sm font-semibold mb-4">Security Information</h3>
-            <div class="space-y-4">
+            <dl class="space-y-4">
                 {# V-06: sourced from the audit log (soc2_audit_log), the same store
                    /admin/audit-log reads, so the two cannot disagree. An em dash means
-                   "no prior login recorded" — never a fabricated placeholder. #}
+                   "no prior login recorded" -- never a fabricated placeholder. #}
                 <div class="flex justify-between items-start py-3 border-b border-border">
                     <dt class="font-medium text-sm text-muted-foreground">Last login</dt>
                     <dd class="text-sm">
@@ -137,9 +244,9 @@
                             <ul class="space-y-1">
                                 {% for ev in recent_auth_events %}
                                     <li class="flex items-center justify-between gap-3">
-                                        <span class="font-mono text-xs">{{ ev.created_at.strftime('%d %b %H:%M') if ev.created_at else '—' }}</span>
+                                        <span class="font-mono text-xs">{{ ev.created_at.strftime('%d %b %H:%M') if ev.created_at else '--' }}</span>
                                         <span class="text-xs {% if ev.action == 'login_failed' %}text-destructive{% else %}text-muted-foreground{% endif %}">{{ ev.action|replace('_', ' ') }}</span>
-                                        <span class="font-mono text-xs text-muted-foreground">{{ ev.ip_address or '—' }}</span>
+                                        <span class="font-mono text-xs text-muted-foreground">{{ ev.ip_address or '--' }}</span>
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -148,8 +255,9 @@
                         {% endif %}
                     </dd>
                 </div>
-            </div>
-        </div>
+            </dl>
+    {% endcall %}
+    {% endcall %}
     </div>
 
     {# PLT-017: Notification Preferences #}
@@ -158,115 +266,72 @@
         ('solution_updates',    'Solution updates',    'Receive notifications when a solution you own advances to a new ADM phase.'),
         ('assignment_changes',  'Assignment changes',  'Receive notifications when an ArchiMate element is assigned or re-assigned to you.'),
         ('weekly_digest',       'Weekly digest',       'Receive a weekly summary of activity across your solutions and architecture portfolio.'),
+        ('alert_email',         'Daily alert email',   'One email a day listing the alerts about what you own: support dates, owners, costs and overdue review conditions. The bell shows them either way.'),
         ('mention_notifications','Mentions',           'Receive notifications when you are mentioned in a comment or review.')
     ] %}
-    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
-        <div class="p-6">
+    <div class="mt-6">
+    {% call card() %}
+    {% call card_content() %}
             <h3 class="text-sm font-semibold mb-1">Notification Preferences</h3>
             <p class="text-xs text-muted-foreground mb-5">Choose which in-app notifications you want to receive.</p>
             <form method="POST" action="{{ url_for('account.save_preferences') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="form_type" value="notifications">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                {{ input(type='hidden', name='form_type', value='notifications') }}
                 <div class="space-y-4">
                     {% for pref_key, pref_label, pref_desc in notif_prefs %}
                         {% set is_enabled = user.get_notification_preference(pref_key) %}
-                        <div class="flex items-start justify-between gap-4 py-3 {% if not loop.last %}border-b border-border{% endif %}">
+                        <div class="flex items-start justify-between gap-4 py-3 {% if not loop.last %}border-b border-border{% endif %}"
+                             x-data="{ checked: {{ 'true' if is_enabled else 'false' }} }">
                             <div class="flex-1 min-w-0">
-                                <label id="pref_{{ pref_key }}_label" for="pref_{{ pref_key }}" class="text-sm font-medium cursor-pointer">{{ pref_label }}</label>
+                                <label id="pref_{{ pref_key }}_label" for="pref_{{ pref_key }}_btn" class="text-sm font-medium cursor-pointer">{{ pref_label }}</label>
                                 <p class="text-xs text-muted-foreground mt-0.5">{{ pref_desc }}</p>
                             </div>
                             <div class="flex-shrink-0 pt-0.5">
-                                <button type="button"
-                                        id="pref_{{ pref_key }}_btn"
-                                        role="switch"
-                                        aria-checked="{{ 'true' if is_enabled else 'false' }}"
-                                        aria-labelledby="pref_{{ pref_key }}_label"
-                                        @click="
-                                            const btn = $el;
-                                            const checked = btn.getAttribute('aria-checked') === 'true';
-                                            btn.setAttribute('aria-checked', (!checked).toString());
-                                            const inp = document.getElementById('pref_{{ pref_key }}');
-                                            if (inp) inp.checked = !checked;
-                                            btn.classList.toggle('bg-primary', !checked);
-                                            btn.classList.toggle('bg-muted', checked);
-                                            btn.querySelector('span').classList.toggle('translate-x-5', !checked);
-                                            btn.querySelector('span').classList.toggle('translate-x-0', checked);
-                                        "
-                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if is_enabled else 'bg-muted' }}">
-                                    <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if is_enabled else 'translate-x-0' }} ml-0.5"></span>
-                                </button>
-                                <input type="checkbox"
-                                       id="pref_{{ pref_key }}"
-                                       name="{{ pref_key }}"
-                                       value="on"
-                                       class="sr-only"
-                                       {% if is_enabled %}checked{% endif %}>
+                                {{ switch(id='pref_' + pref_key + '_btn', bind_checked='checked', on_click='checked = !checked', aria_label=pref_label) }}
+                                {{ input(type='checkbox', id='pref_' + pref_key, name=pref_key, value='on', aria_label=pref_label,
+                                          class='sr-only', attrs_dict={'x-model': 'checked'}) }}
                             </div>
                         </div>
                     {% endfor %}
                 </div>
                 <div class="mt-6 flex justify-end">
-                    <button type="submit"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Save preferences
-                    </button>
+                    {{ button(type='submit', text='Save preferences') }}
                 </div>
             </form>
-        </div>
+    {% endcall %}
+    {% endcall %}
     </div>
 
     {# Display Preferences #}
-    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
-        <div class="p-6">
+    <div class="mt-6">
+    {% call card() %}
+    {% call card_content() %}
             <h3 class="text-sm font-semibold mb-1">Display Preferences</h3>
             <p class="text-xs text-muted-foreground mb-5">Control how architecture terms are shown throughout the application.</p>
             <form method="POST" action="{{ url_for('account.save_preferences') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="form_type" value="display">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                {{ input(type='hidden', name='form_type', value='display') }}
                 <div class="space-y-4">
                     {% set show_archimate = user.show_archimate_names %}
-                    <div class="flex items-start justify-between gap-4 py-3">
+                    <div class="flex items-start justify-between gap-4 py-3"
+                         x-data="{ checked: {{ 'true' if show_archimate else 'false' }} }">
                         <div class="flex-1 min-w-0">
-                            <label id="pref_show_archimate_label" for="pref_show_archimate" class="text-sm font-medium cursor-pointer">Show ArchiMate names</label>
+                            <label id="pref_show_archimate_label" for="pref_show_archimate_btn" class="text-sm font-medium cursor-pointer">Show ArchiMate names</label>
                             <p class="text-xs text-muted-foreground mt-0.5">When off, element types use plain language (e.g. "Application" instead of "ApplicationComponent"). Turn on to see the standard ArchiMate names.</p>
                         </div>
                         <div class="flex-shrink-0 pt-0.5">
-                            <button type="button"
-                                    id="pref_show_archimate_btn"
-                                    role="switch"
-                                    aria-checked="{{ 'true' if show_archimate else 'false' }}"
-                                    aria-labelledby="pref_show_archimate_label"
-                                    @click="
-                                        const btn = $el;
-                                        const checked = btn.getAttribute('aria-checked') === 'true';
-                                        btn.setAttribute('aria-checked', (!checked).toString());
-                                        const inp = document.getElementById('pref_show_archimate');
-                                        if (inp) inp.checked = !checked;
-                                        btn.classList.toggle('bg-primary', !checked);
-                                        btn.classList.toggle('bg-muted', checked);
-                                        btn.querySelector('span').classList.toggle('translate-x-5', !checked);
-                                        btn.querySelector('span').classList.toggle('translate-x-0', checked);
-                                    "
-                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted' }}">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if show_archimate else 'translate-x-0' }} ml-0.5"></span>
-                            </button>
-                            <input type="checkbox"
-                                   id="pref_show_archimate"
-                                   name="show_archimate_names"
-                                   value="on"
-                                   class="sr-only"
-                                   {% if show_archimate %}checked{% endif %}>
+                            {{ switch(id='pref_show_archimate_btn', bind_checked='checked', on_click='checked = !checked', aria_label='Show ArchiMate names') }}
+                            {{ input(type='checkbox', id='pref_show_archimate', name='show_archimate_names', value='on', aria_label='Show ArchiMate names',
+                                      class='sr-only', attrs_dict={'x-model': 'checked'}) }}
                         </div>
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end">
-                    <button type="submit"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Save preferences
-                    </button>
+                    {{ button(type='submit', text='Save preferences') }}
                 </div>
             </form>
-        </div>
+    {% endcall %}
+    {% endcall %}
     </div>
 {% endmacro %}
 
@@ -282,11 +347,11 @@
             </div>
             <div class="md:col-span-3">
                 {% if form %}
-                    <div class="rounded-lg border border-border bg-card text-card-foreground">
-                        <div class="p-6">
+                    {% call card() %}
+                    {% call card_content() %}
                             {{ f.render_form(form) }}
-                        </div>
-                    </div>
+                    {% endcall %}
+                    {% endcall %}
                 {% else %}
                     {{ user_info(user) }}
                 {% endif %}
@@ -295,3 +360,4 @@
     </div>
     {{ check.password_check('new_password', 0) }}
 {% endblock %}
+{# design-block: settings #}

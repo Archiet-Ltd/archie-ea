@@ -82,11 +82,18 @@ GOVERNANCE_ACTIONS = {
     "archimate": ("edit",),
     "arb_decision": ("vote", "decide"),
     "portfolio": ("manage",),
+    "owner": ("assign",),
 }
 _GOVERNANCE_DEFAULTS = {
     "solution": {
         "edit": frozenset({"solution_architect", "enterprise_architect", "business_architect", "platform_admin"}),
-        "view_all": frozenset({"enterprise_architect", "cto", "platform_admin"}),
+        # Reading every solution in the organisation (never editing): the
+        # architect personas and the reviewer, the CTO, and a viewer, who
+        # reads solutions but cannot change them.
+        "view_all": frozenset({
+            "enterprise_architect", "solution_architect", "business_architect",
+            "arb_member", "cto", "viewer", "platform_admin",
+        }),
         "access_any": frozenset({"platform_admin"}),
     },
     "archimate": {
@@ -98,6 +105,14 @@ _GOVERNANCE_DEFAULTS = {
     },
     "portfolio": {
         "manage": frozenset({"portfolio_manager", "enterprise_architect", "business_architect", "platform_admin"}),
+    },
+    # Recording who owns an application or another element: the architect
+    # personas, who are the ones asked to keep ownership complete.
+    "owner": {
+        "assign": frozenset({
+            "solution_architect", "enterprise_architect", "business_architect",
+            "data_architect", "security_architect", "platform_admin",
+        }),
     },
 }
 
@@ -172,6 +187,32 @@ def persona_key(user) -> str:
     return str(getattr(user, "enterprise_role", "") or "").strip().lower()
 
 
+def _governance_key(user, org_id) -> str:
+    """The persona an administrator assigned; a person with none answers as ``viewer``
+    when their organisation role is viewer, so a viewer's read ability is in the matrix.
+
+    A stored ``platform_admin`` persona narrows only: without platform or
+    organisation administrator authority it reads as no persona."""
+    persona = persona_key(user)
+    if persona == "platform_admin" and not _is_administrator(user, org_id):
+        persona = ""
+    if persona:
+        return persona
+    return "viewer" if role_key(user, org_id) == "viewer" else ""
+
+
+def can_change_model(user, organization_id: Optional[int] = None) -> bool:
+    """Whether ``user`` may create or edit model elements and import model files.
+
+    The persona that edits the model (``archimate`` / ``edit``) or the role that
+    edits elements one at a time (``motivation_element`` / ``edit``): the two
+    answers the screens used to ask separately by role name.
+    """
+    return can(user, "edit", "archimate", organization_id) or can(
+        user, "edit", "motivation_element", organization_id
+    )
+
+
 def default_allowed(role: str, action: str, object_type: str) -> bool:
     if object_type in GOVERNANCE_ACTIONS:
         return str(role).lower() in _GOVERNANCE_DEFAULTS[object_type].get(action, frozenset())
@@ -208,12 +249,24 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
         row = _grant(org_id, "user", user.id, object_type, action)
         if row is not None:
             return bool(row.allowed)
-    key = persona_key(user) if governance else role_key(user, org_id)
+    key = _governance_key(user, org_id) if governance else role_key(user, org_id)
     if org_id is not None:
         row = _grant(org_id, "role", key, object_type, action)
         if row is not None:
             return bool(row.allowed)
     return default_allowed(key, action, object_type)
+
+
+def may_change_model_element(user, action: str = "edit") -> bool:
+    """Whether ``user`` may ``action`` a goal, requirement, epic or other model element.
+
+    The motivation-element row of the matrix, or the persona an administrator
+    assigned: enterprise, business and solution architects edit the model and
+    its solutions even when their platform role carries no write permission.
+    """
+    if can(user, action, "motivation_element"):
+        return True
+    return can(user, "edit", "archimate") or can(user, "edit", "solution")
 
 
 def role_cell(org_id: int, role: str, action: str, object_type: str):

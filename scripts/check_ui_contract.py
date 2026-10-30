@@ -15,9 +15,35 @@ offending line or the line above, for the rare legitimate case):
   button-no-type  a <button> with no type= (defaults to submit inside a form)
   arbitrary-type  an arbitrary text-[Npx] size off the type scale
 
+Three further rules, from shadcn's own agent rules, are counted separately
+(each its own ratchet in verify.py, not part of the total above) and run with
+``--rule``. They read page and component templates outside the macro
+definitions, so the canonical macros are never counted against themselves:
+
+  dialog-title  a dialog, sheet or drawer with no title: a modal/dialog/drawer
+                call with no title argument, or an element with role="dialog"
+                whose aria-labelledby names no element in the template;
+  empty-state   a hand-written "No ... yet" block with its own icon, instead
+                of the empty_state macro;
+  legacy-macro  a call to an old macro (empty_state, page_header, modal,
+                dense_table, shadcn_*) outside the files that define it;
+  raw-button    a hand-written <button> outside a macro definition, instead
+                of the button component;
+  missing-value a bare dash, "N/A" or zero shown where a value is missing
+                ({{ x or '—' }}, |default('—'), {% else %}—), instead of
+                explained_value with its reason and next step;
+  second-library  a macro defined outside app/templates/components and
+                app/templates/basecoat under a name the library already
+                exports (read from those folders), or a page importing such a
+                name from anywhere but the library;
+  form-field    a form control inside a <form> that is not rendered by
+                form_field or placed inside a form_group call (label, control,
+                description and error together).
+
 Usage:
     python scripts/check_ui_contract.py            # list violations by rule
     python scripts/check_ui_contract.py --count    # print only the total (gate)
+    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value|second-library [--count|--list]
 """
 from __future__ import annotations
 
@@ -143,7 +169,226 @@ def collect():
     return findings
 
 
+# ---- component rules (shadcn agent rules) --------------------------------
+
+_MACRO_BLOCK = re.compile(r"{%-?\s*macro\b.*?{%-?\s*endmacro\s*-?%}", re.DOTALL)
+_JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_DIALOG_CALL = re.compile(
+    r"{%-?\s*call\s+(modal|dialog|drawer|modal_form|confirmation_dialog)\s*\((.*?)\)\s*-?%}", re.DOTALL)
+_TITLE_ARG = re.compile(r"\b(title|labelledby)\s*=\s*(?!(?:''|\"\")\s*(?:[,)]|$))\S")
+_LABELLEDBY = re.compile(r"aria-labelledby\s*=\s*[\"']([^\"']*)[\"']")
+_EMPTY_TEXT = re.compile(
+    r">\s*No\s+[A-Za-z][\w\s,'/-]{1,60}?\s(?:yet|found|available|recorded)\b[^<]*<")
+_ICON = re.compile(r"data-lucide=|<svg\b")
+_FORM_BLOCK = re.compile(r"<form\b.*?</form>", re.DOTALL | re.IGNORECASE)
+_CONTROL = re.compile(r"<(input|select|textarea)\b", re.IGNORECASE)
+_NON_FIELD_TYPES = ("hidden", "submit", "button", "reset", "image")
+_GROUP_CALL = re.compile(
+    r"{%-?\s*call\s+form_group\b.*?{%-?\s*endcall\s*-?%}", re.DOTALL)
+
+
+def _mask(match: re.Match) -> str:
+    return re.sub(r"[^\n]", " ", match.group(0))
+
+
+def _template_view(text: str) -> str:
+    """The template with comments and macro definitions blanked, line numbers intact."""
+    for rx in (_JINJA_COMMENT, _HTML_COMMENT, _MACRO_BLOCK):
+        text = rx.sub(_mask, text)
+    return text
+
+
+def _tag_end(text: str, start: int) -> int:
+    """Index just past the '>' closing the tag opened at start, quotes respected."""
+    q = None
+    k = start + 1
+    while k < len(text):
+        ch = text[k]
+        if q:
+            if ch == q:
+                q = None
+        elif ch in "\"'":
+            q = ch
+        elif ch == ">":
+            return k + 1
+        k += 1
+    return len(text)
+
+
+def _line_of(text: str, pos: int) -> int:
+    return text.count("\n", 0, pos) + 1
+
+
+def _rule_dialog_title(rel: str, text: str, view: str):
+    out = []
+    for m in _DIALOG_CALL.finditer(view):
+        if not _TITLE_ARG.search(m.group(2)):
+            out.append((_line_of(text, m.start()),
+                        f"{m.group(1)}() call has no title; pass title='...'"))
+    for m in re.finditer(r"<(?:dialog\b|[a-z]+\b[^>]*?role\s*=\s*[\"'](?:alert)?dialog[\"'])", view):
+        tag = view[m.start():_tag_end(view, m.start())]
+        if "role" not in tag and not tag.startswith("<dialog"):
+            continue
+        lab = _LABELLEDBY.search(tag)
+        if not lab or not lab.group(1).strip():
+            out.append((_line_of(text, m.start()), "dialog has no aria-labelledby title"))
+        elif f'id="{lab.group(1)}"' not in view and f"id='{lab.group(1)}'" not in view:
+            out.append((_line_of(text, m.start()),
+                        f"dialog aria-labelledby=\"{lab.group(1)}\" names no element in this template"))
+    return out
+
+
+def _rule_empty_state(rel: str, text: str, view: str):
+    out = []
+    lines = view.splitlines()
+    for m in _EMPTY_TEXT.finditer(view):
+        ln = _line_of(view, m.start() + 1)
+        window = "\n".join(lines[max(0, ln - 9):ln])
+        if _ICON.search(window):
+            out.append((ln, "hand-written empty state; use the empty_state macro"))
+    return out
+
+
+def _rule_form_field(rel: str, text: str, view: str):
+    out = []
+    grouped = [(g.start(), g.end()) for g in _GROUP_CALL.finditer(view)]
+    for f in _FORM_BLOCK.finditer(view):
+        for c in _CONTROL.finditer(view, f.start(), f.end()):
+            tag = view[c.start():_tag_end(view, c.start())]
+            kind = re.search(r"\btype\s*=\s*[\"']?(\w+)", tag)
+            if c.group(1).lower() == "input" and kind and kind.group(1).lower() in (
+                    _NON_FIELD_TYPES):
+                continue
+            if any(a <= c.start() < b for a, b in grouped):
+                continue
+            out.append((_line_of(text, c.start()),
+                        f"<{c.group(1).lower()}> outside form_field/form_group"))
+    return out
+
+# Old macros kept only as compatibility wrappers. A call elsewhere is the
+# second implementation the design system retires.
+_LEGACY_CALL = re.compile(
+    r"(?:{{-?|{%-?\s*call(?:\([^)]*\))?)\s*"
+    r"(empty_state|page_header|modal|dense_table|shadcn_\w+)\s*\(")
+_LEGACY_HOMES = (
+    "components/empty_state.html", "components/page_header.html",
+    "components/modal.html", "components/dense_table.html",
+    "macros/page_shell.html", "macros/shadcn_compat.html")
+_BUTTON_TAG = re.compile(r"<button\b", re.IGNORECASE)
+# A value expression whose last step substitutes a placeholder:
+# {{ x or '—' }}, {{ a if x else 'N/A' }}, {{ x|default('-') }}. A bare 0 is a
+# display only when the expression sits directly in element text, not in an
+# attribute, a script or a condition.
+_PLACEHOLDER = r"(?:—|&mdash;|-|N/A|n/a)"
+_MISSING_EXPR = re.compile(
+    r"{{-?\s*[^{}]*?(?:\bor\s+|\belse\s+)['\"]" + _PLACEHOLDER + r"['\"]\s*-?}}"
+    r"|{{-?\s*[^{}]*?\|\s*default\(\s*['\"]" + _PLACEHOLDER + r"['\"]\s*(?:,[^)]*)?\)\s*-?}}")
+_MISSING_ZERO = re.compile(
+    r">\s*{{-?\s*[^{}()]*?(?:\bor\s+|\belse\s+)['\"]?0['\"]?\s*-?}}\s*<")
+_MISSING_ELSE = re.compile(
+    r"{%-?\s*else\s*-?%}\s*(?:<(\w+)[^>]*>\s*)?" + _PLACEHOLDER + r"\s*(?:</\1>\s*)?{%-?\s*endif")
+
+
+def _rule_legacy_macro(rel: str, text: str, view: str):
+    if rel.replace("\\", "/").endswith(_LEGACY_HOMES):
+        return []
+    return [(_line_of(text, m.start()), f"{m.group(1)}() is an old macro; use the component")
+            for m in _LEGACY_CALL.finditer(view)]
+
+
+def _rule_raw_button(rel: str, text: str, view: str):
+    return [(_line_of(text, m.start()), "hand-written <button>; use the button component")
+            for m in _BUTTON_TAG.finditer(view)]
+
+
+def _rule_missing_value(rel: str, text: str, view: str):
+    out = []
+    for rx in (_MISSING_EXPR, _MISSING_ZERO, _MISSING_ELSE):
+        for m in rx.finditer(view):
+            out.append((_line_of(text, m.start()),
+                        "missing value shown as a bare dash or zero; use explained_value"))
+    return out
+
+
+_MACRO_DEF = re.compile(r"{%-?\s*macro\s+(\w+)\s*\(")
+_FROM_IMPORT = re.compile(r"{%-?\s*from\s+['\"]([^'\"]+)['\"]\s+import\s+(.*?)\s*-?%}", re.DOTALL)
+_LIBRARY_DIRS = ("components", "basecoat")
+
+
+def _library_macro_names() -> frozenset:
+    """Macro names exported by the component library, read from its files."""
+    names = set()
+    for sub in _LIBRARY_DIRS:
+        for path in (TPL / sub).rglob("*.html"):
+            text = _JINJA_COMMENT.sub("", path.read_text(encoding="utf-8", errors="replace"))
+            names.update(n for n in _MACRO_DEF.findall(text) if not n.startswith("_"))
+    return frozenset(names)
+
+
+def _outside_library(rel: str) -> bool:
+    try:
+        parts = Path(rel).resolve().relative_to(TPL.resolve()).parts
+    except ValueError:
+        return True
+    return not parts or parts[0] not in _LIBRARY_DIRS
+
+
+def _rule_second_library(rel: str, text: str, view: str):
+    if not _outside_library(rel):
+        return []
+    names = _library_macro_names()
+    plain = _HTML_COMMENT.sub(_mask, _JINJA_COMMENT.sub(_mask, text))
+    out = [(_line_of(text, m.start()),
+            f"macro {m.group(1)}() duplicates a library component; use the library's")
+           for m in _MACRO_DEF.finditer(plain) if m.group(1) in names]
+    for m in _FROM_IMPORT.finditer(plain):
+        if m.group(1).split("/")[0] in _LIBRARY_DIRS:
+            continue
+        for item in m.group(2).split(","):
+            name = item.strip().split()[0] if item.strip() else ""
+            if name in names:
+                out.append((_line_of(text, m.start()),
+                            f"imports {name} from {m.group(1)}, not from the library"))
+    return out
+
+
+COMPONENT_RULES = {
+    "dialog-title": _rule_dialog_title,
+    "empty-state": _rule_empty_state,
+    "form-field": _rule_form_field,
+    "legacy-macro": _rule_legacy_macro,
+    "raw-button": _rule_raw_button,
+    "missing-value": _rule_missing_value,
+    "second-library": _rule_second_library,
+}
+
+
+def collect_component_rule(rule: str):
+    """[(repo path, line, message)] for one component rule, hatch lines honoured."""
+    fn = COMPONENT_RULES[rule]
+    out = []
+    for path in sorted(TPL.rglob("*.html")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        lines = text.splitlines()
+        for ln, msg in fn(str(path), text, _template_view(text)):
+            line = lines[ln - 1] if ln - 1 < len(lines) else ""
+            prev = lines[ln - 2] if ln >= 2 else ""
+            if _hatched(line, prev):
+                continue
+            out.append((path.relative_to(ROOT).as_posix(), ln, msg))
+    return out
+
+
 def main() -> int:
+    if "--rule" in sys.argv:
+        rule = sys.argv[sys.argv.index("--rule") + 1]
+        found = collect_component_rule(rule)
+        if "--list" in sys.argv:
+            for rel, ln, msg in found:
+                print(f"{rel}:{ln}: {msg}")
+        print(len(found))
+        return 0
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:

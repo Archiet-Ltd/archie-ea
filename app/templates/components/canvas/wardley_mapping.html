@@ -1,0 +1,24 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ wardley-mapping.html, reduced to its axes and component areas. #}
+{# Wardley Map, C1. After Simon Wardley: the vertical axis is visibility to the user, the user need at the top down to infrastructure; the horizontal axis is evolution in four stages, Genesis, Custom-Built, Product (+rental) and Commodity (+utility). Entelim holds no x and y position for an element, so each component sits in the column of its evolution stage, and the user and the need sit above, as in the published figure. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% import 'components/canvas/_ui.html' as ui with context %}
+{% set SPEC = {
+  'form': 'C1', 'name': 'Wardley map', 'grid': 'grid-cols-4 grid-rows-[auto_auto_auto_auto_auto]', 'width': 'min-w-260',
+  'hint': 'Scroll sideways on a narrow screen to see all four evolution stages. Visibility falls from the user at the top to infrastructure below.',
+  'credit': 'Wardley Map after Simon Wardley, Wardley Maps.',
+  'boxes': [
+    {'key': 'user', 'title': 'User', 'icon': 'user', 'question': 'Who is the map for?', 'empty': 'No user yet. Add the actor or role the map starts from.', 'area': 'col-span-2 col-start-1 row-start-1'},
+    {'key': 'user-need', 'title': 'User need', 'icon': 'target', 'question': 'What do they need?', 'empty': 'No need yet. Add the goal or value they need.', 'area': 'col-span-2 col-start-3 row-start-1'},
+    {'key': 'genesis', 'title': 'Genesis', 'icon': 'sparkles', 'question': 'Novel, uncertain, still being discovered.', 'empty': 'No components yet. Add what is new and unproven.', 'area': 'col-start-1 row-start-3'},
+    {'key': 'custom-built', 'title': 'Custom-built', 'icon': 'hammer', 'question': 'Built specially, few alternatives.', 'empty': 'No components yet. Add what you build for yourself.', 'area': 'col-start-2 row-start-3'},
+    {'key': 'product', 'title': 'Product (+rental)', 'icon': 'package', 'question': 'Bought as a product, compared on features.', 'empty': 'No components yet. Add what you buy or rent as a product.', 'area': 'col-start-3 row-start-3'},
+    {'key': 'commodity', 'title': 'Commodity (+utility)', 'icon': 'plug', 'question': 'Standard, bought by the unit.', 'empty': 'No components yet. Add what you buy as a standard utility.', 'area': 'col-start-4 row-start-3'},
+    {'key': 'movement', 'title': 'Movement', 'icon': 'move-right', 'question': 'What is about to move along the evolution axis?', 'empty': 'No movement yet. Add the work packages that move a component.', 'area': 'col-span-2 col-start-1 row-start-5'},
+    {'key': 'inertia', 'title': 'Inertia', 'icon': 'anchor', 'question': 'What resists the move?', 'empty': 'No inertia yet. Add the assessments and constraints that resist change.', 'area': 'col-span-2 col-start-3 row-start-5'},
+  ]} %}
+{% macro wardley_mapping(data, id='wardley-mapping') -%}
+{% call f.grid_canvas(SPEC, data, id) %}
+      <div class="col-span-4 row-start-2 flex items-center justify-between gap-2 px-2 text-xs text-muted-foreground"><span class="font-medium text-foreground">Value chain: visible to the user, then less visible, then infrastructure</span><span class="flex items-center gap-1">Evolution {{ ui.lucide('arrow-right', 'size-4') }}</span></div>
+      <div class="col-span-4 row-start-4 flex items-center justify-between px-2 text-xs text-muted-foreground"><span>Uncharted</span><span>Industrialised</span></div>
+{% endcall %}
+{%- endmacro %}

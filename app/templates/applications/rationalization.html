@@ -712,7 +712,7 @@
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3" role="list" aria-label="Disposition taxonomy legend">
         <!-- Retain -->
         <div class="rounded-lg border p-3 flex flex-col gap-1" role="listitem">
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30 w-fit"><!-- token-migration-ok -->
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30 w-fit"><!-- token-migration-ok -->
             Retain
           </span>
           <p class="text-xs text-muted-foreground leading-snug">Keep as-is — adequate fit, minimal risk</p>
@@ -1684,7 +1684,7 @@
                         'bg-muted/50 text-muted-foreground border-border': dcPlanStatus === 'draft',
                         'bg-warning/10 text-warning-emphasis border-warning/30': dcPlanStatus === 'reviewed',
                         'bg-success/10 text-success-emphasis border-success/30': dcPlanStatus === 'approved',
-                        'bg-blue-500/10 text-blue-600 border-blue-500/30': dcPlanStatus === 'in_progress', /* token-migration-ok */
+                        'bg-info/10 text-info-emphasis border-info/30': dcPlanStatus === 'in_progress', /* token-migration-ok */
                         'bg-green-500/10 text-green-600 border-green-500/30': dcPlanStatus === 'completed', /* token-migration-ok */
                       }"
                       x-text="dcStatusLabel(dcPlanStatus)"><!-- token-migration-ok --></span>
@@ -2094,6 +2094,7 @@
           <div class="relative">
             <input id="dossier-app-search"
                    type="text"
+                   role="combobox"
                    autocomplete="off"
                    placeholder="Search application…"
                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm pr-8"
@@ -3599,7 +3600,7 @@
           replatform: 'bg-violet-500/10 text-violet-600 border border-violet-500/30', /* token-migration-ok */
           rehost: 'bg-sky-500/10 text-sky-600 border border-sky-500/30', /* token-migration-ok */
           refactor: 'bg-amber-500/10 text-amber-600 border border-amber-500/30', /* token-migration-ok */
-          retain: 'bg-blue-500/10 text-blue-600 border border-blue-500/30', /* token-migration-ok */
+          retain: 'bg-info/10 text-info-emphasis border border-info/30', /* token-migration-ok */
         };
         return map[(disposition || '').toLowerCase()] || 'bg-muted/50 text-muted-foreground border border-border'; /* token-migration-ok */
       },
@@ -3616,7 +3617,7 @@
       _reviewStatusClass(status) {
         const map = {
           reviewed: 'bg-success/10 text-success-emphasis border border-success/30',
-          approved: 'bg-blue-500/10 text-blue-600 border border-blue-500/30', /* token-migration-ok */
+          approved: 'bg-info/10 text-info-emphasis border border-info/30', /* token-migration-ok */
           draft: 'bg-muted/50 text-muted-foreground border border-border',
           rejected: 'bg-destructive/10 text-destructive-emphasis border border-destructive/30',
         };
@@ -3691,7 +3692,7 @@
           replatform: 'bg-violet-500/10 text-violet-600 border-violet-500/30', /* token-migration-ok */
           rehost: 'bg-sky-500/10 text-sky-600 border-sky-500/30', /* token-migration-ok */
           refactor: 'bg-amber-500/10 text-amber-600 border-amber-500/30',  /* design-tokens-ok: matches _dispositionClass sibling copy (already exempted) */
-          retain: 'bg-blue-500/10 text-blue-600 border-blue-500/30', /* token-migration-ok */
+          retain: 'bg-info/10 text-info-emphasis border-info/30', /* token-migration-ok */
         };
         return map[(disposition || '').toLowerCase()] || 'bg-muted/50 text-muted-foreground border-border';
       },
@@ -3708,7 +3709,7 @@
       _reviewStatusClass(status) {
         const map = {
           reviewed: 'bg-success/10 text-success-emphasis border-success/30',
-          approved: 'bg-blue-500/10 text-blue-600 border-blue-500/30', /* token-migration-ok */
+          approved: 'bg-info/10 text-info-emphasis border-info/30', /* token-migration-ok */
           draft: 'bg-muted/50 text-muted-foreground border-border',
           rejected: 'bg-destructive/10 text-destructive border-destructive/30',
         };
@@ -4055,7 +4056,7 @@
         const map = {
           projected: 'bg-muted/50 text-muted-foreground border-border',
           in_progress: 'bg-amber-500/10 text-amber-600 border-amber-500/30', /* token-migration-ok */
-          measured: 'bg-blue-500/10 text-blue-600 border-blue-500/30', /* token-migration-ok */
+          measured: 'bg-info/10 text-info-emphasis border-info/30', /* token-migration-ok */
           validated: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30', /* token-migration-ok */
         };
         return map[(status || '').toLowerCase()] || 'bg-muted/50 text-muted-foreground border-border';
@@ -4075,3 +4076,4 @@
 </script>
 <script src="{{ url_for('static', filename='js/applications/rationalization.js') }}"></script>
 {% endblock %}
+{# design-block: dashboard #}

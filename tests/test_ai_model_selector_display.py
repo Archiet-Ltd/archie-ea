@@ -16,6 +16,11 @@ import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 from playwright.sync_api import expect, sync_playwright
 
+from tests.chat_opening_fixture import (
+    APPLICATIONS, APPLICATIONS_PATH, close_chat_options, open_chat_options,
+)
+from tests.render_context import app_template_context
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -38,6 +43,7 @@ def html():
         DictLoader({'layouts/admin_base.html': base}),
         FileSystemLoader(ROOT / 'app/templates')]), autoescape=True)
     return env.get_template('ai_chat/index.html').render(
+        **app_template_context(),
         llm_configured=True, domain_config={},
         persona_config={'categories': {}, 'personas': {}}, default_chat_persona='',
         chat_persona_preference_key='test-model-display', csrf_token=lambda: 'test-token',
@@ -75,7 +81,7 @@ def launch(browser):
                 pass
 
             def respond(self, body, content_type='application/json', status=200):
-                if isinstance(body, dict):
+                if isinstance(body, (dict, list)):
                     body = json.dumps(body)
                 if isinstance(body, str):
                     body = body.encode('utf-8')
@@ -110,6 +116,8 @@ def launch(browser):
                     return self.respond({'success': True})
                 if path.startswith('/ai-chat/context/'):
                     return self.respond({'elements': [], 'applications': []})
+                if path == APPLICATIONS_PATH:
+                    return self.respond(APPLICATIONS)
                 if path == '/ai-chat/recommendations':
                     return self.respond({'alerts': [], 'recommendations': [],
                                          'summary': {'total': 0}})
@@ -122,6 +130,9 @@ def launch(browser):
                 body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
                 if self.path == '/account/session/keepalive':
                     return self.respond({'success': True})
+                if self.path == '/ai-chat/estate-answer':
+                    # The chat asks the records first; this organisation names nothing in them.
+                    return self.respond({'success': True, 'found': False})
                 if self.path == '/ai-chat/message/stream':
                     payloads.append(json.loads(body))
                     events = [{'type': 'token', 'text': 'Fixture response.'},
@@ -140,7 +151,7 @@ def launch(browser):
         page.on('request', lambda request: unexpected.append(request.url)
                 if not request.url.startswith(base + '/') else None)
         page.goto(base + '/')
-        page.get_by_role('button', name='Toggle advanced settings', exact=True).click(timeout=3000)
+        open_chat_options(page)
         page.on('framenavigated', lambda frame: errors.append(
             {'unexpected_navigation': urlsplit(frame.url).path + '?' + urlsplit(frame.url).query})
             if frame == page.main_frame else None)
@@ -205,7 +216,7 @@ def test_default_composer_preserves_automatic_model(launch, count, failure):
         expect(page.locator('#model-selector-empty-note')).to_be_visible()
     else:
         expect(page.locator('#model-selector')).to_be_visible()
-    page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
+    close_chat_options(page)
     initial_url = page.url
     page.locator('#user-input').fill('Check model display fixture.')
     page.locator('#user-input').press('Enter')
@@ -224,7 +235,7 @@ def test_multiple_models_preserve_explicit_selection(launch):
         {'model': 'fixture-b', 'display_name': 'Fixture B', 'provider': 'openai',
          'recommended_for': [], 'is_fallback': False, 'fallback_order': 0, 'test_status': None}])
     page.get_by_label('AI model', exact=True).select_option('fixture-b')
-    page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
+    close_chat_options(page)
     page.locator('#user-input').fill('Use the selected fixture model.')
     page.locator('#user-input').press('Enter')
     expect(page.locator('#messages-container')).to_contain_text('Fixture response.')
@@ -238,7 +249,7 @@ def test_ordinary_send_click_uses_same_stream_without_navigation(launch):
         {'model': 'fixture-0', 'display_name': 'Fixture 0', 'provider': 'openai',
          'recommended_for': [], 'is_fallback': False, 'fallback_order': 0, 'test_status': None}])
     expect(page.locator('#model-selector-empty-note')).to_contain_text('One AI model is configured')
-    page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
+    close_chat_options(page)
     initial_url = page.url
     page.locator('#user-input').fill('Send click fixture.')
     page.locator('#send-btn').click()

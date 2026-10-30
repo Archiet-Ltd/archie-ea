@@ -1,213 +1,123 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: data-table #}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/input.html' import input %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
-{% block title %}Data Entity Catalog — {{ config.APP_NAME }}{% endblock %}
+{% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Technology Layer', 'href': url_for('archimate_crud.dashboard') + '#technology'},
     {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Entity Catalog', 'current': true}
+    {'text': 'Data objects', 'current': true}
 ]) }}
 {% endblock %}
 
 {% block content %}
+{% set filtered = search or classification or entity_type or domain_id %}
+{% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), true), ('Diagram', url_for('data_architecture.data_entity_diagram', domain_id=domain_id or none), false)] %}
+{% set classification_options = [('', 'All'), ('public', 'Public'), ('internal', 'Internal'), ('confidential', 'Confidential'), ('restricted', 'Restricted')] %}
+{% set type_options = [('', 'All'), ('master', 'Master'), ('transactional', 'Transactional'), ('reference', 'Reference'), ('derived', 'Derived')] %}
+{% set domain_options = [('', 'All domains')] %}
+{% for d in domains %}{% set _ = domain_options.append((d.id|string, d.name)) %}{% endfor %}
+
 <div class="space-y-6">
-    {# Header #}
-    {% macro _ps_actions() %}
-<a href="{{ url_for('data_architecture.create_data_entity') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
-            Create Entity
-        </a>
+    {% macro _actions() %}
+    {{ button(text='Create entity', icon='plus', href=url_for('data_architecture.create_data_entity')) }}
     {% endmacro %}
-    {{ page_shell(title='Data Entity Catalog', subtitle=(total_count) ~ ' data entities across the enterprise', actions_caller=_ps_actions) }}
+    {{ page_shell(title='Data objects', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
 
-    {# Summary Cards #}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {% for label, value in [('Total entities', total_count), ('Domains', domains|length), ('PII entities', entities|selectattr('contains_pii')|list|length), ('Classifications', classification_dist.keys()|select|list|length)] %}
         <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Entities</div>
-            <div class="text-2xl font-bold text-foreground mt-1">{{ total_count }}</div>
+            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ label }}</div>
+            <div class="mt-1 text-2xl font-bold text-foreground">{{ value }}</div>
         </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Domains</div>
-            <div class="text-2xl font-bold text-foreground mt-1">{{ domains|length }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">PII Entities</div>
-            <div class="text-2xl font-bold text-foreground mt-1">{{ entities|selectattr('contains_pii')|list|length }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Classifications</div>
-            <div class="text-2xl font-bold text-foreground mt-1">{{ classification_dist|length }}</div>
-        </div>
+        {% endfor %}
     </div>
 
-    {# Filters #}
     <div class="rounded-lg border border-border bg-card p-4">
-        <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex flex-wrap gap-3 items-end">
-            <div class="flex-1 min-w-[200px]">
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
-                <input type="text" name="search" value="{{ search }}"
-                    class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Search entities..." aria-label="Search">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Classification</label>
-                <select name="classification" class="h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground" aria-label="Classification">
-                    <option value="">All</option>
-                    <option value="public" {{ 'selected' if classification == 'public' }}>Public</option>
-                    <option value="internal" {{ 'selected' if classification == 'internal' }}>Internal</option>
-                    <option value="confidential" {{ 'selected' if classification == 'confidential' }}>Confidential</option>
-                    <option value="restricted" {{ 'selected' if classification == 'restricted' }}>Restricted</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-                <select name="entity_type" class="h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground" aria-label="Type">
-                    <option value="">All</option>
-                    <option value="master" {{ 'selected' if entity_type == 'master' }}>Master</option>
-                    <option value="transactional" {{ 'selected' if entity_type == 'transactional' }}>Transactional</option>
-                    <option value="reference" {{ 'selected' if entity_type == 'reference' }}>Reference</option>
-                    <option value="derived" {{ 'selected' if entity_type == 'derived' }}>Derived</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
-                <select name="domain_id" class="h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground" aria-label="Domain">
-                    <option value="">All Domains</option>
-                    {% for d in domains %}
-                    <option value="{{ d.id }}" {{ 'selected' if domain_id == d.id|string }}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                Filter
-            </button>
-            {% if search or classification or entity_type or domain_id %}
-            <a href="{{ url_for('data_architecture.data_entity_catalog') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Clear
-            </a>
-            {% endif %}
-        </form>
+    <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex flex-wrap items-end gap-3">
+        {% call form_group(id='catalog-search', label='Search', class='min-w-[200px] flex-1') %}
+            {{ input(id='catalog-search', name='search', value=search, placeholder='Search entities…', aria_label='Search') }}
+        {% endcall %}
+        {% call form_group(id='catalog-classification', label='Classification') %}
+            {{ native_select(id='catalog-classification', name='classification', options=classification_options, selected=classification) }}
+        {% endcall %}
+        {% call form_group(id='catalog-type', label='Type') %}
+            {{ native_select(id='catalog-type', name='entity_type', options=type_options, selected=entity_type) }}
+        {% endcall %}
+        {% call form_group(id='catalog-domain', label='Domain') %}
+            {{ native_select(id='catalog-domain', name='domain_id', options=domain_options, selected=domain_id) }}
+        {% endcall %}
+        {{ button(text='Filter', type='submit') }}
+        {% if filtered %}{{ button(text='Clear', variant='outline', href=url_for('data_architecture.data_entity_catalog')) }}{% endif %}
+    </form>
     </div>
 
-    {# Entity Table #}
     {% if entities %}
     <div class="rounded-lg border border-border bg-card overflow-hidden">
-        <table class="dense-table w-full">
-            <thead>
-                <tr class="border-b bg-muted/50">
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">#</th>
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">Entity</th>
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">Type</th>
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">Classification</th>
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">PII</th>
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">Quality</th>
-                    <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">System of Record</th>
-                    <th class="text-right text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entity in entities %}
-                <tr class="border-b hover:bg-accent/50 transition-colors">
-                    <td class="px-4 py-3 text-sm text-muted-foreground">{{ loop.index }}</td>
-                    <td class="px-4 py-3">
-                        <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}"
-                           class="font-medium text-sm text-foreground hover:underline">{{ entity.name }}</a>
-                        {% if entity.business_name and entity.business_name != entity.name %}
-                        <div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>
-                        {% endif %}
-                        {% if entity.description %}
-                        <div class="text-xs text-muted-foreground mt-0.5 line-clamp-1">{{ entity.description[:80] }}</div>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if entity.entity_type %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium
-                            {% if entity.entity_type == 'master' %}bg-primary/10 text-primary border border-primary/30
-                            {% elif entity.entity_type == 'transactional' %}bg-success/10 text-success-emphasis border border-success/30
-                            {% elif entity.entity_type == 'reference' %}bg-warning/10 text-warning-emphasis border border-warning/30
-                            {% else %}bg-muted text-muted-foreground border border-border{% endif %}">
-                            {{ entity.entity_type }}
-                        </span>
-                        {% else %}
-                        <span class="text-xs text-muted-foreground">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if entity.data_classification %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium
-                            {% if entity.data_classification == 'restricted' %}bg-destructive/10 text-destructive-emphasis border border-destructive/30
-                            {% elif entity.data_classification == 'confidential' %}bg-warning/10 text-warning-emphasis border border-warning/30
-                            {% elif entity.data_classification == 'internal' %}bg-primary/10 text-primary border border-primary/30
-                            {% else %}bg-success/10 text-success-emphasis border border-success/30{% endif %}">
-                            {{ entity.data_classification }}
-                        </span>
-                        {% else %}
-                        <span class="text-xs text-muted-foreground">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if entity.contains_pii %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">
-                            PII
-                        </span>
-                        {% else %}
-                        <span class="text-xs text-muted-foreground">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if entity.data_quality_score is not none %}
-                        <div class="flex items-center gap-2">
-                            <div class="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                                <div class="h-full rounded-full
-                                    {% if entity.data_quality_score >= 70 %}bg-success
-                                    {% elif entity.data_quality_score >= 40 %}bg-warning
-                                    {% else %}bg-destructive{% endif %}"
-                                    style="width: {{ entity.data_quality_score }}%"><!-- inline-style-ok --></div>
-                            </div>
-                            <span class="text-xs text-muted-foreground">{{ entity.data_quality_score }}%</span>
-                        </div>
-                        {% else %}
-                        <span class="text-xs text-muted-foreground">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-sm text-muted-foreground">
-                        {% if entity.system_of_record_application %}
-                        {{ entity.system_of_record_application.name }}
-                        {% elif entity.system_of_record %}
-                        <span>{{ entity.system_of_record }}</span>
-                        <span class="text-xs">(legacy label)</span>
-                        {% else %}
-                        —
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <a href="{{ url_for('data_architecture.edit_data_entity', entity_id=entity.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                            Edit
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% call table() %}
+        {% call table_header() %}{% call table_row() %}
+            {% call table_head() %}#{% endcall %}
+            {% call table_head() %}Entity{% endcall %}
+            {% call table_head() %}Type{% endcall %}
+            {% call table_head() %}Classification{% endcall %}
+            {% call table_head() %}PII{% endcall %}
+            {% call table_head() %}Quality{% endcall %}
+            {% call table_head() %}System of record{% endcall %}
+            {% call table_head() %}Applications{% endcall %}
+            {% call table_head() %}Steward{% endcall %}
+            {% call table_head() %}Flow{% endcall %}
+            {% call table_head(class='text-right') %}Actions{% endcall %}
+        {% endcall %}{% endcall %}
+        {% call table_body() %}
+        {% for entity in entities %}
+            {% set flow_row = flows.get(entity.id) %}
+            {% call table_row(attrs_dict={'data-testid': 'data-entity-row-' ~ entity.id}) %}
+                {% call table_cell(class='text-muted-foreground') %}{{ loop.index }}{% endcall %}
+                {% call table_cell() %}
+                    <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}" class="text-sm font-medium text-foreground hover:underline">{{ entity.name }}</a>
+                    {% if entity.business_name and entity.business_name != entity.name %}<div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>{% endif %}
+                    {% if entity.description %}<div class="line-clamp-1 text-xs text-muted-foreground">{{ entity.description[:80] }}</div>{% endif %}
+                {% endcall %}
+                {% call table_cell() %}{% if entity.entity_type %}{% call badge('info' if entity.entity_type == 'master' else ('success' if entity.entity_type == 'transactional' else ('warning' if entity.entity_type == 'reference' else 'neutral'))) %}{{ entity.entity_type }}{% endcall %}{% else %}—{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.data_classification %}{% call badge('danger' if entity.data_classification == 'restricted' else ('warning' if entity.data_classification == 'confidential' else ('info' if entity.data_classification == 'internal' else 'success'))) %}{{ entity.data_classification }}{% endcall %}{% else %}—{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.contains_pii %}{% call badge('danger') %}PII{% endcall %}{% else %}—{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.data_quality_score is not none %}{{ entity.data_quality_score }}%{% else %}—{% endif %}{% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}
+                    {% if entity.system_of_record_application %}{{ entity.system_of_record_application.name }}{% elif entity.system_of_record %}{{ entity.system_of_record }} (legacy label){% else %}—{% endif %}
+                {% endcall %}
+                {% call table_cell(class='min-w-56') %}
+                    {% if flow_row and flow_row.applications %}
+                    <ul class="space-y-1">
+                        {% for app in flow_row.applications %}
+                        <li><span class="font-medium text-foreground">{{ app.name }}</span> <span class="text-muted-foreground">{{ app.access | join(', ') }}</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <span class="text-muted-foreground">None recorded</span>
+                    {% endif %}
+                {% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ (flow_row.steward if flow_row else none) or 'None recorded' }}{% endcall %}
+                {% call table_cell() %}{% if flow_row and flow_row.applications and flow_row.element_id %}<a class="text-primary underline underline-offset-2 whitespace-nowrap" data-testid="data-entity-flow-link" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=entity.id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">Nothing recorded yet</span>{% endif %}{% endcall %}
+                {% call table_cell(class='text-right') %}{{ button(text='Edit', variant='outline', size='sm', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}{% endcall %}
+            {% endcall %}
+        {% endfor %}
+        {% endcall %}
+    {% endcall %}
     </div>
+    {% elif filtered %}
+    {{ empty_state(icon='search-x', title='No data entities match these filters', description='Nothing in the catalog fits the search and filters above. Clear them to see every entity.', cta_text='Clear the filters', cta_href=url_for('data_architecture.data_entity_catalog')) }}
     {% else %}
-    <div class="rounded-lg border border-border bg-card p-12 text-center">
-        <div class="mx-auto w-12 h-12 rounded-lg bg-muted flex items-center justify-center mb-4">
-            <i data-lucide="database" class="w-6 h-6 text-muted-foreground" aria-hidden="true"></i>
-        </div>
-        <h2 class="text-lg font-semibold text-foreground mb-2">No data entities found</h2>
-        {% if search or classification or entity_type or domain_id %}
-        <p class="text-sm text-muted-foreground">No entities match your current filters. Try broadening your search.</p>
-        {% else %}
-        <p class="text-sm text-muted-foreground">The data entity catalog is empty. Data entities represent the business data objects (Customer, Order, Product, etc.) managed across your enterprise. They can be imported from Abacus or created manually.</p>
-        {% endif %}
-    </div>
+    {{ empty_state(icon='database', title='No data entities yet', description='Data entities are the business data objects, such as Customer, Order or Product, that your enterprise manages. Create the first one to start the catalog.', cta_text='Create an entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
     {% endif %}
 </div>
 {% endblock %}

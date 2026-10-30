@@ -1,8 +1,8 @@
 ---
 page_family: role
 role_group: architecture
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
 description: "Solution architect tools from Entelim: ADM kanban, review board decisions and impact analysis on one shared model. Start free, see pricing today."
 source: app/utils/role_access.py (ROLE_SOLUTION_ARCHITECT, SIDEBAR_ZONES, _MY_WORK_LINKS),
@@ -38,11 +38,10 @@ diagram and a decision log kept in two places that quietly drift apart.
 
 - [What does this design touch?](/modules/digital-twin)
 - [Has the review board approved it, and with which conditions?](/use-cases/architecture-review-board)
-- [Which interfaces change?](/modules/interface-register)
 
 ## The screens you will use
 
-- **Ask**, first, for a quick question about one element, and the impact analysis it opens into to
+- **The AI chat**, first, for a quick question about one element, and the impact analysis to
   trace what a design touches — see [Digital twin of your organisation](/modules/digital-twin).
 - **Architecture Journey and Solutions**, where a design is built: its ArchiMate elements, the APQC
   processes it affects, and the owner, sponsor and technical lead recorded against it.
@@ -58,7 +57,7 @@ diagram and a decision log kept in two places that quietly drift apart.
   budget](/use-cases/programme-tracking) within [Portfolio](/modules/portfolio).
 - **Interface Register**, recording each interface's type, protocol, criticality and status against
   the roadmap initiative it belongs to, and flagging the gaps between one initiative's interfaces and
-  the next — see [Interface Register](/modules/interface-register).
+  the next — see the Interface Register screen.
 - **AI Chat**, carrying the same questions into a conversation instead of a search through the model —
   see [AI Chat](/modules/ai-chat).
 
@@ -88,9 +87,9 @@ person who asks what changed gets the real answer.
 ## Works with
 
 An imported Archi or Open Exchange model puts a design on the same model your enterprise architects
-use from day one. From there, [connect Jira](/connectors/jira) to carry a design's work into the
-tracker your delivery team already uses, and [connect Microsoft 365 and
-Teams](/connectors/microsoft-365-and-teams) to send a design's exported blueprint to SharePoint and
+use from day one. From there, connect Jira (see [the connectors](/connectors)) to carry a design's work into the
+tracker your delivery team already uses, and connect Microsoft 365 and
+Teams to send a design's exported blueprint to SharePoint and
 post the decision to a Teams channel as soon as the review board approves it.
 
 ## Limits
@@ -112,8 +111,8 @@ and motivation layers.
 
 ### Can I submit a design to the review board from it?
 
-Yes. A design in Solutions goes to the review board as a change proposal with its impact evidence
-attached, is discussed in a recorded session, and comes back with a decision — approved, approved
+Yes. A design in Solutions goes to the review board as a change proposal with its evidence pinned
+to the decision, is discussed in a recorded session, and comes back with a decision — approved, approved
 with conditions, rejected or deferred — recorded against that same design rather than a separate
 document.
 
@@ -134,7 +133,7 @@ redrawn by hand.
 
 Anyone editing a design — moving it across ADM Kanban, submitting it to the review board, or
 recording an interface — needs an editor seat on the Team plan, priced at $29 per editor a month.
-People who only ask questions on Ask are free, on every plan, and Community covers a whole
+People who only ask questions in the AI chat are free, on every plan, and Community covers a whole
 organisation of up to three people at no cost at all.
 
 ## Start free

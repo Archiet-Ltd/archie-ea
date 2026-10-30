@@ -98,7 +98,8 @@ def test_rendered_workspace_keeps_primary_controls_and_modal_targets(client):
     assert html.count('aria-label="Breadcrumb"') == 1
     assert 'data-testid="btn-create-element"' in html
     assert 'id="archimate-form-modal"' in html
-    assert 'data-testid="btn-ai-generate-element"' in html
+    # Generate with AI sits in the header's More menu
+    assert 'data-testid="dropdown-ai-generate-element"' in html
     assert 'data-testid="ai-generate-modal"' in html
     assert 'data-testid="detail-edit-btn"' in html
 
@@ -121,10 +122,16 @@ def test_layer_spine_names_every_layer_and_exposes_selection():
 
 
 def test_actions_and_data_surface_follow_the_applications_hierarchy():
-    """The repository gets one primary action and a wrapping, neutral data surface."""
+    """The repository gets one primary action and a wrapping, neutral data surface.
+
+    The action buttons now render through the button() macro, which turns its
+    ``testid`` argument into ``data-testid`` at render time — so the source-level
+    declaration is ``testid='...'``, and the guaranteed rendered testid follows
+    from the macro contract. Each action is still declared exactly once.
+    """
     template = _template()
 
-    assert template.count('data-testid="btn-create-element"') == 1
+    assert template.count("testid='btn-create-element'") == 1
     for test_id in (
         "btn-import-oef",
         "btn-export-oef",
@@ -133,7 +140,8 @@ def test_actions_and_data_surface_follow_the_applications_hierarchy():
         "btn-vendor-templates",
         "btn-ai-generate-element",
     ):
-        assert f'data-testid="{test_id}"' in template
+        # the secondary actions sit in the header's More menu as dropdown-<name>
+        assert f"testid='{test_id}'" in template or f"'dropdown-{test_id[4:]}'" in template, test_id
     assert 'data-testid="architecture-data-card"' in template
     assert 'data-testid="architecture-filter-bar"' in template
     assert 'data-testid="filter-search"' in template

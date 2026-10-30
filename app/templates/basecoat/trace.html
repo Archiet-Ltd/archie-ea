@@ -1,0 +1,55 @@
+{# trace: port of shadcn/ui trace.tsx (pinned in compliance/upstream). Macros: trace, trace_line, trace_icon, trace_title, trace_description, trace_collapsible, trace_collapsible_trigger, trace_collapsible_content, trace_collapsible_content_inner #}
+
+{#- Trace -#}
+{% macro trace(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceLine -#}
+{% macro trace_line(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-line', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceIcon -#}
+{% macro trace_icon(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-icon', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceTitle -#}
+{% macro trace_title(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-title', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceDescription -#}
+{% macro trace_description(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-description', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceCollapsible -#}
+{% macro trace_collapsible(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-collapsible', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceCollapsibleTrigger -#}
+{% macro trace_collapsible_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-collapsible-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceCollapsibleContent -#}
+{% macro trace_collapsible_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-collapsible-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TraceCollapsibleContent -#}
+{% macro trace_collapsible_content_inner(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('trace-collapsible-content-inner', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

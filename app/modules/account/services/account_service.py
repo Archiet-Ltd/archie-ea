@@ -151,13 +151,31 @@ class AccountService:
         _label = ("{} {}".format(first_name or "", last_name or "").strip()
                   or (email.split("@")[0] if email else "New"))
         _base_slug = _re.sub(r"[^a-z0-9]+", "-",
-                             ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
+                              ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
         _slug = _base_slug
-        while Organization.query.filter_by(slug=_slug).first():
-            _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
-        org = Organization(name="{}'s Workspace".format(_label), slug=_slug)
-        db.session.add(org)
-        db.session.flush()
+        from app.modules.organization.public_signals import PLACEHOLDER_ENDING
+        # Try the base slug first; when it collides (a concurrent sign-up, or an
+        # organisation already owns it), roll back inside a savepoint and append a
+        # short unique suffix. Up to five tries. The name is a stand-in until the
+        # person confirms their company name.
+        from sqlalchemy.exc import IntegrityError
+
+        org = None
+        for _attempt in range(5):
+            try:
+                with db.session.begin_nested():
+                    org = Organization(name="{}{}".format(_label, PLACEHOLDER_ENDING), slug=_slug, reporting_currency="GBP")
+                    db.session.add(org)
+                    db.session.flush()
+                break
+            except IntegrityError:
+                org = None
+                _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
+        if org is None:
+            raise RuntimeError("could not find a free organisation address after five tries")
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
 
         user = User(
             first_name=first_name,
@@ -170,6 +188,10 @@ class AccountService:
         # The user owns the organisation just created for them, so granting
         # org-admin here is always a grant in their own organisation.
         user.grant_org_admin()
+        # A self-serve owner is a startup CTO until they say otherwise: the lens shapes
+        # the dashboard and chat wording only and grants nothing, so no role question is
+        # asked at sign-up. It can be changed later.
+        user.persona_lens = User.DEFAULT_PERSONA_LENS
         db.session.add(user)
         try:
             db.session.flush()
@@ -314,6 +336,9 @@ class AccountService:
         # There is no acting session to preserve -- a reset happens
         # while logged out.
         AccountService._revoke_other_sessions(user.id, "password_change", except_sid=None)
+        from app.services import activity_record
+
+        activity_record.record_security_event("password_reset", user)
         return True, "Your password has been updated. Sign in with your new password."
 
     @staticmethod

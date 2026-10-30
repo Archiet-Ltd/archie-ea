@@ -39,6 +39,7 @@ def set_capability_owner(
     organization_id: int,
     ownership_type: str = "primary",
     assigned_by: Optional[int] = None,
+    replace_primary: bool = False,
 ) -> ApplicationOwner:
     """Refuses (CrossOrganisationCapabilityOwner) a capability or an owner
     from another organisation, and an unknown ownership type, rather than
@@ -50,6 +51,7 @@ def set_capability_owner(
         organization_id=organization_id,
         ownership_type=ownership_type,
         assigned_by=assigned_by,
+        replace_primary=replace_primary,
     )
 
 

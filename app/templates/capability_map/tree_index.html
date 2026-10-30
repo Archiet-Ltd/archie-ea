@@ -1,3 +1,4 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'components/breadcrumb.html' as breadcrumb %}
@@ -39,8 +40,8 @@
 
     <!-- Breadcrumb -->
     {% call breadcrumb.breadcrumb() %}
-        {% call breadcrumb.breadcrumb_item(href=url_for('admin.dashboard')) %}
-            <i data-lucide="home" class="h-4 w-4"></i>
+        {% call breadcrumb.breadcrumb_item(href=home_url()) %}
+            <i data-lucide="home" class="h-4 w-4"></i><span class="sr-only">Home</span>
         {% endcall %}
         {{ breadcrumb.breadcrumb_separator() }}
         {% call breadcrumb.breadcrumb_item(href=url_for('capability_map.index')) %}

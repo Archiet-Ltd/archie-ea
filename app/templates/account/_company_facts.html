@@ -1,0 +1,28 @@
+{# The profile read from the company website: each fact with the page it came from. Nothing is recorded until the person continues. #}
+<section class="space-y-2" data-testid="signup-facts">
+    <div class="flex items-baseline justify-between gap-3">
+        <h2 class="text-sm font-semibold">What we read on {{ website.url }}</h2>
+        {% if completeness %}<span class="text-xs text-muted-foreground" data-testid="signup-completeness">{{ ((completeness.value * 100) if completeness.value <= 1 else completeness.value) | round | int }}% of the profile found</span>{% endif %}
+    </div>
+    {% set site_row = sources | selectattr('key', 'equalto', 'website') | first %}
+    {% if site_row and site_row.state == 'reading' %}
+    <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" role="status" data-testid="signup-facts-more">
+        More facts are still being worked out from your website.
+        <a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline" data-testid="signup-facts-refresh">Show them when they are ready</a>
+    </p>
+    {% endif %}
+    <p class="text-xs text-muted-foreground">Tick what is right and change what is not. Each fact names the page it came from, and nothing is added to your model until you continue.</p>
+    <ul class="max-h-56 divide-y divide-border overflow-auto rounded-md border border-border" data-testid="signup-facts-list">
+        {% for fact in facts %}
+        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 p-2" data-fact="{{ fact.id }}" data-original="{{ fact.text }}">
+            {{ checkbox(id='fact-keep-' ~ fact.id, checked=(fact.percent >= 50), attrs_dict={'data-fact-keep': '', 'aria-label': 'Keep ' ~ fact.label}) }}
+            <span class="w-36 shrink-0 text-sm font-medium" data-testid="fact-label">{{ fact.label }}</span>
+            <div class="min-w-48 flex-1">{{ input(id='fact-value-' ~ fact.id, value=fact.text, size='sm', aria_label=fact.label ~ ' value', attrs_dict={'data-fact-value': ''}) }}</div>
+            <p class="flex w-full min-w-0 flex-wrap gap-x-1 pl-7 text-xs text-muted-foreground sm:w-72 sm:flex-nowrap sm:pl-0">
+                <a href="{{ fact.source_url }}" class="min-w-0 truncate text-primary hover:underline" title="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url | replace('https://', '') | replace('http://', '') }}</a>
+                <span class="shrink-0 whitespace-nowrap" data-testid="fact-confidence">&middot; {{ fact.percent }}% sure{% if fact.read_on %} &middot; read {{ fact.read_on }}{% endif %}</span>
+            </p>
+        </li>
+        {% endfor %}
+    </ul>
+</section>

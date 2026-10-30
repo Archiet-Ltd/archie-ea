@@ -1,0 +1,43 @@
+{# design-block: chat #}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/empty_state.html' import empty_state %}
+{# A catalogue answer drawn as cards in the chat: a card saying what was asked and what the
+   records hold, then one link per record the answer rests on. A question the records cannot
+   answer says so, with what would let it. #}
+<div class="space-y-3" data-catalogue-cards data-catalogue-entry="{{ answer.entry_id }}">
+    {% set sentence = (answer.reason[:1] | upper ~ answer.reason[1:]) if answer.reason else '' %}
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}{{ answer.title }}{% endcall %}
+            {% call card_description() %}
+                {% if answer.records %}{{ answer.summary[:1] | upper }}{{ answer.summary[1:] }}: {{ answer.total if answer.total is not none else answer.records | length }} in your records.
+                {% elif answer.complete %}{{ sentence }}.
+                {% else %}Your records cannot answer this yet.{% endif %}
+            {% endcall %}
+        {% endcall %}
+    {% endcall %}
+    {% if answer.records %}
+    {% call card(class='p-4') %}
+        <ul class="space-y-2" aria-label="Records this answer rests on">
+            {% for record in answer.records %}
+            <li data-catalogue-record>
+                {# A record's name can be a whole sentence (a value proposition read from a website), so it wraps instead of running off a narrow screen. #}
+                <a href="{{ record.url }}" class="flex w-fit max-w-full min-w-0 items-start gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline break-words" data-testid="catalogue-open"{% if record.external %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                    <i data-lucide="external-link" class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></i>
+                    <span class="min-w-0">{{ record.name }}</span>
+                </a>
+                {% if record.dependents or record.source_line %}
+                <p class="mt-1 text-xs text-muted-foreground">
+                    {% if record.dependents %}<span class="font-medium text-foreground" data-catalogue-count>{{ record.dependents }}</span>{% endif %}
+                    {% if record.dependents and record.source_line %}<span aria-hidden="true"> · </span>{% endif %}
+                    {% if record.source_line %}<span data-catalogue-source>{{ record.source_line }}</span>{% endif %}
+                </p>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    {% endcall %}
+    {% else %}
+        {{ empty_state(icon='circle-help', title=(sentence if sentence else 'Nothing in your records answers this yet'), description=answer.next_step or '', cta_text=(answer.next_label if answer.next_url else none), cta_href=(answer.next_url or none), padding='py-6') }}
+    {% endif %}
+</div>

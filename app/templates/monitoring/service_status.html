@@ -1,4 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import hidden_input %}
+{% from 'components/table.html' import table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/empty_state.html' import empty_state %}
 
@@ -33,21 +36,19 @@
                 <p class="mt-1 text-xs text-muted-foreground">Checked {{ status.checked_at.strftime('%d %b %Y %H:%M') }} UTC</p>
             </div>
             <form method="post" action="{{ url_for('service_status.update_subscription') }}" data-testid="service-status-subscription">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
                 {% if subscribed %}
                 <p class="mb-2 text-sm text-foreground" data-testid="service-status-subscribed">You are subscribed to status updates.</p>
-                <input type="hidden" name="subscribe" value="0">
-                <button type="submit" data-testid="service-status-unsubscribe"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                {{ hidden_input(("subscribe"), value=("0")) }}
+                {% call button(type="submit", variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"data-testid": ("service-status-unsubscribe")}) %}
                     <i data-lucide="bell-off" class="h-4 w-4" aria-hidden="true"></i> Unsubscribe
-                </button>
+                {% endcall %}
                 {% else %}
                 <p class="mb-2 text-sm text-muted-foreground" data-testid="service-status-not-subscribed">Get told when an incident opens or is resolved.</p>
-                <input type="hidden" name="subscribe" value="1">
-                <button type="submit" data-testid="service-status-subscribe"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                {{ hidden_input(("subscribe"), value=("1")) }}
+                {% call button(type="submit", variant="default", class="justify-center whitespace-nowrap justify-center", attrs_dict={"data-testid": ("service-status-subscribe")}) %}
                     <i data-lucide="bell" class="h-4 w-4" aria-hidden="true"></i> Subscribe
-                </button>
+                {% endcall %}
                 {% endif %}
             </form>
         </div>
@@ -87,7 +88,7 @@
         <h2 id="incident-history-heading" class="mb-2 text-base font-semibold text-foreground">Incident history</h2>
         {% if status.history %}
         <div class="overflow-x-auto rounded-lg border border-border">
-            <table class="dense-table w-full text-sm" data-testid="service-status-history">
+            {% call table(class="dense-table w-full text-sm", attrs_dict={"data-testid": ("service-status-history")}) %}
                 <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
                         <th class="px-4 py-2.5">Incident</th>
@@ -106,7 +107,7 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
         </div>
         {% else %}
         {{ empty_state(

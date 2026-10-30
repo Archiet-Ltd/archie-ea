@@ -44,7 +44,7 @@
                         :class="levelFilter === lvl ? getLevelBadgeClassActive(lvl) : 'bg-muted text-muted-foreground hover:text-foreground'">
                     <span class="inline-block w-2 h-2 rounded-full" :class="getLevelDotColor(lvl)"></span>
                     <span x-text="'L' + lvl"></span>
-                    <span class="text-xs opacity-70" x-text="'(' + countByLevel(lvl) + ')'"></span>
+                    <span class="text-xs" x-text="'(' + countByLevel(lvl) + ')'"></span>
                 </button>
             </template>
         </div>
@@ -245,10 +245,10 @@ function hierarchyView() {
             const colors = {
                 // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
                 1: 'bg-primary',
-                2: 'bg-sky-500', // design-tokens-ok
-                3: 'bg-amber-500', // design-tokens-ok
-                4: 'bg-violet-500', // design-tokens-ok
-                5: 'bg-rose-500' // design-tokens-ok
+                2: 'bg-layer-implementation-emphasis',
+                3: 'bg-layer-strategy-emphasis',
+                4: 'bg-layer-motivation-emphasis',
+                5: 'bg-layer-risk-emphasis'
             };
             return colors[level] || 'bg-muted-foreground';
         },
@@ -489,7 +489,7 @@ function hierarchyView() {
                 'Mobility': 'bg-teal-500', // design-tokens-ok
                 'Finance': 'bg-amber-500' // design-tokens-ok
             };
-            return colorMap[domain] || 'bg-muted/50';
+            return colorMap[domain] || 'bg-muted-foreground';
         },
 
         getTypeColor(type) {
@@ -591,3 +591,4 @@ function hierarchyView() {
 }
 </script>
 {% endblock %}
+{# design-block: data-table #}

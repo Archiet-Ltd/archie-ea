@@ -186,7 +186,7 @@ class TestBearerOnlyCallSucceedsWithCsrfEnabled:
         assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
         assert "error" not in data, data
-        assert len(data["result"]["tools"]) == 11
+        assert len(data["result"]["tools"]) == 13  # the eleven, get_genome_slice and ask_data_flow
 
 
 class TestNoAuthGetsRealUnauthorizedNotCsrf:

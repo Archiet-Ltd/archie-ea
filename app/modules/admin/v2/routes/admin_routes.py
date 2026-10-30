@@ -32,6 +32,7 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
 from app.utils.pagination import safe_int_arg
 
 try:
@@ -60,6 +61,7 @@ from werkzeug.exceptions import HTTPException
 from app import csrf
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 from app.services import solution_prompt_override_service
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
@@ -592,7 +594,12 @@ def change_account_type(user_id):
     # so POST behaviour is unchanged.
     form = ChangeAccountTypeForm(obj=user)
     if form.validate_on_submit():
-        _svc.change_user_role(user, form.role.data)
+        try:
+            _svc.change_user_role(user, form.role.data)
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return render_template("admin/manage_user.html", user=user, form=form)
         role_name = user.role.name if user.role else "No Role"
         flash(
             "Role for user {} successfully changed to {}.".format(
@@ -684,6 +691,10 @@ def delete_user(user_id):
                 ip_address=request.remote_addr,
                 description=f"admin_user_delete via {request.path}",
             )
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return redirect(url_for("admin.user_info", user_id=user_id))
         except IntegrityError:
             db.session.rollback()
             flash(
@@ -735,6 +746,10 @@ def api_settings():
     edit_id = request.args.get("edit", type=int)
     edit_settings = APISettings.query.get(edit_id) if edit_id else None
     form = APISettingsForm()
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    # What the platform has spent on answers this month, per provider in its order, with ceilings.
+    spend_ledger = LLMService.spend_ledger_rows()
 
     if form.validate_on_submit():
         provider = form.provider.data
@@ -772,6 +787,7 @@ def api_settings():
                     all_settings=all_settings,
                     edit_id=edit_id,
                     edit_settings=edit_settings,
+                    spend_ledger=spend_ledger,
                 )
 
             settings = APISettings(
@@ -846,6 +862,7 @@ def api_settings():
         all_settings=all_settings,
         edit_id=edit_id,
         edit_settings=edit_settings,
+        spend_ledger=spend_ledger,
     )
 
 
@@ -896,7 +913,7 @@ def preview_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -907,10 +924,10 @@ def preview_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     existing = {s.provider for s in APISettings.query.all()}
@@ -992,7 +1009,7 @@ def load_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -1003,10 +1020,10 @@ def load_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     requested_keys = data["keys"]
@@ -3337,6 +3354,10 @@ def api_bulk_delete_users():
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "ids list required"}), 400
     safe_ids = [i for i in ids if i != current_user.id]
+    try:
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
     deleted = User.query.filter(
         User.id.in_(safe_ids), User.organization_id == g.current_org_id
     ).delete(synchronize_session=False)
@@ -4873,7 +4894,15 @@ def _get_capability_suggestion_default():
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
-    return render_template("admin/solution_prompts.html")
+    # The list is rendered on the server (the CSP Alpine build cannot run the old
+    # client-side table); the same data the JSON endpoint below returns.
+    try:
+        prompts = solution_prompts_data().get_json().get("prompts", [])
+        load_error = None
+    except Exception:
+        logger.exception("Failed to load solution prompts")
+        prompts, load_error = [], "The prompts could not be read. Refresh the page to try again."
+    return render_template("admin/solution_prompts.html", prompts=prompts, load_error=load_error)
 
 
 @admin_bp_v2.route("/solution-prompts/data")
@@ -5523,6 +5552,9 @@ def organization_create():
         db.session.add(org)
         db.session.flush()
         set_contract_plan(org, plan_key, seats)
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         db.session.commit()
         flash(f'Organization "{name}" created.', "success")
         return redirect(url_for("admin.organizations_list"))
@@ -5683,6 +5715,11 @@ def toggle_org_admin(org_id, user_id):
     # (checked above), so this is always a grant/revoke in their own
     # organisation.
     if user.is_admin():
+        try:
+            ensure_keeps_administrator(org_id, [user_id])
+        except LastAdministratorError as exc:
+            flash(exc.message, "error")
+            return redirect(url_for("admin.organization_detail", org_id=org_id))
         user.revoke_org_admin()
         OrgRole.query.filter_by(
             organization_id=org_id, user_id=user_id
@@ -5756,6 +5793,12 @@ def remove_user_from_org(org_id, user_id):
     default_org = Organization.query.filter_by(slug="default").first()
     if not default_org or default_org.id == org_id:
         flash("Cannot remove user — no other organization to move them to.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
+
+    try:
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
+    except LastAdministratorError as exc:
+        flash(exc.message, "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
     user.organization_id = default_org.id

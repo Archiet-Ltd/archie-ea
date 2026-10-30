@@ -32,6 +32,7 @@ from flask import (
 )
 from flask_login import current_user, login_required  # dead-code-ok
 from app.middleware.tenant_context import current_org_id
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import case, or_  # dead-code-ok
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -509,42 +510,54 @@ def risk_assessment():
 @enterprise_bp.route("/strategic/technology-roadmap")
 @login_required
 def technology_roadmap():
-    """Technology Roadmap"""
-    try:
-        workpackages = WorkPackage.query.limit(500).all()
-
-        return render_template(
-            "enterprise/technology_roadmap.html", workpackages=workpackages
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(f"Database error loading technology roadmap: {e}")
-        raise DatabaseError(
-            message=f"Failed to load technology roadmap: {str(e)}",
-            user_message="Unable to load technology roadmap.",
-            recovery_action="Return to the dashboard and try again.",
-        )
+    """The enterprise technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
-# ============================================================================
-# IMPLEMENTATION PLANNING ROUTES
-# ============================================================================
-
-
-# implementation_planning_dashboard removed — empty shell page, frozen sidebar link
-
-
-@enterprise_bp.route("/implementation/work-packages")
+@enterprise_bp.route("/implementation/work-packages", methods=["GET", "POST"])
 @login_required
 def work_packages():
     """Work Packages Management.
 
-    The page is an Alpine table (`workPackagesTable()` in
-    static/js/enterprise/work_packages_table.js) that loads rows from
-    `/enterprise/api/work-packages` below. It never read a server-rendered
-    `workpackages` variable, so the hardcoded `workpackages=[]` that used to
-    be passed here was dead — and read as a permanently-empty page (S-11).
+    The list is rendered on the server from the one work package store (the
+    list table filters, sorts and pages it in the browser). A POST deletes the
+    selected rows (form field ``ids``, or ``?delete=<id>`` for one row's menu),
+    with the same organisation fence and audit entry as the JSON delete below.
     """
-    return render_template("enterprise/work_packages.html")
+    org_id = current_organization_id()
+    if request.method == "POST":
+        ids = request.form.getlist("ids") or request.args.getlist("delete")
+        deleted = 0
+        for raw_id in ids:
+            try:
+                wp = work_package_service.get_work_package(int(raw_id), org_id)
+            except (TypeError, ValueError):
+                continue
+            if wp is None:
+                continue
+            wp_id, wp_name = wp.id, wp.name
+            work_package_service.delete_work_package(wp_id, organization_id=org_id)
+            deleted += 1
+            _audit_wp("delete", wp_id, wp_name, severity=AuditEventSeverity.HIGH)
+        db.session.commit()
+        if deleted:
+            flash("Deleted %d work package%s." % (deleted, "" if deleted == 1 else "s"), "success")
+        else:
+            flash("Select at least one work package to delete.", "warning")
+        return redirect(url_for("enterprise.work_packages"))
+
+    UWP = UnifiedWorkPackage
+    rows = (
+        work_package_service.query_for(org_id)
+        .order_by(UWP.created_at.desc(), UWP.id.asc())
+        .limit(500)
+        .all()
+    )
+    return render_template(
+        "enterprise/work_packages.html",
+        work_packages=rows,
+        gaps_by_wp=work_package_service.gaps_for_work_packages(rows, org_id),
+    )
 
 
 @enterprise_bp.route("/api/work-packages", methods=["GET"])

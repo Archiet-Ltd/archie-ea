@@ -1,0 +1,22 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ porters-five-forces.html. Adapted only to Entelim macro names. #}
+{# Porter's Five Forces, C2. After Michael E. Porter (HBR, 1979): the cross. Rivalry in the centre, new entrants above, substitutes below, suppliers to the left, buyers to the right, joined to the centre by arrows pointing inward. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% import 'components/canvas/_ui.html' as ui with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': "Porter's five forces", 'grid': 'grid-cols-12', 'width': 'min-w-260',
+  'hint': 'Scroll sideways on a narrow screen to see the whole cross.',
+  'credit': "Five forces after Michael E. Porter, How Competitive Forces Shape Strategy, Harvard Business Review, 1979.",
+  'boxes': [
+    {'key': 'new-entrants', 'title': 'Threat of New Entrants', 'icon': 'log-in', 'question': 'How easy is it for new competitors to enter?', 'empty': 'No entry threats yet. Add the drivers or assessments of who could enter.', 'area': 'col-span-4 col-start-5 row-start-1'},
+    {'key': 'suppliers', 'title': 'Bargaining Power of Suppliers', 'icon': 'factory', 'question': 'How much leverage do suppliers have over us?', 'empty': 'No supplier forces yet. Add the suppliers or assessments of their leverage.', 'area': 'col-span-3 col-start-1 row-start-3'},
+    {'key': 'rivalry', 'title': 'Rivalry among Existing Competitors', 'icon': 'flame', 'question': 'How intense is competition among existing firms?', 'empty': 'No rivalry yet. Add the drivers or assessments of competition.', 'area': 'col-span-4 col-start-5 row-start-3'},
+    {'key': 'buyers', 'title': 'Bargaining Power of Buyers', 'icon': 'shopping-cart', 'question': 'How much leverage do customers have over us?', 'empty': 'No buyer forces yet. Add the segments or assessments of their leverage.', 'area': 'col-span-3 col-start-10 row-start-3'},
+    {'key': 'substitutes', 'title': 'Threat of Substitutes', 'icon': 'repeat', 'question': 'What other ways could customers meet the same need?', 'empty': 'No substitutes yet. Add the other ways customers could meet the need.', 'area': 'col-span-4 col-start-5 row-start-5'},
+  ]} %}
+{% set ARROWS = [('arrow-down', 'col-start-5 col-span-4 row-start-2'), ('arrow-right', 'col-start-4 row-start-3'),
+                 ('arrow-left', 'col-start-9 row-start-3'), ('arrow-up', 'col-start-5 col-span-4 row-start-4')] %}
+{% macro porters_five_forces(data, id='porters-five-forces') -%}
+{% call f.grid_canvas(SPEC, data, id) %}
+    {% for icon, area in ARROWS %}<div class="{{ area }} flex items-center justify-center text-muted-foreground" aria-hidden="true">{{ ui.lucide(icon, 'size-8') }}</div>{% endfor %}
+{% endcall %}
+{%- endmacro %}

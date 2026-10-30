@@ -22,25 +22,19 @@
 @media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }
 .pricing-page .pp-sub { color: var(--pp-muted); max-width: 42.5rem; line-height: 1.7; margin: 0 0 2rem; }
 
-/* Focus: the toggle labels and links in the lead have no shared class; buttons, summaries and the shared inline link use the shared outline. */
-#pp-bill-year:focus-visible ~ .pp-toggle label[for="pp-bill-year"], #pp-bill-month:focus-visible ~ .pp-toggle label[for="pp-bill-month"] { outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; }
+/* Focus: links in the lead have no shared class; buttons, summaries and the shared inline link use the shared outline. */
 .pricing-page .pp-lead a:focus-visible { outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; border-radius: 0.25rem; }
 
-/* Monthly / annual toggle: two radios, no script. State lives in :checked. */
-.pricing-page .pp-toggle { display: inline-flex; padding: 0.25rem; gap: 0.25rem; border: 1px solid var(--pp-border); border-radius: 0.75rem; background: hsl(var(--muted)); margin-bottom: 2rem; }
-.pricing-page .pp-radio { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.pricing-page .pp-toggle label { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 500; cursor: pointer; color: var(--pp-muted); }
-.pricing-page .pp-toggle .pp-save { margin-left: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: hsl(var(--success-emphasis)); }
-#pp-bill-year:checked ~ .pp-toggle label[for="pp-bill-year"],
-#pp-bill-month:checked ~ .pp-toggle label[for="pp-bill-month"] { background: hsl(var(--background)); color: var(--pp-fg); box-shadow: 0 1px 2px hsl(var(--foreground) / .12); }
+/* Monthly / annual choice: the shared radio group, no script. The chosen radio decides which prices show. */
+.pricing-page .pp-toggle { margin-bottom: 2rem; }
 .pricing-page [data-interval] { display: none; }
-#pp-bill-year:checked ~ .pp-plans [data-interval="year"],
-#pp-bill-month:checked ~ .pp-plans [data-interval="month"],
+.pricing-page:has(#pp-interval-1:checked) .pp-plans [data-interval="year"],
+.pricing-page:has(#pp-interval-2:checked) .pp-plans [data-interval="month"],
 .pricing-page [data-interval="both"] { display: block; }
-#pp-bill-year:checked ~ .pp-plans a[data-interval="year"],
-#pp-bill-month:checked ~ .pp-plans a[data-interval="month"] { display: inline-flex; }
-#pp-bill-year:checked ~ .pp-plans span[data-interval="year"],
-#pp-bill-month:checked ~ .pp-plans span[data-interval="month"] { display: inline; }
+.pricing-page:has(#pp-interval-1:checked) .pp-plans a[data-interval="year"],
+.pricing-page:has(#pp-interval-2:checked) .pp-plans a[data-interval="month"] { display: inline-flex; }
+.pricing-page:has(#pp-interval-1:checked) .pp-plans span[data-interval="year"],
+.pricing-page:has(#pp-interval-2:checked) .pp-plans span[data-interval="month"] { display: inline; }
 
 /* Plan cards: four across, stack on narrow screens */
 .pricing-page .pp-plans { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
@@ -81,6 +75,8 @@
    the row rules and the table uses separate borders, because a collapsed border does not travel with a sticky
    header. */
 .pricing-page .pp-frame { overflow: clip; }
+/* reuse-ok: the shared table's scroll wrapper must not become the scroll container, or the header would pin to it instead of the page */
+.pricing-page .pp-frame > div { overflow: visible; }
 .pricing-page .public-table { border-collapse: separate; border-spacing: 0; }
 /* reuse-ok: cell row rules, because separate borders under a sticky header need the rule on the cell */
 .pricing-page .public-table th, .pricing-page .public-table td { text-align: center; border-bottom: 1px solid hsl(var(--border)); }

@@ -385,6 +385,10 @@ _ELEMENTS = [
     ("Quality Excellence Programme", "WorkPackage", "implementation"),
     ("Operational Resilience Programme", "WorkPackage", "implementation"),
     ("Sustainability Initiative", "WorkPackage", "implementation"),
+    ("Calibration Certificate Portal", "WorkPackage", "implementation"),
+    ("Engineer Scheduling Assistant", "WorkPackage", "implementation"),
+    ("Instrument History Timeline", "WorkPackage", "implementation"),
+    ("Shared Telemetry Pipeline", "WorkPackage", "implementation"),
     ("Digital Twin of Calibration Lab", "Deliverable", "implementation"),
     ("Mobile Field App", "Deliverable", "implementation"),
     ("Real-time Dashboard", "Deliverable", "implementation"),
@@ -758,6 +762,10 @@ _ARB_REVIEWS = [
      "standards_exception", "medium", "submitted", 5, None, None),
     ("LQ-ARB-2026-009", "Introduce a vendor risk score into supplier selection",
      "architecture_change", "low", "submitted", 2, None, None),
+    ("LQ-ARB-2026-010", "Adopt a single customer identifier across the estate",
+     "architecture_change", "high", "under_review", 18, None, None),
+    ("LQ-ARB-2026-011", "Exception to the approved database standard for Field Service",
+     "standards_exception", "medium", "submitted", 26, None, None),
 ]
 
 # ── application owners ─────────────────────────────────────────────────────
@@ -781,7 +789,18 @@ _OWNER_USERS = [
     ("Ellis", "DataSteward", "ellis.datasteward@lantern-quay.example.com"),
     ("Cameron", "SysAdmin", "cameron.sysadmin@lantern-quay.example.com"),
     ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
+    ("Bryn", "BusinessArch", "bryn.businessarch@lantern-quay.example.com"),
 ]
+
+# The one demo user who can look but not change the model: a business analyst
+# on the Viewer platform role, so the demonstration carries a read-only persona
+# beside its sixteen architects. Matches an entry of _OWNER_USERS.
+_DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
+_DEMO_READER_PERSONA = "business_analyst"
+
+# The one business architect in the demonstration, so what that persona does and
+# does not see (Connections yes, Billing no) can be walked signed in as them.
+_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
@@ -839,6 +858,39 @@ _APP_INFRASTRUCTURE_MONTHLY = 2500
 # The one place the annual total is computed; the applications below are
 # created with it and an earlier seed's blanket figure is brought back to it.
 _APP_TOTAL_COST = _APP_LICENSE_ANNUAL + 12 * _APP_INFRASTRUCTURE_MONTHLY
+
+# Each application's own annual licence (None where Lantern Quay builds it) and monthly infrastructure
+# cost, so the estate's costs differ from one application to the next, and the business area it serves.
+# (application) -> (licence per year, infrastructure per month, business area)
+_APP_COSTS = {
+    "Event Relay": (84000, 3200, "IT Operations"),
+    "Calibration Ledger": (None, 2100, "Quality and Compliance"),
+    "Dispatch Planner": (96000, 2600, "Operations"),
+    "Inventory Manager": (132000, 3400, "Operations"),
+    "Field Service Scheduler": (78000, 1200, "Field Services"),
+    "Compliance Reporter": (54000, 700, "Quality and Compliance"),
+    "Supplier Portal": (66000, 900, "Shared Services"),
+    "Workforce Planner": (90000, 1100, "Shared Services"),
+    "Quality Monitor": (None, 1500, "Quality and Compliance"),
+    "Sensor Data Hub": (48000, 4800, "Field Services"),
+    "Firmware Distribution Service": (None, 1900, "Field Services"),
+    "Customer Portal": (72000, 1300, "Operations"),
+    "Finance System": (168000, 4200, "Shared Services"),
+    "Document Management": (36000, 600, "Shared Services"),
+    "Identity Provider": (30000, 200, "IT Operations"),
+    "Monitoring Dashboard": (42000, 800, "IT Operations"),
+    "Alert Manager": (18000, 100, "IT Operations"),
+    "Reporting Engine": (24000, 700, "Shared Services"),
+    "Integration Bus": (102000, 2400, "IT Operations"),
+    "Data Warehouse": (120000, 6100, "IT Operations"),
+}
+
+
+def _app_figures(app_name):
+    """(licence, infrastructure per month, total per year, area) for an application."""
+    licence, infra, area = _APP_COSTS.get(app_name, (_APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY, None))
+    return licence, infra, (licence or 0) + 12 * infra, area
+
 
 # Organisation units that own the applications (one per owner role).
 _OWNER_UNITS = [
@@ -927,7 +979,52 @@ _CAPABILITIES = [
     ("Security Operations", "LQ-CAP-SECURITY", 3, 4, 3),
 ]
 
+# Each demo capability sits in a business domain, so the capability heat map has
+# rows to compare rather than one "No domain" strip. (code, name) per domain.
+_CAPABILITY_DOMAINS = {
+    "LQ-FIELD": ("Field Operations", ["CALIBRATION", "WATER-QUALITY", "FIELD-SERVICE", "ASSET-LIFECYCLE", "INCIDENT"]),
+    "LQ-SUPPLY": ("Supply and Fulfilment", ["INVENTORY", "FULFILMENT", "SUPPLIER", "DEMAND", "QUALITY"]),
+    "LQ-GOVERN": ("Governance and People", ["COMPLIANCE", "WORKFORCE", "DOCUMENT", "IDENTITY"]),
+    "LQ-DATA": ("Data and Integration", ["EVENT-PROCESSING", "ANALYTICS", "INTEGRATION", "MONITORING"]),
+    "LQ-TECH": ("Technology Operations", ["DEVICE-MGMT", "FIRMWARE", "NETWORK", "BACKUP", "CAPACITY", "SECURITY"]),
+}
+
+# The judgment for each demo capability: strategic differentiates the company,
+# operational runs it day to day, supporting is what every company needs.
+_CAPABILITY_TYPES = {
+    "LQ-CAP-CALIBRATION": "strategic",
+    "LQ-CAP-WATER-QUALITY": "strategic",
+    "LQ-CAP-FIELD-SERVICE": "strategic",
+    "LQ-CAP-DEMAND": "strategic",
+    "LQ-CAP-ANALYTICS": "strategic",
+    "LQ-CAP-EVENT-PROCESSING": "strategic",
+    "LQ-CAP-INVENTORY": "operational",
+    "LQ-CAP-FULFILMENT": "operational",
+    "LQ-CAP-SUPPLIER": "operational",
+    "LQ-CAP-ASSET-LIFECYCLE": "operational",
+    "LQ-CAP-INCIDENT": "operational",
+    "LQ-CAP-QUALITY": "operational",
+    "LQ-CAP-INTEGRATION": "operational",
+    "LQ-CAP-MONITORING": "operational",
+    "LQ-CAP-DEVICE-MGMT": "operational",
+    "LQ-CAP-FIRMWARE": "operational",
+    "LQ-CAP-NETWORK": "operational",
+    "LQ-CAP-COMPLIANCE": "supporting",
+    "LQ-CAP-WORKFORCE": "supporting",
+    "LQ-CAP-IDENTITY": "supporting",
+    "LQ-CAP-DOCUMENT": "supporting",
+    "LQ-CAP-BACKUP": "supporting",
+    "LQ-CAP-CAPACITY": "supporting",
+    "LQ-CAP-SECURITY": "supporting",
+}
+
 # ── risks ──────────────────────────────────────────────────────────────────
+
+# (risk title, earlier residual (likelihood, impact), residual now)
+_RISING_RISKS = [
+    ("Event Relay single point of failure", (3, 4), (4, 5)),
+    ("Calibration Ledger data corruption", (2, 4), (4, 4)),
+]
 
 _RISKS = [
     # (title, likelihood, impact, status, owner, mitigation, archimate_element_name)
@@ -1067,17 +1164,65 @@ _CANVAS_DESCRIPTION = (
     "How Lantern Quay Systems makes, calibrates, ships and recovers water-quality sensors."
 )
 _CANVAS_OPERATING_MODEL = "coordination"
-_CANVAS_BLOCKS = {
-    "customer_segments": "Municipal water utilities\nIndustrial process-water operators\nEnvironmental survey firms",
-    "value_propositions": "Calibrated sensors with a certificate for every batch\nRecovered assemblies recertified instead of scrapped\nRemote diagnostics that cut site visits",
-    "channels": "Direct account managers\nCustomer portal for orders and returns\nField service engineers",
-    "customer_relationships": "Named service engineer per account\nScheduled preventive maintenance visits\nQuarterly drift and compliance reports",
-    "revenue_streams": "Sensor sales\nAnnual calibration and maintenance contracts\nRecertified assembly resale",
-    "key_activities": "Assemble and calibrate sensor modules\nField calibration runs\nRecover and recertify returned assemblies",
-    "key_resources": "Calibration rigs and the calibration ledger\nField service engineers\nComponent stock and supplier panel",
-    "key_partners": "Component suppliers\nCourier and logistics partners\nRegional testing laboratories",
-    "cost_structure": "Components and assembly labour\nField service travel\nCloud hosting and data platform",
+# Each box of the canvas lists elements of the model: (name, type, layer). An
+# entry that already exists in the seeded model (a process, a resource pool,
+# a capability) is found by name and reused, never created twice.
+_CANVAS_VISION = ("Recover every sensor assembly for reuse", "Goal", "motivation")
+_CANVAS_ENTRIES = {
+    "customer_segments": [
+        ("Municipal water utilities", "BusinessActor", "business"),
+        ("Industrial process-water operators", "BusinessActor", "business"),
+        ("Environmental survey firms", "BusinessActor", "business"),
+    ],
+    "value_propositions": [
+        ("Calibrated sensors with a certificate for every batch", "BusinessService", "business"),
+        ("Recovered assemblies recertified instead of scrapped", "BusinessService", "business"),
+        ("Remote diagnostics that cut site visits", "BusinessService", "business"),
+        ("Operators know their readings can be trusted", "Value", "motivation"),
+    ],
+    "channels": [
+        ("Direct account managers", "BusinessInterface", "business"),
+        ("Customer portal for orders and returns", "BusinessInterface", "business"),
+        ("Field service engineers on site", "BusinessInterface", "business"),
+    ],
+    "customer_relationships": [
+        ("Named service engineer per account", "BusinessService", "business"),
+        ("Scheduled preventive maintenance visits", "BusinessService", "business"),
+        ("Quarterly drift and compliance reports", "BusinessService", "business"),
+    ],
+    "key_activities": [
+        ("Assemble sensor module", "BusinessProcess", "business"),
+        ("Test sensor calibration", "BusinessProcess", "business"),
+        ("Recertify recovered assembly", "BusinessProcess", "business"),
+    ],
+    "key_resources": [
+        ("Calibration Rig Pool", "Resource", "strategy"),
+        ("Field Engineer Pool", "Resource", "strategy"),
+        ("Component stock and supplier panel", "Resource", "strategy"),
+    ],
+    "key_partners": [
+        ("Component suppliers", "BusinessActor", "business"),
+        ("Courier and logistics partners", "BusinessActor", "business"),
+        ("Regional testing laboratories", "BusinessActor", "business"),
+    ],
 }
+# (service it prices, plan name, price, currency, billing period, mechanism)
+_CANVAS_PRICES = [
+    ("Calibrated sensors with a certificate for every batch", "Sensor sale", "1850.00", "GBP", "use", "sale"),
+    ("Remote diagnostics that cut site visits", "Annual calibration and maintenance", "24000.00", "GBP", "year", "subscription"),
+    ("Recovered assemblies recertified instead of scrapped", "Recertified assembly resale", "980.00", "GBP", "use", "sale"),
+]
+# (source, target, relationship type): what serves, realises or is assigned to what.
+_CANVAS_LINKS = [
+    ("Assemble sensor module", "Sensor Calibration", "Realization"),
+    ("Test sensor calibration", "Sensor Calibration", "Realization"),
+    ("Recertify recovered assembly", "Asset Lifecycle Management", "Realization"),
+    ("Calibration Rig Pool", "Sensor Calibration", "Assignment"),
+    ("Field Engineer Pool", "Field Service Management", "Assignment"),
+    ("Calibrated sensors with a certificate for every batch", "Municipal water utilities", "Serving"),
+    ("Remote diagnostics that cut site visits", "Industrial process-water operators", "Serving"),
+    ("Recovered assemblies recertified instead of scrapped", "Environmental survey firms", "Serving"),
+]
 
 # ── work packages ──────────────────────────────────────────────────────────
 
@@ -1205,6 +1350,72 @@ _GAP_PLACEMENT = {
 #  seed function
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _seed_canvas_model(org_id, canvas):
+    """Fill the canvas from the organisation's model: elements per box, links
+    to the seeded capabilities, price plans, and the vision as a Goal.
+    Idempotent: every element is found by name and type before one is made."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models.price_plan import PricePlan
+    from app.modules.business_model_canvas import model_service
+    from app.services.archimate_backbone import create_backbone_element
+
+    created = 0
+    by_key = {
+        (e.name, e.type): e
+        for e in db.session.query(ArchiMateElement).filter(ArchiMateElement.organization_id == org_id)
+    }
+    by_name = {}
+    for (name, _type), e in by_key.items():
+        by_name.setdefault(name, e)
+
+    def element(name, type_, layer):
+        nonlocal created
+        el = by_key.get((name, type_))
+        if el is None:
+            el = create_backbone_element(
+                element_type=type_, layer=layer, name=name, organization_id=org_id,
+                provenance={"created_from": "demo company seed"},
+            )
+            by_key[(name, type_)] = el
+            by_name.setdefault(name, el)
+            created += 1
+        return el
+
+    model_service.ensure_view(canvas)
+    for box, entries in _CANVAS_ENTRIES.items():
+        for name, type_, layer in entries:
+            el = element(name, type_, layer)
+            model_service.place(canvas, box, el)
+    vision = element(*_CANVAS_VISION)
+    canvas.vision_element_id = vision.id
+    db.session.flush()
+
+    for source, target, rel_type in _CANVAS_LINKS:
+        src, tgt = by_name.get(source), by_name.get(target)
+        if src is None or tgt is None:
+            continue
+        if not db.session.query(ArchiMateRelationship.id).filter_by(
+            source_id=src.id, target_id=tgt.id, type=rel_type, organization_id=org_id
+        ).first():
+            db.session.add(ArchiMateRelationship(
+                source_id=src.id, target_id=tgt.id, type=rel_type, organization_id=org_id,
+            ))
+            created += 1
+    for service_name, plan_name, price, currency, period, mechanism in _CANVAS_PRICES:
+        service = by_key.get((service_name, "BusinessService"))
+        if service is None or db.session.query(PricePlan.id).filter_by(
+            organization_id=org_id, element_id=service.id, name=plan_name
+        ).first():
+            continue
+        db.session.add(PricePlan(
+            organization_id=org_id, element_id=service.id, name=plan_name, price=price,
+            currency=currency, billing_period=period, pricing_mechanism=mechanism,
+        ))
+        created += 1
+    db.session.flush()
+    return created
+
+
 def _resolve_elements(org_id):
     """Return {name: ArchiMateElement} for all elements in this org; where a work package's own
     element shares a seeded element's name, the first-created (seeded) element wins."""
@@ -1255,12 +1466,1032 @@ def _resolve_users(org_id):
     return {r.email: r for r in rows}
 
 
+# ── SAFe kinds for the portfolio Kanban and the Kind filter ────────────────
+# (work package element, kanban state, business value, time criticality,
+#  risk reduction, job size). Twelve existing work packages become Epics spread
+# over the first four columns; Analyzing sits at its limit of three so the
+# limit shows. Scores differ so each column has a visible order.
+_SAFE_EPICS = [
+    ("Digital Transformation Programme", "Funnel", 8, 5, 5, 13),
+    ("Sustainability Initiative", "Funnel", 5, 3, 2, 8),
+    ("Inventory Accuracy Drive", "Funnel", 3, 5, 5, 5),
+    ("Quality Excellence Programme", "Reviewing", 8, 8, 5, 8),
+    ("Compliance System Upgrade", "Reviewing", 5, 13, 8, 5),
+    ("Supplier Consolidation Programme", "Reviewing", 5, 3, 3, 13),
+    ("Operational Resilience Programme", "Analyzing", 13, 8, 13, 13),
+    ("Predictive Maintenance Pilot", "Analyzing", 8, 5, 8, 8),
+    ("Field Tester Rollout", "Analyzing", 8, 8, 3, 5),
+    ("Event Backbone Migration", "Portfolio Backlog", 13, 8, 13, 8),
+    ("Calibration Automation Phase 1", "Portfolio Backlog", 13, 13, 5, 8),
+    ("Calibration Automation Phase 2", "Portfolio Backlog", 8, 5, 3, 13),
+]
+
+# (work package element, kind, business value, time criticality, risk
+#  reduction, job size)
+_SAFE_OTHER_KINDS = [
+    ("Calibration Certificate Portal", "Feature", 8, 5, 3, 5),
+    ("Engineer Scheduling Assistant", "Feature", 5, 3, 3, 8),
+    ("Instrument History Timeline", "Feature", 3, 2, 2, 3),
+    ("Shared Telemetry Pipeline", "Enabler", 5, 3, 8, 8),
+]
+
+# ── solutions on the ADM board ─────────────────────────────────────────────
+# (name, description, ADM phase, governance status, deployment status,
+#  deliverables as (name, delivery status, type))
+_SOLUTIONS = [
+    (
+        "Field Calibration Platform",
+        "One platform for scheduling, performing and certifying field calibrations.",
+        "B", "proposed", None,
+        [
+            ("Calibration process model", "in_progress", "business_architecture", "Business Architecture document"),
+            ("Stakeholder impact assessment", "planned", "assessment", None),
+        ],
+    ),
+    (
+        "Supplier Collaboration Hub",
+        "A shared portal where suppliers confirm orders, deliveries and certificates.",
+        "D", "in_progress", None,
+        [
+            ("Integration architecture", "in_progress", "technology_architecture", "Technology Architecture"),
+            ("Supplier onboarding runbook", "planned", "runbook", None),
+            ("Security review", "planned", "assessment", None),
+        ],
+    ),
+    (
+        "Event-Driven Operations Backbone",
+        "Replaces point-to-point feeds with one governed event backbone.",
+        "F", "approved", "development",
+        [
+            ("Migration roadmap", "completed", "implementation_plan", "Finalized Implementation Plan"),
+            ("Cut-over plan", "in_progress", "implementation_plan", None),
+        ],
+    ),
+]
+
+# ── one value stream, four stages, each supported by capabilities (by code) ─
+_VALUE_STREAM = (
+    "Calibration Request to Certificate", "LQ-VS-CALIBRATION",
+    "From a customer's calibration request to the certificate that closes it.",
+    [
+        ("Receive Request", ["LQ-CAP-FULFILMENT"]),
+        ("Schedule Engineer", ["LQ-CAP-FIELD-SERVICE", "LQ-CAP-WORKFORCE"]),
+        ("Calibrate and Test", ["LQ-CAP-CALIBRATION", "LQ-CAP-QUALITY"]),
+        ("Certify and Report", ["LQ-CAP-COMPLIANCE", "LQ-CAP-WATER-QUALITY"]),
+    ],
+)
+
+# ── requirements backlog: (name, description, status, MoSCoW, ADM phase,
+#    capability, solution) ──────────────────────────────────────────────────
+_BACKLOG_REQUIREMENTS = [
+    ("Record the as-found reading for every instrument",
+     "The engineer records the reading before any adjustment is made.",
+     "Draft", "MUST", "B", "Sensor Calibration", "Field Calibration Platform"),
+    ("Show a customer the status of an open request",
+     "A customer can see whether a request is received, scheduled or certified.",
+     "Draft", "SHOULD", "B", "Order Fulfilment", "Field Calibration Platform"),
+    ("Suggest the nearest qualified engineer",
+     "Scheduling proposes engineers by location and certification.",
+     "Refined", "SHOULD", "C", "Field Service Management", "Field Calibration Platform"),
+    ("Suppliers confirm delivery dates in the portal",
+     "A supplier confirms or proposes a new delivery date for each order line.",
+     "Refined", "MUST", "C", "Supplier Management", "Supplier Collaboration Hub"),
+    ("Reject certificates with a missing reference standard",
+     "A certificate cannot be issued without the reference standard used.",
+     "Approved", "MUST", "D", "Regulatory Compliance", "Supplier Collaboration Hub"),
+    ("Retry a failed event delivery three times",
+     "A failed delivery is retried and then raised to an operator.",
+     "Approved", "COULD", "D", "Event Processing", "Event-Driven Operations Backbone"),
+    ("Publish every instrument change as an event",
+     "Each change to an instrument is published once to the event backbone.",
+     "Implemented", "MUST", "E", "Event Processing", "Event-Driven Operations Backbone"),
+    ("Export certificates as signed documents",
+     "A certificate downloads as a signed document with its reference number.",
+     "Implemented", "SHOULD", "E", "Regulatory Compliance", "Field Calibration Platform"),
+]
+
+
+# Three data domains with the entities, attributes and relationships a data
+# architect would draw for a fabrication and fulfilment business. Each entity is
+# a DataEntity (and so its ArchiMate data object); nothing here is a second store.
+_DATA_MODEL = {
+    "Customer": {
+        "entities": {
+            "Customer": ["customer_id:uuid:pk", "legal_name:varchar", "segment:varchar?", "created_on:date"],
+            "Contact": ["contact_id:uuid:pk", "customer_id:uuid:fk", "full_name:varchar", "email:varchar?"],
+            "Delivery Address": ["address_id:uuid:pk", "customer_id:uuid:fk", "street:varchar", "postcode:varchar", "country:varchar"],
+            "Consent": ["consent_id:uuid:pk", "contact_id:uuid:fk", "purpose:varchar", "given_on:timestamp", "withdrawn_on:timestamp?"],
+        },
+        "relationships": [
+            ("Customer", "Contact", "one-to-many", "has"),
+            ("Customer", "Delivery Address", "one-to-many", "ships to"),
+            ("Contact", "Consent", "one-to-many", "gives"),
+        ],
+    },
+    "Orders and Fulfilment": {
+        "entities": {
+            "Sales Order": ["order_id:uuid:pk", "customer_id:uuid:fk", "placed_on:timestamp", "status:varchar"],
+            "Order Line": ["line_id:uuid:pk", "order_id:uuid:fk", "product_id:uuid:fk", "quantity:integer", "unit_price:decimal"],
+            "Product": ["product_id:uuid:pk", "sku:varchar", "name:varchar", "weight_kg:decimal?"],
+            "Shipment": ["shipment_id:uuid:pk", "order_id:uuid:fk", "carrier:varchar", "shipped_on:date?"],
+            "Return": ["return_id:uuid:pk", "line_id:uuid:fk", "reason:text", "received_on:date?"],
+        },
+        "relationships": [
+            ("Sales Order", "Order Line", "one-to-many", "contains"),
+            ("Product", "Order Line", "one-to-many", "is sold on"),
+            ("Sales Order", "Shipment", "one-to-many", "is sent in"),
+            ("Order Line", "Return", "one-to-many", "may be returned as"),
+        ],
+    },
+    "Finance": {
+        "entities": {
+            "Invoice": ["invoice_id:uuid:pk", "order_id:uuid:fk", "issued_on:date", "total:decimal"],
+            "Payment": ["payment_id:uuid:pk", "invoice_id:uuid:fk", "paid_on:date", "amount:decimal"],
+            "Cost Centre": ["cost_centre_id:varchar:pk", "name:varchar", "owner:varchar?"],
+            "Ledger Entry": ["entry_id:bigint:pk", "cost_centre_id:varchar:fk", "invoice_id:uuid:fk?", "posted_on:date", "amount:decimal"],
+        },
+        "relationships": [
+            ("Invoice", "Payment", "one-to-many", "is settled by"),
+            ("Cost Centre", "Ledger Entry", "one-to-many", "is charged by"),
+            ("Invoice", "Ledger Entry", "one-to-many", "is posted as"),
+        ],
+    },
+}
+
+
+def _seed_data_model(org_id) -> dict:
+    """Fill the demonstration organisation's data domains so each opens with a
+    drawn entity relationship diagram. Idempotent: a domain or entity that
+    exists by name is left as it is."""
+    from app.models.process_data import DataDomain, DataEntity, DataEntityRelationship
+    from app.modules.architecture.services import data_erd_service as erd
+
+    stats = {"data_domains_created": 0, "data_entities_created": 0, "data_relationships_created": 0}
+    for domain_name, spec in _DATA_MODEL.items():
+        domain = DataDomain.query.filter_by(organization_id=org_id, name=domain_name).first()
+        if domain is None:
+            domain = DataDomain(name=domain_name, organization_id=org_id,
+                                description=f"The {domain_name.lower()} data of Lantern Quay Systems")
+            db.session.add(domain)
+            db.session.flush()
+            stats["data_domains_created"] += 1
+        by_name = {}
+        for entity_name, columns in spec["entities"].items():
+            entity = DataEntity.query.filter_by(
+                organization_id=org_id, domain_id=domain.id, name=entity_name).first()
+            if entity is None:
+                attributes = []
+                for column in columns:
+                    parts = column.split(":")
+                    nullable = parts[-1].endswith("?")
+                    parts[-1] = parts[-1].rstrip("?")
+                    flags = parts[2:]
+                    attributes.append({
+                        "name": parts[0], "data_type": parts[1],
+                        "is_primary_key": "pk" in flags, "is_foreign_key": "fk" in flags,
+                        "is_nullable": nullable,
+                    })
+                entity = erd.create_entity(domain, entity_name, attributes)
+                stats["data_entities_created"] += 1
+            by_name[entity_name] = entity
+        for source, target, preset, label in spec["relationships"]:
+            exists = DataEntityRelationship.query.filter_by(
+                organization_id=org_id, source_entity_id=by_name[source].id,
+                target_entity_id=by_name[target].id).first()
+            if exists is None:
+                erd.relate(by_name[source], by_name[target], preset=preset, label=label)
+                stats["data_relationships_created"] += 1
+    db.session.flush()
+    return stats
+
+
+# Where the demonstration organisation's customer data goes: which applications
+# create, read, update or delete each entity (ArchiMate access relationships,
+# the one store for that), the copy into the warehouse (a lineage row), which
+# entities hold personal data, the systems of record and the domain stewards.
+_DATA_STEWARDS = {
+    "Customer": "Customer Operations lead",
+    "Orders and Fulfilment": "Fulfilment Operations lead",
+    "Finance": "Financial Controller",
+    "Analytics": "Head of Data",
+}
+_PERSONAL_DATA = ("Customer", "Contact", "Delivery Address", "Consent", "Customer Analytics Profile")
+_SYSTEMS_OF_RECORD = {"Customer": "Customer Portal", "Invoice": "Finance System", "Sales Order": "Dispatch Planner"}
+_DATA_ACCESS = [
+    # (application, entity, C/R/U/D letters)
+    ("Customer Portal", "Customer", "CRU"),
+    ("Customer Portal", "Contact", "CRUD"),
+    ("Customer Portal", "Consent", "CRU"),
+    ("Customer Portal", "Delivery Address", "CRUD"),
+    ("Dispatch Planner", "Customer", "R"),
+    ("Dispatch Planner", "Delivery Address", "R"),
+    ("Dispatch Planner", "Sales Order", "CRU"),
+    ("Finance System", "Customer", "R"),
+    ("Finance System", "Invoice", "CRU"),
+    ("Finance System", "Payment", "CRU"),
+    ("Integration Bus", "Customer", "R"),
+    ("Data Warehouse", "Customer Analytics Profile", "CU"),
+    ("Reporting Engine", "Customer Analytics Profile", "R"),
+]
+# (source entity, target entity, kind of copy)
+_DATA_COPIES = [("Customer", "Customer Analytics Profile", "Batch")]
+
+
+def _seed_data_flows(org_id) -> dict:
+    """Record where the demonstration organisation's data flows. Idempotent: an
+    access relationship or lineage row that exists is left as it is."""
+    from app.models.all_missing_models import DataLineage
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.process_data import DataDomain, DataEntity
+    from app.modules.architecture.services import data_erd_service as erd
+    from app.modules.architecture.services.data_architecture_service import record_entity_access
+
+    stats = {"data_accesses_recorded": 0, "data_copies_recorded": 0}
+    analytics = DataDomain.query.filter_by(organization_id=org_id, name="Analytics").first()
+    if analytics is None:
+        analytics = DataDomain(name="Analytics", organization_id=org_id,
+                               description="The analytics data of Lantern Quay Systems")
+        db.session.add(analytics)
+        db.session.flush()
+    if DataEntity.query.filter_by(organization_id=org_id, name="Customer Analytics Profile").first() is None:
+        erd.create_entity(analytics, "Customer Analytics Profile", [
+            {"name": "customer_id", "data_type": "uuid", "is_primary_key": True, "is_foreign_key": False, "is_nullable": False},
+            {"name": "segment", "data_type": "varchar", "is_primary_key": False, "is_foreign_key": False, "is_nullable": True},
+            {"name": "lifetime_value", "data_type": "decimal", "is_primary_key": False, "is_foreign_key": False, "is_nullable": True},
+        ])
+    for domain in DataDomain.query.filter_by(organization_id=org_id).all():
+        if domain.name in _DATA_STEWARDS and not domain.data_steward:
+            domain.data_steward = _DATA_STEWARDS[domain.name]
+    entities = {e.name: e for e in DataEntity.query.filter_by(organization_id=org_id).all()}
+    apps = {a.name: a for a in ApplicationComponent.query.filter_by(organization_id=org_id).all()}
+    for name in _PERSONAL_DATA:
+        if name in entities:
+            entities[name].contains_pii = True
+            entities[name].data_classification = entities[name].data_classification or "confidential"
+    for entity_name, app_name in _SYSTEMS_OF_RECORD.items():
+        entity, app = entities.get(entity_name), apps.get(app_name)
+        if entity is not None and app is not None and entity.system_of_record_application_id is None:
+            entity.system_of_record_application_id = app.id
+            entity.system_of_record = app.name
+    db.session.flush()
+    for app_name, entity_name, letters in _DATA_ACCESS:
+        entity, app = entities.get(entity_name), apps.get(app_name)
+        if entity is None or app is None or not entity.archimate_element_id or not app.archimate_element_id:
+            continue
+        record_entity_access(entity, app, list(letters))
+        stats["data_accesses_recorded"] += 1
+    for source_name, target_name, kind in _DATA_COPIES:
+        source, target = entities.get(source_name), entities.get(target_name)
+        if source is None or target is None or not source.archimate_element_id or not target.archimate_element_id:
+            continue
+        exists = DataLineage.query.filter_by(
+            organization_id=org_id, archimate_element_id=source.archimate_element_id,
+            target_archimate_element_id=target.archimate_element_id).first()
+        if exists is None:
+            db.session.add(DataLineage(
+                name=f"{source.name} -> {target.name}", organization_id=org_id,
+                archimate_element_id=source.archimate_element_id,
+                target_archimate_element_id=target.archimate_element_id,
+                lineage_type=kind, source_system="Customer Portal", target_system="Data Warehouse"))
+            stats["data_copies_recorded"] += 1
+    db.session.flush()
+    return stats
+
+
+def _seed_boards(org_id, demo_user_id) -> dict:
+    """SAFe kinds, ADM-board solutions, a value stream and a requirements
+    backlog for the demonstration organisation.
+
+    Idempotent. A work package that already carries a kind is left alone, so
+    a card an architect has moved is not put back by a re-run.
+    """
+    from app.models.adm_deliverable import ADMDeliverable
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.implementation_migration import Deliverable
+    from app.models.solution_architect_models import (
+        RequirementType, SolutionRequirement,
+    )
+    from app.models.solution_models import Solution, solution_deliverables
+    from app.models.unified_capability import (
+        CapabilityValueStreamMapping, ValueStream, ValueStreamStage,
+    )
+    from app.modules.capabilities.services import value_stream_service
+    from app.services.adm_deliverable_service import seed_deliverables
+    from app.services.element_profile_service import (
+        read_profile, set_kind, set_kind_property, set_wsjf_components,
+    )
+
+    stats = {
+        "safe_kinds_set": 0,
+        "solutions_created": 0,
+        "solution_deliverables_created": 0,
+        "value_streams_created": 0,
+        "value_stream_stages_created": 0,
+        "stage_capabilities_linked": 0,
+        "backlog_requirements_created": 0,
+    }
+
+    # SAFe kinds
+    elements = _resolve_elements(org_id)
+    for name, state, bv, tc, rr, js in _SAFE_EPICS:
+        el = elements.get(name)
+        if el is None or read_profile(el).get("kind"):
+            continue
+        set_kind(el, "Epic", source="seed")
+        set_kind_property(el, "kanban_state", state, source="seed")
+        set_wsjf_components(el, bv, tc, rr, js, source="seed")
+        stats["safe_kinds_set"] += 1
+    for name, kind, bv, tc, rr, js in _SAFE_OTHER_KINDS:
+        el = elements.get(name)
+        if el is None or read_profile(el).get("kind"):
+            continue
+        set_kind(el, kind, source="seed")
+        set_wsjf_components(el, bv, tc, rr, js, source="seed")
+        stats["safe_kinds_set"] += 1
+    db.session.flush()
+
+    # Solutions, each with deliverables matched to the phase's TOGAF checklist
+    seed_deliverables()
+    templates = {
+        (t.phase, t.name): t.id for t in db.session.query(ADMDeliverable).filter_by(is_template=True)
+    }
+    solutions = {
+        s.name: s
+        for s in db.session.query(Solution).filter(Solution.organization_id == org_id)
+    }
+    for name, desc, phase, gov, deploy, deliverables in _SOLUTIONS:
+        if name in solutions:
+            # Seeded before deliverables carried a checklist item: match them now.
+            for d_name, _s, _t, d_template in deliverables:
+                if d_template is None:
+                    continue
+                for existing in (
+                    db.session.query(Deliverable)
+                    .join(solution_deliverables,
+                          solution_deliverables.c.deliverable_id == Deliverable.id)
+                    .filter(solution_deliverables.c.solution_id == solutions[name].id,
+                            Deliverable.name == d_name,
+                            Deliverable.adm_template_id.is_(None))
+                ):
+                    existing.adm_template_id = templates.get((phase, d_template))
+            continue
+        sol = Solution(
+            name=name, description=desc, organization_id=org_id,
+            adm_phase=phase, governance_status=gov, deployment_status=deploy,
+            complexity_level="medium", solution_owner="Ivo Reed",
+            created_by_id=demo_user_id,
+        )
+        db.session.add(sol)
+        db.session.flush()
+        solutions[name] = sol
+        stats["solutions_created"] += 1
+        for d_name, d_status, d_type, d_template in deliverables:
+            deliverable = Deliverable(
+                name=d_name, organization_id=org_id,
+                delivery_status=d_status, deliverable_type=d_type,
+                adm_template_id=templates.get((phase, d_template)),
+            )
+            db.session.add(deliverable)
+            db.session.flush()
+            db.session.execute(
+                solution_deliverables.insert().values(
+                    solution_id=sol.id, deliverable_id=deliverable.id)
+            )
+            stats["solution_deliverables_created"] += 1
+    db.session.flush()
+
+    # Value stream with four stages mapped to capabilities
+    vs_name, vs_code, vs_desc, stages = _VALUE_STREAM
+    vs = (
+        db.session.query(ValueStream)
+        .filter(ValueStream.organization_id == org_id, ValueStream.code == vs_code)
+        .first()
+    )
+    if vs is None:
+        vs = value_stream_service.create_value_stream({
+            "name": vs_name, "code": vs_code, "description": vs_desc,
+            "value_stream_type": "customer_facing",
+        })
+        stats["value_streams_created"] += 1
+    vs_id = vs.id
+    unified = _resolve_caps(org_id)
+    for order, (stage_name, cap_codes) in enumerate(stages, start=1):
+        stage = (
+            db.session.query(ValueStreamStage)
+            .filter(ValueStreamStage.value_stream_id == vs_id,
+                    ValueStreamStage.name == stage_name)
+            .first()
+        )
+        if stage is None:
+            stage = value_stream_service.create_stage(
+                vs_id, {"name": stage_name, "stage_order": order})
+            stats["value_stream_stages_created"] += 1
+        mapped = {
+            m.capability_id
+            for m in db.session.query(CapabilityValueStreamMapping)
+            .filter(CapabilityValueStreamMapping.value_stream_stage_id == stage.id)
+        }
+        for code in cap_codes:
+            cap = unified.get(code)
+            if cap is None or cap.id in mapped:
+                continue
+            value_stream_service.upsert_mapping_cell(
+                cap.id, vs_id, stage.id,
+                {"support_type": "primary", "support_level": 4, "impact_level": "high"},
+            )
+            stats["stage_capabilities_linked"] += 1
+
+    # Requirements name the capability they serve by its name
+    caps = {
+        c.name: c
+        for c in db.session.query(BusinessCapability)
+        .filter(BusinessCapability.organization_id == org_id)
+    }
+    # Requirements backlog
+    existing = {
+        r.name
+        for r in db.session.query(SolutionRequirement)
+        .filter(SolutionRequirement.organization_id == org_id)
+    }
+    for name, desc, status, moscow, phase, cap_name, sol_name in _BACKLOG_REQUIREMENTS:
+        if name in existing:
+            continue
+        cap = caps.get(cap_name)
+        sol = solutions.get(sol_name)
+        db.session.add(SolutionRequirement(
+            name=name, description=desc, status=status, moscow_priority=moscow,
+            togaf_phase=phase, requirement_type=RequirementType.FUNCTIONAL,
+            organization_id=org_id, owner="Ivo Reed",
+            capability_id=cap.id if cap else None,
+            solution_id=sol.id if sol else None,
+        ))
+        stats["backlog_requirements_created"] += 1
+    db.session.flush()
+    stats.update(_seed_solution_blueprints(org_id, solutions))
+    stats["solution_risks_created"] = _seed_solution_risks(org_id, solutions)
+    return stats
+
+
+# ── the blueprint of each seeded solution ─────────────────────────────────
+# The fifteen blueprint sections are filled from the seeded estate, not typed
+# in as figures: a narrative where the section is prose (summary, decisions),
+# and links to the seeded elements, capabilities, applications, value stream
+# and requirements where it is a view. The completeness, the governance state
+# and the compliance figure are then read back from the blueprint's own
+# scoring, so they cannot disagree with what is written.
+#
+# (name, type, layer, description): elements the blueprint needs that the
+# estate did not already have.
+_BLUEPRINT_NEW_ELEMENTS = [
+    ("Certificate issued within the agreed time", "Outcome", "strategy",
+     "A customer holds a signed calibration certificate within the turnaround agreed when the request was made."),
+    ("Field calibration service", "BusinessService", "business",
+     "The service a customer buys: an engineer visits, calibrates the instrument on site and certifies the result."),
+    ("Calibration Ledger API", "ApplicationInterface", "application",
+     "The interface the field tester and the scheduler use to read an instrument's history and write a new reading."),
+    ("Field Service Edge Network", "CommunicationNetwork", "technology",
+     "The mobile and site network that connects handheld testers to the ledger when an engineer is at a customer."),
+    ("Tester to Ledger Path", "Path", "technology",
+     "The encrypted path a handheld tester uses to send readings; it queues readings when the network is lost."),
+    ("Calibration rig go-live", "ImplementationEvent", "implementation",
+     "The date the first automated calibration rig starts certifying customer instruments."),
+    ("Supplier order confirmation", "BusinessService", "business",
+     "A supplier confirms, changes or rejects an order line and the buyer sees the answer the same day."),
+    ("Supplier Portal API", "ApplicationInterface", "application",
+     "The interface suppliers use to confirm delivery dates and upload certificates."),
+    ("Event backbone cut-over", "ImplementationEvent", "implementation",
+     "The weekend on which point-to-point feeds are switched off and every system publishes to the event backbone."),
+]
+
+# Plain descriptions for seeded elements the blueprints use. Only an element
+# with no description of its own gets one.
+_BLUEPRINT_DESCRIPTIONS = {
+    "Regulatory Compliance Officer": "Signs off that every certificate meets the accreditation body's rules.",
+    "Increasing regulatory scrutiny": "Inspectors now ask for the reference standard behind each reading, so records must be complete and traceable.",
+    "Improve calibration throughput": "Certify more instruments per engineer per week without lowering the accuracy checks.",
+    "Calibration records must be immutable": "A reading, once written, is never changed; a correction is a new, linked record.",
+    "Field devices must operate offline for 72 hours": "A handheld tester keeps recording readings with no signal for three days and sends them when it reconnects.",
+    "Customer data must be encrypted at rest": "Customer names, sites and instrument details are encrypted wherever they are stored.",
+    "System must support 500 concurrent field devices": "Five hundred testers can send readings at the same time without delay to any of them.",
+    "Must operate within existing network segments": "No new network zone is added; the platform uses the segments the security team already monitors.",
+    "Field calibration run": "An engineer visits a site, checks each instrument against the reference standard and records the as-found and as-left readings.",
+    "Field Service Engineer": "The person who travels to the customer and performs the calibration.",
+    "Calibration Ledger": "The system of record for every instrument, every reading and every certificate issued.",
+    "Calibration Lookup": "Returns an instrument's full calibration history from its serial number.",
+    "Field Service Scheduler": "Proposes which engineer visits which site, using location and certification.",
+    "Calibration result": "The as-found and as-left readings, the reference standard used and the pass or fail outcome.",
+    "Sensor reading": "One measured value from an instrument, with the time and the device that took it.",
+    "Quay Compute Pool": "The shared compute cluster that runs the ledger and the scheduler.",
+    "Field Service Edge": "The edge site where handheld testers synchronise before data reaches the central cluster.",
+    "Handheld Field Tester": "The rugged tablet-sized device an engineer carries to record readings on site.",
+    "Container Runtime": "Runs each platform service in its own container so a fault stays inside one service.",
+    "Calibration throughput gap": "Today an engineer certifies about half as many instruments a week as the target.",
+    "Baseline Architecture": "Paper job sheets, a spreadsheet of instruments and certificates typed by hand.",
+    "Target Architecture": "One ledger, tester readings captured on site and certificates generated automatically.",
+    "Calibration Automation Phase 1": "Capture readings on the handheld tester and write them straight to the ledger.",
+    "Calibration Automation Phase 2": "Generate and sign the certificate from the ledger without retyping.",
+    "Automated Calibration Rig": "A bench rig that runs the standard test sequence and records every reading itself.",
+    "Sensor Calibration": "Checking an instrument against a reference standard and certifying the result.",
+    "Supplier Management": "Choosing, onboarding and measuring the suppliers the business relies on.",
+    "Supplier Portal": "Where suppliers confirm orders, delivery dates and certificates.",
+    "Procurement Officer": "Raises orders and chases suppliers for confirmation.",
+    "Onboard new supplier": "Collects a new supplier's details, certificates and bank information before first order.",
+    "Supplier evaluation": "A supplier's delivery and quality record for the period.",
+    "Supplier performance gap": "Late and unconfirmed deliveries are found only when production stops.",
+    "Consolidate supplier base": "Reduce the number of suppliers for each component to two approved sources.",
+    "Supplier Consolidation Programme": "Moves suppliers onto the portal and retires the paper onboarding pack.",
+    "Consolidated Supplier Panel": "The approved list of suppliers per component category.",
+    "Reduce supplier lead time by 20%": "Shorten the time from order to delivery by a fifth.",
+    "Supply chain volatility": "Delivery dates move often, so planners need to see confirmations as they arrive.",
+    "Event Relay": "Delivers each event once to every system that subscribed to it.",
+    "Event Delivery": "The service that publishes an event and guarantees every subscriber receives it.",
+    "Event Transport": "The message transport that carries events between sites.",
+    "Event backbone resilience gap": "The relay runs in one region, so a regional outage stops every feed.",
+    "Migrate to cloud-hosted event backbone": "Move the relay to a managed service running in two regions.",
+    "Event Backbone Migration": "Moves each feed from a point-to-point link onto the backbone, one system at a time.",
+    "Cloud Event Backbone": "The managed event service every system publishes to.",
+    "No single point of failure in event path": "Every part of the event path has a second instance in a second region.",
+    "Failures must be visible within five minutes": "An operator sees a failed delivery within five minutes of it happening.",
+    "Recovery time objective of four hours": "After an outage the event path is working again within four hours.",
+    "Integration Bus": "The existing bus that carries the point-to-point feeds the backbone replaces.",
+    "Cost pressure on field operations": "Each field visit costs more than customers will pay, so every wasted trip matters.",
+    "Reduce field service cost per visit": "Cut the cost of a visit by sending the right engineer once.",
+}
+
+_FCP_SPEC = {
+    "fields": [
+        {"name": "instrument_serial", "type": "string", "description": "Serial number printed on the instrument."},
+        {"name": "reading_value", "type": "decimal", "description": "The measured value in the instrument's unit."},
+        {"name": "reference_standard", "type": "string", "description": "The standard the reading was checked against."},
+        {"name": "recorded_at", "type": "timestamp", "description": "When the engineer recorded the reading."},
+    ],
+    "integration": {
+        "protocol": "REST", "auth_method": "OAuth2",
+        "retry_policy": {"attempts": 5, "backoff": "exponential"},
+        "sla": {"max_latency_ms": 800},
+        "description": "Handheld testers send readings to the ledger and retry when the network drops.",
+    },
+    "deployment": {
+        "runtime": "python3.11", "framework": "fastapi", "database": "postgresql",
+        "cache": "redis", "messaging": "none", "container_runtime": "kubernetes",
+    },
+}
+
+
+def _spec_hash(value):
+    import hashlib
+    import json as _json
+    return hashlib.sha256(_json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
+# What each element type carries once its specification is confirmed: an
+# application element its fields and interface, a data object its integration
+# contract, a technology element its deployment; a component carries all three.
+_SPEC_PARTS = {
+    "ApplicationComponent": ("fields", "integration", "deployment"),
+    "ApplicationService": ("fields",),
+    "ApplicationInterface": ("fields",),
+    "DataObject": ("integration",),
+    "Node": ("deployment",),
+    "Device": ("deployment",),
+    "SystemSoftware": ("deployment",),
+}
+
+
+def _confirmed_spec(spec, element_type):
+    """The confirmed specification for an element of this type, each part
+    carrying a version and a hash of what was confirmed; None when the
+    element type carries no specification."""
+    parts = _SPEC_PARTS.get(element_type)
+    if not parts:
+        return None
+    out = {}
+    if "fields" in parts:
+        out.update({
+            "fields": spec["fields"], "fields_status": "confirmed",
+            "contract_status": "confirmed", "fields_version": 1,
+            "fields_hash": _spec_hash(spec["fields"]),
+        })
+    if "integration" in parts:
+        out["integrations"] = {"tester-to-ledger": dict(
+            spec["integration"], status="confirmed", version=1,
+            contract_hash=_spec_hash(spec["integration"]),
+        )}
+    if "deployment" in parts:
+        out.update({
+            "deployment": spec["deployment"], "deployment_status": "confirmed",
+            "deployment_version": 1, "deployment_hash": _spec_hash(spec["deployment"]),
+        })
+    return out
+
+
+# Per solution: the narrative sections, the elements each view section links,
+# the relationships that join them, and which linked component carries the
+# confirmed specification.
+_BLUEPRINTS = {
+    "Field Calibration Platform": {
+        "narratives": {
+            "executive_summary": (
+                "Lantern Quay certifies customer instruments by sending an engineer to site with paper job sheets. "
+                "Readings are retyped into a spreadsheet at the depot and the certificate follows days later, so an "
+                "engineer completes about half the instruments a week that the target needs, and inspectors now ask "
+                "for the reference standard behind every reading. The Field Calibration Platform replaces that with "
+                "one calibration ledger. The engineer records the as-found and as-left readings on a handheld tester "
+                "that works offline for three days, the scheduler proposes the nearest qualified engineer, and the "
+                "certificate is generated from the ledger rather than retyped. We expect throughput to rise by a "
+                "third in the first year, certificates to reach customers within the agreed turnaround, and every "
+                "reading to be traceable to a national standard for the inspector."
+            ),
+            "architecture_decisions": (
+                "We chose one calibration ledger as the system of record instead of keeping a spreadsheet per depot, "
+                "because inspectors need a single, unaltered history for each instrument. Readings are immutable: a "
+                "correction is a new record linked to the old one, which keeps the audit trail intact. The handheld "
+                "tester stores readings locally and sends them when it reconnects, rather than requiring a live "
+                "connection, because engineers often work in plant rooms with no signal. We rejected buying a "
+                "packaged calibration suite because it could not record the reference standard per reading and "
+                "would have forced a second system for certificates. The platform runs on the existing compute pool "
+                "and network segments so the security team does not take on a new zone. Each decision is recorded "
+                "with its rejected options in the decision register."
+            ),
+        },
+        "links": {
+            "vision_motivation": ["Regulatory Compliance Officer", "Increasing regulatory scrutiny",
+                                  "Improve calibration throughput", "Calibration records must be immutable"],
+            "value_stream_map": ["Calibration Request to Certificate", "Sensor Calibration",
+                                 "Certificate issued within the agreed time"],
+            "business_process_view": ["Field calibration run", "Field Service Engineer", "Field calibration service"],
+            "application_cooperation": ["Calibration Ledger", "Calibration Lookup", "Calibration Ledger API",
+                                        "Field Service Scheduler"],
+            "data_information": ["Calibration result", "Sensor reading"],
+            "deployment_view": ["Quay Compute Pool", "Handheld Field Tester", "Container Runtime"],
+            "network_communication": ["Field Service Edge Network", "Tester to Ledger Path", "Field Service Edge"],
+            "gap_analysis": ["Calibration throughput gap", "Baseline Architecture", "Target Architecture"],
+            "transition_roadmap": ["Baseline Architecture", "Target Architecture", "Calibration Automation Phase 1"],
+            "work_packages": ["Calibration Automation Phase 1", "Calibration Automation Phase 2",
+                              "Automated Calibration Rig", "Calibration rig go-live"],
+            "security_viewpoint": ["Must operate within existing network segments",
+                                   "Customer data must be encrypted at rest"],
+            "nfr_satisfaction": ["System must support 500 concurrent field devices",
+                                 "Field devices must operate offline for 72 hours"],
+            "requirements_traceability": ["Calibration records must be immutable", "Calibration Automation Phase 1",
+                                          "Calibration Automation Phase 2"],
+        },
+        "relationships": [
+            ("Calibration Request to Certificate", "Improve calibration throughput", "realization"),
+            ("Calibration Request to Certificate", "Sensor Calibration", "association"),
+            ("Calibration Request to Certificate", "Certificate issued within the agreed time", "realization"),
+            ("Regulatory Compliance Officer", "Increasing regulatory scrutiny", "association"),
+            ("Increasing regulatory scrutiny", "Improve calibration throughput", "influence"),
+            ("Calibration records must be immutable", "Improve calibration throughput", "realization"),
+            ("Field Service Engineer", "Field calibration run", "assignment"),
+            ("Field calibration run", "Field calibration service", "realization"),
+            ("Calibration Ledger", "Calibration Lookup", "realization"),
+            ("Calibration Ledger", "Calibration Ledger API", "composition"),
+            ("Field Service Scheduler", "Calibration Ledger API", "serving"),
+            ("Calibration Ledger", "Calibration result", "access"),
+            ("Calibration Ledger", "Sensor reading", "access"),
+            ("Quay Compute Pool", "Container Runtime", "composition"),
+            ("Handheld Field Tester", "Tester to Ledger Path", "association"),
+            ("Field Service Edge Network", "Tester to Ledger Path", "composition"),
+            ("Field Service Edge", "Field Service Edge Network", "association"),
+            ("Calibration throughput gap", "Baseline Architecture", "association"),
+            ("Calibration throughput gap", "Target Architecture", "association"),
+            ("Baseline Architecture", "Target Architecture", "triggering"),
+            ("Calibration Automation Phase 1", "Target Architecture", "realization"),
+            ("Calibration Automation Phase 1", "Calibration Automation Phase 2", "triggering"),
+            ("Calibration Automation Phase 2", "Automated Calibration Rig", "realization"),
+            ("Calibration Automation Phase 2", "Calibration rig go-live", "triggering"),
+            ("Must operate within existing network segments", "Customer data must be encrypted at rest", "association"),
+            ("System must support 500 concurrent field devices", "Field devices must operate offline for 72 hours", "association"),
+            ("Calibration Automation Phase 1", "Calibration records must be immutable", "realization"),
+        ],
+        "spec": _FCP_SPEC,
+        "capabilities": ["Sensor Calibration", "Field Service Management", "Order Fulfilment"],
+    },
+    "Supplier Collaboration Hub": {
+        "narratives": {
+            "executive_summary": (
+                "Purchasing at Lantern Quay chases suppliers by email and phone. Delivery dates change without "
+                "notice, certificates arrive as attachments that nobody files, and a late delivery is usually found "
+                "only when a production line stops. The Supplier Collaboration Hub gives every supplier a portal "
+                "where they confirm each order line, propose a new date and upload the certificate that goes with "
+                "it. Buyers see the answer the same day, planners see which orders are unconfirmed, and quality can "
+                "reject a delivery whose certificate is missing the reference standard. The first release covers "
+                "the twenty suppliers who deliver sensor components. We expect confirmed delivery dates for nine "
+                "orders in ten and a fifth off average lead time once the consolidated supplier panel is in place."
+            ),
+            "architecture_decisions": (
+                "Suppliers use the existing Supplier Portal rather than a new application, because it already "
+                "holds their identities and the order history, and adding a second login would have split the "
+                "record. Order confirmation is exposed through an interface so a large supplier can connect its own "
+                "system instead of typing into the portal. We decided that a certificate without a reference "
+                "standard is rejected at upload, not at goods-in, so the problem reaches the supplier while the "
+                "order is still open. We rejected emailing a daily spreadsheet because nobody owned the reply. "
+                "Supplier performance is calculated from confirmed and delivered dates held in the portal, and "
+                "that one calculation feeds the scorecard buyers use, so there is a single figure to argue about."
+            ),
+        },
+        "links": {
+            "vision_motivation": ["Procurement Officer", "Supply chain volatility", "Reduce supplier lead time by 20%"],
+            "business_process_view": ["Onboard new supplier", "Procurement Officer", "Supplier order confirmation"],
+            "application_cooperation": ["Supplier Portal", "Supplier Portal API"],
+            "data_information": ["Supplier evaluation", "Supplier Portal"],
+            "gap_analysis": ["Supplier performance gap", "Baseline Architecture", "Target Architecture"],
+            "work_packages": ["Supplier Consolidation Programme", "Consolidated Supplier Panel"],
+        },
+        "capabilities": ["Supplier Management", "Regulatory Compliance"],
+        "relationships": [
+            ("Supply chain volatility", "Reduce supplier lead time by 20%", "influence"),
+            ("Procurement Officer", "Onboard new supplier", "assignment"),
+            ("Onboard new supplier", "Supplier order confirmation", "realization"),
+            ("Supplier Portal", "Supplier Portal API", "composition"),
+            ("Supplier Portal", "Supplier evaluation", "access"),
+            ("Supplier performance gap", "Baseline Architecture", "association"),
+            ("Supplier performance gap", "Target Architecture", "association"),
+            ("Supplier Consolidation Programme", "Consolidated Supplier Panel", "realization"),
+        ],
+    },
+    "Event-Driven Operations Backbone": {
+        "narratives": {
+            "executive_summary": (
+                "Operations systems at Lantern Quay talk to each other through dozens of point-to-point feeds. "
+                "When one feed breaks, nobody knows until a downstream team notices missing data, and the event "
+                "relay that carries the most important events runs in a single region. The Event-Driven Operations "
+                "Backbone replaces those feeds with one governed backbone: each system publishes a change once and "
+                "every interested system receives it, with failed deliveries retried and then raised to an "
+                "operator within five minutes. The backbone runs in two regions so one regional outage no longer "
+                "stops operations, and it has been approved by the Architecture Review Board. Migration is "
+                "feed by feed, so the business keeps running while the old links are switched off one at a time."
+            ),
+            "architecture_decisions": (
+                "We moved to a managed event service rather than extending the in-house relay, because the relay "
+                "was a single point of failure and the team could not staff a second region. Every event is "
+                "published once and consumed by as many systems as need it, which removes the pairwise feeds and "
+                "the reconciliation they required. A failed delivery is retried three times and then raised to an "
+                "operator, rather than dropped silently. We kept the Integration Bus in place during migration "
+                "so each feed can be moved and rolled back independently. We rejected a big-bang cut-over "
+                "because a failure would have stopped dispatch and certification at the same time. The Architecture "
+                "Review Board approved the managed service and asked for a recovery objective of four hours."
+            ),
+        },
+        "links": {
+            "application_cooperation": ["Event Relay", "Event Delivery"],
+            "deployment_view": ["Event Transport", "Quay Compute Pool"],
+            "gap_analysis": ["Event backbone resilience gap", "Baseline Architecture", "Target Architecture"],
+            "work_packages": ["Event Backbone Migration", "Cloud Event Backbone", "Event backbone cut-over"],
+            "security_viewpoint": ["No single point of failure in event path", "Failures must be visible within five minutes"],
+            "nfr_satisfaction": ["Recovery time objective of four hours"],
+        },
+        "capabilities": ["Event Processing"],
+        "relationships": [
+            ("Event Relay", "Event Delivery", "realization"),
+            ("Event Transport", "Event Relay", "serving"),
+            ("Quay Compute Pool", "Event Transport", "realization"),
+            ("Event backbone resilience gap", "Baseline Architecture", "association"),
+            ("Event backbone resilience gap", "Target Architecture", "association"),
+            ("Event Backbone Migration", "Cloud Event Backbone", "realization"),
+            ("Event Backbone Migration", "Event backbone cut-over", "triggering"),
+            ("No single point of failure in event path", "Failures must be visible within five minutes", "association"),
+        ],
+    },
+}
+
+
+# Risks of each seeded solution: (title, probability, impact, status, owner,
+# mitigation). Spread across the grid on purpose, including a likely risk with
+# a small impact and an unlikely one with a large impact.
+_SOLUTION_RISKS = {
+    "Field Calibration Platform": [
+        ("Engineers keep using paper job sheets after go-live", 5, 5, "open", "Ivo Reed",
+         "Run two depots on the tester for a month, keep a paper fallback until the depot lead signs off."),
+        ("Readings are lost when a tester loses signal", 3, 5, "mitigated", "IT Operations Lead",
+         "The tester stores every reading locally and sends it on reconnect; tested with a 72-hour outage."),
+        ("A reading is saved without its reference standard", 4, 4, "open", "Calibration Specialist",
+         "The tester will not accept a reading until a reference standard is chosen."),
+        ("Historic certificates are dropped during the ledger load", 4, 4, "open", "Regulatory Compliance Officer",
+         "Reconcile certificate counts per depot before and after each load."),
+        ("Accreditation audit delays certificate signing", 2, 4, "accepted", "Regulatory Compliance Officer",
+         "Accepted for the first quarter; the audit date is known and signing is planned around it."),
+        ("A tester battery fails on a long site visit", 5, 1, "open", "Field Service Lead",
+         "Issue a spare battery pack with each tester."),
+    ],
+    "Supplier Collaboration Hub": [
+        ("Suppliers do not adopt the portal", 4, 3, "open", "Procurement Officer",
+         "Onboard the twenty sensor-component suppliers first, with a named buyer for each."),
+        ("The portal is unavailable at month end", 3, 4, "open", "IT Operations Lead",
+         "Add a second instance before the first month-end close."),
+        ("A valid certificate file is rejected on upload", 2, 2, "mitigated", "Quality Assurance Lead",
+         "Accept PDF and image files; a rejected upload tells the supplier why."),
+    ],
+    "Event-Driven Operations Backbone": [
+        ("The second region is not funded after cut-over", 2, 5, "open", "Ivo Reed",
+         "Hold the second-region budget in the migration programme until both regions are live."),
+        ("A feed is switched off before its replacement is proven", 3, 5, "mitigated", "IT Operations Lead",
+         "Each feed runs on both paths for two weeks and is switched off only when the counts match."),
+        ("An operator misses a failed-delivery alert", 1, 3, "accepted", "IT Operations Lead",
+         "Alerts go to the on-call rota and are repeated after five minutes."),
+    ],
+}
+
+
+def _seed_solution_risks(org_id, solutions) -> int:
+    """Record each solution's risks in the one risk register, linked to the
+    solution the way the solution's own risk list reads them."""
+    from app.models.risk import Risk, RiskStatus
+    from app.models.risk_entity_link import RiskEntityLink
+
+    existing = {
+        r.title: r
+        for r in db.session.query(Risk).filter(Risk.organization_id == org_id)
+    }
+    created = 0
+    for sol_name, rows in _SOLUTION_RISKS.items():
+        sol = solutions.get(sol_name)
+        if sol is None:
+            continue
+        for title, probability, impact, status, owner, mitigation in rows:
+            risk = existing.get(title)
+            if risk is None:
+                risk = Risk(
+                    title=title, description=mitigation, likelihood=probability,
+                    impact=impact, status=RiskStatus(status), owner=owner,
+                    mitigation_plan=mitigation, organization_id=org_id,
+                    solution_id=sol.id,
+                )
+                db.session.add(risk)
+                db.session.flush()
+                created += 1
+            linked = (
+                db.session.query(RiskEntityLink)
+                .filter_by(risk_id=risk.id, entity_type="solution", entity_id=sol.id)
+                .first()
+            )
+            if linked is None:
+                db.session.add(RiskEntityLink(
+                    risk_id=risk.id, entity_type="solution", entity_id=sol.id,
+                    organization_id=org_id))
+    db.session.flush()
+    return created
+
+
+def _seed_solution_blueprints(org_id, solutions) -> dict:
+    """Write each seeded solution's blueprint and read its governance state
+    back from the blueprint's own scoring. Idempotent: an element keeps the
+    description it has, a link or relationship already present is not doubled,
+    and a narrative an architect has edited is not overwritten."""
+    from app.models import ArchiMateRelationship
+    from app.models.archimate_core import ArchitectureModel
+    from app.services.archimate_backbone import create_backbone_element
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import SolutionArchiMateElement as SolutionElementLink
+    from app.models.solution_models import SolutionCapabilityMapping
+    from app.modules.solutions_strategic.v2.services.blueprint_completeness_service import (
+        BlueprintCompletenessService,
+    )
+
+    stats = {
+        "blueprint_elements_created": 0,
+        "blueprint_elements_described": 0,
+        "blueprint_links_created": 0,
+        "blueprint_relationships_created": 0,
+        "blueprint_narratives_written": 0,
+        "blueprint_capabilities_mapped": 0,
+    }
+    business_caps = {
+        c.name: c
+        for c in db.session.query(BusinessCapability)
+        .filter(BusinessCapability.organization_id == org_id)
+    }
+    elements = _resolve_elements(org_id)
+    for name, etype, layer, desc in _BLUEPRINT_NEW_ELEMENTS:
+        if name in elements:
+            continue
+        elements[name] = create_backbone_element(
+            element_type=etype, layer=layer, name=name, description=desc,
+            organization_id=org_id,
+        )
+        stats["blueprint_elements_created"] += 1
+    for name, desc in _BLUEPRINT_DESCRIPTIONS.items():
+        el = elements.get(name)
+        if el is not None and not (el.description or "").strip():
+            el.description = desc
+            stats["blueprint_elements_described"] += 1
+    db.session.flush()
+
+    svc = BlueprintCompletenessService()
+    for sol_name, plan in _BLUEPRINTS.items():
+        sol = solutions.get(sol_name)
+        if sol is None:
+            continue
+        arch = (
+            db.session.query(ArchitectureModel)
+            .filter(ArchitectureModel.organization_id == org_id,
+                    ArchitectureModel.solution_id == sol.id)
+            .first()
+        )
+        if arch is None:
+            arch = ArchitectureModel(
+                name="%s architecture" % sol_name, version="1.0",
+                organization_id=org_id, solution_id=sol.id,
+            )
+            db.session.add(arch)
+            db.session.flush()
+
+        narratives = dict(sol.section_narratives or {})
+        for section, text in plan["narratives"].items():
+            if not (narratives.get(section) or "").strip():
+                narratives[section] = text
+                stats["blueprint_narratives_written"] += 1
+        sol.section_narratives = narratives
+
+        linked = {
+            row.element_id: row
+            for row in db.session.query(SolutionElementLink)
+            .filter(SolutionElementLink.solution_id == sol.id)
+        }
+        for names in plan["links"].values():
+            for name in names:
+                el = elements.get(name)
+                if el is None:
+                    continue
+                if el.architecture_id is None:
+                    el.architecture_id = arch.id
+                spec = _confirmed_spec(plan["spec"], el.type) if plan.get("spec") else None
+                row = linked.get(el.id)
+                if row is not None:
+                    if row.spec_data is None and spec is not None:
+                        row.spec_data = spec
+                    continue
+                linked[el.id] = SolutionElementLink(
+                    solution_id=sol.id, layer_type=(el.layer or "").lower() or None,
+                    element_id=el.id, element_table="archimate_elements",
+                    element_name=el.name, element_role="primary", spec_data=spec,
+                )
+                db.session.add(linked[el.id])
+                stats["blueprint_links_created"] += 1
+        db.session.flush()
+
+        existing = {
+            (r.source_id, r.target_id)
+            for r in db.session.query(ArchiMateRelationship)
+            .filter(ArchiMateRelationship.organization_id == org_id)
+        }
+        for src_name, tgt_name, rel_type in plan["relationships"]:
+            src, tgt = elements.get(src_name), elements.get(tgt_name)
+            if src is None or tgt is None or (src.id, tgt.id) in existing:
+                continue
+            db.session.add(ArchiMateRelationship(
+                source_id=src.id, target_id=tgt.id, type=rel_type,
+                architecture_id=arch.id, organization_id=org_id,
+            ))
+            existing.add((src.id, tgt.id))
+            stats["blueprint_relationships_created"] += 1
+        db.session.flush()
+
+        sol.business_sponsor = sol.business_sponsor or "Chief Operations Officer"
+        sol.technical_lead = sol.technical_lead or "Head of Engineering"
+        mapped = {
+            m.capability_id
+            for m in db.session.query(SolutionCapabilityMapping)
+            .filter(SolutionCapabilityMapping.solution_id == sol.id)
+        }
+        for cap_name in plan["capabilities"]:
+            cap = business_caps.get(cap_name)
+            if cap is not None and cap.id not in mapped:
+                db.session.add(SolutionCapabilityMapping(
+                    solution_id=sol.id, capability_id=cap.id, support_level="full",
+                    notes="Capability this solution serves, from the demonstration estate.",
+                ))
+                stats["blueprint_capabilities_mapped"] += 1
+        db.session.flush()
+
+        # Score the blueprint, then let the facts decide the governance
+        # state: a solution whose every section clears the ARB threshold is
+        # ready to be proposed; an ARB decision (approved or rejected) and an
+        # open review are human acts and are left alone.
+        scores = svc.score_all(sol.id)
+        if (sol.governance_status or "draft") in ("draft", "proposed"):
+            sol.governance_status = (
+                "proposed" if svc.check_arb_ready(sol.id, scores)["ready"] else "draft"
+            )
+    db.session.flush()
+    return stats
+
+
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
     Returns counts keyed by entity kind.  Idempotent: re-running creates
-    nothing new and changes nothing.
+    nothing new and changes nothing. The records are written with their
+    dates spread over the last 90 days, so their history is sealed once.
     """
+    from app.services.history_spread import HAND_LABEL, dated_history
+
+    with dated_history(rest=("manual", HAND_LABEL)):
+        return _seed_demo_company()
+
+
+def _seed_demo_company() -> dict:
     from app.models.organization import Organization
     from app.models.user import User, Role
     from app.models import ArchiMateElement, ArchiMateRelationship
@@ -1285,13 +2516,23 @@ def seed_demo_company() -> dict:
     if org is None:
         from app.services.billing_plans import set_contract_plan
 
-        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG)
+        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG, settings={"currency_code": "GBP"}, reporting_currency="GBP")
         db.session.add(org)
         db.session.flush()
         # Enterprise has no people limit, so the demo cast below fits.
         set_contract_plan(org, "enterprise", None)
         stats["organization_created"] = 1
     else:
+        # Ensure the demo organisation has its currency set.
+        changed = False
+        if not (org.settings or {}).get("currency_code"):
+            org.settings = {**(org.settings or {}), "currency_code": "GBP"}
+            changed = True
+        if not org.reporting_currency:
+            org.reporting_currency = "GBP"
+            changed = True
+        if changed:
+            db.session.flush()
         stats["organization_created"] = 0
     org_id = org.id
     # Commit the org row before tenant_scope, which calls db.session.remove()
@@ -1379,6 +2620,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
+            licence, infra, total, area = _app_figures(app_name)
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -1390,9 +2632,10 @@ def seed_demo_company() -> dict:
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
                 implementation_date=_dt.date(2022, 3, 15),
                 go_live_date=_dt.date(2022, 6, 1),
-                total_cost_of_ownership=_APP_TOTAL_COST,
-                license_cost_annual=_APP_LICENSE_ANNUAL,
-                infrastructure_cost_monthly=_APP_INFRASTRUCTURE_MONTHLY,
+                total_cost_of_ownership=total,
+                license_cost_annual=licence,
+                infrastructure_cost_monthly=infra,
+                business_domain=area,
                 business_criticality="high",
                 strategic_importance="high",
             )
@@ -1432,6 +2675,7 @@ def seed_demo_company() -> dict:
         existing_owner_emails = {
             u.email for u in User.query.filter_by(organization_id=org_id).all()
         }
+        viewer_role = Role.query.filter_by(name="Viewer").first()
         owner_users_created = 0
         for first, last, email in _OWNER_USERS:
             if email in existing_owner_emails:
@@ -1444,11 +2688,28 @@ def seed_demo_company() -> dict:
                 organization_id=org_id,
                 confirmed=True,
                 role=viewer_role,
-                enterprise_role="enterprise_architect",
+                enterprise_role=(
+                    "business_architect"
+                    if email == _DEMO_BUSINESS_ARCHITECT_EMAIL
+                    else "enterprise_architect"
+                ),
             )
             db.session.add(u)
             owner_users_created += 1
         if owner_users_created:
+            db.session.flush()
+        reader = User.query.filter_by(
+            email=_DEMO_READER_EMAIL, organization_id=org_id
+        ).first()
+        if reader is not None and reader.enterprise_role != _DEMO_READER_PERSONA:
+            reader.enterprise_role = _DEMO_READER_PERSONA
+            db.session.flush()
+
+        architect = User.query.filter_by(
+            email=_DEMO_BUSINESS_ARCHITECT_EMAIL, organization_id=org_id
+        ).first()
+        if architect is not None and architect.enterprise_role != "business_architect":
+            architect.enterprise_role = "business_architect"
             db.session.flush()
 
         apps = _resolve_apps(org_id)
@@ -1492,7 +2753,7 @@ def seed_demo_company() -> dict:
         from app.models.enterprise_intelligence import (
             ApplicationOwnership, OrganizationUnit,
         )
-        from app.services.application_cost_accessor import sync_cost_fact
+        from app.services.application_cost_accessor import state_contract, sync_cost_fact
 
         units = {
             u.code: u
@@ -1543,19 +2804,25 @@ def seed_demo_company() -> dict:
                 ))
                 held.add((app.id, unit.id, "Business Owner"))
                 changed = True
-            # The total is the sum of its components, whatever an earlier
-            # seed wrote.
-            if (app.license_cost_annual == _APP_LICENSE_ANNUAL
-                    and app.infrastructure_cost_monthly == _APP_INFRASTRUCTURE_MONTHLY
-                    and app.total_cost_of_ownership != _APP_TOTAL_COST):
-                app.total_cost_of_ownership = _APP_TOTAL_COST
+            # The figures are the application's own, whatever an earlier seed wrote.
+            licence, infra, total, area = _app_figures(app_name)
+            if (app.license_cost_annual, app.infrastructure_cost_monthly, app.total_cost_of_ownership,
+                    app.business_domain) != (licence, infra, total, area):
+                app.license_cost_annual, app.infrastructure_cost_monthly = licence, infra
+                app.total_cost_of_ownership, app.business_domain = total, area
                 changed = True
             agreed += changed
         db.session.flush()
         for app in _resolve_apps(org_id).values():
             for column in ("total_cost_of_ownership", "license_cost_annual",
                            "infrastructure_cost_monthly"):
-                sync_cost_fact(app, column, "USD")
+                sync_cost_fact(app, column)
+            # The Spend page reads contracts, so a vendor-supplied application states its cost there
+            # too: the run cost on the Overview, the Spend page and the canvas's cost box then agree.
+            profile = _APP_PROFILE.get(app.name)
+            if (profile and "in-house" not in profile[2].lower() and not profile[0].startswith("5.")
+                    and app.total_cost_of_ownership):
+                state_contract(app, profile[2], app.total_cost_of_ownership, months_ago=3 + app.id % 8)
         db.session.flush()
         stats["application_figures_agreed"] = agreed
 
@@ -1614,6 +2881,109 @@ def seed_demo_company() -> dict:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
         db.session.flush()
 
+        # Business domains for the heat map (also for a database seeded before
+        # capabilities carried one: a domain an editor has set is left alone).
+        from app.models.unified_capability import BusinessDomain
+
+        domain_of = {}
+        for dcode, (dname, members) in _CAPABILITY_DOMAINS.items():
+            domain = BusinessDomain.query.filter_by(code=dcode).first()
+            if domain is None:
+                domain = BusinessDomain(code=dcode, name=dname,
+                                        description="%s capabilities of Lantern Quay Systems" % dname)
+                db.session.add(domain)
+                db.session.flush()
+            for member in members:
+                domain_of["LQ-CAP-" + member] = (domain.id, dname)
+        for cap in db.session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org_id):
+            if cap.domain_id is None and cap.code in domain_of:
+                cap.domain_id = domain_of[cap.code][0]
+        for cap in db.session.query(BusinessCapability).filter(BusinessCapability.organization_id == org_id):
+            if not cap.business_domain and cap.code in domain_of:
+                cap.business_domain = domain_of[cap.code][1]
+        db.session.flush()
+
+        # The judgment replaces the starting value, but only while the capability still
+        # carries the starting value: a type an editor has changed is theirs.
+        from app.services.capability_type import default_capability_type
+
+        for cap in db.session.query(UnifiedCapability).filter(
+            UnifiedCapability.organization_id == org_id
+        ):
+            chosen = _CAPABILITY_TYPES.get(cap.code)
+            if chosen and cap.capability_type in (
+                None, default_capability_type(cap.category, cap.level),
+            ):
+                cap.capability_type = chosen
+        db.session.flush()
+
+        # ── 7a. every capability has its model element and its canonical record ──
+        # The coverage page, the genome slice and the chat read the unified store
+        # with a model element on both ends; a capability without either reads as
+        # unsupported however many systems run it.
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_application_capability_mapping import (
+            UnifiedApplicationCapabilityMapping,
+        )
+        from app.modules.capabilities.services.capability_service import ensure_capability_record
+        from app.services.archimate_backbone import create_backbone_element
+
+        from app.models.archimate_core import ArchiMateElement
+
+        unified_by_code = {u.code: u for u in _resolve_caps(org_id).values()}
+        # Re-read: writing a capability record can already have mirrored its element.
+        elements = _resolve_elements(org_id)
+        elements_made = 0
+        for name, code, _cur, _tgt, level in _CAPABILITIES:
+            bc_now = existing_bcs.get(code)
+            element = (
+                db.session.get(ArchiMateElement, bc_now.archimate_element_id)
+                if bc_now is not None and bc_now.archimate_element_id is not None else None
+            )
+            if element is None:
+                element = elements.get(name)
+            if element is None or element.type != "Capability":
+                element = create_backbone_element(
+                    element_type="Capability", layer="strategy", name=name,
+                    organization_id=org_id,
+                )
+                elements[name] = element
+                elements_made += 1
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.archimate_element_id is None:
+                bc.archimate_element_id = element.id
+            ucap = unified_by_code.get(code)
+            if ucap is None:
+                ucap, _created = ensure_capability_record(
+                    name=name, code=code, level=level, organization_id=org_id,
+                    archimate_element_id=element.id,
+                    domain_id=(domain_of.get(code) or (None,))[0],
+                )
+                unified_by_code[code] = ucap
+            elif ucap.archimate_element_id is None:
+                ucap.archimate_element_id = element.id
+        for demo_app in db.session.query(ApplicationComponent).filter(
+            ApplicationComponent.organization_id == org_id
+        ):
+            if demo_app.archimate_element_id is None:
+                match = elements.get(demo_app.name)
+                if match is not None and match.type == "ApplicationComponent":
+                    demo_app.archimate_element_id = match.id
+        db.session.flush()
+        stats["capability_elements_created"] = elements_made
+
+        # Link each business capability to its unified twin (ADR 0008's FK),
+        # so vendor discovery's capability bridge (vendor_analysis_routes.py)
+        # resolves a selection through the FK instead of resting on name
+        # equality alone. The pair created or confirmed just above shares a
+        # code, which is the stable join key (two capabilities can share a
+        # display name; they cannot share a code within this seed).
+        for code, ucap in unified_by_code.items():
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.deprecated_in_favor_of_id is None:
+                bc.deprecated_in_favor_of_id = ucap.id
+        db.session.flush()
+
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
 
@@ -1623,9 +2993,30 @@ def seed_demo_company() -> dict:
             .filter(ApplicationCapabilityMapping.organization_id == org_id)
             .all()
         }
+        unified_mapped = {
+            (m.application_component_id, m.unified_capability_id)
+            for m in db.session.query(UnifiedApplicationCapabilityMapping)
+            .join(ApplicationComponent,
+                  ApplicationComponent.id == UnifiedApplicationCapabilityMapping.application_component_id)
+            .filter(ApplicationComponent.organization_id == org_id)
+            .all()
+        }
+        unified_created = 0
         mappings_created = 0
         for app_name, app in _resolve_apps(org_id).items():
             profile = _APP_PROFILE.get(app_name)
+            ucap = unified_by_code.get(profile[3]) if profile else None
+            if ucap is not None and (app.id, ucap.id) not in unified_mapped:
+                db.session.add(UnifiedApplicationCapabilityMapping(
+                    unified_capability_id=ucap.id,
+                    application_component_id=app.id,
+                    support_level="full",
+                    coverage_percentage=80,
+                    relationship_type="supports",
+                    is_active=True,
+                ))
+                unified_mapped.add((app.id, ucap.id))
+                unified_created += 1
             bc = existing_bcs.get(profile[3]) if profile else None
             if bc is None or (app.id, bc.id) in mapped:
                 continue
@@ -1639,9 +3030,10 @@ def seed_demo_company() -> dict:
                 is_active=True,
             ))
             mappings_created += 1
-        if mappings_created:
+        if mappings_created or unified_created:
             db.session.flush()
         stats["capability_mappings_created"] = mappings_created
+        stats["unified_capability_mappings_created"] = unified_created
 
         # ── 7c. architecture review board queue ─────────────────────────
         from app.models.architecture_review_board import ARBReviewItem
@@ -1713,6 +3105,34 @@ def seed_demo_company() -> dict:
         if risks_created:
             db.session.flush()
         stats["risks_created"] = risks_created
+
+        # Two risks whose score has risen in the last week, so the weekly
+        # briefing has movement to report. Skipped once a risk has history.
+        from app.models.risk_score_history import RiskScoreHistory
+
+        rising_created = 0
+        for title, was, now_score in _RISING_RISKS:
+            risk = (
+                db.session.query(Risk)
+                .filter(Risk.organization_id == org_id, Risk.title == title)
+                .first()
+            )
+            if risk is None or db.session.query(RiskScoreHistory).filter(
+                RiskScoreHistory.risk_id == risk.id
+            ).first():
+                continue
+            risk.residual_likelihood, risk.residual_impact = now_score
+            for (likelihood, impact), days_ago in ((was, 21), (now_score, 2)):
+                db.session.add(RiskScoreHistory(
+                    risk_id=risk.id, score_kind="residual",
+                    likelihood=likelihood, impact=impact,
+                    recorded_at=_dt.datetime.utcnow() - _dt.timedelta(days=days_ago),
+                    organization_id=org_id,
+                ))
+            rising_created += 1
+        if rising_created:
+            db.session.flush()
+        stats["rising_risks_created"] = rising_created
 
         # ── 9. programmes ───────────────────────────────────────────────
         existing_progs = {
@@ -1900,15 +3320,23 @@ def seed_demo_company() -> dict:
             .first()
         )
         if canvas_exists is None:
-            db.session.add(BusinessModelCanvas(
+            canvas = BusinessModelCanvas(
                 organization_id=org_id,
                 name=_CANVAS_NAME,
                 description=_CANVAS_DESCRIPTION,
                 operating_model_type=_CANVAS_OPERATING_MODEL,
-                **_CANVAS_BLOCKS,
-            ))
+            )
+            db.session.add(canvas)
             db.session.flush()
+        else:
+            canvas = BusinessModelCanvas.query.filter_by(
+                id=canvas_exists[0], organization_id=org_id
+            ).first()
+        stats["canvas_entries_created"] = _seed_canvas_model(org_id, canvas)
         stats["business_model_canvases_created"] = 0 if canvas_exists else 1
+        from app.commands import seed_framework_canvases
+
+        stats["framework_canvases_created"], stats["framework_canvas_rows_created"] = seed_framework_canvases.seed(org_id)
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {
@@ -1991,6 +3419,12 @@ def seed_demo_company() -> dict:
                 work_package_service.link_gap(
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
         db.session.flush()
+
+        demo_user = User.query.filter_by(
+            email=_DEMO_USER_EMAIL, organization_id=org_id).first()
+        stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_data_model(org_id))
+        stats.update(_seed_data_flows(org_id))
 
         db.session.commit()
 

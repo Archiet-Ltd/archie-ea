@@ -1,14 +1,13 @@
 ---
 page_family: role
 role_group: technology-leadership
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
-description: "Entelim's CIO dashboard for CTOs: a scorecard, rationalisation, roadmaps and investment analysis built on one shared model. Start free, see pricing today."
+description: "Entelim's CIO dashboard for CTOs: a scorecard, rationalisation, roadmaps and the review board built on one shared model. Start free, see pricing today."
 source: app/utils/role_access.py (ROLE_CTO, SIDEBAR_ZONES, _MY_WORK_LINKS, _BOARD_ROLES),
   app/modules/architecture/services/cto_scorecard_service.py,
   app/modules/dashboard/v2/routes/dashboard_views.py (health_scorecard),
-  app/modules/architecture/routes/architecture_routes.py (investment_priorities),
   app/modules/applications/routes/coverage_routes.py, app/modules/capabilities/routes/ownership_routes.py,
   content/pages/modules/{rationalization,roadmaps,business-case}.md,
   content/pages/function-per-segment/{uc-s2-03-duplicate-spend,uc-s2-08-risk-blast-radius,
@@ -43,7 +42,7 @@ time, rather than a slide rebuilt by hand before each board meeting.
 
 ## The screens you will use
 
-- **Ask**, the same plain-language question screen every role starts from, for a quick check before
+- **The AI chat**, the one place every role asks in plain words, for a quick check before
   you open a dashboard.
 - **The CTO scorecard and the health scorecard**, together giving the share of your applications
   still on a supported vendor version, the oldest open architecture exceptions to escalate, and one
@@ -52,8 +51,6 @@ time, rather than a slide rebuilt by hand before each board meeting.
 - **Rationalisation** — see [Rationalisation](/modules/rationalization) — scoring every application
   Tolerate, Invest, Migrate or Eliminate, and turning the result into the consolidation list that
   answers what you're paying for twice.
-- **Investment analysis**, inside [Business Case](/modules/business-case), scoring each capability's
-  priority for new spend against its strategic value, coverage, maturity and risk.
 - **Ownership coverage and capabilities with no owner**, broken down by business unit, so a gap in
   accountability is visible before an auditor finds it.
 - **Roadmaps** — see [Roadmaps](/modules/roadmaps) — the gap register between today's stages and the
@@ -73,8 +70,9 @@ work on [enterprise architect tools](/roles/enterprise-architects).
 2. Check rationalisation's consolidation list for what you're paying for twice, and ownership
    coverage for which business unit has an application nobody has claimed.
 3. Open the roadmap's gap register for the stage a proposed change sits in, and the business case
-   behind it, with capex, annual opex, three-year TCO, ROI, payback and NPV drawn from the capability,
-   initiative or solution it's linked to.
+   behind it, with the capex, annual opex, three-year TCO, ROI, payback and NPV recorded on it. The
+   costs of the capability, initiative or solution it's linked to can fill blank cost fields and are
+   shown beside what was entered as a cross-check.
 4. Send the change to the review board, and decide it once its sessions and evidence are recorded.
 5. Set direction on the tech radar for anything newly adopted, trialled, assessed or put on hold.
 
@@ -96,7 +94,7 @@ organisation's data, on every plan including the free one.
 
 The scorecards answer from what is recorded against an application: one with no vendor product
 linked counts toward neither a supported nor an unsupported share, rather than being guessed into
-one. Investment analysis scores capabilities, not business cases, and a business case's benefit and
+one. A business case's benefit and
 payback figures are the ones you enter, not ones Entelim estimates for you. A review board decision
 is still made by the people sitting on it; Entelim holds the evidence and the record, not the
 judgement.
@@ -112,7 +110,7 @@ is sold by contract, from $24,000 a year, and adds SAML single sign-on and unlim
 
 ### Can the board see the numbers without a paid seat?
 
-Yes. Anyone who only reads a dashboard or asks a question on the Ask screen is free, on every plan
+Yes. Anyone who only reads a dashboard or asks a question in the AI chat is free, on every plan
 including Enterprise. An editor seat is only needed to change the model itself: updating a roadmap,
 recording a rationalisation decision, or taking a case through the review board.
 
@@ -132,7 +130,7 @@ renewals, plus a read-out call to walk your team through what it found.
 
 ### Do I need to learn ArchiMate to use the CIO dashboard?
 
-No. The CTO and CIO workspace is built around dashboards you read and a plain-language Ask screen,
+No. The CTO and CIO workspace is built around dashboards you read and a plain-language AI chat,
 not a modelling canvas. Architects on your team keep working in ArchiMate underneath; you see the
 scorecards, the consolidation list and the roadmap it produces, not the notation behind it.
 

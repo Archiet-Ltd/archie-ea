@@ -1,0 +1,139 @@
+{# design-block: board #}
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'macros/kanban_board.html' import kanban_board, kanban_card %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/avatar.html' import avatar %}
+
+{% block title %}SAFe Portfolio Kanban{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+    {% macro _page_actions() %}
+        {% if can_write %}
+        {{ button(text='Add epic', icon='plus', testid='btn-add-epic', aria_label='Add epic',
+                  attrs_dict={'data-modal-open': 'add-epic-modal', 'title': 'Record a new epic in the Funnel'}) }}
+        {% endif %}
+    {% endmacro %}
+    {{ page_shell(
+        title='Portfolio Kanban',
+        subtitle='Epics organized by workflow state, ordered by WSJF priority',
+        breadcrumb=[('SAFe', None), ('Portfolio Kanban', None)],
+        actions_caller=_page_actions
+    ) }}
+
+    {% if can_write %}
+    {% call modal(id='add-epic-modal', title='Add epic',
+                  description='The epic starts in the Funnel. Score each WSJF factor from 1 upwards.') %}
+        <form method="post" action="{{ url_for('safe_portfolio.add_epic') }}">
+        {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
+        <div class="space-y-4">
+            <div>
+                <label for="epic-name" class="block text-sm font-medium mb-1.5">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
+                {{ input(id='epic-name', name='name', required=true, placeholder='e.g. Customer onboarding modernisation') }}
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                {% for field, label in [('business_value', 'Business Value'), ('time_criticality', 'Time Criticality'), ('risk_reduction', 'Risk Reduction'), ('job_size', 'Job Size')] %}
+                <div>
+                    <label for="epic-{{ field }}" class="block text-sm font-medium mb-1.5">{{ label }}</label>
+                    {{ input(id='epic-' ~ field, name=field, type='number', value='1', attrs_dict={'min': '1', 'max': '20'}) }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+            {{ button(text='Cancel', variant='outline', attrs_dict={'data-modal-close': 'add-epic-modal'}) }}
+            {{ button(text='Add epic', type='submit', aria_label='Add epic') }}
+        </div>
+        </form>
+    {% endcall %}
+    {% endif %}
+
+    {# Config for the shared board component is handed over as a JSON data
+       island, not inline in x-data: the app runs Alpine's CSP build, whose
+       expression evaluator does not accept an inline object/function literal
+       in an attribute. safePortfolioBoard() reads this and calls the shared
+       kanbanBoard() factory. #}
+    <script type="application/json" id="safe-portfolio-kanban-config">
+      {
+        "columns": {{ columns_config | tojson }},
+        "cards": {{ cards | tojson }},
+        "canWrite": {{ can_write | tojson }},
+        "wipLimits": {{ wip_limits | tojson }},
+        "moveUrl": "/api/safe/portfolio/{id}",
+        "moveField": "kanban_state",
+        "sortBy": "wsjf_score"
+      }
+    </script>
+
+    <div x-data="safePortfolioBoard()">
+
+        {% if not can_write %}
+        <p class="text-sm text-foreground mb-2" data-testid="board-read-only">You can view this board. Ask an architect to move epics or add new ones.</p>
+        {% endif %}
+        <p class="text-xs text-muted-foreground mb-3">
+            Each card shows its WSJF score (Weighted Shortest Job First): Business Value, Time Criticality and Risk Reduction added together, divided by Job Size.
+            {% if can_write %}Drag a card to a new column, use the card's menu, or focus it and press the left or right arrow key.{% endif %} The board scrolls sideways when the columns do not fit.
+        </p>
+
+        {% call(state) kanban_board(
+                plain_headers=true,
+                unit='epic',
+                states=kanban_states,
+                empty_hints=empty_hints,
+                can_write=can_write,
+                stage_group=stage_group,
+                lane=true,
+                region_label='Portfolio Kanban board, scrolls horizontally') %}
+            {% set group = stage_group.get(state) %}
+            <template x-for="card in columnCards('{{ state }}')" :key="card.id">
+                {% call kanban_card(kanban_states, class='transition-colors', title='card.name', top='isTopCard(card)', can_write=can_write) %}
+                  <div x-data="{ expanded: false }" class="mt-1.5 space-y-1.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
+                        {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
+                        <template x-if="isTopCard(card)">
+                            {% call badge(variant='success') %}<i data-lucide="star" class="mr-1 h-3 w-3" aria-hidden="true"></i>Top WSJF{% endcall %}
+                        </template>
+                        {% call button(variant='ghost', size='icon-xs', class='ml-auto shrink-0 text-primary', on_click="expanded = !expanded",
+                                       attrs_dict={':aria-expanded': 'expanded', ':aria-label': "`${expanded ? 'Hide' : 'Show'} WSJF factors for ${card.name}`", ':title': "expanded ? 'Hide WSJF factors' : 'Show WSJF factors'"}) %}
+                            <i data-lucide="chevron-right" class="h-3 w-3 transition-transform" :class="{ 'rotate-90': expanded }" aria-hidden="true"></i>
+                        {% endcall %}
+                    </div>
+
+                    <template x-if="card.owner_name || card.updated_at || card.created_at">
+                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                            <template x-if="card.owner_name">
+                                {% call avatar(size='sm', class='h-6 w-6 text-xs') %}<span :title="card.owner_name" x-text="card.owner_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()"></span>{% endcall %}
+                            </template>
+                            <template x-if="card.updated_at || card.created_at">
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="calendar" class="h-3 w-3" aria-hidden="true"></i>
+                                    <span x-text="card.updated_at || card.created_at"></span>
+                                </span>
+                            </template>
+                        </div>
+                    </template>
+
+                    <div x-show="expanded" x-collapse class="border-t border-border pt-2">
+                        <dl class="space-y-1 text-xs">
+                            {% for label, field in [('Business Value', 'business_value'), ('Time Criticality', 'time_criticality'), ('Risk Reduction', 'risk_reduction'), ('Job Size', 'job_size')] %}
+                            <div class="flex justify-between gap-2">
+                                <dt class="text-muted-foreground">{{ label }}</dt>
+                                <dd class="font-medium text-foreground" x-text="card.{{ field }}"></dd>
+                            </div>
+                            {% endfor %}
+                        </dl>
+                    </div>
+                  </div>
+                {% endcall %}
+            </template>
+        {% endcall %}
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/components/kanban_board.js') }}"></script>
+{% endblock %}

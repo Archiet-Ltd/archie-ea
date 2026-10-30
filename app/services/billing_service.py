@@ -48,7 +48,7 @@ except ImportError:
         pass
 
 
-NOT_CONFIGURED = "Online payment is not set up on this installation."
+NOT_CONFIGURED = "Online payment is not open yet. Contact us to buy a plan."
 PROVIDER_REFUSED = "The payment provider did not accept the request. Nothing was changed."
 
 # Provider subscription status -> stored status. A status not listed here
@@ -209,7 +209,7 @@ class BillingService:
         if not price_id:
             raise BillingNotConfigured(
                 f"The {plan.name} {'annual' if interval == 'year' else 'monthly'} price is "
-                "not set up on this installation."
+                "not available yet. Contact us to buy a plan."
             )
         return plan, price_id
 
@@ -232,6 +232,27 @@ class BillingService:
             and (sub.stripe_subscription_id or sub.monelytics_subscription_id)
             and sub.status != SubscriptionStatus.cancelled
         )
+
+    @staticmethod
+    def checkout_origins() -> List[str]:
+        """Where the provider's hosted checkout lives, as web origins.
+
+        The buy form posts to this site and is answered with a redirect to the hosted
+        checkout. A browser checks that second hop against the form-action rule of the
+        page that held the form, so the billing page names these origins.
+        """
+        from urllib.parse import urlsplit
+
+        def origin(url: str) -> Optional[str]:
+            parts = urlsplit(url or "")
+            return "%s://%s" % (parts.scheme, parts.netloc) if parts.scheme and parts.netloc else None
+
+        if monelytics_provider.configured():
+            found = [origin(os.environ.get("MONELYTICS_BASE_URL", ""))]
+        else:
+            # A local provider mock (STRIPE_API_BASE) hosts its own payment page.
+            found = ["https://checkout.stripe.com", origin(os.environ.get("STRIPE_API_BASE", ""))]
+        return list(dict.fromkeys(o for o in found if o))
 
     @classmethod
     def create_checkout_session(

@@ -18,6 +18,29 @@
 {% from 'components/badge.html' import badge %}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
+{# A role page with its own captured screen opens with the home page's hero (text left, the screen in
+   a browser frame right) through the one shared partial; every other landing keeps the text hero below. #}
+{% set role_hero = page.family == 'role' and screenshot %}
+{% if role_hero %}
+{% set hero = {
+  'testid': 'landing-hero',
+  'breadcrumb': landing.breadcrumb,
+  'title': landing.title,
+  'compact': true,
+  'lead': landing.lead_html,
+  'primary': (primary_label, primary_url),
+  'secondary': (secondary_label, '/pricing'),
+  'figure': {
+    'url': screenshot.url, 'width': screenshot.width, 'height': screenshot.height,
+    'mobile_url': screenshot.mobile.url if screenshot.mobile else none,
+    'mobile_width': screenshot.mobile.width if screenshot.mobile else none,
+    'mobile_height': screenshot.mobile.height if screenshot.mobile else none,
+    'frame_label': screenshot.frame_label or 'AI chat · Demonstration company',
+    'alt': screenshot.alt, 'caption': screenshot.caption,
+  },
+} %}
+{% include 'public/_partials/_hero.html' %}
+{% else %}
 <section data-testid="landing-hero" class="landing-hero bg-background border-b border-border">
   <div class="public-container">
     <nav aria-label="Breadcrumb">
@@ -33,8 +56,30 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 <div class="landing-bands">
+  {% if page.family == 'role' and more_screens %}
+  <section class="landing-band" aria-labelledby="role-more-screens-heading" data-testid="role-more-screens">
+    <div class="public-container">
+      <div class="public-page-content prose max-w-none"><h2 id="role-more-screens-heading">More of the product, as you would use it</h2></div>
+      <div class="mt-8 grid gap-8 {% if more_screens | length > 1 %}lg:grid-cols-2{% else %}lg:grid-cols-1{% endif %}">
+        {% for shot in more_screens %}
+        <figure class="home-hero__figure" data-testid="role-more-screens-figure">
+          <div class="home-frame">
+            <div class="home-frame__bar" aria-hidden="true">
+              <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
+              <span class="home-frame__url">{{ shot.frame_label }}</span>
+            </div>
+            <img src="{{ shot.url }}" alt="{{ shot.alt }}" width="{{ shot.width }}" height="{{ shot.height }}" loading="lazy" decoding="async" class="home-frame__img">
+          </div>
+          <figcaption class="public-card-body mt-3 text-center">{{ shot.caption }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
   {# A use-case page's figure (if any) renders inside its "What Entelim answers" band below
      instead of here -- see the section loop's figure_band branch -- but only when that band
      actually exists. A use-case page with no "What Entelim answers" heading (e.g. one whose
@@ -43,7 +88,7 @@
      be dropped entirely instead of rendered anywhere. Every other landing family (module,
      comparison) keeps this page-top slot exactly as before regardless. #}
   {% set has_figure_band = landing.sections | selectattr('variant', 'equalto', 'figure_band') | list %}
-  {% if (screenshot or recording) and not (page.family == 'function-per-segment' and has_figure_band) %}
+  {% if (screenshot or recording) and not role_hero and not (page.family == 'function-per-segment' and has_figure_band) %}
   <section class="landing-band">
     <div class="public-container">
       <div class="[&>figure:first-child]:mt-0">
@@ -102,6 +147,19 @@
   </section>
   {% endfor %}
 
+  {% if siblings %}
+  <section class="landing-band" aria-label="Other roles">
+    <div class="public-container">
+      <div class="public-page-content prose max-w-none"><h2>Other roles</h2></div>
+      <ul role="list" class="mt-8 flex flex-wrap gap-3">
+        {% for group in siblings %}{% for entry in group.pages %}
+        <li><a href="{{ entry.url }}" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-colors">{{ entry.title }}</a></li>
+        {% endfor %}{% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
   {% if page.cta == 'plans' %}
   <section class="landing-band">
     <div class="public-container">
@@ -124,7 +182,7 @@
     <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
     <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
       <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
-      <a href="/contact" class="public-btn public-btn--outline">Get in touch</a>
+      <a href="/contact" class="public-btn public-btn--outline">{{ 'Talk to us' if page.family == 'role' else 'Get in touch' }}</a>
     </div>
   </div>
 </section>

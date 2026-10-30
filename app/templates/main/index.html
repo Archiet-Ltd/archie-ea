@@ -1,9 +1,9 @@
-{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
+{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% block full_title %}Entelim — See what breaks before you change it{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
 <meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
-<meta property="og:title" content="Entelim — The Company Brain for every enterprise">
+<meta property="og:title" content="Entelim — See what breaks before you change it">
 <meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
@@ -11,7 +11,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — The Company Brain for every enterprise">
+<meta name="twitter:title" content="Entelim — See what breaks before you change it">
 <meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
@@ -35,50 +35,41 @@
 <!-- Hero: category name first, product-in-search-terms second. One centred column, then the real
      product window (the applications portfolio) in a browser frame. The captures are 2x and shown 1:1
      (scripts/capture_proof_assets.py). -->
-<section class="home-hero" data-testid="home-hero">
+<section class="home-hero home-hero--fold" data-testid="home-hero">
   <div class="mx-auto max-w-5xl px-4 text-center">
-    {% call badge(size='pill') %}
-      <span class="sm:hidden">Open source &middot; Self-host free</span>
-      <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
-    {% endcall %}
-
     <h1 class="home-display">
-      The company brain for every enterprise.
+      See what breaks before you change it.
     </h1>
 
     <p class="home-lead">
-      One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-      suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
-      need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
-      an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
-      model and get a free, cited answer to what breaks if a system fails, in minutes.
+      Connect GitHub and Entelim maps your services, owners and dependencies, then answers in plain words,
+      citing the file and commit behind every fact.
     </p>
 
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/pricing" class="public-btn public-btn--lg public-btn--outline">See pricing</a>
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+      {{ button(text='Start free', href=url_for('account.register'), size='lg', testid='home-hero-start') }}
+      {{ button(text='See pricing', href='/pricing', variant='outline', size='lg', testid='home-hero-pricing') }}
     </div>
   </div>
 
-  <div class="home-hero__stage mt-16">
+  <div class="home-hero__stage mt-6">
     <figure class="home-hero__figure" data-testid="home-hero-figure">
       <div class="home-frame">
         <div class="home-frame__bar" aria-hidden="true">
           <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">Applications</span>
+          <span class="home-frame__url">AI chat</span>
         </div>
-        {# The desktop capture is 1280 CSS px wide and is shown at that width; the phone-width capture
-           of the same screen is shown below 740px. #}
+        {# A real answer from the sample company in the AI chat, captured by scripts/capture_proof_assets.py --home-chat. #}
         <picture>
-          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/product-portfolio-mobile.webp') }}"
-                  width="358" height="640">
-          <img src="{{ url_for('static', filename='img/home/product-portfolio.webp') }}"
-               alt="The Entelim application portfolio for a demonstration company: every application with its owner, lifecycle status and the business capability it serves."
-               width="1280" height="800" decoding="async" fetchpriority="high" class="home-frame__img">
+          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/chat-answer-mobile.webp') }}"
+                  width="374" height="529">
+          <img src="{{ url_for('static', filename='img/home/chat-answer.webp') }}"
+               alt="The AI chat answering what breaks if the Payments service fails: it lists the connections, and under each one the owner and the source the link was read from."
+               width="908" height="670" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
         </picture>
       </div>
       <figcaption class="public-card-body mt-3 text-center">
-        The application portfolio of the demonstration company, as Entelim shows it.
+        A real answer in the AI chat: what depends on one system, with the owner and the source behind each connection.
       </figcaption>
     </figure>
   </div>
@@ -141,9 +132,9 @@
         Ask a question. Get an answer that shows its working.
       </h2>
       <p class="home-section-lead">
-        Pick any element in your model and ask: what breaks if it fails, which strategy it serves, which
-        programmes touch it, and which risks reach it. Every row shows its source and how it was derived, and you
-        can see the model as it stood on any past date.
+        Ask the AI chat what breaks if a system fails, which strategy it serves, which programmes touch it
+        and which risks reach it. Every answer names the records behind it, and you can see the model as it
+        stood on any past date.
       </p>
     </div>
     <div class="mt-12 grid gap-6 sm:grid-cols-2">
@@ -165,7 +156,7 @@
       </div>
     </div>
     <div class="mt-8">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask your own model</a>
+      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--outline">Start free and ask the AI chat</a>
     </div>
   </div>
 </section>
@@ -219,7 +210,7 @@
         <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
         <ul class="public-card-body mt-6 space-y-2">
           <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/features#simulation-and-scenario-planning" class="public-link text-foreground">Simulation and Scenario Planning</a></li>
+          <li><a href="/modules/scenario-modelling" class="public-link text-foreground">Scenarios (coming soon)</a></li>
           <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
         </ul>
       </div>
@@ -258,12 +249,12 @@
       </p>
     </div>
     <ul class="home-emphasis-list mt-12 max-w-3xl">
-      <li><strong>Your administrator decides.</strong> Each assistant is approved for your organisation and access can be revoked at any time.</li>
+      <li><strong>You connect it yourself.</strong> Any member can connect their own AI assistant from their account, and an administrator can disconnect it at any time.</li>
       <li><strong>Read first, change only with approval.</strong> Assistants start with read access; a suggested change arrives in your approval queue, and nothing changes until a person approves it.</li>
       <li><strong>Every call on the record.</strong> Each request is logged with the assistant, the grant and the person it acted for.</li>
     </ul>
     <p class="home-note mt-8 max-w-3xl">
-      Read access for your AI assistants opens in Q1 2027. Today, Entelim's own assistant already works this way:
+      Connecting your own AI assistant is live on every plan. Entelim's own AI chat works the same way:
       every action passes one permission check and every change waits for approval.
     </p>
   </div>
@@ -284,7 +275,7 @@
         <p class="public-stepper__name">Modelled</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q1 2027</p>
+        <p class="home-eyebrow">Next</p>
         <p class="public-stepper__name">Synchronised</p>
       </li>
       <li>
@@ -343,7 +334,7 @@
     </div>
 
     <div class="mt-6 overflow-x-auto rounded-2xl border border-border public-table-scroll" tabindex="0" role="region" aria-label="Pricing plans table, scrollable">
-      <table class="public-table">
+      {% call table(class='public-table') %}
         <thead>
           <tr>
             <th scope="col">Plan</th>
@@ -359,7 +350,7 @@
             <td><strong>Free</strong></td>
             <td>No trial clock.</td>
             <td>For evaluation, one-person companies and self-hosters.</td>
-            <td>One organisation, three people. Every question, the Business Model Canvas, the twin map. File import. Community support.</td>
+            <td>One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer. File import. Community support.</td>
           </tr>
           <tr>
             <td>Startup</td>
@@ -373,7 +364,7 @@
             <td><strong>$29</strong>/editor/month</td>
             <td>$290/editor/year. Askers free.</td>
             <td>For scale-ups and services companies, 50 to 500 people.</td>
-            <td>Single sign-on, the review-board workflow, and your own model key.</td>
+            <td>Single sign-on and the review-board workflow.</td>
           </tr>
           <tr>
             <td>Enterprise</td>
@@ -383,7 +374,7 @@
             <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
           </tr>
         </tbody>
-      </table>
+      {% endcall %}
     </div>
 
     <div class="mt-6 grid gap-6 sm:grid-cols-2">
@@ -429,7 +420,7 @@
           Licensed under AGPL-3.0.
         </h2>
         <p class="public-card-body mb-6">
-          Every question, the Business Model Canvas and the twin map run on software licensed under AGPL-3.0. Run it
+          Every question, the Business Model Canvas and the ArchiMate Composer run on software licensed under AGPL-3.0. Run it
           on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you,
           support it under contract, or connect it to your systems.
         </p>
@@ -484,11 +475,11 @@
         </details>
         <details>
           <summary>What works today?{{ faq_chevron() }}</summary>
-          <p>Import an existing architecture model and get a cited answer to what breaks if a system fails, in minutes. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
+          <p>Connect GitHub or Jira when you sign up, or import an existing architecture model, then ask the AI chat what breaks if a system fails and get a cited answer. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
         </details>
         <details>
           <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
-          <p>Read access for your own AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's own assistant already works through the same permission and approval model.</p>
+          <p>Yes. Connect your own AI assistant from your account, on every plan, through the open Model Context Protocol. It reads your model and cites the records; any change it suggests waits in your approval queue.</p>
         </details>
       </div>
     </div>
@@ -499,9 +490,9 @@
 <section class="home-closing">
   <div class="container px-4">
     <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Import your model. Get a cited answer in minutes.</h2>
+    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
     <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
       <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
       <a href="/contact" class="public-btn public-btn--lg public-btn--outline">Get in touch</a>
     </div>
@@ -512,3 +503,4 @@
 {% include 'components/public_footer.html' %}
 
 {% endblock %}
+{# design-block: public #}

@@ -980,7 +980,12 @@ def test_comparison_pages_have_faq_jsonld(app):
 
 def test_module_pages_have_software_application_jsonld(app):
     """Module pages have SoftwareApplication JSON-LD."""
-    pages = [p for p in load_all_pages() if p.family == "module" and not _is_merged(p)]
+    # A module still on the waiting list is a plain page: no software node for a
+    # capability that cannot be used yet.
+    pages = [
+        p for p in load_all_pages()
+        if p.family == "module" and not _is_merged(p) and p.cta != "waiting_list"
+    ]
     assert len(pages) > 0, "No module pages found"
     with app.test_client() as client:
         for page in pages[:5]:  # Sample first 5
@@ -1334,8 +1339,10 @@ def test_no_waiting_list_on_non_cta_pages(app):
     with app.test_client() as client:
         rv = client.get("/modules/applications")
         html = rv.data.decode()
-        # applications has no cta field, so no waiting list
-        assert "Join the waiting list" not in html
+        # applications has no cta field, so no waiting list. The site menus (the
+        # Coming soon column) are the shell, not this page's content.
+        content = re.sub(r"<footer.*?</footer>", "", re.sub(r"<header.*?</header>", "", html, flags=re.DOTALL), flags=re.DOTALL)
+        assert "Join the waiting list" not in content
 
 
 def test_page_count_consistency(app):
@@ -2547,8 +2554,12 @@ def test_roles_and_connectors_hub_groups_and_extra_entries(app):
             < role_html.index("<h2>Owners</h2>")
             < role_html.index("<h2>More</h2>")
         )
-        # Empty groups are not rendered.
-        assert "<h2>Security, risk and compliance</h2>" not in role_html
+        # A group with no page in it is not rendered; one with a page is.
+        from app.services.public_pages import ROLE_GROUPS
+
+        used = {p.front_matter.get("role_group") for p in load_feed_pages() if p.family == "role"}
+        for key, label in ROLE_GROUPS:
+            assert (f"<h2>{label}</h2>" in role_html) == (key in used), label
 
         conn_html = client.get("/connectors").data.decode()
         assert conn_html.index("<h2>AI assistants</h2>") < conn_html.index("<h2>Collaboration</h2>")
@@ -2586,7 +2597,9 @@ def test_every_role_page_links_every_sibling(app):
         for url in role_urls:
             html = client.get(url).data.decode()
             assert "<h2>Other roles</h2>" in html
-            links = _hrefs(html)
+            # The strip only: the site navbar and footer link every role page, this page included.
+            strip = html[html.index('aria-label="Other roles"'):]
+            links = _hrefs(strip[: strip.index("</section>")])
             for other in role_urls:
                 assert (other in links) == (other != url), f"{url} vs {other}"
             for _, targets in ROLE_HUB_EXTRA_ENTRIES:
@@ -2614,13 +2627,15 @@ def test_modules_integrations_301_to_connectors(app):
     assert "/modules/integrations" not in feed_page_paths()
 
 
-def test_assistant_connector_page_is_held():
+def test_assistant_connector_page_is_live_and_listed():
+    """Connecting the customer's own AI assistant works on every plan, so its page is
+    indexable and the /connectors hub lists it."""
     page = load_page("connector", slug="ai-assistants")
     assert page is not None, "ai-assistants connector page not found"
-    assert _is_held(page), (
-        "ai-assistants connector page should be held (its own front matter "
-        "sets state: held)"
-    )
+    assert not _is_held(page), "ai-assistants connector page should be live, not held"
+    from app.services.public_pages import feed_page_paths
+
+    assert "/connectors/ai-assistants" in feed_page_paths()
 
 
 def test_features_page_shows_captured_module_screenshots(app):
@@ -2772,3 +2787,23 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
         rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
+
+
+ROLE_PAGE_SLUGS = ("enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects")
+
+
+def test_role_pages_are_live_and_listed_everywhere(app):
+    """The four role pages are on main: not held, in the hub, each other's strip, sitemap and llms.txt."""
+    with app.test_client() as client:
+        hub = client.get("/roles").data.decode()
+        sitemap = client.get("/sitemap.xml").data.decode()
+        llms = client.get("/llms.txt").data.decode()
+        for slug in ROLE_PAGE_SLUGS:
+            page = load_page("role", slug=slug)
+            assert not page.is_held, f"{slug} is still held"
+            url = "/roles/" + slug
+            assert url in hub and url in sitemap and url in llms, f"{slug} missing from hub, sitemap or llms.txt"
+            html = client.get(url).data.decode()
+            for other in ROLE_PAGE_SLUGS:
+                if other != slug:
+                    assert "/roles/" + other in html, f"{slug}: sibling strip does not list {other}"

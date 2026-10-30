@@ -61,6 +61,8 @@ function composerApp() {
         _redo: [],
         _MAX: 50,
         _recording: true,
+        onChange: null,
+        _changed: function() { if (typeof this.onChange === 'function') this.onChange(); },
 
         pause: function() { this._recording = false; },
         resume: function() { this._recording = true; },
@@ -70,6 +72,7 @@ function composerApp() {
             this._undo.push(action);
             if (this._undo.length > this._MAX) this._undo.shift();
             this._redo = [];
+            this._changed();
         },
 
         canUndo: function() { return this._undo.length > 0; },
@@ -81,6 +84,7 @@ function composerApp() {
             this._recording = false;
             try { a.undo(); } finally { this._recording = true; }
             this._redo.push(a);
+            this._changed();
         },
 
         redo: function() {
@@ -89,9 +93,10 @@ function composerApp() {
             this._recording = false;
             try { a.redo(); } finally { this._recording = true; }
             this._undo.push(a);
+            this._changed();
         },
 
-        clear: function() { this._undo = []; this._redo = []; },
+        clear: function() { this._undo = []; this._redo = []; this._changed(); },
     };
 
     /* ── Layer Y-band ordering ────────────────────────────── */
@@ -565,6 +570,7 @@ function composerApp() {
         applyLayerBanding: applyLayerBanding,
         VIEWPOINT_PALETTE_MAP: VIEWPOINT_PALETTE_MAP,
         applyCustomLabel: _applyCustomLabel,
+        PALETTE: PALETTE,
     };
 
     let _base = {
@@ -1061,6 +1067,7 @@ function composerApp() {
         init: function() {
             let self = this;
 
+            ComposerRenderer.useNotation(true);
             defineArchiMateShape();
 
             this.graph = new joint.dia.Graph();
@@ -1076,7 +1083,7 @@ function composerApp() {
                     { name: 'dot', args: { color: '#dde1e6', thickness: 1 } },
                     { name: 'dot', args: { color: '#c8cdd3', thickness: 1, scaleFactor: 5 } },
                 ],
-                background: { color: '#fafbfc' },
+                background: { color: 'transparent' },
 
                 interactive: function(cellView) {
                     if (self.mode === 'view') return { elementMove: false, addLinkFromMagnet: false };
@@ -1123,13 +1130,15 @@ function composerApp() {
             });
 
             /* ── Pan / rubber-band select: drag on blank canvas ── */
+            this.shellInit();
+
             this.paper.on('blank:pointerdown', function(evt) {
                 /* CMP-06: middle-mouse drag always pans, in any mode. Plain
                    left-drag in edit mode is rubber-band select (below), so
                    off-screen content was only reachable via Space+drag — an
                    undiscoverable gesture. Middle-mouse pan is the universal
                    diagram-tool convention and conflicts with nothing. */
-                if (evt.button === 1 || self._spaceDown || self.mode === 'view') {
+                if (evt.button === 1 || self._spaceDown || self.shellPan || self.mode === 'view') {
                     if (evt.button === 1 && evt.preventDefault) evt.preventDefault();
                     self._isPanning = true;
                     self._panStart = { x: evt.clientX, y: evt.clientY };
@@ -2423,10 +2432,14 @@ function composerApp() {
             });
 
             /* ── Dirty state tracking ── */
-            this.graph.on('change:position', function() { self.viewpointDirty = true; });
-            this.graph.on('change:size', function() { self.viewpointDirty = true; });
-            this.graph.on('add', function() { self.viewpointDirty = true; });
-            this.graph.on('remove', function() { self.viewpointDirty = true; });
+            this.graph.on('change:position', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+            this.graph.on('change:size', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+            this.graph.on('add', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+            this.graph.on('remove', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+
+            /* A neighbourhood opened to look at is not an edit: the drawing and its
+               settling do not count, the first touch on the canvas does. */
+            this.paper.el.addEventListener('pointerdown', function() { self._focusQuiet = false; }, true);
 
             /* ── Mini-map: update on graph/paper changes ── */
             let mmUpdate = function() { self._scheduleMiniMapUpdate(); };
@@ -3082,10 +3095,12 @@ function composerApp() {
         _openFocusView: function(elementId, centreName, depth, includeDerived) {
             let self = this;
             self.viewpointLoading = true;
+            self._focusQuiet = true;
             self.statusText = 'Loading neighbourhood...';
             let fail = function(err) {
                 self.viewpointLoading = false;
                 self.focusView = null;
+                self._focusQuiet = false;
                 self.statusText = 'Failed to load the neighbourhood of ' + (centreName || 'this element');
                 _toast('error', 'Could not load the neighbourhood of ' + (centreName || 'this element'));
             };
@@ -3119,9 +3134,6 @@ function composerApp() {
                    top-down order the Twin Map reads, so a chain from the centre up to a
                    Strategy or Goal element can be followed along the drawn connections. */
                 applyLayerBanding(self.graph);
-                self.paper.scaleContentToFit({ padding: 40, maxScale: 1 });
-                self.zoomPercent = Math.round(self.paper.scale().sx * 100);
-                self._scheduleMiniMapUpdate();
                 self.componentsPanelOpen = false;
                 UndoStack.resume();
                 UndoStack.clear();
@@ -3129,7 +3141,6 @@ function composerApp() {
                 self.currentSavedVpId = null;
                 self.mode = 'edit';
                 self.viewpointLoading = false;
-                self.viewpointDirty = true;
                 self.focusView = {
                     name: centreName || ('Element #' + elementId),
                     depth: depth,
@@ -3137,7 +3148,12 @@ function composerApp() {
                     ids: elements.map(function(e) { return e.id; }),
                     hasDerived: relationships.some(function(r) { return r.kind === 'derived'; }),
                     empty: relationships.length === 0,
-                    saving: false
+                    saving: false,
+                    rows: rows.map(function(r) {
+                        return { key: r.key, elementId: r.elementId, from: r.fromName, name: r.name,
+                                 relation: r.relationType, kind: r.kindLabel, depth: r.depth };
+                    }),
+                    listOpen: false
                 };
 
                 let centre = loaded.cellMap[elementId];
@@ -3152,9 +3168,51 @@ function composerApp() {
                     self._applyNeighborFocus(centre);
                 }
                 self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
-                self.$nextTick(function() { if (window.lucide) lucide.createIcons(); });
+                self.viewpointDirty = false;
+                window.setTimeout(function() { self._focusQuiet = false; }, 3500);
+                /* Fit once the card is on screen, so the drawing sits below it. */
+                self.$nextTick(function() {
+                    if (window.lucide) lucide.createIcons();
+                    self._fitFocusViewWhileSettling();
+                });
             })
             .catch(function(err) { UndoStack.resume(); fail(err); });
+        },
+
+        /* Keep the focus drawing fitted while the canvas settles. A panel that is still
+           closing leaves the canvas a few dozen pixels wide on a phone; a fit made then
+           shrinks the drawing to nothing, so every size change in the first three seconds
+           refits (and re-spreads the connection words) once it has been still for a moment. */
+        _fitFocusViewWhileSettling: function() {
+            let self = this;
+            let el = document.getElementById('composer-canvas');
+            if (!el) return;
+            let fit = function() {
+                if (!self.focusView) return;
+                self.fitCanvas();
+                ComposerRenderer.separateLabels(self.paper, self.graph);
+            };
+            self._focusFitUntil = Date.now() + 3000;
+            fit();
+            if (self._focusFitObserver || typeof ResizeObserver === 'undefined') return;
+            let timer = null;
+            self._focusFitObserver = new ResizeObserver(function() {
+                if (Date.now() > self._focusFitUntil) return;
+                window.clearTimeout(timer);
+                timer = window.setTimeout(fit, 80);
+            });
+            self._focusFitObserver.observe(el);
+        },
+
+        /* A row of the connections list opens the same details the drawn element opens. */
+        openFocusConnection: function(elementId) {
+            let self = this;
+            let cell = self.graph.getElements().filter(function(c) {
+                return String(c.get('elementId')) === String(elementId);
+            })[0];
+            if (!cell) return;
+            let view = self.paper.findViewByModel(cell);
+            if (view) self.paper.trigger('element:pointerclick', view, {});
         },
 
         saveFocusView: function() {
@@ -3357,16 +3415,27 @@ function composerApp() {
             let rect = document.getElementById('composer-canvas').getBoundingClientRect();
             let scale = this.paper.scale();
             let translate = this.paper.translate();
-            this.dropX = (event.clientX - rect.left - translate.tx) / scale.sx;
-            this.dropY = (event.clientY - rect.top - translate.ty) / scale.sy;
+            this._beginAddAt(
+                this.dragType,
+                (event.clientX - rect.left - translate.tx) / scale.sx,
+                (event.clientY - rect.top - translate.ty) / scale.sy
+            );
+        },
 
-            /* Centre element on cursor (element is 200×130) and snap to 12px grid */
+        /* Open the add dialog for a type at a point in diagram coordinates. Used by the
+           palette drop and by the palette's click/Enter add. */
+        _beginAddAt: function(typeObj, x, y) {
+            this.dropX = x;
+            this.dropY = y;
+
+            /* Centre element on the point (element is 200×130) and snap to 12px grid */
             let GRID = 12;
             this.dropX = Math.round((this.dropX - 100) / GRID) * GRID;
             this.dropY = Math.round((this.dropY - 65) / GRID) * GRID;
 
-            this.searchType = this.dragType.label;
-            this.searchTypeFilter = this.dragType.type;
+            this.dragType = typeObj;
+            this.searchType = typeObj.label;
+            this.searchTypeFilter = typeObj.type;
             this.searchQuery = '';
             this.searchResults = [];
             this.searchLayerFilter = '';
@@ -3463,6 +3532,7 @@ function composerApp() {
             let pos = this._placementFor(this.dropX, this.dropY);
             let node = createNode(item.id, item.name, item.type, layer, pos.x, pos.y);
             this.graph.addCell(node);
+            this.shellRecordPlacement(node);
             this.canvasElements[item.id] = item;
             this.elementCount++;
             this.statusText = 'Added: ' + item.name;
@@ -4102,6 +4172,13 @@ function composerApp() {
                 || this.commentPanelOpen
                 || this.auditPanelOpen;
             let rightPadding = rightPanelOpen ? 40 + 320 : 40;
+            /* The unsaved-view card floats over the top of the canvas: fit below it. */
+            let topPadding = 40;
+            let card = this.focusView ? document.getElementById('composer-focus-banner') : null;
+            let canvasEl = document.getElementById('composer-canvas');
+            if (card && canvasEl && card.offsetHeight) {
+                topPadding = Math.max(40, Math.round(card.getBoundingClientRect().bottom - canvasEl.getBoundingClientRect().top) + 16);
+            }
             /* CMP-05: fit was unreliable in the narrow side-panel — it zoomed to
                150% with the element half off the left edge. Two causes fixed:
                (1) maxScale 1.5 let a small selection zoom IN past the viewport;
@@ -4110,10 +4187,13 @@ function composerApp() {
                useModelGeometry reads the model bboxes instead, which are always
                current. */
             this.paper.scaleContentToFit({
-                padding: { top: 40, bottom: 40, left: 40, right: rightPadding },
+                padding: { top: topPadding, bottom: 40, left: 40, right: rightPadding },
                 maxScale: 1,
                 minScale: 0.1,
-                useModelGeometry: true
+                useModelGeometry: true,
+                /* Centre the diagram in the space the padding leaves; the default hugs the top-left corner. */
+                horizontalAlign: 'middle',
+                verticalAlign: 'middle'
             });
             this.zoomPercent = Math.round(this.paper.scale().sx * 100);
             this._scheduleMiniMapUpdate();
@@ -7185,11 +7265,14 @@ function composerApp() {
     };
 
     /* Merge all module methods into the base data object */
-    return Object.assign(_base,
+    Object.assign(_base,
         ComposerAI.getMethods(_helpers),
         ComposerPersistence.getMethods(_helpers),
         ComposerGraph.getMethods(_helpers),
         ComposerSearch.getMethods(_helpers)
     );
+    /* The shell module has getters (Alpine computed properties); Object.assign would run them once
+       and freeze the result, so copy its property descriptors instead. */
+    return Object.defineProperties(_base, Object.getOwnPropertyDescriptors(ComposerShell.getMethods(_helpers)));
 
 }

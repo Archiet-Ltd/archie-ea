@@ -16,6 +16,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
+from app.modules.architecture.services import data_erd_service as erd
 from app.modules.architecture.services import data_sor_service as sor
 
 from app.models import (
@@ -213,8 +214,22 @@ def data_architecture_dashboard():
                 "Failed to query ArchiMate element/relationship counts", exc_info=True
             )
 
+        from app.modules.architecture.services.data_architecture_service import (
+            data_flow_overview,
+            default_flow_entity,
+            flow_cascade,
+        )
+
+        overview = data_flow_overview(_current_org_id())
+        chosen = request.args.get("entity", type=int)
+        flow_entity = next(
+            (row for row in overview["entities"] if row["id"] == chosen and row["element_id"]), None
+        ) or default_flow_entity(overview)
+
         return render_template(
             "enterprise/data_architecture_dashboard.html",
+            overview=overview,
+            flow=flow_cascade(flow_entity) if flow_entity else None,
             data_stack=data_platform_stack,
             data_cap_count=len(data_caps_objs),
             conceptual_count=conceptual_count,
@@ -240,6 +255,8 @@ def data_architecture_dashboard():
             data_lineage_count=None,
             archimate_data_count=None,
             archimate_rel_count=None,
+            overview=None,
+            flow=None,
             load_error="The data architecture inventory could not be read.",
         )
 
@@ -306,6 +323,10 @@ def data_lineage_view():
         except Exception:
             logger.debug("semantic lineage suggestions unavailable", exc_info=True)
 
+    from app.modules.architecture.services.data_architecture_service import data_flow_overview
+
+    overview = data_flow_overview(_current_org_id())
+
     traced_ids = {row.archimate_element_id for row in grounded_lineage if row.archimate_element_id}
     traced_ids |= {
         row.target_archimate_element_id
@@ -324,6 +345,7 @@ def data_lineage_view():
         relationship_edges=relationship_edges,
         suggestions=suggestions,
         untraced=untraced,
+        overview=overview,
     )
 
 
@@ -362,6 +384,17 @@ def create_data_lineage():
     db.session.commit()
     flash("Lineage recorded.", "success")
     return redirect(url_for("data_architecture.data_lineage_view"))
+
+
+@data_architecture_bp.route("/api/data-flows")
+@login_required
+def api_data_flows():
+    """The organisation's data entities, the applications that use each, their
+    owner and steward, and the applications that handle personal data: the same
+    reader as the data architecture page (and the assistant's ask_data_flow)."""
+    from app.modules.architecture.services.data_architecture_service import data_flow_overview
+
+    return jsonify(data_flow_overview(_current_org_id()))
 
 
 @data_architecture_bp.route("/api/data-models")
@@ -547,6 +580,7 @@ def create_data_model():
 def data_entity_catalog():
     """Data entity catalog — browse, search, and filter data entities."""
     from app.models.process_data import DataDomain, DataEntity
+    from app.modules.architecture.services.data_architecture_service import data_flow_overview
 
     search = request.args.get("search", "").strip()
     classification = request.args.get("classification", "")
@@ -589,6 +623,9 @@ def data_entity_catalog():
         entity_type=entity_type,
         classification_dist=classification_dist,
         total_count=len(entities),
+        # The applications, steward and flow of each entity: the same reader as
+        # the data architecture page and the assistant's ask_data_flow.
+        flows={row["id"]: row for row in data_flow_overview(_current_org_id())["entities"]},
     )
 
 
@@ -785,3 +822,175 @@ def api_data_entities():
         }
         for e in entities
     ])
+
+
+# ============================================================================
+# Entity relationship diagram: the logical model of a data domain
+# ============================================================================
+
+
+def _erd_error(exc, status=400):
+    db.session.rollback()
+    return jsonify({"error": str(exc)}), status
+
+
+def _erd_entity_or_404(entity_id):
+    return sor.get_entity(_current_org_id(), entity_id)
+
+
+@data_architecture_bp.route("/data-entities/diagram")
+@login_required
+def data_entity_diagram():
+    """The Diagram view of the data objects list: one domain's entities and
+    the relationships between them."""
+    org_id = _current_org_id()
+    domains = (
+        DataDomain.query.filter(DataDomain.organization_id == org_id).order_by(DataDomain.name).all()
+    )
+    domain_id = request.args.get("domain_id", type=int)
+    domain = next((d for d in domains if d.id == domain_id), None) if domain_id else None
+    if domain is None and domains:
+        from app.models.process_data import DataEntity
+
+        counts = dict(
+            db.session.query(DataEntity.domain_id, db.func.count(DataEntity.id))
+            .filter(DataEntity.organization_id == org_id)
+            .group_by(DataEntity.domain_id)
+            .all()
+        )
+        domain = max(domains, key=lambda d: (counts.get(d.id, 0), -d.id))
+    diagram = erd.domain_diagram(domain) if domain is not None else None
+    return render_template(
+        "data_architecture/entity_diagram.html",
+        domains=domains,
+        domain=domain,
+        diagram=diagram,
+        data_types=erd.DATA_TYPES,
+        domain_options=[(d.id, d.name) for d in domains],
+        type_options=[(t, t) for t in erd.DATA_TYPES],
+        preset_options=[
+            ("one-to-one", "One to one"),
+            ("one-to-many", "One to many"),
+            ("many-to-one", "Many to one"),
+            ("many-to-many", "Many to many"),
+            ("custom", "Custom"),
+        ],
+        cardinality_options=[(v, erd.CARDINALITY_LABELS[v]) for v in erd.CARDINALITY_LABELS],
+    )
+
+
+@data_architecture_bp.route("/api/data-erd/<int:domain_id>")
+@login_required
+def api_data_erd(domain_id):
+    domain = sor.get_domain(_current_org_id(), domain_id)
+    if domain is None:
+        return jsonify({"error": "That data domain is not in your organisation."}), 404
+    return jsonify(erd.domain_diagram(domain))
+
+
+@data_architecture_bp.route("/api/data-erd/<int:domain_id>/entities", methods=["POST"])
+@login_required
+def api_data_erd_add_entity(domain_id):
+    domain = sor.get_domain(_current_org_id(), domain_id)
+    if domain is None:
+        return jsonify({"error": "That data domain is not in your organisation."}), 404
+    body = request.get_json(silent=True) or {}
+    try:
+        entity = erd.create_entity(
+            domain, body.get("name"), body.get("attributes"), body.get("description")
+        )
+        db.session.commit()
+    except erd.ErdError as exc:
+        return _erd_error(exc)
+    return jsonify(erd.entity_dict(entity)), 201
+
+
+@data_architecture_bp.route("/api/data-erd/entities/<int:entity_id>", methods=["PUT"])
+@login_required
+def api_data_erd_edit_entity(entity_id):
+    entity = _erd_entity_or_404(entity_id)
+    if entity is None:
+        return jsonify({"error": "That entity is not in your organisation."}), 404
+    body = request.get_json(silent=True) or {}
+    try:
+        erd.update_entity(entity, body.get("name"), body.get("attributes"), body.get("description"))
+        db.session.commit()
+    except erd.ErdError as exc:
+        return _erd_error(exc)
+    return jsonify(erd.entity_dict(entity))
+
+
+@data_architecture_bp.route("/api/data-erd/entities/<int:entity_id>", methods=["DELETE"])
+@login_required
+def api_data_erd_delete_entity(entity_id):
+    entity = _erd_entity_or_404(entity_id)
+    if entity is None:
+        return jsonify({"error": "That entity is not in your organisation."}), 404
+    db.session.delete(entity)
+    db.session.commit()
+    return jsonify({"deleted": entity_id})
+
+
+@data_architecture_bp.route("/api/data-erd/relationships", methods=["POST"])
+@login_required
+def api_data_erd_relate():
+    body = request.get_json(silent=True) or {}
+    org_id = _current_org_id()
+    source = sor.get_entity(org_id, body.get("source_id"))
+    target = sor.get_entity(org_id, body.get("target_id"))
+    if source is None or target is None:
+        return jsonify({"error": "Both entities must be in your organisation."}), 404
+    try:
+        rel = erd.relate(
+            source,
+            target,
+            preset=body.get("preset"),
+            source_cardinality=body.get("source_cardinality"),
+            target_cardinality=body.get("target_cardinality"),
+            label=body.get("label"),
+        )
+        db.session.commit()
+    except erd.ErdError as exc:
+        return _erd_error(exc)
+    return jsonify(erd.relationship_dict(rel)), 201
+
+
+def _erd_relationship_or_none(rel_id):
+    from app.models.process_data import DataEntityRelationship
+
+    return DataEntityRelationship.query.filter(
+        DataEntityRelationship.id == rel_id,
+        DataEntityRelationship.organization_id == _current_org_id(),
+    ).first()
+
+
+@data_architecture_bp.route("/api/data-erd/relationships/<int:rel_id>", methods=["PUT"])
+@login_required
+def api_data_erd_edit_relationship(rel_id):
+    rel = _erd_relationship_or_none(rel_id)
+    if rel is None:
+        return jsonify({"error": "That relationship is not in your organisation."}), 404
+    body = request.get_json(silent=True) or {}
+    try:
+        erd.update_relationship(
+            rel,
+            preset=body.get("preset"),
+            source_cardinality=body.get("source_cardinality"),
+            target_cardinality=body.get("target_cardinality"),
+            label=body.get("label"),
+        )
+        db.session.commit()
+    except erd.ErdError as exc:
+        return _erd_error(exc)
+    return jsonify(erd.relationship_dict(rel))
+
+
+@data_architecture_bp.route("/api/data-erd/relationships/<int:rel_id>", methods=["DELETE"])
+@login_required
+def api_data_erd_delete_relationship(rel_id):
+    rel = _erd_relationship_or_none(rel_id)
+    if rel is None:
+        return jsonify({"error": "That relationship is not in your organisation."}), 404
+    db.session.delete(rel)
+    db.session.commit()
+    return jsonify({"deleted": rel_id})

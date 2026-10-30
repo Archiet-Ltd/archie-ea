@@ -85,6 +85,8 @@ def login():
 
             _sso_cfg = SSOService().config_for_login(form.email.data, form.password.data)
             if _sso_cfg is not None:
+                # Keep where the person was going (a connector set-up, say) through the identity provider.
+                session["_post_login_next"] = buy_intent.next_candidate() or ""
                 return redirect(
                     url_for("sso.sso_initiate", email=form.email.data)
                 )
@@ -218,39 +220,9 @@ def mfa_challenge():
         flash("Your sign-in attempt expired. Please sign in again.", "error")
         return redirect(url_for("account.login"))
 
-    from app.services import mfa_service
+    from app.modules.account.mfa_flow import run_mfa_challenge
 
-    if not user.mfa_enabled:
-        secret = session.get("_mfa_enroll_secret")
-        if not secret:
-            secret = mfa_service.generate_secret()
-            session["_mfa_enroll_secret"] = secret
-        if request.method == "POST":
-            code = request.form.get("code", "")
-            try:
-                mfa_service.enroll(user, secret, code)
-            except mfa_service.MFAError as exc:
-                flash(str(exc), "form-error")
-                return render_template(
-                    "account/mfa_enroll.html",
-                    secret=secret,
-                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
-                )
-            session.pop("_mfa_enroll_secret", None)
-            return _complete_login_after_mfa(user)
-        return render_template(
-            "account/mfa_enroll.html",
-            secret=secret,
-            provisioning_uri=mfa_service.provisioning_uri(user, secret),
-        )
-
-    if request.method == "POST":
-        code = request.form.get("code", "")
-        if mfa_service.verify_login_code(user, code):
-            return _complete_login_after_mfa(user)
-        flash("That code was not accepted. Try again.", "form-error")
-
-    return render_template("account/mfa_challenge.html")
+    return run_mfa_challenge(user, _complete_login_after_mfa)
 
 
 @account_bp_v2.route("/register", methods=["GET", "POST"])
@@ -259,6 +231,20 @@ def mfa_challenge():
 def register():
     """Register a new user, and send them a confirmation email."""
     return mail_views.register_view()
+
+
+def _company_card():
+    from app.modules.account.services import onboarding_service
+
+    org = getattr(current_user, "organization", None)
+    return onboarding_service.settings_card(org) if org is not None else None
+
+
+# Sign-up after the account: bring the company in, then choose the AI provider.
+from app.modules.admin.connector_routes import connections_access as _connections_access  # noqa: E402
+from app.modules.account.routes import onboarding_views  # noqa: E402
+
+onboarding_views.add_routes(account_bp_v2, _connections_access)
 
 
 @account_bp_v2.route("/logout")
@@ -299,6 +285,7 @@ def manage():
         "account/manage.html",
         user=current_user,
         form=None,
+        company=_company_card(),
         last_login_entry=last_login_entry,
         recent_auth_events=auth_audit.recent_auth_events(current_user.id),
     )
@@ -505,6 +492,7 @@ def save_preferences():
         "solution_updates",
         "assignment_changes",
         "weekly_digest",
+        "alert_email",
         "mention_notifications",
     ]
     try:
@@ -591,6 +579,10 @@ def sso_login(provider):
     state = secrets.token_urlsafe(32)
     session["sso_state"] = state
     session["sso_provider"] = provider
+    from app.utils.safe_redirect import is_safe_next_url
+
+    _requested_next = request.args.get("next")
+    session["_post_login_next"] = _requested_next if is_safe_next_url(_requested_next) else ""
 
     callback_url = url_for("account.sso_callback", provider=provider, _external=True)
     return client.authorize_redirect(callback_url, state=state)
@@ -716,11 +708,13 @@ def sso_callback(provider):
     # registered, so whichever is live stays internally consistent between
     # its own MFA and non-MFA paths.
     from app.services import mfa_service
+    from app.utils.safe_redirect import safe_next_url
 
+    _post_next = session.pop("_post_login_next", "") or ""
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
-        session["_mfa_pending_next"] = ""
+        session["_mfa_pending_next"] = _post_next
         return redirect(url_for("account.mfa_challenge"))
 
     session_registry.login_and_register(user)
@@ -734,4 +728,4 @@ def sso_callback(provider):
         audit_logger.log_authentication(success=True, method=f"sso:{provider}")
     except Exception:
         _log.warning("Audit log failed on SSO success for %s", provider)
-    return redirect(url_for("main.index"))
+    return redirect(safe_next_url(_post_next, url_for("main.index")))

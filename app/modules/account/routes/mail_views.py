@@ -16,7 +16,7 @@ from app.modules.account.forms.account_forms import (
     RequestResetPasswordForm,
 )
 from app.modules.account.services.account_service import AccountService
-from app.services import buy_intent
+from app.services import buy_intent, signup_attribution
 
 MAIL_UNAVAILABLE_RESET = (
     "E-mail is not available on this server, so a reset link cannot be sent. "
@@ -36,8 +36,8 @@ def _link_expired(title, message, action_label, action_href):
 
 def _after_confirmation_url(user):
     """Where a newly confirmed person goes: an owner lands on inviting the team."""
-    if "team.team" in current_app.view_functions and getattr(user, "is_org_admin", False):
-        return url_for("team.team")
+    if "account.welcome" in current_app.view_functions and getattr(user, "is_org_admin", False):
+        return url_for("account.welcome")
     return url_for("dashboard.overview")
 
 
@@ -57,12 +57,14 @@ def register_view():
 
         log_signup_started()
     if form.validate_on_submit():
+        origin = signup_attribution.held()  # read before sign-in starts a fresh session
         _user, confirmation = AccountService.sign_up(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             email=form.email.data,
             password=form.password.data,
         )
+        signup_attribution.record(_user, origin)
         from app.services.public_analytics_service import log_signup_completed
 
         log_signup_completed()
@@ -78,17 +80,22 @@ def register_view():
                 "error",
             )
             return redirect(url_for("account.unconfirmed"))
+        # On the way into the welcome steps the notice is a line on the page, so it never covers the step
+        # heading on a phone; on the other routes it stays a toast.
         flash(
-            "Account created. Welcome to {}! E-mail is not available on this "
-            "server, so no confirmation message was sent.".format(current_app.config['APP_NAME']),
-            "info",
+            "Account created. Welcome to {}! Your account is ready to use, "
+            "with no confirmation message to wait for.".format(current_app.config['APP_NAME']),
+            "signup-notice" if chosen is None and "account.welcome" in current_app.view_functions else "info",
         )
         if chosen is not None:
             # Usable at once: sign in and go straight to that plan's checkout.
             return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
+        if "account.welcome" in current_app.view_functions:
+            # Signed in at once: the second step of sign-up.
+            return redirect(url_for("account.welcome"))
         return redirect(url_for("main.index"))
     return render_template(
-        "account/register.html", form=form,
+        "account/register.html", form=form, step=1,
         signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
     )
 
@@ -156,11 +163,14 @@ def confirm_request_view():
         return redirect(url_for("main.index"))
     if request.method != "POST":
         return redirect(url_for("account.unconfirmed"))
-    delivered, error = AccountService.send_confirmation_email(current_user)
+    delivered, _error = AccountService.send_confirmation_email(current_user)
     if delivered:
         flash("A new confirmation link has been sent to {}.".format(current_user.email), "success")
     else:
-        flash("No message was sent: {}".format(error), "error")
+        flash(
+            "We could not send a confirmation link just now. Please try again in a few minutes.",
+            "error",
+        )
     return redirect(url_for("account.unconfirmed"))
 
 

@@ -1,4 +1,6 @@
 {% extends "layouts/composer_base.html" %}
+{# design-block: board #}
+{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Architecture Composer{% endblock %}
 
 {% block breadcrumb %}
@@ -11,554 +13,22 @@
 {% endblock %}
 
 {% block extra_css %}
-<style>
-/* ═══════════════════════════════════════════════════════════
-   ArchiMate Composer — Enterprise SaaS Production Styles
-   ═══════════════════════════════════════════════════════════ */
-
-/* ── Tab strip — thin scrollbar for overflow indication ───── */
-[role="tablist"] { scrollbar-width: thin; }
-[role="tablist"]::-webkit-scrollbar { height: 4px; }
-[role="tablist"]::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
-
-/* ── Canvas dot grid ──────────────────────────────────────── */
-.composer-canvas-bg {
-    background-color: hsl(var(--muted) / 0.3);
-    background-image: radial-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px);
-    background-size: 24px 24px;
-}
-
-/* ── Drag ghost ──────────────────────────────────────────── */
-.drag-ghost {
-    position: fixed; pointer-events: none; z-index: 9999;
-    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    background: hsl(var(--background)); border: 2px solid hsl(var(--primary));
-    box-shadow: 0 8px 25px -5px rgba(0,0,0,0.15);
-    transform: translate(-50%, -50%);
-}
-
-/* ── Canvas ──────────────────────────────────────────────── */
-#composer-canvas { width: 100%; height: 100%; overflow: hidden; }
-#composer-canvas svg { width: 100%; height: 100%; }
-
-/* ── Element card shadows + hover/selected states (Phase 4) ── */
-.joint-element { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.06)); transition: filter 0.15s; }
-.joint-element:hover { filter: drop-shadow(0 2px 6px rgba(0,0,0,0.10)); }
-.joint-element.selected { filter: drop-shadow(0 4px 12px rgba(37,99,235,0.18)); }
-
-/* ── JointJS port visibility + affordance (ENT-120 / MM-03) ── */
-.joint-element .joint-port { opacity: 0; transition: opacity 0.2s, transform 0.2s; }
-.joint-element:hover .joint-port { opacity: 1; }
-/* Port circle: always visible at decent size on hover, blue fill signals drag-to-connect */
-.joint-element .joint-port circle {
-    cursor: crosshair;
-    transition: r 0.12s ease-out, fill 0.12s, stroke 0.12s, stroke-width 0.12s;
-}
-.joint-element:hover .joint-port circle {
-    r: 9 !important;
-    fill: #3b82f6 !important;
-    stroke: #1d4ed8 !important;
-    stroke-width: 2 !important;
-    filter: drop-shadow(0 0 3px rgba(59,130,246,0.4));
-}
-.joint-element .joint-port:hover circle {
-    r: 11 !important;
-    fill: #2563eb !important;
-    stroke: #1e40af !important;
-    stroke-width: 2.5 !important;
-    filter: drop-shadow(0 0 6px rgba(59,130,246,0.6));
-}
-/* Port discovery pulse — plays once on first element hover via JS class */
-@keyframes portPulse {
-    0%   { opacity: 0; transform: scale(0.5); }
-    50%  { opacity: 1; transform: scale(1.2); }
-    100% { opacity: 1; transform: scale(1); }
-}
-.joint-element.port-discover .joint-port {
-    animation: portPulse 0.35s ease-out forwards;
-}
-/* Resize handles: hidden by default, visible on element hover.
-   !important is required because JointJS may set opacity as SVG presentation attribute. */
-[joint-selector="resizeHandle"],
-[joint-selector="resizeHandleTL"],
-[joint-selector="resizeHandleTR"],
-[joint-selector="resizeHandleBL"],
-[joint-selector="resizeHandleT"],
-[joint-selector="resizeHandleR"],
-[joint-selector="resizeHandleB"],
-[joint-selector="resizeHandleL"] { opacity: 0 !important; transition: opacity 0.15s; }
-.joint-element:hover [joint-selector="resizeHandle"],
-.joint-element:hover [joint-selector="resizeHandleTL"],
-.joint-element:hover [joint-selector="resizeHandleTR"],
-.joint-element:hover [joint-selector="resizeHandleBL"],
-.joint-element:hover [joint-selector="resizeHandleT"],
-.joint-element:hover [joint-selector="resizeHandleR"],
-.joint-element:hover [joint-selector="resizeHandleB"],
-.joint-element:hover [joint-selector="resizeHandleL"] { opacity: 1 !important; }
-.view-mode [joint-selector="resizeHandle"],
-.view-mode [joint-selector="resizeHandleTL"],
-.view-mode [joint-selector="resizeHandleTR"],
-.view-mode [joint-selector="resizeHandleBL"],
-.view-mode [joint-selector="resizeHandleT"],
-.view-mode [joint-selector="resizeHandleR"],
-.view-mode [joint-selector="resizeHandleB"],
-.view-mode [joint-selector="resizeHandleL"] { opacity: 0 !important; pointer-events: none; }
-.view-mode .joint-element .joint-port { opacity: 0 !important; pointer-events: none; }
-.view-mode .joint-element:hover .joint-port { opacity: 0 !important; }
-
-/* ── Search / modal overlays ─────────────────────────────── */
-.search-overlay {
-    position: fixed; inset: 0; z-index: 100;
-    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
-    align-items: flex-start; justify-content: center;
-    padding-top: 80px;
-}
-.search-overlay:not(.hidden) {
-    display: flex;
-}
-.search-panel {
-    background: hsl(var(--background)); border-radius: 16px; width: 520px; max-height: 520px;
-    box-shadow: 0 25px 60px -12px rgba(0,0,0,0.3);
-    display: flex; flex-direction: column; overflow: hidden;
-    border: 1px solid hsl(var(--border));
-}
-.search-panel input { font-family: Inter, system-ui, sans-serif; }
-
-/* ── CMP2-010: Version diff summary panel ─────────────────── */
-.diff-summary-panel {
-    position: absolute;
-    top: 8px; right: 8px; z-index: 60;
-    width: 280px;
-    background: hsl(var(--background));
-    border: 1px solid hsl(var(--border));
-    border-radius: 12px;
-    box-shadow: 0 8px 30px -8px rgba(0,0,0,0.2);
-    display: flex; flex-direction: column;
-    overflow: hidden;
-}
-.diff-summary-section { margin-bottom: 2px; }
-.diff-summary-section .no-underline { text-decoration: none; }
-
-/* ── CMP2-010: Diff badge overlays (SVG) ────────────────── */
-.diff-badge-overlay { pointer-events: none; }
-
-.search-header-input {
-    width: 100%; padding: 14px 16px; border: none; outline: none;
-    font-size: 15px; border-bottom: 1px solid hsl(var(--border));
-    background: transparent;
-}
-.search-results { overflow-y: auto; flex: 1; max-height: 340px; }
-.search-result-item {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 16px; cursor: pointer; transition: background 0.1s;
-    border-bottom: 1px solid hsl(var(--border));
-}
-.search-result-item:hover { background: hsl(var(--accent)); }
-.search-result-name { font-size: 13px; font-weight: 500; }
-.search-result-meta { font-size: 11px; color: hsl(var(--muted-foreground)); }
-.search-create-section {
-    border-top: 1px solid hsl(var(--border)); padding: 12px 16px;
-    background: hsl(var(--muted));
-}
-.search-create-row { display: flex; gap: 8px; align-items: center; }
-.search-create-input {
-    flex: 1; padding: 8px 12px; border: 1px solid hsl(var(--border)); border-radius: 6px;
-    font-size: 13px; outline: none; background: hsl(var(--background));
-}
-.search-create-input:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15); }
-.search-create-btn {
-    padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600;
-    background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: none; cursor: pointer;
-    white-space: nowrap; transition: background 0.12s;
-}
-.search-create-btn:hover { background: hsl(var(--primary) / 0.9); }
-.search-create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Keyboard shortcut badge ─────────────────────────────── */
-kbd.shortcut-key {
-    display: inline-flex; align-items: center; justify-content: center;
-    padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    background: hsl(var(--muted)); border: 1px solid hsl(var(--border));
-    color: hsl(var(--muted-foreground)); white-space: nowrap;
-    box-shadow: 0 1px 0 hsl(var(--border));
-}
-
-/* ── Relationship picker ─────────────────────────────────── */
-.rel-picker {
-    position: fixed; z-index: 110; background: hsl(var(--popover));
-    border-radius: 12px; box-shadow: 0 20px 40px -12px rgba(0,0,0,0.25);
-    padding: 8px; width: 220px; border: 1px solid hsl(var(--border));
-    max-height: min(60vh, 420px); overflow-y: auto;
-}
-.rel-picker-item {
-    padding: 7px 12px; border-radius: 6px; cursor: pointer;
-    font-size: 12px; font-weight: 500; text-transform: capitalize;
-    transition: background 0.1s;
-}
-.rel-picker-item:hover { background: hsl(var(--accent)); }
-
-/* ── Context menu ────────────────────────────────────────── */
-.context-menu {
-    position: fixed; z-index: 120; background: hsl(var(--popover));
-    border-radius: 10px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.2);
-    padding: 4px; min-width: 180px; border: 1px solid hsl(var(--border));
-}
-.context-menu-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 12px; border-radius: 6px; cursor: pointer;
-    font-size: 12px; font-weight: 500; color: hsl(var(--foreground));
-    transition: background 0.1s;
-}
-.context-menu-item:hover { background: hsl(var(--accent)); }
-.context-menu-item.danger { color: hsl(var(--destructive)); }
-.context-menu-item.danger:hover { background: hsl(var(--destructive) / 0.1); }
-.context-menu-sep { height: 1px; background: hsl(var(--border)); margin: 4px 0; }
-
-/* ── Toolbar (redesigned — clean horizontal bar) ─────────── */
-/* Override legacy app.css nav { margin-bottom: 40px !important } */
-nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
-.composer-toolbar {
-    display: flex; align-items: center; gap: 4px;
-    padding: 6px 16px; border-bottom: 1px solid hsl(var(--border));
-    background: hsl(var(--card)); flex-shrink: 0; min-height: 44px;
-    flex-wrap: nowrap; overflow: visible;
-}
-/* CMP-063: Toolbar overflow — secondary actions collapse into "More" dropdown below 1920px.
-   At 1920px with sidebar (240px), usable toolbar width is ~1680px. With all primary buttons,
-   secondary items (Layout, Style, Analyze, Present, Export) overflow. Show "More" dropdown instead. */
-.toolbar-overflow-more { display: none; }
-@media (max-width: 1919px) {
-    .toolbar-overflow-secondary { display: none !important; }
-    .toolbar-overflow-more { display: block; }
-    .composer-toolbar { padding: 6px 8px; gap: 2px; }
-    .toolbar-sep { margin: 0 1px; }
-}
-@media (min-width: 1920px) {
-    .toolbar-overflow-secondary { display: inline-flex; }
-    .toolbar-overflow-more { display: none !important; }
-}
-.toolbar-btn {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 500;
-    border: 1px solid transparent; background: transparent;
-    color: hsl(var(--muted-foreground)); cursor: pointer;
-    transition: all 0.15s;
-}
-.toolbar-btn:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
-.toolbar-btn:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 1px; }
-.toolbar-btn i { width: 14px; height: 14px; }
-.toolbar-btn-sm {
-    padding: 4px 8px; font-size: 14px; font-weight: 600; min-width: 28px; min-height: 28px;
-    border-radius: 8px; justify-content: center;
-}
-.toolbar-btn.active {
-    background: hsl(var(--primary) / 0.1); color: hsl(var(--primary));
-    border-color: hsl(var(--primary) / 0.2);
-}
-.toolbar-sep { width: 1px; height: 20px; background: hsl(var(--border)); margin: 0 4px; flex-shrink: 0; }
-.toolbar-badge {
-    display: inline-flex; align-items: center; white-space: nowrap;
-    font-size: 10px; color: hsl(var(--muted-foreground)); font-weight: 500;
-    padding: 2px 8px; background: hsl(var(--muted)); border-radius: 6px;
-}
-.zoom-badge {
-    font-size: 11px; font-weight: 600; color: hsl(var(--foreground));
-    min-width: 36px; text-align: center;
-}
-
-/* ── Toolbar dropdown menus ──────────────────────────────── */
-.toolbar-dropdown {
-    position: relative;
-}
-.toolbar-dropdown-menu {
-    position: absolute; top: calc(100% + 4px); left: 0; z-index: 60;
-    min-width: 200px; max-height: 400px; overflow-y: auto;
-    background: hsl(var(--popover)); border: 1px solid hsl(var(--border));
-    border-radius: 12px; box-shadow: 0 12px 40px -8px rgba(0,0,0,0.2);
-    padding: 4px;
-}
-.toolbar-dropdown-menu.right-align { left: auto; right: 0; }
-.toolbar-dropdown-item {
-    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-    padding: 7px 12px; font-size: 12px; font-weight: 500;
-    color: hsl(var(--foreground)); cursor: pointer;
-    border: none; background: none; border-radius: 8px;
-    transition: background 0.1s;
-}
-.toolbar-dropdown-item:hover { background: hsl(var(--accent)); }
-.toolbar-dropdown-item i { width: 14px; height: 14px; flex-shrink: 0; }
-.toolbar-dropdown-label {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.06em; padding: 8px 12px 4px;
-    color: hsl(var(--muted-foreground));
-}
-.toolbar-dropdown-sep { height: 1px; background: hsl(var(--border)); margin: 4px 0; }
-
-/* ── Floating panels ─────────────────────────────────────── */
-.floating-panel {
-    background: hsl(var(--card) / 0.95);
-    backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border));
-    border-radius: 16px;
-    box-shadow: 0 8px 32px -8px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.04);
-}
-
-/* ── Component palette chips ─────────────────────────────── */
-.palette-chip {
-    display: flex; height: 32px; align-items: center; gap: 6px;
-    border-radius: 8px; padding: 0 10px;
-    cursor: grab; user-select: none;
-    font-size: 11px; font-weight: 600;
-    border: 1px solid; transition: all 0.15s;
-}
-.palette-chip:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateY(-1px); }
-.palette-chip:active { cursor: grabbing; transform: scale(0.96); }
-.palette-chip i { width: 14px; height: 14px; flex-shrink: 0; }
-
-/* Palette layer colors */
-/* ArchiMate 3.2 spec palette chip colors */
-.palette-chip-business { background: #FFFFB5; border-color: #e6e68a; color: #665c00; }
-.palette-chip-application { background: #B5FFFF; border-color: #80e5e5; color: #005f6b; }
-.palette-chip-technology { background: #C9E7B7; border-color: #a0cf8a; color: #1b5e20; }
-.palette-chip-motivation { background: #CCCCFF; border-color: #a3a3e6; color: #37379e; }
-.palette-chip-strategy { background: #F5DEAA; border-color: #dfc480; color: #6d4c00; }
-.palette-chip-physical { background: #C9E7B7; border-color: #a0cf8a; color: #33691e; }
-.palette-chip-implementation { background: #FFE0E0; border-color: #e6b3b3; color: #8e2020; }
-.palette-chip-implementation-migration { background: #FFE0E0; border-color: #e6b3b3; color: #8e2020; }
-.palette-chip-composite { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
-.palette-chip-diagram-tools { background: hsl(var(--muted)); border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
-
-/* ── Detail panel (floating) ─────────────────────────────── */
-.detail-panel {
-    width: 280px; flex-shrink: 0; border-left: 1px solid hsl(var(--border));
-    overflow-y: auto; background: hsl(var(--card));
-}
-
-/* ── Viewpoint dropdown (reused across toolbar) ──────────── */
-.vp-dropdown { position: relative; }
-.vp-dropdown-menu {
-    position: absolute; top: 100%; left: 0; z-index: 50;
-    min-width: 260px; max-height: 360px; overflow-y: auto;
-    background: hsl(var(--popover)); border: 1px solid hsl(var(--border));
-    border-radius: 12px; box-shadow: 0 12px 40px -8px rgba(0,0,0,0.2);
-    margin-top: 4px; padding: 4px;
-}
-.vp-dropdown-cat {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.06em; padding: 8px 12px 4px;
-    color: hsl(var(--muted-foreground));
-}
-.vp-dropdown-item {
-    display: block; width: 100%; text-align: left;
-    padding: 6px 12px; font-size: 12px; font-weight: 500;
-    color: hsl(var(--foreground)); cursor: pointer;
-    border: none; background: none; border-radius: 8px; margin: 0;
-    transition: background 0.1s;
-}
-.vp-dropdown-item:hover { background: hsl(var(--accent)); }
-.vp-dropdown-item.active-vp { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); font-weight: 600; }
-
-/* ── Layer legend ────────────────────────────────────────── */
-.vp-legend {
-    display: flex; flex-wrap: wrap; gap: 8px;
-    padding: 6px 16px; border-top: 1px solid hsl(var(--border));
-}
-.vp-legend-item {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 10px; color: hsl(var(--muted-foreground));
-}
-.vp-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
-
-/* ── MM-06: Link vertex/segment tool styling ─────────────── */
-.joint-link .joint-link-tools .link-tool .tool-remove { display: none; }
-.joint-link .joint-link-tools circle.vertex-marker {
-    r: 6; fill: #3b82f6; stroke: #1d4ed8; stroke-width: 1.5;
-    cursor: move; transition: r 0.1s;
-}
-.joint-link .joint-link-tools circle.vertex-marker:hover {
-    r: 8; fill: #2563eb;
-}
-.joint-link .joint-link-tools .segment-marker {
-    fill: #93c5fd; stroke: #3b82f6; stroke-width: 1;
-    cursor: move; opacity: 0.7;
-}
-.joint-link .joint-link-tools .segment-marker:hover {
-    fill: #3b82f6; opacity: 1;
-}
-/* ── MM-04: Highlight valid connection target during magnet drag ── */
-.joint-element.joint-highlighted-target [joint-selector="body"] {
-    stroke: #22c55e !important; stroke-width: 3 !important;
-    filter: drop-shadow(0 0 6px rgba(34,197,94,0.4));
-}
-
-/* ── Dimmed elements (neighbor focus) ────────────────────── */
-.joint-element.dimmed { opacity: 0.12 !important; transition: opacity 0.25s; }
-.joint-link.dimmed { opacity: 0.06 !important; transition: opacity 0.25s; }
-.joint-element.highlighted { opacity: 1 !important; }
-.joint-link.highlighted { opacity: 1 !important; }
-
-/* ── Impact analysis highlighting (CMP-019) ──────────────── */
-.joint-element.impact-affected {
-    outline: 3px solid hsl(var(--destructive)) !important;
-    outline-offset: 2px; opacity: 1 !important;
-    transition: outline 0.2s, opacity 0.25s;
-}
-.joint-element.impact-dimmed { opacity: 0.15 !important; transition: opacity 0.25s; }
-
-/* ── CMP2-008: Retirement simulation heatmap ─────────────── */
-.joint-element.retirement-hop-1 [joint-selector="body"] { stroke: #ef4444 !important; stroke-width: 3 !important; filter: drop-shadow(0 0 6px rgba(239,68,68,0.4)); }
-.joint-element.retirement-hop-2 [joint-selector="body"] { stroke: #f59e0b !important; stroke-width: 2.5 !important; filter: drop-shadow(0 0 4px rgba(245,158,11,0.3)); }
-.joint-element.retirement-hop-3 [joint-selector="body"] { stroke: #eab308 !important; stroke-width: 2 !important; }
-.joint-element.retirement-unaffected { opacity: 0.15 !important; }
-.joint-element.retirement-source [joint-selector="body"] { stroke: #dc2626 !important; stroke-width: 3 !important; stroke-dasharray: 6,3; }
-@keyframes retirePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-.joint-element.retirement-source { animation: retirePulse 1.5s ease-in-out infinite; }
-
-/* ── CMP2-001: Current/Target/Gap state indicators ───────── */
-/* State badge indicators (visible in 'all' mode) */
-.joint-element.state-current-only [joint-selector="body"] {
-    stroke: #ef4444 !important; stroke-width: 2.5 !important;
-    stroke-dasharray: 6,4 !important;
-}
-.joint-element.state-target-only [joint-selector="body"] {
-    stroke: #22c55e !important; stroke-width: 2.5 !important;
-}
-.joint-element.state-both [joint-selector="body"] {
-    /* Default rendering — no special border in 'all' mode */
-}
-/* Dimmed elements in filtered current/target view */
-.joint-element.state-dimmed { opacity: 0.15 !important; transition: opacity 0.25s; }
-.joint-link.state-dimmed { opacity: 0.1 !important; transition: opacity 0.25s; }
-/* Gap analysis borders */
-.joint-element.state-gap-target [joint-selector="body"] {
-    stroke: #22c55e !important; stroke-width: 3 !important;
-    filter: drop-shadow(0 0 4px rgba(34,197,94,0.35));
-}
-.joint-element.state-gap-current [joint-selector="body"] {
-    stroke: #ef4444 !important; stroke-width: 3 !important;
-    stroke-dasharray: 6,4 !important;
-    filter: drop-shadow(0 0 4px rgba(239,68,68,0.35));
-}
-.joint-element.state-gap-both [joint-selector="body"] {
-    stroke: #f59e0b !important; stroke-width: 3 !important;
-    filter: drop-shadow(0 0 4px rgba(245,158,11,0.35));
-}
-
-/* ── CMP2-004: Metrics overlay badges ────────────────────── */
-.metrics-badge-fo { overflow: visible; pointer-events: none; }
-.metrics-badge {
-    font-family: system-ui, -apple-system, sans-serif;
-    font-size: 9px; font-weight: 600; line-height: 1;
-    display: inline-block; padding: 2px 5px; border-radius: 8px;
-    white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-    border: 1.5px solid rgba(255,255,255,0.7);
-}
-
-/* ── Explanation panel (CMP-019, CMP-065: fixed width/overflow) ── */
-.explain-panel {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 360px; min-width: 320px;
-    background: hsl(var(--card)); border-right: 1px solid hsl(var(--border));
-    box-shadow: 4px 0 16px -4px rgba(0,0,0,0.08); z-index: 45;
-    overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column;
-}
-.explain-panel-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0; min-width: 0;
-}
-.explain-tabs {
-    display: flex; gap: 2px; padding: 8px 16px;
-    border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0;
-}
-.explain-tab {
-    padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 500;
-    cursor: pointer; border: none;
-    background: transparent; color: hsl(var(--muted-foreground));
-    transition: background 0.12s, color 0.12s;
-}
-.explain-tab:hover { background: hsl(var(--accent)); }
-.explain-tab.active {
-    background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); font-weight: 600;
-}
-
-/* ── CMP2-009: Compliance quality panel (right side) ──────── */
-.compliance-panel {
-    position: absolute; right: 0; top: 0; bottom: 0; width: 340px; min-width: 300px;
-    background: hsl(var(--card)); border-left: 1px solid hsl(var(--border));
-    box-shadow: -4px 0 16px -4px rgba(0,0,0,0.08); z-index: 45;
-    overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column;
-}
-.explain-content {
-    flex: 1; padding: 16px; overflow-y: auto; overflow-x: hidden;
-    font-size: 13px; line-height: 1.6; color: hsl(var(--foreground)); word-break: break-word;
-}
-.explain-content h2 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
-.explain-content h3 { font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 6px; }
-.explain-content ul { padding-left: 16px; margin-bottom: 8px; }
-.explain-content li { margin-bottom: 3px; }
-.explain-content code { font-size: 12px; background: hsl(var(--muted)); padding: 1px 4px; border-radius: 3px; }
-
-/* ── Mini-map ────────────────────────────────────────────── */
-.mini-map {
-    width: 168px;
-    background: hsl(var(--card) / 0.9);
-    backdrop-filter: blur(8px);
-    border: 1px solid hsl(var(--border));
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-    overflow: hidden;
-    user-select: none;
-}
-
-/* ── CMP-12: narrow side-panel layout ────────────────────────
-   When the composer is docked in a side panel (~<1100px), QA saw the minimap
-   overlapping canvas elements and toolbar controls clipped off the edge. Hide
-   the minimap (navigation is covered by fit-to-content and middle-mouse pan) and
-   let the toolbar scroll horizontally instead of clipping. The tab strip already
-   scrolls (overflow-x-auto). Everything reverts above the breakpoint. */
-@media (max-width: 1100px) {
-    .mini-map { display: none !important; }
-    .composer-toolbar {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        scrollbar-width: thin;
-    }
-    .composer-toolbar::-webkit-scrollbar { height: 4px; }
-    .composer-toolbar::-webkit-scrollbar-thumb {
-        background: hsl(var(--border));
-        border-radius: 2px;
-    }
-}
-
-/* ── Layer visibility dots ───────────────────────────────── */
-.layer-dot {
-    width: 14px; height: 14px; border-radius: 50%; cursor: pointer;
-    transition: opacity 0.15s, transform 0.15s; border: 2px solid;
-    flex-shrink: 0;
-}
-.layer-dot:hover { transform: scale(1.15); }
-
-/* CMP-054: Presentation mode */
-.composer-presentation-active {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 100 !important;
-    background: hsl(var(--background));
-    width: 100vw !important;
-    height: 100vh !important;
-}
-.composer-presentation-active .composer-toolbar,
-.composer-presentation-active .composer-sidebar { display: none !important; }
-.presentation-controls {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    z-index: 110; display: flex; align-items: center; gap: 12px;
-    background: hsl(var(--background) / 0.95); border: 1px solid hsl(var(--border));
-    border-radius: 12px; padding: 8px 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/archimate_composer.css') }}">
 {% endblock %}
 
 {% block content %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/diagram/palette.html' import diagram_palette with context %}
+{% from 'components/diagram/finder.html' import diagram_finder with context %}
+{% from 'components/diagram/legend.html' import diagram_legend with context %}
+{% from 'components/diagram/status_line.html' import diagram_status_line with context %}
+{% from 'components/diagram/minimap.html' import diagram_minimap with context %}
+{% from 'components/diagram/properties_sheet.html' import diagram_properties_sheet with context %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/select.html' import native_select %}
 {# AIC-318: workspace return banner — visible when composer was opened for a solution that has an active workspace #}
 {% if solution_id %}
 <div class="bg-info/10 border-b border-info/30 text-primary dark:text-info px-4 py-2 text-sm flex items-center gap-2" role="alert" data-testid="composer-workspace-banner">
@@ -585,74 +55,63 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
     {% include 'archimate/partials/_composer_toolbar.html' %}
 
     {# ── ENT-107: Viewpoint tab strip ────────────────────────── #}
-    <div class="h-10 flex items-center px-4 gap-1 border-b shrink-0 overflow-x-auto"
-         style="background: hsl(var(--muted)); border-color: hsl(var(--border)); scrollbar-width: thin;"
-         role="tablist" aria-label="Open viewpoints">
+    <div class="h-10 items-center px-4 gap-1 border-b border-border bg-muted shrink-0 overflow-x-auto"
+         :class="viewpointTabs.length > 1 ? 'flex' : 'hidden md:flex'">
+        <div role="group" aria-label="Open viewpoints" class="contents">
         <template x-for="tab in viewpointTabs" :key="tab.id">
             <div class="flex items-center gap-1 px-3 h-full text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer select-none"
-                 role="tab"
-                 :aria-selected="tab.id === activeTabId"
+                 data-tab
                  :class="tab.id === activeTabId
  ? 'bg-card text-primary border-b-[3px] border-primary -mb-px'
  : 'border-b-[3px] border-transparent text-muted-foreground hover:text-foreground hover:bg-card/50'"
                  @click="activeTabId = tab.id; loadSavedViewpoint(tab.id, tab.name)"
-                 @dblclick.stop="$event.target.closest('[role=tab]').querySelector('[data-tab-name]') && $event.target.closest('[role=tab]').querySelector('[data-tab-name]').setAttribute('contenteditable', 'true'); $event.target.closest('[role=tab]').querySelector('[data-tab-name]') && $event.target.closest('[role=tab]').querySelector('[data-tab-name]').focus()">
-                <span x-text="tab.name" data-tab-name
+                 @dblclick.stop="$el.querySelector('[data-tab-name]').setAttribute('contenteditable', 'true'); $el.querySelector('[data-tab-name]').focus()">
+                {% call button(variant='bare', size='bare', class="text-xs", attrs_dict={":aria-current": "tab.id === activeTabId ? 'true' : false"}) %}<span x-text="tab.name" data-tab-name
                       @blur="$el.removeAttribute('contenteditable'); tab.name = $el.textContent.trim() || tab.name"
                       @keydown.enter.prevent="$el.blur()"
                       @keydown.escape.prevent="$el.textContent = tab.name; $el.blur()"
-                      class="outline-none"></span>
-                <button type="button" @click.stop="closeViewpointTab(tab)"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-1"
-                        aria-label="Close tab"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></button>
+                      class="outline-none"></span>{% endcall %}
+                {% call button(variant='ghost', size='icon-sm', class="ml-1", aria_label="Close tab", attrs_dict={"@click.stop": "closeViewpointTab(tab)"}) %}<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg>{% endcall %}
             </div>
         </template>
+        </div>
         {# C-04: relabelled from "New blank diagram" — that name and the tab-strip
            position read as "open a new tab" (additive), but the action clears the
            current canvas (destructive). newDiagram() now confirms with the exact
            element/relationship count and is undoable via Ctrl+Z (see composer_graph.js). #}
-        <button type="button" @click="newDiagram()"
-                class="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:bg-card/80 ml-1 shrink-0 transition-colors"
-                title="Clear canvas and start a new diagram"
-                aria-label="Clear canvas and start a new diagram">
+        {% call button(variant='ghost', size='icon-sm', class="flex items-center justify-center w-8 rounded-full ml-1 shrink-0", aria_label="Clear canvas and start a new diagram", attrs_dict={"@click": "newDiagram()", "title": "Clear canvas and start a new diagram"}) %}
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-width="2"/></svg>
-        </button>
+        {% endcall %}
     </div>
 
     {# ── CMP-049: Filter bar ── #}
     <div x-show="filterBarVisible" x-cloak x-transition
          class="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
         <i data-lucide="filter" class="w-3.5 h-3.5 text-muted-foreground"></i>
-        <input type="text" x-model="paletteFilter" @input.debounce.300ms="applyFilter()"
-               placeholder="Filter: layer:application, type:Node, or name text…"
-               aria-label="Search navigation"
-               class="flex-1 bg-transparent text-sm border-none focus:outline-none placeholder:text-muted-foreground/50">
+        {{ input(placeholder="Filter: layer:application, type:Node, or name text\u2026", aria_label="Search navigation", class="flex-1", attrs_dict={"x-model": "paletteFilter", "@input.debounce.300ms": "applyFilter()"}) }}
         <span class="text-2xs text-muted-foreground">layer: | type: | name:</span>
-        <button aria-label="Clear filter" type="button" @click="clearFilter(); filterBarVisible = false" class="p-1 rounded hover:bg-muted">
+        {% call button(variant='ghost', size='icon-sm', aria_label="Clear filter", attrs_dict={"@click": "clearFilter(); filterBarVisible = false"}) %}
             <i data-lucide="x" class="w-3 h-3"></i>
-        </button>
+        {% endcall %}
     </div>
 
     {# ── CMP-040: Drill-down breadcrumb navigation ── #}
     <div x-show="breadcrumbStack.length > 0" x-cloak x-transition
          class="flex items-center gap-1 px-3 py-1.5 bg-muted/50 border-b border-border text-xs">
-        <button aria-label="Go to top level" type="button" @click="navigateBreadcrumb(0)"
-                class="text-muted-foreground hover:text-foreground transition-colors">
+        {% call button(variant='ghost', size='xs', aria_label="Go to top level", attrs_dict={"@click": "navigateBreadcrumb(0)"}) %}
             <i data-lucide="home" class="w-3 h-3"></i>
-        </button>
+        {% endcall %}
         <template x-for="(crumb, idx) in breadcrumbStack" :key="idx">
             <div class="flex items-center gap-1">
                 <i data-lucide="chevron-right" class="w-3 h-3 text-muted-foreground"></i>
-                <button type="button" @click="navigateBreadcrumb(idx)"
-                        class="text-muted-foreground hover:text-foreground hover:underline transition-colors"
-                        x-text="crumb.viewpointName"></button>
+                {% call button(variant='ghost', size='xs', attrs_dict={"@click": "navigateBreadcrumb(idx)", "x-text": "crumb.viewpointName"}) %}{% endcall %}
             </div>
         </template>
         <i data-lucide="chevron-right" class="w-3 h-3 text-muted-foreground"></i>
         <span class="font-medium" x-text="activeViewpointName || 'Current'"></span>
-        <button type="button" @click="breadcrumbUp()" class="ml-2 px-2 py-0.5 rounded bg-muted border border-border hover:bg-accent text-2xs">
+        {% call button(variant='outline', size='xs', class="ml-2 text-2xs", attrs_dict={"@click": "breadcrumbUp()"}) %}
             <i data-lucide="arrow-up" class="w-3 h-3 inline"></i> Up
-        </button>
+        {% endcall %}
     </div>
 
     {# ── Enterprise fallback banner ───────────────────────── #}
@@ -687,14 +146,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
             </div>
         </template>
         <div class="ml-auto flex gap-2">
-            <button type="button" @click="generatePlateaus()" :disabled="plateauLoading"
-                    class="px-2.5 py-1 bg-primary/10 text-info-emphasis rounded-md text-xs font-medium hover:bg-primary/20 disabled:opacity-50">
+            {% call button(variant='ghost', size='xs', class="text-xs", attrs_dict={"@click": "generatePlateaus()", ":disabled": "plateauLoading"}) %}
                 <span x-text="plateauLoading ? 'Generating...' : 'Generate Plateaus'"></span>
-            </button>
-            <button type="button" @click="exitDeltaMode()"
-                    class="px-2.5 py-1 bg-muted text-muted-foreground rounded-md text-xs font-medium hover:bg-muted/80">
+            {% endcall %}
+            {% call button(variant='ghost', size='xs', class="text-xs", attrs_dict={"@click": "exitDeltaMode()"}) %}
                 Exit Delta
-            </button>
+            {% endcall %}
         </div>
     </div>
 
@@ -715,26 +172,32 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
             </div>
         </template>
         <div class="ml-auto flex items-center gap-1.5">
-            <button type="button" @click="diffSummaryOpen = !diffSummaryOpen"
-                    class="px-2 py-0.5 rounded border transition-colors text-2xs font-medium"
-                    :class="diffSummaryOpen ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-warning/20 border-warning/40 text-warning-emphasis hover:bg-warning/30'">
+            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "diffSummaryOpen = !diffSummaryOpen", ":class": "diffSummaryOpen ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-warning/20 border-warning/40 text-warning-emphasis hover:bg-warning/30'"}) %}
                 <i data-lucide="list" class="w-3 h-3 inline-block mr-0.5 align-middle"></i>
                 Details
-            </button>
-            <button type="button" @click="toggleDiffOverlay()"
-                    class="px-2 py-0.5 rounded bg-warning/20 border border-warning/40 hover:bg-warning/30 transition-colors text-warning-emphasis text-2xs font-medium">
+            {% endcall %}
+            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "toggleDiffOverlay()"}) %}
                 <i data-lucide="eye" class="w-3 h-3 inline-block mr-0.5 align-middle"></i>
                 Toggle Overlay
-            </button>
-            <button type="button" @click="clearSnapshotDiff()"
-                    class="px-2 py-0.5 rounded bg-warning/20 border border-warning/40 hover:bg-warning/30 transition-colors text-warning-emphasis text-2xs font-medium">
+            {% endcall %}
+            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "clearSnapshotDiff()"}) %}
                 Exit Compare
-            </button>
+            {% endcall %}
         </div>
     </div>
 
     {# ── Main layout: full-bleed canvas + floating panels ── #}
     <div class="flex flex-1 overflow-hidden relative">
+
+        {# ── Element rail (left): add from the palette, or find what is already in the view ── #}
+        <aside x-show="shellRailOpen" x-cloak class="flex w-72 shrink-0 flex-col border-r border-border bg-card" aria-label="Elements" data-testid="composer-rail">
+            <div class="inline-flex shrink-0 border-b border-border" role="group" aria-label="Element list">
+                {% call button(variant='ghost', size='sm', class='h-10 flex-1 rounded-none', attrs_dict={'@click': "shellRailTab = 'add'", ':aria-pressed': "shellRailTab === 'add'", ':class': "shellRailTab === 'add' ? 'bg-accent text-foreground' : ''", 'data-testid': 'rail-tab-add'}) %}Add{% endcall %}
+                {% call button(variant='ghost', size='sm', class='h-10 flex-1 rounded-none', attrs_dict={'@click': "shellRailTab = 'view'", ':aria-pressed': "shellRailTab === 'view'", ':class': "shellRailTab === 'view' ? 'bg-accent text-foreground' : ''", 'data-testid': 'rail-tab-view'}) %}In this view{% endcall %}
+            </div>
+            <div class="flex min-h-0 flex-1 flex-col" x-show="shellRailTab === 'add'">{{ diagram_palette() }}</div>
+            <div class="flex min-h-0 flex-1 flex-col" x-show="shellRailTab === 'view'" x-cloak>{{ diagram_finder() }}</div>
+        </aside>
 
         {# ── Canvas (full-bleed) ─────────────────────────── #}
         <div class="flex-1 relative flex flex-col">
@@ -751,34 +214,32 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                      class="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-0.5 bg-background/95 border border-border rounded-lg px-1.5 py-1 backdrop-blur-sm">
                     <span class="text-2xs text-muted-foreground font-medium px-1.5" x-text="_selectedCells.length + ' selected'"></span>
                     <div class="w-px h-5 bg-border mx-0.5"></div>
-                    <button type="button" @click="alignSelectedLeft()" title="Align left" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "alignSelectedLeft()", "title": "Align left"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="3" x2="4" y2="21"/><rect x="8" y="5" width="12" height="5" rx="1"/><rect x="8" y="14" width="8" height="5" rx="1"/></svg>
-                    </button>
-                    <button type="button" @click="alignSelectedCenter()" title="Align center" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    {% endcall %}
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "alignSelectedCenter()", "title": "Align center"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><rect x="6" y="5" width="12" height="5" rx="1"/><rect x="8" y="14" width="8" height="5" rx="1"/></svg>
-                    </button>
-                    <button type="button" @click="alignSelectedRight()" title="Align right" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    {% endcall %}
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "alignSelectedRight()", "title": "Align right"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="20" y1="3" x2="20" y2="21"/><rect x="4" y="5" width="12" height="5" rx="1"/><rect x="8" y="14" width="8" height="5" rx="1"/></svg>
-                    </button>
+                    {% endcall %}
                     <div class="w-px h-5 bg-border mx-0.5"></div>
-                    <button type="button" @click="alignSelectedTop()" title="Align top" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "alignSelectedTop()", "title": "Align top"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="4" x2="21" y2="4"/><rect x="5" y="8" width="5" height="12" rx="1"/><rect x="14" y="8" width="5" height="8" rx="1"/></svg>
-                    </button>
-                    <button type="button" @click="alignSelectedMiddle()" title="Align middle" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    {% endcall %}
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "alignSelectedMiddle()", "title": "Align middle"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><rect x="5" y="6" width="5" height="12" rx="1"/><rect x="14" y="8" width="5" height="8" rx="1"/></svg>
-                    </button>
-                    <button type="button" @click="alignSelectedBottom()" title="Align bottom" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    {% endcall %}
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "alignSelectedBottom()", "title": "Align bottom"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="20" x2="21" y2="20"/><rect x="5" y="4" width="5" height="12" rx="1"/><rect x="14" y="8" width="5" height="8" rx="1"/></svg>
-                    </button>
+                    {% endcall %}
                     <div class="w-px h-5 bg-border mx-0.5"></div>
-                    <button type="button" @click="distributeSelectedH()" title="Distribute horizontally" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                            :class="_selectedCells.length < 3 ? 'opacity-40 pointer-events-none' : ''">
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "distributeSelectedH()", "title": "Distribute horizontally", ":class": "_selectedCells.length < 3 ? 'opacity-40 pointer-events-none' : ''"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="4" height="12" rx="1"/><rect x="10" y="6" width="4" height="12" rx="1"/><rect x="18" y="6" width="4" height="12" rx="1"/></svg>
-                    </button>
-                    <button type="button" @click="distributeSelectedV()" title="Distribute vertically" class="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                            :class="_selectedCells.length < 3 ? 'opacity-40 pointer-events-none' : ''">
+                    {% endcall %}
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "distributeSelectedV()", "title": "Distribute vertically", ":class": "_selectedCells.length < 3 ? 'opacity-40 pointer-events-none' : ''"}) %}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="4" rx="1"/><rect x="6" y="10" width="12" height="4" rx="1"/><rect x="6" y="18" width="12" height="4" rx="1"/></svg>
-                    </button>
+                    {% endcall %}
                 </div>
 
                 {# ── CMP2-008: Retirement simulation dismiss bar ── #}
@@ -786,10 +247,9 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                      class="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-destructive/95 text-destructive-foreground border border-destructive rounded-lg px-4 py-2 backdrop-blur-sm text-xs font-medium">
                     <i data-lucide="alert-triangle" class="w-4 h-4 flex-shrink-0"></i>
                     <span>Simulating retirement of <strong x-text="retirementSimSource ? (retirementSimSource.get('label') || retirementSimSource.get('elName') || 'element') : 'element'"></strong> &mdash; <span x-text="retirementAffectedCount"></span> elements affected</span>
-                    <button type="button" @click="clearRetirementSimulation()"
-                            class="ml-2 px-2.5 py-1 rounded-md bg-background/20 hover:bg-background/40 text-destructive-foreground text-2xs font-semibold transition-colors">
+                    {% call button(variant='ghost', size='xs', class="ml-2 text-2xs", attrs_dict={"@click": "clearRetirementSimulation()"}) %}
                         Clear Simulation
-                    </button>
+                    {% endcall %}
                 </div>
 
                 {# Drop indicator #}
@@ -805,7 +265,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm border border-destructive bg-destructive/5 opacity-40"></span> Removed (baseline only)</div>
                     <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm border border-warning bg-warning/10"></span> Changed</div>
                     <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-muted opacity-20"></span> Unchanged</div>
-                    <button type="button" @click="clearGapOverlay()" class="mt-2 w-full px-2 py-1 rounded bg-muted border border-border hover:bg-accent text-2xs">Clear Overlay</button>
+                    {% call button(variant='outline', size='xs', class="mt-2 w-full text-2xs", attrs_dict={"@click": "clearGapOverlay()"}) %}Clear Overlay{% endcall %}
                 </div>
 
                 {# ── CMP-056: Diagram metadata panel ── #}
@@ -814,31 +274,28 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="info" class="w-4 h-4 text-primary"></i>
                         <span class="font-semibold text-sm">Diagram Metadata</span>
-                        <button aria-label="Close metadata panel" type="button" @click="metadataPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto">
+                        {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center ml-auto", aria_label="Close metadata panel", attrs_dict={"@click": "metadataPanelOpen = false"}) %}
                             <i data-lucide="x" class="w-3 h-3"></i>
-                        </button>
+                        {% endcall %}
                     </div>
                     <div class="space-y-2.5">
                         <div>
                             <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
-                            <textarea x-model="diagramDescription" rows="3" placeholder="Diagram purpose…"
-                                      class="w-full mt-1 px-2.5 py-1.5 rounded-md border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Description"></textarea>
+                            {{ textarea(placeholder="Diagram purpose\u2026", rows=3, aria_label="Description", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramDescription"}) }}
                         </div>
                         <div class="flex gap-2">
                             <div class="flex-1">
                                 <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Version</label>
-                                <input type="text" x-model="diagramVersion"
-                                       class="w-full mt-1 px-2.5 py-1.5 rounded-md border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Version">
+                                {{ input(aria_label="Version", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramVersion"}) }}
                             </div>
                             <div class="flex-1">
                                 <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Audience</label>
-                                <select x-model="diagramAudience"
-                                        class="w-full mt-1 px-2.5 py-1.5 rounded-md border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Audience">
+                                {% call native_select(size="sm", aria_label="Audience", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramAudience"}) %}
                                     <option>Technical</option>
                                     <option>Business</option>
                                     <option>Executive</option>
                                     <option>All</option>
-                                </select>
+                                {% endcall %}
                             </div>
                         </div>
                         <div x-show="diagramLastModified" x-cloak class="text-2xs text-muted-foreground">
@@ -866,24 +323,28 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                 <div x-show="!viewpointLoading && elementCount === 0 && (!graph || graph.getElements().length === 0)" x-cloak
                      class="absolute inset-0 flex items-start justify-center p-8 pt-12 z-10 pointer-events-none overflow-y-auto">
                     <div class="flex flex-col items-center gap-6 max-w-2xl w-full pointer-events-auto">
+                        {% if workspace_is_empty is sameas true and not focus %}
+                        {# Nothing is modelled in this organisation: say so and offer the way in #}
+                        <div class="w-full rounded-lg border border-border bg-card" data-testid="composer-empty-workspace">
+                            {{ empty_state(icon='layers', title='Nothing is modelled yet', description='Connect GitHub and your systems, and the elements they connect to, appear here to open and explore.', cta_text='Connect GitHub', cta_href=url_for('m365_connector.github_connect') if 'm365_connector.github_connect' in flask.current_app.view_functions else none) }}
+                        </div>
+                        {% endif %}
                         {# Hero #}
                         <div class="flex flex-col items-center gap-3 text-center">
                             <div class="size-14 rounded-lg bg-card border border-border flex items-center justify-center text-primary">
                                 <i data-lucide="pen-tool" class="w-7 h-7"></i>
                             </div>
-                            <h3 class="text-lg font-bold" style="color: hsl(var(--foreground));">Architectural Canvas</h3>
+                            <h3 class="text-lg font-bold text-foreground">Architectural Canvas</h3>
                             <p class="text-muted-foreground text-sm leading-relaxed max-w-md">
                                 Drag elements from the palette, use Ctrl+K to quick-add, or start from a template below.
                             </p>
                             <div class="flex gap-2 mt-1">
-                                <button type="button" @click="openQuickAdd()" x-show="mode === 'edit'" x-cloak
-                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                                {% call button(variant='default', size='sm', class="items-center justify-center gap-2 whitespace-nowrap items-center", attrs_dict={"@click": "openQuickAdd()", "x-show": "mode === 'edit'", "x-cloak": ""}) %}
                                     <i data-lucide="plus" class="w-4 h-4"></i> New Element
-                                </button>
-                                <button type="button" @click="openGenerateModal()" x-show="mode === 'edit'" x-cloak
-                                        class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border bg-card text-foreground font-semibold text-sm hover:bg-accent transition-all">
+                                {% endcall %}
+                                {% call button(variant='outline', size='xs', class="flex items-center gap-2", attrs_dict={"@click": "openGenerateModal()", "x-show": "mode === 'edit'", "x-cloak": ""}) %}
                                     <i data-lucide="sparkles" class="w-4 h-4"></i> Generate with AI
-                                </button>
+                                {% endcall %}
                             </div>
                         </div>
 
@@ -892,13 +353,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Continue where you left off</h4>
                             <div class="grid grid-cols-3 gap-2">
                                 <template x-for="tab in viewpointTabs.slice(0, 3)" :key="tab.id">
-                                    <button type="button" @click="activeTabId = tab.id; loadSavedViewpoint(tab.id, tab.name)"
-                                            class="flex items-center gap-2.5 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-all text-left">
+                                    {% call button(variant='outline', size='xs', class="flex items-center gap-2.5 text-left", attrs_dict={"@click": "activeTabId = tab.id; loadSavedViewpoint(tab.id, tab.name)"}) %}
                                         <div class="size-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
                                             <i data-lucide="file" class="w-4 h-4 text-primary"></i>
                                         </div>
                                         <span class="text-xs font-medium truncate" x-text="tab.name"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>
@@ -908,11 +368,10 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Start from a template</h4>
                             <div class="grid grid-cols-3 gap-2">
                                 <template x-for="tpl in _builtinTemplates" :key="tpl.id">
-                                    <button type="button" @click="loadBuiltinTemplate(tpl)"
-                                            class="flex flex-col gap-1.5 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-all text-left">
+                                    {% call button(variant='outline', size='xs', class="flex gap-1.5 text-left", attrs_dict={"@click": "loadBuiltinTemplate(tpl)"}) %}
                                         <span class="text-xs font-semibold" x-text="tpl.name"></span>
                                         <span class="text-2xs text-muted-foreground leading-snug line-clamp-2" x-text="tpl.description"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>
@@ -941,22 +400,22 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                 {# ── CMP-054: Presentation mode controls (CMP-061: fixed dismiss) ── #}
                 <div x-show="presentationActive" x-cloak x-transition @click.stop @mousedown.stop @pointerdown.stop
                      class="presentation-controls pointer-events-auto">
-                    <button type="button" @click="presentationPrev()" class="p-2 rounded-lg hover:bg-muted transition-colors" title="Previous">
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "presentationPrev()", "title": "Previous"}) %}
                         <i data-lucide="chevron-left" class="w-5 h-5 pointer-events-none"></i>
-                    </button>
+                    {% endcall %}
                     <div class="text-sm font-medium px-3">
                         <span x-text="(presentationIndex + 1) + ' / ' + presentationSlides.length"></span>
                     </div>
-                    <button type="button" @click="presentationNext()" class="p-2 rounded-lg hover:bg-muted transition-colors" title="Next">
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "presentationNext()", "title": "Next"}) %}
                         <i data-lucide="chevron-right" class="w-5 h-5 pointer-events-none"></i>
-                    </button>
+                    {% endcall %}
                     <div class="w-px h-6 bg-border mx-1"></div>
                     <span class="text-xs text-muted-foreground max-w-[200px] truncate"
                           x-text="presentationSlides[presentationIndex] ? presentationSlides[presentationIndex].name : ''"></span>
                     <div class="w-px h-6 bg-border mx-1"></div>
-                    <button type="button" @click="exitPresentationMode()" class="p-2 rounded-lg hover:bg-destructive/10 text-destructive-emphasis transition-colors" title="Exit (Esc)">
+                    {% call button(variant='ghost', size='icon-sm', attrs_dict={"@click": "exitPresentationMode()", "title": "Exit (Esc)"}) %}
                         <i data-lucide="x" class="w-5 h-5 pointer-events-none"></i>
-                    </button>
+                    {% endcall %}
                 </div>
 
                 {# CMP-019: Explanation panel (slide-out from left, inside canvas) #}
@@ -964,15 +423,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="explain-panel">
                         <div class="explain-panel-header">
                             <h3 class="text-sm font-semibold">Diagram Explanation</h3>
-                            <button type="button" @click="explanationPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close explanation panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close explanation panel", attrs_dict={"@click": "explanationPanelOpen = false"}) %}&times;{% endcall %}
                         </div>
                         <div class="explain-tabs">
-                            <button type="button" class="explain-tab" :class="explanationAudience === 'technical' ? 'active' : ''"
-                                    @click="explanationAudience = 'technical'; explainDiagram()">Technical</button>
-                            <button type="button" class="explain-tab" :class="explanationAudience === 'business' ? 'active' : ''"
-                                    @click="explanationAudience = 'business'; explainDiagram()">Business</button>
-                            <button type="button" class="explain-tab" :class="explanationAudience === 'developer' ? 'active' : ''"
-                                    @click="explanationAudience = 'developer'; explainDiagram()">Developer</button>
+                            {% call button(variant='ghost', size='bare', class="explain-tab", attrs_dict={":class": "explanationAudience === 'technical' ? 'active' : ''", "@click": "explanationAudience = 'technical'; explainDiagram()"}) %}Technical{% endcall %}
+                            {% call button(variant='ghost', size='bare', class="explain-tab", attrs_dict={":class": "explanationAudience === 'business' ? 'active' : ''", "@click": "explanationAudience = 'business'; explainDiagram()"}) %}Business{% endcall %}
+                            {% call button(variant='ghost', size='bare', class="explain-tab", attrs_dict={":class": "explanationAudience === 'developer' ? 'active' : ''", "@click": "explanationAudience = 'developer'; explainDiagram()"}) %}Developer{% endcall %}
                         </div>
                         <div class="explain-content">
                             <template x-if="explanationLoading">
@@ -996,7 +452,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="explain-panel">
                         <div class="explain-panel-header">
                             <h3 class="text-sm font-semibold">Impact Analysis</h3>
-                            <button type="button" @click="impactPanelOpen = false; _clearImpactHighlight()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close impact panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close impact panel", attrs_dict={"@click": "impactPanelOpen = false; _clearImpactHighlight()"}) %}&times;{% endcall %}
                         </div>
                         <div class="explain-content">
                             <template x-if="!impactData">
@@ -1033,7 +489,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                 <i data-lucide="shield-check" class="w-4 h-4"></i>
                                 Diagram Quality
                             </h3>
-                            <button type="button" @click="compliancePanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close compliance panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close compliance panel", attrs_dict={"@click": "compliancePanelOpen = false"}) %}&times;{% endcall %}
                         </div>
                         <div class="p-4">
                             {# Score display #}
@@ -1053,7 +509,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <div class="w-full h-2 rounded-full bg-muted overflow-hidden mb-4">
                                 <div class="h-full rounded-full transition-all duration-500"
                                      :class="complianceScore >= 80 ? 'bg-success' : (complianceScore >= 50 ? 'bg-warning' : 'bg-destructive')"
-                                     :style="'width:' + complianceScore + '%'"></div>
+                                     x-effect="$el.style.width = complianceScore + '%'"></div>
                             </div>
 
                             {# Deductions list #}
@@ -1079,11 +535,9 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                                     </div>
                                                     <div class="text-muted-foreground mt-0.5 truncate" x-text="d.message"></div>
                                                 </div>
-                                                <button type="button" x-show="d.elementId" x-cloak
-                                                        @click="highlightComplianceElement(d.elementId)"
-                                                        class="flex-shrink-0 px-2 py-0.5 rounded text-2xs font-medium bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
+                                                {% call button(variant='ghost', size='xs', class="text-2xs", attrs_dict={"x-show": "d.elementId", "x-cloak": "", "@click": "highlightComplianceElement(d.elementId)"}) %}
                                                     Highlight
-                                                </button>
+                                                {% endcall %}
                                             </div>
                                         </template>
                                     </div>
@@ -1103,13 +557,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <div class="bg-card border border-border rounded-lg p-2 text-xs">
                                 <div class="flex items-start justify-between gap-1">
                                     <span x-text="s.reason" class="text-foreground leading-tight"></span>
-                                    <button type="button" @click="dismissSuggestion(i)" class="text-muted-foreground hover:text-foreground flex-shrink-0 ml-1">&times;</button>
+                                    {% call button(variant='ghost', size='xs', class="ml-1", attrs_dict={"@click": "dismissSuggestion(i)"}) %}&times;{% endcall %}
                                 </div>
                                 <div class="mt-1.5 flex gap-1">
-                                    <button type="button" @click="s.kind === 'element' ? acceptElementSuggestion(s) : acceptRelSuggestion(s)"
-                                            class="px-2 py-0.5 bg-primary/10 text-info-emphasis rounded text-2xs font-medium hover:bg-primary/20">
+                                    {% call button(variant='ghost', size='xs', class="text-2xs", attrs_dict={"@click": "s.kind === 'element' ? acceptElementSuggestion(s) : acceptRelSuggestion(s)"}) %}
                                         Add
-                                    </button>
+                                    {% endcall %}
                                     <span x-text="s.kind === 'element' ? s.type : s.suggested_type"
                                           class="px-1.5 py-0.5 bg-muted rounded text-2xs text-muted-foreground"></span>
                                 </div>
@@ -1123,19 +576,18 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-40 overflow-y-auto">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Validation Report</h3>
-                            <button type="button" @click="validationPanelOpen = false; _clearValidationHighlight()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close validation panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close validation panel", attrs_dict={"@click": "validationPanelOpen = false; _clearValidationHighlight()"}) %}&times;{% endcall %}
                         </div>
                         {# Phase selector #}
                         <div class="px-3 pt-2 pb-1">
                             <label class="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">Phase Gate</label>
-                            <select x-model="validationPhase" @change="runValidation()"
-                                    class="mt-1 w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="Phase Gate">
+                            {% call native_select(size="sm", aria_label="Phase Gate", class="mt-1 w-full text-xs", attrs_dict={"x-model": "validationPhase", "@change": "runValidation()"}) %}
                                 <option value="">No phase filter</option>
                                 <option value="A">Phase A — Architecture Vision</option>
                                 <option value="B">Phase B — Business Architecture</option>
                                 <option value="C">Phase C — Information Systems</option>
                                 <option value="D">Phase D — Technology Architecture</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="p-3 space-y-3">
                             {# Loading #}
@@ -1197,9 +649,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-40 overflow-y-auto">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Migration Plateaus</h3>
-                            <button type="button" @click="plateauSuggestions = []; _applyDeltaStyling()"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    aria-label="Close plateau panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close plateau panel", attrs_dict={"@click": "plateauSuggestions = []; _applyDeltaStyling()"}) %}&times;{% endcall %}
                         </div>
                         <div class="p-3 space-y-2">
                             <template x-for="(p, idx) in plateauSuggestions" :key="'plat-' + idx">
@@ -1216,10 +666,9 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                     </div>
                                 </div>
                             </template>
-                            <button type="button" @click="_applyDeltaStyling()"
-                                    class="w-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md mt-2">
+                            {% call button(variant='outline', size='xs', class="w-full text-xs mt-2", attrs_dict={"@click": "_applyDeltaStyling()"}) %}
                                 Reset highlight
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </template>
@@ -1229,7 +678,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-72 bg-card border-l border-border z-40 flex flex-col">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Comments</h3>
-                            <button type="button" @click="closeComments()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close comments panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close comments panel", attrs_dict={"@click": "closeComments()"}) %}&times;{% endcall %}
                         </div>
                         <div class="flex-1 overflow-y-auto p-3 space-y-2">
                             <template x-if="commentsLoading">
@@ -1253,10 +702,8 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             </template>
                         </div>
                         <div class="p-3 border-t border-border">
-                            <textarea x-model="newCommentText" rows="2" placeholder="Add a comment..."
-                                class="w-full text-xs border border-border rounded p-2 bg-background resize-none" aria-label="Add a comment..."></textarea>
-                            <button type="button" @click="addComment()" :disabled="!newCommentText.trim()"
-                                class="mt-1 w-full px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium disabled:opacity-50">Post</button>
+                            {{ textarea(placeholder="Add a comment...", rows=2, aria_label="Add a comment...", class="w-full text-xs", attrs_dict={"x-model": "newCommentText"}) }}
+                            {% call button(variant='default', size='xs', class="mt-1 w-full text-xs", attrs_dict={"@click": "addComment()", ":disabled": "!newCommentText.trim()"}) %}Post{% endcall %}
                         </div>
                     </div>
                 </template>
@@ -1266,7 +713,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-40 flex flex-col">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Change History</h3>
-                            <button type="button" @click="auditPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close audit panel">&times;</button>
+                            {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close audit panel", attrs_dict={"@click": "auditPanelOpen = false"}) %}&times;{% endcall %}
                         </div>
                         <div class="flex-1 overflow-y-auto p-3 space-y-1.5">
                             <template x-if="auditLoading">
@@ -1323,12 +770,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-warning/40 border border-warning"></span> Potential gap</span>
                             <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-muted border border-border"></span> None</span>
                         </div>
-                        <button type="button" @click="generateRelMatrix()" class="toolbar-btn toolbar-btn-sm" title="Refresh matrix">
+                        {% call button(variant='ghost', size='bare', class="toolbar-btn toolbar-btn-sm", attrs_dict={"@click": "generateRelMatrix()", "title": "Refresh matrix"}) %}
                             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                        </button>
-                        <button type="button" @click="exportRelMatrixCsv()" class="toolbar-btn toolbar-btn-sm" title="Export CSV">
+                        {% endcall %}
+                        {% call button(variant='ghost', size='bare', class="toolbar-btn toolbar-btn-sm", attrs_dict={"@click": "exportRelMatrixCsv()", "title": "Export CSV"}) %}
                             <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                        </button>
+                        {% endcall %}
                     </div>
                 </div>
 
@@ -1341,10 +788,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                 </template>
 
                 <template x-if="relMatrixData && relMatrixData.elements.length > 0">
-                    <div class="overflow-auto p-2">
-                        <table class="dense-table border-collapse text-xs">
-                            <thead>
-                                <tr>
+                    {% set relmatrix_header %}
                                     <th class="sticky left-0 top-0 z-20 bg-muted px-2 py-1.5 text-left font-semibold text-muted-foreground border border-border min-w-[160px]">
                                         Source \ Target
                                     </th>
@@ -1356,9 +800,8 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                                  x-text="tgtEl.name"></div>
                                         </th>
                                     </template>
-                                </tr>
-                            </thead>
-                            <tbody>
+                    {% endset %}
+                    {% call dense_table(header=relmatrix_header, caption='Relationship matrix', table_class='text-xs') %}
                                 <template x-for="srcEl in relMatrixData.elements" :key="'row-' + srcEl.id">
                                     <tr>
                                         <td class="sticky left-0 z-10 px-2 py-1 font-medium border border-border min-w-[160px] whitespace-nowrap"
@@ -1387,115 +830,18 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                         </template>
                                     </tr>
                                 </template>
-                            </tbody>
-                        </table>
-                    </div>
+                    {% endcall %}
                 </template>
             </div>
 
-            {# Layer legend (shown in view mode with active viewpoint) #}
-            {# design-tokens-ok: ArchiMate layer legend below — colour is the only thing distinguishing the 7 layers, kept raw per DESIGN.md's ArchiMate Layer Colors table #}
-            <div x-show="activeViewpoint && elementCount > 0" x-cloak
-                 class="vp-legend" aria-label="Layer legend">
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-violet-500"></span>Strategy</span> <!-- design-tokens-ok: layer legend -->
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-violet-600"></span>Motivation</span> <!-- design-tokens-ok: layer legend -->
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-primary"></span>Business</span>
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-cyan-500"></span>Application</span> <!-- design-tokens-ok: layer legend -->
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-emerald-500"></span>Technology</span> <!-- design-tokens-ok: layer legend -->
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-amber-500"></span>Physical</span> <!-- design-tokens-ok: layer legend -->
-                <span class="vp-legend-item"><span class="vp-legend-dot bg-orange-500"></span>Implementation</span> <!-- design-tokens-ok: layer legend -->
-            </div>
+
+            {{ diagram_minimap() }}
         </div>
 
-        {# ── Fixed Components Sidebar (right) ────────────── #}
-        <aside x-show="mode === 'edit' && componentsPanelOpen" x-cloak
-               x-transition:enter="transition ease-out duration-200"
-               x-transition:enter-start="opacity-0 translate-x-4"
-               x-transition:enter-end="opacity-100 translate-x-0"
-               x-transition:leave="transition ease-in duration-150"
-               x-transition:leave-start="opacity-100 translate-x-0"
-               x-transition:leave-end="opacity-0 translate-x-4"
-               @keydown.escape.window="componentsPanelOpen = false"
-               role="complementary"
-               aria-label="Capabilities Panel"
-               data-testid="composer-capabilities-panel"
-               class="w-80 shrink-0 border-l border-border flex flex-col overflow-hidden z-20 bg-card">
-            <div class="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
-                <h3 class="font-bold text-sm flex items-center gap-2 text-foreground">
-                    <i data-lucide="component" class="w-4 h-4 text-primary"></i>
-                    Components
-                </h3>
-                <div class="flex items-center gap-1">
-                    <button type="button" @click="componentsPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close components panel">
-                        <i data-lucide="panel-right-close" class="w-4 h-4"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="px-3 py-2 border-b border-border">
-                <input type="text" x-model="paletteFilter" placeholder="Filter elements..."
-                       aria-label="Filter elements"
-                       class="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background focus:ring-1 focus:ring-primary/50 outline-none">
-            </div>
-            <div class="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-                <template x-for="(types, layer) in filteredPalette" :key="layer">
-                    <section>
-                        <h4 class="text-2xs font-bold uppercase tracking-wider mb-2 px-1 text-muted-foreground"
-                            x-text="(layer === 'Composite' || layer === 'Diagram Tools') ? layer : layer + ' Layer'"></h4>
-                        <div class="grid grid-cols-2 gap-1.5">
-                            <template x-for="t in types" :key="t.type">
-                                <div class="bg-card rounded-lg border border-border p-3 palette-chip"
-                                     :class="'palette-chip-' + layer.toLowerCase().replace(/[^a-z]/g, '-').replace(/-+/g, '-').replace(/-$/, '')"
-                                     draggable="true"
-                                     @dragstart="onPaletteDragStart($event, t)"
-                                     @dragend="onPaletteDragEnd($event)">
-                                    <span class="truncate" x-text="t.label"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </section>
-                </template>
-            </div>
-            <div class="px-3 py-2.5 border-t border-border bg-muted/30">
-                <p class="text-2xs text-center text-muted-foreground">
-                    Drag onto canvas to add
-                </p>
-            </div>
-        </aside>
-
-        {# Toggle button for components panel (shown when panel is closed, edit mode) #}
-        <button type="button" x-show="mode === 'edit' && !componentsPanelOpen" x-cloak
-                @click="componentsPanelOpen = true"
-                class="absolute right-4 top-4 z-30 p-2.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground transition-all"
-                title="Open components library">
-            <i data-lucide="component" class="w-5 h-5"></i>
-        </button>
-
-        {# ── Mini-map (bottom left) ─────────────────────────── #}
-        <div class="absolute bottom-4 left-4 z-20 mini-map" x-show="elementCount > 0" x-cloak
-             @mousedown.prevent="miniMapPointerDown($event)"
-             @mousemove.prevent="miniMapPointerMove($event)"
-             @mouseup.prevent="miniMapPointerUp()"
-             @mouseleave="miniMapPointerUp()">
-            <div class="flex items-center justify-between px-2.5 pt-1.5 pb-0.5">
-                <span class="text-2xs font-semibold uppercase tracking-wider" style="color: hsl(var(--muted-foreground));">Minimap</span>
-                <button type="button" @click.stop="miniMapExpanded = !miniMapExpanded; try { window.localStorage.setItem('archie.composer.miniMapExpanded', miniMapExpanded); } catch (e) { /* swallow-ok: localStorage is unavailable in private browsing */ }"
-                        class="text-2xs text-muted-foreground hover:text-foreground leading-none p-0.5"
-                        x-text="miniMapExpanded ? '−' : '+'"></button>
-            </div>
-            <canvas id="minimap-canvas"
-                    x-show="miniMapExpanded" x-cloak
-                    :width="miniMapExpanded ? 152 : 0"
-                    :height="miniMapExpanded ? 100 : 0"
-                    class="block mx-auto mb-1 rounded-md cursor-crosshair"
-                    style="width: 152px; height: 100px; background: hsl(var(--muted) / 0.3);"></canvas>
-        </div>
-
-        
         {# ── CMP-028: Autosave recovery prompt ───────────── #}
         <div x-show="_showAutosavePrompt" x-cloak
              role="alertdialog" aria-modal="true" aria-label="Restore unsaved work"
-             class="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg px-6 py-4 max-w-md"
-             style="border-color: hsl(var(--border));">
+             class="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg px-6 py-4 max-w-md">
             <div class="flex items-start gap-3">
                 <div class="flex-shrink-0 mt-0.5">
                     <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -1504,8 +850,8 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <h3 class="text-sm font-semibold text-foreground mb-1">Unsaved work found</h3>
                     <p class="text-xs text-muted-foreground mb-3">A previous session left unsaved changes. Would you like to restore them?</p>
                     <div class="flex gap-2">
-                        <button type="button" @click="restoreAutosave()" class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Restore</button>
-                        <button type="button" @click="discardAutosave()" class="px-3 py-1.5 text-xs font-medium rounded-md border text-foreground hover:bg-accent transition-colors" style="border-color: hsl(var(--border));">Discard</button>
+                        {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"@click": "restoreAutosave()"}) %}Restore{% endcall %}
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"@click": "discardAutosave()"}) %}Discard{% endcall %}
                     </div>
                 </div>
             </div>
@@ -1514,20 +860,34 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
         {# ── Focus mode banner: an unsaved view opened from ?element= ───────── #}
         <div x-show="focusView" x-cloak id="composer-focus-banner"
              role="region" aria-label="Unsaved view"
-             class="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-card border shadow-xl rounded-xl px-5 py-3 max-w-xl"
-             style="border-color: hsl(var(--border));">
+             class="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-xl px-5 py-3 max-w-xl">
             <div class="flex items-start gap-3">
                 <div class="flex-1">
                     <h3 class="text-sm font-semibold text-foreground mb-1" id="composer-focus-title"
                         x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
+                    {% if focus and focus.most_connected %}<p class="text-xs text-muted-foreground mb-1" id="composer-focus-most-connected">Showing the most connected element in your model. Search for another element to look at it instead.</p>{% endif %}
                     <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
                     <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
+                    <div class="mb-2" x-show="focusView && !focusView.empty">
+                        {% call button(variant='link', size='bare', class="h-auto p-0 text-xs", attrs_dict={"id": "composer-focus-list-toggle", "@click": "focusView.listOpen = !focusView.listOpen", ":aria-expanded": "focusView && focusView.listOpen ? 'true' : 'false'", "aria-controls": "composer-focus-list", "x-text": "focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"}) %}{% endcall %}
+                        <div id="composer-focus-list" x-show="focusView && focusView.listOpen" x-cloak class="mt-2 max-h-64 overflow-auto rounded-md border border-border">
+                            {% call dense_table(columns=[('From', ''), ('Relationship', ''), ('To', ''), ('Kind', '')], caption='Connections of the chosen element', flush=true, table_class='text-xs') %}
+                                    <template x-for="row in (focusView ? focusView.rows : [])" :key="row.key">
+                                        <tr class="border-t border-border" data-focus-row>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.from || 'Unnamed element'"></td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.relation"></td>
+                                            <td class="px-2 py-1">
+                                                {% call button(variant='link', size='bare', class="h-auto p-0 text-xs font-normal whitespace-normal text-left", attrs_dict={"@click": "openFocusConnection(row.elementId)", "x-text": "row.name || 'Unnamed element'"}) %}{% endcall %}
+                                            </td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.kind"></td>
+                                        </tr>
+                                    </template>
+                                {% endcall %}
+                        </div>
+                    </div>
                     <div class="flex gap-2">
-                        <button type="button" id="composer-focus-save" @click="saveFocusView()"
-                                :disabled="focusView && focusView.saving"
-                                class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save as diagram</button>
-                        <button type="button" id="composer-focus-discard" @click="discardFocusView()"
-                                class="px-3 py-1.5 text-xs font-medium rounded-md border text-foreground hover:bg-accent transition-colors" style="border-color: hsl(var(--border));">Discard</button>
+                        {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-save", "@click": "saveFocusView()", ":disabled": "focusView && focusView.saving"}) %}Save as diagram{% endcall %}
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-discard", "@click": "discardFocusView()"}) %}Discard{% endcall %}
                     </div>
                 </div>
             </div>
@@ -1539,10 +899,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
             <div class="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/30">
                 <h3 class="text-sm font-semibold text-foreground"
                     x-text="selectedNode ? 'Element Detail' : 'Relationship Detail'"></h3>
-                <button type="button"
-                        @click="selectedNode = null; selectedEdge = null"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label="Close detail panel">&times;</button>
+                {% call button(variant='ghost', size='icon-sm', class="w-8 items-center justify-center", aria_label="Close detail panel", attrs_dict={"@click": "selectedNode = null; selectedEdge = null"}) %}&times;{% endcall %}
             </div>
 
             {# Node detail #}
@@ -1553,10 +910,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                         <div>
                             <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Name</dt>
                             <dd class="mt-0.5">
-                                <input type="text" x-model="selectedNode.label"
-                                       @blur="updateSelectedNodeName()"
-                                       @keydown.enter="$event.target.blur()"
-                                       class="w-full text-sm font-semibold bg-transparent border-b border-transparent hover:border-border focus:border-primary outline-none py-0.5 text-foreground transition-colors" aria-label="Element name">
+                                {{ input(aria_label="Element name", class="w-full", attrs_dict={"x-model": "selectedNode.label", "@blur": "updateSelectedNodeName()", "@keydown.enter": "$event.target.blur()"}) }}
                             </dd>
                         </div>
                         <div class="flex items-center gap-2">
@@ -1575,34 +929,27 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Description</dt>
                         <dd class="mt-0.5">
-                            <textarea x-model="selectedNode.description"
-                                      @blur="updateSelectedNodeDescription()"
-                                      placeholder="Add description..."
-                                      class="w-full text-xs text-foreground bg-muted/30 border border-border rounded p-1.5 resize-none focus:border-primary outline-none transition-colors" rows="2" aria-label="Add description..."></textarea>
+                            {{ textarea(placeholder="Add description...", rows=2, aria_label="Add description...", class="w-full text-xs", attrs_dict={"x-model": "selectedNode.description", "@blur": "updateSelectedNodeDescription()"}) }}
                         </dd>
                     </div>
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Status</dt>
                         <dd class="mt-1">
-                            <select aria-label="Element status" x-model="selectedNode.status"
-                                    @change="updateSelectedNodeStatus()"
-                                    class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:border-primary outline-none transition-colors">
+                            {% call native_select(size="sm", aria_label="Element status", class="w-full text-xs", attrs_dict={"x-model": "selectedNode.status", "@change": "updateSelectedNodeStatus()"}) %}
                                 <option value="">— not set —</option>
                                 <option value="planned">Planned</option>
                                 <option value="assigned">Assigned</option>
                                 <option value="in-progress">In Progress</option>
                                 <option value="realized">Realized</option>
                                 <option value="deprecated">Deprecated</option>
-                            </select>
+                            {% endcall %}
                         </dd>
                     </div>
                     {# GAP-INT-002: Deployment zone type for Grouping/Location elements #}
                     <div x-show="selectedNode && (selectedNode.elType === 'Grouping' || selectedNode.elType === 'Location')" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Deployment Zone</dt>
                         <dd class="mt-1">
-                            <select x-model="selectedNode._zoneType"
-                                    @change="updateZoneType()"
-                                    class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:border-primary outline-none transition-colors" aria-label="Zone Type">
+                            {% call native_select(size="sm", aria_label="Zone Type", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._zoneType", "@change": "updateZoneType()"}) %}
                                 <option value="default">Default</option>
                                 <option value="saas">SaaS</option>
                                 <option value="on_premises">On-Premises</option>
@@ -1615,30 +962,23 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                 <option value="middleware">Middleware</option>
                                 <option value="dmz">DMZ</option>
                                 <option value="internet">Internet</option>
-                            </select>
+                            {% endcall %}
                         </dd>
                     </div>
                     {# GAP-CMP-009: Data Classification & PII for DataObject elements #}
                     <div x-show="selectedNode && selectedNode.elType === 'DataObject'" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Data Classification</dt>
                         <dd class="mt-1">
-                            <select aria-label="Data classification" x-model="selectedNode._dataClassification"
-                                    @change="updateDataClassification()"
-                                    class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:border-primary outline-none transition-colors">
+                            {% call native_select(size="sm", aria_label="Data classification", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._dataClassification", "@change": "updateDataClassification()"}) %}
                                 <option value="">— not set —</option>
                                 <option value="public">Public</option>
                                 <option value="internal">Internal</option>
                                 <option value="confidential">Confidential</option>
                                 <option value="restricted">Restricted</option>
-                            </select>
+                            {% endcall %}
                         </dd>
                         <dd class="mt-2">
-                            <label class="flex items-center gap-2 cursor-pointer text-xs">
-                                <input type="checkbox" x-model="selectedNode._containsPII"
-                                       @change="updateDataClassification()"
-                                       class="rounded border-border text-primary focus:ring-primary/50">
-                                <span>Contains PII</span>
-                            </label>
+                            {{ checkbox(id="composer-contains-pii", label="Contains PII", attrs_dict={"x-model": "selectedNode._containsPII", "@change": "updateDataClassification()"}) }}
                         </dd>
                     </div>
                     {# GAP-INT-007: Interface metadata for ApplicationInterface elements #}
@@ -1829,36 +1169,28 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
                     {# CMP-043: Custom Properties (tagged values) #}
                     <div class="pt-2 border-t border-border" x-show="selectedNode.elementId" x-cloak>
-                        <button type="button" class="flex items-center gap-1.5 w-full text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
-                                @click="customPropsOpen = !customPropsOpen">
+                        {% call button(variant='ghost', size='xs', class="flex items-center gap-1.5 w-full text-left text-2xs", attrs_dict={"@click": "customPropsOpen = !customPropsOpen"}) %}
                             <i data-lucide="tag" class="w-3 h-3"></i>
                             Custom Properties
                             <i :data-lucide="customPropsOpen ? 'chevron-up' : 'chevron-down'" class="w-3 h-3 ml-auto"></i>
-                        </button>
+                        {% endcall %}
                         <div x-show="customPropsOpen" x-cloak class="mt-2 space-y-1.5"> <!-- modal-a11y-ok -->
                             {# Existing props #}
                             <template x-for="prop in getCustomProps(selectedNode.elementId)" :key="prop.key">
                                 <div class="flex items-center gap-1 text-xs group">
                                     <span class="flex-1 font-medium text-foreground truncate" x-text="prop.key"></span>
                                     <span class="flex-1 text-muted-foreground truncate" x-text="prop.value"></span>
-                                    <button type="button" @click="deleteCustomProp(selectedNode.elementId, prop.key)"
-                                            class="opacity-0 group-hover:opacity-100 text-destructive-emphasis hover:text-destructive-emphasis/80 text-xs leading-none flex-shrink-0 transition-opacity"
-                                            title="Remove property">&times;</button>
+                                    {% call button(variant='ghost', size='xs', class="text-xs", attrs_dict={"@click": "deleteCustomProp(selectedNode.elementId, prop.key)", "title": "Remove property"}) %}&times;{% endcall %}
                                 </div>
                             </template>
                             {# Add new prop #}
                             <div class="flex gap-1 mt-2">
-                                <input type="text" x-model="_customPropNewKey" placeholder="Key"
-                                       @keydown.enter="addCustomProp()"
-                                       class="w-1/2 text-2xs bg-muted/30 border border-border rounded px-1.5 py-1 focus:border-primary outline-none transition-colors text-foreground" aria-label="Key">
-                                <input type="text" x-model="_customPropNewVal" placeholder="Value"
-                                       @keydown.enter="addCustomProp()"
-                                       class="w-1/2 text-2xs bg-muted/30 border border-border rounded px-1.5 py-1 focus:border-primary outline-none transition-colors text-foreground" aria-label="Property value">
+                                {{ input(placeholder="Key", aria_label="Key", class="text-2xs", attrs_dict={"x-model": "_customPropNewKey", "@keydown.enter": "addCustomProp()"}) }}
+                                {{ input(placeholder="Value", aria_label="Property value", class="text-2xs", attrs_dict={"x-model": "_customPropNewVal", "@keydown.enter": "addCustomProp()"}) }}
                             </div>
-                            <button type="button" @click="addCustomProp()" x-show="_customPropNewKey.trim()" x-cloak
-                                    class="w-full text-2xs py-1 rounded border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors">
+                            {% call button(variant='outline', size='xs', class="w-full text-2xs", attrs_dict={"@click": "addCustomProp()", "x-show": "_customPropNewKey.trim()", "x-cloak": ""}) %}
                                 + Add Property
-                            </button>
+                            {% endcall %}
                             <p x-show="!getCustomProps(selectedNode.elementId).length && !_customPropNewKey" x-cloak
                                class="text-2xs text-muted-foreground text-center py-1">
                                 No custom properties yet
@@ -1869,21 +1201,20 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     {# CMP-040: Drill-down link controls #}
                     <div class="mt-2 pt-2 border-t border-border" x-show="selectedNode && selectedNode.elementId" x-cloak>
                         <template x-if="!(_currentSelectedCell && _currentSelectedCell.get('linkedViewpointId'))">
-                            <button type="button" @click="linkElementToViewpoint()"
-                                    class="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-accent transition-colors flex items-center gap-1.5">
+                            {% call button(variant='ghost', size='xs', class="w-full text-left text-xs flex items-center gap-1.5", attrs_dict={"@click": "linkElementToViewpoint()"}) %}
                                 <i data-lucide="link" class="w-3 h-3"></i> Link Sub-Diagram
-                            </button>
+                            {% endcall %}
                         </template>
                         <template x-if="_currentSelectedCell && _currentSelectedCell.get('linkedViewpointId')">
                             <div class="space-y-1">
                                 <div class="text-2xs text-muted-foreground">Linked: <span x-text="_currentSelectedCell.get('linkedViewpointName')"></span></div>
                                 <div class="flex gap-1">
-                                    <button type="button" @click="drillDown(_currentSelectedCell)" class="flex-1 px-2 py-1 rounded text-xs bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
+                                    {% call button(variant='ghost', size='xs', class="flex-1 text-xs", attrs_dict={"@click": "drillDown(_currentSelectedCell)"}) %}
                                         <i data-lucide="arrow-down-right" class="w-3 h-3 inline"></i> Drill Down
-                                    </button>
-                                    <button aria-label="Unlink viewpoint" type="button" @click="unlinkViewpoint()" class="px-2 py-1 rounded text-xs text-destructive-emphasis hover:bg-destructive/10 transition-colors">
+                                    {% endcall %}
+                                    {% call button(variant='ghost', size='xs', class="text-xs", aria_label="Unlink viewpoint", attrs_dict={"@click": "unlinkViewpoint()"}) %}
                                         <i data-lucide="unlink" class="w-3 h-3 inline"></i>
-                                    </button>
+                                    {% endcall %}
                                 </div>
                             </div>
                         </template>
@@ -1909,26 +1240,16 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Label</dt>
                         <dd class="mt-1">
-                            <input type="text" x-model="selectedEdge.customLabel"
-                                   @blur="updateSelectedLinkLabel()"
-                                   @keydown.enter="$event.target.blur()"
-                                   placeholder="(optional label)"
-                                   class="w-full text-xs bg-muted/30 border border-border rounded px-2 py-1 focus:border-primary outline-none transition-colors text-foreground" aria-label="(optional label)">
+                            {{ input(placeholder="(optional label)", aria_label="(optional label)", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge.customLabel", "@blur": "updateSelectedLinkLabel()", "@keydown.enter": "$event.target.blur()"}) }}
                         </dd>
                     </div>
                     {# GAP-CMP-010: Relationship cardinality labels #}
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Cardinality (optional)</dt>
                         <dd class="mt-1 flex items-center gap-2">
-                            <input aria-label="Source cardinality" type="text" x-model="selectedEdge.sourceCardinality"
-                                   @blur="updateSelectedLinkCardinality()"
-                                   placeholder="1" maxlength="10"
-                                   class="w-16 text-xs bg-muted/30 border border-border rounded px-2 py-1 focus:border-primary outline-none text-foreground text-center">
+                            {{ input(placeholder="1", aria_label="Source cardinality", class="w-16 text-xs text-center", attrs_dict={"x-model": "selectedEdge.sourceCardinality", "@blur": "updateSelectedLinkCardinality()", "maxlength": "10"}) }}
                             <span class="text-2xs text-muted-foreground">to</span>
-                            <input aria-label="Target cardinality" type="text" x-model="selectedEdge.targetCardinality"
-                                   @blur="updateSelectedLinkCardinality()"
-                                   placeholder="*" maxlength="10"
-                                   class="w-16 text-xs bg-muted/30 border border-border rounded px-2 py-1 focus:border-primary outline-none text-foreground text-center">
+                            {{ input(placeholder="*", aria_label="Target cardinality", class="w-16 text-xs text-center", attrs_dict={"x-model": "selectedEdge.targetCardinality", "@blur": "updateSelectedLinkCardinality()", "maxlength": "10"}) }}
                         </dd>
                     </div>
                     <div x-show="selectedEdge.description" x-cloak>
@@ -1943,27 +1264,22 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                         <dd class="mt-1 space-y-1.5">
                             <div>
                                 <label class="text-2xs text-muted-foreground">Data</label>
-                                <input type="text" x-model="selectedEdge._connSpec.data_name"
-                                       @blur="updateConnectionSpec()"
-                                       placeholder="e.g. GL Payroll Posting Data"
-                                       class="w-full text-xs bg-muted/30 border border-border rounded px-2 py-1 focus:border-primary outline-none text-foreground" aria-label="Data">
+                                {{ input(placeholder="e.g. GL Payroll Posting Data", aria_label="Data", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.data_name", "@blur": "updateConnectionSpec()"}) }}
                             </div>
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <label class="text-2xs text-muted-foreground">Transfer Strategy</label>
-                                    <select x-model="selectedEdge._connSpec.transfer_strategy" @change="updateConnectionSpec()"
-                                            class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="Transfer Strategy">
+                                    {% call native_select(size="sm", aria_label="Transfer Strategy", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.transfer_strategy", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="PUSH">PUSH</option>
                                         <option value="PULL">PULL</option>
                                         <option value="Manual">Manual</option>
                                         <option value="Event-driven">Event-driven</option>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                                 <div>
                                     <label class="text-2xs text-muted-foreground">Protocol</label>
-                                    <select x-model="selectedEdge._connSpec.protocol" @change="updateConnectionSpec()"
-                                            class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="Protocol">
+                                    {% call native_select(size="sm", aria_label="Protocol", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.protocol", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="HTTPS">HTTPS</option>
                                         <option value="SFTP">SFTP</option>
@@ -1973,21 +1289,17 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                         <option value="gRPC">gRPC</option>
                                         <option value="TCP">TCP</option>
                                         <option value="File">File</option>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                             </div>
                             <div>
                                 <label class="text-2xs text-muted-foreground">Interface Type</label>
-                                <input type="text" x-model="selectedEdge._connSpec.interface_type"
-                                       @blur="updateConnectionSpec()"
-                                       placeholder="e.g. File Transfer over SFTP"
-                                       class="w-full text-xs bg-muted/30 border border-border rounded px-2 py-1 focus:border-primary outline-none text-foreground" aria-label="Interface Type">
+                                {{ input(placeholder="e.g. File Transfer over SFTP", aria_label="Interface Type", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.interface_type", "@blur": "updateConnectionSpec()"}) }}
                             </div>
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <label class="text-2xs text-muted-foreground">IAM / Auth</label>
-                                    <select x-model="selectedEdge._connSpec.iam_method" @change="updateConnectionSpec()"
-                                            class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="IAM / Auth">
+                                    {% call native_select(size="sm", aria_label="IAM / Auth", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.iam_method", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="oAuth2.0">oAuth2.0</option>
                                         <option value="SSH Key">SSH Key</option>
@@ -1997,12 +1309,11 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                         <option value="Basic Auth">Basic Auth</option>
                                         <option value="SAML">SAML</option>
                                         <option value="None">None</option>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                                 <div>
                                     <label class="text-2xs text-muted-foreground">File Format</label>
-                                    <select x-model="selectedEdge._connSpec.file_format" @change="updateConnectionSpec()"
-                                            class="w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="File Format">
+                                    {% call native_select(size="sm", aria_label="File Format", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_format", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="JSON">JSON</option>
                                         <option value="XML">XML</option>
@@ -2012,15 +1323,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                         <option value="Avro">Avro</option>
                                         <option value="Protobuf">Protobuf</option>
                                         <option value="EDI">EDI</option>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                             </div>
                             <div>
                                 <label class="text-2xs text-muted-foreground">File Name Pattern</label>
-                                <input type="text" x-model="selectedEdge._connSpec.file_name_pattern"
-                                       @blur="updateConnectionSpec()"
-                                       placeholder="e.g. SAPGLPostingParams_YYYYMMDD.csv"
-                                       class="w-full text-xs bg-muted/30 border border-border rounded px-2 py-1 focus:border-primary outline-none text-foreground" aria-label="File Name Pattern">
+                                {{ input(placeholder="e.g. SAPGLPostingParams_YYYYMMDD.csv", aria_label="File Name Pattern", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_name_pattern", "@blur": "updateConnectionSpec()"}) }}
                             </div>
                         </dd>
                     </div>
@@ -2028,44 +1336,31 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div x-show="selectedEdge.relType === 'access'" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Access Mode</dt>
                         <dd class="mt-1 flex gap-1">
-                            <button type="button" @click="setSelectedLinkAccessMode('read')"
-                                    :class="selectedEdge.accessMode === 'read' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"
-                                    class="text-2xs px-2 py-0.5 rounded border font-medium">Read</button>
-                            <button type="button" @click="setSelectedLinkAccessMode('write')"
-                                    :class="selectedEdge.accessMode === 'write' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"
-                                    class="text-2xs px-2 py-0.5 rounded border font-medium">Write</button>
-                            <button type="button" @click="setSelectedLinkAccessMode('readwrite')"
-                                    :class="selectedEdge.accessMode === 'readwrite' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"
-                                    class="text-2xs px-2 py-0.5 rounded border font-medium">R/W</button>
+                            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "setSelectedLinkAccessMode('read')", ":class": "selectedEdge.accessMode === 'read' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"}) %}Read{% endcall %}
+                            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "setSelectedLinkAccessMode('write')", ":class": "selectedEdge.accessMode === 'write' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"}) %}Write{% endcall %}
+                            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "setSelectedLinkAccessMode('readwrite')", ":class": "selectedEdge.accessMode === 'readwrite' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"}) %}R/W{% endcall %}
                         </dd>
                     </div>
                     {# Routing style toggle #}
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Routing</dt>
                         <dd class="mt-1 flex gap-1">
-                            <button type="button" @click="setSelectedLinkRouting('manhattan')"
-                                    :class="selectedEdge.routingStyle === 'manhattan' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"
-                                    class="text-2xs px-2 py-0.5 rounded border font-medium">Manhattan</button>
-                            <button type="button" @click="setSelectedLinkRouting('normal')"
-                                    :class="selectedEdge.routingStyle === 'normal' || selectedEdge.routingStyle === 'smooth' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"
-                                    class="text-2xs px-2 py-0.5 rounded border font-medium">Smooth</button>
+                            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "setSelectedLinkRouting('manhattan')", ":class": "selectedEdge.routingStyle === 'manhattan' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"}) %}Manhattan{% endcall %}
+                            {% call button(variant='outline', size='xs', class="text-2xs", attrs_dict={"@click": "setSelectedLinkRouting('normal')", ":class": "selectedEdge.routingStyle === 'normal' || selectedEdge.routingStyle === 'smooth' ? 'bg-primary/10 border-primary text-primary' : 'bg-background border-border text-foreground'"}) %}Smooth{% endcall %}
                         </dd>
                     </div>
                     {# Edit actions (edit mode only) #}
                     <template x-if="mode === 'edit'">
                         <div class="pt-2 border-t border-border space-y-1.5">
-                            <button type="button" @click="changeRelType()"
-                                    class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent text-xs text-foreground transition-colors">
+                            {% call button(variant='ghost', size='xs', class="w-full text-left flex items-center gap-2 text-xs", attrs_dict={"@click": "changeRelType()"}) %}
                                 <i data-lucide="repeat" class="w-3 h-3"></i> Change Type
-                            </button>
-                            <button type="button" @click="reverseSelectedRel()"
-                                    class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent text-xs text-foreground transition-colors">
+                            {% endcall %}
+                            {% call button(variant='ghost', size='xs', class="w-full text-left flex items-center gap-2 text-xs", attrs_dict={"@click": "reverseSelectedRel()"}) %}
                                 <i data-lucide="arrow-left-right" class="w-3 h-3"></i> Reverse Direction
-                            </button>
-                            <button type="button" @click="deleteSelectedRel()"
-                                    class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent text-xs text-destructive-emphasis transition-colors">
+                            {% endcall %}
+                            {% call button(variant='ghost', size='xs', class="w-full text-left flex items-center gap-2 text-xs", attrs_dict={"@click": "deleteSelectedRel()"}) %}
                                 <i data-lucide="trash-2" class="w-3 h-3"></i> Delete
-                            </button>
+                            {% endcall %}
                         </div>
                     </template>
                 </dl>
@@ -2073,80 +1368,23 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
         </div>
     </div>
 
-    {# ── Status Bar ──────────────────────────────────── #}
-    <footer class="h-8 shrink-0 border-t flex items-center justify-between px-4 text-2xs select-none"
-            style="background: hsl(var(--card)); border-color: hsl(var(--border)); color: hsl(var(--muted-foreground));">
-        <div class="flex items-center gap-4">
-            <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-success shrink-0"></span>
-                <span>Connected</span>
-            </div>
-            <div class="h-3 w-px" style="background: hsl(var(--border));"></div>
-            <span x-show="elementCount > 0" x-cloak
-                  x-text="'x: ' + canvasCursorX + ', y: ' + canvasCursorY"></span>
-        </div>
-        <div class="flex items-center gap-4">
-            <div x-show="statusText && statusText !== 'Ready' && !/fail|error|denied|invalid|paused|cancel|limit/i.test(statusText)" x-cloak
-                 class="flex items-center gap-1.5">
-                <i data-lucide="check-circle" class="w-3 h-3 text-success"></i>
-                <span x-text="statusText"></span>
-            </div>
-            {# CMP-07: single unified save indicator (see saveIndicator getter).
-               Replaces the previous three competing blocks (error statusText,
-               "Unsaved changes", "Autosave: <label>") that left users unsure
-               whether their work was safe. #}
-            <div class="flex items-center gap-1.5" :class="saveIndicator.tone">
-                <i :data-lucide="saveIndicator.icon" class="w-3 h-3"></i>
-                <span x-text="saveIndicator.text"></span>
-            </div>
-            <div class="h-3 w-px" style="background: hsl(var(--border));"></div>
-            <button type="button" @click="showShortcutsModal = true"
-                    class="hover:text-foreground transition-colors">Keyboard Shortcuts</button>
-        </div>
-    </footer>
+    {{ diagram_legend() }}
+
+    {{ diagram_status_line() }}
+
+    {{ diagram_properties_sheet() }}
 
 
-    <div x-show="annotEditOpen" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
-         role="dialog" aria-modal="true" aria-label="Edit Annotation"
-         @keydown.escape.window="cancelAnnotationEdit()"
-         @keydown.tab.prevent>
-        <div class="bg-background border border-border rounded-xl w-[360px] p-5"
-             @click.outside="cancelAnnotationEdit()">
-            <div class="flex items-center gap-2 mb-3">
-                <i data-lucide="sticky-note" class="w-4 h-4 text-warning"></i>
-                <span class="font-semibold text-sm">Edit Annotation</span>
-            </div>
-            <textarea x-model="annotEditText" rows="4" autofocus
-                      class="w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      placeholder="Type annotation text…" aria-label="Type annotation text…"></textarea>
+
+{% call modal(id='composer-annotation-modal', title='Edit Annotation', size='sm', attrs={'x-init': "Platform.modal.on('composer-annotation-modal', 'close', () => { if (annotEditOpen) { cancelAnnotationEdit() } })", 'x-effect': "annotEditOpen ? Platform.modal.open('composer-annotation-modal') : Platform.modal.close('composer-annotation-modal')"}) %}
+            {{ textarea(placeholder="Type annotation text\u2026", rows=4, aria_label="Type annotation text\u2026", class="w-full", attrs_dict={"x-model": "annotEditText", "autofocus": ""}) }}
             <div class="flex justify-end gap-2 mt-3">
-                <button type="button" @click="cancelAnnotationEdit()"
-                        class="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-muted transition-colors">Cancel</button>
-                <button type="button" @click="saveAnnotationText()"
-                        class="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>
+                {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"@click": "cancelAnnotationEdit()"}) %}Cancel{% endcall %}
+                {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"@click": "saveAnnotationText()"}) %}Save{% endcall %}
             </div>
-        </div>
-    </div>
-
+{% endcall %}
     {# ── CMP-070: Keyboard shortcut help modal ── #}
-    <div x-show="showShortcutsModal" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
-         role="dialog" aria-modal="true" aria-label="Keyboard Shortcuts"
-         @keydown.escape.window="showShortcutsModal = false"
-         @click.self="showShortcutsModal = false">
-        <div class="bg-background border border-border rounded-xl w-[520px] max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between p-4 border-b border-border shrink-0">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="keyboard" class="w-4 h-4 text-primary"></i>
-                    <span class="font-semibold text-sm">Keyboard Shortcuts</span>
-                </div>
-                <button type="button" @click="showShortcutsModal = false"
-                        class="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                        title="Close">
-                    <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
-            </div>
+{% call modal(id='composer-shortcuts-modal', title='Keyboard Shortcuts', size='lg', attrs={'x-init': "Platform.modal.on('composer-shortcuts-modal', 'close', () => { if (showShortcutsModal) { showShortcutsModal = false } })", 'x-effect': "showShortcutsModal ? Platform.modal.open('composer-shortcuts-modal') : Platform.modal.close('composer-shortcuts-modal')"}) %}
             <div class="overflow-y-auto p-4 grid grid-cols-2 gap-x-8 gap-y-1 text-xs">
                 <div class="col-span-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-1">Canvas</div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Undo</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Ctrl+Z</kbd></div>
@@ -2185,21 +1423,9 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Search &amp; Replace</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Ctrl+H</kbd></div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">This help</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">?</kbd></div>
             </div>
-        </div>
-    </div>
-
+{% endcall %}
     {# ── CMP-040: Link element to viewpoint modal ── #}
-    <div x-show="linkViewpointModalOpen" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
-         role="dialog" aria-modal="true" aria-label="Link to Sub-Diagram"
-         @keydown.escape.window="linkViewpointModalOpen = false"
-         @keydown.tab.prevent>
-        <div class="bg-background border border-border rounded-xl w-[400px] max-h-[500px] flex flex-col"
-             @click.outside="linkViewpointModalOpen = false">
-            <div class="flex items-center gap-2 p-4 border-b border-border">
-                <i data-lucide="link" class="w-4 h-4 text-primary"></i>
-                <span class="font-semibold text-sm">Link to Sub-Diagram</span>
-            </div>
+{% call modal(id='composer-link-viewpoint-modal', title='Link to Sub-Diagram', size='default', attrs={'x-init': "Platform.modal.on('composer-link-viewpoint-modal', 'close', () => { if (linkViewpointModalOpen) { linkViewpointModalOpen = false } })", 'x-effect': "linkViewpointModalOpen ? Platform.modal.open('composer-link-viewpoint-modal') : Platform.modal.close('composer-link-viewpoint-modal')"}) %}
             <div class="p-4 overflow-y-auto flex-1">
                 <p class="text-xs text-muted-foreground mb-3">Select a saved viewpoint to link as a sub-diagram. Double-click the element to drill down.</p>
                 <template x-if="linkViewpointList.length === 0">
@@ -2207,97 +1433,53 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                 </template>
                 <div class="space-y-1">
                     <template x-for="vp in linkViewpointList" :key="vp.id">
-                        <button type="button" @click="confirmLinkViewpoint(vp.id, vp.name)"
-                                class="w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors text-sm flex items-center gap-2">
+                        {% call button(variant='outline', size='xs', class="w-full text-left flex items-center gap-2", attrs_dict={"@click": "confirmLinkViewpoint(vp.id, vp.name)"}) %}
                             <i data-lucide="layout" class="w-3.5 h-3.5 text-muted-foreground"></i>
                             <span x-text="vp.name"></span>
-                        </button>
+                        {% endcall %}
                     </template>
                 </div>
             </div>
             <div class="p-3 border-t border-border flex justify-end">
-                <button type="button" @click="linkViewpointModalOpen = false"
-                        class="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-muted transition-colors">Cancel</button>
+                {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"@click": "linkViewpointModalOpen = false"}) %}Cancel{% endcall %}
             </div>
-        </div>
-    </div>
-
+{% endcall %}
     {# ── CMP-055: Save style template dialog ── #}
-    <div x-show="styleTemplateSaveOpen" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
-         role="dialog" aria-modal="true" aria-label="Save Style Template"
-         @keydown.escape.window="styleTemplateSaveOpen = false"
-         @keydown.tab.prevent>
-        <div class="bg-background border border-border rounded-xl w-[320px] p-5"
-             @click.outside="styleTemplateSaveOpen = false">
-            <div class="flex items-center gap-2 mb-3">
-                <i data-lucide="palette" class="w-4 h-4 text-primary"></i>
-                <span class="font-semibold text-sm">Save Style Template</span>
-            </div>
+{% call modal(id='composer-style-template-modal', title='Save Style Template', size='sm', attrs={'x-init': "Platform.modal.on('composer-style-template-modal', 'close', () => { if (styleTemplateSaveOpen) { styleTemplateSaveOpen = false } })", 'x-effect': "styleTemplateSaveOpen ? Platform.modal.open('composer-style-template-modal') : Platform.modal.close('composer-style-template-modal')"}) %}
             <p class="text-xs text-muted-foreground mb-3">Save the selected element's current styling as a reusable template.</p>
-            <input type="text" x-model="newStyleTemplateName" placeholder="Template name…" autofocus
-                   @keydown.enter="saveCustomStyleTemplate()"
-                   class="w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 mb-3" aria-label="Template name…">
+            {{ input(placeholder="Template name\u2026", aria_label="Template name\u2026", class="w-full mb-3", attrs_dict={"x-model": "newStyleTemplateName", "autofocus": "", "@keydown.enter": "saveCustomStyleTemplate()"}) }}
             <div class="flex justify-end gap-2">
-                <button type="button" @click="styleTemplateSaveOpen = false"
-                        class="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-muted transition-colors">Cancel</button>
-                <button type="button" @click="saveCustomStyleTemplate()" :disabled="!newStyleTemplateName || !newStyleTemplateName.trim()"
-                        class="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40">Save</button>
+                {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"@click": "styleTemplateSaveOpen = false"}) %}Cancel{% endcall %}
+                {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"@click": "saveCustomStyleTemplate()", ":disabled": "!newStyleTemplateName || !newStyleTemplateName.trim()"}) %}Save{% endcall %}
             </div>
-        </div>
-    </div>
-
+{% endcall %}
     {# ── CMP-057: Search and Replace dialog ── #}
-    <div x-show="searchReplaceOpen" x-cloak x-transition
-         class="fixed top-4 right-4 z-50 bg-background border border-border rounded-xl w-[380px]"
-         role="dialog" aria-modal="true" aria-label="Find and Replace"
-         @keydown.escape.window="closeSearchReplace()"
-         @keydown.tab.prevent>
-        <div class="flex items-center gap-2 px-4 py-3 border-b border-border">
-            <i data-lucide="replace" class="w-4 h-4 text-primary"></i>
-            <span class="font-semibold text-sm">Find and Replace</span>
-            <div class="flex-1"></div>
+{% call modal(id='composer-find-replace-modal', title='Find and Replace', size='sm', attrs={'x-init': "Platform.modal.on('composer-find-replace-modal', 'close', () => { if (searchReplaceOpen) { closeSearchReplace() } })", 'x-effect': "searchReplaceOpen ? Platform.modal.open('composer-find-replace-modal') : Platform.modal.close('composer-find-replace-modal')"}) %}
             <span class="text-2xs text-muted-foreground" x-show="srMatches.length > 0" x-cloak
                   x-text="(srCurrentIndex + 1) + ' / ' + srMatches.length"></span>
-            <button aria-label="Close" type="button" @click="closeSearchReplace()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-            </button>
-        </div>
         <div class="p-4 space-y-3">
             <div>
-                <input type="text" x-model="srFindText" @input.debounce.300ms="srFindMatches()"
-                       placeholder="Find…" autofocus
-                       :aria-invalid="srRegexError ? 'true' : 'false'"
-                       class="w-full px-3 py-2 rounded-md border border-border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Find…">
+                {{ input(placeholder="Find\u2026", aria_label="Find\u2026", class="w-full", attrs_dict={"x-model": "srFindText", "@input.debounce.300ms": "srFindMatches()", "autofocus": "", ":aria-invalid": "srRegexError ? 'true' : 'false'"}) }}
                 <p x-cloak x-show="srRegexError" x-text="srRegexError" role="alert"
                    class="mt-1 text-xs text-destructive-emphasis"></p>
             </div>
             <div>
-                <input type="text" x-model="srReplaceText" placeholder="Replace with…"
-                       class="w-full px-3 py-2 rounded-md border border-border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Replace with…">
+                {{ input(placeholder="Replace with\u2026", aria_label="Replace with\u2026", class="w-full", attrs_dict={"x-model": "srReplaceText"}) }}
             </div>
             <div class="flex items-center gap-3">
-                <label class="flex items-center gap-1 text-xs cursor-pointer">
-                    <input type="checkbox" x-model="srCaseSensitive" @change="srFindMatches()" class="rounded border-border">
-                    Case sensitive
-                </label>
-                <label class="flex items-center gap-1 text-xs cursor-pointer">
-                    <input type="checkbox" x-model="srUseRegex" @change="srFindMatches()" class="rounded border-border">
-                    Regex
-                </label>
+                {{ checkbox(id="sr-case-sensitive", label="Case sensitive", attrs_dict={"x-model": "srCaseSensitive", "@change": "srFindMatches()"}) }}
+                {{ checkbox(id="sr-use-regex", label="Regex", attrs_dict={"x-model": "srUseRegex", "@change": "srFindMatches()"}) }}
             </div>
             <div class="flex items-center gap-2">
-                <button type="button" @click="srReplaceNext()" :disabled="srMatches.length === 0"
-                        class="flex-1 px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent transition-colors disabled:opacity-40">
+                {% call button(variant='outline', size='xs', class="flex-1 text-xs", attrs_dict={"@click": "srReplaceNext()", ":disabled": "srMatches.length === 0"}) %}
                     Replace Next
-                </button>
-                <button type="button" @click="srReplaceAll()" :disabled="srMatches.length === 0"
-                        class="flex-1 px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40">
+                {% endcall %}
+                {% call button(variant='default', size='xs', class="flex-1 text-xs", attrs_dict={"@click": "srReplaceAll()", ":disabled": "srMatches.length === 0"}) %}
                     Replace All (<span x-text="srMatches.length"></span>)
-                </button>
+                {% endcall %}
             </div>
         </div>
-    </div>
+{% endcall %}
 
     {% include 'archimate/partials/_composer_context_menus.html' %}
     {% include 'archimate/partials/_composer_overlays.html' %}
@@ -2333,6 +1515,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 <script src="{{ url_for('static', filename='js/archimate/composer_persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer_graph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer_search.js') }}"></script>
+<script src="{{ url_for('static', filename='js/archimate/composer_shell.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer.js') }}"></script>
 <script>
 window.__COMPOSER_CONFIG__ = {
