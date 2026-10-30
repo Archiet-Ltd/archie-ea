@@ -39,13 +39,6 @@ def _org(org_id: Optional[int]) -> Optional[int]:
     return None
 
 
-def can_see_vendor_cost(user) -> bool:
-    """Who is shown what a vendor costs: the cost-visibility roles, and the procurement and finance personas whose job it is."""
-    from app.utils.role_access import can_access_section, can_see_costs
-
-    return bool(can_see_costs(user) or can_access_section(user, "procurement"))
-
-
 def clean_name(name) -> str:
     return " ".join(str(name or "").split())
 
@@ -310,8 +303,11 @@ def page_summary() -> Optional[Dict]:
         db.session.rollback()
         current_app.logger.exception("Vendor register could not be read")
         return None
+    # Who reads the total is the Costs page's rule, the same one the rows and the register API follow.
+    from app.decorators.requires_role import may_see_spend_pages
+
     costs = [r["annual_cost"] for r in rows if r["annual_cost"] is not None]
-    show_cost = can_see_vendor_cost(current_user)
+    show_cost = may_see_spend_pages(current_user)
     return {
         "vendor_count": len(rows),
         "supplied_count": total_systems - len(unmapped),

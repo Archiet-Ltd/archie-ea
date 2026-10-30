@@ -8,6 +8,9 @@
 
 /* ── 1. Data Table ──────────────────────────────────────────────────────── */
 
+/* Library tables (components/list_table.html, every part marked data-slot) keep the library's own look; these
+   rules style the hand-written tables only. The Overview keeps them as approved. */
+
 /* Give .overflow-x-auto containers that wrap a table card-like treatment.
    T-01 (2 Sep 2026 browser audit): this rule used to set `overflow: hidden`
    to clip the rounded corners around the table's straight edges. `overflow`
@@ -47,15 +50,15 @@
    The body-cell rule below already used a fully opaque hsl(var(--card));
    the header needs the same property, not merely a lower-alpha echo of
    thead's own bg-muted/40. */
-#main-content .overflow-x-auto table thead th:first-child,
-#main-content .overflow-x-auto table thead th:last-child {
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
     position: sticky;
     z-index: 2;
     background-color: hsl(var(--muted));
 }
 
-#main-content .overflow-x-auto table tbody td:first-child,
-#main-content .overflow-x-auto table tbody td:last-child {
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
     position: sticky;
     z-index: 1;
     background-color: hsl(var(--card));
@@ -64,29 +67,29 @@
 /* The row a link anchors to (for example #gap-5) is marked across every cell. The
    sticky first and last cells carry their own opaque colour, so they are tinted
    here too, with the same primary tint laid over the card colour. */
-#main-content .overflow-x-auto table tbody tr:target td {
+#main-content .overflow-x-auto table tbody tr:target td:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     background-color: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
 }
 
-#main-content .overflow-x-auto table thead th:first-child,
-#main-content .overflow-x-auto table tbody td:first-child {
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child {
     left: 0;
 }
 
-#main-content .overflow-x-auto table thead th:last-child,
-#main-content .overflow-x-auto table tbody td:last-child {
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child,
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
     right: 0;
 }
 
 /* Sticky last-column edge: left border + shadow so the scrolled boundary is
    visible rather than cutting mid-word with no cue. Scoped to .solutions-table
    so other tables in the product are unaffected. */
-#main-content .overflow-x-auto table.solutions-table thead th:last-child {
+#main-content .overflow-x-auto table.solutions-table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
     border-left: 1px solid hsl(var(--border));
     box-shadow: -4px 0 8px -4px hsl(var(--foreground) / 0.12);
 }
 
-#main-content .overflow-x-auto table.solutions-table tbody td:last-child {
+#main-content .overflow-x-auto table.solutions-table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
     border-left: 1px solid hsl(var(--border));
     box-shadow: -4px 0 8px -4px hsl(var(--foreground) / 0.08);
 }
@@ -111,13 +114,13 @@
 }
 
 /* Don't double-border containers that already have border classes */
-#main-content .overflow-x-auto.border,
-#main-content .overflow-x-auto[class*="border-"] {
+#main-content .overflow-x-auto.border:not([data-slot=table-container]),
+#main-content .overflow-x-auto[class*="border-"]:not([data-slot=table-container]) {
     border: none;
 }
 
 /* Base table */
-#main-content table {
+#main-content table:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem; /* text-sm */
@@ -125,13 +128,13 @@
 }
 
 /* thead */
-#main-content thead {
+#main-content thead:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     background-color: hsl(var(--muted) / 0.5);
     border-bottom: 1px solid hsl(var(--border));
 }
 
 /* th — override inconsistent templates */
-#main-content th {
+#main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     padding: 0.75rem 1rem;
     text-align: left;
     font-size: 0.6875rem;        /* 11px — visually tight, professional */
@@ -143,11 +146,11 @@
     border-bottom: 1px solid hsl(var(--border));
 }
 
-#main-content th.text-center { text-align: center; }
-#main-content th.text-right  { text-align: right; }
+#main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *).text-center { text-align: center; }
+#main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *).text-right  { text-align: right; }
 
 /* td */
-#main-content td {
+#main-content td:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid hsl(var(--border));
     vertical-align: middle;
@@ -155,33 +158,33 @@
 }
 
 /* No bottom border on last row */
-#main-content tbody tr:last-child td {
+#main-content tbody tr:last-child td:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     border-bottom: none;
 }
 
 /* Row hover */
-#main-content tbody tr {
+#main-content tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     transition: background-color 0.1s ease;
 }
-#main-content tbody tr:hover {
+#main-content tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *):hover {
     background-color: hsl(var(--muted) / 0.4);
 }
 
 /* Clickable rows */
-#main-content tbody tr[onclick],
-#main-content tbody tr.cursor-pointer,
-#main-content table.selectable tbody tr {
+#main-content tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *)[onclick],
+#main-content tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *).cursor-pointer,
+#main-content table.selectable tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     cursor: pointer;
 }
-#main-content tbody tr[onclick]:hover,
-#main-content tbody tr.cursor-pointer:hover,
-#main-content table.selectable tbody tr:hover {
+#main-content tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *)[onclick]:hover,
+#main-content tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *).cursor-pointer:hover,
+#main-content table.selectable tbody tr:where(:not([data-slot]), [data-testid=overview-dashboard] *):hover {
     background-color: hsl(var(--primary) / 0.05);
 }
 
 /* Compact variant */
-#main-content table.table-compact th,
-#main-content table.table-compact td {
+#main-content table.table-compact th:where(:not([data-slot]), [data-testid=overview-dashboard] *),
+#main-content table.table-compact td:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     padding: 0.4375rem 0.75rem;
     font-size: 0.8125rem;
 }

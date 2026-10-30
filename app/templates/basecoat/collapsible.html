@@ -1,0 +1,19 @@
+{# collapsible: port of shadcn/ui collapsible.tsx (pinned in compliance/upstream). Macros: collapsible, collapsible_trigger, collapsible_content #}
+
+{#- Collapsible -#}
+{% macro collapsible(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('collapsible', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CollapsibleTrigger -#}
+{% macro collapsible_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('collapsible-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CollapsibleContent -#}
+{% macro collapsible_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('collapsible-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
