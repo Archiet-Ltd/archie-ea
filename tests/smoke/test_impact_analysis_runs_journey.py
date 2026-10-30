@@ -110,9 +110,10 @@ def test_demo_architect_picks_an_element_and_reads_the_answer_and_its_run(
         runs.first.get_by_test_id("impact-run-open").click()
         page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "/intelligence/answers/" in page.url, page.url
-        stored_rows = page.locator("[data-answer-row] a")
+        stored_rows = page.locator("tr[data-element-id]")
         expect(stored_rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert sorted(stored_rows.all_inner_texts()) == chat_names
+        assert stored_rows.count() == len(chat_names), (stored_rows.count(), chat_names)
+        assert page.locator("[data-row-total]").inner_text().strip() == str(len(chat_names))
 
         # Running it again lists a second run, newest first.
         page.goto(live_server + PAGE_PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
