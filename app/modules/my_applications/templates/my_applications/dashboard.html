@@ -47,7 +47,6 @@
     </div>
 
     {# Chart grid: health of the owned applications as the primary chart, the roadmap beside it. #}
-    {% set chart_colour = 'hsl(var(--chart-1))' %}
     {% set health_rows = [
         {'status': 'Healthy', 'applications': health_summary.healthy},
         {'status': 'At risk', 'applications': health_summary.at_risk},

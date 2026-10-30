@@ -72,6 +72,8 @@ def dashboard():
         recent_apps=recent_apps,
         ownership_summary=get_ownership_summary(current_user.id),
         health_summary=get_application_health_summary(current_user.id),
+        # The chart series colour is a token, passed in as the Overview and the rationalisation pages pass theirs.
+        chart_colour="hsl(var(--chart-1))",
     )
 
 
