@@ -52,6 +52,40 @@ def _seed(org_id):
         return ids
 
 
+def _unreachable_note_actions(page):
+    """Every note's edit and remove actions take focus from the keyboard and show when they do."""
+    failures = []
+    notes = page.locator("[data-canvas-pane=canvas] [data-canvas-note]")
+    assert notes.count() > 0, "no notes to check"
+    for i in range(min(notes.count(), 6)):
+        note = notes.nth(i)
+        buttons = note.locator("button[data-note-edit], button[data-note-remove]")
+        for k in range(buttons.count()):
+            button = buttons.nth(k)
+            if not button.get_attribute("aria-label"):
+                failures.append(f"note {i} action {k} has no accessible label")
+            button.focus()
+            if not button.evaluate("e => e === document.activeElement"):
+                failures.append(f"note {i} action {k} cannot take keyboard focus")
+            else:
+                try:
+                    button.evaluate_handle("e => e.closest('span.absolute')").evaluate(
+                        "e => new Promise((ok, no) => { const t = Date.now(); (function w() { getComputedStyle(e).opacity === '1' ? ok() : Date.now() - t > 3000 ? no('slow') : setTimeout(w, 50); })(); })")
+                except Exception:
+                    opacity = button.evaluate("e => getComputedStyle(e.closest('span.absolute')).opacity")
+                    failures.append(f"note {i} action {k} stays invisible while focused (opacity {opacity})")
+        edit = note.locator("button[data-note-edit]")
+        if edit.count():
+            edit.first.focus()
+            page.keyboard.press("Enter")
+            try:
+                expect(note.get_by_role("dialog").first).to_be_visible()
+            except AssertionError:
+                failures.append(f"note {i}: Enter on the edit action does not open the editor")
+            page.keyboard.press("Escape")
+    return failures
+
+
 def _fold_failures(browser, live_server, seeded, canvas_type):
     strip, _ = CASES[canvas_type]
     ids = _seed(seeded["ids"]["org"])
@@ -68,6 +102,7 @@ def _fold_failures(browser, live_server, seeded, canvas_type):
             bottom = card.locator("[data-canvas-band]").evaluate("e => e.getBoundingClientRect().bottom")
             if bottom > 900:
                 failures.append(f"{box} title band ends at {bottom}px, below the 900px first screen")
+        failures += _unreachable_note_actions(page)
         return failures
     finally:
         context.close()
@@ -75,7 +110,6 @@ def _fold_failures(browser, live_server, seeded, canvas_type):
 
 @pytest.mark.smoke
 @pytest.mark.journey
-@pytest.mark.xfail(strict=True, reason="seeded upper rows of the nine-block grid are ~800px tall in the canvas component (narrow note cards with edit and remove buttons); the strip cannot reach the first screen from the page template alone")
 @pytest.mark.parametrize("canvas_type", list(CASES))
 def test_founder_sees_the_bottom_strip_on_the_first_screen(browser, live_server, seeded, canvas_type):
     failures = _fold_failures(browser, live_server, seeded, canvas_type)

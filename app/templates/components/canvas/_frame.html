@@ -75,7 +75,7 @@
 {#- The rename and remove controls of one note; nothing when the note is read-only. -#}
 {% macro note_actions(n, class='') -%}
   {% if n is mapping and (n.rename_url or n.remove_url) %}
-  <span class="{{ class }} flex shrink-0 items-center gap-0.5 py-1.5 pr-1.5">
+  <span class="{{ class }} flex shrink-0 items-center gap-0.5">
     {% if n.rename_url %}{{ ui.edit_popover('Edit this entry', 'Edit ' ~ n.text, n.rename_url, n.box, n.text, n.box ~ '-' ~ n.id) }}{% endif %}
     {% if n.remove_url %}
     <form method="post" action="{{ n.remove_url }}" class="inline-flex">
@@ -93,10 +93,10 @@
     form takes the entry off this canvas. -#}
 {% macro note_card(canvas_id, box_title, element, n, canvas_name='') -%}
 {%- set text = n.text if n is mapping else n -%}
-<li data-canvas-note class="flex w-full flex-wrap items-start gap-x-1 rounded-md border bg-card">
+<li data-canvas-note class="group/note relative flex w-full items-start rounded-md border bg-card">
   {% call ui.hover_card() %}
-    {% if n is mapping and n.href %}<a href="{{ n.href }}" class="block min-w-0 break-words px-2 py-1.5 text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring" data-note-text>{{ text }}</a>
-    {% else %}<span class="block min-w-0 break-words px-2 py-1.5 text-sm" data-note-text>{{ text }}</span>{% endif %}
+    {% if n is mapping and n.href %}<a href="{{ n.href }}" class="block min-w-0 break-words px-2 py-1 text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring" data-note-text>{{ text }}</a>
+    {% else %}<span class="block min-w-0 break-words px-2 py-1 text-sm" data-note-text>{{ text }}</span>{% endif %}
     {% call ui.hover_card_content() %}
       <div class="flex flex-col gap-2 text-sm">
         <p class="font-medium">{{ text }}</p>
@@ -110,7 +110,7 @@
       </div>
     {% endcall %}
   {% endcall %}
-  {{ note_actions(n, 'ml-auto') }}
+  {{ note_actions(n, 'absolute right-1 top-1 rounded-md border bg-card opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100') }}
 </li>
 {%- endmacro %}
 
@@ -118,7 +118,7 @@
     empty says what is missing and what to do; an editable box also offers its add dialog. -#}
 {% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false) -%}
 {% if items %}
-<ul class="flex flex-col gap-2" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
+<ul class="flex flex-col gap-1.5" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
   {% for n in items %}{{ note_card(canvas_id, title, element, n, canvas_name) }}{% endfor %}
 </ul>
 {% else %}
@@ -172,7 +172,8 @@
 <div id="box-{{ b.key }}" class="contents"></div>
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0') %}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
-  {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
+  {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3') %}
+    <div class="flex min-h-0 flex-col gap-3{{ ' max-h-32 overflow-y-auto' if scroll else '' }}"{% if scroll %} tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long" data-canvas-scroll{% endif %}>
     {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add) }}
     {% for s in (b.subs or []) %}
     {%- set sm = canvas_box_meta(canvas_id, s.key) -%}
@@ -188,7 +189,8 @@
       {{ notes(canvas_id, s.key, boxes.get(s.key) or [], s.title, sm.element, canvas_name, s.empty or s.question, add) }}
     </div>
     {% endfor %}
-  {% endcall %}
+    </div>
+    {% endcall %}
 {% endcall %}
 {%- endmacro %}
 
@@ -205,7 +207,7 @@
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
   <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">
     {{ decoration }}
-    {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable) }}{% endfor %}
+    {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable, scroll=('row-start-3' not in b.area)) }}{% endfor %}
   </div>
 {% endcall %}
 {%- endmacro %}
