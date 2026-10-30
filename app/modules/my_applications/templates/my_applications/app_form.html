@@ -1,9 +1,13 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Edit {{ app.name }}{% endblock %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto max-w-3xl">
+<div class="p-6 space-y-6">
 
   {{ page_shell(
       title='Edit ' ~ app.name,
@@ -15,97 +19,76 @@
       ]
   ) }}
 
-  <form method="POST" action="{{ url_for('my_applications.app_edit', app_id=app.id) }}" class="space-y-6">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="max-w-2xl">
+  {% call ui.card() %}
+  <form method="POST" action="{{ url_for('my_applications.app_edit', app_id=app.id) }}" class="space-y-6 px-6" data-testid="app-edit-form">
+    {{ hidden_input('csrf_token', csrf_token()) }}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Description</h2>
-      <div>
-        <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">What this application does</label>
-        <textarea id="description" name="description" rows="4"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none">{{ app.description or '' }}</textarea>
-      </div>
-    </div>
+    {% call ui.field_set() %}
+      {{ ui.field_legend(text='Description') }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='What this application does', attrs={'for': 'description'}) }}
+        {{ ui.textarea(id='description', name='description', rows=4, class='resize-none', text=(app.description or '')) }}
+      {% endcall %}
+    {% endcall %}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Status</h2>
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="lifecycle_status" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle</label>
-          <select id="lifecycle_status" name="lifecycle_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not set</option>
-            {% set preselected_lifecycle = suggested_lifecycle or app.lifecycle_status %}
-            {% for value in statuses %}
-            <option value="{{ value }}" {% if preselected_lifecycle == value %}selected{% endif %}>
-              {{ value | replace('_', ' ') | title }}
-            </option>
-            {% endfor %}
-          </select>
-          {% if suggested_lifecycle and suggested_lifecycle != app.lifecycle_status %}
-          <p class="text-xs text-muted-foreground mt-1">AI-suggested value shown - review before saving.</p>
-          {% endif %}
-        </div>
-        <div>
-          <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment</label>
-          <select id="deployment_status" name="deployment_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not set</option>
-            {% for value in deployment_statuses %}
-            <option value="{{ value }}" {% if app.deployment_status == value %}selected{% endif %}>
-              {{ value | title }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label for="health_status" class="block text-sm font-medium text-muted-foreground mb-1">Health</label>
-          <select id="health_status" name="health_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">Not assessed</option>
-            {% set preselected_health = suggested_health or app.health_status %}
-            {% for value in health_statuses %}
-            <option value="{{ value }}" {% if preselected_health == value %}selected{% endif %}>
-              {{ value | replace('_', ' ') | title }}
-            </option>
-            {% endfor %}
-          </select>
-          <p class="text-xs text-muted-foreground mt-1">Drives the health overview.</p>
-          {% if suggested_health and suggested_health != app.health_status %}
-          <p class="text-xs text-muted-foreground mt-1">AI-suggested value shown - review before saving.</p>
-          {% endif %}
-        </div>
-      </div>
-    </div>
+    {{ ui.field_separator() }}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Accountability</h2>
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business owner</label>
-          <input type="text" id="business_owner" name="business_owner" maxlength="255"
-                 value="{{ app.business_owner or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        </div>
-        <div>
-          <label for="technical_owner" class="block text-sm font-medium text-muted-foreground mb-1">Technical lead</label>
-          <input type="text" id="technical_owner" name="technical_owner" maxlength="255"
-                 value="{{ app.technical_owner or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        </div>
-      </div>
-    </div>
+    {% call ui.field_set() %}
+      {{ ui.field_legend(text='Status') }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Lifecycle', attrs={'for': 'lifecycle_status'}) }}
+        {% set preselected_lifecycle = suggested_lifecycle or app.lifecycle_status %}
+        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='lifecycle_status', name='lifecycle_status', class='w-full') %}
+          {{ native_select_option('Not set', value='') }}
+          {% for value in statuses %}{{ native_select_option(value | replace('_', ' ') | title, value=value, selected=(preselected_lifecycle == value)) }}{% endfor %}
+        {% endcall %}{% endcall %}
+        {% if suggested_lifecycle and suggested_lifecycle != app.lifecycle_status %}
+        {{ ui.field_description(text='AI-suggested value shown - review before saving.') }}
+        {% endif %}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Deployment', attrs={'for': 'deployment_status'}) }}
+        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='deployment_status', name='deployment_status', class='w-full') %}
+          {{ native_select_option('Not set', value='') }}
+          {% for value in deployment_statuses %}{{ native_select_option(value | title, value=value, selected=(app.deployment_status == value)) }}{% endfor %}
+        {% endcall %}{% endcall %}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Health', attrs={'for': 'health_status'}) }}
+        {% set preselected_health = suggested_health or app.health_status %}
+        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='health_status', name='health_status', class='w-full') %}
+          {{ native_select_option('Not assessed', value='') }}
+          {% for value in health_statuses %}{{ native_select_option(value | replace('_', ' ') | title, value=value, selected=(preselected_health == value)) }}{% endfor %}
+        {% endcall %}{% endcall %}
+        {{ ui.field_description(text='Drives the health overview.') }}
+        {% if suggested_health and suggested_health != app.health_status %}
+        {{ ui.field_description(text='AI-suggested value shown - review before saving.') }}
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
 
-    <div class="flex items-center justify-between">
-      <button type="submit"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-        <i data-lucide="save" class="w-4 h-4"></i> Save changes
-      </button>
-      <a href="{{ url_for('my_applications.app_detail', app_id=app.id) }}"
-         class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
+    {{ ui.field_separator() }}
+
+    {% call ui.field_set() %}
+      {{ ui.field_legend(text='Accountability') }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Business owner', attrs={'for': 'business_owner'}) }}
+        {{ ui.input(id='business_owner', name='business_owner', type='text', maxlength=255, value=(app.business_owner or '')) }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Technical lead', attrs={'for': 'technical_owner'}) }}
+        {{ ui.input(id='technical_owner', name='technical_owner', type='text', maxlength=255, value=(app.technical_owner or '')) }}
+      {% endcall %}
+    {% endcall %}
+
+    <div class="flex items-center justify-end gap-3">
+      {{ ui.button(text='Cancel', variant='outline', href=url_for('my_applications.app_detail', app_id=app.id)) }}
+      {{ ui.button(text='Save changes', type='submit') }}
     </div>
   </form>
+  {% endcall %}
+  </div>
 
 </div>
-<script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 {% endblock %}

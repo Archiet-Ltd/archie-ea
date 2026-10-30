@@ -1,10 +1,25 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/input.html' import hidden_input %}
+{% from 'components/radio_group.html' import radio_group %}
 {% from 'macros/page_shell.html' import page_shell %}
+
+{% macro _sel(id, label, options, current, required=false, placeholder=none, attrs={}) -%}
+  {% call ui.field() %}
+    {{ ui.field_label(text=label ~ (' *' if required else ''), attrs={'for': id}) }}
+    {% call native_select_wrapper(class='w-full') %}{% call native_select(id=id, name=id, class='w-full', required=required, attrs=attrs) %}
+      {% if placeholder %}{{ native_select_option(placeholder, value='', selected=(not current), disabled=required) }}{% endif %}
+      {% for val in options %}{{ native_select_option(val | capitalize if id == 'operational_status' else val, value=val, selected=(current == val)) }}{% endfor %}
+    {% endcall %}{% endcall %}
+  {% endcall %}
+{%- endmacro %}
 
 {% block title %}{% if interface %}Edit {{ interface.name }}{% else %}New interface{% endif %} — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
-<div class="flex-1 overflow-auto p-6" x-data="interfaceComponentPicker()">
+<div class="p-6 space-y-6" x-data="interfaceComponentPicker()">
   {{ page_shell(
       title=('Edit ' ~ interface.name) if interface else 'New interface',
       subtitle=initiative.name if initiative else None,
@@ -16,225 +31,86 @@
   ) }}
 
   {% if errors %}
-  <div class="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis" role="alert" data-testid="interface-form-error">
-    {{ errors }}
-  </div>
+  {% call ui.alert(variant='destructive', class='max-w-2xl', attrs={'role': 'alert', 'data-testid': 'interface-form-error'}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=errors) }}{% endcall %}
   {% endif %}
 
+  <div class="max-w-2xl">
+  {% call ui.card() %}
   <form method="POST"
         action="{{ url_for('interface_register.update', element_id=interface.id) if interface else url_for('interface_register.create') }}"
-        class="space-y-6 max-w-3xl">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="initiative_id" value="{{ initiative.id if initiative else '' }}">
+        class="space-y-6 px-6" data-testid="interface-form">
+    {{ hidden_input('csrf_token', csrf_token()) }}
+    {{ hidden_input('initiative_id', initiative.id if initiative else '') }}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-5">
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1" for="name">Name <span class="text-destructive-emphasis">*</span></label>
-        <input type="text" id="name" name="name" required
-               value="{{ form_data.get('name') if form_data else (interface.name if interface else '') }}"
-               placeholder="e.g. Customer Master Replication (S/4 to CRM)"
-               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1" for="description">Description</label>
-        <textarea id="description" name="description" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y">{{ form_data.get('description') if form_data else (interface.description or '' if interface else '') }}</textarea>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="interface_type">Interface type <span class="text-destructive-emphasis">*</span></label>
-          <select id="interface_type" name="interface_type" required
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set current = form_data.get('interface_type') if form_data else (metadata.interface_type if metadata else '') %}
-            <option value="" {% if not current %}selected{% endif %} disabled>Select…</option>
-            {% for val in ['REST', 'SOAP', 'GraphQL', 'gRPC', 'MQ', 'Event', 'File', 'Database', 'IDOC', 'BAPI', 'RFC', 'OData'] %}
-            <option value="{{ val }}" {% if current == val %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="protocol">Protocol <span class="text-destructive-emphasis">*</span></label>
-          <select id="protocol" name="protocol" required
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set current = form_data.get('protocol') if form_data else (metadata.protocol if metadata else '') %}
-            <option value="" {% if not current %}selected{% endif %} disabled>Select…</option>
-            {% for val in ['HTTP', 'HTTPS', 'TCP', 'AMQP', 'MQTT', 'FTP', 'SFTP', 'tRFC', 'qRFC', 'IDoc-XML'] %}
-            <option value="{{ val }}" {% if current == val %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="data_format">Data format</label>
-          <select id="data_format" name="data_format"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set current = form_data.get('data_format') if form_data else (metadata.data_format if metadata else '') %}
-            <option value="" {% if not current %}selected{% endif %}>—</option>
-            {% for val in ['JSON', 'XML', 'CSV', 'Avro', 'Protobuf', 'EDI'] %}
-            <option value="{{ val }}" {% if current == val %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="message_pattern">Message pattern</label>
-          <select id="message_pattern" name="message_pattern"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set current = form_data.get('message_pattern') if form_data else (metadata.message_pattern if metadata else '') %}
-            <option value="" {% if not current %}selected{% endif %}>—</option>
-            {% for val in ['Request-Response', 'Fire-and-Forget', 'Pub-Sub', 'Streaming'] %}
-            <option value="{{ val }}" {% if current == val %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <span class="block text-sm font-medium text-foreground mb-1.5">Synchronous?</span>
-        {% set sync_current = 'sync' if (form_data and form_data.get('is_synchronous') == 'sync') or (not form_data and metadata and metadata.is_synchronous) else 'async' %}
-        <div class="flex items-center gap-4">
-          <label class="inline-flex items-center gap-2 text-sm">
-            <input type="radio" name="is_synchronous" value="sync" {% if sync_current == 'sync' %}checked{% endif %}>
-            Synchronous
-          </label>
-          <label class="inline-flex items-center gap-2 text-sm">
-            <input type="radio" name="is_synchronous" value="async" {% if sync_current == 'async' %}checked{% endif %}>
-            Asynchronous
-          </label>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="authentication_method">Authentication</label>
-          <select id="authentication_method" name="authentication_method"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set current = form_data.get('authentication_method') if form_data else (metadata.authentication_method if metadata else '') %}
-            <option value="" {% if not current %}selected{% endif %}>—</option>
-            {% for val in ['OAuth2', 'API Key', 'Basic Auth', 'Certificate', 'SAML', 'None'] %}
-            <option value="{{ val }}" {% if current == val %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="business_criticality">Business criticality</label>
-          <select id="business_criticality" name="business_criticality"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set current = form_data.get('business_criticality') if form_data else (metadata.business_criticality if metadata else '') %}
-            <option value="" {% if not current %}selected{% endif %}>—</option>
-            {% for val in ['Critical', 'High', 'Medium', 'Low'] %}
-            <option value="{{ val }}" {% if current == val %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="transaction_volume_daily">Daily transaction volume</label>
-          <input type="number" id="transaction_volume_daily" name="transaction_volume_daily" min="0"
-                 value="{{ form_data.get('transaction_volume_daily') if form_data else (metadata.transaction_volume_daily if metadata and metadata.transaction_volume_daily is not none else '') }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-1" for="operational_status">Operational status</label>
-          <select id="operational_status" name="operational_status" x-model="operationalStatus"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            {% set os_current = form_data.get('operational_status') if form_data else (metadata.operational_status if metadata else 'planned') %}
-            {% for val in ['planned', 'development', 'testing', 'production', 'deprecated', 'retired'] %}
-            <option value="{{ val }}" {% if os_current == val %}selected{% endif %}>{{ val | capitalize }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
+    {% call ui.field_set() %}
+      {{ ui.field_legend(text='Interface') }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Name *', attrs={'for': 'name'}) }}
+        {{ ui.input(id='name', name='name', type='text', required=true, autofocus=true, placeholder='e.g. Customer Master Replication (S/4 to CRM)', value=(form_data.get('name') if form_data else (interface.name if interface else ''))) }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Description', attrs={'for': 'description'}) }}
+        {{ ui.textarea(id='description', name='description', rows=3, class='resize-y', text=(form_data.get('description') if form_data else (interface.description or '' if interface else ''))) }}
+      {% endcall %}
+      {{ _sel('interface_type', 'Interface type', ['REST', 'SOAP', 'GraphQL', 'gRPC', 'MQ', 'Event', 'File', 'Database', 'IDOC', 'BAPI', 'RFC', 'OData'], (form_data.get('interface_type') if form_data else (metadata.interface_type if metadata else '')), required=true, placeholder='Select…') }}
+      {{ _sel('protocol', 'Protocol', ['HTTP', 'HTTPS', 'TCP', 'AMQP', 'MQTT', 'FTP', 'SFTP', 'tRFC', 'qRFC', 'IDoc-XML'], (form_data.get('protocol') if form_data else (metadata.protocol if metadata else '')), required=true, placeholder='Select…') }}
+      {{ _sel('data_format', 'Data format', ['JSON', 'XML', 'CSV', 'Avro', 'Protobuf', 'EDI'], (form_data.get('data_format') if form_data else (metadata.data_format if metadata else '')), placeholder='Not set') }}
+      {{ _sel('message_pattern', 'Message pattern', ['Request-Response', 'Fire-and-Forget', 'Pub-Sub', 'Streaming'], (form_data.get('message_pattern') if form_data else (metadata.message_pattern if metadata else '')), placeholder='Not set') }}
+      {% set sync_current = 'sync' if (form_data and form_data.get('is_synchronous') == 'sync') or (not form_data and metadata and metadata.is_synchronous) else 'async' %}
+      {{ radio_group(name='is_synchronous', label='Synchronous?', value=sync_current, inline=true, options=[{'value': 'sync', 'label': 'Synchronous'}, {'value': 'async', 'label': 'Asynchronous'}]) }}
+      {{ _sel('authentication_method', 'Authentication', ['OAuth2', 'API Key', 'Basic Auth', 'Certificate', 'SAML', 'None'], (form_data.get('authentication_method') if form_data else (metadata.authentication_method if metadata else '')), placeholder='Not set') }}
+      {{ _sel('business_criticality', 'Business criticality', ['Critical', 'High', 'Medium', 'Low'], (form_data.get('business_criticality') if form_data else (metadata.business_criticality if metadata else '')), placeholder='Not set') }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Daily transaction volume', attrs={'for': 'transaction_volume_daily'}) }}
+        {{ ui.input(id='transaction_volume_daily', name='transaction_volume_daily', type='number', attrs={'min': 0}, value=(form_data.get('transaction_volume_daily') if form_data else (metadata.transaction_volume_daily if metadata and metadata.transaction_volume_daily is not none else ''))) }}
+      {% endcall %}
+      {% set os_current = form_data.get('operational_status') if form_data else (metadata.operational_status if metadata else 'planned') %}
+      {{ _sel('operational_status', 'Operational status', ['planned', 'development', 'testing', 'production', 'deprecated', 'retired'], os_current, attrs={'x-model': 'operationalStatus'}) }}
       <div x-show="operationalStatus === 'retired'" x-cloak>
-        <label class="block text-sm font-medium text-muted-foreground mb-1" for="retirement_date">Retirement date</label>
-        <input type="date" id="retirement_date" name="retirement_date"
-               value="{{ form_data.get('retirement_date') if form_data else (metadata.retirement_date.isoformat() if metadata and metadata.retirement_date else '') }}"
-               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        {% call ui.field() %}
+          {{ ui.field_label(text='Retirement date', attrs={'for': 'retirement_date'}) }}
+          {{ ui.input(id='retirement_date', name='retirement_date', type='date', value=(form_data.get('retirement_date') if form_data else (metadata.retirement_date.isoformat() if metadata and metadata.retirement_date else ''))) }}
+        {% endcall %}
       </div>
-    </div>
+    {% endcall %}
 
-    <!-- Provider / consumer application pickers (DESIGN.md entity-field rule: debounced live-search, never free text) -->
-    <div class="bg-card border border-border rounded-lg p-6 space-y-5">
-      <h3 class="text-sm font-semibold text-foreground flex items-center gap-2">
-        <i data-lucide="git-compare-arrows" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-        Coupling
-      </h3>
+    {{ ui.field_separator() }}
 
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Provider application</label>
-        <input type="hidden" name="provider_component_id" :value="provider ? provider.id : ''">
-        <template x-if="provider">
-          <div class="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <span x-text="provider.name"></span>
-            <button type="button" @click="provider = null" aria-label="Clear provider" class="text-muted-foreground hover:text-destructive-emphasis">
-              <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
+    {# Provider / consumer application pickers (DESIGN.md entity-field rule: debounced live-search, never free text) #}
+    {% call ui.field_set() %}
+      {{ ui.field_legend(text='Coupling') }}
+      {% for who, label in [('provider', 'Provider application'), ('consumer', 'Consumer application')] %}
+      {% call ui.field() %}
+        {{ ui.field_label(text=label, attrs={'for': who ~ '-search'}) }}
+        {{ ui.input(type='hidden', name=who ~ '_component_id', attrs={':value': who ~ ' ? ' ~ who ~ '.id : \'\''}) }}
+        <template x-if="{{ who }}">
+          <div class="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm">
+            <span x-text="{{ who }}.name"></span>
+            {% call ui.button(type='button', variant='ghost', size='icon-sm', attrs={'@click': who ~ ' = null', 'aria-label': 'Clear ' ~ who}) %}{{ lucide('x') }}{% endcall %}
           </div>
         </template>
-        <template x-if="!provider">
+        <template x-if="!{{ who }}">
           <div class="relative">
-            <input type="text" x-model="providerQuery" @input.debounce.300ms="search('provider')"
-                   placeholder="Search applications…"
-                   aria-label="Search provider application"
-                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            <div x-show="providerResults.length > 0" x-cloak
+            {{ ui.input(id=who ~ '-search', type='text', placeholder='Search applications…', attrs={'x-model': who ~ 'Query', '@input.debounce.300ms': "search('" ~ who ~ "')", 'aria-label': 'Search ' ~ label|lower}) }}
+            <div x-show="{{ who }}Results.length > 0" x-cloak
                  class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
-              <template x-for="app in providerResults" :key="app.id">
-                <button type="button" @click="selectProvider(app)"
-                        class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors" x-text="app.name"></button>
+              <template x-for="app in {{ who }}Results" :key="app.id">
+                {{ ui.button(type='button', variant='ghost', class='w-full justify-start rounded-none', attrs={'@click': 'select' ~ who|capitalize ~ '(app)', 'x-text': 'app.name'}) }}
               </template>
             </div>
           </div>
         </template>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-muted-foreground mb-1">Consumer application</label>
-        <input type="hidden" name="consumer_component_id" :value="consumer ? consumer.id : ''">
-        <template x-if="consumer">
-          <div class="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <span x-text="consumer.name"></span>
-            <button type="button" @click="consumer = null" aria-label="Clear consumer" class="text-muted-foreground hover:text-destructive-emphasis">
-              <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
-          </div>
-        </template>
-        <template x-if="!consumer">
-          <div class="relative">
-            <input type="text" x-model="consumerQuery" @input.debounce.300ms="search('consumer')"
-                   placeholder="Search applications…"
-                   aria-label="Search consumer application"
-                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            <div x-show="consumerResults.length > 0" x-cloak
-                 class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
-              <template x-for="app in consumerResults" :key="app.id">
-                <button type="button" @click="selectConsumer(app)"
-                        class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors" x-text="app.name"></button>
-              </template>
-            </div>
-          </div>
-        </template>
-      </div>
-    </div>
+      {% endcall %}
+      {% endfor %}
+    {% endcall %}
 
     <div class="flex items-center justify-between">
-      <a href="{{ url_for('interface_register.index', initiative_id=initiative.id) if initiative else url_for('interface_register.index') }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-        Cancel
-      </a>
-      <button type="submit" data-testid="interface-form-submit"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-        <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
-        {% if interface %}Save changes{% else %}Create interface{% endif %}
-      </button>
+      {{ ui.button(text='Cancel', variant='outline', href=(url_for('interface_register.index', initiative_id=initiative.id) if initiative else url_for('interface_register.index'))) }}
+      {{ ui.button(text=('Save changes' if interface else 'Create interface'), type='submit', attrs={'data-testid': 'interface-form-submit'}) }}
     </div>
   </form>
+  {% endcall %}
+  </div>
 </div>
 
 <script>

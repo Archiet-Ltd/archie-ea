@@ -3270,7 +3270,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -3286,7 +3286,8 @@
     "page-shell",
     "select",
     "textarea",
-    "card"
+    "card",
+    "radio-group"
    ],
    "confidence": "high",
    "controls": {
@@ -3332,7 +3333,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/interface-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -3341,7 +3342,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -3718,7 +3719,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -3779,7 +3780,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/application-edit.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -3788,7 +3789,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -4795,7 +4796,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -4856,7 +4857,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/license-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -4866,7 +4867,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -12053,7 +12054,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -12112,7 +12113,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/agent-registry-new.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -12121,7 +12122,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -20361,7 +20362,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -20420,7 +20421,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/record-review-outcome.md",
    "states": [
     "loading",
     "empty-no-permission",
@@ -20428,7 +20429,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -28283,7 +28284,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -28343,7 +28344,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/new-data-issue.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -28352,7 +28353,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -40368,7 +40369,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "components": [
     "alert",
@@ -40406,8 +40407,8 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
-   "status": "mapped",
+   "spec": "docs/design/specs/solution-edit.md",
+   "status": "implemented",
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",

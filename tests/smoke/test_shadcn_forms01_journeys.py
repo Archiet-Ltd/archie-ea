@@ -12,6 +12,34 @@ from tests.smoke.fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
+def _watch(page):
+    """Collect script errors so a failure says what the page did, not only what it lacked."""
+    errors = []
+    page.on("pageerror", lambda e: errors.append("pageerror: %s" % e))
+    page.on("console", lambda m: errors.append("console.%s: %s" % (m.type, m.text)) if m.type == "error" else None)
+    return errors
+
+
+def _shoot(page, slug):
+    """Judge the open screen the way a person would: 1440 wide in light, then 390 wide in dark.
+
+    Nothing may overflow the phone width. With FORMS01_SHOTS set to a folder the screens are also saved there.
+    """
+    import os
+
+    folder = os.environ.get("FORMS01_SHOTS")
+    for width, height, dark in ((390, 844, True), (1440, 900, False)):
+        page.set_viewport_size({"width": width, "height": height})
+        page.evaluate("d => document.documentElement.classList.toggle('dark', d)", dark)
+        page.wait_for_timeout(250)
+        if width == 390 and not os.environ.get("FORMS01_SKIP_OVERFLOW"):
+            overflow = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+            assert overflow <= 1, "%s overflows a 390 wide screen by %spx" % (slug, overflow)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+            page.screenshot(path="%s/%s-%d-%s.png" % (folder, slug, width, "dark" if dark else "light"), full_page=True)
+
+
 def _open(page, base, path):
     page.goto(base + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
@@ -24,6 +52,7 @@ def test_platform_admin_registers_an_agent_and_sees_it(browser, live_server):
         sign_in(page, live_server, org["emails"]["platform_admin"])
         _open(page, live_server, "/admin/agent-registry/new")
         form = page.locator("[data-testid=new-agent-form]")
+        _shoot(page, "agent-registry-new")
         expect(form.get_by_label("Name")).to_be_visible()
         # A missing name is refused in the browser and nothing is sent.
         form.get_by_role("button", name="Register").click()
@@ -60,6 +89,7 @@ def test_data_architect_raises_a_data_issue_and_it_is_listed(browser, live_serve
         sign_in(page, live_server, org["emails"]["data_architect"])
         _open(page, live_server, "/data-governance/issues/new?data_entity_id=%d" % entity_id)
         form = page.locator("[data-testid=new-data-issue-form]")
+        _shoot(page, "new-data-issue")
         expect(form.get_by_label("Data entity ID")).to_have_value(str(entity_id))
         form.get_by_label("Title").fill("Duplicate customer ids")
         form.get_by_label("Description").fill("Two systems issue ids for the same customer")
@@ -96,6 +126,7 @@ def test_architect_records_a_review_outcome_and_it_shows_on_the_decision(browser
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         _open(page, live_server, "/architecture/decisions/%d/record-outcome" % decision_id)
         form = page.locator("[data-testid=record-outcome-form]")
+        _shoot(page, "record-outcome")
         expect(form).to_contain_text("Review date")
         form.get_by_role("button", name="Record Outcome").click()
         assert form.locator("#review_outcome").evaluate("e => e.validity.valueMissing")
@@ -104,5 +135,198 @@ def test_architect_records_a_review_outcome_and_it_shows_on_the_decision(browser
         form.get_by_role("button", name="Record Outcome").click()
         page.wait_for_url("**/architecture/decisions/%d" % decision_id, timeout=PAGE_TIMEOUT)
         expect(page.locator("body")).to_contain_text("The decision still holds; renewed for a year.")
+    finally:
+        page.close()
+
+
+def test_procurement_records_a_licence_and_it_is_judged_against_the_contract(browser, live_server):
+    org = create_fresh_org("procurement", org_admin=True)
+    from app import create_app, db
+    from app.models.application_portfolio import VendorContract
+
+    app = create_app("testing")
+    with app.app_context():
+        from datetime import date
+
+        c = VendorContract(contract_name="Atlas platform agreement", organization_id=org["org_id"],
+                           start_date=date(2026, 1, 1))
+        db.session.add(c)
+        db.session.commit()
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["procurement"])
+        _open(page, live_server, "/procurement/licenses/new")
+        form = page.locator("[data-testid=license-form]")
+        _shoot(page, "license-form")
+        # The contract is required: the browser refuses the form without one.
+        form.get_by_role("button", name="Record licence").click()
+        assert form.locator("#contract_id").evaluate("e => e.validity.valueMissing")
+        form.locator("#contract_id").select_option(label="Atlas platform agreement")
+        form.locator("#product_name").fill("Atlas Pro seats")
+        form.locator("#quantity_entitled").fill("10")
+        form.locator("#quantity_deployed").fill("14")
+        form.locator("#unit_cost").fill("42.50")
+        form.locator("#unit_cost").press("Enter")
+        page.wait_for_url("**/procurement/licenses/*", timeout=PAGE_TIMEOUT)
+        assert "/new" not in page.url
+        body = page.locator("body")
+        expect(body).to_contain_text("Atlas Pro seats")
+        expect(body).to_contain_text("14")
+        # Edit it: the same form comes back filled and a change is kept.
+        licence_url = page.url
+        _open(page, live_server, licence_url.replace(live_server, "") + "/edit")
+        form = page.locator("[data-testid=license-form]")
+        expect(form.locator("#product_name")).to_have_value("Atlas Pro seats")
+        expect(form.locator("#quantity_deployed")).to_have_value("14")
+        form.locator("#quantity_deployed").fill("8")
+        form.get_by_role("button", name="Save changes").click()
+        page.wait_for_url(licence_url, timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("8")
+    finally:
+        page.close()
+
+
+def test_application_owner_edits_their_application_and_the_change_shows(browser, live_server):
+    org = create_fresh_org("application_manager", org_admin=True)
+    from app import create_app, db
+    from app.models.application_layer import ApplicationComponent
+    from app.models.application_owner import ApplicationOwner
+
+    app = create_app("testing")
+    with app.app_context():
+        comp = ApplicationComponent(name="Billing engine", organization_id=org["org_id"])
+        db.session.add(comp)
+        db.session.flush()
+        db.session.add(ApplicationOwner(application_id=comp.id, user_id=org["user_ids"]["application_manager"],
+                                        organization_id=org["org_id"]))
+        db.session.commit()
+        app_id = comp.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["application_manager"])
+        _open(page, live_server, "/my-applications/app/%d/edit" % app_id)
+        form = page.locator("[data-testid=app-edit-form]")
+        _shoot(page, "application-edit")
+        expect(form.get_by_label("Lifecycle")).to_be_visible()
+        form.get_by_label("What this application does").fill("Invoices and collects subscription payments")
+        form.get_by_label("Health").select_option("at_risk")
+        form.get_by_label("Business owner").fill("Priya Raman")
+        form.get_by_label("Technical lead").fill("Tomas Berg")
+        form.get_by_role("button", name="Save changes").click()
+        page.wait_for_url("**/my-applications/app/%d" % app_id, timeout=PAGE_TIMEOUT)
+        body = page.locator("body")
+        expect(body).to_contain_text("Invoices and collects subscription payments")
+        # The edit form shows what was saved, and an unset value reads "Not set".
+        _open(page, live_server, "/my-applications/app/%d/edit" % app_id)
+        form = page.locator("[data-testid=app-edit-form]")
+        expect(form.get_by_label("Business owner")).to_have_value("Priya Raman")
+        expect(form.get_by_label("Technical lead")).to_have_value("Tomas Berg")
+        expect(form.get_by_label("Deployment")).to_have_value("")
+        expect(form.get_by_label("Deployment").locator("option:checked")).to_have_text("Not set")
+    finally:
+        page.close()
+
+
+def test_solution_architect_registers_an_interface_between_two_applications(browser, live_server):
+    org = create_fresh_org("solution_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchitectureModel
+    from app.models.implementation_migration import TechnologyRoadmapInitiative
+    from app.services.archimate_backbone import create_backbone_element
+
+    app = create_app("testing")
+    with app.app_context():
+        arch = ArchitectureModel(name="Target architecture", organization_id=org["org_id"])
+        db.session.add(arch)
+        db.session.flush()
+        initiative = TechnologyRoadmapInitiative(name="CRM consolidation", fiscal_year_start=2026,
+                                                 fiscal_year_end=2027, architecture_id=arch.id)
+        db.session.add(initiative)
+        for name in ("Customer CRM", "Order hub"):
+            element = create_backbone_element(element_type="ApplicationComponent", layer="Application",
+                                              name=name, organization_id=org["org_id"])
+            db.session.add(ApplicationComponent(name=name, organization_id=org["org_id"],
+                                                archimate_element_id=element.id))
+        db.session.commit()
+        initiative_id = initiative.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["solution_architect"])
+        _open(page, live_server, "/interface-register/new?initiative_id=%d" % initiative_id)
+        form = page.locator("[data-testid=interface-form]")
+        _shoot(page, "interface-form")
+        # Required fields are refused by the browser until they are filled.
+        form.get_by_role("button", name="Create interface").click()
+        assert form.locator("#name").evaluate("e => e.validity.valueMissing")
+        form.locator("#name").fill("Customer master replication")
+        form.locator("#interface_type").select_option("REST")
+        form.locator("#protocol").select_option("HTTPS")
+        form.locator("#operational_status").select_option("retired")
+        expect(form.locator("#retirement_date")).to_be_visible()
+        form.locator("#operational_status").select_option("production")
+        expect(form.locator("#retirement_date")).to_be_hidden()
+        form.locator("#provider-search").fill("Customer")
+        page.get_by_role("button", name="Customer CRM").click()
+        form.locator("#consumer-search").fill("Order")
+        page.get_by_role("button", name="Order hub").click()
+        form.get_by_role("button", name="Create interface").click()
+        page.wait_for_url("**/interface-register/?initiative_id=%d" % initiative_id, timeout=PAGE_TIMEOUT)
+        body = page.locator("body")
+        expect(body).to_contain_text("Customer master replication")
+        # The coupling was stored: the edit form brings both applications back into their pickers.
+        edit_href = page.locator("a[href*='/edit']").first.get_attribute("href")
+        _open(page, live_server, edit_href)
+        form = page.locator("[data-testid=interface-form]")
+        expect(form.locator("#name")).to_have_value("Customer master replication")
+        expect(form.locator("#interface_type")).to_have_value("REST")
+        expect(form).to_contain_text("Customer CRM")
+        expect(form).to_contain_text("Order hub")
+    finally:
+        page.close()
+
+
+def test_solution_architect_edits_a_solution_and_the_record_shows_it(browser, live_server):
+    org = create_fresh_org("solution_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.solution_models import Solution
+
+    app = create_app("testing")
+    with app.app_context():
+        sol = Solution(name="Customer data platform", description="One view of the customer",
+                       solution_type="Technology", business_domain="Customer", status="Planning",
+                       complexity_level="Medium", business_value="Fewer duplicate records",
+                       organization_id=org["org_id"], created_by_id=org["user_ids"]["solution_architect"])
+        db.session.add(sol)
+        db.session.commit()
+        solution_id = sol.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["solution_architect"])
+        _open(page, live_server, "/solutions/%d/edit" % solution_id)
+        form = page.locator("[data-testid=solution-edit-form]")
+        _shoot(page, "solution-edit")
+        expect(form.locator("#edit-solution-name")).to_have_value("Customer data platform")
+        expect(form.locator("#edit-solution-type")).to_have_value("Technology")
+        # A required field left empty is refused in the browser.
+        form.locator("#edit-solution-name").fill("")
+        form.get_by_role("button", name="Update Solution").click()
+        assert form.locator("#edit-solution-name").evaluate("e => e.validity.valueMissing")
+        form.locator("#edit-solution-name").fill("Customer data platform v2")
+        form.locator("#edit-solution-status").select_option("Active")
+        form.locator("#edit-in-scope").fill("CRM, Billing engine")
+        form.locator("#edit-technical-lead").fill("Tomas Berg")
+        form.get_by_role("button", name="Update Solution").click()
+        page.wait_for_url(lambda u: "/edit" not in u, timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("Customer data platform v2")
+        _open(page, live_server, "/solutions/%d/edit" % solution_id)
+        form = page.locator("[data-testid=solution-edit-form]")
+        expect(form.locator("#edit-solution-status")).to_have_value("Active")
+        expect(form.locator("#edit-in-scope")).to_have_value("CRM, Billing engine")
+        expect(form.locator("#edit-technical-lead")).to_have_value("Tomas Berg")
     finally:
         page.close()

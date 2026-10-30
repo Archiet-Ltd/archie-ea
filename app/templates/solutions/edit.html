@@ -1,4 +1,8 @@
+{# design-block: form #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Edit {{ solution.name }}{% endblock %}
@@ -20,126 +24,95 @@
         ]
     ) }}
 
-    <!-- Form -->
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form method="POST" action="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <!-- Basic Information -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Basic Information</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-solution-name" class="block text-sm font-medium text-muted-foreground mb-1">Solution Name *</label>
-                        <input type="text" name="name" id="edit-solution-name" value="{{ solution.name }}" required
-                               class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                               placeholder="e.g., Customer Data Platform" autofocus>
-                    </div>
 
-                    <div>
-                        <label for="edit-solution-description" class="block text-sm font-medium text-muted-foreground mb-1">Description *</label>
-                        <textarea name="description" id="edit-solution-description" required rows="3"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Describe the solution and its purpose...">{{ solution.description }}</textarea>
-                    </div>
+    <div class="max-w-2xl">
+        {% call ui.card() %}
+        <form method="POST" action="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="space-y-6 px-6" data-testid="solution-edit-form">
+            {{ hidden_input('csrf_token', csrf_token()) }}
 
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="edit-solution-type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type *</label>
-                            <select name="solution_type" id="edit-solution-type" required
-                                    class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select Type</option>
-                                <option value="Technology" {% if solution.solution_type == 'Technology' %}selected{% endif %}>Technology</option>
-                                <option value="Process" {% if solution.solution_type == 'Process' %}selected{% endif %}>Process</option>
-                                <option value="Organizational" {% if solution.solution_type == 'Organizational' %}selected{% endif %}>Organizational</option>
-                                <option value="Hybrid" {% if solution.solution_type == 'Hybrid' %}selected{% endif %}>Hybrid</option>
-                            </select>
-                        </div>
+            {% call ui.field_set() %}
+                {{ ui.field_legend(text='Basic information') }}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Solution Name *', attrs={'for': 'edit-solution-name'}) }}
+                    {{ ui.input(id='edit-solution-name', name='name', type='text', value=solution.name, required=true, autofocus=true, placeholder='e.g., Customer Data Platform') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Description *', attrs={'for': 'edit-solution-description'}) }}
+                    {% call ui.textarea(id='edit-solution-description', name='description', rows=3, required=true, placeholder='Describe the solution and its purpose...') %}{{ solution.description }}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Solution Type *', attrs={'for': 'edit-solution-type'}) }}
+                    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='edit-solution-type', name='solution_type', class='w-full', required=true) %}
+                            {{ native_select_option('Select type', value='') }}
+                            {{ native_select_option('Technology', value='Technology', selected=(solution.solution_type == 'Technology')) }}
+                            {{ native_select_option('Process', value='Process', selected=(solution.solution_type == 'Process')) }}
+                            {{ native_select_option('Organizational', value='Organizational', selected=(solution.solution_type == 'Organizational')) }}
+                            {{ native_select_option('Hybrid', value='Hybrid', selected=(solution.solution_type == 'Hybrid')) }}
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Business Domain *', attrs={'for': 'edit-business-domain'}) }}
+                    {{ ui.input(id='edit-business-domain', name='business_domain', type='text', value=solution.business_domain, required=true, placeholder='e.g., Customer Management') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Complexity Level *', attrs={'for': 'edit-complexity-level'}) }}
+                    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='edit-complexity-level', name='complexity_level', class='w-full', required=true) %}
+                            {{ native_select_option('Select level', value='') }}
+                            {{ native_select_option('Low', value='Low', selected=(solution.complexity_level == 'Low')) }}
+                            {{ native_select_option('Medium', value='Medium', selected=(solution.complexity_level == 'Medium')) }}
+                            {{ native_select_option('High', value='High', selected=(solution.complexity_level == 'High')) }}
+                            {{ native_select_option('Very High', value='Very High', selected=(solution.complexity_level == 'Very High')) }}
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+            {% endcall %}
 
-                        <div>
-                            <label for="edit-business-domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain *</label>
-                            <input type="text" name="business_domain" id="edit-business-domain" value="{{ solution.business_domain }}" required
-                                   class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                   placeholder="e.g., Customer Management">
-                        </div>
+            {{ ui.field_separator() }}
 
-                        <div>
-                            <label for="edit-complexity-level" class="block text-sm font-medium text-muted-foreground mb-1">Complexity Level *</label>
-                            <select name="complexity_level" id="edit-complexity-level" required
-                                    class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select Level</option>
-                                <option value="Low" {% if solution.complexity_level == 'Low' %}selected{% endif %}>Low</option>
-                                <option value="Medium" {% if solution.complexity_level == 'Medium' %}selected{% endif %}>Medium</option>
-                                <option value="High" {% if solution.complexity_level == 'High' %}selected{% endif %}>High</option>
-                                <option value="Very High" {% if solution.complexity_level == 'Very High' %}selected{% endif %}>Very High</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% call ui.field_set() %}
+                {{ ui.field_legend(text='Business value') }}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Value Proposition *', attrs={'for': 'edit-value-proposition'}) }}
+                    {% call ui.textarea(id='edit-value-proposition', name='value_proposition', rows=2, required=true, placeholder='Describe the key value and benefits...') %}{{ solution.business_value or '' }}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Target Outcomes (comma-separated)', attrs={'for': 'edit-target-outcomes'}) }}
+                    {% call ui.textarea(id='edit-target-outcomes', name='target_outcomes', rows=2, required=false, placeholder='e.g., Reduce cost by 30%, Improve efficiency, Better customer experience') %}{%- if solution.target_outcomes is string -%}{{ solution.target_outcomes }}{%- elif solution.target_outcomes -%}{{ solution.target_outcomes|join(', ') }}{%- endif -%}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Success Metrics (comma-separated)', attrs={'for': 'edit-success-metrics'}) }}
+                    {% call ui.textarea(id='edit-success-metrics', name='success_metrics', rows=2, required=false, placeholder='e.g., ROI 2.5x, Deployment time 6 months, Adoption 80%') %}{%- if solution.success_metrics is string -%}{{ solution.success_metrics }}{%- elif solution.success_metrics -%}{{ solution.success_metrics|join(', ') }}{%- endif -%}{% endcall %}
+                {% endcall %}
+            {% endcall %}
 
-            <!-- Business Value -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Business Value</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-value-proposition" class="block text-sm font-medium text-muted-foreground mb-1">Value Proposition *</label>
-                        <textarea name="value_proposition" id="edit-value-proposition" required rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Describe the key value and benefits...">{{ solution.business_value or '' }}</textarea>
-                    </div>
+            {{ ui.field_separator() }}
 
-                    <div>
-                        <label for="edit-target-outcomes" class="block text-sm font-medium text-muted-foreground mb-1">Target Outcomes (comma-separated)</label>
-                        <textarea name="target_outcomes" id="edit-target-outcomes" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="e.g., Reduce cost by 30%, Improve efficiency, Better customer experience">{%- if solution.target_outcomes is string -%}{{ solution.target_outcomes }}{%- elif solution.target_outcomes -%}{{ solution.target_outcomes|join(', ') }}{%- endif -%}</textarea>
-                    </div>
+            {% call ui.field_set() %}
+                {{ ui.field_legend(text='Scope and boundaries') }}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Scope Description', attrs={'for': 'edit-scope-description'}) }}
+                    {% call ui.textarea(id='edit-scope-description', name='scope_description', rows=2, required=false, placeholder='Describe what the solution covers...') %}{{ solution.scope_description or '' }}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='In Scope (comma-separated)', attrs={'for': 'edit-in-scope'}) }}
+                    {% call ui.textarea(id='edit-in-scope', name='in_scope_applications', rows=2, required=false, placeholder='Comma-separated items in scope') %}{%- if solution.in_scope_applications -%}{{ solution.in_scope_applications|join(', ') if solution.in_scope_applications is not string else solution.in_scope_applications }}{%- endif -%}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Out of Scope (comma-separated)', attrs={'for': 'edit-out-of-scope'}) }}
+                    {% call ui.textarea(id='edit-out-of-scope', name='out_of_scope_applications', rows=2, required=false, placeholder='Comma-separated items out of scope') %}{%- if solution.out_of_scope_applications -%}{{ solution.out_of_scope_applications|join(', ') if solution.out_of_scope_applications is not string else solution.out_of_scope_applications }}{%- endif -%}{% endcall %}
+                {% endcall %}
+            {% endcall %}
 
-                    <div>
-                        <label for="edit-success-metrics" class="block text-sm font-medium text-muted-foreground mb-1">Success Metrics (comma-separated)</label>
-                        <textarea name="success_metrics" id="edit-success-metrics" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="e.g., ROI 2.5x, Deployment time 6 months, Adoption 80%">{%- if solution.success_metrics is string -%}{{ solution.success_metrics }}{%- elif solution.success_metrics -%}{{ solution.success_metrics|join(', ') }}{%- endif -%}</textarea>
-                    </div>
-                </div>
-            </div>
+            {{ ui.field_separator() }}
 
-            <!-- Scope and Boundaries -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Scope and Boundaries</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-scope-description" class="block text-sm font-medium text-muted-foreground mb-1">Scope Description</label>
-                        <textarea name="scope_description" id="edit-scope-description" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Describe what the solution covers...">{{ solution.scope_description or '' }}</textarea>
-                    </div>
-                    <div>
-                        <label for="edit-in-scope" class="block text-sm font-medium text-muted-foreground mb-1">In Scope (comma-separated)</label>
-                        <textarea name="in_scope_applications" id="edit-in-scope" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Comma-separated items in scope">{%- if solution.in_scope_applications -%}{{ solution.in_scope_applications|join(', ') if solution.in_scope_applications is not string else solution.in_scope_applications }}{%- endif -%}</textarea>
-                    </div>
-                    <div>
-                        <label for="edit-out-of-scope" class="block text-sm font-medium text-muted-foreground mb-1">Out of Scope (comma-separated)</label>
-                        <textarea name="out_of_scope_applications" id="edit-out-of-scope" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Comma-separated items out of scope">{%- if solution.out_of_scope_applications -%}{{ solution.out_of_scope_applications|join(', ') if solution.out_of_scope_applications is not string else solution.out_of_scope_applications }}{%- endif -%}</textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Governance -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Governance &amp; Ownership</h2>
-                <div class="grid grid-cols-1 gap-4">
-                    {% for field_name, field_label in [
-                        ('solution_owner', 'Solution Owner'),
-                        ('business_sponsor', 'Business Sponsor'),
-                        ('technical_lead', 'Technical Lead'),
-                        ('architecture_lead', 'Architecture Lead')
-                    ] %}
-                    <div x-data="{
+            {% call ui.field_set() %}
+                {{ ui.field_legend(text='Governance and ownership') }}
+                {% for field_name, field_label in [
+                    ('solution_owner', 'Solution Owner'),
+                    ('business_sponsor', 'Business Sponsor'),
+                    ('technical_lead', 'Technical Lead'),
+                    ('architecture_lead', 'Architecture Lead')
+                ] %}
+                <div x-data="{
                         query: '{{ solution[field_name] or '' }}',
                         results: [],
                         showDropdown: false,
@@ -182,57 +155,44 @@
                             this.results = [];
                         }
                     }" @click.outside="showDropdown = false">
-                        <label for="edit-{{ field_name|replace('_', '-') }}" class="block text-sm font-medium text-muted-foreground mb-1">{{ field_label }}</label>
-                        <div class="relative">
-                            <input type="text" name="{{ field_name }}" id="edit-{{ field_name|replace('_', '-') }}" x-model="query"
-                                   @input.debounce.300ms="search()"
-                                   @focus="if (query.length >= 2) search()"
-                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                   placeholder="Search by name or email..." autocomplete="off">
-                            <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
-                                <template x-for="u in results" :key="u.id">
-                                    <button type="button" @click="select(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
-                                        <span x-text="u.name" class="font-medium"></span>
-                                        <span x-text="u.email" class="text-xs text-muted-foreground"></span>
-                                    </button>
-                                </template>
-                            </div>
+                    {% call ui.field() %}
+                    {{ ui.field_label(text=field_label, attrs={'for': 'edit-' ~ field_name|replace('_', '-')}) }}
+                    <div class="relative">
+                        {{ ui.input(id='edit-' ~ field_name|replace('_', '-'), name=field_name, type='text', placeholder='Search by name or email...', autocomplete='off', attrs={'x-model': 'query', '@input.debounce.300ms': 'search()', '@focus': 'if (query.length >= 2) search()'}) }}
+                        <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto rounded-md border border-border bg-popover">
+                            <template x-for="u in results" :key="u.id">
+                                {% call ui.button(type='button', variant='ghost', class='w-full justify-between rounded-none', attrs={'@click': 'select(u)'}) %}
+                                    <span x-text="u.name" class="font-medium"></span>
+                                    <span x-text="u.email" class="text-xs text-muted-foreground"></span>
+                                {% endcall %}
+                            </template>
                         </div>
                     </div>
-                    {% endfor %}
-
-                    <div>
-                        <label for="edit-solution-status" class="block text-sm font-medium text-muted-foreground mb-1">Status *</label>
-                        <select name="status" id="edit-solution-status" required
-                                class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                            <option value="">Select Status</option>
-                            <option value="Planning" {% if solution.status == 'Planning' %}selected{% endif %}>Planning</option>
-                            <option value="In Progress" {% if solution.status == 'In Progress' %}selected{% endif %}>In Progress</option>
-                            <option value="Active" {% if solution.status == 'Active' %}selected{% endif %}>Active</option>
-                            <option value="Deployed" {% if solution.status == 'Deployed' %}selected{% endif %}>Deployed</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="edit-expected-delivery-date" class="block text-sm font-medium text-muted-foreground mb-1">Expected Delivery Date</label>
-                        <input type="date" name="expected_delivery_date" id="edit-expected-delivery-date"
-                               value="{{ solution.expected_delivery_date.strftime('%Y-%m-%d') if solution.expected_delivery_date else '' }}"
-                               class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                    </div>
+                    {% endcall %}
                 </div>
-            </div>
+                {% endfor %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Status *', attrs={'for': 'edit-solution-status'}) }}
+                    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='edit-solution-status', name='status', class='w-full', required=true) %}
+                            {{ native_select_option('Select status', value='') }}
+                            {{ native_select_option('Planning', value='Planning', selected=(solution.status == 'Planning')) }}
+                            {{ native_select_option('In Progress', value='In Progress', selected=(solution.status == 'In Progress')) }}
+                            {{ native_select_option('Active', value='Active', selected=(solution.status == 'Active')) }}
+                            {{ native_select_option('Deployed', value='Deployed', selected=(solution.status == 'Deployed')) }}
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Expected Delivery Date', attrs={'for': 'edit-expected-delivery-date'}) }}
+                    {{ ui.input(id='edit-expected-delivery-date', name='expected_delivery_date', type='date', value=(solution.expected_delivery_date.strftime('%Y-%m-%d') if solution.expected_delivery_date else '')) }}
+                {% endcall %}
+            {% endcall %}
 
-            <!-- Form Actions -->
-            <div class="flex gap-3 justify-end">
-                <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" 
-                   class="px-4 py-2 border border-border rounded-md text-foreground/80 hover:bg-muted transition">
-                    Cancel
-                </a>
-                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary transition">
-                    Update Solution
-                </button>
+            <div class="flex justify-end gap-3">
+                {{ ui.button(text='Cancel', variant='outline', href=url_for('solution_design.view_solution', solution_id=solution.id)) }}
+                {{ ui.button(text='Update Solution', type='submit') }}
             </div>
         </form>
+        {% endcall %}
     </div>
 </div>
 {% endblock %}

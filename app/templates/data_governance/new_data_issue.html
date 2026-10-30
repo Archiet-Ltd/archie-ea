@@ -1,3 +1,4 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'components/input.html' import hidden_input %}
@@ -15,7 +16,7 @@
   ) }}
   <div class="max-w-2xl">
     {% call ui.card() %}
-    <form method="post" action="{{ url_for('data_governance.new_data_issue') }}" class="space-y-6 p-6" data-testid="new-data-issue-form">
+    <form method="post" action="{{ url_for('data_governance.new_data_issue') }}" class="space-y-6 px-6" data-testid="new-data-issue-form">
       {{ hidden_input('csrf_token', csrf_token()) }}
       {% call ui.field() %}
         {{ ui.field_label(text='Data entity ID', attrs={'for': 'data_entity_id'}) }}
