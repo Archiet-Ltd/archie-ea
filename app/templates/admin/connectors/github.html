@@ -28,6 +28,14 @@
         {% endif %}
     {% endwith %}
 
+    {% if github_app_configured %}
+    <div class="mb-6 space-y-3" data-testid="github-app-connect">
+        <p class="text-sm text-muted-foreground">Install the Entelim GitHub App on your organisation; the first read starts the moment you land back here.</p>
+        {{ button(text='Connect GitHub', icon='github', variant='primary', size='default', href=github_app_install_url, testid='github-app-connect-link') }}
+        <p class="text-sm text-muted-foreground">Or paste a read-only token:</p>
+    </div>
+    {% endif %}
+
     <form method="POST" action="{{ url_for('m365_connector.github_connect_save') }}" class="space-y-6" data-testid="github-connect-form">
         {{ hidden_input('csrf_token', csrf_token()) }}
 

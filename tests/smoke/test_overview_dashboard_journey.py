@@ -63,6 +63,21 @@ def _content(page):
     return page.locator("main").first.inner_text().strip()
 
 
+def _greeting(email):
+    """"Welcome" on this user's first-ever session, "Welcome back" on every later one --
+    read from the user_sessions rows the login just created/extended, not assumed from
+    test order (round welcome01)."""
+    from app import create_app
+    from app.models.user import User
+    from app.models.user_session import UserSession
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        sessions = UserSession.query.filter_by(user_id=user.id).count()
+    return "Welcome" if sessions <= 1 else "Welcome back"
+
+
 def _assert_role(email, expected):
     from app import create_app
     from app.middleware.tenant_decorators import is_platform_admin
@@ -102,7 +117,7 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
 
         # welcome card: first name, the applications the Systems list shows, and the share of facts with a source
         first = "Launch" if persona == "enterprise_architect" else "Owen"
-        expect(dash.get_by_text("Welcome back, %s" % first)).to_be_visible()
+        expect(dash.get_by_text("%s, %s" % (_greeting(email), first))).to_be_visible()
         assert _int(dash.locator('[data-testid="welcome-applications"] span').first.inner_text()) == 3
         assert re.fullmatch(r"\d+%", dash.locator('[data-testid="welcome-sourced"] span').first.inner_text().strip())
 
