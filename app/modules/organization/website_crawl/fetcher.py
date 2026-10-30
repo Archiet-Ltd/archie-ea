@@ -7,6 +7,7 @@ never requested.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -16,7 +17,12 @@ from urllib.robotparser import RobotFileParser
 import requests
 import urllib3
 
-from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+from app.utils.ssrf_guard import (
+    BlockedOutboundURL,
+    _is_public_ip,
+    internal_targets_allowed,
+    validate_user_supplied_url,
+)
 
 from .extraction import same_site, visible_text
 
@@ -24,6 +30,9 @@ USER_AGENT = "EntelimProfileReader/1.0 (+reads only the website its owner consen
 MAX_BYTES = 1_500_000
 MAX_REDIRECTS = 5
 MAX_CRAWL_DELAY = 5.0
+UNREADABLE = "We could not read that address. Check it is your public website."
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,10 +51,25 @@ def _checked(url: str, site: str) -> str:
     try:
         validate_user_supplied_url(url)
     except BlockedOutboundURL as exc:
-        raise FetchRefused(str(exc)) from exc
+        logger.info("Website reader refused %s: %s", url, exc)
+        raise FetchRefused(UNREADABLE) from exc
     if not same_site(url, site):
         raise FetchRefused("not on the consented site")
     return url
+
+
+def _connected_address_checked(response) -> None:
+    """Re-check the address the connection actually used, so a name that resolved to a public
+    address when checked and to a private one when connected (DNS rebinding) is still refused."""
+    if internal_targets_allowed():
+        return
+    try:
+        peer = response.raw._connection.sock.getpeername()[0]
+    except Exception:  # no socket to inspect (a body already read, or a test double)
+        return
+    if not _is_public_ip(peer):
+        logger.info("Website reader refused a connection to non-public address %s", peer)
+        raise FetchRefused(UNREADABLE)
 
 
 class Fetcher:
@@ -67,6 +91,7 @@ class Fetcher:
                 timeout=timeout, allow_redirects=False, stream=True,
             )
             try:
+                _connected_address_checked(response)
                 if response.status_code in (301, 302, 303, 307, 308) and response.headers.get("Location"):
                     current = _checked(urljoin(current, response.headers["Location"]), self.site)
                     continue
