@@ -81,7 +81,8 @@ def test_the_contract_actions_stay_with_the_procurement_roles(app, db_session, m
     _forget_cached_user()
     cto_list = cto.get("/procurement/contracts").get_data(as_text=True)
     assert "Acme support contract" in cto_list
-    assert "New Contract" not in cto_list
+    assert "New contract" not in cto_list
+    assert 'href="/procurement/contracts/new"' not in cto_list
     _forget_cached_user()
     cto_detail = cto.get(f"/procurement/contracts/{contract.id}")
     assert cto_detail.status_code == 200
@@ -91,7 +92,8 @@ def test_the_contract_actions_stay_with_the_procurement_roles(app, db_session, m
 
     _forget_cached_user()
     proc_list = procurement.get("/procurement/contracts").get_data(as_text=True)
-    assert "New Contract" in proc_list
+    assert "New contract" in proc_list
+    assert 'href="/procurement/contracts/new"' in proc_list
     _forget_cached_user()
     assert "Edit contract" in procurement.get(f"/procurement/contracts/{contract.id}").get_data(as_text=True)
 

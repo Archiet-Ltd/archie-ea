@@ -746,6 +746,10 @@ def api_settings():
     edit_id = request.args.get("edit", type=int)
     edit_settings = APISettings.query.get(edit_id) if edit_id else None
     form = APISettingsForm()
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    # What the platform has spent on answers this month, per provider in its order, with ceilings.
+    spend_ledger = LLMService.spend_ledger_rows()
 
     if form.validate_on_submit():
         provider = form.provider.data
@@ -783,6 +787,7 @@ def api_settings():
                     all_settings=all_settings,
                     edit_id=edit_id,
                     edit_settings=edit_settings,
+                    spend_ledger=spend_ledger,
                 )
 
             settings = APISettings(
@@ -857,6 +862,7 @@ def api_settings():
         all_settings=all_settings,
         edit_id=edit_id,
         edit_settings=edit_settings,
+        spend_ledger=spend_ledger,
     )
 
 
@@ -4888,7 +4894,15 @@ def _get_capability_suggestion_default():
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
-    return render_template("admin/solution_prompts.html")
+    # The list is rendered on the server (the CSP Alpine build cannot run the old
+    # client-side table); the same data the JSON endpoint below returns.
+    try:
+        prompts = solution_prompts_data().get_json().get("prompts", [])
+        load_error = None
+    except Exception:
+        logger.exception("Failed to load solution prompts")
+        prompts, load_error = [], "The prompts could not be read. Refresh the page to try again."
+    return render_template("admin/solution_prompts.html", prompts=prompts, load_error=load_error)
 
 
 @admin_bp_v2.route("/solution-prompts/data")

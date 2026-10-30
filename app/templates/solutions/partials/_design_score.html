@@ -1,0 +1,46 @@
+{# The design score of a solution: the radial chart with "n of 10" and the ten
+   plain checks, each missing one linking to where it is fixed.
+
+   `score` is DesignScore.to_dict() from app/services/solution_design_score_service.py,
+   the one computation every surface reads.
+#}
+{% from 'components/completeness_ring.html' import completeness_ring %}
+
+{% macro design_score_panel(score, show_checks=true, links=true, ring=true, columns=1, heading=true) %}
+<section class="space-y-3" {% if heading %}aria-labelledby="design-score-heading-{{ score.solution_id }}"{% else %}aria-label="Design score checks"{% endif %} id="design-score">
+  {% if heading %}
+  <div class="flex items-center gap-4">
+    {% if ring %}{{ completeness_ring(score.passed, size='large', total=score.total,
+                         label='Design score ' ~ score.label) }}{% endif %}
+    <div class="min-w-0">
+      <h3 id="design-score-heading-{{ score.solution_id }}" class="text-sm font-semibold text-foreground">Design score</h3>
+      <p class="text-2xl font-semibold tabular-nums text-foreground">{{ score.label }}</p>
+      <p class="text-xs text-muted-foreground">
+        {%- if score.passed == score.total -%}Every check passes.
+        {%- else -%}{{ score.total - score.passed }} check{{ 's' if score.total - score.passed != 1 }} still open.{%- endif -%}
+      </p>
+    </div>
+  </div>
+  {% endif %}
+  {% if show_checks %}
+  <ul class="{{ 'grid gap-x-8 gap-y-2 md:grid-cols-2' if columns == 2 else 'space-y-1.5' }}">
+    {% for check in score.checks %}
+    <li class="flex items-start gap-2 text-sm" data-check="{{ check.key }}" data-passed="{{ 'true' if check.passed else 'false' }}">
+      <i data-lucide="{{ 'check-circle-2' if check.passed else 'circle' }}"
+         class="mt-0.5 h-4 w-4 shrink-0 {{ 'text-success' if check.passed else 'text-muted-foreground' }}" aria-hidden="true"></i>
+      <div class="min-w-0">
+        <span class="{{ 'text-foreground' if check.passed else 'text-foreground font-medium' }}">{{ check.label }}</span>
+        <span class="sr-only">{{ 'passed' if check.passed else 'open' }}</span>
+        <p class="text-xs text-muted-foreground">{{ check.detail }}
+          {%- if links and not check.passed %} <a href="{{ check.fix_href }}" class="text-primary hover:underline">Fix this</a>{% endif %}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro design_score_ring(score, size='small') %}
+{{ completeness_ring(score.passed, size=size, total=score.total, label='Design score ' ~ score.label) }}
+{% endmacro %}
