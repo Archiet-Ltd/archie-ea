@@ -178,6 +178,8 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
             who = f"Drawn by {label}"
         elif kind in ("connector", "derived") and label:
             who = label
+        elif kind == "sample":
+            who = "Sample data"
         else:
             who = drawn_by(rel.created_by_id)
         # The recorded origin date wins; then the creation date, then the last

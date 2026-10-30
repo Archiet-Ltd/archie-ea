@@ -115,3 +115,56 @@ def test_loading_twice_adds_the_working_data_once(client, login_as, make_org):
     login_as(client, user)
     client.post("/architecture/sample-company/load")
     assert _counts(org.id) == first
+
+
+def test_sample_records_carry_the_sample_origin_never_a_connector(client, login_as, make_org):
+    """A sample record is labelled sample data, so it cannot be shown as evidence a connector read."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.modules.intelligence.services.query_service import _row_origin
+
+    org = make_org()
+    user = _architect(org, "founder-e@example.com")
+    login_as(client, user)
+    assert client.post("/architecture/sample-company/load").status_code == 302
+    kinds = {
+        row[0] for row in db.session.execute(
+            db.text(
+                "SELECT source_kind FROM archimate_elements WHERE organization_id = :o AND source_label = 'Sample company' "
+                "UNION ALL SELECT source_kind FROM archimate_relationships "
+                "WHERE organization_id = :o AND source_label = 'Sample company'"
+            ),
+            {"o": org.id},
+        )
+    }
+    # Elements the file itself brought in keep the importer's own "import" kind; what the loader adds is "sample".
+    assert "sample" in kinds and "connector" not in kinds
+    assert not db.session.execute(
+        db.text("SELECT 1 FROM archimate_relationships WHERE organization_id = :o AND source_kind = 'connector'"),
+        {"o": org.id},
+    ).first()
+    rel = ArchiMateRelationship.query.filter_by(organization_id=org.id, source_kind="sample").first()
+    assert rel is not None
+    assert _row_origin(rel)["text"] == "Sample data"
+    assert ArchiMateElement.query.filter_by(organization_id=org.id, source_kind="sample").count() > 0
+
+
+def test_sample_owners_are_named_sample_people_and_take_no_plan_place(client, login_as, make_org):
+    """Every sample application has a named sample owner, and loading it on a full plan still works."""
+    org = make_org()
+    user = _architect(org, "founder-f@example.com")
+    login_as(client, user)
+    client.post("/architecture/sample-company/load")
+    names = [
+        row[0] for row in db.session.execute(
+            db.text(
+                "SELECT DISTINCT u.first_name || ' ' || u.last_name FROM application_owners ao "
+                "JOIN users u ON u.id = ao.user_id WHERE ao.organization_id = :o AND ao.ownership_type = 'primary'"
+            ),
+            {"o": org.id},
+        )
+    ]
+    assert names and all("(sample owner)" in name for name in names)
+    assert user.email not in names
+    from app.services.billing_plans import _count_members
+
+    assert _count_members(db.session.connection(), org.id, "all") == 1
