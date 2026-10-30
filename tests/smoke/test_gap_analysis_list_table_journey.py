@@ -224,13 +224,51 @@ def test_gap_analysis_list_table(browser, live_server, seeded, gap_data, viewpor
         page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
         assert "Foreign Board" not in page.content()
 
-        # The progress bar attribute reflects the percentage shown.
-        progress_bar = page.locator('progress').first
+        # The coverage bar's value agrees with the percentage shown beside it.
+        # 3 of the 9 seeded gaps are closed by `gap_data`'s closer cards, so the
+        # computed figure is round(3 / 9 * 100) == 33.
+        summary = page.locator('[data-testid="gap-coverage-summary"]')
+        expect(summary).to_be_visible(timeout=PAGE_TIMEOUT)
+        progress_bar = summary.locator('[role="progressbar"]').first
         expect(progress_bar).to_be_visible()
-        bar_value = progress_bar.get_attribute('value')
-        percentage_text = page.locator('[data-testid="gap-row"] >> text=/%/').first.inner_text()
-        percentage_value = re.search(r'(\d+)%', percentage_text).group(1)
-        assert abs(float(bar_value) - float(percentage_value)) < 2
+        bar_now = float(progress_bar.get_attribute('aria-valuenow'))
+        bar_max = float(progress_bar.get_attribute('aria-valuemax'))
+        percentage_text = summary.locator('[data-testid="gap-coverage-pct"]').inner_text()
+        percentage_value = float(re.search(r'(\d+)%', percentage_text).group(1))
+        assert bar_max == 100, bar_max
+        assert bar_now == 33, bar_now
+        assert bar_now == percentage_value, (bar_now, percentage_value)
+
+        # The attributes above are necessary but not sufficient: the previous
+        # defect (a Tailwind arbitrary-value class, `w-[{{ pct }}%]`, that
+        # Tailwind's static build never generates) left aria-valuenow correct
+        # while the bar still drew full at every percentage. Measure what is
+        # actually rendered: the fill element's visible overlap with its
+        # track, as a fraction of the track's width.
+        visual = page.evaluate(
+            """
+            () => {
+                const bar = document.querySelector(
+                    '[data-testid="gap-coverage-summary"] [role="progressbar"]'
+                );
+                if (!bar) return null;
+                const indicator = bar.querySelector('[data-slot="progress-indicator"]');
+                const fillEl = indicator || bar;
+                const trackEl = indicator ? bar : bar.parentElement;
+                const fillRect = fillEl.getBoundingClientRect();
+                const trackRect = trackEl.getBoundingClientRect();
+                const overlapLeft = Math.max(fillRect.left, trackRect.left);
+                const overlapRight = Math.min(fillRect.right, trackRect.right);
+                const overlapWidth = Math.max(0, overlapRight - overlapLeft);
+                return trackRect.width > 0 ? (overlapWidth / trackRect.width) * 100 : null;
+            }
+            """
+        )
+        assert visual is not None, "no [role=progressbar] found inside the coverage summary"
+        assert abs(visual - percentage_value) < 2, (
+            "the bar's rendered fill is %.1f%% of its track but the page says %s%%"
+            % (visual, percentage_value)
+        )
 
         # The table caption is correct.
         caption = page.locator('caption')

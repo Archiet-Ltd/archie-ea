@@ -113,18 +113,18 @@ def compliance_checklist(approval_id):
 def gap_analysis():
     """Gap Analysis — show Gap cards and the WorkPackages that close them."""
     try:
-         gaps = (
-             KanbanCard.query
-             .filter_by(arch_element_type="Gap", organization_id=current_user.organization_id)
-             .order_by(KanbanCard.adm_phase_id, KanbanCard.title)
-             .all()
-         )
-         closers = (
-             KanbanCard.query
-             .filter(KanbanCard.closes_gap_id.isnot(None), KanbanCard.organization_id==current_user.organization_id)
-             .order_by(KanbanCard.title)
-             .all()
-         )
+        gaps = (
+            KanbanCard.query
+            .filter_by(arch_element_type="Gap", organization_id=current_user.organization_id)
+            .order_by(KanbanCard.adm_phase_id, KanbanCard.title)
+            .all()
+        )
+        closers = (
+            KanbanCard.query
+            .filter(KanbanCard.closes_gap_id.isnot(None), KanbanCard.organization_id == current_user.organization_id)
+            .order_by(KanbanCard.title)
+            .all()
+        )
         gap_closers: dict = {}
         for card in closers:
             gap_closers.setdefault(card.closes_gap_id, []).append(card)

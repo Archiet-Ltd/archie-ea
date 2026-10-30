@@ -181,10 +181,10 @@
     {% if gaps %}
     {% set covered = gaps|length - unclosed_count %}
     {% set pct = ((covered / gaps|length) * 100)|round|int %}
-    <div class="p-4 bg-muted/30 rounded-lg border border-border">
+    <div class="p-4 bg-muted/30 rounded-lg border border-border" data-testid="gap-coverage-summary">
         <div class="flex items-center justify-between text-sm mb-2">
             <span class="font-medium text-foreground">Gap Coverage</span>
-            <span class="text-muted-foreground">{{ covered }} / {{ gaps|length }} gaps have a closing WorkPackage ({{ pct }}%)</span>
+            <span class="text-muted-foreground" data-testid="gap-coverage-pct">{{ covered }} / {{ gaps|length }} gaps have a closing WorkPackage ({{ pct }}%)</span>
         </div>
         {% call progress(value=pct, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': 'Gap coverage'}) %}
             {{ progress_indicator(value=pct) }}
