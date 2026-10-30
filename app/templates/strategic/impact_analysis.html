@@ -25,7 +25,7 @@
                 {# Secondary until an analysis exists, so the page's own action ("Analyze Impact") leads;
                    they take the primary style once there is a report to act on. #}
                 <button type="button" 
-                    @click="$dispatch('open-impact-scenario-comparison.window')"
+                    @click="$dispatch('open-impact-scenario-comparison')"
                     :class="analysisResult ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'"
                     class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors">
                     <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>

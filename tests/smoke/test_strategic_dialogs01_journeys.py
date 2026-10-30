@@ -307,10 +307,10 @@ def test_impact_scenario_comparison_warns_without_a_console_error(browser, live_
     _login(page, live_server, linked_portfolio["emails"]["enterprise_architect"])
     page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.evaluate(
-        "(scenarios) => { localStorage.setItem('impactAnalysisScenarios', JSON.stringify(scenarios));"
-        " window.dispatchEvent(new CustomEvent('open-impact-scenario-comparison')); }",
-        scenarios,
+        "(scenarios) => { localStorage.setItem('impactAnalysisScenarios', JSON.stringify(scenarios)); }",
+        scenarios
     )
+    page.get_by_role("button", name="Compare Scenarios").click()
 
     content = page.get_by_test_id("impact-scenario-comparison-content")
     expect(content).to_be_visible()
