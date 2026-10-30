@@ -488,14 +488,25 @@ class TestTwoOrganisationIsolation:
 # --------------------------------------------------------------------- #
 
 
+def _assert_no_partial_secret(body: bytes, secret: str) -> None:
+    text = body.decode("utf-8", "replace")
+    for i in range(len(secret) - 3):
+        assert secret[i : i + 4] not in text, (
+            "No part of the credential (4+ characters) may appear in the response."
+        )
+
+
 class TestConnectorsPageJourney:
     def test_added_connector_shows_masked_credential_and_never_retrieves_it(
         self, db_session, org_a, admin_a, client, login_as
     ):
+        """A saved credential reads "Stored"; no part of it is ever in the page."""
         from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
         from app.models.connector_config import ConnectorConfig
 
-        secret = "ultra-secret-credential-42"
+        # Distinctive on purpose: made of runs no page text contains, so the
+        # four-character partial-secret check detects a leak, not a coincidence.
+        secret = "Zq7Xk9Wv-Jp4Hn2Rt"
         login_as(client, admin_a)
         resp = client.post(
             "/admin/connectors",
@@ -509,15 +520,17 @@ class TestConnectorsPageJourney:
         )
         assert resp.status_code == 302
 
-        # Reload the page: the credential renders masked and only masked.
+        # Reload the page: the credential reads "Stored" and nothing of it is shown.
         resp = client.get("/admin/connectors")
         assert resp.status_code == 200
-        assert b"******" in resp.data, (
-            "The credential must be shown masked on the connectors page."
+        assert b"Stored" in resp.data, (
+            "A saved credential must read 'Stored' on the connectors page."
         )
+        assert b"******" not in resp.data
         assert secret.encode() not in resp.data, (
             "The plaintext credential must never appear on the page."
         )
+        _assert_no_partial_secret(resp.data, secret)
 
         # The proposal is waiting in this organisation's queue, and the
         # change is not applied until it is approved.
@@ -546,8 +559,10 @@ class TestConnectorsPageJourney:
         assert result.get("success") is True, result
 
         resp = client.get("/admin/connectors")
-        assert b"******" in resp.data
+        assert b"Stored" in resp.data
+        assert b"******" not in resp.data
         assert secret.encode() not in resp.data
+        _assert_no_partial_secret(resp.data, secret)
 
     def test_sync_against_recorded_fixture_shows_health_last_sync_and_proposals(
         self, db_session, org_a, org_b, admin_a, admin_b, client, login_as, monkeypatch
