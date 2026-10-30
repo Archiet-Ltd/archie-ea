@@ -1,251 +1,142 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_rationalization_family_journey.py #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Tracking — Rationalization{% endblock %}
 
 {% block content %}
-<div x-data="trackingApp()" x-init="loadBenefits(); loadDependencyRisk(); loadRetirementSequence()">
+<div class="p-6 space-y-6" x-data="trackingApp()" x-init="loadBenefits(); loadDependencyRisk(); loadRetirementSequence()" @dependencies-changed.window="loadDependencyRisk()" data-testid="tracking-dashboard">
+  {{ page_shell(title='Portfolio Tracking', subtitle='Monitor savings realization, dependency risk, and retirement progress', breadcrumb=[('Rationalization', url_for('unified_applications.rationalization_dashboard')), ('Tracking', none)]) }}
 
-    {# ── Breadcrumbs ──────────────────────────────────────────────── #}
+  {% include 'applications/rationalization/_sub_nav.html' %}
 
-    {{ page_shell(title='Portfolio Tracking', subtitle='Monitor savings realization, dependency risk, and retirement progress', breadcrumb=[('Rationalization', url_for('unified_applications.rationalization_dashboard')), ('Tracking', none)]) }}
+  {# Stat card row: the two savings figures, read from the same benefits tracker the application pages read. #}
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-testid="tracking-stats">
+    {% for testid, label, value, sentence in [
+      ('tracking-projected', 'Projected savings', financial_summary.projected, 'Aggregate projected annual savings from all tracked applications'),
+      ('tracking-actual', 'Actual savings', financial_summary.actual, 'Realized annual savings from completed rationalization actions')] %}
+    {% call ui.card(attrs={'data-testid': testid}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_description(text=label) }}
+        {{ ui.card_title(text=currency_symbol ~ '{:,.0f}'.format(value or 0), class='text-2xl font-semibold tabular-nums', attrs={'data-testid': testid ~ '-value'}) }}
+      {% endcall %}
+      {% call ui.card_content() %}<p class="text-sm text-muted-foreground">{{ sentence }}</p>{% endcall %}
+    {% endcall %}
+    {% endfor %}
+  </div>
 
-    {% include 'applications/rationalization/_sub_nav.html' %}
-
-    {# ── 1. Financial Summary ─────────────────────────────────────── #}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="rounded-lg border border-border bg-card p-5">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
-                    <i data-lucide="trending-up" class="h-5 w-5 text-success"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Projected Savings</p>
-                    <p class="text-2xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(financial_summary.projected|default(0)) }}</p>
-                </div>
-            </div>
-            <p class="text-xs text-muted-foreground">Aggregate projected annual savings from all tracked applications</p>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-5">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                    <i data-lucide="badge-check" class="h-5 w-5 text-primary"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Actual Savings</p>
-                    <p class="text-2xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(financial_summary.actual|default(0)) }}</p>
-                </div>
-            </div>
-            <p class="text-xs text-muted-foreground">Realized annual savings from completed rationalization actions</p>
-        </div>
-    </div>
-
-    {# ── 2. Dependency Risk Detail ────────────────────────────────── #}
-    <div id="dependencies" class="rounded-lg border border-border bg-card mb-8">
-        <div class="p-5 border-b border-border flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-foreground">Portfolio Dependency Risk</h2>
-            <div class="flex items-center gap-2">
-                {# RATA-012: Import Dependencies button #}
-                <button type="button" @click="showImportModal = true"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    <i data-lucide="upload" class="h-3.5 w-3.5"></i> Import
-                </button>
-                <select x-model="depRiskFilter" @change="loadDependencyRisk()"
-                    class="rounded-md border border-input bg-background px-3 py-1.5 text-xs" aria-label="Filter by Risk Level">
-                <option value="">All Risk Levels</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-            </select>
-            </div>
-        </div>
-
-        <template x-if="depLoading">
-            <div class="p-6 space-y-3 animate-pulse">
-                <div class="h-6 bg-muted rounded w-full"></div>
-                <div class="h-5 bg-muted rounded w-full"></div>
-                <div class="h-5 bg-muted rounded w-4/5"></div>
-            </div>
-        </template>
-
-        <template x-if="!depLoading && depResults.length === 0">
-            <div class="p-8 text-center">
-                <i data-lucide="shield" class="h-8 w-8 text-muted-foreground/50 mx-auto mb-2"></i>
-                <p class="text-sm text-muted-foreground">No dependency risk data available.</p>
-            </div>
-        </template>
-
-        <template x-if="!depLoading && depResults.length > 0">
-            <div>
-                <table class="dense-table w-full text-sm">
-                    <thead class="bg-muted/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Application</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-24">Blockers</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-24">Critical</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-28">Downstream</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground w-20">Risk</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <template x-for="item in depResults" :key="item.id">
-                            <tr class="hover:bg-muted/30 cursor-pointer"
-                                @click="window.location.href='/applications/rationalization/planning/' + item.id">
-                                <td class="px-4 py-3 font-medium text-foreground" x-text="item.name"></td>
-                                <td class="px-4 py-3" x-text="item.blocker_count"></td>
-                                <td class="px-4 py-3" x-text="item.critical_count"></td>
-                                <td class="px-4 py-3" x-text="item.downstream_count"></td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
-                                          :class="item.risk_level === 'critical' ? 'bg-destructive/10 text-destructive-emphasis' : item.risk_level === 'high' ? 'bg-warning/10 text-warning-emphasis' : 'bg-muted text-muted-foreground'"
-                                          x-text="item.risk_level"></span>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-                <div class="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30">
-                    <span class="text-xs text-muted-foreground" x-text="'Page ' + depPage + ' of ' + depTotalPages"></span>
-                    <div class="flex gap-2">
-                        <button type="button" @click="depPage--; loadDependencyRisk()" :disabled="depPage <= 1"
-                                class="px-3 py-1 text-xs rounded-md border border-border hover:bg-muted disabled:opacity-50">Previous</button>
-                        <button type="button" @click="depPage++; loadDependencyRisk()" :disabled="depPage >= depTotalPages"
-                                class="px-3 py-1 text-xs rounded-md border border-border hover:bg-muted disabled:opacity-50">Next</button>
-                    </div>
-                </div>
-            </div>
-        </template>
-    </div>
-
-    {# ── 3. Retirement Sequence ───────────────────────────────────── #}
-    <div class="rounded-lg border border-border bg-card p-5 mb-8">
-        <h2 class="text-sm font-semibold text-foreground mb-4">Retirement Sequence</h2>
-
-        <template x-if="retLoading">
-            <div class="space-y-4 animate-pulse">
-                <div class="h-12 bg-muted rounded"></div>
-                <div class="h-12 bg-muted rounded"></div>
-            </div>
-        </template>
-
-        <template x-if="!retLoading && retWaves.length === 0">
-            <div class="text-center py-6">
-                <i data-lucide="clock" class="h-8 w-8 text-muted-foreground/50 mx-auto mb-2"></i>
-                <p class="text-sm text-muted-foreground">No retirement sequence computed yet.</p>
-            </div>
-        </template>
-
-        <template x-if="!retLoading && retWaves.length > 0">
-            <div class="space-y-4">
-                <template x-for="(wave, idx) in retWaves" :key="idx">
-                    <div class="border rounded-lg p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold"
-                                  x-text="idx + 1"></span>
-                            <span class="text-sm font-semibold text-foreground" x-text="'Wave ' + (idx + 1)"></span>
-                            <span class="text-xs text-muted-foreground" x-text="wave.apps.length + ' application(s)'"></span>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <template x-for="app in wave.apps" :key="app.id || app.name">
-                                <a :href="'/applications/rationalization/planning/' + (app.id || '')"
-                                   class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/80"
-                                   x-text="app.name"></a>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-            </div>
-        </template>
-    </div>
-
-    {# ── RATA-012: Dependency Import Modal ────────────────────────── #}
-    <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
-         @keydown.escape.window="showImportModal = false"
-         role="dialog" aria-modal="true" aria-labelledby="import-deps-title">
-        <div class="absolute inset-0 bg-overlay/50" @click="showImportModal = false"></div>
-        <div class="relative bg-card rounded-lg border border-border w-full max-w-lg mx-4 p-6">
-            <h3 id="import-deps-title" class="text-base font-semibold text-foreground mb-4">Import Dependencies</h3>
-
-            {# File input #}
-            <div x-show="!importResult" x-cloak class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Upload JSON or CSV file</label>
-                    <input type="file" accept=".json,.csv"
-                           @change="handleImportFile($event)"
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-xs file:font-medium file:text-primary" aria-label="Upload JSON or CSV file">
-                </div>
-
-                {# Preview table #}
-                <template x-if="importPreview.length > 0">
-                    <div>
-                        <p class="text-xs font-medium text-muted-foreground mb-2">Preview (first 10 rows)</p>
-                        <div class="overflow-x-auto border rounded-lg">
-                            <table class="dense-table w-full text-xs">
-                                <thead class="bg-muted/50">
-                                    <tr>
-                                        <th class="px-2 py-1.5 text-left">Source</th>
-                                        <th class="px-2 py-1.5 text-left">Target</th>
-                                        <th class="px-2 py-1.5 text-left">Type</th>
-                                        <th class="px-2 py-1.5 text-left">Strength</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-border">
-                                    <template x-for="row in importPreview" :key="row.source_app_id + '-' + row.target_app_id">
-                                        <tr>
-                                            <td class="px-2 py-1" x-text="row.source_app_id"></td>
-                                            <td class="px-2 py-1" x-text="row.target_app_id"></td>
-                                            <td class="px-2 py-1" x-text="row.dependency_type || '—'"></td>
-                                            <td class="px-2 py-1" x-text="row.dependency_strength || 'medium'"></td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="flex justify-end gap-2 mt-4">
-                            <button type="button" @click="showImportModal = false; importPreview = []; importFile = null;"
-                                    class="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted">Cancel</button>
-                            <button type="button" @click="submitImport()"
-                                    :disabled="importLoading"
-                                    class="px-4 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                                <span x-show="importLoading" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1"></span>
-                                Confirm Import
-                            </button>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            {# Result summary #}
-            <template x-if="importResult">
-                <div class="space-y-3">
-                    <div class="flex items-center gap-2"
-                         :class="importResult.success ? 'text-success-emphasis' : 'text-destructive-emphasis'">
-                        <i :data-lucide="importResult.success ? 'check-circle-2' : 'alert-circle'" class="h-5 w-5"></i>
-                        <span class="text-sm font-medium" x-text="importResult.success ? 'Import Complete' : 'Import Failed'"></span>
-                    </div>
-                    <template x-if="importResult.success">
-                        <div class="text-sm text-muted-foreground space-y-1">
-                            <p>Imported: <span class="font-medium text-foreground" x-text="importResult.imported"></span></p>
-                            <p>Skipped (duplicates): <span class="font-medium text-foreground" x-text="importResult.skipped"></span></p>
-                            <template x-if="importResult.errors && importResult.errors.length > 0">
-                                <div class="mt-2">
-                                    <p class="text-xs font-medium text-destructive-emphasis">Errors:</p>
-                                    <template x-for="e in importResult.errors.slice(0, 5)" :key="e.row">
-                                        <p class="text-xs text-destructive-emphasis" x-text="'Row ' + e.row + ': ' + e.reason"></p>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                    <div class="flex justify-end">
-                        <button type="button" @click="showImportModal = false; importResult = null; importPreview = []; importFile = null; loadDependencyRisk();"
-                                class="px-4 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted">Close</button>
-                    </div>
-                </div>
+  {# Dependency risk #}
+  <div id="dependencies" data-testid="dependency-risk">
+  {% call ui.card() %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Portfolio dependency risk') }}
+      {{ ui.card_description(text='Applications whose retirement is blocked or affects others') }}
+      {% call ui.card_action(class='flex items-center gap-2') %}
+        {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='dep-risk-filter', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Filter by risk level', 'x-model': 'depRiskFilter', '@change': 'depPage = 1; loadDependencyRisk()', 'data-testid': 'dep-risk-filter'}) %}
+          {{ ui.native_select_option(text='All risk levels', value='') }}
+          {% for level in ['critical', 'high', 'medium', 'low'] %}{{ ui.native_select_option(text=level | capitalize, value=level) }}{% endfor %}
+        {% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call ui.card_content(class='px-0') %}
+      <p class="px-6 text-sm text-muted-foreground" x-show="depLoading" x-cloak>Loading dependency risk…</p>
+      <p class="px-6 text-sm text-muted-foreground" x-show="!depLoading && depResults.length === 0" x-cloak data-testid="dependency-empty">No application has a recorded dependency yet. Import dependencies to see which retirements they block.</p>
+      <div x-show="!depLoading && depResults.length > 0" x-cloak>
+        {% call ui.table_container() %}{% call ui.table() %}
+          {% call ui.table_header() %}{% call ui.table_row() %}
+            {{ ui.table_head(text='Application', class='pl-6') }}{{ ui.table_head(text='Blockers') }}{{ ui.table_head(text='Critical') }}{{ ui.table_head(text='Downstream') }}{{ ui.table_head(text='Risk', class='pr-6') }}
+          {% endcall %}{% endcall %}
+          {% call ui.table_body() %}
+            <template x-for="item in depResults" :key="item.id">
+              {% call ui.table_row(attrs={'data-testid': 'dependency-row'}) %}
+                {% call ui.table_cell(class='pl-6') %}<a :href="'/applications/rationalization/planning/' + item.id" class="font-medium hover:underline" x-text="item.name"></a>{% endcall %}
+                {% call ui.table_cell(class='tabular-nums', attrs={'x-text': 'item.blocker_count'}) %}{% endcall %}
+                {% call ui.table_cell(class='tabular-nums', attrs={'x-text': 'item.critical_count'}) %}{% endcall %}
+                {% call ui.table_cell(class='tabular-nums', attrs={'x-text': 'item.downstream_count'}) %}{% endcall %}
+                {% call ui.table_cell(class='pr-6') %}{% call ui.badge(variant='outline', attrs={':class': "item.risk_level === 'critical' ? 'border-destructive text-destructive' : ''"}) %}<span x-text="item.risk_level"></span>{% endcall %}{% endcall %}
+              {% endcall %}
             </template>
-        </div>
-    </div>
+          {% endcall %}
+        {% endcall %}{% endcall %}
+      </div>
+    {% endcall %}
+    {% call ui.card_footer(class='justify-between text-sm text-muted-foreground') %}
+      <span x-text="'Page ' + depPage + ' of ' + depTotalPages"></span>
+      <span class="flex gap-2">
+        {{ ui.button(text='Previous', variant='outline', size='sm', attrs={'type': 'button', '@click': 'depPage--; loadDependencyRisk()', ':disabled': 'depPage <= 1'}) }}
+        {{ ui.button(text='Next', variant='outline', size='sm', attrs={'type': 'button', '@click': 'depPage++; loadDependencyRisk()', ':disabled': 'depPage >= depTotalPages'}) }}
+      </span>
+    {% endcall %}
+  {% endcall %}
+  </div>
 
+  {# Retirement sequence #}
+  <div data-testid="retirement-sequence">
+  {% call ui.card() %}
+    {% call ui.card_header() %}{{ ui.card_title(text='Retirement sequence') }}{{ ui.card_description(text='The order applications can retire in, so nothing is retired before what depends on it') }}{% endcall %}
+    {% call ui.card_content(class='flex flex-col gap-4') %}
+      <p class="text-sm text-muted-foreground" x-show="retLoading" x-cloak>Loading the retirement sequence…</p>
+      <p class="text-sm text-muted-foreground" x-show="!retLoading && retWaves.length === 0" x-cloak data-testid="retirement-empty">No retirement sequence yet. It appears once applications are marked for retirement.</p>
+      <template x-for="(wave, idx) in retWaves" :key="idx">
+        {% call ui.item(attrs={'data-testid': 'retirement-wave'}) %}
+          {% call ui.item_content() %}
+            <span class="text-sm font-medium" x-text="'Wave ' + (idx + 1)"></span>
+            <span class="flex flex-wrap gap-2">
+              <template x-for="app in wave.apps" :key="app.id || app.name">
+                <a :href="'/applications/rationalization/planning/' + (app.id || '')" class="text-sm hover:underline" x-text="app.name"></a>
+              </template>
+            </span>
+          {% endcall %}
+          {% call ui.item_actions() %}{% call ui.badge(variant='secondary') %}<span x-text="wave.apps.length + ' application(s)'"></span>{% endcall %}{% endcall %}
+        {% endcall %}
+      </template>
+    {% endcall %}
+  {% endcall %}
+  </div>
+
+  {# Dependency import. The dialog is lifted to the page body when it opens, so its content carries its own import state
+     and tells the table to reload when it closes. #}
+  {% call ui.dialog() %}
+    {{ ui.dialog_trigger(text='Import dependencies', attrs={'data-testid': 'import-open'}) }}
+    {% call ui.dialog_content(attrs={'x-data': 'trackingApp()', 'data-testid': 'import-dialog'}) %}
+      {% call ui.dialog_header() %}{{ ui.dialog_title(text='Import dependencies') }}{{ ui.dialog_description(text='Upload a JSON or CSV file of application dependencies.') }}{% endcall %}
+      <div x-show="!importResult" class="space-y-4">
+        {% call ui.field() %}
+          {{ ui.field_label(text='Upload JSON or CSV file', attrs={'for': 'import-file'}) }}
+          {{ ui.input(id='import-file', attrs={'type': 'file', 'accept': '.json,.csv', '@change': 'handleImportFile($event)'}) }}
+        {% endcall %}
+        <div x-show="importPreview.length > 0" x-cloak>
+          <p class="text-sm font-medium">Preview (first 10 rows)</p>
+          {% call ui.table_container() %}{% call ui.table() %}
+            {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Source') }}{{ ui.table_head(text='Target') }}{{ ui.table_head(text='Type') }}{{ ui.table_head(text='Strength') }}{% endcall %}{% endcall %}
+            {% call ui.table_body() %}
+              <template x-for="row in importPreview" :key="row.source_app_id + '-' + row.target_app_id">
+                {% call ui.table_row() %}
+                  {% call ui.table_cell(attrs={'x-text': 'row.source_app_id'}) %}{% endcall %}
+                  {% call ui.table_cell(attrs={'x-text': 'row.target_app_id'}) %}{% endcall %}
+                  {% call ui.table_cell(attrs={'x-text': "row.dependency_type || 'Not recorded'"}) %}{% endcall %}
+                  {% call ui.table_cell(attrs={'x-text': "row.dependency_strength || 'medium'"}) %}{% endcall %}
+                {% endcall %}
+              </template>
+            {% endcall %}
+          {% endcall %}{% endcall %}
+        </div>
+      </div>
+      <div x-show="importResult" x-cloak class="space-y-2" data-testid="import-result">
+        <p class="text-sm font-medium" x-text="importResult && importResult.success ? 'Import complete' : 'Import failed'"></p>
+        <p class="text-sm text-muted-foreground" x-show="importResult && importResult.success">Imported <span class="tabular-nums" x-text="importResult && importResult.imported"></span>, skipped <span class="tabular-nums" x-text="importResult && importResult.skipped"></span> duplicates.</p>
+        <template x-for="e in ((importResult && importResult.errors) || []).slice(0, 5)" :key="e.row">
+          <p class="text-sm text-destructive" x-text="'Row ' + e.row + ': ' + e.reason"></p>
+        </template>
+        <p class="text-sm text-muted-foreground" x-show="importResult && !importResult.success" x-text="importResult && importResult.error"></p>
+      </div>
+      {% call ui.dialog_footer() %}
+        {{ ui.button(text='Confirm import', attrs={'type': 'button', 'x-show': 'importPreview.length > 0 && !importResult', '@click': 'submitImport()', ':disabled': 'importLoading', 'data-testid': 'import-confirm'}) }}
+        {{ ui.dialog_close(text='Close', attrs={'type': 'button', '@click': "importResult = null; importPreview = []; importFile = null; $dispatch('dependencies-changed')"}) }}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
 </div>
 {% endblock %}
 

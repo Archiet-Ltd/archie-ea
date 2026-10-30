@@ -40,10 +40,10 @@ function trackingApp() {
 
             Platform.fetch.get(baseUrl + '/portfolio-dependencies', params, { silent: true })
                 .then(function(data) {
-                    self.depResults = (data.applications || data.dependencies || []).map(function(d) {
+                    self.depResults = (data.apps || data.applications || data.dependencies || []).map(function(d) {
                         return {
-                            id: d.application_id || d.id,
-                            name: d.application_name || d.name || 'Unknown',
+                            id: d.app_id || d.application_id || d.id,
+                            name: d.app_name || d.application_name || d.name || 'Unknown',
                             blocker_count: d.blocker_count || d.total_blockers || 0,
                             critical_count: d.critical_blocker_count || d.critical_blockers || 0,
                             downstream_count: d.downstream_count || d.downstream_apps || 0,
