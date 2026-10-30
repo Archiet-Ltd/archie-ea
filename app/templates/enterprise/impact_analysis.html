@@ -49,6 +49,11 @@
         {% endcall %}
     {% endcall %}
 
+    {# One call site for the page's single empty state, whichever applies --
+       the component is the same macro call wherever it is used; branching
+       chooses its words, not a second call. #}
+    {% set empty = namespace(icon=none, title=none, description=none) %}
+
     {% if element_not_found %}
     {% call card() %}
         {% call card_content() %}
@@ -76,7 +81,9 @@
     {% endcall %}
 
     {% if not answer.rows %}
-        {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.') }}
+        {% set empty.icon = 'search' %}
+        {% set empty.title = 'Nothing is recorded as depending on this yet' %}
+        {% set empty.description = 'No connections lead from here. Nothing is missing: there is simply nothing recorded.' %}
     {% else %}
     {% call section_card(title='What depends on it') %}
         {% set element_rows = [] %}
@@ -108,11 +115,20 @@
     {% endif %}
 
     {% elif has_elements %}
-        {{ empty_state(icon='search', title='Choose an element to see what depends on it', description='Pick an application, capability or other element above.') }}
+        {% set empty.icon = 'search' %}
+        {% set empty.title = 'Choose an element to see what depends on it' %}
+        {% set empty.description = 'Pick an application, capability or other element above.' %}
     {% else %}
+        {% set empty.icon = 'git-branch' %}
+        {% set empty.title = 'Nothing is modelled yet' %}
+        {% set empty.description = 'Add at least one application to your model, and you can ask what breaks if it fails.' %}
+    {% endif %}
+
+    {% if empty.title %}
     {% call card() %}
         {% call card_content() %}
-            {{ empty_state(icon='git-branch', title='Nothing is modelled yet', description='Add at least one application to your model, and you can ask what breaks if it fails.') }}
+            {{ empty_state(icon=empty.icon, title=empty.title, description=empty.description) }}
+            {% if not has_elements and not element_not_found and not answer %}
             <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="impact-first-steps">
                 {% if may_connect_github %}
                 {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='impact-connect-github') }}
@@ -125,6 +141,7 @@
                 {% endif %}
                 {{ button(text='Add an application', href=url_for('unified_applications.application_list'), variant='outline', testid='impact-add-application') }}
             </div>
+            {% endif %}
         {% endcall %}
     {% endcall %}
     {% endif %}
