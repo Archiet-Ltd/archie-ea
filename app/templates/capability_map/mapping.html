@@ -1,4 +1,6 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/dialog.html' import dialog %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -6,7 +8,7 @@
 
 {% block content %}
 {% set can_edit = can_edit_capabilities(current_user) %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"{% if can_edit %} x-data="mappingDialog()"{% endif %}>
     {{ page_header(title='Capability Mapping', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Capability Mapping'}], description='Map applications to business capabilities') }}
 
     {% if load_error %}
@@ -36,10 +38,8 @@
         <p class="font-medium">No data available for mapping.</p>
         <p class="text-sm mt-1 mb-4">Add capabilities and applications first.</p>
         <div class="flex justify-center gap-3">
-            <a href="{{ url_for('unified_low_priority.capability_map_capabilities') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add capabilities</a>
-            <a href="{{ url_for('unified_applications.application_list') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add applications</a>
+            {{ ui.button(text='Add capabilities', href=url_for('unified_low_priority.capability_map_capabilities')) }}
+            {{ ui.button(text='Add applications', variant='ghost', href=url_for('unified_applications.application_list')) }}
         </div>
     </div>
     {% else %}
@@ -69,14 +69,12 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5 justify-end max-w-md">
                         {% for m in mapped %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">{{ m.name }}</span>
+                        {{ ui.badge(text=m.name, variant='secondary') }}
                         {% else %}
                         <span class="text-xs text-muted-foreground">No application mapped</span>
                         {% endfor %}
                         {% if can_edit and total_apps > 0 %}
-                        <button type="button" data-action="openMapDialog"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 ml-2 items-center"
-                                aria-label="Map applications to {{ cap.name|e }}">Map applications</button>
+                        {{ ui.button(text='Map applications', variant='ghost', size='sm', class='ml-2', attrs={'type': 'button', 'data-action': 'openMapDialog', '@click': 'openFor($el.closest(\'.cap-row\'))', 'aria-label': 'Map applications to ' ~ cap.name}) }}
                         {% endif %}
                     </div>
                 </div>
@@ -104,12 +102,12 @@
                 {% if app.operational_status %}
                 {% set s = app.operational_status|lower %}
                 {% if s == 'active' %}
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-success/10 text-success-emphasis border border-success/20">Active</span>
+                {{ ui.badge(text='Active', variant='outline') }}
                 {% else %}
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground border border-border">{{ app.operational_status|title }}</span>
+                {{ ui.badge(text=app.operational_status|title, variant='secondary') }}
                 {% endif %}
                 {% else %}
-                <span class="text-xs text-muted-foreground" title="No operational status recorded">&mdash;</span>
+                <span class="text-xs text-muted-foreground" title="No operational status recorded">Not set</span>
                 {% endif %}
             </div>
             {% else %}
@@ -118,104 +116,72 @@
         </div>
     </div>
     {% endif %}
+
+{% if can_edit %}
+{% call dialog(start_hidden=false, open_expr='open', close_expr='open = false', title_expr='title', description='Tick every application that supports this capability.') %}
+  <div class="space-y-3 max-h-72 overflow-y-auto" id="map-app-list">
+    {% for app in applications %}
+    {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
+      {{ ui.input(type='checkbox', id='map-app-' ~ app.id, value=app.id, class='map-app-checkbox size-4 shrink-0', attrs={'x-model': 'checked'}) }}
+      {{ ui.field_label(text=app.name, attrs={'for': 'map-app-' ~ app.id}) }}
+    {% endcall %}
+    {% endfor %}
+  </div>
+  <div class="flex justify-end gap-2 mt-5">
+    {{ ui.button(text='Cancel', variant='outline', attrs={'type': 'button', 'data-action': 'closeMapDialog', '@click': 'open = false'}) }}
+    {{ ui.button(text='Save mappings', attrs={'type': 'button', 'id': 'map-save', 'data-action': 'saveMappings', '@click': 'save()', ':disabled': 'saving'}) }}
+  </div>
+{% endcall %}
+{% endif %}
 </div>
 
 {% if can_edit %}
-<dialog id="map-dialog" class="rounded-xl border border-border bg-card text-foreground p-0 w-full max-w-md backdrop:bg-black/50">
-  <div class="p-6">
-    <h3 id="map-dialog-title" class="text-base font-semibold text-foreground text-foreground mb-1">Map applications</h3>
-    <p class="text-sm text-muted-foreground mb-4">Tick every application that supports this capability.</p>
-    <input type="hidden" id="map-cap-id" value="">
-    <div class="space-y-2 max-h-72 overflow-y-auto" id="map-app-list">
-      {% for app in applications %}
-      <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" class="map-app-checkbox h-4 w-4 rounded border-border" value="{{ app.id }}">
-        <span>{{ app.name }}</span>
-      </label>
-      {% endfor %}
-    </div>
-    <div class="flex justify-end gap-2 mt-5">
-      <button type="button" data-action="closeMapDialog"
-        class="h-9 px-4 rounded-md text-sm border border-border hover:bg-muted">Cancel</button>
-      <button type="button" id="map-save" data-action="saveMappings"
-        class="h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90">Save mappings</button>
-    </div>
-  </div>
-</dialog>
-
 <script>
-// Scoped: partials/_scripts_common.html installs a global [data-action] delegator
-// that resolves the action name against `window`, and this page installs its own.
-// Global functions would therefore run TWICE per click and write twice.
-(function () {
-'use strict';
-
-function el(id) { return document.getElementById(id); }
-
-function mapToast(msg, isErr) {
-    if (window.Platform && Platform.toast) { isErr ? Platform.toast.error(msg) : Platform.toast.success(msg); }
-}
-
-function openMapDialog(row) {
-    var mapped = (row.dataset.mappedIds || '').split(',').filter(Boolean);
-    el('map-cap-id').value = row.dataset.capId;
-    el('map-dialog-title').textContent = 'Map applications to ' + row.dataset.capName;
-    document.querySelectorAll('.map-app-checkbox').forEach(function (cb) {
-        cb.checked = mapped.indexOf(cb.value) !== -1;
-    });
-    el('map-dialog').showModal();
-}
-
-var saving = false;
-
-async function saveMappings() {
-    if (saving) return;
-    saving = true;
-    var btn = el('map-save');
-    btn.disabled = true;
-    var capId = el('map-cap-id').value;
-    var row = document.querySelector('.cap-row[data-cap-id="' + capId + '"]');
-    var before = (row.dataset.mappedIds || '').split(',').filter(Boolean);
-    var after = [...document.querySelectorAll('.map-app-checkbox')]
-        .filter(function (cb) { return cb.checked; })
-        .map(function (cb) { return cb.value; });
-    var added = after.filter(function (id) { return before.indexOf(id) === -1; });
-    var removed = before.filter(function (id) { return after.indexOf(id) === -1; });
-
-    try {
-        if (added.length) {
-            await Platform.fetch.post('/capability-map/api/mappings', {
-                capability_id: capId,
-                applications: added.map(function (id) {
-                    return { application_id: id, mapping: { support_level: 'partial' } };
-                })
-            }, { silent: true });
+// Alpine scope for the mapping dialog. Rows keep data-cap-id / data-mapped-ids; the dialog is
+// the shared Alpine dialog, so no second [data-action] delegator is installed.
+function mappingDialog() {
+    return {
+        open: false, saving: false, capId: '', title: 'Map applications', checked: [],
+        openFor: function (row) {
+            this.capId = row.dataset.capId;
+            this.title = 'Map applications to ' + row.dataset.capName;
+            this.checked = (row.dataset.mappedIds || '').split(',').filter(Boolean);
+            this.open = true;
+        },
+        save: async function () {
+            if (this.saving) return;
+            this.saving = true;
+            var capId = this.capId;
+            var row = document.querySelector('.cap-row[data-cap-id="' + capId + '"]');
+            var before = (row.dataset.mappedIds || '').split(',').filter(Boolean);
+            var after = this.checked.slice();
+            var added = after.filter(function (id) { return before.indexOf(id) === -1; });
+            var removed = before.filter(function (id) { return after.indexOf(id) === -1; });
+            try {
+                if (added.length) {
+                    await Platform.fetch.post('/capability-map/api/mappings', {
+                        capability_id: capId,
+                        applications: added.map(function (id) {
+                            return { application_id: id, mapping: { support_level: 'partial' } };
+                        })
+                    }, { silent: true });
+                }
+                for (const id of removed) {
+                    await Platform.fetch.delete(
+                        '/capability-map/api/mappings/by-capability/' + capId + '/application/' + id,
+                        { silent: true });
+                }
+                this.open = false;
+                Platform.toast.success('Mappings saved');
+                setTimeout(function () { window.location.reload(); }, 400);
+            } catch (e) {
+                var detail = (e && e.data && (e.data.error || e.data.message)) || e.message || e;
+                Platform.toast.error('Could not save mappings: ' + detail);
+                this.saving = false;
+            }
         }
-        for (const id of removed) {
-            await Platform.fetch.delete(
-                '/capability-map/api/mappings/by-capability/' + capId + '/application/' + id,
-                { silent: true });
-        }
-        el('map-dialog').close();
-        mapToast('Mappings saved');
-        setTimeout(function () { window.location.reload(); }, 400);
-    } catch (e) {
-        var detail = (e && e.data && (e.data.error || e.data.message)) || e.message || e;
-        mapToast('Could not save mappings: ' + detail, true);
-        btn.disabled = false;
-        saving = false;
-    }
+    };
 }
-
-document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-action]');
-    if (!t) return;
-    var a = t.getAttribute('data-action');
-    if (a === 'openMapDialog') return openMapDialog(t.closest('.cap-row'));
-    if (a === 'saveMappings') return saveMappings();
-    if (a === 'closeMapDialog') { var d = el('map-dialog'); if (d) d.close(); }
-});
-})();
 </script>
 {% endif %}
 {% endblock %}
