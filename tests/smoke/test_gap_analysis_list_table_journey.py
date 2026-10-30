@@ -331,6 +331,9 @@ def test_gap_analysis_empty_table_agrees_with_the_computed_figures(browser, live
         expect(action).to_be_visible(timeout=PAGE_TIMEOUT)
         action.click()
         page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.locator('[data-testid="architecture-page-header"]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        # It lands on a form for a gap, not on an empty list.
+        dialog = page.get_by_role("dialog", name="New Architecture Task")
+        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(dialog.locator("#ct-arch-element-type")).to_have_value("Gap")
     finally:
         context.close()
