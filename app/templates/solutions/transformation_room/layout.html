@@ -61,11 +61,15 @@
   {% endcall %}
 
   {% if room.workstream %}
-  {%- set _stage_tabs = [] -%}
-  {%- for item in room.stage_routes -%}
-  {%- set _ = _stage_tabs.append((item.label, url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=item.key), room.stage == item.key, 'stage-' ~ item.key)) -%}
-  {%- endfor -%}
-  {{ section_tabs(_stage_tabs, label='Workstream stages', testid='stage-stepper', class='mt-6') }}
+  <nav aria-label="Workstream stages" data-testid="stage-stepper" class="mt-6 overflow-x-auto rounded-lg border bg-card p-1">
+    <ol class="flex min-w-max items-center gap-1">
+      {% for item in room.stage_routes %}
+      {%- set _open = room.stage == item.key -%}
+      {% if not loop.first %}<li aria-hidden="true">{{ lucide('chevron-right', class='size-4 text-muted-foreground') }}</li>{% endif %}
+      <li>{{ ui.button(text=item.label, href=url_for('solution_design.transformation_workstream_stage', programme_id=room.programme.id, workstream_id=room.workstream.id, stage=item.key), variant=('secondary' if _open else 'ghost'), size='sm', attrs=({'aria-current': 'step', 'data-testid': 'stage-' ~ item.key} if _open else {'data-testid': 'stage-' ~ item.key})) }}</li>
+      {% endfor %}
+    </ol>
+  </nav>
   {% endif %}
 
   <div class="mt-6">

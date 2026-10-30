@@ -65,9 +65,9 @@ def test_cto_moves_across_every_stage_with_the_stepper(width, browser, live_serv
         _create_programme(page, f"CTO room {width}")
         _shot(page, f"A-objective-{width}-{scheme}")
         room_url = page.url
-        stepper = page.locator('nav[aria-label="Workstream stages"] [data-slot="tabs-list"]')
-        assert stepper.count() == 1, "the stage strip is the library's tabs list"
-        triggers = stepper.locator('[data-slot="tabs-trigger"]')
+        stepper = page.locator('nav[aria-label="Workstream stages"]')
+        assert stepper.count() == 1, "the stage strip is one labelled stepper"
+        triggers = stepper.locator('a[data-slot="button"]')
         assert [t.strip() for t in triggers.all_inner_texts()] == STAGES
         # The stepper keeps its left-to-right shape: one row, even on a phone.
         tops = {round(b["y"]) for b in (triggers.nth(i).bounding_box() for i in range(len(STAGES)))}
@@ -76,6 +76,8 @@ def test_cto_moves_across_every_stage_with_the_stepper(width, browser, live_serv
             page.locator('nav[aria-label="Workstream stages"]').get_by_role("link", name=label, exact=True).click()
             page.wait_for_load_state("domcontentloaded")
             assert page.locator("main h2").count() >= 1
+            current = page.locator('nav[aria-label="Workstream stages"] [aria-current="step"]')
+            assert current.count() == 1 and current.inner_text().strip() == label, "the open stage is the marked step"
             _shot(page, f"A-stage-{label.lower()}-{width}-{scheme}")
             if label in UNAVAILABLE:
                 assert page.get_by_text("Not available in this release", exact=True).count() == 1

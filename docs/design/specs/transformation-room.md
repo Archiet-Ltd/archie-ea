@@ -7,8 +7,9 @@ flask-basecoat product detail example.
 A CTO opens a programme's room, reads where the change stands and moves to the next stage without losing their place.
 
 ## What moves
-- The room's two rows of sections (Transform, Decisions, Execute, Outcomes; then the seven workstream stages) are the
-  library's section tabs: one row, read left to right, scrolling sideways on a phone and never stacking.
+- The room's section row (Transform, Decisions, Execute, Outcomes) is the library's section tabs. The seven
+  workstream stages are a stepper of library buttons that are links, with the open stage marked as the current step:
+  one row, read left to right, scrolling sideways on a phone and never stacking.
 - Every stage page sits in the library card. The workstream list is the library list table; adding a workstream and
   saving the objective use the library's fields and buttons.
 
