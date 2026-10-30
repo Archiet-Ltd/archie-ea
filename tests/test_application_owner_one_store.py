@@ -455,3 +455,86 @@ def test_owner_coverage_counts_a_recorded_owner_and_only_this_organisations(
         g.current_org_id = org_a.id
         context = _build_overview_context()
     assert context["data_coverage"]["owner"] == 50
+
+
+# ── the Owner cell names each person once ────────────────────────────────────
+
+
+def _owner_cells(client, application_id):
+    """The applications list's owner cells for one application (desktop column only)."""
+    from bs4 import BeautifulSoup
+
+    resp = client.get("/applications/")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    soup = BeautifulSoup(resp.get_data(as_text=True), "html.parser")
+    return soup.find_all(attrs={"data-testid": "app-owner-%s" % application_id})
+
+
+def test_a_person_holding_two_roles_is_named_once_with_both_role_labels(
+        db_session, make_org, client, login_as):
+    from app.services.element_ownership_service import set_element_owner
+
+    org = make_org("one-store-cell-dual")
+    jane = _person(db_session, org, "jane")
+    application = _make_app(db_session, org, "Ledger")
+    set_element_owner(element_type="application", element_id=application.id, user_id=jane.id,
+                      organization_id=org.id, ownership_type="business")
+    set_element_owner(element_type="application", element_id=application.id, user_id=jane.id,
+                      organization_id=org.id, ownership_type="technical")
+    db_session.flush()
+
+    login_as(client, jane)
+    cells = _owner_cells(client, application.id)
+
+    assert len(cells) == 1
+    assert cells[0].contents[0].strip() == _full_name(jane)
+    roles_text = cells[0].find("span").get_text(strip=True)
+    assert "Business" in roles_text
+    assert "Technical" in roles_text
+
+
+def test_two_different_owners_give_two_names(db_session, make_org, client, login_as):
+    from app.services.element_ownership_service import set_element_owner
+
+    org = make_org("one-store-cell-two")
+    jane, joe = _person(db_session, org, "jane"), _person(db_session, org, "joe")
+    application = _make_app(db_session, org, "Ledger")
+    set_element_owner(element_type="application", element_id=application.id, user_id=jane.id,
+                      organization_id=org.id, ownership_type="business")
+    set_element_owner(element_type="application", element_id=application.id, user_id=joe.id,
+                      organization_id=org.id, ownership_type="technical")
+    db_session.flush()
+
+    login_as(client, jane)
+    cells = _owner_cells(client, application.id)
+
+    names = sorted(cell.contents[0].strip() for cell in cells)
+    assert names == sorted([_full_name(jane), _full_name(joe)])
+
+
+def test_an_application_with_only_legacy_owner_text_still_shows_that_text_once(
+        db_session, make_org, client, login_as):
+    org = make_org("one-store-cell-legacy")
+    jane = _person(db_session, org, "jane")
+    application = _make_app(db_session, org, "Legacy", legacy_business_owner="Casey Recorded")
+    db_session.flush()
+
+    login_as(client, jane)
+    cells = _owner_cells(client, application.id)
+
+    assert len(cells) == 1
+    assert cells[0].get_text(strip=True) == "Casey Recorded"
+
+
+def test_an_application_with_no_owner_still_shows_the_no_owner_link(
+        db_session, make_org, client, login_as):
+    org = make_org("one-store-cell-none")
+    jane = _person(db_session, org, "jane")
+    application = _make_app(db_session, org, "Bare")
+    db_session.flush()
+
+    login_as(client, jane)
+    cells = _owner_cells(client, application.id)
+
+    assert len(cells) == 1
+    assert "No owner" in cells[0].get_text()

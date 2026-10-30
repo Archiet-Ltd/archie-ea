@@ -433,15 +433,30 @@ def application_list():
         for listed in pagination.items:
             if listed.id not in owned_ids:
                 continue
-            names = [
-                o["user_name"]
-                for o in owners_by_app.get(listed.id, [])
-                if o.get("user_name") and o["user_name"] != "\u2014"
-            ]
-            if not names:
+            # Group the owner records of this application by person, so someone
+            # holding two ownership types (e.g. business and technical) is named
+            # once with both role labels, not once per owner record.
+            rows_by_user = {}
+            grouped = []
+            for o in owners_by_app.get(listed.id, []):
+                name = o.get("user_name")
+                if not name or name == "\u2014":
+                    continue
+                role_label = o.get("ownership_type_label")
+                user_id = o.get("user_id")
+                existing = rows_by_user.get(user_id) if user_id is not None else None
+                if existing is not None:
+                    if role_label and role_label not in existing["roles"]:
+                        existing["roles"].append(role_label)
+                    continue
+                row = {"name": name, "roles": [role_label] if role_label else []}
+                if user_id is not None:
+                    rows_by_user[user_id] = row
+                grouped.append(row)
+            if not grouped:
                 legacy = (listed.legacy_business_owner or listed.legacy_application_owner or "").strip()
-                names = [legacy] if legacy else ["Name not recorded"]
-            owner_names_by_app[listed.id] = names
+                grouped = [{"name": legacy, "roles": []}] if legacy else [{"name": "Name not recorded", "roles": []}]
+            owner_names_by_app[listed.id] = grouped
 
         # ── 6. Build filter option lists (deduplicated, normalised) ───────────
         def _distinct_normalised(col):

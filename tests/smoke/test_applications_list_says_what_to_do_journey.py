@@ -390,3 +390,71 @@ def test_the_list_template_is_built_from_components_only():
         assert not shadow.search(line), "shadow on line %d" % number
         assert not off_token.search(line), "raw colour on line %d" % number
     assert re.search(r"{%-?\s*from\s+'components/", source), "the page imports no component macro"
+
+
+def _owner_once_shots_dir():
+    """Where this round's walk screenshots go, if the sibling bucket repo is checked out here."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[3] / "sdlc-orchestrator"
+    if not root.is_dir():
+        return None
+    target = root / "docs" / "buckets" / "entelim-enterprise-intelligence-management-platform-design-the-f" / \
+        "launch-cut" / "reports" / "owner-once01c-shots"
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def test_one_person_holding_two_roles_is_named_once_in_the_owner_cell(app, page, live_server):
+    """A CTO reading the owner column sees each accountable person once, with their roles —
+    never the same name twice because they hold two ownership records on one application."""
+    from app import db
+
+    org = _make_org(app, "DualRole", with_apps=False)
+    with app.app_context():
+        from app.models.application_owner import ApplicationOwner
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.user import User
+
+        user = User.query.filter_by(email=org["email"]).one()
+        application = ApplicationComponent(
+            name="Golf Shared %s" % org["org"], organization_id=org["org"], component_type="web_application")
+        db.session.add(application)
+        db.session.flush()
+        db.session.add(ApplicationOwner(application_id=application.id, user_id=user.id,
+                                        organization_id=org["org"], ownership_type="business"))
+        db.session.add(ApplicationOwner(application_id=application.id, user_id=user.id,
+                                        organization_id=org["org"], ownership_type="technical"))
+        db.session.commit()
+        application_id = application.id
+
+    # 1440, light: the desktop owner cell names the person once, with both roles.
+    _login(page, live_server, org["email"])
+    _open_list(page, live_server)
+    cells = page.locator('[data-testid="app-owner-%s"]' % application_id)
+    assert cells.count() == 1, "the owner cell repeated the name instead of grouping it"
+    cell_text = " ".join(cells.inner_text().split())
+    assert org["person"] in cell_text
+    assert "Business" in cell_text and "Technical" in cell_text
+
+    shots = _owner_once_shots_dir()
+    if shots is not None:
+        page.screenshot(path=str(shots / "owner-once-1440-light.png"), full_page=True)
+
+    # 390, dark: the same single name on the mobile card, no duplicate.
+    dark_ctx = page.context.browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    dark_ctx.add_init_script("localStorage.setItem('theme', 'dark');")
+    dark_page = dark_ctx.new_page()
+    try:
+        _login(dark_page, live_server, org["email"])
+        _open_list(dark_page, live_server)
+        mobile_cells = dark_page.locator('[data-testid="app-owner-mobile-%s"]' % application_id)
+        assert mobile_cells.count() == 1, "the mobile owner cell repeated the name instead of grouping it"
+        mobile_text = " ".join(mobile_cells.inner_text().split())
+        assert org["person"] in mobile_text
+        assert "Business" in mobile_text and "Technical" in mobile_text
+
+        if shots is not None:
+            dark_page.screenshot(path=str(shots / "owner-once-390-dark.png"), full_page=True)
+    finally:
+        dark_ctx.close()

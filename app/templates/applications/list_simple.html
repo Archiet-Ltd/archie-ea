@@ -41,8 +41,10 @@
     filter_options     dict {component_types, lifecycle_statuses, process_levels, capability_levels, domains}
     stats              dict {total, active_portfolio, strategic, tactical, sunset_decom_pipeline, decommissioned,
                              summary_total, no_owner, no_capability, no_vendor}
-    owner_names_by_app dict {application id: [owner names]}; the owner column and the
-                       summary answer the same question (has_assigned_owner)
+    owner_names_by_app dict {application id: [{name, roles}, ...]}; one row per
+                       person (roles is the list of that person's role labels on
+                       this application); the owner column and the summary
+                       answer the same question (has_assigned_owner)
     include_decom      bool — full portfolio when true (default false: active portfolio only)
     qs_include_decom_true / qs_include_decom_false — toggle query strings
     currency_symbol    str
@@ -100,11 +102,12 @@
                    menu_width='w-52', items=items) }}
 {% endmacro %}
 
-{# The owner cell: the names the summary counted, or the plain reason there are none. #}
-{% macro owner_cell(app, owner_names, sfx='') %}
-  {%- if owner_names -%}
-    {%- for owner_name in owner_names -%}
-    <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
+{# The owner cell: the people the summary counted, each named once with their
+   role labels, or the plain reason there are none. #}
+{% macro owner_cell(app, owner_rows, sfx='') %}
+  {%- if owner_rows -%}
+    {%- for owner_row in owner_rows -%}
+    <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_row.name }}{% if owner_row.roles %}<span class="block text-xs text-muted-foreground">{{ owner_row.roles | join(', ') }}</span>{% endif %}</span>
     {%- endfor -%}
   {%- elif can('edit', 'application') -%}
     <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
