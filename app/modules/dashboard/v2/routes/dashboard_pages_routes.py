@@ -876,7 +876,11 @@ def submit_rationalization_assessment():
         if not data or "application_id" not in data:
             return jsonify({"success": False, "error": "Application ID required"}), 400
 
-        app_id = data["application_id"]
+        try:
+            # The form posts the id as text; the score lookup compares it with an integer column.
+            app_id = int(data["application_id"])
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Application ID must be a number"}), 400
         score = RationalizationScoringService.calculate_app_score(app_id)
 
         if score:

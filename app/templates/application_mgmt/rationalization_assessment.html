@@ -1,9 +1,11 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/radio_group.html' import radio_group %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Rationalization Assessment{% endblock %}
-
-{% block head %}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -19,24 +21,24 @@
   ) }}
 
   <!-- Progress -->
-  <div class="bg-card border border-border rounded-lg p-6 mb-6">
+  {% call ui.card() %}
+  <div class="px-6">
     <div class="flex justify-between items-center mb-2">
       <span class="text-sm font-medium">Progress</span>
       <span class="text-sm text-muted-foreground" id="progress-text">Step 1 of 6</span>
     </div>
-    <div class="w-full bg-muted rounded-full h-2">
-      <div id="progress-bar" class="progress-bar bg-primary h-2 rounded-full transition-[width] duration-300 ease-in-out" style="width: 16%"></div>  <!-- inline-style-ok -->
-    </div>
+    {% call ui.progress(value=17, id='progress-bar', class='h-2 w-full rounded-full bg-muted', attrs={'aria-label': 'Assessment progress', 'aria-valuemin': '0'}) %}{{ ui.progress_indicator(value=17, id='progress-indicator') }}{% endcall %}
   </div>
+  {% endcall %}
 
   <!-- Data Readiness Card — shows evidence completeness for the selected application -->
-  <div id="readiness-card" class="bg-card border border-border rounded-lg p-6 mb-6 hidden" aria-live="polite">
+  <div id="readiness-card" class="rounded-lg border border-border bg-card p-6 hidden" aria-live="polite">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-base font-semibold flex items-center gap-2">
         <i data-lucide="clipboard-check" class="h-5 w-5 text-primary" aria-hidden="true"></i>
         Data Readiness
       </h2>
-      <span id="readiness-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"></span>
+      {{ ui.badge(id='readiness-badge', variant='outline') }}
     </div>
 
     <!-- Not-ready warning banner -->
@@ -59,29 +61,27 @@
         <span class="text-xs font-medium text-muted-foreground">Overall Data Completeness</span>
         <span id="readiness-pct" class="text-xs font-semibold text-foreground">0%</span>
       </div>
-      <div class="w-full bg-muted rounded-full h-2">
-        <div id="readiness-bar" class="h-2 rounded-full transition-[width] duration-500 ease-in-out bg-primary w-0"></div>
-      </div>
+      {% call ui.progress(value=0, id='readiness-track', class='h-2 w-full rounded-full bg-muted', attrs={'aria-label': 'Overall data completeness', 'aria-valuemin': '0'}) %}{{ ui.progress_indicator(value=0, id='readiness-bar') }}{% endcall %}
     </div>
   </div>
 
   <!-- Application Selector -->
-  <div id="app-selector" class="bg-card border border-border rounded-lg p-6 mb-6">
-    <label for="application-select" class="block text-sm font-medium mb-2">Select Application to Assess</label>
-    <select id="application-select" class="w-full rounded-md border px-3 py-2">
-      <option value="">Choose an application...</option>
-      {% for app in applications %}
-      <option value="{{ app.id }}">{{ app.name }} ({{ app.application_type or 'Unknown' }})</option>
-      {% endfor %}
-    </select>
-    <div id="app-details" class="mt-4 hidden">
-      <div class="grid grid-cols-3 gap-4 text-sm">
-        <div><span class="text-muted-foreground">Current Score:</span> <span id="current-score" class="font-medium">-</span></div>
-        <div><span class="text-muted-foreground">TIME Action:</span> <span id="current-action" class="font-medium">-</span></div>
-        <div><span class="text-muted-foreground">Last Assessed:</span> <span id="last-assessed" class="font-medium">-</span></div>
-      </div>
-    </div>
+  {% call ui.card(id='app-selector') %}
+  <div class="space-y-6 px-6">
+    {% call ui.field() %}
+      {{ ui.field_label(text='Select Application to Assess', attrs={'for': 'application-select'}) }}
+      {% call native_select_wrapper(class='w-full') %}{% call native_select(id='application-select', class='w-full') %}
+        {{ native_select_option('Choose an application...', value='') }}
+        {% for app in applications %}{{ native_select_option(app.name ~ ' (' ~ (app.application_type or 'Type not set') ~ ')', value=app.id) }}{% endfor %}
+      {% endcall %}{% endcall %}
+    {% endcall %}
+    <dl id="app-details" class="hidden space-y-2 text-sm">
+      <div class="flex justify-between gap-4"><dt class="text-muted-foreground">Current score</dt><dd id="current-score" class="font-medium">Not scored</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-muted-foreground">TIME action</dt><dd id="current-action" class="font-medium">Not set</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-muted-foreground">Last assessed</dt><dd id="last-assessed" class="font-medium">Not assessed</dd></div>
+    </dl>
   </div>
+  {% endcall %}
 
   <!-- Questionnaire Steps -->
   <form id="assessment-form" class="space-y-6">
@@ -93,66 +93,30 @@
           Technical Health Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the current architecture pattern?</label>
-            <div class="grid grid-cols-1 gap-3">
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="architecture_pattern" value="modern_microservices" class="w-4 h-4" aria-label="Architecture Pattern">
-                <div><div class="font-medium">Modern/Microservices</div><div class="text-xs text-muted-foreground">Cloud-native, scalable</div></div>
-              </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="architecture_pattern" value="soa" class="w-4 h-4" aria-label="Architecture Pattern">
-                <div><div class="font-medium">Service-Oriented (SOA)</div><div class="text-xs text-muted-foreground">Modular but aging</div></div>
-              </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="architecture_pattern" value="monolithic" class="w-4 h-4" aria-label="Architecture Pattern">
-                <div><div class="font-medium">Monolithic</div><div class="text-xs text-muted-foreground">Single codebase, harder to scale</div></div>
-              </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="architecture_pattern" value="legacy" class="w-4 h-4" aria-label="Architecture Pattern">
-                <div><div class="font-medium">Legacy/Mainframe</div><div class="text-xs text-muted-foreground">Outdated technology stack</div></div>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='architecture_pattern', label='What is the current architecture pattern?', inline=false, options=[
+            {'value': 'modern_microservices', 'label': 'Modern/Microservices', 'description': 'Cloud-native, scalable'},
+            {'value': 'soa', 'label': 'Service-Oriented (SOA)', 'description': 'Modular but aging'},
+            {'value': 'monolithic', 'label': 'Monolithic', 'description': 'Single codebase, harder to scale'},
+            {'value': 'legacy', 'label': 'Legacy/Mainframe', 'description': 'Outdated technology stack'}]) }}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">How would you rate the technical debt level?</label>
-            <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="technical_debt" value="low" class="hidden peer" aria-label="Technical Debt">
-                <div class="peer-checked:text-primary font-medium">Low</div>
-                <div class="text-xs text-muted-foreground">Clean codebase</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="technical_debt" value="medium" class="hidden peer" aria-label="Technical Debt">
-                <div class="peer-checked:text-primary font-medium">Medium</div>
-                <div class="text-xs text-muted-foreground">Some refactoring needed</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="technical_debt" value="high" class="hidden peer" aria-label="Technical Debt">
-                <div class="peer-checked:text-primary font-medium">High</div>
-                <div class="text-xs text-muted-foreground">Significant issues</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="technical_debt" value="critical" class="hidden peer" aria-label="Technical Debt">
-                <div class="peer-checked:text-primary font-medium">Critical</div>
-                <div class="text-xs text-muted-foreground">Blocking issues</div>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='technical_debt', label='How would you rate the technical debt level?', inline=false, options=[
+            {'value': 'low', 'label': 'Low', 'description': 'Clean codebase'},
+            {'value': 'medium', 'label': 'Medium', 'description': 'Some refactoring needed'},
+            {'value': 'high', 'label': 'High', 'description': 'Significant issues'},
+            {'value': 'critical', 'label': 'Critical', 'description': 'Blocking issues'}]) }}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the deployment frequency?</label>
-            <select name="deployment_frequency" class="h-9 w-full rounded-md border px-3 border-input" aria-label="What is the deployment frequency?">
-              <option value="">Select...</option>
-              <option value="multiple_daily">Multiple times per day (CI/CD)</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly or less</option>
-              <option value="manual">Manual deployments only</option>
-            </select>
-          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='What is the deployment frequency?', attrs={'for': 'deployment_frequency'}) }}
+            {% call native_select_wrapper(class='w-full') %}{% call native_select(id='deployment_frequency', name='deployment_frequency', class='w-full') %}
+              {{ native_select_option('Not set', value='') }}
+              {{ native_select_option('Multiple times per day (CI/CD)', value='multiple_daily') }}
+              {{ native_select_option('Daily', value='daily') }}
+              {{ native_select_option('Weekly', value='weekly') }}
+              {{ native_select_option('Monthly', value='monthly') }}
+              {{ native_select_option('Quarterly or less', value='quarterly') }}
+              {{ native_select_option('Manual deployments only', value='manual') }}
+            {% endcall %}{% endcall %}
+          {% endcall %}
         </div>
       </div>
     </div>
@@ -165,62 +129,26 @@
           Business Value Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
-            <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="strategic_importance" value="critical" class="hidden peer" aria-label="Strategic Importance">
-                <div class="peer-checked:text-primary font-medium">Critical</div>
-                <div class="text-xs text-muted-foreground">Mission-critical</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="strategic_importance" value="high" class="hidden peer" aria-label="Strategic Importance">
-                <div class="peer-checked:text-primary font-medium">High</div>
-                <div class="text-xs text-muted-foreground">Strategic priority</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="strategic_importance" value="medium" class="hidden peer" aria-label="Strategic Importance">
-                <div class="peer-checked:text-primary font-medium">Medium</div>
-                <div class="text-xs text-muted-foreground">Supporting role</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="strategic_importance" value="low" class="hidden peer" aria-label="Strategic Importance">
-                <div class="peer-checked:text-primary font-medium">Low</div>
-                <div class="text-xs text-muted-foreground">Non-essential</div>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='strategic_importance', label='Strategic Importance', inline=false, options=[
+            {'value': 'critical', 'label': 'Critical', 'description': 'Mission-critical'},
+            {'value': 'high', 'label': 'High', 'description': 'Strategic priority'},
+            {'value': 'medium', 'label': 'Medium', 'description': 'Supporting role'},
+            {'value': 'low', 'label': 'Low', 'description': 'Non-essential'}]) }}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">User Satisfaction (1-10)</label>
-            <input type="range" name="user_satisfaction" min="1" max="10" value="5" class="w-full mb-2" aria-label="User Satisfaction">
+          {% call ui.field() %}
+            {{ ui.field_label(text='User Satisfaction (1-10)', attrs={'for': 'user_satisfaction'}) }}
+            {{ ui.input(id='user_satisfaction', name='user_satisfaction', type='range', value=5, attrs={'min': 1, 'max': 10}) }}
             <div class="flex justify-between text-xs text-muted-foreground">
               <span>Very Dissatisfied (1)</span>
               <span id="satisfaction-value" class="font-medium text-foreground">5</span>
               <span>Very Satisfied (10)</span>
             </div>
-          </div>
+          {% endcall %}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Business Process Coverage</label>
-            <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="process_coverage" value="comprehensive" class="hidden peer" aria-label="Process Coverage">
-                <div class="peer-checked:text-primary font-medium">Comprehensive</div>
-                <div class="text-xs text-muted-foreground">End-to-end</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="process_coverage" value="partial" class="hidden peer" aria-label="Process Coverage">
-                <div class="peer-checked:text-primary font-medium">Partial</div>
-                <div class="text-xs text-muted-foreground">Key processes</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="process_coverage" value="limited" class="hidden peer" aria-label="Process Coverage">
-                <div class="peer-checked:text-primary font-medium">Limited</div>
-                <div class="text-xs text-muted-foreground">Single process</div>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='process_coverage', label='Business Process Coverage', inline=false, options=[
+            {'value': 'comprehensive', 'label': 'Comprehensive', 'description': 'End-to-end'},
+            {'value': 'partial', 'label': 'Partial', 'description': 'Key processes'},
+            {'value': 'limited', 'label': 'Limited', 'description': 'Single process'}]) }}
         </div>
       </div>
     </div>
@@ -233,38 +161,22 @@
           Cost Efficiency Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Annual Operating Cost Tier</label>
-            <div class="grid grid-cols-1 gap-3">
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="cost_tier" value="very_low" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">Very Low</div><div class="text-xs text-muted-foreground">&lt; $50K/year</div></div>
-              </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="cost_tier" value="low" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">Low</div><div class="text-xs text-muted-foreground">$50K - $250K/year</div></div>
-              </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="cost_tier" value="medium" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">Medium</div><div class="text-xs text-muted-foreground">$250K - $1M/year</div></div>
-              </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="cost_tier" value="high" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">High</div><div class="text-xs text-muted-foreground">$1M - $5M/year</div></div>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='cost_tier', label='Annual Operating Cost Tier', inline=false, options=[
+            {'value': 'very_low', 'label': 'Very Low', 'description': '< $50K/year'},
+            {'value': 'low', 'label': 'Low', 'description': '$50K - $250K/year'},
+            {'value': 'medium', 'label': 'Medium', 'description': '$250K - $1M/year'},
+            {'value': 'high', 'label': 'High', 'description': '$1M - $5M/year'}]) }}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">License Optimization Opportunity</label>
-            <select name="license_optimization" class="h-9 w-full rounded-md border px-3 border-input" aria-label="License Optimization Opportunity">
-              <option value="">Select...</option>
-              <option value="high">High - Significant unused licenses</option>
-              <option value="medium">Medium - Some optimization possible</option>
-              <option value="low">Low - Well optimized</option>
-              <option value="none">None - No licenses required</option>
-            </select>
-          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='License Optimization Opportunity', attrs={'for': 'license_optimization'}) }}
+            {% call native_select_wrapper(class='w-full') %}{% call native_select(id='license_optimization', name='license_optimization', class='w-full') %}
+              {{ native_select_option('Not set', value='') }}
+              {{ native_select_option('High - Significant unused licenses', value='high') }}
+              {{ native_select_option('Medium - Some optimization possible', value='medium') }}
+              {{ native_select_option('Low - Well optimized', value='low') }}
+              {{ native_select_option('None - No licenses required', value='none') }}
+            {% endcall %}{% endcall %}
+          {% endcall %}
         </div>
       </div>
     </div>
@@ -277,43 +189,23 @@
           Vendor Risk Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Vendor Financial Health</label>
-            <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="vendor_health" value="strong" class="hidden peer" aria-label="Vendor Health">
-                <div class="peer-checked:text-primary font-medium">Strong</div>
-                <div class="text-xs text-muted-foreground">Stable, growing</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="vendor_health" value="stable" class="hidden peer" aria-label="Vendor Health">
-                <div class="peer-checked:text-primary font-medium">Stable</div>
-                <div class="text-xs text-muted-foreground">No concerns</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="vendor_health" value="at_risk" class="hidden peer" aria-label="Vendor Health">
-                <div class="peer-checked:text-primary font-medium">At Risk</div>
-                <div class="text-xs text-muted-foreground">Some concerns</div>
-              </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
-                <input type="radio" name="vendor_health" value="critical" class="hidden peer" aria-label="Vendor Health">
-                <div class="peer-checked:text-primary font-medium">Critical</div>
-                <div class="text-xs text-muted-foreground">High risk</div>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='vendor_health', label='Vendor Financial Health', inline=false, options=[
+            {'value': 'strong', 'label': 'Strong', 'description': 'Stable, growing'},
+            {'value': 'stable', 'label': 'Stable', 'description': 'No concerns'},
+            {'value': 'at_risk', 'label': 'At Risk', 'description': 'Some concerns'},
+            {'value': 'critical', 'label': 'Critical', 'description': 'High risk'}]) }}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Contract Status</label>
-            <select name="contract_status" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Contract Status">
-              <option value="">Select...</option>
-              <option value="long_term">Long-term contract (3+ years)</option>
-              <option value="medium_term">Medium-term (1-3 years)</option>
-              <option value="short_term">Short-term (&lt; 1 year)</option>
-              <option value="expiring">Expiring soon</option>
-              <option value="no_contract">No contract / Open source</option>
-            </select>
-          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='Contract Status', attrs={'for': 'contract_status'}) }}
+            {% call native_select_wrapper(class='w-full') %}{% call native_select(id='contract_status', name='contract_status', class='w-full') %}
+              {{ native_select_option('Not set', value='') }}
+              {{ native_select_option('Long-term contract (3+ years)', value='long_term') }}
+              {{ native_select_option('Medium-term (1-3 years)', value='medium_term') }}
+              {{ native_select_option('Short-term (< 1 year)', value='short_term') }}
+              {{ native_select_option('Expiring soon', value='expiring') }}
+              {{ native_select_option('No contract / Open source', value='no_contract') }}
+            {% endcall %}{% endcall %}
+          {% endcall %}
         </div>
       </div>
     </div>
@@ -326,45 +218,32 @@
           Dependencies &amp; Duplication
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Are there duplicate/similar applications?</label>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2">
-                <input type="radio" name="has_duplicates" value="yes" class="w-4 h-4" aria-label="Has Duplicates">
-                <span>Yes</span>
-              </label>
-              <label class="flex items-center gap-2">
-                <input type="radio" name="has_duplicates" value="no" class="w-4 h-4" aria-label="Has Duplicates">
-                <span>No</span>
-              </label>
-              <label class="flex items-center gap-2">
-                <input type="radio" name="has_duplicates" value="unknown" class="w-4 h-4" aria-label="Has Duplicates">
-                <span>Unknown</span>
-              </label>
-            </div>
-          </div>
+          {{ radio_group(name='has_duplicates', label='Are there duplicate/similar applications?', inline=true, options=[
+            {'value': 'yes', 'label': 'Yes'},
+            {'value': 'no', 'label': 'No'},
+            {'value': 'unknown', 'label': 'Unknown'}]) }}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Integration Complexity</label>
-            <select name="integration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Integration Complexity">
-              <option value="">Select...</option>
-              <option value="high">High - Many critical integrations</option>
-              <option value="medium">Medium - Some integrations</option>
-              <option value="low">Low - Few integrations</option>
-              <option value="none">None - Standalone</option>
-            </select>
-          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='Integration Complexity', attrs={'for': 'integration_complexity'}) }}
+            {% call native_select_wrapper(class='w-full') %}{% call native_select(id='integration_complexity', name='integration_complexity', class='w-full') %}
+              {{ native_select_option('Not set', value='') }}
+              {{ native_select_option('High - Many critical integrations', value='high') }}
+              {{ native_select_option('Medium - Some integrations', value='medium') }}
+              {{ native_select_option('Low - Few integrations', value='low') }}
+              {{ native_select_option('None - Standalone', value='none') }}
+            {% endcall %}{% endcall %}
+          {% endcall %}
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Data Migration Complexity</label>
-            <select name="data_migration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Data Migration Complexity">
-              <option value="">Select...</option>
-              <option value="simple">Simple - Standard data formats</option>
-              <option value="moderate">Moderate - Some transformation needed</option>
-              <option value="complex">Complex - Heavy transformation</option>
-              <option value="very_complex">Very Complex - Legacy data formats</option>
-            </select>
-          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='Data Migration Complexity', attrs={'for': 'data_migration_complexity'}) }}
+            {% call native_select_wrapper(class='w-full') %}{% call native_select(id='data_migration_complexity', name='data_migration_complexity', class='w-full') %}
+              {{ native_select_option('Not set', value='') }}
+              {{ native_select_option('Simple - Standard data formats', value='simple') }}
+              {{ native_select_option('Moderate - Some transformation needed', value='moderate') }}
+              {{ native_select_option('Complex - Heavy transformation', value='complex') }}
+              {{ native_select_option('Very Complex - Legacy data formats', value='very_complex') }}
+            {% endcall %}{% endcall %}
+          {% endcall %}
         </div>
       </div>
     </div>
@@ -390,15 +269,9 @@
 
     <!-- Navigation -->
     <div class="flex justify-between pt-4">
-      <button type="button" id="prev-btn" class="px-4 py-2 border rounded-md hover:bg-accent hidden" aria-label="Go to previous step">
-        <i data-lucide="arrow-left" class="h-4 w-4 inline mr-1" aria-hidden="true"></i> Previous
-      </button>
-      <button type="button" id="next-btn" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 ml-auto" aria-label="Go to next step">
-        Next <i data-lucide="arrow-right" class="h-4 w-4 inline ml-1" aria-hidden="true"></i>
-      </button>
-      <button type="submit" id="submit-btn" class="px-4 py-2 bg-success text-primary-foreground rounded-md hover:bg-success ml-auto hidden" aria-label="Submit assessment">
-        <i data-lucide="save" class="h-4 w-4 inline mr-1" aria-hidden="true"></i> Submit Assessment
-      </button>
+      {{ ui.button(type='button', text='Previous', variant='outline', id='prev-btn', class='hidden', attrs={'aria-label': 'Go to previous step'}) }}
+      {{ ui.button(type='button', text='Next', id='next-btn', class='ml-auto', attrs={'aria-label': 'Go to next step'}) }}
+      {{ ui.button(text='Submit Assessment', type='submit', id='submit-btn', class='ml-auto hidden', attrs={'aria-label': 'Submit assessment'}) }}
     </div>
   </form>
 </div>
@@ -407,8 +280,16 @@
 let currentStep = 1;
 const totalSteps = 6;
 
+function setProgress(trackId, indicatorId, pct) {
+  const track = document.getElementById(trackId);
+  const indicator = document.getElementById(indicatorId);
+  track.setAttribute('aria-valuenow', Math.round(pct));
+  indicator.setAttribute('data-value', Math.round(pct));
+  indicator.style.transform = `translateX(-${100 - pct}%)`;
+}
+
 function updateProgress() {
-  document.getElementById('progress-bar').style.width = `${(currentStep / totalSteps) * 100}%`;
+  setProgress('progress-bar', 'progress-indicator', (currentStep / totalSteps) * 100);
   document.getElementById('progress-text').textContent = `Step ${currentStep} of ${totalSteps}`;
 
   document.querySelectorAll('.questionnaire-step').forEach((step, idx) => {
@@ -491,18 +372,13 @@ function renderReadinessCard(readiness) {
 
   // Progress bar
   const pctVal = Math.round((readiness.readiness_score || 0) * 100);
-  bar.style.width = `${pctVal}%`;
-  bar.className = `h-2 rounded-full transition-[width] duration-500 ease-in-out ${pctVal >= 75 ? 'bg-success' : pctVal >= 50 ? 'bg-warning' : 'bg-destructive'}`;
+  setProgress('readiness-track', 'readiness-bar', pctVal);
   pct.textContent = `${pctVal}%`;
 
   // Badge
   const isReady = readiness.is_decision_ready;
   badge.textContent = isReady ? 'Decision Ready' : 'Incomplete Evidence';
-  badge.className = `inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${
-    isReady
-      ? 'bg-success/10 text-success border-success/30'
-      : 'bg-warning/10 text-warning border-warning/30'
-  }`;
+  badge.setAttribute('data-variant', isReady ? 'secondary' : 'outline');
 
   // Warning banner
   warning.classList.toggle('hidden', isReady);
@@ -524,8 +400,8 @@ document.getElementById('application-select').addEventListener('change', async (
     const data = await Platform.fetch.post(`/dashboard/api/rationalization/calculate/${appId}`, null, { silent: true });
     // Platform.fetch returns parsed data directly; success structure is same
     if (data.success) {
-      document.getElementById('current-score').textContent = data.data.overall_score || 'N/A';
-      document.getElementById('current-action').textContent = data.data.time_action || 'N/A';
+      document.getElementById('current-score').textContent = data.data.overall_score || 'Not scored';
+      document.getElementById('current-action').textContent = data.data.time_action || 'Not set';
       document.getElementById('last-assessed').textContent = new Date().toLocaleDateString();
       document.getElementById('app-details').classList.remove('hidden');
       // Render readiness card if the API returns readiness data
@@ -536,7 +412,7 @@ document.getElementById('application-select').addEventListener('change', async (
   }
 });
 
-document.querySelector('input[name="user_satisfaction"]').addEventListener('input', (e) => {
+document.getElementById('user_satisfaction').addEventListener('input', (e) => {
   document.getElementById('satisfaction-value').textContent = e.target.value;
 });
 

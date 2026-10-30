@@ -1,23 +1,12 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/modal_form.html' import modal_form %}
+{% from 'components/radio_group.html' import radio_group %}
 
 {% block title %}Data Validation - Response Comparison{% endblock %}
-
-{% block head %}
-<style>
-  .comparison-row { transition: all 0.2s; }
-  .comparison-row:hover { background: hsl(var(--accent)); }
-  .value-diff { background: hsl(var(--destructive)/0.1); border-left: 3px solid hsl(var(--destructive)); }
-  .value-match { background: hsl(var(--success)/0.1); border-left: 3px solid hsl(var(--success)); }
-  .source-badge { font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; }
-  .source-abacus { background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); }
-  .source-manual { background: hsl(var(--amber-500)/0.1); color: hsl(var(--amber-600)); }
-  .source-assessment { background: hsl(var(--green-500)/0.1); color: hsl(var(--green-600)); }
-  .conflict-indicator { animation: pulse 2s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-</style>
-{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -25,15 +14,11 @@
   <div class="mb-8">
     {% macro _ps_actions() %}
 <div class="flex gap-3">
-        <select id="app-selector" class="px-3 py-2 border rounded-md" @change="loadComparison()" aria-label="Select Application...">
-          <option value="">Select Application...</option>
-          {% for app in applications %}
-          <option value="{{ app.id }}">{{ app.name }}</option>
-          {% endfor %}
-        </select>
-        <button type="button" @click="resolveAllConflicts()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" id="resolve-all-btn" disabled>
-          Resolve All
-        </button>
+        {% call native_select_wrapper(class='w-64') %}{% call native_select(id='app-selector', class='w-64', attrs={'aria-label': 'Select application'}) %}
+          {{ native_select_option('Select application…', value='') }}
+          {% for app in applications %}{{ native_select_option(app.name, value=app.id) }}{% endfor %}
+        {% endcall %}{% endcall %}
+        {{ ui.button(type='button', text='Resolve All', id='resolve-all-btn', disabled=true) }}
       </div>
     {% endmacro %}
     {{ page_shell(title='Response Validation', breadcrumb=[('Home', '/'), ('Rationalization', url_for('dashboard_pages.rationalization_scorecard')), ('Response Validation', none)], subtitle='Compare and resolve data discrepancies between sources', actions_caller=_ps_actions) }}
@@ -41,95 +26,88 @@
 
   <!-- Summary Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    {{ metrics_card(title='Total Fields', value='-', value_id='total-fields', icon='list', description='Compared fields') }}
-    {{ metrics_card(title='Matched', value='-', value_id='matched-fields', icon='check-circle', value_class='text-success', description='Values in agreement') }}
-    {{ metrics_card(title='Conflicts', value='-', value_id='conflict-fields', icon='alert-triangle', value_class='text-warning', description='Requires resolution') }}
-    {{ metrics_card(title='Missing Data', value='-', value_id='missing-fields', icon='database', value_class='text-primary', description='Incomplete values') }}
+    {% call ui.card() %}
+      {% call ui.card_header() %}{{ ui.card_description(text='Total Fields') }}{% call ui.card_title(class='text-2xl tabular-nums '.strip()) %}<span id="total-fields" class="text-base font-normal text-muted-foreground">Not loaded</span>{% endcall %}{% endcall %}
+      {% call ui.card_content() %}<p class="text-xs text-muted-foreground">Compared fields</p>{% endcall %}
+    {% endcall %}
+    {% call ui.card() %}
+      {% call ui.card_header() %}{{ ui.card_description(text='Matched') }}{% call ui.card_title(class='text-2xl tabular-nums text-success'.strip()) %}<span id="matched-fields" class="text-base font-normal text-muted-foreground">Not loaded</span>{% endcall %}{% endcall %}
+      {% call ui.card_content() %}<p class="text-xs text-muted-foreground">Values in agreement</p>{% endcall %}
+    {% endcall %}
+    {% call ui.card() %}
+      {% call ui.card_header() %}{{ ui.card_description(text='Conflicts') }}{% call ui.card_title(class='text-2xl tabular-nums text-warning'.strip()) %}<span id="conflict-fields" class="text-base font-normal text-muted-foreground">Not loaded</span>{% endcall %}{% endcall %}
+      {% call ui.card_content() %}<p class="text-xs text-muted-foreground">Requires resolution</p>{% endcall %}
+    {% endcall %}
+    {% call ui.card() %}
+      {% call ui.card_header() %}{{ ui.card_description(text='Missing Data') }}{% call ui.card_title(class='text-2xl tabular-nums '.strip()) %}<span id="missing-fields" class="text-base font-normal text-muted-foreground">Not loaded</span>{% endcall %}{% endcall %}
+      {% call ui.card_content() %}<p class="text-xs text-muted-foreground">Incomplete values</p>{% endcall %}
+    {% endcall %}
   </div>
 
   <!-- Data Sources Legend -->
   <div class="bg-card border border-border rounded-lg p-4 mb-6">
     <div class="flex flex-wrap items-center gap-4 text-sm">
       <span class="font-medium">Data Sources:</span>
-      <span class="source-badge source-abacus">Abacus (System of Record)</span>
-      <span class="source-badge source-manual">Manual Entry</span>
-      <span class="source-badge source-assessment">Assessment Response</span>
+      {{ ui.badge(text='Abacus (System of Record)', variant='secondary') }}
+      {{ ui.badge(text='Manual Entry', variant='outline') }}
+      {{ ui.badge(text='Assessment Response', variant='outline') }}
     </div>
   </div>
 
   <!-- Comparison Table -->
   <div class="bg-card border border-border rounded-lg overflow-hidden">
     <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Response validation">
-      <table class="dense-table w-full text-sm">
-        <thead class="bg-muted">
-          <tr>
-            <th class="text-left py-3 px-4 font-medium">Field</th>
-            <th class="text-left py-3 px-4 font-medium w-48">Abacus Value</th>
-            <th class="text-left py-3 px-4 font-medium w-48">Manual/Assessment Value</th>
-            <th class="text-center py-3 px-4 font-medium w-24">Status</th>
-            <th class="text-center py-3 px-4 font-medium w-32">Action</th>
-          </tr>
-        </thead>
-        <tbody id="comparison-body">
-          <tr>
-            <td colspan="5" class="text-center py-12 text-muted-foreground">
+      {% call ui.table() %}
+        {% call ui.table_header() %}
+          {% call ui.table_row() %}
+            {{ ui.table_head(text='Field') }}
+            {{ ui.table_head(text='Abacus Value', class='w-48') }}
+            {{ ui.table_head(text='Manual/Assessment Value', class='w-48') }}
+            {{ ui.table_head(text='Status', class='w-24 text-center') }}
+            {{ ui.table_head(text='Action', class='w-32 text-center') }}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.table_body(id='comparison-body') %}
+          {% call ui.table_row() %}
+            {% call ui.table_cell(class='py-12 text-center text-muted-foreground', attrs={'colspan': 5}) %}
               <i data-lucide="database" class="h-12 w-12 mx-auto mb-3 opacity-50" aria-hidden="true"></i>
               <p>Select an application to view data comparison</p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
+      <template id="resolve-button-template">{{ ui.button(type='button', text='Resolve', variant='link', size='sm', attrs={'data-action': 'openResolutionModal'}) }}</template>
     </div>
   </div>
 
   <!-- Resolution Modal -->
-  <div id="resolution-modal" class="modal-root items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-overlay/50" hidden  role="dialog">
-    <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
-      <h2 class="text-lg font-semibold mb-4">Resolve Conflict</h2>
-      <div class="space-y-4">
-        <div>
-          <label class="text-sm text-muted-foreground">Conflicting field</label>
-          <div id="modal-field-name" class="font-medium"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="px-3 py-2 bg-primary/10 rounded-md">
-            <div class="text-xs text-primary mb-1">Abacus</div>
-            <div id="modal-abacus-value" class="font-medium"></div>
-          </div>
-          <div class="px-3 py-2 bg-warning/10 rounded-md">
-            <div class="text-xs text-warning-emphasis mb-1">Manual/Assessment</div>
-            <div id="modal-manual-value" class="font-medium"></div>
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-2">Select Correct Value</label>
-          <div class="space-y-2">
-            <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
-              <input type="radio" name="resolution" value="abacus" class="w-4 h-4" aria-label="Resolution">
-              <span>Use Abacus value</span>
-            </label>
-            <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
-              <input type="radio" name="resolution" value="manual" class="w-4 h-4" aria-label="Resolution">
-              <span>Use Manual/Assessment value</span>
-            </label>
-            <label for="custom-value" class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
-              <input type="radio" name="resolution" value="custom" class="w-4 h-4" aria-label="Resolution">
-              <span>Enter custom value:</span>
-            </label>
-            <input type="text" id="custom-value" class="w-full rounded border px-3 py-2 hidden" placeholder="Enter value...">
-          </div>
-        </div>
-        <div>
-          <label for="resolution-notes" class="block text-sm font-medium mb-2">Resolution Notes (optional)</label>
-          <textarea id="resolution-notes" rows="2" class="w-full rounded border px-3 py-2" placeholder="Why this value was chosen..."></textarea>
-        </div>
+  {% call modal_form(id='resolution-modal', title='Resolve Conflict', submit_text='Confirm', size='sm') %}
+    <div class="space-y-6">
+      <div>
+        <p class="text-sm text-muted-foreground">Conflicting field</p>
+        <div id="modal-field-name" class="font-medium"></div>
       </div>
-      <div class="flex justify-end gap-3 mt-6">
-        <button type="button" @click="closeResolutionModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
-        <button type="button" @click="confirmResolution()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" aria-label="Confirm">Confirm</button>
-      </div>
+      <dl class="space-y-2 text-sm">
+        <div class="rounded-md border border-border px-3 py-2">
+          <dt class="text-xs text-muted-foreground">Abacus</dt>
+          <dd id="modal-abacus-value" class="font-medium"></dd>
+        </div>
+        <div class="rounded-md border border-border px-3 py-2">
+          <dt class="text-xs text-muted-foreground">Manual/Assessment</dt>
+          <dd id="modal-manual-value" class="font-medium"></dd>
+        </div>
+      </dl>
+      {{ radio_group(name='resolution', label='Select correct value', options=[
+          {'value': 'abacus', 'label': 'Use Abacus value'},
+          {'value': 'manual', 'label': 'Use Manual/Assessment value'},
+          {'value': 'custom', 'label': 'Enter custom value'}]) }}
+      {{ ui.input(id='custom-value', type='text', class='hidden', placeholder='Enter value...', attrs={'aria-label': 'Custom value'}) }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Resolution notes (optional)', attrs={'for': 'resolution-notes'}) }}
+        {{ ui.textarea(id='resolution-notes', rows=2, placeholder='Why this value was chosen...') }}
+      {% endcall %}
     </div>
-  </div>
+  {% endcall %}
 </div>
 
 <script>
@@ -147,7 +125,7 @@ async function loadComparison() {
   if (!appId) {
     document.getElementById('comparison-body').innerHTML = `
       <tr>
-        <td colspan="5" class="text-center py-12 text-muted-foreground">
+        <td colspan="5" class="p-12 text-center text-muted-foreground">
           <i data-lucide="database" class="h-12 w-12 mx-auto mb-3 opacity-50" aria-hidden="true"></i>
           <p>Select an application to view data comparison</p>
         </td>
@@ -179,33 +157,32 @@ function renderComparison(comparisons) {
   const tbody = document.getElementById('comparison-body');
 
   if (!comparisons.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-muted-foreground">No data available</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-muted-foreground">No fields to compare for this application.</td></tr>';
     return;
   }
 
   tbody.innerHTML = comparisons.map((item, idx) => {
-    const statusClass = item.status === 'conflict' ? 'value-diff' : (item.status === 'match' ? 'value-match' : '');
+    const statusClass = item.status === 'conflict' ? 'border-l-2 border-l-destructive bg-destructive/10' : (item.status === 'match' ? 'border-l-2 border-l-success bg-success/10' : '');
     const statusIcon = item.status === 'conflict'
       ? '<i data-lucide="alert-triangle" class="h-4 w-4 text-warning" aria-hidden="true"></i>'
       : (item.status === 'match' ? '<i data-lucide="check-circle" class="h-4 w-4 text-success" aria-hidden="true"></i>' : '<i data-lucide="help-circle" class="h-4 w-4 text-primary" aria-hidden="true"></i>');
+    const resolveButton = document.getElementById('resolve-button-template').innerHTML
+      .replace('data-action="openResolutionModal"', 'data-action="openResolutionModal" data-id="' + idx + '"');
 
     return `
-      <tr class="comparison-row border-b ${statusClass}" data-idx="${idx}">
-        <td class="py-3 px-4 font-medium">${escapeHtml(item.field)}</td>
-        <td class="py-3 px-4">
-          <span class="source-badge source-abacus mb-1 inline-block">Abacus</span>
+      <tr class="border-b transition-colors hover:bg-muted/50 ${statusClass}" data-idx="${idx}">
+        <td class="p-2 align-middle font-medium">${escapeHtml(item.field)}</td>
+        <td class="p-2 align-middle">
+          <span class="mb-1 inline-block text-xs font-medium text-muted-foreground">Abacus</span>
           <div class="text-sm ${!item.abacus_value ? 'text-muted-foreground italic' : ''}">${escapeHtml(item.abacus_value || 'Not set')}</div>
         </td>
-        <td class="py-3 px-4">
-          <span class="source-badge ${item.manual_source === 'assessment' ? 'source-assessment' : 'source-manual'} mb-1 inline-block">${item.manual_source === 'assessment' ? 'Assessment' : 'Manual'}</span>
+        <td class="p-2 align-middle">
+          <span class="mb-1 inline-block text-xs font-medium text-muted-foreground">${item.manual_source === 'assessment' ? 'Assessment' : 'Manual'}</span>
           <div class="text-sm ${!item.manual_value ? 'text-muted-foreground italic' : ''}">${escapeHtml(item.manual_value || 'Not set')}</div>
         </td>
-        <td class="py-3 px-4 text-center">${statusIcon}</td>
-        <td class="py-3 px-4 text-center">
-          ${item.status === 'conflict' ?
-            `<button type="button" data-action="openResolutionModal" data-id="${idx}" class="text-primary hover:underline text-sm">Resolve</button>` :
-            '<span class="text-muted-foreground text-sm">-</span>'
-          }
+        <td class="p-2 align-middle text-center">${statusIcon}</td>
+        <td class="p-2 align-middle text-center">
+          ${item.status === 'conflict' ? resolveButton : '<span class="text-muted-foreground text-sm">Not needed</span>'}
         </td>
       </tr>
     `;
@@ -215,10 +192,15 @@ function renderComparison(comparisons) {
 }
 
 function updateStats(stats) {
-  document.getElementById('total-fields').textContent = stats.total;
-  document.getElementById('matched-fields').textContent = stats.matched;
-  document.getElementById('conflict-fields').textContent = stats.conflicts;
-  document.getElementById('missing-fields').textContent = stats.missing;
+  const show = (id, value) => {
+    const el = document.getElementById(id);
+    el.textContent = value;
+    el.className = '';
+  };
+  show('total-fields', stats.total);
+  show('matched-fields', stats.matched);
+  show('conflict-fields', stats.conflicts);
+  show('missing-fields', stats.missing);
 }
 
 function openResolutionModal(idx) {
@@ -338,9 +320,14 @@ async function resolveAllConflicts() {
   }
 }
 
-// Close modal on backdrop click
-document.getElementById('resolution-modal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeResolutionModal();
+// The page's own controls: a plain script has no Alpine scope to call a global from an attribute.
+document.getElementById('app-selector').addEventListener('change', loadComparison);
+document.getElementById('resolve-all-btn').addEventListener('click', resolveAllConflicts);
+
+// The modal's own form submits: confirm the resolution instead of posting the page.
+document.getElementById('resolution-modal-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  confirmResolution();
 });
 
 // Initialize

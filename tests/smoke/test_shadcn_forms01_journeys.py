@@ -481,3 +481,135 @@ def test_architect_reviews_what_an_import_guessed_retypes_and_confirms(browser, 
         assert not [e for e in errors if "pageerror" in e], errors
     finally:
         page.close()
+
+
+def test_application_manager_completes_the_rationalization_assessment(browser, live_server):
+    org = create_fresh_org("application_manager", org_admin=True)
+    from app import create_app, db
+    from app.models.application_layer import ApplicationComponent
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(ApplicationComponent(name="Legacy ledger", organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["application_manager"])
+        _open(page, live_server, "/dashboard/rationalization/assessment")
+        expect(page.locator("#progress-text")).to_have_text("Step 1 of 6")
+        _shoot(page, "rationalization-assessment")
+        page.locator("#application-select").select_option(label="Legacy ledger (Type not set)")
+        expect(page.locator("#app-details")).to_be_visible()
+        # Walk the six steps: answer one question per step, then submit from the keyboard-reachable button.
+        page.get_by_label("Monolithic").check()
+        page.locator("#deployment_frequency").select_option("weekly")
+        page.get_by_role("button", name="Go to next step").click()
+        expect(page.locator("#progress-text")).to_have_text("Step 2 of 6")
+        page.locator(".questionnaire-step[data-step=\"2\"]").get_by_label("High", exact=True).check()
+        page.locator("#user_satisfaction").fill("7")
+        page.get_by_role("button", name="Go to next step").click()
+        page.get_by_role("button", name="Go to next step").click()
+        page.get_by_role("button", name="Go to next step").click()
+        page.get_by_role("button", name="Go to next step").click()
+        expect(page.locator("#progress-text")).to_have_text("Step 6 of 6")
+        expect(page.get_by_role("button", name="Submit assessment")).to_be_visible()
+        page.get_by_role("button", name="Submit assessment").click()
+        page.wait_for_url("**/dashboard/rationalization", timeout=PAGE_TIMEOUT)
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
+
+
+def test_application_manager_compares_an_applications_data_and_resolves_a_conflict(browser, live_server):
+    org = create_fresh_org("application_manager", org_admin=True)
+    from app import create_app, db
+    from app.models.application_layer import ApplicationComponent
+
+    app = create_app("testing")
+    with app.app_context():
+        comp = ApplicationComponent(name="Legacy ledger", organization_id=org["org_id"], description="General ledger")
+        db.session.add(comp)
+        db.session.commit()
+        app_id = comp.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["application_manager"])
+        _open(page, live_server, "/dashboard/rationalization/validate")
+        expect(page.locator("#total-fields")).to_have_text("Not loaded")
+        _shoot(page, "response-validation")
+        expect(page.get_by_role("button", name="Resolve All")).to_be_disabled()
+        page.locator("#app-selector").select_option(str(app_id))
+        # Ten fields are compared; the stat cards and the table agree.
+        expect(page.locator("#total-fields")).to_have_text("10")
+        expect(page.locator("#comparison-body tr")).to_have_count(10)
+        expect(page.locator("#comparison-body tr").first.locator("td")).to_have_count(5)
+        expect(page.locator("#comparison-body")).to_contain_text("General ledger")
+        expect(page.locator("#comparison-body")).to_contain_text("Not set")
+        # No stored application carries a second source for a field today, so the conflict path is staged in
+        # the page's own data: the modal, its choices and the save call are the real ones.
+        page.evaluate("""() => {
+            comparisonData[1].manual_value = 'The general ledger'; comparisonData[1].status = 'conflict';
+            renderComparison(comparisonData);
+        }""")
+        page.get_by_role("button", name="Resolve", exact=True).click()
+        dialog = page.get_by_role("dialog")
+        expect(dialog).to_be_visible()
+        expect(dialog).to_contain_text("Description")
+        dialog.get_by_role("button", name="Confirm").click()
+        expect(page.locator("#comparison-body")).to_contain_text("General ledger")  # nothing chosen: modal stays
+        expect(dialog).to_be_visible()
+        dialog.get_by_label("Use Manual/Assessment value").check()
+        dialog.get_by_label("Resolution notes (optional)").fill("The manual wording is the current one")
+        dialog.get_by_role("button", name="Confirm").click()
+        expect(dialog).to_be_hidden()
+        # The choice was written to the application.
+        _open(page, live_server, "/dashboard/rationalization/validate")
+        page.locator("#app-selector").select_option(str(app_id))
+        expect(page.locator("#comparison-body")).to_contain_text("The general ledger")
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
+
+
+def test_architect_reads_the_vision_deliverable_editor(browser, live_server):
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    from app import create_app, db
+    from app.models.workflow_models import EAWorkflowDefinition
+
+    app = create_app("testing")
+    created_definition = None
+    with app.app_context():
+        # The Phase A workflow is not part of the seed, so the editor would show its not-configured page.
+        if EAWorkflowDefinition.query.filter_by(workflow_code="ADM_PHASE_A_VISION").first() is None:
+            definition = EAWorkflowDefinition(workflow_code="ADM_PHASE_A_VISION", workflow_name="Architecture Vision",
+                                              workflow_category="adm", steps=[], is_active=True)
+            db.session.add(definition)
+            db.session.commit()
+            created_definition = definition.id
+        db.session.remove()
+    page = browser.new_page()
+    try:
+        errors = _watch(page)
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        _open(page, live_server, "/ea-workflows/deliverables/vision?project_name=Customer%20platform")
+        editor = page.locator("[data-testid=deliverable-editor-page]")
+        expect(editor).to_be_visible()
+        expect(editor).to_contain_text("Readiness Summary")
+        _shoot(page, "deliverable-editor")
+        expect(page.get_by_role("heading", name="Customer platform").first).to_be_visible()
+        # The three actions are stated as not available yet and cannot be pressed.
+        for name in ("Save Draft", "Submit for Review", "Export"):
+            expect(page.get_by_role("button", name=name)).to_be_disabled()
+        first_field = editor.locator("input[disabled]").first
+        expect(first_field).to_be_disabled()
+        assert not [e for e in errors if "pageerror" in e], errors
+    finally:
+        page.close()
+        if created_definition is not None:
+            with app.app_context():
+                db.session.query(EAWorkflowDefinition).filter_by(id=created_definition).delete()
+                db.session.commit()

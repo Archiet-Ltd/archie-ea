@@ -1,4 +1,6 @@
+{# design-block: form #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from "components/page_header.html" import page_header %}
 
 {% block title %}{{ deliverable_title }}{% endblock %}
@@ -20,7 +22,7 @@
 ) }}
 
 <div class="space-y-6" data-testid="deliverable-editor-page">
-    <div class="rounded-xl border-2 border-input bg-background p-6">
+    <div class="rounded-xl border border-border bg-card p-6">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div class="space-y-3">
                 <div class="flex flex-wrap items-center gap-2">
@@ -54,18 +56,9 @@
                 </div>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center cursor-not-allowed" disabled title="Save Draft — coming soon">
-                    <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
-                    Save Draft
-                </button>
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center cursor-not-allowed" disabled title="Submit for Review — coming soon" data-testid="submit-for-review-button">
-                    <i data-lucide="badge-check" class="h-4 w-4" aria-hidden="true"></i>
-                    Submit for Review
-                </button>
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center cursor-not-allowed" disabled title="Export — coming soon" data-testid="deliverable-export-button">
-                    <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
-                    Export
-                </button>
+                {{ ui.button(type='button', text='Save Draft', variant='outline', disabled=true, attrs={'title': 'Save Draft is not available yet'}) }}
+                {{ ui.button(type='button', text='Submit for Review', variant='outline', disabled=true, attrs={'title': 'Submit for Review is not available yet', 'data-testid': 'submit-for-review-button'}) }}
+                {{ ui.button(type='button', text='Export', variant='outline', disabled=true, attrs={'title': 'Export is not available yet', 'data-testid': 'deliverable-export-button'}) }}
             </div>
         </div>
     </div>
@@ -73,7 +66,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div class="xl:col-span-2 space-y-4">
             {% for section in sections %}
-            <section class="rounded-xl border-2 border-input bg-background p-6" data-testid="deliverable-section-{{ section.key }}">
+            <section class="rounded-xl border border-border bg-card p-6" data-testid="deliverable-section-{{ section.key }}">
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div>
                         <div class="flex items-center gap-2 flex-wrap">
@@ -96,8 +89,10 @@
                         <div class="space-y-3">
                             {% for field_key, field_value in section.fields.items() %}
                             <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">{{ field_key|replace("_", " ")|title }}</label>
-                                <input aria-label="{{ field_key|replace('_', ' ')|title }}" type="text" value="{{ field_value or '' }}" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" disabled>
+                                {% call ui.field() %}
+                                    {{ ui.field_label(text=field_key|replace("_", " ")|title, attrs={'for': 'field-' ~ section.key ~ '-' ~ field_key}) }}
+                                    {{ ui.input(id='field-' ~ section.key ~ '-' ~ field_key, type='text', value=(field_value or ''), disabled=true) }}
+                                {% endcall %}
                             </div>
                             {% endfor %}
                         </div>
@@ -133,7 +128,7 @@
         </div>
 
         <aside class="space-y-4">
-            <div class="rounded-xl border-2 border-input bg-background p-5" data-testid="deliverable-readiness-panel">
+            <div class="rounded-xl border border-border bg-card p-5" data-testid="deliverable-readiness-panel">
                 <h2 class="text-lg font-semibold mb-3">Readiness Summary</h2>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="rounded-lg bg-muted/40 p-3 text-center"><p class="text-2xl font-bold">{{ readiness_summary.total_sections }}</p><p class="text-xs text-muted-foreground mt-1">Total sections</p></div>
@@ -159,7 +154,7 @@
                 </div>
             </div>
 
-            <div class="rounded-xl border-2 border-input bg-background p-5" data-testid="deliverable-traceability-panel">
+            <div class="rounded-xl border border-border bg-card p-5" data-testid="deliverable-traceability-panel">
                 <h2 class="text-lg font-semibold mb-3">Traceability Panel</h2>
                 <p class="text-sm text-muted-foreground">{{ traceability_view.total_refs }} source reference{{ '' if traceability_view.total_refs == 1 else 's' }} captured across the deliverable.</p>
                 <div class="mt-4 space-y-3">
@@ -174,7 +169,7 @@
                 </div>
             </div>
 
-            <div class="rounded-xl border-2 border-input bg-background p-5" data-testid="deliverable-handoff-panel">
+            <div class="rounded-xl border border-border bg-card p-5" data-testid="deliverable-handoff-panel">
                 <h2 class="text-lg font-semibold mb-3">ADM Phase Handoffs</h2>
                 <p class="text-sm text-muted-foreground">{{ handoff_view.ready_targets }} downstream deliverable{{ '' if handoff_view.ready_targets == 1 else 's' }} currently ready to inherit Vision outputs.</p>
                 <div class="mt-4 space-y-3">

@@ -1,105 +1,76 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}Custom Field Management{% endblock %}
+{% block title %}{{ 'Edit custom field' if field else 'New custom field' }}{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <div class="max-w-4xl mx-auto">
-        <!-- Header -->
-        <div class="mb-8">
-            {% macro _ps_actions() %}
-<a href="{{ url_for('unified_applications.application_list') }}"
-                   class="inline-flex items-center px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2" aria-hidden="true"></i>
-                    Back to Applications
-                </a>
-            {% endmacro %}
-            {{ page_shell(title='Custom Field Management', breadcrumb=[('Home', '/'), ('Custom Field Management', none)], subtitle='Manage custom fields for applications', actions_caller=_ps_actions) }}
-        </div>
+<div class="p-6 space-y-6">
+    {{ page_shell(title=('Edit custom field' if field else 'New custom field'),
+                  subtitle='A custom field is one more fact every application can carry.',
+                  breadcrumb=[('Home', '/'), ('Custom fields', url_for('application_mgmt.custom_fields_list')), (('Edit' if field else 'New'), none)]) }}
 
-        <!-- Custom Field Form -->
-        <div class="bg-card rounded-lg border border-border p-6">
-            <form method="POST" action="{{ request.path }}">
-                {{ form.hidden_tag() }}
-                
-                <!-- Field Name -->
-                <div class="mb-6">
-                    {{ form.field_name.label(class="block text-sm font-medium text-foreground mb-2") }}
-                    {{ form.field_name(class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring") }}
-                    {% if form.field_name.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.field_name.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
+    <div class="max-w-2xl">
+        {% call ui.card() %}
+        <form method="POST" action="{{ request.path }}" class="space-y-6 px-6" data-testid="custom-field-form">
+            {{ hidden_input('csrf_token', csrf_token()) }}
 
-                <!-- Field Type -->
-                <div class="mb-6">
-                    {{ form.field_type.label(class="block text-sm font-medium text-foreground mb-2") }}
-                    {{ form.field_type(class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring") }}
-                    {% if form.field_type.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.field_type.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
+            {% call ui.field_set() %}
+                {{ ui.field_legend(text='Definition') }}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Label *', attrs={'for': 'field_label'}) }}
+                    {{ ui.input(id='field_label', name='field_label', type='text', required=true, maxlength=255, value=(field.field_label if field else '')) }}
+                    {{ ui.field_description(text='What people see beside the value.') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Field name *', attrs={'for': 'field_name'}) }}
+                    {{ ui.input(id='field_name', name='field_name', type='text', required=true, maxlength=64, autocomplete='off', value=(field.field_name if field else ''), attrs={'pattern': '[a-zA-Z][a-zA-Z0-9_]{0,63}'}) }}
+                    {{ ui.field_description(text='Starts with a letter; letters, digits and underscores only.') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Type', attrs={'for': 'field_type'}) }}
+                    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='field_type', name='field_type', class='w-full') %}
+                        {% for t in ['text', 'textarea', 'number', 'integer', 'float', 'date', 'boolean', 'select', 'multiselect', 'url', 'email'] %}{{ native_select_option(t|capitalize, value=t, selected=((field.field_type if field else 'text') == t)) }}{% endfor %}
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Choices', attrs={'for': 'options'}) }}
+                    {{ ui.textarea(id='options', name='options', rows=3, text=(field.get_options()|join('\n') if field and field.get_options() else '')) }}
+                    {{ ui.field_description(text='For a select or multiselect type: one choice per line.') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Help text', attrs={'for': 'help_text'}) }}
+                    {{ ui.textarea(id='help_text', name='help_text', rows=3, text=(field.help_text if field and field.help_text else '')) }}
+                {% endcall %}
+            {% endcall %}
 
-                <!-- Field Description -->
-                <div class="mb-6">
-                    {{ form.description.label(class="block text-sm font-medium text-foreground mb-2") }}
-                    {{ form.description(class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring", rows="3") }}
-                    {% if form.description.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.description.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
+            {{ ui.field_separator() }}
 
-                <!-- Required Field -->
-                <div class="mb-6">
-                    <div class="flex items-center">
-                        {{ form.required(class="h-4 w-4 text-primary focus:ring-primary border-border rounded") }}
-                        {{ form.required.label(class="ml-2 block text-sm text-foreground") }}
-                    </div>
-                    {% if form.required.errors %}
-                        <div class="mt-1 text-sm text-destructive-emphasis">
-                            {% for error in form.required.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
+            {% call ui.field_set() %}
+                {{ ui.field_legend(text='Where it shows') }}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Group', attrs={'for': 'field_group'}) }}
+                    {{ ui.input(id='field_group', name='field_group', type='text', value=(field.field_group if field and field.field_group else '')) }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Display order', attrs={'for': 'display_order'}) }}
+                    {{ ui.input(id='display_order', name='display_order', type='number', value=(field.display_order if field and field.display_order is not none else 0), attrs={'min': 0}) }}
+                {% endcall %}
+                {{ checkbox(id='is_required', name='is_required', label='Required', description='An application cannot be saved without a value.', checked=(field.is_required if field else false)) }}
+                {{ checkbox(id='is_searchable', name='is_searchable', label='Searchable', description='Search finds applications by this value.', checked=(field.is_searchable if field else true)) }}
+                {{ checkbox(id='is_shown_in_list', name='is_shown_in_list', label='Show in the application list', checked=(field.is_shown_in_list if field else false)) }}
+            {% endcall %}
 
-                <!-- Submit Buttons -->
-                <div class="flex items-center justify-end space-x-4">
-                    <a href="{{ url_for('unified_applications.application_list') }}"
-                       class="px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-                        Cancel
-                    </a>
-                    <button type="submit"
-                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-                        Save Custom Field
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Existing Custom Fields -->
-        <div class="mt-8">
-            <h2 class="text-lg font-semibold text-foreground mb-4">Existing Custom Fields</h2>
-            <div class="bg-card rounded-lg border border-border">
-                <div class="p-4">
-                    <p class="text-muted-foreground text-sm">No custom fields defined yet.</p>
-                </div>
+            <div class="flex items-center justify-end gap-3">
+                {{ ui.button(text='Cancel', variant='outline', href=url_for('application_mgmt.custom_fields_list')) }}
+                {{ ui.button(text=('Save changes' if field else 'Create custom field'), type='submit') }}
             </div>
-        </div>
+        </form>
+        {% endcall %}
     </div>
 </div>
 {% endblock %}

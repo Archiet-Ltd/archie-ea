@@ -13044,7 +13044,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -13104,7 +13104,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/custom-field-form.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -13113,7 +13113,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -13254,7 +13254,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -13314,7 +13314,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/rationalization-assessment.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -13323,7 +13323,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -13362,7 +13362,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -13378,7 +13378,9 @@
     "page-shell",
     "select",
     "card",
-    "table"
+    "table",
+    "dialog",
+    "radio-group"
    ],
    "confidence": "low",
    "controls": {
@@ -13427,7 +13429,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/response-validation.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -13437,7 +13439,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -29583,7 +29585,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "form",
    "charts": [],
    "components": [
@@ -29643,7 +29645,7 @@
      "image": "docs/design/reference/basecoat-form.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/deliverable-editor.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -29653,7 +29655,7 @@
     "export-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
