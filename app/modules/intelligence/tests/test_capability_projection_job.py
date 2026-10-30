@@ -109,7 +109,7 @@ def cleanup(db):
 
 
 def _ensure_provenance_index(db):
-    """T-cap-prov-index-01: the index is now declared on the model
+    """The index is now declared on the model
     (``UnifiedCapability.__table_args__``) and created by migration
     ``20261029_cap_prov_index``, so every database this
     test suite runs against -- whether built by ``db.create_all()`` or by the
@@ -122,8 +122,8 @@ def _ensure_provenance_index(db):
     with db.engine.connect() as conn:
         assert _has_provenance_index(conn), (
             f"{PROVENANCE_INDEX} is absent on this database -- it must be present "
-            "unconditionally after T-cap-prov-index-01 (declared on the model and "
-            "created by db.create_all() and by the migration chain alike)"
+            "unconditionally -- it is declared on the model and "
+            "created by db.create_all() and by the migration chain alike"
         )
 
 

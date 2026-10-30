@@ -352,7 +352,7 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
                 "organization_id IS NOT NULL AND archimate_id IS NOT NULL"
             ),
         ),
-        # T-cap-prov-index-01: the provenance natural key the write-time ON
+        # The provenance natural key the write-time ON
         # CONFLICT (source_table, source_id) arbiter in
         # app/commands/project_capabilities.py requires. Previously created
         # only by scripts/migrate_unified_capability_provenance.sql via the

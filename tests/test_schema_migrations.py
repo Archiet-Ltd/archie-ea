@@ -288,7 +288,7 @@ def test_upgrade_on_an_empty_database_builds_the_full_schema(scratch_databases, 
 
 
 def test_create_all_and_chain_upgrade_both_carry_the_provenance_index(scratch_databases):
-    """T-cap-prov-index-01, acceptance criterion 1.
+    """The unified-capability provenance index must be created by both build paths.
 
     Before this change, ``uq_unified_capabilities_provenance`` existed only
     via the separate ``apply-unified-capability-provenance-migration``

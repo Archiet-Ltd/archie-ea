@@ -17,7 +17,7 @@ does). The SQL itself is idempotent (`CREATE UNIQUE INDEX IF NOT EXISTS`,
 wrapped in its own `BEGIN/COMMIT`) — this command re-applies it safely on every
 deploy.
 
-T-cap-prov-index-01: the index is now also declared on
+The index is now also declared on
 `UnifiedCapability.__table_args__` and created by migration
 `20261029_cap_prov_index`, so on every database this
 command now runs against, the index is usually already there (from
