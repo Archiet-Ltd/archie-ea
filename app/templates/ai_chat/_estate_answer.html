@@ -162,7 +162,7 @@
                count at the top of the page): every number and date here says so, so the
                two never read as one disagreeing figure. #}
             <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
-                <div><dt class="text-muted-foreground">Last worked out</dt><dd class="text-foreground" data-derivation-last-run>{{ last.finished_at | format_datetime('%d %b %Y, %H:%M') if last and last.finished_at else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">Last worked out</dt><dd class="text-foreground" data-derivation-last-run>{{ (recorded_text(last.finished_at) or '—') if last and last.finished_at else '—' }}</dd></div>
                 <div><dt class="text-muted-foreground">Connections across the whole model</dt><dd class="text-foreground" data-derivation-current>{{ derivation.current_count if last else '—' }}</dd></div>
                 <div><dt class="text-muted-foreground">May be out of date</dt><dd class="text-foreground" data-derivation-stale>{{ derivation.stale_count if last else '—' }}</dd></div>
             </dl>
@@ -174,7 +174,7 @@
             {% if derivation.runs %}
             <ol class="mt-2 space-y-1 text-xs text-muted-foreground" aria-label="Recent runs">
                 {% for run in derivation.runs %}
-                <li data-derivation-run>{{ run.derived_count if run.derived_count is not none else '—' }} connections across the whole model, worked out {{ run.finished_at | format_datetime('%d %b %Y, %H:%M') if run.finished_at else '—' }} ({{ run.explicit_count if run.explicit_count is not none else '—' }} relationships read)</li>
+                <li data-derivation-run>{{ run.derived_count if run.derived_count is not none else '—' }} connections across the whole model, worked out {{ (recorded_text(run.finished_at) or '—') if run.finished_at else '—' }} ({{ run.explicit_count if run.explicit_count is not none else '—' }} relationships read)</li>
                 {% endfor %}
             </ol>
             {% else %}
