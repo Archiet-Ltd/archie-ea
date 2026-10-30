@@ -86,7 +86,9 @@ def test_impact_page_matches_the_chat_and_a_reload_keeps_the_answer(browser, liv
         # Open the Impact Analysis page from the sidebar, as a person does --
         # never a dead end: an "Element Type" dropdown with nowhere to search.
         _open_from_sidebar(page, live_server)
-        expect(page.get_by_text("Choose an element to see what depends on it")).to_be_visible()
+        # One empty state, not a duplicate: the page has one call site for
+        # whichever empty state applies, not one per branch.
+        expect(page.get_by_text("Choose an element to see what depends on it")).to_have_count(1)
         _shot(page, "impact-page-no-selection-1440-light")
 
         _choose_element(page, ASKED_ELEMENT)
