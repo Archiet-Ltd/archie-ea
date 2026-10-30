@@ -19,6 +19,7 @@ import argparse
 import ipaddress
 import re
 import secrets
+import subprocess
 import sys
 import time
 from urllib.parse import urlparse
@@ -114,11 +115,16 @@ class Smoke:
         return False, last
 
     def schema(self):
-        resp = self.get("/api/health/database")
-        if resp is None or resp.status_code != 200:
-            triggers.append("schema check failed: the database health route did not answer 200")
-            return False, "database health answered %s" % (resp.status_code if resp is not None else "nothing")
-        return True, "database health answered 200"
+        resp = self.get("/health")
+        try:
+            body = resp.json() if resp is not None else {}
+        except ValueError:
+            body = {}
+        db = ((body.get("checks") or {}).get("database") or {}).get("status")
+        if resp is None or resp.status_code != 200 or db != "healthy":
+            triggers.append("schema check failed: /health does not report the database healthy (%s)" % (db or "no database check"))
+            return False, "database check reported %s" % (db or "nothing")
+        return True, "database check healthy, version %s" % (body.get("version") or "unreported")
 
     def page_ok(self, path: str):
         resp = self.get(path)
@@ -153,7 +159,20 @@ class Smoke:
             return False, "the sign-up form answered %s" % (resp.status_code if resp is not None else "nothing")
         self.accounts.append({"email": email, "user_id": None})
         if "unconfirmed" in resp.url or "confirm" in resp.url.lower():
-            return False, "the account needs an email confirmation this script cannot read: %s" % email
+            if not self.args.confirm_command:
+                return False, "the account needs an email confirmation and no --confirm-command was given: %s" % email
+            done = subprocess.run(self.args.confirm_command.replace("{email}", email), shell=True, timeout=120,  # noqa: S602
+                                  capture_output=True, text=True)
+            if done.returncode != 0:
+                return False, "the confirm command failed for %s" % email
+            link = done.stdout.strip()
+            if link.startswith("http"):
+                self.get(link[len(self.base):] if link.startswith(self.base) else link)
+            login = self.get("/account/login")
+            resp = self.send("POST", "/account/login", data={"csrf_token": self.csrf(login), "email": email,
+                                                            "password": password})
+            if resp is None or "/account/login" in resp.url:
+                return False, "signing in after confirmation did not work for %s" % email
         if "/account/login" in resp.url or "/account/register" in resp.url:
             return False, "the sign-up did not sign the new person in"
         return True, "account %s created and signed in" % email
@@ -195,7 +214,8 @@ class Smoke:
         """The data-subject pages: record an erasure request, review it, run it. Returns why it failed."""
         index = self.get("/compliance/data-subject-requests")
         if index is None or index.status_code != 200:
-            return "the erasure pages did not load"
+            return "the erasure pages answered %s for this account (they are open to the data-protection role only)" % (
+                index.status_code if index is not None else "nothing")
         m = re.search(r'<option value="(\d+)"[^>]*>\s*[^<]*%s' % re.escape(acct["email"]), index.text)
         if not m:
             return "account not listed in the erasure pages"
@@ -250,6 +270,8 @@ def main(argv=None) -> int:
     ap.add_argument("--confirm", help="the confirmation word printed in the refusal message")
     ap.add_argument("--website", default="https://example.com", help="company website to sign up with")
     ap.add_argument("--email-domain", default=EMAIL_DOMAIN, help="a domain you control for smoke+<time>@ addresses")
+    ap.add_argument("--confirm-command", help="shell command run after sign-up when email confirmation is required; "
+                    "'{email}' is replaced by the address; it may print a confirmation link to open")
     ap.add_argument("--health-timeout", type=float, default=300)
     ap.add_argument("--site-timeout", type=float, default=300)
     args = ap.parse_args(argv)

@@ -33,11 +33,7 @@ def _product(*, facts_after_site=True, erase_ok=True):
 
     @app.route("/health")
     def health():
-        return "ok"
-
-    @app.route("/api/health/database")
-    def dbhealth():
-        return jsonify({"status": "healthy"})
+        return jsonify({"status": "healthy", "version": "t", "checks": {"database": {"status": "healthy"}}})
 
     for path in ("/", "/pricing", "/account/login"):
         app.add_url_rule(path, path, lambda: "<main><h1>Entelim</h1><p>content here</p></main>")
