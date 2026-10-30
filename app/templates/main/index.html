@@ -203,7 +203,7 @@
 ] %}
 {% set capability_count = capability_groups | map(attribute='items') | map('length') | sum %}
 {% set NUMBER_WORDS = {13: 'thirteen', 14: 'fourteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty'} %}
-{% set capability_count_word = NUMBER_WORDS[capability_count] %}
+{% set capability_count_word = NUMBER_WORDS.get(capability_count, capability_count) %}
 <section class="home-section">
   <div class="container px-4">
     <div class="max-w-3xl">

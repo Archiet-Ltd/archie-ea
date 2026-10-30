@@ -1,18 +1,18 @@
 ---
 page_family: site
 title: "Features"
-page_role: "The eighteen capabilities of Enterprise Intelligence Management, grouped by the question each one answers, each linked to the module pages and use cases that deliver it today."
+page_role: "The seventeen capabilities of Enterprise Intelligence Management, grouped by the question each one answers, each linked to the module pages and use cases that deliver it today."
 source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-status-register.yml
 ---
 
-# The eighteen capabilities of Enterprise Intelligence Management
+# The seventeen capabilities of Enterprise Intelligence Management
 
 Every role starts with the same two things. Entelim builds one model of what you run from the tools
 you already use: connect GitHub or Jira, or import a file, and every fact in the model links back to
 the source it came from. Then you ask about that model in the AI chat and get answers that cite the
 records behind every line.
 
-Eighteen capabilities build on those two, grouped into five questions every enterprise asks: set
+Seventeen capabilities build on those two, grouped into five questions every enterprise asks: set
 direction, know what you run, stay in control, get answers before you need them, and connect and
 trust. Start with [what connects](/connectors) and [the AI chat](/modules/ai-chat).
 
