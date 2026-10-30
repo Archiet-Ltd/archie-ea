@@ -68,10 +68,10 @@
 {# ══════════════════════════════════════════════════════════════════
    WIZARD — Wide layout with copilot panel restored
    ══════════════════════════════════════════════════════════════════ #}
-{{ hidden_input('', solution.description|default('', true) if solution is defined and solution else '', id='journey-v2-solution-description') }}
-{{ hidden_input('', solution.name|default('', true) if solution is defined and solution else '', id='journey-v2-solution-name') }}
-{{ hidden_input('', journey_state_json|default('null', true), id='journey-v2-state') }}
-{{ hidden_input('', (solution.governance_status or 'draft') if solution is defined and solution else 'draft', id='journey-v2-governance-status') }}
+{{ hidden_input('solution_description', solution.description|default('', true) if solution is defined and solution else '', id='journey-v2-solution-description') }}
+{{ hidden_input('solution_name', solution.name|default('', true) if solution is defined and solution else '', id='journey-v2-solution-name') }}
+{{ hidden_input('journey_state', journey_state_json|default('null', true), id='journey-v2-state') }}
+{{ hidden_input('governance_status', (solution.governance_status or 'draft') if solution is defined and solution else 'draft', id='journey-v2-governance-status') }}
 
 <div x-data="journeyV2Flow({{ solution_id or 0 }})" x-init="init()" class="space-y-4">
 
