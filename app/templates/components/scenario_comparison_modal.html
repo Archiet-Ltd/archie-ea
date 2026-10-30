@@ -380,7 +380,7 @@
             </span>
         </div>
         <div class="flex items-center gap-3">
-            {% call ui.button(type='button', variant='outline', class='border border-input text-foreground hover:bg-accent', attrs={'@click': 'exportComparison()', ':disabled': 'scenarios.filter(s => s).length === 0', 'aria-label': 'Export comparison to CSV', 'data-testid': 'scenario-export'}) %}
+            {% call ui.button(type='button', variant='outline', class='border border-input text-foreground hover:bg-accent', attrs={'@click': 'exportComparison()', ':disabled': 'scenarios.filter(s => s).length === 0', 'data-testid': 'scenario-export'}) %}
                 <i data-lucide="download" class="h-4 w-4"></i>
                 Export CSV
             {% endcall %}

@@ -184,11 +184,11 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
         {{ ui.button(text='Cancel', type='button', variant='ghost', class='text-muted-foreground hover:bg-accent hover:text-foreground', attrs={'@click': "Platform.modal.close('arb-submission')", ':disabled': 'loading', 'aria-label': 'Close'}) }}
         {% call ui.button(type='button', class='bg-primary px-4 text-primary-foreground hover:bg-primary/90', attrs={'@click': 'submitToARB()', ':disabled': 'loading', 'data-testid': 'arb-submit'}) %}
             <span x-show="!loading" x-cloak>
-                <i data-lucide="send" class="h-4 w-4 inline"></i>
+                <i data-lucide="send" class="h-4 w-4" aria-hidden="true"></i>
                 Submit to ARB
             </span>
             <span x-show="loading" x-cloak class="flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
