@@ -5771,7 +5771,7 @@ def remove_user_from_org(org_id, user_id):
         flash("User does not belong to this organization.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
-    default_org = Organization.query.filter_by(slug="default").first()
+    default_org = Organization.default_organization()
     if not default_org or default_org.id == org_id:
         flash("Cannot remove user — no other organization to move them to.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))

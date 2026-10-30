@@ -266,7 +266,7 @@ class OrganizationDeletionService:
         org = sess.get(Organization, org_id)
         if org is None:
             raise OrganizationDeletionRefused("That organisation no longer exists.")
-        if org.slug == "default":
+        if Organization.is_default(org):
             raise OrganizationDeletionRefused("The Default organisation cannot be deleted.")
 
         org_name, org_slug = org.name, org.slug
@@ -307,6 +307,15 @@ class OrganizationDeletionService:
                 where = " OR ".join("%s = :org_id" % _q(col) for col in plan.org_columns[table])
                 _remove_pointing_rows(sess, plan, table, where, params, {table}, counts)
                 _delete(sess, table, where, params, counts)
+
+            # entity_history.organization_id deliberately carries no foreign key to
+            # organizations (app/models/entity_history.py -- some archimate_elements/
+            # _relationships rows predate that key ever being enforced), so the
+            # foreign-key-driven plan above never discovers it as one of this organisation's
+            # tables. Removed explicitly here, by the same DELETE-and-count mechanism as
+            # every table the plan does discover, so no row of the deleted organisation
+            # survives in it either.
+            _delete(sess, "entity_history", "organization_id = :org_id", params, counts)
 
             _remove_people(sess, plan, leaving)
 

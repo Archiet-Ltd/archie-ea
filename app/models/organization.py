@@ -7,6 +7,13 @@ System-wide config (roles, permissions, feature flags, templates) is shared.
 
 from app import db
 
+#: The one shared organisation every unassigned sign-up lands in (the slug
+#: ``app/models/user.py``'s ``_assign_default_organization`` listener seeds on first
+#: use). The single place this product names it; every caller that needs to
+#: recognise or resolve the Default organisation goes through ``Organization.is_default``
+#: / ``Organization.default_organization`` below instead of repeating the slug.
+DEFAULT_ORGANIZATION_SLUG = "default"
+
 
 class Organization(db.Model):  # migration-exempt
     """Tenant boundary. Every piece of business data belongs to exactly one org."""
@@ -34,3 +41,26 @@ class Organization(db.Model):  # migration-exempt
 
     def __repr__(self):
         return f"<Organization '{self.name}' ({self.slug})>"
+
+    @classmethod
+    def is_default(cls, org):
+        """True when ``org`` is the Default organisation."""
+        return org is not None and org.slug == DEFAULT_ORGANIZATION_SLUG
+
+    @classmethod
+    def default_organization(cls, create=False):
+        """Return the Default organisation, or ``None`` when no row names it yet.
+
+        With ``create=True``, seeds it first (same name and slug as the
+        ``before_insert`` listener on ``User`` creates on first use) when the
+        database holds none -- for a caller, such as a test fixture building a
+        fresh database, that needs the row to exist rather than merely to look
+        for it.
+        """
+        row = cls.query.filter_by(slug=DEFAULT_ORGANIZATION_SLUG).first()
+        if row is not None or not create:
+            return row
+        row = cls(name="Default Organization", slug=DEFAULT_ORGANIZATION_SLUG)
+        db.session.add(row)
+        db.session.flush()
+        return row

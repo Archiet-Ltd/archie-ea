@@ -201,7 +201,13 @@ def test_the_default_organisation_says_it_cannot_be_deleted_and_refuses(page, li
     from app.models.organization import Organization
 
     with app.app_context():
-        default_id = Organization.query.filter_by(slug="default").one().id
+        # The Default organisation is resolved through the one helper the deletion
+        # service and the admin route also use, not by naming its slug again here. The
+        # smoke database's own users all carry an explicit organization_id (see
+        # conftest._seed_standard_org), so the before_insert listener that otherwise
+        # creates this row on first use never fires -- seed it, as that listener would.
+        default_id = Organization.default_organization(create=True).id
+        db.session.commit()
         db.session.remove()
 
     _login(page, live_server, seeded["emails"]["platform_admin"])
