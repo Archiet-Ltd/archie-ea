@@ -25,9 +25,14 @@ IMPACT_PHRASINGS = [
     "What if we replace Payments service?",
     # existing phrasings must keep matching
     "What breaks if Payments service fails?",
-    "What if Payments service is decommissioned?",
-    "If Payments service fails, what happens?",
-]
+     "What if Payments service is decommissioned?",
+     "What if Payments service is replaced?",
+     "What if Payments service was retired?",
+     "What if Payments service was decommissioned?",
+     "What if Payments service was removed?",
+     "What if Payments service was replaced?",
+     "If Payments service fails, what happens?",
+ ]
 
 
 @pytest.mark.parametrize("message", IMPACT_PHRASINGS)
