@@ -249,6 +249,14 @@ def test_1_connect_github_is_the_primary_one_click_button(world, browser):
         shoot(page, "1-connect-github-app", 1440, "light")
     finally:
         context.close()
+    context, page = _page(browser, color_scheme="dark", width=390, height=844)
+    try:
+        sign_in(page, world["base"], world["one"]["emails"]["solution_architect"])
+        page.goto(world["base"] + "/admin/connectors/github", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("github-app-connect-link")).to_be_visible()
+        shoot(page, "1-connect-github-app", 390, "dark")
+    finally:
+        context.close()
 
 
 def test_2_a_forged_state_is_refused_with_a_plain_message(world, browser):
@@ -385,6 +393,15 @@ def test_6_with_the_settings_unset_the_page_is_exactly_the_token_form(unconfigur
         expect(page.get_by_label("GitHub organisation")).to_be_visible()
         expect(page.get_by_label("Read-only token")).to_be_visible()
         expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
+        shoot(page, "6-token-form-only", 1440, "light")
+    finally:
+        context.close()
+    context, page = _page(browser, color_scheme="dark", width=390, height=844)
+    try:
+        sign_in(page, unconfigured_world["base"], unconfigured_world["org"]["emails"]["solution_architect"])
+        page.goto(unconfigured_world["base"] + "/admin/connectors/github", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("github-app-connect-link")).to_have_count(0)
+        shoot(page, "6-token-form-only", 390, "dark")
     finally:
         context.close()
 
