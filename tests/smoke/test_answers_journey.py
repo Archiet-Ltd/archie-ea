@@ -111,6 +111,11 @@ def test_cto_asks_what_breaks_if_two_fail_together_and_reopens_the_stored_answer
     computed_before = page.locator("[data-computed-at]").get_attribute("datetime")
     assert rows_before, "the answer lists what is affected"
     assert str(graph["gateway"]) in rows_before
+    # The affected table is the shared table component, not a hand-rolled one:
+    # a real header row with column headers, not a layout-only div grid.
+    table = page.locator("[data-answer-rows] table")
+    expect(table.locator("thead th")).to_have_count(6)
+    expect(table.locator("thead th").first).to_have_text("Element")
 
     page.reload(wait_until="domcontentloaded")
 
