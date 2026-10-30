@@ -439,8 +439,8 @@ _FIGURES = (
 
 
 def _figure_text(value):
-    """A figure as the page's own field shows it; an unset figure is an em dash."""
-    return "—" if value is None else str(value)
+    """A figure as the page's own field shows it; an unset figure is 'Not set'."""
+    return "Not set" if value is None else str(value)
 
 
 def build_export_context(business_case):
@@ -465,9 +465,40 @@ def build_export_context(business_case):
             boxes.append({"key": "recommendation", "label": "Recommendation",
                           "text": (business_case.recommended_option or "").strip()})
 
-    figures = [(label, _figure_text(getattr(business_case, attr))) for label, attr in _FIGURES]
+    # --- Figures: render stored values, but add a computed TCO and ROI if possible ---
+    capex = _to_decimal(business_case.capex)
+    opex_annual = _to_decimal(business_case.opex_annual)
+    benefit_annual = _to_decimal(business_case.financial_benefit_annual)
+
+    computed_tco = (capex or Decimal("0")) + 3 * (opex_annual or Decimal("0")) if capex is not None or opex_annual is not None else None
+    computed_roi = (benefit_annual - computed_tco) / computed_tco * 100 if benefit_annual is not None and computed_tco is not None and computed_tco > 0 else None
+
+    stored_tco = _to_decimal(business_case.tco_3yr)
+    stored_roi = _to_decimal(business_case.roi_percentage)
+
+    figures = []
+    for label, attr in _FIGURES:
+        if attr == "tco_3yr":
+            if computed_tco is not None:
+                val = f"{computed_tco:.2f} (computed)"
+            else:
+                val = _figure_text(stored_tco) + " (as entered)"
+        elif attr == "roi_percentage":
+            if computed_roi is not None:
+                val = f"{computed_roi:.1f}% (computed)"
+            else:
+                val = _figure_text(stored_roi) + " (as entered)"
+        else:
+            val = _figure_text(getattr(business_case, attr))
+        
+        source = business_case.updated_at.strftime("%Y-%m-%d")
+        figures.append((label, val, f"Source: Manual Entry, As of: {source}"))
+
+
+    npv_val = "Not set" if business_case.npv is None else f"{business_case.npv:.2f}"
+    source = business_case.updated_at.strftime("%Y-%m-%d")
     figures.append(("NPV (3yr, 10% discount)",
-                    "—" if business_case.npv is None else f"{business_case.npv:.2f}"))
+                     npv_val, f"Source: Computed, As of: {source}"))
 
     return {
         "title": business_case.title or "Untitled Business Case",
