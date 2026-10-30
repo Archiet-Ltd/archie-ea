@@ -1,5 +1,6 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'architecture_assistant/partials/_journey_home_panels.html' import journey_count_panel %}
 
@@ -87,18 +88,10 @@
            could reach its last stage and then simply dead-end, with no way
            to ever mark it done. It now switches to a real closing action. #}
         <template x-if="currentStage !== 'deliver'">
-          <button type="button" @click="advance" :disabled="saving"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
-            <span>Complete this stage</span>
-            <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
-          </button>
+          {% call ui.button(class='shrink-0', attrs={'type': 'button', '@click': 'advance', ':disabled': 'saving'}) %}<span>Complete this stage</span><i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>{% endcall %}
         </template>
         <template x-if="currentStage === 'deliver'">
-          <button type="button" @click="closeJourney" :disabled="closingJourney || journeyStatus === 'completed'"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
-            <span x-text="journeyStatus === 'completed' ? 'Journey completed' : (closingJourney ? 'Closing…' : 'Mark journey complete')"></span>
-            <i data-lucide="check" class="h-4 w-4" aria-hidden="true"></i>
-          </button>
+          {% call ui.button(class='shrink-0', attrs={'type': 'button', '@click': 'closeJourney', ':disabled': "closingJourney || journeyStatus === 'completed'"}) %}<span x-text="journeyStatus === 'completed' ? 'Journey completed' : (closingJourney ? 'Closing…' : 'Mark journey complete')"></span><i data-lucide="check" class="h-4 w-4" aria-hidden="true"></i>{% endcall %}
         </template>
       </div>
 
@@ -209,29 +202,19 @@
             <div class="mt-3 grid gap-3 grid-cols-1 sm:items-end grid-cols-1">
               <div class="relative" @click.outside="closeMemberPicker">
                 <label for="journey-member-search" class="block text-sm font-medium text-muted-foreground mb-1">Person</label>
-                <input id="journey-member-search" type="search" x-model="memberQuery"
-                  @input.debounce.300ms="searchMembers" @focus="searchMembers"
-                  @keydown.down.prevent="moveMemberResult(1)" @keydown.up.prevent="moveMemberResult(-1)"
-                  @keydown.enter.prevent="selectActiveMember" @keydown.escape="closeMemberPicker"
-                  role="combobox" aria-autocomplete="list" aria-controls="journey-member-results"
-                  :aria-expanded="memberPickerOpen.toString()" :aria-activedescendant="activeMemberResultId"
-                  autocomplete="off" placeholder="Search by name or email"
-                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                <input type="hidden" name="journey_member_user_id" :value="selectedMember ? selectedMember.id : ''">
+                {{ ui.input(id='journey-member-search', name='journey_member_search', type='search', autocomplete='off', placeholder='Search by name or email', class='mt-1', attrs={'x-model': 'memberQuery', '@input.debounce.300ms': 'searchMembers', '@focus': 'searchMembers', '@keydown.down.prevent': 'moveMemberResult(1)', '@keydown.up.prevent': 'moveMemberResult(-1)', '@keydown.enter.prevent': 'selectActiveMember', '@keydown.escape': 'closeMemberPicker', 'role': 'combobox', 'aria-autocomplete': 'list', 'aria-controls': 'journey-member-results', ':aria-expanded': 'memberPickerOpen.toString()', ':aria-activedescendant': 'activeMemberResultId'}) }}
+                {{ ui.input(type='hidden', name='journey_member_user_id', attrs={':value': "selectedMember ? selectedMember.id : ''"}) }}
 
                 <div id="journey-member-results" x-show="memberPickerOpen" x-cloak role="listbox"
                      class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1">
                   <template x-for="(person, index) in memberResults" :key="person.id">
-                    <button type="button" role="option" :id="`journey-member-option-${person.id}`"
-                      :aria-selected="(index === activeMemberIndex).toString()"
-                      @mouseenter="activeMemberIndex = index" @click="selectMember(person)"
-                      class="flex w-full items-start justify-between gap-3 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    {% call ui.button(variant='ghost', class='h-auto w-full items-start justify-between gap-3 px-3 py-2 text-left font-normal', attrs={'type': 'button', 'role': 'option', ':id': "`journey-member-option-${person.id}`", ':aria-selected': '(index === activeMemberIndex).toString()', '@mouseenter': 'activeMemberIndex = index', '@click': 'selectMember(person)'}) %}
                       <span class="min-w-0">
                         <span class="block truncate font-medium" x-text="person.name"></span>
                         <span class="block truncate text-xs text-muted-foreground" x-text="person.email"></span>
                       </span>
                       <i x-show="selectedMember && selectedMember.id === person.id" x-cloak data-lucide="check" class="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true"></i>
-                    </button>
+                    {% endcall %}
                   </template>
                   <p x-show="!memberSearching && !memberResults.length" x-cloak class="px-3 py-2 text-sm text-muted-foreground">No available people match.</p>
                   <p x-show="memberSearching" x-cloak class="px-3 py-2 text-sm text-muted-foreground" role="status">Searching people&hellip;</p>
@@ -240,29 +223,10 @@
 
               <div>
                 <label for="journey-member-role" class="block text-sm font-medium text-muted-foreground mb-1">Journey role</label>
-                <select id="journey-member-role" x-model="memberRole"
-                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                  <option value="chief_architect">Chief architect</option>
-                  <option value="enterprise_architect">Enterprise architect</option>
-                  <option value="business_architect">Business architect</option>
-                  <option value="solution_architect">Solution architect</option>
-                  <option value="application_architect">Application architect</option>
-                  <option value="data_architect">Data architect</option>
-                  <option value="technology_architect">Technology architect</option>
-                  <option value="security_architect">Security architect</option>
-                  <option value="programme_architect">Programme architect</option>
-                  <option value="sponsor">Sponsor</option>
-                  <option value="stakeholder">Stakeholder</option>
-                  <option value="reviewer">Reviewer</option>
-                  <option value="contributor">Contributor</option>
-                </select>
+                {% call ui.native_select_wrapper(class='mt-1 w-full') %}{% call ui.native_select(id='journey-member-role', class='w-full', attrs={'x-model': 'memberRole'}) %}{{ ui.native_select_option('Chief architect', value='chief_architect') }}{{ ui.native_select_option('Enterprise architect', value='enterprise_architect') }}{{ ui.native_select_option('Business architect', value='business_architect') }}{{ ui.native_select_option('Solution architect', value='solution_architect') }}{{ ui.native_select_option('Application architect', value='application_architect') }}{{ ui.native_select_option('Data architect', value='data_architect') }}{{ ui.native_select_option('Technology architect', value='technology_architect') }}{{ ui.native_select_option('Security architect', value='security_architect') }}{{ ui.native_select_option('Programme architect', value='programme_architect') }}{{ ui.native_select_option('Sponsor', value='sponsor') }}{{ ui.native_select_option('Stakeholder', value='stakeholder') }}{{ ui.native_select_option('Reviewer', value='reviewer') }}{{ ui.native_select_option('Contributor', value='contributor') }}{% endcall %}{% endcall %}
               </div>
 
-              <button type="submit" :disabled="savingMember || !selectedMember"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="user-plus" class="h-4 w-4" aria-hidden="true"></i>
-                <span x-text="savingMember ? 'Adding…' : 'Add'"></span>
-              </button>
+              {% call ui.button(attrs={'type': 'submit', ':disabled': 'savingMember || !selectedMember'}) %}<i data-lucide="user-plus" class="h-4 w-4" aria-hidden="true"></i><span x-text="savingMember ? 'Adding…' : 'Add'"></span>{% endcall %}
             </div>
           </form>
           {% endif %}
@@ -299,12 +263,7 @@
                     {% endif %}
                     {% if link.note %}<p class="mt-1 text-xs text-muted-foreground">{{ link.note }}</p>{% endif %}
                   </div>
-                  <button type="button" @click="unlinkLink({{ link.id }})" :disabled="unlinkingLinkId === {{ link.id }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center"
-                    aria-label="Unlink {{ target_label or (entity_type|replace('_', ' ')) }}">
-                    <i data-lucide="unlink" class="h-4 w-4" aria-hidden="true"></i>
-                    <span x-text="unlinkingLinkId === {{ link.id }} ? 'Unlinking…' : 'Unlink'"></span>
-                  </button>
+                  {% call ui.button(variant='outline', class='shrink-0', attrs={'type': 'button', '@click': 'unlinkLink(' ~ link.id ~ ')', ':disabled': 'unlinkingLinkId === ' ~ link.id, 'aria-label': 'Unlink ' ~ (target_label or (entity_type|replace('_', ' ')))}) %}<i data-lucide="unlink" class="h-4 w-4" aria-hidden="true"></i><span x-text="unlinkingLinkId === {{ link.id }} ? 'Unlinking…' : 'Unlink'"></span>{% endcall %}
                 </div>
               {% endfor %}
             {% else %}
@@ -379,21 +338,13 @@
           <form class="mt-4 space-y-3" @submit.prevent="addEvidence">
             <div>
               <label for="evidence-name" class="block text-sm font-medium text-muted-foreground mb-1">Evidence name</label>
-              <input id="evidence-name" type="text" x-model.trim="evidenceName" required maxlength="255"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="Operating model v3">
+              {{ ui.input(id='evidence-name', name='evidence_name', type='text', required=true, maxlength=255, placeholder='Operating model v3', class='mt-1', attrs={'x-model.trim': 'evidenceName'}) }}
             </div>
             <div>
               <label for="evidence-reference" class="block text-sm font-medium text-muted-foreground mb-1">Document or reference</label>
-              <input id="evidence-reference" type="text" x-model.trim="evidenceReference" required maxlength="1000"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="File name, repository path or URL">
+              {{ ui.input(id='evidence-reference', name='evidence_reference', type='text', required=true, maxlength=1000, placeholder='File name, repository path or URL', class='mt-1', attrs={'x-model.trim': 'evidenceReference'}) }}
             </div>
-            <button type="submit" :disabled="savingEvidence || !evidenceName || !evidenceReference"
-              class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50">
-              <i data-lucide="paperclip" class="h-4 w-4" aria-hidden="true"></i>
-              Add evidence
-            </button>
+            {% call ui.button(variant='outline', class='w-full', attrs={'type': 'submit', ':disabled': 'savingEvidence || !evidenceName || !evidenceReference'}) %}<i data-lucide="paperclip" class="h-4 w-4" aria-hidden="true"></i>Add evidence{% endcall %}
           </form>
 
           <ul class="mt-4 space-y-2" aria-live="polite">
@@ -418,52 +369,28 @@
           <form class="mt-4 space-y-3" @submit.prevent="addLink">
             <div>
               <label for="link-entity-type" class="block text-sm font-medium text-muted-foreground mb-1">Record type</label>
-              <select id="link-entity-type" x-model="linkEntityType" @change="resetRecordPicker"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                <option value="application">Application</option>
-                <option value="archimate_element">ArchiMate element</option>
-              </select>
+              {% call ui.native_select_wrapper(class='mt-1 w-full') %}{% call ui.native_select(id='link-entity-type', class='w-full', attrs={'x-model': 'linkEntityType', '@change': 'resetRecordPicker'}) %}{{ ui.native_select_option('Application', value='application') }}{{ ui.native_select_option('ArchiMate element', value='archimate_element') }}{% endcall %}{% endcall %}
             </div>
             <div>
               <label for="link-relation" class="block text-sm font-medium text-muted-foreground mb-1">Relation</label>
-              <select id="link-relation" x-model="linkRelation"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                {% for value in link_relations %}
-                <option value="{{ value }}">{{ value|title }}</option>
-                {% endfor %}
-              </select>
+              {% call ui.native_select_wrapper(class='mt-1 w-full') %}{% call ui.native_select(id='link-relation', class='w-full', attrs={'x-model': 'linkRelation'}) %}{% for value in link_relations %}{{ ui.native_select_option(value|title, value=value) }}{% endfor %}{% endcall %}{% endcall %}
             </div>
             <div class="relative" @click.outside="closeRecordPicker">
               <label for="link-record-search" class="block text-sm font-medium text-muted-foreground mb-1">Record</label>
-              <input id="link-record-search" type="search" x-model="recordQuery"
-                @input.debounce.300ms="searchRecords" @focus="searchRecords"
-                @keydown.down.prevent="moveRecordResult(1)" @keydown.up.prevent="moveRecordResult(-1)"
-                @keydown.enter.prevent="selectActiveRecord" @keydown.escape="closeRecordPicker"
-                role="combobox" aria-autocomplete="list" aria-controls="journey-record-results"
-                :aria-expanded="recordPickerOpen.toString()" :aria-activedescendant="activeRecordResultId"
-                autocomplete="off" placeholder="Search the catalog"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
+              {{ ui.input(id='link-record-search', name='link_record_search', type='search', autocomplete='off', placeholder='Search the catalog', class='mt-1', attrs={'x-model': 'recordQuery', '@input.debounce.300ms': 'searchRecords', '@focus': 'searchRecords', '@keydown.down.prevent': 'moveRecordResult(1)', '@keydown.up.prevent': 'moveRecordResult(-1)', '@keydown.enter.prevent': 'selectActiveRecord', '@keydown.escape': 'closeRecordPicker', 'role': 'combobox', 'aria-autocomplete': 'list', 'aria-controls': 'journey-record-results', ':aria-expanded': 'recordPickerOpen.toString()', ':aria-activedescendant': 'activeRecordResultId'}) }}
               <div id="journey-record-results" x-show="recordPickerOpen" x-cloak role="listbox"
                    class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1">
                 <template x-for="(record, index) in recordResults" :key="record.id">
-                  <button type="button" role="option" :id="`journey-record-option-${record.id}`"
-                    :aria-selected="(index === activeRecordIndex).toString()"
-                    @mouseenter="activeRecordIndex = index" @click="selectRecord(record)"
-                    class="block w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  {% call ui.button(variant='ghost', class='h-auto w-full flex-col items-start gap-0 px-3 py-2 text-left font-normal', attrs={'type': 'button', 'role': 'option', ':id': "`journey-record-option-${record.id}`", ':aria-selected': '(index === activeRecordIndex).toString()', '@mouseenter': 'activeRecordIndex = index', '@click': 'selectRecord(record)'}) %}
                     <span class="block truncate font-medium" x-text="record.name"></span>
                     <span class="block truncate text-xs text-muted-foreground" x-text="record.context || record.type || ''"></span>
-                  </button>
+                  {% endcall %}
                 </template>
                 <p x-show="!recordSearching && !recordResults.length" x-cloak class="px-3 py-2 text-sm text-muted-foreground">No matching catalog records.</p>
                 <p x-show="recordSearching" x-cloak class="px-3 py-2 text-sm text-muted-foreground" role="status">Searching records&hellip;</p>
               </div>
             </div>
-            <button type="submit" :disabled="savingLink || !selectedRecord"
-              class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50">
-              <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i>
-              <span x-text="savingLink ? 'Linking…' : 'Link selected record'"></span>
-            </button>
+            {% call ui.button(variant='outline', class='w-full', attrs={'type': 'submit', ':disabled': 'savingLink || !selectedRecord'}) %}<i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i><span x-text="savingLink ? 'Linking…' : 'Link selected record'"></span>{% endcall %}
           </form>
           <p class="mt-3 text-xs leading-5 text-muted-foreground">
             To link a decision, risk, document, review, programme or solution, open that record in its source workspace and associate it with this journey there.

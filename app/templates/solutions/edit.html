@@ -1,7 +1,33 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Edit {{ solution.name }}{% endblock %}
+
+{% macro text_field(id, name, label, value='', required=false, placeholder='', type='text') %}
+  {% call ui.field() %}
+    {{ ui.field_label(text=label, attrs={'for': id}) }}
+    {{ ui.input(id=id, name=name, type=type, required=required, value=value, placeholder=placeholder) }}
+  {% endcall %}
+{% endmacro %}
+
+{% macro area_field(id, name, label, value='', required=false, placeholder='', rows=2) %}
+  {% call ui.field() %}
+    {{ ui.field_label(text=label, attrs={'for': id}) }}
+    {{ ui.textarea(id=id, name=name, rows=rows, required=required, placeholder=placeholder, text=value) }}
+  {% endcall %}
+{% endmacro %}
+
+{% macro select_field(id, name, label, options, current, empty_label) %}
+  {% call ui.field() %}
+    {{ ui.field_label(text=label, attrs={'for': id}) }}
+    {% call ui.native_select_wrapper(class='w-full') %}{% call ui.native_select(id=id, name=name, class='w-full', required=true) %}
+      {{ ui.native_select_option(empty_label, value='', selected=(not current)) }}
+      {% for opt in options %}{{ ui.native_select_option(opt, value=opt, selected=(current == opt)) }}{% endfor %}
+    {% endcall %}{% endcall %}
+  {% endcall %}
+{% endmacro %}
 
 {% block content %}
 <div class="space-y-6">
@@ -20,219 +46,120 @@
         ]
     ) }}
 
-    <!-- Form -->
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form method="POST" action="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <!-- Basic Information -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Basic Information</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-solution-name" class="block text-sm font-medium text-muted-foreground mb-1">Solution Name *</label>
-                        <input type="text" name="name" id="edit-solution-name" value="{{ solution.name }}" required
-                               class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                               placeholder="e.g., Customer Data Platform" autofocus>
-                    </div>
+    <form method="POST" action="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="space-y-6 max-w-2xl">
+        {{ hidden_input('csrf_token', csrf_token()) }}
 
-                    <div>
-                        <label for="edit-solution-description" class="block text-sm font-medium text-muted-foreground mb-1">Description *</label>
-                        <textarea name="description" id="edit-solution-description" required rows="3"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Describe the solution and its purpose...">{{ solution.description }}</textarea>
-                    </div>
+        {% call ui.card() %}
+            {% call ui.card_header() %}{{ ui.card_title(text='Basic Information') }}{% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Solution Name *', attrs={'for': 'edit-solution-name'}) }}
+                    {{ ui.input(id='edit-solution-name', name='name', type='text', required=true, autofocus=true, value=solution.name, placeholder='e.g., Customer Data Platform') }}
+                {% endcall %}
+                {{ area_field('edit-solution-description', 'description', 'Description *', solution.description or '', required=true, placeholder='Describe the solution and its purpose...', rows=3) }}
+                {{ select_field('edit-solution-type', 'solution_type', 'Solution Type *', ['Technology', 'Process', 'Organizational', 'Hybrid'], solution.solution_type, 'Select Type') }}
+                {{ text_field('edit-business-domain', 'business_domain', 'Business Domain *', solution.business_domain or '', required=true, placeholder='e.g., Customer Management') }}
+                {{ select_field('edit-complexity-level', 'complexity_level', 'Complexity Level *', ['Low', 'Medium', 'High', 'Very High'], solution.complexity_level, 'Select Level') }}
+            {% endcall %}
+        {% endcall %}
 
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="edit-solution-type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type *</label>
-                            <select name="solution_type" id="edit-solution-type" required
-                                    class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select Type</option>
-                                <option value="Technology" {% if solution.solution_type == 'Technology' %}selected{% endif %}>Technology</option>
-                                <option value="Process" {% if solution.solution_type == 'Process' %}selected{% endif %}>Process</option>
-                                <option value="Organizational" {% if solution.solution_type == 'Organizational' %}selected{% endif %}>Organizational</option>
-                                <option value="Hybrid" {% if solution.solution_type == 'Hybrid' %}selected{% endif %}>Hybrid</option>
-                            </select>
-                        </div>
+        {% call ui.card() %}
+            {% call ui.card_header() %}{{ ui.card_title(text='Business Value') }}{% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {{ area_field('edit-value-proposition', 'value_proposition', 'Value Proposition *', solution.business_value or '', required=true, placeholder='Describe the key value and benefits...') }}
+                {{ area_field('edit-target-outcomes', 'target_outcomes', 'Target Outcomes (comma-separated)',
+                              (solution.target_outcomes if solution.target_outcomes is string else (solution.target_outcomes|join(', ') if solution.target_outcomes else '')),
+                              placeholder='e.g., Reduce cost by 30%, Improve efficiency, Better customer experience') }}
+                {{ area_field('edit-success-metrics', 'success_metrics', 'Success Metrics (comma-separated)',
+                              (solution.success_metrics if solution.success_metrics is string else (solution.success_metrics|join(', ') if solution.success_metrics else '')),
+                              placeholder='e.g., ROI 2.5x, Deployment time 6 months, Adoption 80%') }}
+            {% endcall %}
+        {% endcall %}
 
-                        <div>
-                            <label for="edit-business-domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain *</label>
-                            <input type="text" name="business_domain" id="edit-business-domain" value="{{ solution.business_domain }}" required
-                                   class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                   placeholder="e.g., Customer Management">
-                        </div>
+        {% call ui.card() %}
+            {% call ui.card_header() %}{{ ui.card_title(text='Scope and Boundaries') }}{% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {{ area_field('edit-scope-description', 'scope_description', 'Scope Description', solution.scope_description or '', placeholder='Describe what the solution covers...') }}
+                {{ area_field('edit-in-scope', 'in_scope_applications', 'In Scope (comma-separated)',
+                              (solution.in_scope_applications if solution.in_scope_applications is string else (solution.in_scope_applications|join(', ') if solution.in_scope_applications else '')),
+                              placeholder='Comma-separated items in scope') }}
+                {{ area_field('edit-out-of-scope', 'out_of_scope_applications', 'Out of Scope (comma-separated)',
+                              (solution.out_of_scope_applications if solution.out_of_scope_applications is string else (solution.out_of_scope_applications|join(', ') if solution.out_of_scope_applications else '')),
+                              placeholder='Comma-separated items out of scope') }}
+            {% endcall %}
+        {% endcall %}
 
-                        <div>
-                            <label for="edit-complexity-level" class="block text-sm font-medium text-muted-foreground mb-1">Complexity Level *</label>
-                            <select name="complexity_level" id="edit-complexity-level" required
-                                    class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select Level</option>
-                                <option value="Low" {% if solution.complexity_level == 'Low' %}selected{% endif %}>Low</option>
-                                <option value="Medium" {% if solution.complexity_level == 'Medium' %}selected{% endif %}>Medium</option>
-                                <option value="High" {% if solution.complexity_level == 'High' %}selected{% endif %}>High</option>
-                                <option value="Very High" {% if solution.complexity_level == 'Very High' %}selected{% endif %}>Very High</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Business Value -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Business Value</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-value-proposition" class="block text-sm font-medium text-muted-foreground mb-1">Value Proposition *</label>
-                        <textarea name="value_proposition" id="edit-value-proposition" required rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Describe the key value and benefits...">{{ solution.business_value or '' }}</textarea>
-                    </div>
-
-                    <div>
-                        <label for="edit-target-outcomes" class="block text-sm font-medium text-muted-foreground mb-1">Target Outcomes (comma-separated)</label>
-                        <textarea name="target_outcomes" id="edit-target-outcomes" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="e.g., Reduce cost by 30%, Improve efficiency, Better customer experience">{%- if solution.target_outcomes is string -%}{{ solution.target_outcomes }}{%- elif solution.target_outcomes -%}{{ solution.target_outcomes|join(', ') }}{%- endif -%}</textarea>
-                    </div>
-
-                    <div>
-                        <label for="edit-success-metrics" class="block text-sm font-medium text-muted-foreground mb-1">Success Metrics (comma-separated)</label>
-                        <textarea name="success_metrics" id="edit-success-metrics" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="e.g., ROI 2.5x, Deployment time 6 months, Adoption 80%">{%- if solution.success_metrics is string -%}{{ solution.success_metrics }}{%- elif solution.success_metrics -%}{{ solution.success_metrics|join(', ') }}{%- endif -%}</textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Scope and Boundaries -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Scope and Boundaries</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-scope-description" class="block text-sm font-medium text-muted-foreground mb-1">Scope Description</label>
-                        <textarea name="scope_description" id="edit-scope-description" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Describe what the solution covers...">{{ solution.scope_description or '' }}</textarea>
-                    </div>
-                    <div>
-                        <label for="edit-in-scope" class="block text-sm font-medium text-muted-foreground mb-1">In Scope (comma-separated)</label>
-                        <textarea name="in_scope_applications" id="edit-in-scope" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Comma-separated items in scope">{%- if solution.in_scope_applications -%}{{ solution.in_scope_applications|join(', ') if solution.in_scope_applications is not string else solution.in_scope_applications }}{%- endif -%}</textarea>
-                    </div>
-                    <div>
-                        <label for="edit-out-of-scope" class="block text-sm font-medium text-muted-foreground mb-1">Out of Scope (comma-separated)</label>
-                        <textarea name="out_of_scope_applications" id="edit-out-of-scope" rows="2"
-                                  class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                  placeholder="Comma-separated items out of scope">{%- if solution.out_of_scope_applications -%}{{ solution.out_of_scope_applications|join(', ') if solution.out_of_scope_applications is not string else solution.out_of_scope_applications }}{%- endif -%}</textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Governance -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-bold text-foreground mb-4">Governance &amp; Ownership</h2>
-                <div class="grid grid-cols-1 gap-4">
-                    {% for field_name, field_label in [
-                        ('solution_owner', 'Solution Owner'),
-                        ('business_sponsor', 'Business Sponsor'),
-                        ('technical_lead', 'Technical Lead'),
-                        ('architecture_lead', 'Architecture Lead')
-                    ] %}
-                    <div x-data="{
-                        query: '{{ solution[field_name] or '' }}',
-                        results: [],
-                        showDropdown: false,
-                        searching: false,
-                        _searchErrorShown: false,
-                        /* Promise chain, not async/await: this expression lives in an
-                           Alpine attribute and is run by the CSP-safe interpreter
-                           (app/static/js/csp/csp-evaluator.js), which cannot await. */
-                        search() {
-                            const self = this;
-                            if (this.query.length < 2) { this.results = []; this.showDropdown = false; return Promise.resolve(); }
-                            this.searching = true;
-                            return Platform.fetch.get('/api/users', null, { silent: true })
-                                .then(function (data) {
-                                    if (!data || !data.success) {
-                                        throw new Error((data && data.error) || 'User search failed');
-                                    }
-                                    const q = self.query.toLowerCase();
-                                    self.results = data.users.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)).slice(0, 5);
-                                    self.showDropdown = self.results.length > 0;
-                                    self._searchErrorShown = false;
-                                    self.searching = false;
-                                })
-                                .catch(function () {
-                                    // Fires on every debounced keystroke — toast once
-                                    // per outage rather than once per character typed.
-                                    // Nothing is invented: a search that never ran shows no results.
-                                    self.results = [];
-                                    self.showDropdown = false;
-                                    if (!self._searchErrorShown) {
-                                        self._searchErrorShown = true;
-                                        if (window.Platform && Platform.toast) Platform.toast.error('User search failed');
-                                    }
-                                    self.searching = false;
-                                });
-                        },
-                        select(user) {
-                            this.query = user.name;
-                            this.showDropdown = false;
-                            this.results = [];
-                        }
-                    }" @click.outside="showDropdown = false">
-                        <label for="edit-{{ field_name|replace('_', '-') }}" class="block text-sm font-medium text-muted-foreground mb-1">{{ field_label }}</label>
-                        <div class="relative">
-                            <input type="text" name="{{ field_name }}" id="edit-{{ field_name|replace('_', '-') }}" x-model="query"
-                                   @input.debounce.300ms="search()"
-                                   @focus="if (query.length >= 2) search()"
-                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                   placeholder="Search by name or email..." autocomplete="off">
-                            <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
-                                <template x-for="u in results" :key="u.id">
-                                    <button type="button" @click="select(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
-                                        <span x-text="u.name" class="font-medium"></span>
-                                        <span x-text="u.email" class="text-xs text-muted-foreground"></span>
-                                    </button>
-                                </template>
-                            </div>
+        {% call ui.card() %}
+            {% call ui.card_header() %}{{ ui.card_title(text='Governance & Ownership') }}{% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {% for field_name, field_label in [
+                    ('solution_owner', 'Solution Owner'),
+                    ('business_sponsor', 'Business Sponsor'),
+                    ('technical_lead', 'Technical Lead'),
+                    ('architecture_lead', 'Architecture Lead')
+                ] %}
+                {% call ui.field(attrs={'x-data': "{
+                    query: '" ~ (solution[field_name] or '')|replace('\\', '\\\\')|replace("'", "\\'") ~ "',
+                    results: [],
+                    showDropdown: false,
+                    searching: false,
+                    _searchErrorShown: false,
+                    search() {
+                        const self = this;
+                        if (this.query.length < 2) { this.results = []; this.showDropdown = false; return Promise.resolve(); }
+                        this.searching = true;
+                        return Platform.fetch.get('/api/users', null, { silent: true })
+                            .then(function (data) {
+                                if (!data || !data.success) {
+                                    throw new Error((data && data.error) || 'User search failed');
+                                }
+                                const q = self.query.toLowerCase();
+                                self.results = data.users.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)).slice(0, 5);
+                                self.showDropdown = self.results.length > 0;
+                                self._searchErrorShown = false;
+                                self.searching = false;
+                            })
+                            .catch(function () {
+                                self.results = [];
+                                self.showDropdown = false;
+                                if (!self._searchErrorShown) {
+                                    self._searchErrorShown = true;
+                                    if (window.Platform && Platform.toast) Platform.toast.error('User search failed');
+                                }
+                                self.searching = false;
+                            });
+                    },
+                    select(user) {
+                        this.query = user.name;
+                        this.showDropdown = false;
+                        this.results = [];
+                    }
+                }", '@click.outside': 'showDropdown = false'}) %}
+                    {{ ui.field_label(text=field_label, attrs={'for': 'edit-' ~ field_name|replace('_', '-')}) }}
+                    <div class="relative">
+                        {{ ui.input(id='edit-' ~ field_name|replace('_', '-'), name=field_name, type='text', placeholder='Search by name or email...', autocomplete='off',
+                                    attrs={'x-model': 'query', '@input.debounce.300ms': 'search()', '@focus': 'if (query.length >= 2) search()'}) }}
+                        <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
+                            <template x-for="u in results" :key="u.id">
+                                {% call ui.button(variant='ghost', class='w-full justify-between rounded-none', attrs={'type': 'button', '@click': 'select(u)'}) %}
+                                    <span x-text="u.name" class="font-medium"></span>
+                                    <span x-text="u.email" class="text-xs text-muted-foreground"></span>
+                                {% endcall %}
+                            </template>
                         </div>
                     </div>
-                    {% endfor %}
+                {% endcall %}
+                {% endfor %}
 
-                    <div>
-                        <label for="edit-solution-status" class="block text-sm font-medium text-muted-foreground mb-1">Status *</label>
-                        <select name="status" id="edit-solution-status" required
-                                class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                            <option value="">Select Status</option>
-                            <option value="Planning" {% if solution.status == 'Planning' %}selected{% endif %}>Planning</option>
-                            <option value="In Progress" {% if solution.status == 'In Progress' %}selected{% endif %}>In Progress</option>
-                            <option value="Active" {% if solution.status == 'Active' %}selected{% endif %}>Active</option>
-                            <option value="Deployed" {% if solution.status == 'Deployed' %}selected{% endif %}>Deployed</option>
-                        </select>
-                    </div>
+                {{ select_field('edit-solution-status', 'status', 'Status *', ['Planning', 'In Progress', 'Active', 'Deployed'], solution.status, 'Select Status') }}
+                {{ text_field('edit-expected-delivery-date', 'expected_delivery_date', 'Expected Delivery Date', (solution.expected_delivery_date.strftime('%Y-%m-%d') if solution.expected_delivery_date else ''), type='date') }}
+            {% endcall %}
+        {% endcall %}
 
-                    <div>
-                        <label for="edit-expected-delivery-date" class="block text-sm font-medium text-muted-foreground mb-1">Expected Delivery Date</label>
-                        <input type="date" name="expected_delivery_date" id="edit-expected-delivery-date"
-                               value="{{ solution.expected_delivery_date.strftime('%Y-%m-%d') if solution.expected_delivery_date else '' }}"
-                               class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="flex gap-3 justify-end">
-                <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" 
-                   class="px-4 py-2 border border-border rounded-md text-foreground/80 hover:bg-muted transition">
-                    Cancel
-                </a>
-                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary transition">
-                    Update Solution
-                </button>
-            </div>
-        </form>
-    </div>
+        <div class="flex gap-3 justify-end">
+            {{ ui.button(text='Cancel', variant='outline', href=url_for('solution_design.view_solution', solution_id=solution.id)) }}
+            {{ ui.button(text='Update Solution', type='submit') }}
+        </div>
+    </form>
 </div>
 {% endblock %}

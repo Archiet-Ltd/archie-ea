@@ -1,19 +1,8 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Import Review{% endblock %}
-
-{% block extra_css %}
-<style>
-  [x-cloak]{display:none!important}
-  .conf-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-  .conf-fallback { background: rgb(220 38 38); }
-  .conf-stroke-stripped-label { background: rgb(217 119 6); }
-  .conf-nesting { background: rgb(202 138 4); }
-  .conf-notation { background: rgb(22 163 74); }
-  .conf-diagram-image { background: rgb(147 51 234); }
-</style>
-{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="importReview()" x-init="load()" x-cloak>
@@ -21,119 +10,92 @@
     {{ page_header(title='Import Review', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Import Review'}], description='What the importer guessed, so you can confirm or correct it') }}
 
     {# Why this page exists, stated once. An unexplained queue gets cleared without being read. #}
-    <div class="rounded-lg border border-border bg-muted/30 p-4 mb-6 text-sm text-muted-foreground">
-        An import records how it decided each thing. Everything below was inferred rather than
-        stated outright — read from an arrowhead, a line label, or the fact that one box was drawn
-        inside another. Confirming an item marks it reviewed; it does not change it.
-    </div>
+    {% call ui.alert(class='mb-6') %}{{ lucide('info') }}{{ ui.alert_description(text='An import records how it decided each thing. Everything below was inferred rather than stated outright: read from an arrowhead, a line label, or the fact that one box was drawn inside another. Confirming an item marks it reviewed; it does not change it.') }}{% endcall %}
 
     <div x-show="loading" class="p-12 text-center text-sm text-muted-foreground">Loading…</div>
 
-    <div x-show="!loading && loadError" x-cloak
-         class="rounded-lg border border-destructive bg-card p-12 text-center">
+    {% call ui.card(class='border-destructive', attrs={'x-show': '!loading && loadError', 'x-cloak': true}) %}{% call ui.card_content(class='p-12 text-center') %}
         <p class="text-lg font-semibold text-destructive-emphasis">The review queue could not be read</p>
         <p class="text-sm text-muted-foreground mt-1" x-text="loadError"></p>
-        <button type="button" @click="load()"
-                class="mt-4 text-xs underline text-muted-foreground hover:text-foreground">
-            Try again
-        </button>
-    </div>
+        {{ ui.button(text='Try again', variant='outline', class='mt-4', attrs={'type': 'button', '@click': 'load()'}) }}
+    {% endcall %}{% endcall %}
 
-    <div x-show="!loading && !loadError && total === 0" x-cloak
-         class="rounded-lg border border-border bg-card p-12 text-center">
+    {% call ui.card(attrs={'x-show': '!loading && !loadError && total === 0', 'x-cloak': true}) %}{% call ui.card_content(class='p-12 text-center') %}
         <p class="text-lg font-semibold text-foreground">Nothing waiting</p>
         <p class="text-sm text-muted-foreground mt-1">
             Every inferred element and relationship has been reviewed.
         </p>
-        <button type="button" @click="includeReviewed = true; load()"
-                class="mt-4 text-xs underline text-muted-foreground hover:text-foreground">
-            Show items already reviewed
-        </button>
-    </div>
+        {{ ui.button(text='Show items already reviewed', variant='outline', class='mt-4', attrs={'type': 'button', '@click': 'includeReviewed = true; load()'}) }}
+    {% endcall %}{% endcall %}
 
     <template x-if="!loading && total > 0">
     <div>
         {# Confidence bands, worst first. #}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
             <template x-for="g in groups" :key="g.reason">
-                <button type="button" @click="activeReason = (activeReason === g.reason ? '' : g.reason)"
-                        :class="activeReason === g.reason ? 'ring-2 ring-primary' : ''"
-                        class="rounded-xl border border-border bg-card p-4 text-left hover:bg-accent transition-colors">
+                {% call ui.button(variant='outline', class='h-auto flex-col items-start justify-start whitespace-normal p-4 text-left', attrs={'type': 'button', '@click': "activeReason = (activeReason === g.reason ? '' : g.reason)", ':class': "activeReason === g.reason ? 'ring-2 ring-primary' : ''"}) %}
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="conf-dot" :class="'conf-' + g.reason"></span>
+                        <span class="inline-block size-2 shrink-0 rounded-full" :class="dot(g.reason)"></span>
                         <span class="text-sm font-semibold text-foreground" x-text="g.label"></span>
                     </div>
                     <p class="text-2xl font-bold text-foreground" x-text="g.count"></p>
-                    <p class="text-xs text-muted-foreground mt-1" x-text="g.explanation"></p>
-                </button>
+                    <p class="text-xs font-normal text-muted-foreground mt-1" x-text="g.explanation"></p>
+                {% endcall %}
             </template>
         </div>
 
         {# Bulk actions. Retype only applies to elements. #}
         <div class="flex flex-wrap items-center gap-3 mb-4">
-            <label class="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <input type="checkbox" @change="toggleAll($event.target.checked)"
-                       class="rounded border-input" aria-label="Select all shown">
-                Select all shown
-            </label>
+            {% call ui.field(attrs={'data-orientation': 'horizontal', 'class': 'w-auto'}) %}
+                {{ ui.checkbox(id='review-select-all', attrs={'aria-label': 'Select all shown', '@click': 'toggleAll(!allSelected)', ':aria-checked': "allSelected ? 'true' : 'false'", ':data-state': "allSelected ? 'checked' : 'unchecked'"}) }}
+                {{ ui.field_label(text='Select all shown', attrs={'for': 'review-select-all'}) }}
+            {% endcall %}
             <span class="text-sm text-muted-foreground" x-text="selected.length + ' selected'"></span>
 
-            <button type="button" @click="accept()" :disabled="!selected.length"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Confirm as correct
-            </button>
+            {{ ui.button(text='Confirm as correct', attrs={'type': 'button', '@click': 'accept()', ':disabled': '!selected.length'}) }}
 
-            <select x-model="retypeTo"
-                    class="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                    aria-label="Change element type to">
-                <option value="">Change element type to…</option>
+            {% call ui.native_select_wrapper(class='w-auto') %}{% call ui.native_select(class='w-auto', attrs={'x-model': 'retypeTo', 'aria-label': 'Change element type to'}) %}
+                {{ ui.native_select_option('Change element type to…', value='') }}
                 <template x-for="t in elementTypes" :key="t">
-                    <option :value="t" x-text="t"></option>
+                    {{ ui.native_select_option(attrs={':value': 't', 'x-text': 't'}) }}
                 </template>
-            </select>
-            <button type="button" @click="retype()" :disabled="!retypeTo || !selectedElements.length"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Apply to <span x-text="selectedElements.length"></span> element(s)
-            </button>
+            {% endcall %}{% endcall %}
+            {% call ui.button(variant='outline', attrs={'type': 'button', '@click': 'retype()', ':disabled': '!retypeTo || !selectedElements.length'}) %}Apply to <span x-text="selectedElements.length"></span> element(s){% endcall %}
 
             <span x-show="message" x-cloak class="text-xs text-muted-foreground" x-text="message"></span>
         </div>
 
-        <div class="rounded-lg border border-border bg-card overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm" data-testid="review-table">
-                    <thead class="bg-muted/40">
-                        <tr>
-                            <th class="px-4 py-2 w-8"><span class="sr-only">Select</span></th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Item</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Kind</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Why it needs review</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        {% call ui.card(class='overflow-hidden') %}
+            {% call ui.table_container() %}
+                {% call ui.table(attrs={'data-testid': 'review-table'}) %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}
+                        {% call ui.table_head(class='w-8') %}<span class="sr-only">Select</span>{% endcall %}
+                        {{ ui.table_head(text='Item') }}
+                        {{ ui.table_head(text='Kind') }}
+                        {{ ui.table_head(text='Type') }}
+                        {{ ui.table_head(text='Why it needs review') }}
+                    {% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
                         <template x-for="item in shown" :key="item.kind + '-' + item.id">
-                            <tr class="border-t border-border hover:bg-muted/40">
-                                <td class="px-4 py-2">
-                                    <input type="checkbox" :value="item.kind + '-' + item.id"
-                                           x-model="selected" class="rounded border-input"
-                                           :aria-label="'Select ' + item.name">
-                                </td>
-                                <td class="px-4 py-2 text-foreground" x-text="item.name"></td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground" x-text="item.kind"></td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground" x-text="item.type"></td>
-                                <td class="px-4 py-2">
+                            {% call ui.table_row() %}
+                                {% call ui.table_cell() %}
+                                    {{ ui.checkbox(attrs={'@click': "toggleOne(item.kind + '-' + item.id)", ':aria-checked': "selected.includes(item.kind + '-' + item.id) ? 'true' : 'false'", ':data-state': "selected.includes(item.kind + '-' + item.id) ? 'checked' : 'unchecked'", ':aria-label': "'Select ' + item.name"}) }}
+                                {% endcall %}
+                                {{ ui.table_cell(class='text-foreground', attrs={'x-text': 'item.name'}) }}
+                                {{ ui.table_cell(class='text-xs text-muted-foreground', attrs={'x-text': 'item.kind'}) }}
+                                {{ ui.table_cell(class='text-xs text-muted-foreground', attrs={'x-text': 'item.type'}) }}
+                                {% call ui.table_cell() %}
                                     <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <span class="conf-dot" :class="'conf-' + item.reason"></span>
+                                        <span class="inline-block size-2 shrink-0 rounded-full" :class="dot(item.reason)"></span>
                                         <span x-text="reasonLabel(item.reason)"></span>
                                     </span>
-                                </td>
-                            </tr>
+                                {% endcall %}
+                            {% endcall %}
                         </template>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    {% endcall %}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
     </div>
     </template>
 </div>
@@ -162,6 +124,27 @@ function importReview() {
         },
         get selectedElements() {
             return this.selected.filter(k => k.startsWith('element-'));
+        },
+
+        get allSelected() {
+            return this.shown.length > 0 && this.selected.length === this.shown.length;
+        },
+
+        // Token colours only: one dot per confidence band.
+        dot(reason) {
+            return {
+                'fallback': 'bg-destructive',
+                'stroke-stripped-label': 'bg-warning',
+                'nesting': 'bg-warning',
+                'notation': 'bg-success',
+                'diagram-image': 'bg-primary'
+            }[reason] || 'bg-muted-foreground';
+        },
+
+        toggleOne(key) {
+            this.selected = this.selected.includes(key)
+                ? this.selected.filter(k => k !== key)
+                : this.selected.concat([key]);
         },
 
         reasonLabel(reason) {
