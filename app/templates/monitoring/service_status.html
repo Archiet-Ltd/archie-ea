@@ -1,10 +1,9 @@
-{# design-block: record-facts
-   Public, read-only service status: platform-wide component states, the time of the last
+{# design-block: public #}
+{# Public, read-only service status: platform-wide component states, the time of the last
    check and recent incidents. No organisation or user data is read or shown here.
    smoke-coverage-ok: covered by tests/smoke/test_status_page_public_journey.py #}
 {% extends 'layouts/public_base.html' %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Service status{% endblock %}
 
@@ -13,6 +12,12 @@
 {% endblock %}
 
 {% block body_theme %}theme-marketing{% endblock %}
+
+{% macro no_data(title, description) -%}
+{%- call ui.empty() -%}
+{%- call ui.empty_header() -%}{{ ui.empty_title(text=title) }}{{ ui.empty_description(text=description) }}{%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
 
 {% macro state_badge(state, label, testid) -%}
 {%- set dot = {'operational': 'bg-success', 'degraded': 'bg-warning', 'outage': 'bg-destructive'}.get(state, 'bg-muted-foreground') -%}
@@ -65,11 +70,7 @@
   <section aria-labelledby="incident-history-heading" class="flex flex-col gap-3">
     <h2 id="incident-history-heading" class="text-base font-semibold text-foreground">Incident history</h2>
     {% if not status.incidents_checked %}
-    {{ empty_state(
-        title='Incident history is not available right now',
-        description='The incident record could not be read during this check. The component states above are still current.',
-        icon='clock'
-    ) }}
+    {{ no_data('Incident history is not available right now', 'The incident record could not be read during this check. The component states above are still current.') }}
     {% elif status.history %}
     <ul class="flex flex-col gap-2" data-testid="service-status-history">
       {% for incident in status.history %}
@@ -87,11 +88,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    {{ empty_state(
-        title='No incidents in the last 90 days',
-        description='When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.',
-        icon='shield-check'
-    ) }}
+    {{ no_data('No incidents in the last 90 days', 'When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.') }}
     {% endif %}
   </section>
 </div>
