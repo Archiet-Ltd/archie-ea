@@ -979,6 +979,35 @@ _CAPABILITIES = [
     ("Security Operations", "LQ-CAP-SECURITY", 3, 4, 3),
 ]
 
+# Child capabilities nested under the level-1 capabilities above, so the capability
+# map and the hierarchy show containment rather than a flat list.
+# (parent code, name, code, current maturity, target maturity, level)
+_CAPABILITY_CHILDREN = [
+    ("LQ-CAP-CALIBRATION", "Calibration Scheduling", "LQ-CAP-CAL-SCHEDULING", 3, 4, 2),
+    ("LQ-CAP-CALIBRATION", "Certificate Issuance", "LQ-CAP-CAL-CERTIFICATES", 4, 5, 2),
+    ("LQ-CAP-CALIBRATION", "Reference Standard Tracking", "LQ-CAP-CAL-STANDARDS", 2, 4, 2),
+    ("LQ-CAP-CAL-CERTIFICATES", "Certificate Archive", "LQ-CAP-CAL-ARCHIVE", 3, 4, 3),
+    ("LQ-CAP-CAL-SCHEDULING", "Engineer Dispatch", "LQ-CAP-CAL-DISPATCH", 2, 3, 3),
+    ("LQ-CAP-WATER-QUALITY", "Sample Collection", "LQ-CAP-WQ-SAMPLING", 4, 5, 2),
+    ("LQ-CAP-WATER-QUALITY", "Lab Result Reporting", "LQ-CAP-WQ-REPORTING", 3, 5, 2),
+    ("LQ-CAP-FIELD-SERVICE", "Job Allocation", "LQ-CAP-FS-ALLOCATION", 2, 4, 2),
+    ("LQ-CAP-FIELD-SERVICE", "Mobile Work Orders", "LQ-CAP-FS-WORKORDERS", 1, 4, 2),
+    ("LQ-CAP-FS-WORKORDERS", "Offline Sync", "LQ-CAP-FS-OFFLINE", 1, 3, 3),
+    ("LQ-CAP-INVENTORY", "Stock Counting", "LQ-CAP-INV-COUNTING", 3, 4, 2),
+    ("LQ-CAP-INVENTORY", "Reorder Planning", "LQ-CAP-INV-REORDER", 2, 4, 2),
+    ("LQ-CAP-FULFILMENT", "Order Picking", "LQ-CAP-FUL-PICKING", 4, 5, 2),
+    ("LQ-CAP-FULFILMENT", "Despatch and Tracking", "LQ-CAP-FUL-DESPATCH", 4, 4, 2),
+    ("LQ-CAP-SUPPLIER", "Supplier Onboarding", "LQ-CAP-SUP-ONBOARDING", 2, 3, 2),
+    ("LQ-CAP-SUPPLIER", "Supplier Performance Review", "LQ-CAP-SUP-REVIEW", 1, 3, 2),
+    ("LQ-CAP-COMPLIANCE", "Audit Management", "LQ-CAP-COMP-AUDIT", 3, 4, 2),
+    ("LQ-CAP-COMPLIANCE", "Evidence Collection", "LQ-CAP-COMP-EVIDENCE", 2, 4, 2),
+    ("LQ-CAP-WORKFORCE", "Skills Matrix", "LQ-CAP-WF-SKILLS", 2, 3, 2),
+    ("LQ-CAP-ASSET-LIFECYCLE", "Maintenance Planning", "LQ-CAP-ASSET-MAINT", 2, 4, 2),
+    ("LQ-CAP-INCIDENT", "Incident Triage", "LQ-CAP-INC-TRIAGE", 3, 4, 2),
+    ("LQ-CAP-DEMAND", "Forecast Modelling", "LQ-CAP-DEM-MODEL", 1, 3, 2),
+    ("LQ-CAP-QUALITY", "Non-conformance Handling", "LQ-CAP-QUA-NCR", 4, 5, 2),
+]
+
 # Each demo capability sits in a business domain, so the capability heat map has
 # rows to compare rather than one "No domain" strip. (code, name) per domain.
 _CAPABILITY_DOMAINS = {
@@ -2983,6 +3012,58 @@ def _seed_demo_company() -> dict:
             if bc is not None and bc.deprecated_in_favor_of_id is None:
                 bc.deprecated_in_favor_of_id = ucap.id
         db.session.flush()
+
+        # ── 7a-ii. child capabilities nested under their parents ────────────
+        # Idempotent and scoped to this organisation: a child found by code is
+        # re-parented only when it has no parent yet.
+        from app.models.unified_capability import UnifiedCapability as _UC
+
+        bc_by_code = {
+            b.code: b
+            for b in db.session.query(BusinessCapability)
+            .filter(BusinessCapability.organization_id == org_id).all()
+        }
+        uc_by_code = {u.code: u for u in _resolve_caps(org_id).values()}
+        children_made = 0
+        for pcode, cname, ccode, cur, tgt, clevel in _CAPABILITY_CHILDREN:
+            pbc, puc = bc_by_code.get(pcode), uc_by_code.get(pcode)
+            if pbc is None or puc is None:
+                continue
+            cbc = bc_by_code.get(ccode)
+            if cbc is None:
+                cbc = BusinessCapability(
+                    name=cname, code=ccode, organization_id=org_id, level=clevel,
+                    parent_capability_id=pbc.id,
+                    business_domain=pbc.business_domain,
+                    business_owner=pbc.business_owner,
+                    current_maturity_level=cur, target_maturity_level=tgt,
+                    maturity_assessment_date=_dt.datetime.utcnow(),
+                )
+                db.session.add(cbc)
+                db.session.flush()
+                bc_by_code[ccode] = cbc
+                children_made += 1
+            elif cbc.parent_capability_id is None:
+                cbc.parent_capability_id = pbc.id
+            cuc = uc_by_code.get(ccode) or db.session.query(_UC).filter(
+                _UC.organization_id == org_id, _UC.code == ccode).first()
+            if cuc is None:
+                cuc, _c = ensure_capability_record(
+                    name=cname, code=ccode, level=clevel, organization_id=org_id,
+                    domain_id=puc.domain_id, parent_capability_id=puc.id,
+                    capability_type=puc.capability_type,
+                    current_maturity_level=cur, target_maturity_level=tgt,
+                )
+            if cuc.parent_capability_id is None:
+                cuc.parent_capability_id = puc.id
+            if cuc.domain_id is None:
+                cuc.domain_id = puc.domain_id
+            if cuc.current_maturity_level is None:
+                cuc.current_maturity_level = cur
+                cuc.target_maturity_level = tgt
+            uc_by_code[ccode] = cuc
+        db.session.flush()
+        stats["capability_children_created"] = children_made
 
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
