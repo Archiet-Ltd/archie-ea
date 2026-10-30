@@ -1,23 +1,11 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/dialog.html' import dialog %}
 
 {% block title %}Data Validation - Response Comparison{% endblock %}
 
-{% block head %}
-<style>
-  .comparison-row { transition: all 0.2s; }
-  .comparison-row:hover { background: hsl(var(--accent)); }
-  .value-diff { background: hsl(var(--destructive)/0.1); border-left: 3px solid hsl(var(--destructive)); }
-  .value-match { background: hsl(var(--success)/0.1); border-left: 3px solid hsl(var(--success)); }
-  .source-badge { font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; }
-  .source-abacus { background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); }
-  .source-manual { background: hsl(var(--amber-500)/0.1); color: hsl(var(--amber-600)); }
-  .source-assessment { background: hsl(var(--green-500)/0.1); color: hsl(var(--green-600)); }
-  .conflict-indicator { animation: pulse 2s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-</style>
-{% endblock %}
+{% block head %}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -25,15 +13,13 @@
   <div class="mb-8">
     {% macro _ps_actions() %}
 <div class="flex gap-3">
-        <select id="app-selector" class="px-3 py-2 border rounded-md" @change="loadComparison()" aria-label="Select Application...">
-          <option value="">Select Application...</option>
+        {% call ui.native_select_wrapper() %}{% call ui.native_select(id='app-selector', attrs={'@change': 'loadComparison()', 'aria-label': 'Select Application...'}) %}
+          {{ ui.native_select_option('Select Application...', value='') }}
           {% for app in applications %}
-          <option value="{{ app.id }}">{{ app.name }}</option>
+          {{ ui.native_select_option(app.name, value=app.id) }}
           {% endfor %}
-        </select>
-        <button type="button" @click="resolveAllConflicts()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" id="resolve-all-btn" disabled>
-          Resolve All
-        </button>
+        {% endcall %}{% endcall %}
+        {{ ui.button(text='Resolve All', attrs={'type': 'button', 'id': 'resolve-all-btn', '@click': 'resolveAllConflicts()', 'disabled': ''}) }}
       </div>
     {% endmacro %}
     {{ page_shell(title='Response Validation', breadcrumb=[('Home', '/'), ('Rationalization', url_for('dashboard_pages.rationalization_scorecard')), ('Response Validation', none)], subtitle='Compare and resolve data discrepancies between sources', actions_caller=_ps_actions) }}
@@ -41,10 +27,10 @@
 
   <!-- Summary Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    {{ metrics_card(title='Total Fields', value='-', value_id='total-fields', icon='list', description='Compared fields') }}
-    {{ metrics_card(title='Matched', value='-', value_id='matched-fields', icon='check-circle', value_class='text-success', description='Values in agreement') }}
-    {{ metrics_card(title='Conflicts', value='-', value_id='conflict-fields', icon='alert-triangle', value_class='text-warning', description='Requires resolution') }}
-    {{ metrics_card(title='Missing Data', value='-', value_id='missing-fields', icon='database', value_class='text-primary', description='Incomplete values') }}
+    {% call ui.card() %}{% call ui.card_header() %}{{ ui.card_description(text='Total Fields') }}{{ ui.card_title(text='Not set', id='total-fields', class='text-2xl tabular-nums') }}{% endcall %}{% call ui.card_content() %}<p class="text-xs text-muted-foreground">Compared fields</p>{% endcall %}{% endcall %}
+    {% call ui.card() %}{% call ui.card_header() %}{{ ui.card_description(text='Matched') }}{{ ui.card_title(text='Not set', id='matched-fields', class='text-2xl tabular-nums text-success') }}{% endcall %}{% call ui.card_content() %}<p class="text-xs text-muted-foreground">Values in agreement</p>{% endcall %}{% endcall %}
+    {% call ui.card() %}{% call ui.card_header() %}{{ ui.card_description(text='Conflicts') }}{{ ui.card_title(text='Not set', id='conflict-fields', class='text-2xl tabular-nums text-warning') }}{% endcall %}{% call ui.card_content() %}<p class="text-xs text-muted-foreground">Requires resolution</p>{% endcall %}{% endcall %}
+    {% call ui.card() %}{% call ui.card_header() %}{{ ui.card_description(text='Missing Data') }}{{ ui.card_title(text='Not set', id='missing-fields', class='text-2xl tabular-nums text-primary') }}{% endcall %}{% call ui.card_content() %}<p class="text-xs text-muted-foreground">Incomplete values</p>{% endcall %}{% endcall %}
   </div>
 
   <!-- Data Sources Legend -->
@@ -58,77 +44,76 @@
   </div>
 
   <!-- Comparison Table -->
-  <div class="bg-card border border-border rounded-lg overflow-hidden">
+  {% call ui.card(class='overflow-hidden') %}
     <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Response validation">
-      <table class="dense-table w-full text-sm">
-        <thead class="bg-muted">
-          <tr>
-            <th class="text-left py-3 px-4 font-medium">Field</th>
-            <th class="text-left py-3 px-4 font-medium w-48">Abacus Value</th>
-            <th class="text-left py-3 px-4 font-medium w-48">Manual/Assessment Value</th>
-            <th class="text-center py-3 px-4 font-medium w-24">Status</th>
-            <th class="text-center py-3 px-4 font-medium w-32">Action</th>
-          </tr>
-        </thead>
-        <tbody id="comparison-body">
-          <tr>
-            <td colspan="5" class="text-center py-12 text-muted-foreground">
-              <i data-lucide="database" class="h-12 w-12 mx-auto mb-3 opacity-50" aria-hidden="true"></i>
+      {% call ui.table() %}
+        {% call ui.table_header() %}
+          {% call ui.table_row() %}
+            {{ ui.table_head(text='Field') }}
+            {{ ui.table_head(text='Abacus Value', class='w-48') }}
+            {{ ui.table_head(text='Manual/Assessment Value', class='w-48') }}
+            {{ ui.table_head(text='Status', class='w-24 text-center') }}
+            {{ ui.table_head(text='Action', class='w-32 text-center') }}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.table_body(id='comparison-body') %}
+          {% call ui.table_row() %}
+            {% call ui.table_cell(class='py-12 text-center text-muted-foreground', attrs={'colspan': '5'}) %}
+              {{ lucide('database', class_name='h-12 w-12 mx-auto mb-3 opacity-50') }}
               <p>Select an application to view data comparison</p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
     </div>
-  </div>
+  {% endcall %}
+
+  <template id="resolve-btn-tpl">{{ ui.button(text='Resolve', variant='link', size='sm', attrs={'type': 'button', 'data-action': 'openResolutionModal'}) }}</template>
 
   <!-- Resolution Modal -->
-  <div id="resolution-modal" class="modal-root items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-overlay/50" hidden  role="dialog">
-    <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
-      <h2 class="text-lg font-semibold mb-4">Resolve Conflict</h2>
-      <div class="space-y-4">
-        <div>
-          <label class="text-sm text-muted-foreground">Conflicting field</label>
-          <div id="modal-field-name" class="font-medium"></div>
+  <div x-data="{ resolutionOpen: false }" @open-resolution.window="resolutionOpen = true" @close-resolution.window="resolutionOpen = false" id="resolution-modal">
+  {% call dialog(open_expr='resolutionOpen', close_expr='resolutionOpen = false', title='Resolve Conflict') %}
+    <div class="space-y-4">
+      <div>
+        <div class="text-sm text-muted-foreground">Conflicting field</div>
+        <div id="modal-field-name" class="font-medium"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="px-3 py-2 bg-primary/10 rounded-md">
+          <div class="text-xs text-primary mb-1">Abacus</div>
+          <div id="modal-abacus-value" class="font-medium"></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="px-3 py-2 bg-primary/10 rounded-md">
-            <div class="text-xs text-primary mb-1">Abacus</div>
-            <div id="modal-abacus-value" class="font-medium"></div>
-          </div>
-          <div class="px-3 py-2 bg-warning/10 rounded-md">
-            <div class="text-xs text-warning-emphasis mb-1">Manual/Assessment</div>
-            <div id="modal-manual-value" class="font-medium"></div>
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-2">Select Correct Value</label>
-          <div class="space-y-2">
-            <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
-              <input type="radio" name="resolution" value="abacus" class="w-4 h-4" aria-label="Resolution">
-              <span>Use Abacus value</span>
-            </label>
-            <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
-              <input type="radio" name="resolution" value="manual" class="w-4 h-4" aria-label="Resolution">
-              <span>Use Manual/Assessment value</span>
-            </label>
-            <label for="custom-value" class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
-              <input type="radio" name="resolution" value="custom" class="w-4 h-4" aria-label="Resolution">
-              <span>Enter custom value:</span>
-            </label>
-            <input type="text" id="custom-value" class="w-full rounded border px-3 py-2 hidden" placeholder="Enter value...">
-          </div>
-        </div>
-        <div>
-          <label for="resolution-notes" class="block text-sm font-medium mb-2">Resolution Notes (optional)</label>
-          <textarea id="resolution-notes" rows="2" class="w-full rounded border px-3 py-2" placeholder="Why this value was chosen..."></textarea>
+        <div class="px-3 py-2 bg-warning/10 rounded-md">
+          <div class="text-xs text-warning-emphasis mb-1">Manual/Assessment</div>
+          <div id="modal-manual-value" class="font-medium"></div>
         </div>
       </div>
-      <div class="flex justify-end gap-3 mt-6">
-        <button type="button" @click="closeResolutionModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
-        <button type="button" @click="confirmResolution()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" aria-label="Confirm">Confirm</button>
+      <div class="space-y-2">
+        <div class="text-sm font-medium">Select Correct Value</div>
+        <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
+          {{ ui.input(type='radio', name='resolution', value='abacus', class='size-4 h-4 w-4 p-0', attrs={'aria-label': 'Use Abacus value'}) }}
+          <span>Use Abacus value</span>
+        </label>
+        <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
+          {{ ui.input(type='radio', name='resolution', value='manual', class='size-4 h-4 w-4 p-0', attrs={'aria-label': 'Use Manual/Assessment value'}) }}
+          <span>Use Manual/Assessment value</span>
+        </label>
+        <label class="flex items-center gap-2 p-3 border rounded-md cursor-pointer hover:bg-accent">
+          {{ ui.input(type='radio', name='resolution', value='custom', class='size-4 h-4 w-4 p-0', attrs={'aria-label': 'Enter custom value'}) }}
+          <span>Enter custom value:</span>
+        </label>
+        {{ ui.input(id='custom-value', type='text', class='hidden', placeholder='Enter value...', attrs={'aria-label': 'Custom value'}) }}
       </div>
+      {% call ui.field() %}
+        {{ ui.field_label(text='Resolution Notes (optional)', attrs={'for': 'resolution-notes'}) }}
+        {{ ui.textarea(id='resolution-notes', rows=2, placeholder='Why this value was chosen...') }}
+      {% endcall %}
     </div>
+    <div class="flex justify-end gap-3 mt-6">
+      {{ ui.button(text='Cancel', variant='outline', attrs={'type': 'button', '@click': 'closeResolutionModal()', 'aria-label': 'Close'}) }}
+      {{ ui.button(text='Confirm', attrs={'type': 'button', '@click': 'confirmResolution()', 'aria-label': 'Confirm'}) }}
+    </div>
+  {% endcall %}
   </div>
 </div>
 
@@ -184,32 +169,37 @@ function renderComparison(comparisons) {
   }
 
   tbody.innerHTML = comparisons.map((item, idx) => {
-    const statusClass = item.status === 'conflict' ? 'value-diff' : (item.status === 'match' ? 'value-match' : '');
+    const statusClass = item.status === 'conflict' ? 'border-l-4 border-l-destructive bg-destructive/10' : (item.status === 'match' ? 'bg-success/10' : '');
     const statusIcon = item.status === 'conflict'
       ? '<i data-lucide="alert-triangle" class="h-4 w-4 text-warning" aria-hidden="true"></i>'
       : (item.status === 'match' ? '<i data-lucide="check-circle" class="h-4 w-4 text-success" aria-hidden="true"></i>' : '<i data-lucide="help-circle" class="h-4 w-4 text-primary" aria-hidden="true"></i>');
 
     return `
-      <tr class="comparison-row border-b ${statusClass}" data-idx="${idx}">
+      <tr class="comparison-row border-b hover:bg-accent ${statusClass}" data-idx="${idx}">
         <td class="py-3 px-4 font-medium">${escapeHtml(item.field)}</td>
         <td class="py-3 px-4">
-          <span class="source-badge source-abacus mb-1 inline-block">Abacus</span>
+          <span class="mb-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Abacus</span>
           <div class="text-sm ${!item.abacus_value ? 'text-muted-foreground italic' : ''}">${escapeHtml(item.abacus_value || 'Not set')}</div>
         </td>
         <td class="py-3 px-4">
-          <span class="source-badge ${item.manual_source === 'assessment' ? 'source-assessment' : 'source-manual'} mb-1 inline-block">${item.manual_source === 'assessment' ? 'Assessment' : 'Manual'}</span>
+          <span class="${item.manual_source === 'assessment' ? 'bg-success/10 text-success-emphasis' : 'bg-warning/10 text-warning-emphasis'} mb-1 inline-block rounded-full px-2 py-0.5 text-xs">${item.manual_source === 'assessment' ? 'Assessment' : 'Manual'}</span>
           <div class="text-sm ${!item.manual_value ? 'text-muted-foreground italic' : ''}">${escapeHtml(item.manual_value || 'Not set')}</div>
         </td>
         <td class="py-3 px-4 text-center">${statusIcon}</td>
         <td class="py-3 px-4 text-center">
-          ${item.status === 'conflict' ?
-            `<button type="button" data-action="openResolutionModal" data-id="${idx}" class="text-primary hover:underline text-sm">Resolve</button>` :
-            '<span class="text-muted-foreground text-sm">-</span>'
-          }
+          ${item.status === 'conflict' ? `<span data-resolve-slot="${idx}"></span>` : ''}
         </td>
       </tr>
     `;
   }).join('');
+
+  // The Resolve button comes from the button component, cloned from the page's template element.
+  const btnTpl = document.getElementById('resolve-btn-tpl');
+  tbody.querySelectorAll('[data-resolve-slot]').forEach(slot => {
+    const btn = btnTpl.content.firstElementChild.cloneNode(true);
+    btn.dataset.id = slot.dataset.resolveSlot;
+    slot.replaceWith(btn);
+  });
 
   lucide.createIcons();
 }
@@ -232,21 +222,11 @@ function openResolutionModal(idx) {
   document.querySelectorAll('input[name="resolution"]').forEach(r => r.checked = false);
   document.getElementById('resolution-notes').value = '';
 
-  if (window.Platform && window.Platform.modal) {
-    window.Platform.modal.open('resolution-modal');
-  } else {
-    document.getElementById('resolution-modal').classList.remove('hidden');
-    document.getElementById('resolution-modal').classList.add('flex');
-  }
+  window.dispatchEvent(new CustomEvent('open-resolution'));
 }
 
 function closeResolutionModal() {
-  if (window.Platform && window.Platform.modal) {
-    window.Platform.modal.close('resolution-modal');
-  } else {
-    document.getElementById('resolution-modal').classList.add('hidden');
-    document.getElementById('resolution-modal').classList.remove('flex');
-  }
+  window.dispatchEvent(new CustomEvent('close-resolution'));
   currentConflict = null;
 }
 
@@ -337,11 +317,6 @@ async function resolveAllConflicts() {
     Platform.toast.success('All conflicts resolved.');
   }
 }
-
-// Close modal on backdrop click
-document.getElementById('resolution-modal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeResolutionModal();
-});
 
 // Initialize
 lucide.createIcons();
