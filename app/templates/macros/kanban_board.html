@@ -57,7 +57,8 @@
                       stage_group=None, show_wip=True, show_move=True,
                       card_width='w-72', region_label='Kanban board, scrolls horizontally',
                       columns='server', inner_class='flex gap-4 min-w-max',
-                      plain_headers=False, unit='item', lane=False) %}
+                      plain_headers=False, unit='item', lane=False,
+                      exit_rules=None, sort_notes=None) %}
 {#
   Two column-rendering modes share one shell:
     columns='server'  the macro renders each column from the Jinja `states`
@@ -75,6 +76,9 @@
                       provides the `kanban-board` container and the sideways
                       scroll region, then yields once via {{ caller() }} for the
                       whole column loop.
+    exit_rules        optional {state: sentence}; shown in muted text under the column's
+                      header as the rule for leaving the column. Default none.
+    sort_notes        optional {state: sentence}; says a column is kept in a stated order.
     unit              the word read after a column's count by assistive tech.
 #}
 {% set body = caller %}
@@ -132,6 +136,14 @@
                         </div>
                     {% endcall %}
                     {% call card_content(class='kanban-column-cards min-h-[3rem] space-y-3 ' ~ ('!p-1 !pt-0' if lane else '!p-3 !pt-0') ~ ' transition-colors') %}
+                        {% set exit_rule = exit_rules.get(state) if exit_rules else None %}
+                        {% set sort_note = sort_notes.get(state) if sort_notes else None %}
+                        {% if exit_rule or sort_note %}
+                        <div class="px-1 text-xs text-muted-foreground">
+                            {% if exit_rule %}<p data-testid="column-exit-rule">{{ exit_rule }}</p>{% endif %}
+                            {% if sort_note %}<p data-testid="column-sort-note">{{ sort_note }}</p>{% endif %}
+                        </div>
+                        {% endif %}
                         <div class="space-y-3 rounded-md"
                              {% if can_write %}:class="dragOverColumn === '{{ state }}' ? 'bg-primary/5 ring-1 ring-primary/20' : ''"{% endif %}>
                             {{ body(state) }}

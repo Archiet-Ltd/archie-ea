@@ -6,7 +6,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/avatar.html' import avatar %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}SAFe Portfolio Kanban{% endblock %}
 
@@ -34,6 +34,12 @@
             <div>
                 <label for="epic-name" class="block text-sm font-medium mb-1.5">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
                 {{ input(id='epic-name', name='name', required=true, placeholder='e.g. Customer onboarding modernisation') }}
+            </div>
+            <div>
+                <label for="epic-type" class="block text-sm font-medium mb-1.5">Epic type</label>
+                {% call ui.native_select(id='epic-type', attrs={'name': 'epic_type'}) %}
+                    {% for t in epic_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                {% endcall %}
             </div>
             <div class="grid grid-cols-2 gap-4">
                 {% for field, label in [('business_value', 'Business Value'), ('time_criticality', 'Time Criticality'), ('risk_reduction', 'Risk Reduction'), ('job_size', 'Job Size')] %}
@@ -87,6 +93,8 @@
                 can_write=can_write,
                 stage_group=stage_group,
                 lane=true,
+                exit_rules=exit_rules,
+                sort_notes=sort_notes,
                 region_label='Portfolio Kanban board, scrolls horizontally') %}
             {% set group = stage_group.get(state) %}
             <template x-for="card in columnCards('{{ state }}')" :key="card.id">
@@ -104,19 +112,35 @@
                         {% endcall %}
                     </div>
 
-                    <template x-if="card.owner_name || card.updated_at || card.created_at">
-                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                            <template x-if="card.owner_name">
-                                {% call avatar(size='sm', class='h-6 w-6 text-xs') %}<span :title="card.owner_name" x-text="card.owner_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()"></span>{% endcall %}
-                            </template>
-                            <template x-if="card.updated_at || card.created_at">
-                                <span class="flex items-center gap-1">
-                                    <i data-lucide="calendar" class="h-3 w-3" aria-hidden="true"></i>
-                                    <span x-text="card.updated_at || card.created_at"></span>
-                                </span>
-                            </template>
-                        </div>
-                    </template>
+                    <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <template x-if="card.epic_type">
+                            {% call ui.badge(variant='outline', attrs={'data-testid': 'epic-type'}) %}<span x-text="card.epic_type"></span>{% endcall %}
+                        </template>
+                        <template x-if="!card.epic_type">
+                            <span data-testid="epic-type">Type not set</span>
+                        </template>
+                        <template x-if="card.updated_at || card.created_at">
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="calendar" class="h-3 w-3" aria-hidden="true"></i>
+                                <span x-text="card.updated_at || card.created_at"></span>
+                            </span>
+                        </template>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 text-xs" data-testid="epic-owner">
+                        <template x-if="card.owner_name">
+                            {% call ui.avatar(class='size-6') %}{% call ui.avatar_fallback(class='text-xs') %}<span x-text="card.owner_initials"></span>{% endcall %}{% endcall %}
+                        </template>
+                        <template x-if="card.owner_linked">
+                            <a :href="card.owner_href" class="truncate font-medium text-foreground hover:underline" x-text="card.owner_name"></a>
+                        </template>
+                        <template x-if="card.owner_plain">
+                            <span class="truncate font-medium text-foreground" x-text="card.owner_name"></span>
+                        </template>
+                        <template x-if="card.owner_missing">
+                            <span class="text-muted-foreground">No owner recorded</span>
+                        </template>
+                    </div>
 
                     <div x-show="expanded" x-collapse class="border-t border-border pt-2">
                         <dl class="space-y-1 text-xs">

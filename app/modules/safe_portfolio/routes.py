@@ -18,6 +18,8 @@ from app.services.element_profile_service import (
     set_wsjf_component,
     set_wsjf_components,
 )
+from app.models.application_owner import ApplicationOwner
+from app.services.element_ownership_service import set_element_owner
 from app.services.archimate_backbone import create_backbone_element
 from app.services.wsjf_service import compute_wsjf_score
 from app.services.profiles.safe import KINDS
@@ -28,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Kanban column order — sourced from the one SAFe profile registry
 KANBAN_STATES = KINDS["Epic"]["properties"]["kanban_state"]["values"]
+EPIC_TYPES = KINDS["Epic"]["properties"]["epic_type"]["values"]
 
 # SAFe portfolio WIP limits per column. Funnel and Done have no limit; the four
 # middle columns do (recognisable-form reference, Portfolio Kanban conventions).
@@ -51,6 +54,20 @@ STAGE_GROUP = {
     "Implementing": "execution",
     "Done": "done",
 }
+
+# The rule for leaving each column, shown in muted text under its header. These
+# are the exit criteria of SAFe's Portfolio Kanban in plain words.
+EXIT_RULES = {
+    "Funnel": "Epic idea captured with its hypothesis",
+    "Reviewing": "Hypothesis refined and ready for analysis",
+    "Analyzing": "Lean business case and WSJF ready",
+    "Portfolio Backlog": "Approved and waiting for capacity",
+    "Implementing": "Minimum viable product released",
+    "Done": "Outcome delivered or the epic stopped",
+}
+
+# Columns that are kept in a stated order, and the words that say so.
+SORT_NOTES = {"Portfolio Backlog": "Sorted by WSJF"}
 
 # What an empty column means and what to do next, per state. A state with no
 # entry here falls back to a plain sentence in the template.
@@ -118,6 +135,9 @@ def add_epic():
     )
     set_kind(element, "Epic", framework_id="safe", source="user")
     set_kind_property(element, "kanban_state", KANBAN_STATES[0], source="user")
+    epic_type = (request.form.get("epic_type") or "").strip()
+    if epic_type in EPIC_TYPES:
+        set_kind_property(element, "epic_type", epic_type, source="user")
     set_wsjf_components(
         element,
         business_value=_score("business_value"),
@@ -125,6 +145,11 @@ def add_epic():
         risk_reduction=_score("risk_reduction"),
         job_size=_score("job_size"),
         source="user",
+    )
+    db.session.flush()
+    set_element_owner(
+        element_type="epic", element_id=element.id, user_id=current_user.id,
+        organization_id=org_id, assigned_by=current_user.id, commit=False,
     )
     db.session.commit()
     flash(f"Added {name} to the {KANBAN_STATES[0]} column.", "success")
@@ -134,6 +159,18 @@ def add_epic():
 def _can_write() -> bool:
     """Whether the signed-in user may edit work packages, per the permission matrix."""
     return may_change_model_element(current_user, "edit")
+
+
+def _can_open_team(org_id: int) -> bool:
+    """Whether the signed-in user may open the team page, where people are listed."""
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    return bool(is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, org_id))
+
+
+def _initials(name):
+    return "".join(part[0] for part in (name or "").split()[:2]).upper()
 
 
 def _owner_name(element: ArchiMateElement, org_id: int):
@@ -168,11 +205,17 @@ def _get_epics() -> List[Dict]:
         .all()
     )
 
+    epic_elements = [e for e in elements if read_profile(e).get("kind") == "Epic"]
+    # Owners come from the one owner record, read in one query for the board.
+    owners = ApplicationOwner.get_display_rows_for_elements_batch(
+        "epic", [e.id for e in epic_elements], org_id
+    )
+    # A person's name links to the team page only for someone who can open it.
+    owner_href = url_for("team.team") if _can_open_team(org_id) else None
+
     epics = []
-    for element in elements:
+    for element in epic_elements:
         profile = read_profile(element)
-        if profile.get("kind") != "Epic":
-            continue
 
         # Read kanban state from acm_properties
         kanban_state = get_kind_property(element, "kanban_state") or "Funnel"
@@ -192,7 +235,12 @@ def _get_epics() -> List[Dict]:
         )
 
         # Get owner name if available
-        owner_name = _owner_name(element, org_id)
+        rows = sorted(
+            owners.get(element.id, []),
+            key=lambda row: (row["ownership_type"] != "primary", row["id"]),
+        )
+        owner_name = rows[0]["user_name"] if rows else _owner_name(element, org_id)
+        owner_name = owner_name if owner_name and owner_name != "\u2014" else None
 
         # Format date
         recorded = element.source_recorded_at or element.recorded_at
@@ -214,6 +262,12 @@ def _get_epics() -> List[Dict]:
                 "risk_reduction": rr,
                 "job_size": js,
                 "owner_name": owner_name,
+                "owner_initials": _initials(owner_name),
+                "owner_linked": bool(owner_name and owner_href),
+                "owner_plain": bool(owner_name and not owner_href),
+                "owner_missing": not owner_name,
+                "owner_href": owner_href,
+                "epic_type": get_kind_property(element, "epic_type"),
                 "updated_at": date_str,
             }
         )
@@ -254,6 +308,9 @@ def index():
         columns_config=columns_config,
         kanban_states=KANBAN_STATES,
         wip_limits=WIP_LIMITS,
+        exit_rules=EXIT_RULES,
+        sort_notes=SORT_NOTES,
+        epic_types=EPIC_TYPES,
         stage_group=STAGE_GROUP,
         empty_hints=EMPTY_COLUMN_HINTS,
         can_write=can_write,
