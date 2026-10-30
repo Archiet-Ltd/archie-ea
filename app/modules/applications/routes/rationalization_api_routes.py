@@ -394,14 +394,30 @@ def rationalization_tracking():
     )
 
 
+def _architect_or_platform_admin(view):
+    """Architect role check (require_roles) for members; a platform admin passes."""
+    from functools import wraps
+
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    architect_only = require_roles("architect")(view)
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if is_platform_admin(current_user):
+            return view(*args, **kwargs)
+        return architect_only(*args, **kwargs)
+
+    return wrapper
+
+
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
-# Not @platform_admin_required: this is a same-organisation, rate-limited,
-# audited write over the caller's own portfolio. It takes the Architect role
-# check the module's other write actions use (admin or architect), so a member
-# without that role cannot start a scoring run; cross-tenant platform
-# authority is not what this route needs.
-@require_roles("admin", "architect")
+# The Architect role check, and no wider: an organisation Administrator who is
+# not an Architect is refused (hotfix 440 keeps duplicate detection off org
+# admins), a platform admin keeps access, and a member without the role cannot
+# start a scoring run.
+@_architect_or_platform_admin
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():
