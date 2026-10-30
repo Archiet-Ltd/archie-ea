@@ -359,13 +359,16 @@ TOOL_ROUTE_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 
-def tool_released(name: str) -> bool:
+def tool_released(tool_name: str) -> bool:
     """True when every route the tool reads is open in the released waves (always true with the switch off)."""
-    paths = TOOL_ROUTE_PATHS.get(CONNECTOR_ALIASES.get(name, name))
+    from app.release_waves import configured_wave, entry_for, is_released_path
+    paths = TOOL_ROUTE_PATHS.get(CONNECTOR_ALIASES.get(tool_name, tool_name))
     if not paths:
-        return True
-    from app.release_waves import is_released_path
-
+        entry = entry_for(tool_name)
+        wave = configured_wave()
+        if wave is None:
+            return True
+        return entry is None or (entry[2] is not None and entry[2] <= wave)
     return all(is_released_path(path) for path in paths)
 
 

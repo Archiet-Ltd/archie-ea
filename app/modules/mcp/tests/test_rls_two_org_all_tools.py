@@ -51,7 +51,7 @@ ALL_TOOLS = [
 
 ROLE = "pr455_rls_probe_runtime"
 
-_SEED = r'''
+_SEED = r"""
 import base64, hashlib, json, os, secrets, sys, uuid
 from app import create_app
 from app.extensions import db
@@ -100,11 +100,12 @@ with app.app_context():
         organization_id=out["ALPHA"]["org"], lifetime_seconds=600)
     out.update(client_id=c.client_id, code=raw, verifier=verifier, sfx=sfx)
 json.dump(out, open(sys.argv[1], "w"))
-'''
+"""
 
-_PROBE = r'''
+_PROBE = r"""
 import json, sys
 from app import create_app
+
 state = json.load(open(sys.argv[1]))
 app = create_app("testing")
 with app.app_context():
@@ -118,8 +119,8 @@ with app.app_context():
 c = app.test_client()
 res = app.config["PUBLIC_BASE_URL"].rstrip("/") + "/mcp"
 A, B = state["ALPHA"], state["BRAVO"]
-r = c.post("/oauth/token", data=dict(grant_type="authorization_code", code=state["code"],
-    redirect_uri="http://localhost/cb", client_id=state["client_id"], code_verifier=state["verifier"], resource=res))
+
+r = c.post("/oauth/token", data=dict(grant_type="authorization_code", code=state["code"], redirect_uri="http://localhost/cb", client_id=state["client_id"], code_verifier=state["verifier"], resource=res))
 if r.status_code != 200:
     print("TOKEN_FAILED", r.status_code, r.get_data(as_text=True)[:500]); sys.exit(1)
 token = r.get_json()["access_token"]
@@ -154,9 +155,15 @@ calls += [("get_genome_slice", {"domain": "business"}, "A"),
           ("get_canvas", {"canvas_type": "business_case", "canvas_id": B["bc"]}, "B")]
 with app.app_context():
     from app.modules.ai_chat.tools.route_read_tools import tool_released
-    calls = [x for x in calls if tool_released(x[0])]
-leaks = 0; alpha_hits = 0; called = set()
+    all_calls = list(calls)
+    calls = [x for x in all_calls if tool_released(x[0])]
+    held_back_calls = [x for x in all_calls if not tool_released(x[0])]
 bad_status = []
+leaks = 0; alpha_hits = 0; called = set()
+for name, args, tag in held_back_calls:
+    st, body = call(name, args)
+    if st != 404:
+        bad_status.append((name, tag, st))
 for name, args, tag in calls:
     st, body = call(name, args); called.add(name)
     if st != 200:
@@ -167,7 +174,7 @@ for name, args, tag in calls:
 print("CALLED", json.dumps(sorted(called)))
 print("BAD_STATUS", json.dumps(bad_status))
 print(f"SUMMARY calls={len(calls)} bravo_leaks={leaks} alpha_hits={alpha_hits}")
-'''
+"""
 
 
 @pytest.fixture
@@ -273,7 +280,7 @@ def test_all_tools_see_zero_rows_from_the_other_organisation_under_rls(
     seed_env["DATABASE_URL"] = app.config["SQLALCHEMY_DATABASE_URI"]
     seed_proc = subprocess.run(
         [sys.executable, "-c", _SEED, str(state_path)],
-        cwd=str(REPO_ROOT), env=seed_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+        cwd=str(REPO_ROOT), env=seed_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
     )
     assert seed_proc.returncode == 0, f"seed failed:\nSTDOUT:{seed_proc.stdout}\nSTDERR:{seed_proc.stderr}"
     state = json.loads(state_path.read_text())

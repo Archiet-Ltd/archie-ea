@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 from flask import g, jsonify, make_response, redirect, render_template, request, url_for
 
@@ -122,21 +123,27 @@ def early_access_target(path: str) -> str | None:
     wave = configured_wave()
     if wave is None or path.startswith(("/early-access", "/static/", "/api/", "/oauth", "/mcp", "/.well-known")):
         return None
-    cache = current_app.extensions.setdefault("release_waves_link_targets", {})
-    key = (path, wave)
-    if key in cache:
-        return cache[key]
-    target = None
-    try:
-        rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
-        entry = entry_for(rule.rule, rule.endpoint)
-        if state_for(entry, wave) in (CLOSED, REDIRECT):
-            code, _info = group_for(entry)
-            target = f"/early-access/{code_slug(code)}"
-    except Exception:  # noqa: BLE001 - an address the router cannot read is left as written
-        target = None
-    cache[key] = target
-    return target
+
+    cache = current_app.extensions.get("release_waves_link_cache")
+    if cache is None:
+
+        @lru_cache(maxsize=4096)
+        def get_target(path, wave):
+            target = None
+            try:
+                rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
+                entry = entry_for(rule.rule, rule.endpoint)
+                if state_for(entry, wave) in (CLOSED, REDIRECT):
+                    code, _info = group_for(entry)
+                    target = f"/early-access/{code_slug(code)}"
+            except Exception:  # noqa: BLE001 - an address the router cannot read is left as written
+                target = None
+            return target
+
+        cache = get_target
+        current_app.extensions["release_waves_link_cache"] = cache
+
+    return cache(path, wave)
 
 
 def point_closed_links_at_early_access(response):
