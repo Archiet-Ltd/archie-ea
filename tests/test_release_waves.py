@@ -146,11 +146,13 @@ def test_a_retired_address_redirects_only_when_its_destination_has_shipped(app, 
     monkeypatch.setitem(app.config, "RELEASE_WAVE", "1")
     rv = client.get("/dashboard/applications/5/edit")
     assert rv.status_code == 302 and rv.headers["Location"].endswith("/applications/5/edit")
-    rv = client.get("/adm-kanban/roadmap")
-    assert rv.status_code == 200 and b"early-access-page" in rv.data  # ships in wave 3
-    monkeypatch.setitem(app.config, "RELEASE_WAVE", "3")
-    rv = client.get("/adm-kanban/roadmap")
+    rv = client.get("/adm-kanban/roadmap")  # the roadmap lens is open at wave 1, so its old address leads there
     assert rv.status_code == 302 and "/genome/roadmap/" in rv.headers["Location"]
+    rv = client.get("/capability-map/archimate/review-queue")
+    assert rv.status_code == 200 and b"early-access-page" in rv.data  # ships in wave 2
+    monkeypatch.setitem(app.config, "RELEASE_WAVE", "2")
+    rv = client.get("/capability-map/archimate/review-queue")
+    assert rv.status_code == 302 and "/ai-chat/approvals/inbox" in rv.headers["Location"]
 
 
 def test_a_malformed_switch_closes_rather_than_opens(app, monkeypatch):
@@ -339,3 +341,60 @@ def test_no_early_access_group_title_or_blurb_carries_plan_wording(wave1):
     for code, info in wave_map()["groups"].items():
         assert not banned.search(info["title"]), (code, info["title"])
         assert not banned.search(info["blurb"] or ""), (code, info["blurb"])
+
+
+def test_the_github_install_return_and_starter_removal_are_open_at_wave_one(wave1):
+    """Connecting GitHub ends on the return address the App install sends the administrator back to, and a
+    first-sit-down starter capability can be removed: neither may answer early access."""
+    with wave1.test_request_context("/"):
+        assert is_released_path("/admin/connectors/github")
+        assert is_released_path("/admin/connectors/github/installed")
+        assert is_released_path("/account/welcome/starter/remove")
+
+
+SIGN_UP_LOADS = (
+    "/capability-map/",
+    "/capability-map/api/capabilities",
+    "/capability-map/health",
+    "/capability-map/maturity",
+    "/capability-map/list",
+    "/capability-map/hierarchy",
+    "/enterprise/capability-map/mapping",
+    "/enterprise/capabilities/7/fact-sheet",
+    "/capability-maturity/frameworks",
+    "/capability-maturity/framework/togaf",
+    "/genome/roadmap/",
+    "/business-model/",
+    "/business-model/3",
+    "/business-model/api/list",
+    "/value-streams/",
+    "/value-streams/4",
+    "/value-streams/4/grid",
+    "/frameworks/",
+    "/industry-apqc/framework/banking",
+    "/ea-workflows/definitions",
+    "/dashboard/compliance",
+    "/dashboard/api/compliance/frameworks",
+    "/dashboard/api/compliance/frameworks/2/controls",
+    "/safe/portfolio/",
+    "/intelligence/answers/12",
+)
+
+
+@pytest.mark.parametrize("path", SIGN_UP_LOADS)
+def test_what_sign_up_loads_is_open_at_wave_one(wave1, path):
+    """The customer chooses canvases and frameworks at sign-up and they are loaded to match, so the capability
+    map, canvases, value streams, framework catalogues and compliance pages must open."""
+    with wave1.test_request_context("/"):
+        assert is_released_path(path), f"{path} is closed at wave 1"
+
+
+def test_every_route_an_assistant_tool_reads_is_open_at_wave_one(wave1):
+    """The assistant connection stays on at wave 1: the read tools that are listed name rules that are open."""
+    from app.modules.ai_chat.tools.route_read_tools import TOOL_ROUTE_PATHS, tool_released
+
+    assert tool_released("ask_impact")
+    assert tool_released("get_element") and tool_released("search_elements")
+    for name in ("ask_strategy", "ask_portfolio", "ask_programme", "ask_risk", "ask_accountability"):
+        assert tool_released(name), name
+    assert set(TOOL_ROUTE_PATHS) >= {"ask_impact"}

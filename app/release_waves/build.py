@@ -58,7 +58,7 @@ PREFIX_OVERRIDES: tuple = (
     ("/api/client-error", "A", "infra", "browser error reports"),
     ("/csp-report", "A", "infra", "browser security reports"),
     ("/early-access", "A", "infra", "the early-access pages themselves"),
-    ("/oauth/", "W1", "PG-CON", "assistant sign-in, consent, token and registration: the connector stays on at wave 1 for signed-in users (lead, 26 Oct)"),
+    ("/oauth/", "W1", "PG-CON", "assistant sign-in, consent, token and registration: the connector stays on at wave 1 for signed-in users"),
     ("/.well-known/", "W1", "PG-CON", "assistant discovery documents (connector stays on at wave 1)"),
     ("/mcp", "W1", "PG-CON", "the assistant connection (MCP): on at wave 1 for signed-in users, advertised from wave 2"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
@@ -77,6 +77,16 @@ PREFIX_OVERRIDES: tuple = (
     ("/api/v1/intelligence/programme/", "W1", "PG-CON", "the programme answer the assistant connection calls"),
     ("/api/v1/intelligence/risk/", "W1", "PG-CON", "the risk answer the assistant connection calls"),
     ("/api/v1/intelligence/strategy/", "W1", "PG-CON", "the strategy answer the assistant connection calls"),
+    ("/api/v1/intelligence/answers", "W1", "PG-CON", "the stored answer read by the assistant connection and token clients"),
+    # Pages and calls a person reaches from what sign-up loads: the capability map, canvases, frameworks and compliance.
+    ("/dashboard/api/compliance/", "W1", "PG-GOV", "adopted frameworks, controls and regulatory changes on the compliance page"),
+    ("/dashboard/api/templates/frameworks", "W1", "PG-FW", "the framework templates the frameworks pages list"),
+    ("/capability-maturity/framework/", "W1", "PG-MAP", "a maturity framework and its domains"),
+    ("/capability-maturity/frameworks-overview", "W1", "PG-MAP", "maturity frameworks overview address"),
+    ("/capability-maturity/api/", "W1", "PG-MAP", "capability maturity reads"),
+    ("/frameworks", "W1", "PG-FW", "the frameworks gallery"),
+    ("/safe/portfolio", "W1", "PG-FW", "the SAFe portfolio"),
+    ("/api/safe/portfolio", "W1", "PG-FW", "the SAFe portfolio data"),
     ("/api/system-settings", "W6", "PG-OPS", "platform settings page data, platform administrators"),
     # Calls a wave-1 screen makes (found by walking the wave-1 preview; "$" means this address only).
     ("/api/notifications", "W1", "PG-ACC", "the notification bell in the signed-in shell"),
@@ -90,9 +100,9 @@ PREFIX_OVERRIDES: tuple = (
     ("/register", "W1", "PG-ACC", "sign-up address"),
     ("/login", "W1", "PG-ACC", "sign-in address"),
     ("/account/", "W1", "PG-ACC", "account, sign-in, two-factor and the first sit-down"),
-    ("/admin/billing/", "W1", "PG-ORG", "plan checkout, cancel and billing (NP-07, NP-08)"),
-    ("/architecture/sample-company/", "W1", "PG-NEW", "start the sample company (NP-06)"),
-    ("/dashboard/api/onboarding-complete", "W1", "PG-NEW", "first sit-down progress (NP-05)"),
+    ("/admin/billing/", "W1", "PG-ORG", "plan checkout, cancel and billing"),
+    ("/architecture/sample-company/", "W1", "PG-NEW", "start the sample company"),
+    ("/dashboard/api/onboarding-complete", "W1", "PG-NEW", "first sit-down progress"),
 )
 
 # Rules whose path is ambiguous after normalisation (two rules read /<x>): named by endpoint.
@@ -105,15 +115,33 @@ ENDPOINT_OVERRIDES: dict = {
 }
 
 # Plan pages whose title names the screen, not an address: the address is in the table.
-# Plan pages moved to another wave by the lead: NP-13 connected assistants and NP-14 the consent page stay on at wave 1.
-PAGE_WAVE_OVERRIDES: dict = {"NP-13": "W1", "NP-14": "W1"}
+# Plan pages moved to wave 1, by address: the connected-assistants page and the consent page stay on with the
+# assistant connection; a stored answer at its permanent address is what the assistant returns and cites; the
+# compliance page and the industry-framework pages open what sign-up loads.
+PAGE_WAVE_OVERRIDES: dict = {
+    "/account/manage/connected-assistants": "W1",
+    "/oauth/authorize": "W1",
+    "/dashboard/compliance": "W1",
+    "/industry-apqc": "W1",
+    "/intelligence/answers/<address>": "W1",
+}
+
+# Page groups moved to wave 1 as a whole: what a customer chooses at sign-up is loaded and must open.
+# Capability map, maturity and capability records; value streams and business model canvases;
+# industry frameworks, enterprise-architecture workflows and the delivery boards.
+WAVE_ONE_GROUPS: tuple = ("PG-MAP", "PG-VS", "PG-FW")
+# Address prefixes (whole path segments) moved to wave 1 whatever their group: every lens of the capability map
+# and the capability roadmap.
+WAVE_ONE_PREFIXES: tuple = ("/capability-map", "/genome/roadmap")
+# Waves a group or prefix move lifts to wave 1; a retired address (RT) keeps its state and its destination.
+MOVABLE_WAVES = ("W2", "W3", "W4", "W5")
 
 PAGE_ADDRESS_OVERRIDES: dict = {
-    "NP-05": "/account/welcome",
-    "NP-06": "/architecture/sample-company/load",
-    "NP-07": "/admin/billing/",
-    "NP-08": "/admin/billing/cancel",
-    "NP-09": "/account/welcome",
+    "Website reading progress and company profile confirm screen": "/account/welcome",
+    "Start the sample company": "/architecture/sample-company/load",
+    "Plan checkout and payment result": "/admin/billing/",
+    "Cancel plan and its confirmation": "/admin/billing/cancel",
+    "Shared error, no-permission and sign-in-again screens": "/account/welcome",
 }
 
 GROUP_FALLBACK = {
@@ -154,26 +182,54 @@ def load_plan() -> dict:
     return json.loads(PLAN_PATH.read_text(encoding="utf-8"))
 
 
+def _address(item: dict) -> str | None:
+    """The address a plan item names, or None when it names no address."""
+    title = item["title"]
+    if title in PAGE_ADDRESS_OVERRIDES:
+        title = PAGE_ADDRESS_OVERRIDES[title]
+    else:
+        m = re.search(r"\((/[^)]*)\)\s*$", title)
+        if m and not title.startswith("/"):
+            title = m.group(1)
+    if not title.startswith("/"):
+        return None
+    title = title.split(" (")[0]
+    # A title written with a descriptive slug list stands for the public site pages; those are
+    # named by endpoint above.
+    if "<legal slug" in title or "<site slug" in title:
+        return None
+    return title
+
+
+def _under(address: str, prefix: str) -> bool:
+    segs, base = _segments(address), _segments(prefix)
+    return len(segs) >= len(base) and segs[: len(base)] == base
+
+
+def _released_at_one(item: dict) -> bool:
+    """True when the plan item is an address, page group or prefix moved to wave 1."""
+    address = _address(item) or ""
+    if PAGE_WAVE_OVERRIDES.get(address.rstrip("/")) == "W1":
+        return True
+    if item["wave"] not in MOVABLE_WAVES:
+        return False
+    return item["reason"] in WAVE_ONE_GROUPS or any(_under(address, prefix) for prefix in WAVE_ONE_PREFIXES)
+
+
 def _plan_pages(plan: dict) -> dict:
     """norm(address) -> plan item, for plan items that name an address."""
     pages: dict = {}
     for item in plan["items"]:
-        title = item["title"]
-        if item["id"] in PAGE_ADDRESS_OVERRIDES:
-            title = PAGE_ADDRESS_OVERRIDES[item["id"]]
-        else:
-            m = re.search(r"\((/[^)]*)\)\s*$", title)
-            if m and not title.startswith("/"):
-                title = m.group(1)
-        if not title.startswith("/"):
-            continue
-        title = title.split(" (")[0]
-        # A title written with a descriptive slug list stands for the public site pages; those are
-        # named by endpoint above.
-        if "<legal slug" in title or "<site slug" in title:
-            continue
-        pages.setdefault(norm(title), item)
+        address = _address(item)
+        if address is not None:
+            pages.setdefault(norm(address), item)
     return pages
+
+
+def _same_page(address: str, pattern: str) -> bool:
+    """True when ``address`` is the page ``pattern`` names, a <parameter> segment standing for any value."""
+    a, p = _segments(address), _segments(pattern)
+    return len(a) == len(p) and all(ps.startswith("<") or ps == s for ps, s in zip(p, a))
 
 
 def build(rules: list[tuple[str, str]]) -> dict:
@@ -199,16 +255,21 @@ def build(rules: list[tuple[str, str]]) -> dict:
         return best
 
     def from_item(item: dict, basis: str, inherit: bool = False) -> list:
-        wave = PAGE_WAVE_OVERRIDES.get(item["id"], item["wave"])
+        wave = item["wave"]
         to = item.get("to") if not inherit else None
         ships = item.get("ships") if not inherit else None
         group = item["reason"]
+        if _released_at_one(item):
+            return ["W1", group, basis, None, None]
         if wave == "RT":
             dest = (item.get("to") or "").split(" (")[0].split("?")[0]
-            dest_item = pages.get(norm(dest)) if dest.startswith("/") else None
+            dest_item = next((it for key, it in pages.items() if dest.startswith("/") and _same_page(dest, key)), None)
             group = dest_item["reason"] if dest_item and dest_item["reason"] != "PG-RT" else "PG-RT"
             if to:
                 to = to.split(" (")[0]
+            # a retired address leads to its destination from the wave the destination opens in
+            if dest_item is not None and _released_at_one(dest_item):
+                ships = "W1"
         return [wave, group, basis, to, ships]
 
     entries: dict = {}
@@ -292,7 +353,7 @@ def build(rules: list[tuple[str, str]]) -> dict:
 
     return {
         "version": 1,
-        "source": "WAVE-PLAN-items-pages-v2 (copied to wave_plan_pages.json), built by scripts/build_wave_map.py",
+        "source": "wave_plan_pages.json, built by scripts/build_wave_map.py",
         "pass_waves": list(PASS_WAVES),
         "groups": {k: groups[k] for k in sorted(groups)},
         "rules": {k: entries[k] for k in sorted(entries)},
