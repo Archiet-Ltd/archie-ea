@@ -331,7 +331,6 @@ system_settings
 systems
 taxonomy_mappings
 tco_benchmarks
-technical_capability_vendor_mappings
 technology_capabilities
 technology_capability
 technology_roadmap_initiatives
