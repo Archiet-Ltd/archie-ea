@@ -106,6 +106,9 @@ def test_layer_table_adds_up_to_the_element_total(live_server, org, page):
     total = _int(page, "health-total-archimate")
     counts = [int(row.locator("td").nth(1).inner_text().strip()) for row in page.get_by_test_id("health-layer-row").all()]
     assert counts and sum(counts) == total
+    # The chart above the table is drawn: it has height, and its svg is on the page.
+    expect(page.get_by_test_id("health-layer-chart")).to_be_visible()
+    expect(page.locator("[data-testid=health-layer-chart] svg").first).to_be_visible()
 
 
 def test_adm_table_accounts_for_every_solution(live_server, org, page):

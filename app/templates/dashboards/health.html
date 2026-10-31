@@ -84,7 +84,7 @@
             {% endcall %}
             {% call ui.card_content(class='flex flex-col gap-4') %}
                 {% if layer_rows %}
-                {{ d.bar_rows(layer_rows, 'layer', 'elements', 'Elements', chart_colour, label='ArchiMate elements by layer', testid='health-layer-chart', class='aspect-auto h-[240px] w-full') }}
+                {{ d.bar_rows(layer_rows, 'layer', 'elements', 'Elements', chart_colour, label='ArchiMate elements by layer', testid='health-layer-chart') }}
                 {% call ui.table_container() %}{% call ui.table() %}
                     {% call ui.table_header() %}{% call ui.table_row() %}{{ ui.table_head(text='Layer') }}{{ ui.table_head(text='Elements', class='text-right') }}{{ ui.table_head(text='Share', class='text-right') }}{% endcall %}{% endcall %}
                     {% call ui.table_body() %}
