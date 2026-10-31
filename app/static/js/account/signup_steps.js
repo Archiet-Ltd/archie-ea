@@ -14,6 +14,7 @@
         jira: root.getAttribute('data-url-jira'),
         website: root.getAttribute('data-url-website'),
         choices: root.getAttribute('data-url-choices'),
+        removeStarter: root.getAttribute('data-url-remove-starter'),
         profile: root.getAttribute('data-url-profile'),
         status: root.getAttribute('data-url-status'),
         test: root.getAttribute('data-url-ai-test')
@@ -34,6 +35,18 @@
         line.textContent = text;
         line.classList.toggle('text-destructive-emphasis', !!failed);
         line.classList.toggle('text-muted-foreground', !failed);
+    }
+
+    // After the industry changes, Settings offers to remove the rows of the old starter model nobody has changed.
+    function offer(removable) {
+        var box = root.querySelector('[data-starter-offer]');
+        if (!box) return;
+        var first = removable && removable[0];
+        box.classList.toggle('hidden', !first);
+        if (!first) return;
+        box.querySelector('[data-starter-offer-text]').textContent =
+            'You no longer use the ' + first.model + ' starter capabilities. ' + first.count + ' of them are as they were loaded.';
+        box.querySelector('[data-action="remove-starter"]').setAttribute('data-model', first.model);
     }
 
     function busy(button, on) {
@@ -246,10 +259,19 @@
         } else if (action === 'save-choices') {
             busy(button, true);
             say('choices', 'Saving…', false);
-            post(URLS.choices, chosen()).then(function () {
+            post(URLS.choices, chosen()).then(function (saved) {
                 say('choices', 'Saved.', false);
+                offer(saved && saved.removable);
             }).catch(function (error) {
                 say('choices', error.message || 'Your choices were not saved.', true);
+            }).then(function () { busy(button, false); });
+        } else if (action === 'remove-starter') {
+            busy(button, true);
+            post(URLS.removeStarter, { model: button.getAttribute('data-model') }).then(function (done) {
+                say('choices', done.removed + ' starter capabilities removed. Anything you had changed was kept.', false);
+                offer([]);
+            }).catch(function (error) {
+                say('choices', error.message || 'The starter capabilities were not removed.', true);
             }).then(function () { busy(button, false); });
         } else if (action === 'show-frameworks') {
             root.querySelectorAll('[data-framework]').forEach(function (box) { box.closest('div').classList.remove('hidden'); });

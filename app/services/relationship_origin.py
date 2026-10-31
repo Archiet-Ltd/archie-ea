@@ -20,6 +20,24 @@ _ORIGIN = {
 }
 
 
+# A hand-entered source label either names a person ("Ada Lovelace") or describes a kind of source
+# ("Entered by the team", "Added from the intake form"). Only a person is "drawn by"; a description reads as given.
+_SOURCE_DESCRIPTION_OPENERS = frozenset(
+    {"entered", "added", "imported", "written", "worked", "created", "recorded", "synced", "loaded", "from"}
+)
+
+
+def manual_origin_text(label: str) -> str:
+    """The words for a hand-entered relationship's source label: "Drawn by <name>" for a person's name,
+    the label as given when it describes a kind of source. The one place both the impact rows and the
+    explanation chain build this, so the two cannot disagree."""
+    label = (label or "").strip()
+    first_word = label.split(" ", 1)[0].lower() if label else ""
+    if first_word in _SOURCE_DESCRIPTION_OPENERS:
+        return label
+    return f"Drawn by {label}"
+
+
 def stamp_origin(mapper, connection, target) -> None:
     if getattr(target, "source_kind", None):
         return

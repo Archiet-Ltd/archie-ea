@@ -84,6 +84,9 @@ class DuplicateDetectionUtils:
     # Default configuration
     DEFAULT_CONFIG = DuplicateDetectionConfig()
 
+    # The fuzzy score from which two names are treated as a likely duplicate.
+    LIKELY_DUPLICATE_THRESHOLD = 0.60
+
     @staticmethod
     def normalize_name(name: str) -> str:
         """Normalise a name for exact-match comparison.

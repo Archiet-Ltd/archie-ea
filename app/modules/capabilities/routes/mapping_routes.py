@@ -558,6 +558,7 @@ def api_unified_capabilities():
                         "id": str(capability.id),
                         "name": capability.name,
                         "code": capability.code,
+                        "source": capability.discovery_source,
                         "type": "Application",
                         "level": capability.level,
                         "category": capability.category,
