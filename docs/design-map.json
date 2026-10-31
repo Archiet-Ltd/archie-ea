@@ -39848,6 +39848,93 @@
    "status": "mapped",
    "tier": "B"
   },
+  "app/templates/solutions/edit.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/file_upload.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/modal_form.html",
+    "components/page_header.html",
+    "components/provenance.html",
+    "components/radio_group.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/stepper.html",
+    "components/switch.html",
+    "components/tabs.html",
+    "macros/check_password.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "form",
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "checkbox",
+    "empty",
+    "field",
+    "input",
+    "page-header",
+    "select",
+    "textarea",
+    "card"
+   ],
+   "controls": {
+    "button": 2,
+    "form": 1,
+    "link": 1
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "macros": [
+    "components/page_header.html"
+   ],
+   "persona": "solution_architect",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: forms",
+     "url": "https://ui.shadcn.com/examples/forms"
+    },
+    "basecoat": {
+     "name": "flask-basecoat gallery: form validation",
+     "image": "docs/design/reference/basecoat-form.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "charts": [],
+   "confidence": "high",
+   "frame": "dashboard-01",
+   "inhouse_components": [
+    "page-header:Replace"
+   ],
+   "original": "preview",
+   "page_type": "form",
+   "reason": "Edit a solution.",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/solutions/list.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
