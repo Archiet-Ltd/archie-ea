@@ -181,7 +181,8 @@ def test_a_database_built_from_the_models_is_fenced_and_a_rerun_is_a_no_op(app, 
                 assert present, f"{table} is not in the model schema"
                 assert c.execute(text(
                     "SELECT is_nullable FROM information_schema.columns WHERE table_name = :t "
-                    "AND column_name = 'organization_id'"), {"t": table}).scalar() == "NO", table
+                    "AND column_name = 'organization_id'"), {"t": table}).scalar() == (
+                        "YES" if table in getattr(module, "KEEP_NULLABLE", ()) else "NO"), table
                 assert c.execute(text("SELECT relrowsecurity FROM pg_class WHERE relname = :t"), {"t": table}).scalar(), table
                 assert c.execute(text(
                     "SELECT count(*) FROM pg_policies WHERE tablename = :t AND policyname LIKE 'tenant_%'"),

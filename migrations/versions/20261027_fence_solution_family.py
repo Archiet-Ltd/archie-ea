@@ -189,11 +189,16 @@ def _column_and_backfill(bind, table, sources):
         )
 
 
+# Work-package copies that no organisation can be attributed to are quarantined with a NULL
+# organisation by design, so these columns stay nullable (the policies still hide NULL rows).
+KEEP_NULLABLE = ("unified_work_packages",)
+
+
 def _tighten_index_fk(bind, table):
     nulls = bind.execute(text(f"SELECT count(*) FROM public.{table} WHERE organization_id IS NULL")).scalar()  # nosec B608
-    if nulls == 0:
+    if nulls == 0 and table not in KEEP_NULLABLE:
         op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
-    else:
+    elif nulls:
         print(f"NULL-ROWS {table}: {nulls}")
     op.create_index(_short("ix", table), table, ["organization_id"], if_not_exists=True)
     covered = bind.execute(
@@ -223,9 +228,9 @@ def upgrade():
         if not (_exists(bind, table) and _has_column(bind, table)):
             continue
         nulls = bind.execute(text(f"SELECT count(*) FROM public.{table} WHERE organization_id IS NULL")).scalar()  # nosec B608
-        if nulls == 0:
+        if nulls == 0 and table not in KEEP_NULLABLE:
             op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
-        else:
+        elif nulls:
             print(f"NULL-ROWS {table}: {nulls}")
         if _policy_count(bind, table, TENANT_POLICIES) != 4 and _may_alter(bind, table):
             _fence(bind, table, TENANT_POLICIES, _TENANT_DEFINITIONS)

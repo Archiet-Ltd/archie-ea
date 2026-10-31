@@ -24,6 +24,7 @@ from sqlalchemy.sql import func  # dead-code-ok
 
 from app import db
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 # Association table for work package dependencies
 work_package_dependencies = Table(
@@ -67,6 +68,17 @@ class RoadmapWorkPackage(TenantMixin, db.Model):
     __tablename__ = "roadmap_work_packages"
     __tenant_parent__ = (('created_by', 'users'),)
     __table_args__ = {"extend_existing": True}
+
+    # A copy bridged into the unified work-package store from a job with no organisation is
+    # quarantined with a NULL organisation (see UnifiedWorkPackage), so the column stays
+    # nullable here too. Isolation keys on TenantMixin, not on nullability.
+    organization_id = Column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # Core fields
     id = Column(BigInteger, primary_key=True)
