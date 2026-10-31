@@ -48,5 +48,8 @@ def answers_early_access(client, path: str, method: str = "GET", **kwargs) -> bo
     """When the wave closes ``path``, check the early-access answer and return True (nothing else to check)."""
     if not closed_at_wave(client.application, path, method):
         return False
+    # a retired address whose destination has shipped answers a redirect: asked without following it, so the
+    # answer under test is the redirect itself, not the page it leads to
+    kwargs = {**kwargs, "follow_redirects": False}
     assert_early_access_answer(client.open(path, method=method, **kwargs), method)
     return True

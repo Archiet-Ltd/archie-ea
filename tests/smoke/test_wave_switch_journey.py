@@ -144,7 +144,7 @@ def test_cto_sidebar_offers_only_first_release_pages_and_each_opens_with_content
         side = _hrefs(page, '[data-slot="sidebar"] a[href]')
         assert len(side) >= 3, "the sidebar must offer the first release's pages: %s" % side
         offered = {h.split("?")[0].rstrip("/") for h, _ in side}
-        for later in ("/capability-map", "/value-streams", "/architecture/business/BusinessActor", "/adm-kanban"):
+        for later in ("/archimate/diagrams", "/architecture/business/BusinessActor", "/arb/standards"):
             assert later not in offered, "%s opens in a later release but the sidebar offers it" % later
         problems = []
         for href, label in side:
@@ -155,8 +155,11 @@ def test_cto_sidebar_offers_only_first_release_pages_and_each_opens_with_content
                 problems.append("%s (%s) -> %s early=%s heading=%r" % (label, href, status, early, heading))
         assert not problems, "\n".join(problems)
         # a later release's address, typed by a signed-in person, says what it is and when to join
-        status, early, heading = _lands_with_content(page, wave_server, "/capability-map")
+        status, early, heading = _lands_with_content(page, wave_server, "/archimate/diagrams")
         assert status == 200 and early and heading
+        # what sign-up loads is part of the first release: the capability map opens with its own content
+        status, early, heading = _lands_with_content(page, wave_server, "/capability-map")
+        assert status == 200 and not early and heading
     finally:
         page.close()
 
@@ -171,7 +174,8 @@ def test_administrator_sidebar_offers_ai_chat_and_connectors_and_both_open_as_pa
         offered = [(h.split("?")[0].rstrip("/"), label.lower()) for h, label in side]
         assert any(h.startswith("/ai-chat") for h, _ in offered), "the sidebar must offer the AI chat: %s" % offered
         assert any(h.startswith("/admin/connectors") for h, _ in offered), "the sidebar must offer the connectors: %s" % offered
-        for path in ("/admin/connectors/github", "/ai-chat"):
+        # the address the GitHub App install sends the administrator back to must open a page too
+        for path in ("/admin/connectors/github", "/admin/connectors/github/installed", "/ai-chat"):
             status, early, heading = _lands_with_content(page, wave_server, path)
             assert status == 200 and heading, "%s -> %s %r" % (path, status, heading)
             assert not early, "%s opens as the early-access page for a signed-in administrator" % path
