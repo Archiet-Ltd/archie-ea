@@ -202,10 +202,14 @@ def api_roadmap_capabilities():
 
 def _recorded_roadmap_gaps():
     """Gaps saved directly from the roadmap (no source capability), as list rows."""
-    from app.models.implementation_migration import Gap
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap
 
     rows = (
-        Gap.query.filter(Gap.source_capability_id.is_(None), Gap.auto_generated.is_(False))
+        Gap.query.filter(
+            Gap.source_capability_id.is_(None),
+            Gap.auto_generated.is_(False),
+            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+        )
         .order_by(Gap.created_at.desc(), Gap.id.desc())
         .all()
     )
