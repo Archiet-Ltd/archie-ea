@@ -39,6 +39,15 @@ def upgrade() -> None:
 def downgrade() -> None:
     if not _has_column("deliverables", "adm_template_id"):
         return
-    op.drop_index("ix_deliverables_adm_template_id", table_name="deliverables")
-    op.execute("ALTER TABLE deliverables DROP CONSTRAINT IF EXISTS fk_deliverables_adm_template_id")
+    # A database built from the models (create_all) carries the column with a
+    # generated foreign-key name, and upgrade() leaves it alone because the column
+    # is already there. So drop whatever foreign key and index sit on the column
+    # rather than assuming the names this revision would have given them.
+    insp = sa.inspect(op.get_bind())
+    for fk in insp.get_foreign_keys("deliverables"):
+        if fk["constrained_columns"] == ["adm_template_id"] and fk.get("name"):
+            op.drop_constraint(fk["name"], "deliverables", type_="foreignkey")
+    for ix in insp.get_indexes("deliverables"):
+        if ix["column_names"] == ["adm_template_id"]:
+            op.drop_index(ix["name"], table_name="deliverables")
     op.drop_column("deliverables", "adm_template_id")
