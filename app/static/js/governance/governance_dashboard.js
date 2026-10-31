@@ -23,20 +23,27 @@
             totalCapabilities: 0,
             needsAttention: 0,
             governanceScore: '—',
-            // Numeric value backing governanceScore's display string, or null
-            // when there is nothing to measure. Found 14 Sep 2026: the
-            // Governance Score tile's icon was hardcoded to a green
-            // "shield-check" success color regardless of the actual score --
-            // a 0% score (every capability needing attention) still showed
-            // as green, contradicting the Need Attention tile right next to
-            // it. This value drives the icon's color band instead.
+            // Numeric value backing governanceScore's display string, or null when there is nothing
+            // to measure. It drives the band word on the score card, so a 0% score never reads as healthy.
             governanceScoreValue: null,
 
-            governanceScoreBadgeClass: function () {
-                if (this.governanceScoreValue === null) return 'bg-muted-foreground/40';
-                if (this.governanceScoreValue >= 80) return 'bg-success';
-                if (this.governanceScoreValue >= 50) return 'bg-warning';
-                return 'bg-destructive';
+            governanceScoreBand: function () {
+                if (this.governanceScoreValue === null) return 'Nothing to measure';
+                if (this.governanceScoreValue >= 80) return 'Healthy';
+                if (this.governanceScoreValue >= 50) return 'Partly governed';
+                return 'Weakly governed';
+            },
+
+            // The library dialogs open and close through their own handle; the older Platform.modal is the fallback.
+            openDialog: function (id) {
+                const el = document.getElementById(id);
+                if (el && el.fbOpen) el.fbOpen();
+                else if (window.Platform && window.Platform.modal) Platform.modal.open(id);
+            },
+            closeDialog: function (id) {
+                const el = document.getElementById(id);
+                if (el && el.fbClose) el.fbClose();
+                else if (window.Platform && window.Platform.modal) Platform.modal.close(id);
             },
 
             // Pagination
@@ -76,6 +83,8 @@
             deleteInProgress: false,
 
             init: function () {
+                // The library dialogs are moved to <body> when opened, outside this component's scope, so they read it from a store.
+                Alpine.store('governance', this);
                 this.loadData();
             },
 
@@ -301,9 +310,7 @@
                 };
                 this.editError = '';
                 this.editSaving = false;
-                if (window.Platform && window.Platform.modal) {
-                    Platform.modal.open('edit-governance-modal');
-                }
+                this.openDialog('edit-governance-modal');
             },
 
             saveGovernance: function () {
@@ -326,9 +333,7 @@
                 .then(function (data) {
                     self.editSaving = false;
                     if (data.success) {
-                        if (window.Platform && window.Platform.modal) {
-                            Platform.modal.close('edit-governance-modal');
-                        }
+                        self.closeDialog('edit-governance-modal');
                         if (window.Platform && window.Platform.toast) {
                             Platform.toast.success('Governance updated');
                         }
@@ -347,9 +352,7 @@
             // Bulk delete
             confirmBulkDelete: function () {
                 this.deleteConfirmText = '';
-                if (window.Platform && window.Platform.modal) {
-                    Platform.modal.open('bulk-delete-confirm-modal');
-                }
+                this.openDialog('bulk-delete-confirm-modal');
             },
 
             executeBulkDelete: function () {
@@ -365,9 +368,7 @@
                     self.deleteInProgress = false;
                     self.deleteConfirmText = '';
                     self.clearSelection();
-                    if (window.Platform && window.Platform.modal) {
-                        Platform.modal.close('bulk-delete-confirm-modal');
-                    }
+                    self.closeDialog('bulk-delete-confirm-modal');
                     if (window.Platform && window.Platform.toast) {
                         if (failures === 0) {
                             Platform.toast.success('Capabilities deleted.');

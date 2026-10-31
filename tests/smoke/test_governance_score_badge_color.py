@@ -68,9 +68,8 @@ def test_zero_score_does_not_show_success_color(browser, live_server, seeded, ca
         if "0%" not in score_text:
             pytest.skip("seeded capability did not produce a 0%% governance score in this environment")
 
-        icon_wrapper = page.locator("text=Governance Score").locator("..").locator("..").locator(
-            "div.flex.h-11.w-11"
-        )
+        # The tile's icon was replaced by the library's band badge (the card no longer carries icons).
+        icon_wrapper = page.get_by_test_id("gov-score-band")
         class_attr = icon_wrapper.get_attribute("class") or ""
         assert "bg-success" not in class_attr, (
             "the Governance Score tile shows a green success icon at a 0%% "

@@ -22697,7 +22697,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [],
    "components": [
@@ -22761,7 +22761,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/capability-governance-dashboard.md",
    "states": [
     "loading",
     "empty-first-use",

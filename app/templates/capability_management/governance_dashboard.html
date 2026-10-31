@@ -1,18 +1,10 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_governance_dashboard_journey.py #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Capability Governance Dashboard{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business Layer', 'href': url_for('archimate_crud.dashboard') + '#business'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Capability Governance', 'current': true}
-]) }}
-{% endblock %}
 
 {% block extra_head_js %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -30,7 +22,7 @@ function userSearchWidget(getVal, setVal) {
                 if (d.success) { const lq = q.toLowerCase(); this.ures = d.users.filter(u => (u.name || '').toLowerCase().includes(lq) || (u.email || '').toLowerCase().includes(lq)).slice(0, 5); this.ushow = this.ures.length > 0; }
                 this.uErrorShown = false;
             } catch (e) {
-                // Debounced on every keystroke — toast once per outage, not on every retry.
+                // Debounced on every keystroke: toast once per outage, not on every retry.
                 if (!this.uErrorShown) {
                     this.uErrorShown = true;
                     if (window.Platform && Platform.toast) Platform.toast.error('User search failed.');
@@ -44,448 +36,253 @@ function userSearchWidget(getVal, setVal) {
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="governanceDashboard()" x-cloak>
+{% macro _sort_head(label, field) %}
+    {% call ui.table_head() %}{{ ui.button(text=label, variant='ghost', size='sm', class='-ml-3', attrs={'@click': "setSort('" ~ field ~ "')", 'aria-label': 'Sort by ' ~ label}) }}{% endcall %}
+{% endmacro %}
+{% set levels = [('1', '1 · Initial'), ('2', '2 · Repeatable'), ('3', '3 · Defined'), ('4', '4 · Managed'), ('5', '5 · Optimizing')] %}
 
-    {{ page_header(
-        title='Capability Governance Dashboard',
-        description='Manage capability ownership, maturity levels, and governance health.'
-    ) }}
+<div class="p-6 space-y-6 mx-auto" x-data="governanceDashboard()" x-cloak data-testid="governance-dashboard">
 
-    {# ── Metrics Cards ── #}
-    <div class="grid gap-4 md:grid-cols-3">
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <div class="flex items-start gap-4">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary">
-                    <i data-lucide="layers" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
-                </div>
-                <div class="flex-1">
-                    <p class="text-sm font-medium text-muted-foreground">Total Capabilities</p>
-                    <p class="text-2xl font-bold tracking-tight" x-text="totalCapabilities"></p>
-                    <p class="text-xs text-muted-foreground mt-1">In the capability model</p>
-                </div>
-            </div>
-        </div>
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <div class="flex items-start gap-4">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-warning">
-                    <i data-lucide="alert-triangle" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
-                </div>
-                <div class="flex-1">
-                    <p class="text-sm font-medium text-muted-foreground">Need Attention</p>
-                    <p class="text-2xl font-bold tracking-tight" x-text="needsAttention"></p>
-                    <p class="text-xs text-muted-foreground mt-1">Missing owner or metadata</p>
-                </div>
-            </div>
-        </div>
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <div class="flex items-start gap-4">
-                {# Found 14 Sep 2026: this icon's bg-success was hardcoded
-                   regardless of the actual score, so a 0% governance score
-                   (every capability needing attention) still showed a green
-                   "all good" badge -- directly contradicting the Need
-                   Attention tile right next to it. #}
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" :class="governanceScoreBadgeClass()">
-                    <i data-lucide="shield-check" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
-                </div>
-                <div class="flex-1">
-                    <p class="text-sm font-medium text-muted-foreground">Governance Score</p>
-                    <p class="text-2xl font-bold tracking-tight" x-text="governanceScore"></p>
-                    <p class="text-xs text-muted-foreground mt-1">Overall governance health</p>
-                </div>
-            </div>
-        </div>
+    {{ page_shell(title='Capability Governance Dashboard', breadcrumb=[('Home', url_for('main.index')), ('Capabilities', url_for('capability_map.index')), ('Capability Governance', none)], subtitle='Manage capability ownership, maturity levels and governance health.') }}
+
+    {# Stat card row: every figure is counted from the capabilities the table below lists. #}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="gov-stat-row">
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='Total Capabilities') }}
+                {{ ui.card_title(text='', class='text-2xl font-semibold tabular-nums', attrs={'x-text': 'loading ? "—" : totalCapabilities', 'data-testid': 'gov-total-value'}) }}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">Every capability in the model, whether or not it is governed yet.</p>{% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='Need Attention') }}
+                {{ ui.card_title(text='', class='text-2xl font-semibold tabular-nums', attrs={'x-text': 'loading ? "—" : needsAttention', 'data-testid': 'gov-attention-value'}) }}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">Capabilities missing an owner, a criticality, an importance or a description.</p>{% endcall %}
+        {% endcall %}
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text='Governance Score') }}
+                {{ ui.card_title(text='', class='text-2xl font-semibold tabular-nums', attrs={'x-text': 'loading ? "—" : governanceScore', 'data-testid': 'gov-score-value'}) }}
+                {% call ui.card_action() %}
+                    {{ ui.badge(variant='outline', text='', attrs={'x-text': 'governanceScoreBand()', 'data-testid': 'gov-score-band'}) }}
+                {% endcall %}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground">The share of capabilities that are fully governed.</p>{% endcall %}
+        {% endcall %}
     </div>
 
-    {# ── Table Card ── #}
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-
-        {# Toolbar #}
-        <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between">
-            <div class="relative flex-1 max-w-sm">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
-                <input
-                    type="search"
-                    placeholder="Search capabilities…"
-                    class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Search capabilities"
-                    @input.debounce.300ms="setSearch($event.target.value)"
-                >
+    {% call ui.card(class='overflow-hidden') %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='Capabilities') }}
+            {{ ui.card_description(text='Open a capability to set its owner, criticality and maturity.') }}
+        {% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-4') %}
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="w-full sm:max-w-sm">
+                    {{ ui.input(attrs={'type': 'search', 'placeholder': 'Search capabilities', 'aria-label': 'Search capabilities', 'data-testid': 'gov-search', '@input.debounce.300ms': 'setSearch($event.target.value)'}) }}
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="sr-only" for="gov-per-page">Per page</label>
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='gov-per-page', class='h-9 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'@change': 'setPerPage($event.target.value)'}) %}
+                        <option value="10">10 per page</option>
+                        <option value="25" selected>25 per page</option>
+                        <option value="50">50 per page</option>
+                        <option value="100">100 per page</option>
+                    {% endcall %}{% endcall %}
+                </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <label class="text-sm text-muted-foreground sr-only" for="gov-per-page">Per page</label>
-                <select id="gov-per-page"
-                        class="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        @change="setPerPage($event.target.value)">
-                    <option value="10">10 / page</option>
-                    <option value="25" selected>25 / page</option>
-                    <option value="50">50 / page</option>
-                    <option value="100">100 / page</option>
-                </select>
+
+            {# Bulk action bar: visible when rows are selected #}
+            <div x-show="_selectedIds.length > 0 || selectAllState === 'cross-page'" x-cloak class="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm" role="status" aria-live="polite">
+                <span class="font-medium" x-text="selectionCount() + ' selected'"></span>
+                <span x-show="selectAllState === 'page' && totalItems > pageSize">{{ ui.button(text='Select all capabilities', variant='link', size='sm', attrs={'@click': 'selectAllCrossPage()'}) }}</span>
+                {{ ui.button(text='Delete selected', variant='destructive', size='sm', attrs={'@click': 'confirmBulkDelete()', 'aria-label': 'Delete selected capabilities'}) }}
+                {{ ui.button(text='Clear', variant='ghost', size='sm', class='ml-auto', attrs={'@click': 'clearSelection()', 'aria-label': 'Clear selection'}) }}
             </div>
-        </div>
 
-        {# Bulk action bar — visible when rows are selected #}
-        <div x-show="_selectedIds.length > 0 || selectAllState === 'cross-page'" x-cloak
-             x-transition:enter="transition ease-out duration-150"
-             x-transition:enter-start="opacity-0 -translate-y-1"
-             x-transition:enter-end="opacity-100 translate-y-0"
-             class="flex items-center gap-3 px-4 py-2 bg-primary/5 border-b text-sm"
-             role="status"
-             aria-live="polite">
-            <span class="font-medium" x-text="selectionCount() + ' selected'"></span>
-            <div class="h-4 w-px bg-border"></div>
-            <button type="button"
-                    @click="confirmBulkDelete()"
-                    class="inline-flex items-center gap-1.5 text-destructive-emphasis hover:text-destructive-emphasis/80 font-medium transition-colors"
-                    aria-label="Delete selected capabilities">
-                <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
-                Delete selected
-            </button>
-            <button type="button"
-                    @click="clearSelection()"
-                    class="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Clear selection">
-                <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                Clear
-            </button>
-        </div>
+            {% call ui.alert(variant='destructive', attrs={'x-cloak': '', 'x-show': '!loading && errorMsg', 'data-testid': 'gov-error'}) %}
+                {{ ui.alert_title(text='The capabilities could not be loaded') }}
+                <div class="col-start-2 flex flex-col items-start gap-2">
+                    <p class="text-sm" x-text="errorMsg"></p>
+                    {{ ui.button(text='Try again', variant='outline', size='sm', attrs={'@click': 'loadData()'}) }}
+                </div>
+            {% endcall %}
+            <p x-show="loading" class="text-sm text-muted-foreground" role="status">Loading capabilities.</p>
 
-        {# Cross-page select-all banner #}
-        <div x-show="selectAllState === 'page' && totalItems > pageSize"
-             x-cloak
-             class="px-4 py-2 bg-primary/5 border-b text-sm text-center">
-            <span x-text="items.length + ' on this page selected.'"></span>
-            <button type="button" @click="selectAllCrossPage()"
-                    class="ml-1 font-medium text-primary hover:underline">
-                Select all <span x-text="totalItems"></span> capabilities
-            </button>
-        </div>
+            <div x-cloak x-show="!loading && !errorMsg && _allItems.length === 0" data-testid="gov-empty">
+                {% call ui.empty(class='p-6 md:p-10') %}
+                    {% call ui.empty_header() %}
+                        {{ ui.empty_title(text='No capabilities are in the model yet') }}
+                        {{ ui.empty_description(text='Governance is measured on the capability model, so there is nothing to score until capabilities exist. Add them on the capability map, then come back to assign owners.') }}
+                    {% endcall %}
+                    {% call ui.empty_content() %}{{ ui.button(text='Open the capability map', variant='outline', size='sm', href=url_for('capability_map.index')) }}{% endcall %}
+                {% endcall %}
+            </div>
+            <div x-cloak x-show="!loading && !errorMsg && _allItems.length > 0 && items.length === 0" data-testid="gov-no-match">
+                {% call ui.empty(class='p-6 md:p-10') %}
+                    {% call ui.empty_header() %}
+                        {{ ui.empty_title(text='No capability matches this search') }}
+                        {{ ui.empty_description(text='Search looks at capability names and owners. Clear the search to see all of them again.') }}
+                    {% endcall %}
+                    {% call ui.empty_content() %}{{ ui.button(text='Clear search', variant='outline', size='sm', attrs={'@click': "document.querySelector('[data-testid=gov-search]').value = ''; setSearch('')"}) }}{% endcall %}
+                {% endcall %}
+            </div>
 
-        {# Table #}
-        <div class="overflow-x-auto" aria-live="polite" aria-atomic="false">
-            <table class="dense-table w-full caption-bottom text-sm" role="grid" aria-label="Capabilities governance table">
-                <thead class="border-b bg-muted/40">
-                    <tr>
-                        {# Select-all checkbox #}
-                        <th class="w-10 h-12 px-3 align-middle" scope="col">
-                            <input type="checkbox"
-                                   class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
-                                   :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
-                                   @change="toggleSelectAll()"
-                                   aria-label="Select all on this page">
-                        </th>
-                        {# Serial # #}
-                        <th class="w-12 h-12 px-3 text-left align-middle font-medium text-muted-foreground tabular-nums" scope="col">#</th>
-                        {# Sortable columns #}
-                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">
-                            <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('name')">
-                                Capability
-                                <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                            </button>
-                        </th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-16" scope="col">
-                            <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('level')">
-                                Lvl
-                                <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                            </button>
-                        </th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">
-                            <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('business_owner')">
-                                Owner
-                                <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                            </button>
-                        </th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">
-                            <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('business_criticality')">
-                                Criticality
-                                <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                            </button>
-                        </th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">
-                            <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('current_maturity_level')">
-                                Maturity
-                                <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                            </button>
-                        </th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Status</th>
-                        <th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground" scope="col">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="[&_tr:last-child]:border-0">
-                    {# Loading state #}
-                    <tr x-show="loading" x-cloak>
-                        <td colspan="9" class="px-4 py-12 text-center">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="loader-2" class="h-6 w-6 text-muted-foreground animate-spin" aria-hidden="true"></i>
-                                <p class="text-sm text-muted-foreground">Loading capabilities…</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {# Error state #}
-                    <tr x-show="!loading && errorMsg" x-cloak>
-                        <td colspan="9" class="px-4 py-12 text-center text-destructive-emphasis text-sm" x-text="errorMsg"></td>
-                    </tr>
-                    {# Empty state #}
-                    <tr x-show="!loading && !errorMsg && items.length === 0" x-cloak>
-                        <td colspan="9" class="px-4 py-12 text-center">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="inbox" class="h-8 w-8 text-muted-foreground/40" aria-hidden="true"></i>
-                                <p class="text-sm text-muted-foreground">No capabilities found</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {# Data rows #}
-                    <template x-for="(row, rowIdx) in items" :key="row.id">
-                        <tr class="border-b transition-colors hover:bg-muted/50"
-                            :class="isSelected(row.id) ? 'bg-primary/5' : ''">
-                            {# Checkbox cell — @click.stop prevents row-click from toggling twice #}
-                            <td class="w-10 px-3 align-middle" @click.stop>
-                                <input type="checkbox"
-                                       class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
-                                       :checked="isSelected(row.id)"
-                                       @change="handleRowCheckboxClick($event, rowIdx)"
-                                       :aria-label="'Select ' + row.name">
-                            </td>
-                            {# Serial number #}
-                            <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
-                            {# Name — click opens edit modal #}
-                            <td class="px-4 py-3 align-middle">
-                                <button type="button"
-                                        class="font-medium text-left hover:text-primary hover:underline transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
-                                        @click="openEditModal(row)"
-                                        :aria-label="'Edit governance for ' + row.name"
-                                        x-text="row.name"></button>
-                            </td>
-                            <td class="px-4 py-3 align-middle tabular-nums text-sm text-muted-foreground">
-                                <span x-text="'L' + row.level"></span>
-                            </td>
-                            <td class="px-4 py-3 align-middle text-sm">
-                                <template x-if="row.business_owner">
-                                    <span class="text-success-emphasis" x-text="row.business_owner"></span>
-                                </template>
-                                <template x-if="!row.business_owner">
-                                    <span class="italic text-muted-foreground">Not assigned</span>
-                                </template>
-                            </td>
-                            <td class="px-4 py-3 align-middle text-sm">
-                                <template x-if="row.business_criticality">
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                          :class="statusClass(row.business_criticality)"
-                                          x-text="formatStatus(row.business_criticality)"></span>
-                                </template>
-                                <template x-if="!row.business_criticality">
-                                    <span class="italic text-muted-foreground text-xs">Not set</span>
-                                </template>
-                            </td>
-                            <td class="px-4 py-3 align-middle text-sm">
-                                <template x-if="maturityDisplay(row)">
-                                    <span class="text-sm" x-text="maturityDisplay(row)"></span>
-                                </template>
-                                <template x-if="!maturityDisplay(row)">
-                                    <span class="italic text-warning-emphasis text-xs">Not assessed</span>
-                                </template>
-                            </td>
-                            <td class="px-4 py-3 align-middle">
-                                <template x-if="row.needs_attention">
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-warning/10 text-warning-emphasis">
-                                        Needs attention
-                                    </span>
-                                </template>
-                                <template x-if="!row.needs_attention">
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-success/10 text-success-emphasis">
-                                        Governed
-                                    </span>
-                                </template>
-                            </td>
-                            <td class="px-4 py-3 align-middle text-right" @click.stop>
-                                <button type="button"
-                                        @click="openEditModal(row)"
-                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                        :aria-label="'Edit governance for ' + row.name">
-                                    <i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i>
-                                    Edit
-                                </button>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-
-        {# Pagination #}
-        <div x-show="totalItems > pageSize" x-cloak class="border-t px-4 py-3 bg-muted/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <p class="text-sm text-muted-foreground" aria-live="polite">
-                Showing <span class="font-medium text-foreground" x-text="pageStart"></span>–<span class="font-medium text-foreground" x-text="pageEnd"></span>
-                of <span class="font-medium text-foreground" x-text="totalItems"></span> capabilities
-            </p>
-            {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is the block above. #}
-            <nav class="flex items-center gap-1" aria-label="Pagination">
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                        :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
-                    <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
-                </button>
-                <template x-for="(pg, idx) in getVisiblePages()" :key="'pg-' + idx">
-                    <span>
-                        <button type="button" x-show="pg !== '...'" x-cloak
-                                class="min-w-[2rem] h-8 rounded-md text-sm font-medium transition-colors"
-                                :class="pg === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"
-                                @click="goToPage(pg)" x-text="pg"></button>
-                        <span x-show="pg === '...'" x-cloak class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
-                    </span>
-                </template>
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                        :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
-                    <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
-                </button>
-            </nav>
-        </div>
-    </div>
-
-    {# ── Edit Governance Modal (canonical modal.html macro) ── #}
-    {% call modal(id='edit-governance-modal', title='Edit Governance', size='lg') %}
-        <p class="text-sm text-muted-foreground -mt-1 mb-5" x-text="editForm.name"></p>
-
-        <div class="space-y-4">
-            <div x-data="userSearchWidget(() => editForm.business_owner, v => { editForm.business_owner = v; })" @click.outside="ushow = false">
-                <label for="gov-edit-owner" class="block text-sm font-medium mb-1">Business Owner</label>
-                <div class="relative">
-                    <input type="text" id="gov-edit-owner"
-                           x-model="editForm.business_owner"
-                           @input.debounce.300ms="usearch()"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                           placeholder="Search by name or email..." autocomplete="off">
-                    <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
-                        <template x-for="u in ures" :key="u.id">
-                            <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
-                                <span x-text="u.name" class="font-medium"></span>
-                                <span x-text="u.email" class="text-xs text-muted-foreground"></span>
-                            </button>
+            <div x-cloak x-show="!loading && !errorMsg && items.length > 0" class="max-h-[65vh] overflow-auto" aria-live="polite">
+                {% call ui.table_container() %}{% call ui.table(attrs={'aria-label': 'Capabilities governance table'}) %}
+                    {% call ui.table_header() %}
+                        {% call ui.table_row() %}
+                            {% call ui.table_head(class='w-10') %}{{ ui.checkbox(attrs={':checked': 'items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })', '@click': 'toggleSelectAll()', 'aria-label': 'Select all on this page'}) }}{% endcall %}
+                            {{ ui.table_head(text='#', class='w-12') }}
+                            {{ _sort_head('Capability', 'name') }}
+                            {{ _sort_head('Level', 'level') }}
+                            {{ _sort_head('Owner', 'business_owner') }}
+                            {{ _sort_head('Criticality', 'business_criticality') }}
+                            {{ _sort_head('Maturity', 'current_maturity_level') }}
+                            {{ ui.table_head(text='Status') }}
+                            {{ ui.table_head(text='Actions', class='text-right') }}
+                        {% endcall %}
+                    {% endcall %}
+                    {% call ui.table_body() %}
+                        <template x-for="(row, rowIdx) in items" :key="row.id">
+                            {% call ui.table_row(attrs={'data-testid': 'gov-row', ':data-capability-id': 'row.id'}) %}
+                                {% call ui.table_cell() %}{{ ui.checkbox(attrs={':checked': 'isSelected(row.id)', '@click': 'handleRowCheckboxClick($event, rowIdx)', ':aria-label': "'Select ' + row.name"}) }}{% endcall %}
+                                {{ ui.table_cell(class='tabular-nums text-muted-foreground', attrs={'x-text': 'row.row_number'}) }}
+                                {% call ui.table_cell(class='max-w-64 truncate font-medium') %}{{ ui.button(variant='link', class='h-auto p-0 font-medium', attrs={'x-text': 'row.name', '@click': 'openEditModal(row)', ':aria-label': "'Edit governance for ' + row.name"}) }}{% endcall %}
+                                {{ ui.table_cell(class='tabular-nums text-muted-foreground', attrs={'x-text': "'L' + row.level"}) }}
+                                {% call ui.table_cell() %}
+                                    <span x-show="row.business_owner" x-text="row.business_owner"></span>
+                                    <span x-show="!row.business_owner" class="text-muted-foreground">Not assigned</span>
+                                {% endcall %}
+                                {% call ui.table_cell() %}
+                                    <span x-show="row.business_criticality">{{ ui.badge(variant='outline', attrs={'x-text': 'formatStatus(row.business_criticality)'}) }}</span>
+                                    <span x-show="!row.business_criticality" class="text-muted-foreground">Not set</span>
+                                {% endcall %}
+                                {% call ui.table_cell() %}
+                                    <span x-show="maturityDisplay(row)" x-text="maturityDisplay(row)"></span>
+                                    <span x-show="!maturityDisplay(row)" class="text-muted-foreground">Not assessed</span>
+                                {% endcall %}
+                                {% call ui.table_cell(attrs={'data-testid': 'gov-status'}) %}
+                                    <template x-if="row.needs_attention">{{ ui.badge(variant='secondary', text='Needs attention') }}</template>
+                                    <template x-if="!row.needs_attention">{{ ui.badge(variant='outline', text='Governed') }}</template>
+                                {% endcall %}
+                                {% call ui.table_cell(class='text-right') %}{{ ui.button(text='Edit', size='sm', attrs={'@click': 'openEditModal(row)', ':aria-label': "'Edit governance for ' + row.name"}) }}{% endcall %}
+                            {% endcall %}
                         </template>
-                    </div>
-                </div>
+                    {% endcall %}
+                {% endcall %}{% endcall %}
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="gov-edit-criticality" class="block text-sm font-medium mb-1">Business Criticality</label>
-                    <select id="gov-edit-criticality"
-                            x-model="editForm.business_criticality"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <option value="">— Not Set —</option>
+            <div x-cloak x-show="!loading && !errorMsg && totalItems > pageSize" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-muted-foreground" aria-live="polite">Showing <span class="font-medium text-foreground tabular-nums" x-text="pageStart"></span> to <span class="font-medium text-foreground tabular-nums" x-text="pageEnd"></span> of <span class="font-medium text-foreground tabular-nums" x-text="totalItems"></span> capabilities</p>
+                <div class="flex items-center gap-1" role="group" aria-label="Pagination">
+                    {{ ui.button(text='Previous', variant='outline', size='sm', attrs={':disabled': '!hasPrev', '@click': 'prevPage()', 'aria-label': 'Previous page'}) }}
+                    <template x-for="(pg, idx) in getVisiblePages()" :key="'pg-' + idx">
+                        <span>
+                            <template x-if="pg !== '...'">{{ ui.button(variant='ghost', size='sm', class='min-w-8 tabular-nums', attrs={'x-text': 'pg', ':aria-current': "pg === page ? 'page' : null", ':class': "pg === page ? 'bg-accent' : ''", '@click': 'goToPage(pg)'}) }}</template>
+                            <span x-show="pg === '...'" class="inline-flex min-w-8 justify-center text-sm text-muted-foreground">&hellip;</span>
+                        </span>
+                    </template>
+                    {{ ui.button(text='Next', variant='outline', size='sm', attrs={':disabled': '!hasNext', '@click': 'nextPage()', 'aria-label': 'Next page'}) }}
+                </div>
+            </div>
+        {% endcall %}
+    {% endcall %}
+
+    {# Edit governance #}
+    {% call ui.dialog() %}
+      {% call ui.dialog_content(id='edit-governance-modal', class='sm:max-w-xl', attrs={'x-data': '{}', 'data-testid': 'gov-edit'}) %}
+        {% call ui.dialog_header() %}
+          {{ ui.dialog_title(text='Edit Governance') }}
+          {{ ui.dialog_description(text='', attrs={'x-text': '$store.governance.editForm.name'}) }}
+        {% endcall %}
+        <div class="flex flex-col gap-4 max-h-[65vh] overflow-y-auto px-0.5">
+            <div x-data="userSearchWidget(() => $store.governance.editForm.business_owner, v => { $store.governance.editForm.business_owner = v; })" @click.outside="ushow = false">
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Business Owner', attrs={'for': 'gov-edit-owner'}) }}
+                    <div class="relative">
+                        {{ ui.input(id='gov-edit-owner', attrs={'type': 'text', 'x-model': '$store.governance.editForm.business_owner', '@input.debounce.300ms': 'usearch()', 'placeholder': 'Search by name or email', 'autocomplete': 'off'}) }}
+                        <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground">
+                            <template x-for="u in ures" :key="u.id">
+                                {% call ui.button(variant='ghost', class='h-auto w-full justify-between rounded-none px-3 py-1.5 font-normal', attrs={'@click': 'uselect(u)'}) %}<span class="font-medium" x-text="u.name"></span><span class="text-xs text-muted-foreground" x-text="u.email"></span>{% endcall %}
+                            </template>
+                        </div>
+                    </div>
+                {% endcall %}
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Business Criticality', attrs={'for': 'gov-edit-criticality'}) }}
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='gov-edit-criticality', class='h-9 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'x-model': '$store.governance.editForm.business_criticality'}) %}
+                        <option value="">Not set</option>
                         <option value="mission_critical">Mission Critical</option>
                         <option value="business_critical">Business Critical</option>
                         <option value="important">Important</option>
                         <option value="supporting">Supporting</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="gov-edit-strategic" class="block text-sm font-medium mb-1">Strategic Importance</label>
-                    <select id="gov-edit-strategic"
-                            x-model="editForm.strategic_importance"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <option value="">— Not Set —</option>
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Strategic Importance', attrs={'for': 'gov-edit-strategic'}) }}
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='gov-edit-strategic', class='h-9 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'x-model': '$store.governance.editForm.strategic_importance'}) %}
+                        <option value="">Not set</option>
                         <option value="critical">Critical</option>
                         <option value="high">High</option>
                         <option value="medium">Medium</option>
                         <option value="low">Low</option>
-                    </select>
-                </div>
+                    {% endcall %}{% endcall %}
+                {% endcall %}
             </div>
-
-            <div>
-                <label for="gov-edit-description" class="block text-sm font-medium mb-1">Description</label>
-                <textarea id="gov-edit-description" rows="3"
-                          x-model="editForm.description"
-                          class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                          placeholder="Describe this capability's purpose…"></textarea>
+            {% call ui.field() %}
+                {{ ui.field_label(text='Description', attrs={'for': 'gov-edit-description'}) }}
+                {{ ui.textarea(id='gov-edit-description', attrs={'rows': '3', 'x-model': '$store.governance.editForm.description', 'placeholder': "Describe this capability's purpose"}) }}
+            {% endcall %}
+            <p class="text-sm font-medium">Maturity assessment</p>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Current Level', attrs={'for': 'gov-edit-cur-maturity'}) }}
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='gov-edit-cur-maturity', class='h-9 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'x-model': '$store.governance.editForm.current_maturity_level'}) %}
+                        <option value="">Not set</option>
+                        {% for value, label in levels %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Target Level', attrs={'for': 'gov-edit-tgt-maturity'}) }}
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='gov-edit-tgt-maturity', class='h-9 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'x-model': '$store.governance.editForm.target_maturity_level'}) %}
+                        <option value="">Not set</option>
+                        {% for value, label in levels %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                    {% endcall %}{% endcall %}
+                {% endcall %}
             </div>
-
-            <div class="border-t border-border pt-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Maturity Assessment</p>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="gov-edit-cur-maturity" class="block text-sm font-medium mb-1">Current Level</label>
-                        <select id="gov-edit-cur-maturity"
-                                x-model="editForm.current_maturity_level"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            <option value="">— Not Set —</option>
-                            <option value="1">1 · Initial</option>
-                            <option value="2">2 · Repeatable</option>
-                            <option value="3">3 · Defined</option>
-                            <option value="4">4 · Managed</option>
-                            <option value="5">5 · Optimizing</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="gov-edit-tgt-maturity" class="block text-sm font-medium mb-1">Target Level</label>
-                        <select id="gov-edit-tgt-maturity"
-                                x-model="editForm.target_maturity_level"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            <option value="">— Not Set —</option>
-                            <option value="1">1 · Initial</option>
-                            <option value="2">2 · Repeatable</option>
-                            <option value="3">3 · Defined</option>
-                            <option value="4">4 · Managed</option>
-                            <option value="5">5 · Optimizing</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <label for="gov-edit-maturity-notes" class="block text-sm font-medium mb-1">Assessment Notes</label>
-                    <textarea id="gov-edit-maturity-notes" rows="2"
-                              x-model="editForm.maturity_assessment_notes"
-                              class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                              placeholder="Rationale for current maturity rating…"></textarea>
-                </div>
-            </div>
-
-            <div x-show="editError" x-cloak
-                 class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
-                 x-text="editError"></div>
+            {% call ui.field() %}
+                {{ ui.field_label(text='Assessment Notes', attrs={'for': 'gov-edit-maturity-notes'}) }}
+                {{ ui.textarea(id='gov-edit-maturity-notes', attrs={'rows': '2', 'x-model': '$store.governance.editForm.maturity_assessment_notes', 'placeholder': 'Rationale for the current maturity rating'}) }}
+            {% endcall %}
+            {% call ui.alert(variant='destructive', attrs={'x-show': '$store.governance.editError', 'x-cloak': '', 'role': 'alert'}) %}
+                <div class="col-start-2"><p class="text-sm" x-text="$store.governance.editError"></p></div>
+            {% endcall %}
         </div>
-
-        <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-            <button type="button"
-                    data-modal-close="edit-governance-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Cancel
-            </button>
-            <button type="button"
-                    @click="saveGovernance()"
-                    :disabled="editSaving"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="editSaving" x-cloak aria-hidden="true"></i>
-                <span x-text="editSaving ? 'Saving…' : 'Save Changes'"></span>
-            </button>
-        </div>
+        {% call ui.dialog_footer() %}
+            {{ ui.button(text='Cancel', variant='outline', attrs={'data-fb-close': ''}) }}
+            {{ ui.button(text='', attrs={'@click': '$store.governance.saveGovernance()', ':disabled': '$store.governance.editSaving', 'x-text': "$store.governance.editSaving ? 'Saving…' : 'Save Changes'"}) }}
+        {% endcall %}
+      {% endcall %}
     {% endcall %}
 
-    {# ── Bulk Delete Confirmation Modal ── #}
-    {% call modal(id='bulk-delete-confirm-modal', title='Delete Capabilities?', size='sm') %}
-        <p class="text-sm text-muted-foreground mb-4">
-            This will permanently delete the selected capabilities and cannot be undone.
-            Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
-        </p>
-        <input type="text"
-               x-model="deleteConfirmText"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
-               placeholder="DELETE"
-               @keydown.enter="executeBulkDelete()"
-               aria-label="Type DELETE to confirm">
-        <div class="flex justify-end gap-3">
-            <button type="button"
-                    data-modal-close="bulk-delete-confirm-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Cancel
-            </button>
-            <button type="button"
-                    @click="executeBulkDelete()"
-                    :disabled="deleteConfirmText !== 'DELETE' || deleteInProgress"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak aria-hidden="true"></i>
-                <span x-text="deleteInProgress ? 'Deleting…' : 'Delete'"></span>
-            </button>
-        </div>
+    {# Bulk delete confirmation #}
+    {% call ui.dialog() %}
+      {% call ui.dialog_content(id='bulk-delete-confirm-modal', attrs={'x-data': '{}', 'data-testid': 'gov-delete'}) %}
+        {% call ui.dialog_header() %}
+          {{ ui.dialog_title(text='Delete capabilities?') }}
+          {{ ui.dialog_description(text='This permanently deletes the selected capabilities and cannot be undone. Type DELETE to confirm.') }}
+        {% endcall %}
+        {{ ui.input(attrs={'type': 'text', 'x-model': '$store.governance.deleteConfirmText', 'placeholder': 'DELETE', '@keydown.enter': '$store.governance.executeBulkDelete()', 'aria-label': 'Type DELETE to confirm'}) }}
+        {% call ui.dialog_footer() %}
+            {{ ui.button(text='Cancel', variant='outline', attrs={'data-fb-close': ''}) }}
+            {{ ui.button(text='', variant='destructive', attrs={'@click': '$store.governance.executeBulkDelete()', ':disabled': "$store.governance.deleteConfirmText !== 'DELETE' || $store.governance.deleteInProgress", 'x-text': "$store.governance.deleteInProgress ? 'Deleting…' : 'Delete'"}) }}
+        {% endcall %}
+      {% endcall %}
     {% endcall %}
 
 </div>
