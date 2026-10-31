@@ -259,7 +259,7 @@
     </div>
 
     <!-- Accessibility: aria-live regions for dynamic announcements (T-042) -->
-    <div x-data aria-live="polite" aria-atomic="true" role="status"
+    <div x-data data-testid="announcer-status" aria-live="polite" aria-atomic="true" role="status"
          class="sr-only"
          x-text="$store.announcer.message">
     </div>

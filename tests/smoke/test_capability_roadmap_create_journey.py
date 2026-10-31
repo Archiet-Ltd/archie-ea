@@ -34,7 +34,7 @@ def _metric(page, key):
 
 
 def _alert_text(page):
-    return page.locator('[role="status"][aria-live="polite"]').first.inner_text()
+    return page.get_by_test_id("announcer-status").inner_text()
 
 
 def _requests(page, fragment):
@@ -49,8 +49,8 @@ def _requests(page, fragment):
 def _walk(page, name):
     import os
 
-    folder = "/home/ubuntu/verify/seats/submit01c/walk"
-    if os.path.isdir(folder):
+    folder = os.environ.get("SMOKE_SCREENSHOT_DIR", "")
+    if folder and os.path.isdir(folder):
         page.screenshot(path=os.path.join(folder, name + ".png"), full_page=True)
 
 
@@ -78,7 +78,7 @@ def _run(browser, live_server, width, height, scheme, tag):
         expect(page.get_by_test_id("rdm-metric-gaps")).to_have_text("1", timeout=PAGE_TIMEOUT)
         assert len([r for r in posts if r.url.endswith("/roadmap/gaps")]) == 1
         page.wait_for_function(
-            "() => document.querySelector('[role=status][aria-live=polite]').textContent.includes('added')"
+            "() => document.querySelector('[data-testid=announcer-status]').textContent.includes('added')"
         )
         assert gap_name in _alert_text(page)
         gap_row = page.get_by_test_id("roadmap-gap-row").filter(has_text=gap_name)
@@ -97,7 +97,7 @@ def _run(browser, live_server, width, height, scheme, tag):
         assert len([r for r in posts if r.url.endswith("/roadmap/plateaus")]) == 1
         expect(page.get_by_test_id("roadmap-plateau-name").filter(has_text=plateau_name)).to_be_visible()
         page.wait_for_function(
-            "() => document.querySelector('[role=status][aria-live=polite]').textContent.includes('Plateau')"
+            "() => document.querySelector('[data-testid=announcer-status]').textContent.includes('Plateau')"
         )
         assert plateau_name in _alert_text(page)
         _walk(page, tag + "-plateau")
@@ -117,7 +117,7 @@ def _run(browser, live_server, width, height, scheme, tag):
         expect(row).to_be_in_viewport()
         assert len([r for r in posts if r.url.endswith("/roadmap/work-packages")]) == 1
         page.wait_for_function(
-            "() => document.querySelector('[role=status][aria-live=polite]').textContent.includes('Work package')"
+            "() => document.querySelector('[data-testid=announcer-status]').textContent.includes('Work package')"
         )
         assert wp_name in _alert_text(page)
         _walk(page, tag + "-work-package")

@@ -2,7 +2,7 @@
 
 A business architect on /capability-roadmap opens the Add Gap, Add Plateau and Add
 Work Package dialogs. Saving each one closes the dialog, moves the matching stat
-card, and announces what was created to a screen reader -- all without a reload.
+card, and announces what was created to a screen reader (the polite status region) -- all without a reload.
 The plateau and the work package are also visible on the page by name; a gap has
 no name surface on this page today (only its stat card and the work-package row
 it ends up linked to), so that half of the assertion does not apply to it. A
@@ -35,9 +35,9 @@ def test_roadmap_dialogs_show_the_saved_record_without_a_reload(browser, live_se
     org = create_fresh_org("business_architect")
     other = create_fresh_org("business_architect")
     suffix = org["suffix"]
-    gap_name = "Submit01b gap %s" % suffix
-    plateau_name = "Submit01b plateau %s" % suffix
-    wp_name = "Submit01b work package %s" % suffix
+    gap_name = "Coverage shortfall %s" % suffix
+    plateau_name = "Target plateau %s" % suffix
+    wp_name = "Close the shortfall %s" % suffix
 
     # The modal id (e.g. "#rdm-create-wp-modal") names the outer wrapper that
     # Platform.modal toggles `hidden` on; it carries no size of its own (its
@@ -54,7 +54,7 @@ def test_roadmap_dialogs_show_the_saved_record_without_a_reload(browser, live_se
         page.goto(live_server + "/capability-roadmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
 
-        alert_region = page.locator('[role="alert"]')
+        alert_region = page.get_by_test_id("announcer-status")
 
         gaps_before = int((page.get_by_test_id("rdm-metric-gaps").inner_text() or "0").strip())
         plateaus_before = int((page.get_by_test_id("rdm-metric-plateaus").inner_text() or "0").strip())
