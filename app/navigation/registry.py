@@ -383,7 +383,6 @@ _CATALOGUE_HOME = (
     ("industry_apqc.", "systems"),
     ("architect_ui.roadmap_builder", "changes"),
     ("architect_ui.architecture_assistant", "changes"),
-    ("main.agentic_gaps_ui", "changes"),
     ("main.ea_workflows_dashboard", "changes"),
     ("roadmap_outcome.", "changes"),
     ("main.archimate_roadmap", "changes"),
