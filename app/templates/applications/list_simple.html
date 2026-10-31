@@ -429,8 +429,11 @@
             <td class="px-2 align-middle">
               {% if pc %}
               <span class="block max-w-[150px] truncate text-xs text-foreground" title="{{ pc.business_capability.name | e }}" data-testid="app-capability-{{ app.id }}">{{ pc.business_capability.name }}</span>
+              {% elif can('edit', 'application') %}
+              {# A missing capability names its next step, the way the owner cell does, and opens the same mapping dialog the row menu uses. #}
+              {{ button(text='No capability mapped yet: map it', variant='link', size='sm', class='h-auto p-0 text-xs', on_click="openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')", testid='app-capability-' ~ app.id) }}
               {% else %}
-              <span class="text-xs text-muted-foreground" data-testid="app-capability-{{ app.id }}">Not mapped</span>
+              <span class="text-xs text-muted-foreground" data-testid="app-capability-{{ app.id }}">No capability mapped yet</span>
               {% endif %}
             </td>
             <td class="px-2 text-right align-middle">{{ row_menu(app) }}</td>
