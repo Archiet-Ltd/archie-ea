@@ -1287,6 +1287,10 @@ def cancel_session(id):
 def add_board_member(session_id):
     """Add a member to an ARB session."""
     arb_session = _own_session_or_404(session_id)
+    seat = (request.form.get("role") or "").strip()
+    if seat not in {value for value, _label in BOARD_SEAT_ROLES}:
+        flash("Choose a seat for the new member", "error")
+        return redirect(url_for("arb.session_detail", id=session_id))
     try:
         data = request.form.to_dict()
         member_id = int(data.get("user_id"))
@@ -1302,11 +1306,12 @@ def add_board_member(session_id):
         (arb_service.add_board_member(
             arb_session_id=session_id,
             user_id=member.id,
-            role=data.get("role"),
+            role=seat,
             voting_member=data.get("voting_member") == "on",
         ))
         flash("Board member added successfully", "success")
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error adding board member: {e}")
         flash("Error adding member. Please try again.", "error")
 
