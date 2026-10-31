@@ -76,8 +76,13 @@ first if in doubt).
 
 ```bash
 ssh root@134.122.105.56 "cd /root/archie-ea && git fetch && git checkout <this-branch> && git log --oneline -3"
-ssh root@134.122.105.56 "cd /root/archie-ea && docker compose up -d --force-recreate server"
+scripts/deploy_verified.sh <this-branch>
 ```
+
+Use the deploy script, not a bare `docker compose up`: it takes a backup, builds, runs the schema
+steps while the old server keeps serving, and only then replaces the server (see
+`CLAUDE.md`, "Deploying to production"). The 8-12 minute figure above predates this; the gap
+is now the new server's start-up only.
 
 `reconcile-schema` (part of the boot chain) adds the 14 nullable
 `organization_id` columns on this boot — non-destructive, ADD-only.

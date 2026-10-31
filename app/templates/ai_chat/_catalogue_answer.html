@@ -12,6 +12,7 @@
             {% call card_description() %}
                 {% if answer.records %}{{ answer.summary[:1] | upper }}{{ answer.summary[1:] }}: {{ answer.total if answer.total is not none else answer.records | length }} in your records.
                 {% elif answer.complete %}{{ sentence }}.
+                {% elif answer.unmatched %}Nothing is recorded under that name.
                 {% else %}Your records cannot answer this yet.{% endif %}
             {% endcall %}
         {% endcall %}
