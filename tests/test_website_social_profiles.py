@@ -59,3 +59,56 @@ def test_addresses_that_are_not_a_profile_root_are_refused(address):
 
 def test_a_profile_root_is_normalised():
     assert social_profile_root("https://www.LinkedIn.com/company/acme/?trk=x")[1] == "https://www.linkedin.com/company/acme"
+
+
+def _page(url, body, header="", footer="", analysis=None):
+    html = "<html><head><title>%s</title></head><body><header>%s</header>%s<footer>%s</footer></body></html>" % (
+        url, header, body, footer)
+    return {"url": url, "fetched_at": "2026-10-30T00:00:00", "static": extract_static(url, html, url),
+            "analysis": analysis or {}}
+
+
+def _facts(page):
+    facts = _facts_from([page]).ordered()
+    return ([r["value"] for r in facts if r["field"] == "social_profile"],
+            [r["value"] for r in facts if r["field"] == "linkedin_url"])
+
+
+def _link(address):
+    return '<a href="%s">link</a>' % address
+
+
+def test_a_short_piece_of_the_name_is_not_the_companys_handle():
+    body = "".join(_link(a) for a in ("https://x.com/post", "https://github.com/hog", "https://www.youtube.com/@o",
+                                      "https://x.com/p", "https://x.com/posthog"))
+    profiles, _ = _facts(_page("https://posthog.com/", body))
+    assert [p["url"] for p in profiles] == ["https://x.com/posthog"]
+
+
+def test_a_handle_must_spell_the_name_as_a_whole_word():
+    body = "".join(_link(a) for a in ("https://github.com/acmeville", "https://x.com/notacme", "https://x.com/acme-hq"))
+    profiles, _ = _facts(_page("https://acme.com/", body))
+    assert [p["url"] for p in profiles] == ["https://x.com/acme-hq"]
+
+
+def test_the_linkedin_address_is_the_linkedin_profile_chosen_by_the_same_rule():
+    body = _link("https://www.linkedin.com/company/bigbank") + _link("https://www.linkedin.com/company/acme")
+    profiles, linkedin = _facts(_page("https://acme.com/", body))
+    assert linkedin == ["https://www.linkedin.com/company/acme"]
+    assert [p["url"] for p in profiles if p["platform"] == "LinkedIn"] == linkedin
+
+
+def test_a_customers_linkedin_page_is_neither_a_profile_nor_the_linkedin_address():
+    profiles, linkedin = _facts(_page("https://acme.com/", _link("https://www.linkedin.com/company/bigbank")))
+    assert profiles == [] and linkedin == []
+
+
+def test_a_model_given_linkedin_address_is_checked_too():
+    page = _page("https://acme.com/", "", analysis={"company": {"linkedin_url": "https://www.linkedin.com/company/other"}})
+    assert _facts(page)[1] == []
+
+
+def test_a_powered_by_link_in_the_footer_is_not_the_companys_account():
+    profiles, _ = _facts(_page("https://acme.com/", "", footer=_link("https://x.com/vercel") + _link("https://x.com/acme")))
+    assert [p["url"] for p in profiles] == ["https://x.com/acme"]
+    assert _facts(_page("https://acme.com/", "", footer=_link("https://x.com/vercel")))[0] == []
