@@ -255,6 +255,12 @@ def init_context_processors(app):
             app.logger.debug(f"Error loading dashboard categories: {e}")
             return default_result
 
+    # Jinja globals, not context, so a macro imported without context can ask them too.
+    from app.services.public_pages import self_serve_plans_offered, single_sign_on_offered
+
+    app.jinja_env.globals["sso_offered"] = single_sign_on_offered
+    app.jinja_env.globals["self_serve_plans_offered"] = self_serve_plans_offered
+
     @app.context_processor
     def inject_guardrail_status():
         """Make guardrail status available to admin templates"""

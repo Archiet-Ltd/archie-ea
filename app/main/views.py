@@ -1019,15 +1019,18 @@ def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
     from app.services.public_pages import (
         build_hub_jsonld,
+        apply_wave_copy,
         build_jsonld,
         load_feed_pages,
         load_page,
+        self_serve_plans_offered,
     )
 
     page = load_page("site", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
+    page = apply_wave_copy(page)
     if slug == "features":
         # /features is the module and connector hub: both lists are built
         # from the feed, so a new module or connector file appears with no
@@ -1059,7 +1062,8 @@ def public_site_page(slug):
         template = "public/pricing.html"
         from app.services import billing_plans
         plan_data = {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS}
-        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data)
+        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data,
+                               self_serve_plans=self_serve_plans_offered())
     return render_template(template, page=page, jsonld=build_jsonld(page))
 
 

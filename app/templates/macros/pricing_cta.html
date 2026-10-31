@@ -14,13 +14,13 @@
   heading='Choose a plan',
   heading_id='buy-heading',
   testid='pricing-buy',
-  intro='Annual billing is selected; monthly is one click away. Any tax due is shown on the payment page before you pay.'
+  intro=none
 ) %}
 {% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
 {% set _btn = 'public-btn transition-colors' %}
 <section aria-labelledby="{{ heading_id }}" class="mt-12 space-y-4" data-testid="{{ testid }}">
   <h2 id="{{ heading_id }}" class="text-2xl font-semibold text-foreground">{{ heading }}</h2>
-  <p class="text-sm text-muted-foreground">{{ intro }}</p>
+  <p class="text-sm text-muted-foreground">{% if intro %}{{ intro }}{% elif self_serve_plans_offered() %}Annual billing is selected; monthly is one click away. Any tax due is shown on the payment page before you pay.{% else %}Start free today. Entelim is free while it is in early access, and plans open for purchase soon.{% endif %}</p>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">Community</p>
@@ -30,7 +30,10 @@
     {% for key, name in [('startup', 'Startup'), ('team', 'Team')] %}
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">{{ name }}</p>
-      {% if _billing %}
+      {% if not self_serve_plans_offered() %}
+      <p class="text-sm text-muted-foreground">Free while Entelim is in early access. Plans open for purchase soon.</p>
+      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register')) }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
+      {% elif _billing %}
       <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
          class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
          data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
