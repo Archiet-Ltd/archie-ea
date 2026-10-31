@@ -114,6 +114,9 @@ def enforce():
 
 
 _ANCHOR = re.compile(r"""(<a\b[^>]*?\bhref=)(["'])(/[^"'#?]*)([^"']*)\2""")
+# A whole link, from its opening tag to its closing tag (links do not nest).
+_LINK = re.compile(r"""<a\b(?P<attrs>[^>]*?\bhref=(["'])(?P<path>/[^"'#?]*)[^"']*\2[^>]*)>(?P<body>.*?)</a>""", re.S)
+_BUTTON_LOOK = re.compile(r"""data-slot=["']button["']|\bclass=["'][^"']*\b(?:btn|inline-flex)\b""")
 
 
 def early_access_target(path: str) -> str | None:
@@ -146,6 +149,12 @@ def early_access_target(path: str) -> str | None:
     return cache(path, wave)
 
 
+def _signed_in() -> bool:
+    from flask_login import current_user
+
+    return bool(current_user and current_user.is_authenticated)
+
+
 def point_closed_links_at_early_access(response):
     """Under RELEASE_WAVE, a link to a page the wave closes leads to that capability's early-access page.
 
@@ -155,6 +164,20 @@ def point_closed_links_at_early_access(response):
     if response.mimetype != "text/html" or response.headers.get("Content-Encoding"):
         return response
     html = response.get_data(as_text=True)
+
+    if _signed_in():
+        # A signed-in person is never sent to a waiting list from inside the app: a link to a page that
+        # opens later is not drawn. A button-like link goes; a link that wraps content (a card, a row)
+        # leaves its content, so a record never loses what it says.
+        def withdraw(match):
+            if early_access_target(match.group("path")) is None:
+                return match.group(0)
+            return "" if _BUTTON_LOOK.search(match.group("attrs")) else match.group("body")
+
+        withdrawn = _LINK.sub(withdraw, html)
+        if withdrawn != html:
+            response.set_data(withdrawn)
+        return response
 
     def swap(match):
         target = early_access_target(match.group(3))
