@@ -245,6 +245,12 @@ def test_a_stakeholder_kept_on_the_matrix_is_always_one_of_the_organisations_own
         expect(page.locator("[data-testid=raci-matrix] thead th", has_text="Launch data_archite")).to_be_visible()
         page.set_viewport_size({"width": 1440, "height": 900})
         _shot(page, "c-keep-1440-light.png")
+        phone_context, phone = _open(browser, live_server, a["emails"]["business_architect"], width=390, height=844, scheme="dark")
+        try:
+            expect(phone.locator("[data-testid=raci-matrix] thead th", has_text="Launch data_archite")).to_be_visible()
+            _shot(phone, "c-keep-390-dark.png")
+        finally:
+            phone_context.close()
     finally:
         context.close()
     # B's matrix is untouched too.
