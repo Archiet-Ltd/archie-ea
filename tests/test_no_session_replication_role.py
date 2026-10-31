@@ -8,7 +8,7 @@ trusted to catch a trigger defect. This is a regression barrier, not a one-time 
 written tomorrow that reaches for ``session_replication_role`` fails here, in a targeted run,
 before it reaches CI.
 
-Round rv-teardown-fk02b removed every teardown-only use: the arb_canonical_conditions /
+Every teardown-only use has been removed: the arb_canonical_conditions /
 arb_condition_evidence_records cycle those sites were working around is now resolved by a
 DEFERRABLE INITIALLY DEFERRED foreign key (``fk_arb_condition_evidence_condition``,
 migration ``20261030_arb_cond_evidence_fk``), so the deletion planner orders around it like
@@ -24,7 +24,7 @@ branch to that guard — a decision for whoever owns that guard, not a test chan
 That round also removed the old per-line ``# session-replication-role-ok: <reason>`` escape
 hatch: it let a future test self-grant the exception by typing a comment, which is exactly how
 one more teardown bypass (``tests/test_schema_migrations.py``) was added in the same branch
-this file was meant to stop. The sites below are the ones the lead has reviewed and ruled
+this file was meant to stop. The sites below are the ones reviewed and ruled
 genuinely not teardown, each with its reason recorded for that ruling; each file's count here
 can only fall, and a file or a count not already in this registry fails the test outright,
 comment or no comment.
@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS_DIR = ROOT / "tests"
 THIS_FILE = Path(__file__).resolve()
 
-# relative path -> the exact number of session_replication_role lines the lead has ruled on.
+# relative path -> the exact number of session_replication_role lines that have been ruled on.
 # Lower this when a use is removed; raise it only with a new ruling recorded in the report
 # above. Never add a bare comment to clear a new one.
 _RULED_COUNTS = {
@@ -80,7 +80,7 @@ def test_no_test_sets_session_replication_role():
     assert not unexpected, (
         "session_replication_role disables every trigger in the session, append-only guards "
         "included; use the organisation-delete marker (archie_org_deletion_admits) or the "
-        "owning writer instead. Every use must be named in _RULED_COUNTS above with the lead's "
+        "owning writer instead. Every use must be named in _RULED_COUNTS above with its "
         "ruling recorded in the report -- a comment on the line no longer clears one. Found:\n  "
         + "\n  ".join(unexpected)
     )

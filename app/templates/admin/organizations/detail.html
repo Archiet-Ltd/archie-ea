@@ -74,7 +74,7 @@
                 &middot; Updated {{ org.updated_at.strftime('%Y-%m-%d %H:%M') }}
                 {% endif %}
             </span>
-            {% if org.slug != 'default' %}
+            {% if not org.is_default(org) %}
             <form method="POST" action="{{ url_for('admin.organization_delete', org_id=org.id) }}"
                   data-confirm="Delete {{ org.name }}? Everything it holds is removed. People who belong only to it are removed with it; people who also belong to another organisation keep that one. This cannot be undone.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -167,7 +167,7 @@
                                         {{ 'Revoke Admin' if user.is_org_admin else 'Make Admin' }}
                                     </button>
                                 </form>
-                                {% if org.slug != 'default' %}
+                                {% if not org.is_default(org) %}
                                 <form method="POST" action="{{ url_for('admin.remove_user_from_org', org_id=org.id, user_id=user.id) }}" class="inline"
                                       data-confirm="Remove {{ user.full_name() or user.email }} from this organization?">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -1,6 +1,6 @@
 """unified_application_capability_mapping follows application_components by a declared foreign key.
 
-QA (29 October) found ``unified_application_capability_mapping`` still referencing
+A review found ``unified_application_capability_mapping`` still referencing
 ``application_components`` after an organisation delete: the model declares
 ``application_component_id = ForeignKey("application_components.id")``, so a database created
 fresh by ``flask init-db`` always carries the constraint, but a database whose
