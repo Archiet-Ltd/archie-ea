@@ -98,7 +98,7 @@
                             {% else %}
                             <span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ (session.scheduled_date|string)[:16] if session.scheduled_date else 'TBD' }}</span>
                             <span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.location or 'Virtual' }}</span>
-                            <span class="flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.members | length if session.members else 0 }} Members</span>
+                            <span class="flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.board_members | length }} Members</span>
                             <span class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.review_items | length if session.review_items else 0 }} Items</span>
                             {% if session.review_items %}
                             {% set solution_items = session.review_items | selectattr('solution_id') | list %}
@@ -107,9 +107,9 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="flex gap-2 ml-4">
+                    <div class="flex gap-2 ml-4" x-data>
                         <a href="{{ url_for('arb.review_detail', id=session.id) if is_reviews_view else url_for('arb.session_detail', id=session.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"><i data-lucide="eye" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>View</a>
-                        {% if not is_reviews_view and session.status == 'scheduled' %}
+                        {% if may_run_board and not is_reviews_view and session.status == 'scheduled' %}
                         {{ button(text='Complete', type='button', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'@click': "Platform.fetch.post('/arb/sessions/" ~ session.id ~ "/complete', {}, {silent: true}).then(function(){location.reload()})", 'aria_label': 'Complete Session'}) }}
                         {% endif %}
                     </div>
