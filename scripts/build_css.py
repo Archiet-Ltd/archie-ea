@@ -191,8 +191,26 @@ def check() -> int:
             file=sys.stderr,
         )
         return 1
-    print("committed tailwind-output.css is up to date")
+    stale = manifest_problem()
+    if stale:
+        print("FAIL: " + stale + "\n      Run: python scripts/build_css.py   and commit the result.", file=sys.stderr)
+        return 1
+    print("committed tailwind-output.css and its manifest are up to date")
     return 0
+
+
+def manifest_problem() -> str | None:
+    """Why the fingerprinted copy the pages load is not the committed stylesheet, or None."""
+    try:
+        named = json.loads(MANIFEST.read_text(encoding="utf-8"))["css/tailwind-output.css"]
+    except (OSError, ValueError, KeyError):
+        return "app/static/manifest.json does not name the fingerprinted tailwind-output.css"
+    hashed = STATIC / named
+    if not hashed.exists():
+        return "the manifest names %s, which is not in the tree" % named
+    if hashed.read_bytes() != OUTPUT_CSS.read_bytes():
+        return "the manifest names %s, which differs from tailwind-output.css" % named
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
