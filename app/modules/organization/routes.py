@@ -308,6 +308,8 @@ def raci_cell_save():
             raci=raci_value,
             notes=notes,
         )
+    except (service.StakeholderNotInOrganisation, service.CapabilityNotInOrganisation) as exc:
+        return error_response(str(exc), code="NOT_FOUND", status_code=404)
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
@@ -316,7 +318,7 @@ def raci_cell_save():
 
 @organization_bp.route("/raci/api/cell", methods=["DELETE"])
 @login_required
-@require_roles("admin")
+@require_roles("admin", "architect", "business_architect")
 def raci_cell_delete():
     """Clear one RACI matrix cell.
 
@@ -330,6 +332,10 @@ def raci_cell_delete():
     if stakeholder_type not in STAKEHOLDER_TYPES or not stakeholder_id or not capability_id:
         return error_response("Invalid cell reference", code="VALIDATION_ERROR", status_code=400)
 
+    try:
+        service.require_organisation_capability(capability_id)
+    except service.CapabilityNotInOrganisation:
+        return not_found_response("RACI assignment")
     deleted = service.delete_raci_cell(stakeholder_type, stakeholder_id, capability_id)
     if not deleted:
         return not_found_response("RACI assignment")
@@ -345,6 +351,25 @@ def stakeholder_search():
     q = request.args.get("q", "")
     results = service.search_stakeholders(q, limit=10)
     return jsonify({"results": results})
+
+
+@organization_bp.route("/raci/api/stakeholder/keep", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def raci_stakeholder_keep():
+    """Save a stakeholder on the matrix before any cell is set, so a reload keeps them."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        assignment = service.keep_raci_stakeholder(
+            stakeholder_type=payload.get("stakeholder_type"),
+            stakeholder_id=payload.get("stakeholder_id"),
+            stakeholder_name=payload.get("stakeholder_name"),
+        )
+    except service.StakeholderNotInOrganisation as exc:
+        return error_response(str(exc), code="NOT_FOUND", status_code=404)
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response(assignment.to_dict())
 
 
 @organization_bp.route("/raci/api/stakeholder", methods=["POST"])
