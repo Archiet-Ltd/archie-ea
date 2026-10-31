@@ -118,7 +118,7 @@
             {% call ui.table_container() %}{% call ui.table(attrs={'aria-label': 'ADM Phase Coverage Matrix'}) %}
                 {% call ui.table_header() %}{% call ui.table_row() %}
                     {{ ui.table_head(text='Workflow') }}
-                    {{ ui.table_head(text='Scenario', class='hidden md:table-cell') }}
+                    {{ ui.table_head(text='Scenario', class='hidden lg:table-cell') }}
                     {{ ui.table_head(text='ADM Phases') }}
                     {{ ui.table_head(text='Status', class='text-right') }}
                 {% endcall %}{% endcall %}
@@ -131,10 +131,10 @@
                             <p class="font-medium leading-tight">
                                 {% if defn %}{% set _h = row_href('main.ea_workflow_definition_detail', workflow_code=wf_code)|trim %}{% if _h %}{{ ui.button(text=name, variant='link', href=_h, class='h-auto p-0 font-medium') }}{% else %}{{ name }}{% endif %}{% else %}{{ name }}{% endif %}
                             </p>
-                            <p class="mt-0.5 hidden text-sm text-muted-foreground sm:block">{{ summary }}</p>
+                            <p class="mt-0.5 hidden max-w-sm whitespace-normal text-sm text-muted-foreground sm:block">{{ summary }}</p>
                         {% endcall %}
-                        {{ ui.table_cell(text=scenario, class='hidden text-muted-foreground md:table-cell') }}
-                        {% call ui.table_cell() %}<div class="flex flex-wrap gap-1">{% for p in phases %}{{ ui.badge(variant='secondary', text=p) }}{% endfor %}</div>{% endcall %}
+                        {{ ui.table_cell(text=scenario, class='hidden max-w-56 whitespace-normal text-muted-foreground lg:table-cell') }}
+                        {% call ui.table_cell() %}<div class="flex min-w-32 flex-wrap gap-1">{% for p in phases %}{{ ui.badge(variant='secondary', text=p) }}{% endfor %}</div>{% endcall %}
                         {% call ui.table_cell(class='text-right') %}{% if defn %}{{ ui.badge(variant='outline', text='Active') }}{% else %}{{ ui.badge(variant='secondary', text='Not seeded') }}{% endif %}{% endcall %}
                     {% endcall %}
                     {% endfor %}
