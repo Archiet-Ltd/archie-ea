@@ -741,10 +741,11 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
 
         # A fourth solution for the quality panel's rule coverage. It carries
         # one must rule and one should rule recorded the way an architect
-        # records them (blueprint proposal business_rules). The must rule
-        # asks for something no generated project mentions, the should rule
-        # for something every project mentions, so the coverage figure a
-        # person reads is a partial one and not the empty-rule-set 100.
+        # records them (blueprint proposal business_rules). The generator
+        # echoes every rule it is given into the project, so the figure is
+        # partial only for a rule the matcher cannot measure: the should
+        # rule has no word of four letters or more, so it stays uncovered
+        # and the panel reads 50, not the empty-rule-set 100.
         from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
 
         rules_component = ApplicationComponent(
@@ -778,12 +779,13 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         ))
         db.session.add(SolutionBlueprintProposal(
             solution_id=codegen_rules_solution.id,
+            organization_id=org.id,
             archimate_type="BusinessRule",
             name="Smoke rules carrier",
             status="rejected",
             acm_properties={"business_rules": [
-                {"name": "Zorblax settlement", "condition": "zorblax settlement quorum", "severity": "must"},
-                {"name": "Health endpoint", "condition": "health", "severity": "should"},
+                {"name": "Cap", "condition": "n<=3", "severity": "should"},
+                {"name": "Health endpoint", "condition": "health", "severity": "must"},
             ]},
         ))
         db.session.commit()

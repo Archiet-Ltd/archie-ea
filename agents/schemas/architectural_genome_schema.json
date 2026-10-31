@@ -278,7 +278,8 @@
             "date",
             "datetime",
             "enum",
-            "json"
+            "json",
+            "uuid"
           ]
         },
         "required": {
@@ -298,7 +299,9 @@
           "enum": [
             "email",
             "phone",
-            "url"
+            "url",
+            "date",
+            "uuid"
           ]
         },
         "enum_values": {
@@ -309,10 +312,23 @@
           "minItems": 1
         },
         "foreign_key": {
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
         },
-        "default_value": {}
+        "default_value": {},
+        "index": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        }
       }
     },
     "transition": {
@@ -485,7 +501,20 @@
               }
             }
           }
-        }
+        },
+        "build_or_buy": {
+          "type": "string"
+        },
+        "module_type": {
+          "type": "string"
+        },
+        "pipeline_pattern": {
+          "type": "string"
+        },
+        "pipeline_pattern_score": {
+          "type": "number"
+        },
+        "pipeline": {}
       },
       "patternProperties": {
         "^_": {}

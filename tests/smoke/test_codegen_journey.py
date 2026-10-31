@@ -137,15 +137,11 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         assert response.status == 200
         expect(page.get_by_role('heading', name='Code Workbench')).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # A solution with linked elements offers Quick Generate (deterministic)
-        # or AI Enrich at Phase 1. The person generates once, opens Setup from
-        # the workbench header, reopens Phase 3, chooses Genome and saves; the
-        # Generate button's own label then proves the mode. Every step is a
-        # click; no test writes workbench state.
-        page.get_by_role('button', name='Quick Generate', exact=True).click()
-        expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=GENERATE_TIMEOUT)
-        page.wait_for_function(WORKBENCH_IDLE, timeout=GENERATE_TIMEOUT)
-        page.get_by_role('button', name='Setup', exact=True).click()
+        # A solution with a linked architecture offers Skip enrichment on the
+        # first visit: it opens Phase 3, where the person chooses Genome and
+        # saves. The Generate button's own label then proves the mode. Every
+        # step is a click; no test writes workbench state.
+        page.get_by_role('button', name='Skip enrichment', exact=False).click()
         page.get_by_role('heading', name='Phase 3: Configure', exact=False).click()
         genome_choice = page.get_by_label('Genome', exact=False).first
         expect(genome_choice).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -158,9 +154,7 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         expect(generate_button).to_be_enabled(timeout=PAGE_TIMEOUT)
         generate_button.click()
 
-        # The workbench returns from Setup to the IDE only when the Genome run
-        # completes, so the IDE header's Re-Generate button is the completion
-        # signal (the file count was already showing from the first run).
+        # The IDE header's Re-Generate button appears when the Genome run completes.
         expect(page.get_by_role('button', name='Re-Generate', exact=True)).to_be_visible(
             timeout=GENERATE_TIMEOUT
         )
@@ -210,5 +204,47 @@ def test_quality_tab_opens_by_click_and_shows_rule_coverage(browser, live_server
             page.reload(timeout=PAGE_TIMEOUT)
         expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=PAGE_TIMEOUT)
         _assert_visible_quality_panel(page)
+    finally:
+        page.close()
+
+
+def test_seeded_rules_give_a_partial_coverage_figure_on_the_panel(browser, live_server, seeded):
+    """With a must rule nothing implements and a should rule everything does,
+    the panel reads the figure _compute_rule_coverage gives for the same rules
+    and the generated code, and that figure is not 100."""
+    from app import create_app
+    from app.modules.codegen.models import CodegenGeneration
+    from app.modules.codegen.routes._helpers import _compute_rule_coverage
+
+    solution_id = seeded['ids']['codegen_rules_solution']
+    rules = [
+        {'name': 'Cap', 'condition': 'n<=3', 'severity': 'should'},
+        {'name': 'Health endpoint', 'condition': 'health', 'severity': 'must'},
+    ]
+    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    try:
+        _login(page, live_server, seeded['emails']['solution_architect'])
+        page.goto(live_server + '/solutions/%s/codegen' % solution_id, timeout=PAGE_TIMEOUT)
+        page.get_by_role('button', name='Quick Generate', exact=True).click()
+        expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=GENERATE_TIMEOUT)
+        page.wait_for_function(WORKBENCH_IDLE, timeout=GENERATE_TIMEOUT)
+        page.reload(timeout=PAGE_TIMEOUT)
+
+        app = create_app('testing')
+        with app.app_context():
+            gen = CodegenGeneration.query.filter_by(solution_id=solution_id).order_by(
+                CodegenGeneration.id.desc()).first()
+            code = '\n'.join(str(v) for v in (gen.generated_files or {}).values())
+        expected = round(_compute_rule_coverage(rules, code)['coverage_pct'])
+        assert expected != 100, 'seeded rules must give a partial figure, got %d' % expected
+
+        page.get_by_role('button', name='Quality', exact=True).click()
+        panel = page.locator('.tab-pane:visible', has_text='Business rule coverage')
+        expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+        row = panel.locator('div.group', has_text='Business rule coverage').first
+        shown = row.inner_text()
+        assert ('%d%%' % expected) in shown and '100%' not in shown, (
+            'Business rule coverage on the panel reads %r, expected %d%%' % (shown, expected))
+        page.screenshot(path='/tmp/shot-quality-1440-light.png')
     finally:
         page.close()
