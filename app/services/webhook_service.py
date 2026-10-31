@@ -261,6 +261,9 @@ class WebhookService:
             "metadata": {"test": True},
         }
 
+        # A test runs inside the administrator's request: one attempt, so a
+        # failure is reported at once instead of after the retry back-off.
+        self.max_retries = 1
         return self._deliver_webhook(subscription, test_event)
 
     def publish_event(

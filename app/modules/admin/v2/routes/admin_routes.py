@@ -4013,6 +4013,7 @@ def webhook_settings():
                 "admin/webhook_settings.html",
                 subscriptions=subscriptions,
                 valid_events=VALID_EVENTS,
+                form=request.form,
             )
 
         if webhook_type not in ("generic", "teams", "slack"):
@@ -4024,7 +4025,16 @@ def webhook_settings():
             url = validate_webhook_url(url)
         except WebhookTargetRefused as exc:
             flash(f"Webhook URL refused: {exc}", "error")
-            return redirect(url_for("admin.webhook_settings"))
+            # Show the form again with what was typed, so it can be corrected.
+            subscriptions = WebhookSubscription.query.filter_by(is_active=True).order_by(
+                WebhookSubscription.created_at.desc()
+            ).all()
+            return render_template(
+                "admin/webhook_settings.html",
+                subscriptions=subscriptions,
+                valid_events=VALID_EVENTS,
+                form=request.form,
+            )
 
         if not selected_events:
             selected_events = ["*"]
