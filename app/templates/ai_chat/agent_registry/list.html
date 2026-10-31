@@ -1,4 +1,7 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'macros/page_shell.html' import page_shell, empty_state %}
 
 {% block title %}Agent Registry — {{ config.APP_NAME }}{% endblock %}
@@ -14,28 +17,14 @@
     <a href="{{ url_for('agent_registry.new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Register agent</a>
   </div>
   {% if registrations %}
-  <table class="dense-table w-full rounded-lg border border-border bg-card text-sm" data-testid="agent-registry-table">
-    <thead>
-      <tr class="border-b border-border text-left text-muted-foreground">
-        <th class="p-3">Name</th>
-        <th class="p-3">Status</th>
-        <th class="p-3">Owner</th>
-        <th class="p-3">Charter</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for reg in registrations %}
-      <tr class="border-b border-border" data-testid="agent-row-{{ reg.id }}">
-        <td class="p-3 font-medium text-foreground">
+  {% call(reg) list_table(rows=registrations, columns=[('Name', ''), ('Status', ''), ('Owner', ''), ('Charter', '')], caption='Registered AI agents', testid='agent-registry-table', row_testid='agent-row') %}
+        {% call table_cell(class='p-3 font-medium text-foreground') %}
           <a href="{{ url_for('agent_registry.detail', registration_id=reg.id) }}" class="hover:underline">{{ reg.name }}</a>
-        </td>
-        <td class="p-3" data-testid="agent-status-{{ reg.id }}">{{ reg.status }}</td>
-        <td class="p-3">{{ reg.owner.email if reg.owner else '—' }}</td>
-        <td class="p-3">{{ reg.charter_persona or '—' }}{% if reg.charter_version %} (v{{ reg.charter_version.version }}){% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% endcall %}
+        {% call table_cell(class='p-3', attrs={'data-testid': 'agent-status-' ~ reg.id}) %}{{ reg.status }}{% endcall %}
+        {% call table_cell(class='p-3') %}{{ reg.owner.email if reg.owner else '?' }}{% endcall %}
+        {% call table_cell(class='p-3') %}{{ reg.charter_persona or '?' }}{% if reg.charter_version %} (v{{ reg.charter_version.version }}){% endif %}{% endcall %}
+  {% endcall %}
   {% else %}
   {{ empty_state(icon='bot', headline='No agents registered', body='Register an agent to give it an owner and a charter.', cta_label='Register agent', cta_href=url_for('agent_registry.new')) }}
   {% endif %}

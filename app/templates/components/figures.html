@@ -1,0 +1,95 @@
+{# Headline figures, states and missing values, drawn the way the Overview draws them (data-type register:
+   headline-figures and status). Every list, dashboard and record page uses these, so a figure, a state or an empty
+   value reads the same on every screen.
+
+   {% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+
+   stat_cards(items)      up to four Overview stat cards in a row. Each item is a mapping:
+                          label, value, sentence (what the figure means), icon (lucide name), and optionally
+                          change ('+3', '-12%'), good (true when the change is welcome), href, testid.
+                          A value of none shows the label large with the sentence, as the Overview does for
+                          "Every application has an owner".
+   state_badge(value)     a state, severity or priority as an outline badge with a coloured dot; the word is
+                          always there, written as a person writes it ("In progress", not "in_progress").
+   money_short(value)    an amount as a list shows it: £87.6k, £1.7m, £950; a record shows the full figure.
+   value_or_unset(value)  the value, or "Not set" in muted text when there is none (None, '', '?', 'None',
+                          'TBD', 'N/A'), never a dash or a question mark. #}
+{% import 'basecoat/index.html' as ui %}
+{% import 'dashboards/_overview_parts.html' as d %}
+
+{%- set _POSITIVE = ['active', 'approved', 'done', 'complete', 'completed', 'live', 'healthy', 'compliant', 'renewed',
+                     'signed', 'accepted', 'resolved', 'passed', 'pass', 'enabled', 'on', 'ok', 'low', 'success',
+                     'implemented', 'operational', 'closed', 'mitigated', 'invest', 'adopt', 'connected'] -%}
+{#- Not started (planned, proposed, draft, open, identified) is neutral grey; amber is work under way or waiting on someone. -#}
+{%- set _CAUTION = ['pending', 'in_progress', 'in progress', 'review', 'in_review', 'in review', 'under_review', 'expiring',
+                    'at_risk', 'at risk', 'medium', 'warning', 'assess', 'trial', 'partial', 'partially_compliant',
+                    'submitted', 'renewal_due', 'tolerate', 'migrate'] -%}
+{%- set _NEGATIVE = ['expired', 'rejected', 'failed', 'fail', 'critical', 'high', 'overdue', 'non_compliant',
+                     'non-compliant', 'cancelled', 'canceled', 'blocked', 'error', 'disabled', 'off', 'breached',
+                     'violation', 'terminated', 'hold', 'eliminate', 'retire', 'disconnected'] -%}
+{%- set _UNSET = [none, '', '?', 'None', 'none', 'TBD', 'tbd', 'N/A', 'n/a', '-', '—'] -%}
+
+{% macro state_badge(value, tone=none, class='', testid=none) -%}
+{%- set key = (value or '')|string|trim|lower -%}
+{%- set t = tone or ('positive' if key in _POSITIVE else 'caution' if key in _CAUTION else 'negative' if key in _NEGATIVE else 'neutral') -%}
+{%- set dot = {'positive': 'bg-success', 'caution': 'bg-warning', 'negative': 'bg-destructive', 'neutral': 'bg-muted-foreground'}[t] -%}
+{%- set word = (value|string|replace('_', ' ')|replace('-', ' ')|trim) if value not in _UNSET else 'Not set' -%}
+{%- call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground ' ~ class, attrs=({'data-testid': testid, 'data-tone': t} if testid else {'data-tone': t})) -%}
+<span class="size-1.5 shrink-0 rounded-full {{ dot }}" aria-hidden="true"></span>{{ word[:1]|upper ~ word[1:] }}
+{%- endcall -%}
+{%- endmacro %}
+
+{% macro value_or_unset(value, text='Not set') -%}
+{%- if value in _UNSET -%}<span class="text-muted-foreground">{{ text }}</span>{%- else -%}{{ value }}{%- endif -%}
+{%- endmacro %}
+
+{% macro stat_card(item) -%}
+{%- set inner -%}
+  {% call ui.card(class='h-full') %}
+    {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide(item.icon or 'chart-no-axes-column') }}</span>{% endcall %}
+    {% call ui.card_content(class='flex flex-col gap-1') %}
+      {% if item.value is not none %}
+      <span class="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums"><span{% if item.testid %} data-testid="{{ item.testid }}-value"{% endif %}>{{ item.value }}</span>{% if item.change %}<span>{{ d.delta(item.change, item.good) }}</span>{% endif %}</span>
+      <span class="text-sm font-medium">{{ item.label }}</span>
+      {% else %}
+      <span class="text-lg font-semibold">{{ item.label }}</span>
+      {% endif %}
+      {% if item.sentence %}<span class="text-sm text-muted-foreground">{{ item.sentence }}</span>{% endif %}
+    {% endcall %}
+  {% endcall %}
+{%- endset -%}
+{%- if item.href -%}
+<a href="{{ item.href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"{% if item.testid %} data-testid="{{ item.testid }}"{% endif %}>{{ inner }}</a>
+{%- else -%}
+<div{% if item.testid %} data-testid="{{ item.testid }}"{% endif %}>{{ inner }}</div>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro money_short(v) -%}
+{%- set sym = (currency_config.symbol if currency_config is defined and currency_config and currency_config.symbol else '£') -%}
+{%- set a = v|float -%}
+{%- if a|abs >= 1000000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000000))|replace('.0', '') }}m
+{%- elif a|abs >= 1000 -%}{{ sym }}{{ ('%.1f'|format(a / 1000))|replace('.0', '') }}k
+{%- else -%}{{ sym }}{{ '%.0f'|format(a) }}{%- endif -%}
+{%- endmacro %}
+
+{% macro stat_cards(items, testid='stat-cards') -%}
+{%- set n = items|length -%}
+<div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2 {{ 'xl:grid-cols-4' if n >= 4 else 'xl:grid-cols-3' if n == 3 else '' }}" data-testid="{{ testid }}">
+  {%- for item in items[:4] %}{{ stat_card(item) }}{% endfor -%}
+</div>
+{%- endmacro %}
+
+{#- A section of a page: the Overview's card with a title, a one-line description and an optional action on the
+    right, around any content. -#}
+{% macro section(title, description=none, action=none, class='', content_class='', testid=none) -%}
+{%- set body = caller() -%}
+{%- call ui.card(class=class, attrs=({'data-testid': testid} if testid else {})) -%}
+  {%- call ui.card_header() -%}
+    {{ ui.card_title(text=title) }}
+    {% if description %}{{ ui.card_description(text=description) }}{% endif %}
+    {% if action %}{% call ui.card_action() %}{{ action() }}{% endcall %}{% endif %}
+  {%- endcall -%}
+  {%- call ui.card_content(class=content_class) -%}{{ body }}{%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}

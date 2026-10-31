@@ -268,7 +268,7 @@
                 </div>
             </template>
             <div class="flex gap-2 pt-4 border-t">
-                {% call button(variant='default', type='submit', attrs_dict={':disabled': 'saving', ':aria-label': 'Submit'}) %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
+                {% call button(variant='default', type='submit', attrs_dict={':disabled': 'saving'}) %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
                 {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
                 <template x-if="editingElement">
                     {{ button(text='Full Edit Page →', variant='link', attrs_dict={':href': 'editPageUrl(editingElement)'}) }}

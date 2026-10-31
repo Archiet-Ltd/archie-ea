@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Dict, List
 
 import pytest
 
@@ -95,7 +96,7 @@ def test_open_alex_rebuilds_the_abstract_in_order():
 def test_reddit_hackernews_bluesky_mastodon_each_keep_link_and_date():
     [r] = run(src.reddit, "https://www.reddit.com/", load("reddit"))
     assert r.url == "https://reddit.com/r/logistics/comments/abc/northwind/" and r.published.startswith("2025-10-19")
-    [h] = run(src.hackernews, "https://hn.algolia.com/", load("hackernews"))
+    [h] = run(src.hackernews, "https://hn.algolia.com/", load("hackernews"), ctx={"page_limit": 1})
     assert h.url == "https://news.ycombinator.com/item?id=4242" and h.published.startswith("2026-10-15")
     [b] = run(src.bluesky, "https://public.api.bsky.app/", load("bluesky"))
     assert b.url == "https://bsky.app/profile/fan.bsky.social/post/3kabc" and b.title.startswith("@fan.bsky.social: Northwind")
@@ -146,7 +147,7 @@ def test_a_source_needing_a_key_is_skipped_plainly_until_the_key_is_set(monkeypa
 def test_registry_is_every_operateiq_source():
     assert {s.key for s in src.REGISTRY} == {
         "news_api", "brave_search", "sec_edgar", "uspto", "open_alex", "reddit", "hackernews", "bluesky", "mastodon",
-        "rss", "yahoo_finance", "alpha_vantage"}
+        "rss", "yahoo_finance", "alpha_vantage", "llmlayer"}
 
 
 def test_http_retries_then_says_what_happened():
@@ -180,6 +181,157 @@ def test_factor_and_quadrant_rules():
     assert service.swot_quadrant(True, 0.6) == "strength" and service.swot_quadrant(True, -0.7) == "weakness"
     assert service.swot_quadrant(False, 0.6) == "threat" and service.swot_quadrant(False, -0.7) == "opportunity"
     assert service.swot_quadrant(True, 0.1) is None and service.swot_quadrant(True, None) is None
+
+
+# ----------------------------------------------------------------------------- new mode tests (pagination, subreddit, sort, top/ask, author feed, timeline, key rotation, LLMLayer)
+
+class SequenceFakeHttp:
+    """FakeHttp that returns sequential responses for the same prefix."""
+    def __init__(self, sequences: Dict[str, List[Any]]):
+        self.sequences = {k: list(v) for k, v in sequences.items()}
+        self.call_counts: Dict[str, int] = {}
+
+    def _body(self, url: str, kw):
+        for prefix, responses in self.sequences.items():
+            if url.startswith(prefix):
+                idx = self.call_counts.get(prefix, 0)
+                if idx >= len(responses):
+                    raise AssertionError("no more responses for " + prefix)
+                self.call_counts[prefix] = idx + 1
+                body = responses[idx]
+                if isinstance(body, Exception):
+                    raise body
+                return body
+        raise AssertionError("unexpected address " + url)
+
+    def json(self, url: str, **kw):
+        return self._body(url, kw)
+
+    def text(self, url: str, **kw):
+        return self._body(url, kw)
+
+
+def test_reddit_pagination_subreddit_sort(monkeypatch):
+    """Reddit: pagination (page_limit), per-subreddit search, and sort order."""
+    # Pagination: two pages
+    http = SequenceFakeHttp({
+        "https://www.reddit.com/r/all/": [load("reddit_pagination"), load("reddit_page2")],
+    })
+    items = src.reddit(http, COMPANY, {"page_limit": 2})
+    assert len(items) == 2
+    assert items[0].title == "Northwind Freight page 1 post"
+    assert items[1].title == "Northwind Freight page 2 post"
+    # Subreddit
+    http = FakeHttp({"https://www.reddit.com/r/logistics/": load("reddit_subreddit")})
+    items = src.reddit(http, COMPANY, {"subreddit": "logistics", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].details["subreddit"] == "logistics"
+    # Sort order
+    http = FakeHttp({"https://www.reddit.com/r/all/": load("reddit_sort")})
+    items = src.reddit(http, COMPANY, {"reddit_sort": "top", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].details["score"] == 100
+
+
+def test_hackernews_top_ask_pagination(monkeypatch):
+    """Hacker News: top stories, Ask HN, and pagination."""
+    # Top stories
+    http = SequenceFakeHttp({
+        "https://hacker-news.firebaseio.com/v0/topstories.json": [[1001]],
+        "https://hacker-news.firebaseio.com/v0/item/1001.json": [load("hackernews_item")],
+    })
+    items = src.hackernews(http, COMPANY, {"hn_mode": "top", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].title == "Northwind Freight top story"
+    assert items[0].details["points"] == 200
+    # Ask HN
+    http = FakeHttp({"https://hn.algolia.com/": load("hackernews_ask")})
+    items = src.hackernews(http, COMPANY, {"hn_mode": "ask", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].title == "Ask HN: How does Northwind Freight handle routing?"
+    assert items[0].details.get("type") == "ask_hn"
+    # Search pagination (two pages)
+    http = SequenceFakeHttp({
+        "https://hn.algolia.com/": [load("hackernews"), load("hackernews_page2")],
+    })
+    items = src.hackernews(http, COMPANY, {"hn_mode": "search", "page_limit": 2})
+    assert len(items) == 2
+    assert items[0].title == "Northwind Freight publishes its routing engine"
+    assert items[1].title == "Northwind Freight page 2 story"
+
+
+def test_bluesky_author_feed(monkeypatch):
+    """Bluesky: author feed mode."""
+    http = FakeHttp({"https://public.api.bsky.app/": load("bluesky_author")})
+    items = src.bluesky(http, COMPANY, {"bluesky_mode": "author", "bluesky_author": "northwind.bsky.social"})
+    assert len(items) == 2
+    assert items[0].title.startswith("@northwind.bsky.social: Northwind Freight announces")
+    assert items[1].title.startswith("@northwind.bsky.social: Northwind Freight hiring")
+    assert items[0].url == "https://bsky.app/profile/northwind.bsky.social/post/post1"
+    # Search mode still works
+    http = FakeHttp({"https://public.api.bsky.app/": load("bluesky")})
+    items = src.bluesky(http, COMPANY, {"bluesky_mode": "search"})
+    assert len(items) == 1
+    assert items[0].title.startswith("@fan.bsky.social: Northwind")
+
+
+def test_mastodon_timeline_instance(monkeypatch):
+    """Mastodon: public timeline and configurable instance."""
+    # Public timeline
+    http = FakeHttp({"https://mastodon.social/": load("mastodon_timeline")})
+    items = src.mastodon(http, COMPANY, {"mastodon_mode": "timeline"})
+    assert len(items) == 2
+    assert items[0].title.startswith("@northwind: Northwind Freight public")
+    assert items[0].details["instance"] == "https://mastodon.social"
+    # Configurable instance
+    http = FakeHttp({"https://mastodon.example/": load("mastodon_instance")})
+    items = src.mastodon(http, COMPANY, {"mastodon_mode": "search", "mastodon_instance": "https://mastodon.example"})
+    assert len(items) == 1
+    assert items[0].details["instance"] == "https://mastodon.example"
+    assert "mastodon.example" in items[0].url
+
+
+def test_brave_key_rotation(monkeypatch):
+    """Brave: rotation over BRAVE_SEARCH_API_KEYS (comma-separated), falling back to BRAVE_SEARCH_API_KEY."""
+    # Multiple keys in BRAVE_SEARCH_API_KEYS
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEYS", "key1,key2,key3")
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    http = FakeHttp({"https://api.search.brave.com/": load("brave_search")})
+    items = src.brave_search(http, COMPANY, {})
+    assert len(items) == 1
+    assert items[0].title == "Northwind Freight logistics profile"
+    # Fallback to BRAVE_SEARCH_API_KEY
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEYS", raising=False)
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fallback-key")
+    http = FakeHttp({"https://api.search.brave.com/": load("brave_search")})
+    items = src.brave_search(http, COMPANY, {})
+    assert len(items) == 1
+    # No key at all -> skipped
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    http = FakeHttp({})
+    with pytest.raises(src.SourceFailed, match="needs BRAVE_SEARCH_API_KEY"):
+        src.brave_search(http, COMPANY, {})
+
+
+def test_llmlayer_skipped_without_key(monkeypatch):
+    """LLMLayer: fallback reader that is skipped when LLMLAYER_API_KEY is absent."""
+    monkeypatch.delenv("LLMLAYER_API_KEY", raising=False)
+    http = FakeHttp({})
+    with pytest.raises(src.SourceFailed, match="needs LLMLAYER_API_KEY"):
+        src.llmlayer(http, COMPANY, {})
+    # With key
+    monkeypatch.setenv("LLMLAYER_API_KEY", "test-key")
+    http = FakeHttp({"https://api.llmlayer.ai/": load("llmlayer")})
+    items = src.llmlayer(http, COMPANY, {})
+    assert len(items) == 1
+    assert items[0].title == "Northwind Freight LLMLayer result"
+    assert items[0].url == "https://llmlayer.example/northwind"
+    # Skipped reason
+    monkeypatch.delenv("LLMLAYER_API_KEY", raising=False)
+    reason = src.skipped_reason(src.BY_KEY["llmlayer"], {})
+    assert reason == "needs LLMLAYER_API_KEY to be set"
+    monkeypatch.setenv("LLMLAYER_API_KEY", "test-key")
+    assert src.skipped_reason(src.BY_KEY["llmlayer"], {}) is None
 
 
 # ----------------------------------------------------------------------------- service, against the database
@@ -531,7 +683,7 @@ def test_every_tag_has_a_reason_and_a_signal_with_no_clear_category_has_no_tag()
     assert service.pestle_factor("mention", "Show HN: Phospho – analytics for LLM apps", "We raised funding at a valuation") is None
     assert service.pestle_factor("mention", "Show HN: a platform for cloud software", "") is None  # a product word is not a factor
     # a record type is its own reason
-    assert service.pestle_reason("filing", "x", "") == ("legal", "a regulatory filing")
+    assert service.pestle_reason("filing", "x", "") == ("legal", "it is a regulatory filing")
     assert service.pestle_reason("news", "A quiet day", "") == (None, None)
 
 
@@ -547,3 +699,202 @@ def test_the_launch_post_is_kept_for_posthog_and_carries_no_tag(db_session, make
     mentions = [r for r in service.signals_for_profile(org.id) if r["kind"] == "mention"]
     assert [r["title"] for r in mentions] == ["Launch HN: PostHog (YC W20)"]
     assert mentions[0]["pestle_factor"] is None
+
+
+# ----------------------------------------------------------------------------- crawl04: common-word names, one event one row, tags that say why
+# Stubbed from what QA found with real sign-ups on 25 Oct 2026: linear.app, cal.com and posthog.com.
+
+def _hn(*hits):
+    return [{"title": t, "objectID": str(i), "created_at": d, **extra} for i, (t, d, extra) in enumerate(hits, start=100)]
+
+
+def _sec(*filings):
+    return {"hits": {"hits": [
+        {"_id": "000%d-%s-000001:doc%d.htm" % (i, d[2:4], i), "_source": {
+            "display_names": ["%s  (CIK 000%d)" % (who, i)], "file_description": "Report", "file_date": d, "form": form,
+            "root_form": form, "ciks": ["000%d" % (1000 + i)]}}
+        for i, (who, form, d) in enumerate(filings, start=1)]}}
+
+
+def _with_facts(org_id, **facts):
+    from app.models.organization import Organization
+
+    org = db.session.get(Organization, org_id)
+    settings = dict(org.settings or {})
+    profile = dict(settings.get("company_profile") or {})
+    profile.update({k: {"value": v} for k, v in facts.items()})
+    settings["company_profile"] = profile
+    org.settings = settings
+    from sqlalchemy.orm.attributes import flag_modified
+
+    flag_modified(org, "settings")
+    db.session.commit()
+
+
+def linear_answers():
+    answers = _posthog_answers()
+    answers["https://efts.sec.gov/"] = _sec(
+        ("LINEAR TECHNOLOGY CORP", "10-Q", "2001-05-10"), ("LINEAR TECHNOLOGY CORP", "10-Q", "2001-08-09"),
+        ("LINEAR TECHNOLOGY CORP", "10-K", "2002-09-20"), ("LINEAR TECHNOLOGY CORP", "10-Q", "2003-02-07"),
+        ("MICRO LINEAR CORP", "10-K", "2010-03-30"), ("MICRO LINEAR CORP", "10-K", "2011-03-30"))
+    answers["https://hn.algolia.com/"] = {"hits": _hn(
+        ("Linear algebra for programmers: a visual guide", "2026-04-02T00:00:00Z", {}),
+        ("Linear A is still undeciphered after a century", "2026-04-03T00:00:00Z", {}),
+        ("Integer linear programming for shift scheduling", "2026-04-04T00:00:00Z", {}),
+        ("Linear raises $35M Series B led by Accel", "2026-03-10T00:00:00Z", {}),
+        ("Show HN: Linear – issue tracking for software teams", "2026-02-01T00:00:00Z", {}),
+        ("Linear changelog: cycles, projects and a new roadmap view", "2026-04-01T00:00:00Z", {}),
+        ("Linear's pricing change draws questions from small teams", "2026-01-15T00:00:00Z", {}))}
+    return answers
+
+
+def calcom_answers():
+    answers = _posthog_answers()
+    answers["https://hn.algolia.com/"] = {"hits": _hn(
+        ("Show HN: CalOverlap – Group Scheduling from Multiple Calendly/Cal.com Links", "2026-03-20T00:00:00Z",
+         {"url": "https://github.com/someone/caloverlap"}),
+        ("Cal.com Calendar Scaffold: T3 Stack and Supabase", "2026-03-22T00:00:00Z", {"url": "https://github.com/someone/scaffold"}),
+        ("Cal.com: Open Scheduling Infrastructure", "2025-11-02T00:00:00Z", {}),
+        ("Cal.com: Open Scheduling Infrastructure", "2026-02-20T00:00:00Z", {}),  # reposted outside the three days
+        ("Cal.com is going closed source", "2026-04-15T08:00:00Z", {}),
+        ("Cal.com goes closed source, citing AI scrapers", "2026-04-15T20:00:00Z", {}),
+        ("Why Cal.com is closing its source code", "2026-04-16T09:00:00Z", {}),
+        ("Cal.com moves to closed source: what changes for self-hosters", "2026-04-17T07:00:00Z", {}))}
+    return answers
+
+
+def posthog_answers():
+    answers = _posthog_answers()
+    answers["https://hn.algolia.com/"] = {"hits": _hn(
+        ("PostHog opens its roadmap", "2026-01-10T00:00:00Z", {}),
+        ("Launch HN: PostHog (YC W20)", "2020-03-01T00:00:00Z", {}),
+        ("Posthog's New Website", "2025-09-11T10:00:00Z", {}), ("New Posthog Website", "2025-09-10T10:00:00Z", {}),
+        ("PostHog raises $70M Series E", "2025-06-01T00:00:00Z", {}),
+        ("PostHog moves its enterprise features to a new licence", "2025-08-01T00:00:00Z", {}),
+        ("Show HN: Laminar – Open-Source DataDog + PostHog for LLM Apps", "2025-03-01T00:00:00Z", {}),
+        ("Show HN: Phospho – Text analytics for LLM apps (Posthog for Prompts)", "2025-03-02T00:00:00Z", {}))}
+    return answers
+
+
+def _read(db_session, make_org, name, site, answers, **facts):
+    org = _confirmed(db_session, make_org, name, site)
+    _with_facts(org.id, **facts)
+    service.refresh_organization(org.id, http=FakeHttp(answers), llm=_no_model)
+    return org
+
+
+def _shown(org):
+    return [r for r in service.signals_for_profile(org.id) if r["kind"] != "sentiment"]
+
+
+def test_linear_keeps_its_own_news_and_not_other_companies_filings_or_linear_algebra(db_session, make_org, tenant_ctx, keys):
+    org = _read(db_session, make_org, "Linear", "https://linear.app", linear_answers(),
+                tagline="Plan and build products: issue tracking and project management for software teams")
+    titles = sorted(r["title"] for r in _shown(org))
+    assert titles == sorted([
+        "Linear raises $35M Series B led by Accel", "Show HN: Linear – issue tracking for software teams",
+        "Linear changelog: cycles, projects and a new roadmap view", "Linear's pricing change draws questions from small teams"]), titles
+    assert not [r for r in _rows(org.id) if r.source == "sec_edgar"], "LINEAR TECHNOLOGY CORP and MICRO LINEAR CORP are not Linear"
+
+
+def test_filings_already_kept_for_other_companies_with_a_shared_word_are_tidied_away(db_session, make_org, tenant_ctx, keys):
+    org = _confirmed(db_session, make_org, "Linear", "https://linear.app")
+    for i in range(14):  # kept 14 times under 3 titles, as QA found
+        who = ("LINEAR TECHNOLOGY CORP", "MICRO LINEAR CORP", "LINEAR TECHNOLOGY CORP")[i % 3]
+        _stored(org.id, subject="Linear", source="sec_edgar", source_label="SEC EDGAR", kind="filing", title="%s: 10-K filing" % who,
+                summary="", url="https://www.sec.gov/x/%d" % i, published_at=datetime(2001 + i, 5, 1))
+    _stored(org.id, subject="Linear", source="hackernews", kind="mention", title="Linear algebra for programmers", summary="",
+            published_at=datetime(2026, 4, 2))
+    _stored(org.id, subject="Linear", source="hackernews", kind="mention", title="Linear raises $35M Series B", summary="",
+            published_at=datetime(2026, 3, 10))
+    service.refresh_organization(org.id, http=FakeHttp(linear_answers()), llm=_no_model, force=True)
+    assert [r.title for r in _rows(org.id) if r.source == "sec_edgar"] == []
+    assert "Linear algebra for programmers" not in [r.title for r in _rows(org.id)]
+    assert "Linear raises $35M Series B" in [r.title for r in _rows(org.id)]
+
+
+def test_the_confirmed_legal_name_has_to_match_the_filer():
+    assert src.legal_name_matches("Northwind Freight Inc. (NWF) (CIK 0001234567)", "Northwind Freight")
+    assert src.legal_name_matches("PostHog, Inc.", "PostHog")
+    assert not src.legal_name_matches("LINEAR TECHNOLOGY CORP", "Linear")
+    assert not src.legal_name_matches("MICRO LINEAR CORP", "Linear")
+
+
+def test_calcom_drops_other_peoples_posts_shows_a_repost_once_and_one_event_as_one_row_with_its_count(db_session, make_org, tenant_ctx, keys):
+    org = _read(db_session, make_org, "Cal.com", "https://cal.com", calcom_answers(), tagline="Open Scheduling Infrastructure")
+    shown = _shown(org)
+    titles = [r["title"] for r in shown]
+    assert not any("CalOverlap" in t or "Scaffold" in t for t in titles), titles  # QA-004
+    assert titles.count("Cal.com: Open Scheduling Infrastructure") == 1  # QA-005, reposted months apart
+    story = [r for r in shown if "closed source" in r["title"] or "source code" in r["title"]]
+    assert len(story) == 1 and story[0]["reports"] == 4, [(r["title"], r["reports"]) for r in shown]  # QA-005
+    assert len(shown) == 2, titles
+    assert len([r for r in _rows(org.id) if r.title == "Cal.com: Open Scheduling Infrastructure"]) == 1
+
+
+def test_posthog_keeps_its_own_posts_and_not_the_comparisons(db_session, make_org, tenant_ctx, keys):
+    org = _read(db_session, make_org, "PostHog", "https://posthog.com", posthog_answers(), tagline="Product analytics")
+    titles = [r["title"] for r in _shown(org)]
+    assert "Launch HN: PostHog (YC W20)" in titles and "PostHog opens its roadmap" in titles
+    assert not any("Laminar" in t or "Phospho" in t for t in titles), titles
+    assert len([t for t in titles if "Website" in t]) == 1
+
+
+def test_tags_for_the_three_companies_are_mostly_matched_and_each_says_why(db_session, make_org, tenant_ctx, keys):
+    rows = []
+    for name, site, answers, facts in (("Linear", "https://linear.app", linear_answers(), {"tagline": "Issue tracking for software teams"}),
+                                       ("Cal.com", "https://cal.com", calcom_answers(), {"tagline": "Open Scheduling Infrastructure"}),
+                                       ("PostHog", "https://posthog.com", posthog_answers(), {"tagline": "Product analytics"})):
+        rows += _shown(_read(db_session, make_org, name, site, answers, **facts))
+    unmatched = [r for r in rows if not r["pestle_factor"]]
+    assert len(unmatched) * 2 < len(rows), ([r["title"] for r in unmatched], len(rows))
+    for r in rows:
+        assert (r["pestle_reason"] is None) == (r["pestle_factor"] is None), r
+    closed = next(r for r in rows if r["title"].startswith("Cal.com") and "closed source" in r["title"])
+    assert closed["pestle_factor"] == "technological" and "closed source" in closed["pestle_reason"]
+
+
+def test_a_licence_a_lawsuit_a_regulation_and_open_versus_closed_source_each_get_a_tag_with_its_reason():
+    for title, factor, word in (("PostHog moves its enterprise features to a new licence", "legal", "licence"),
+                                ("Cal.com sued by a former contractor", "legal", "sued"),
+                                ("New EU regulation lands on scheduling apps", "legal", "regulation"),
+                                ("Cal.com is going closed source", "technological", "closed source"),
+                                ("Why we stay open source", "technological", "open source")):
+        got, reason = service.pestle_reason("mention", title)
+        assert got == factor and word in reason, (title, got, reason)
+    assert service.pestle_reason("mention", "Linear A is still undeciphered after a century") == (None, None)
+
+
+# ----------------------------------------------------------------------------- polish01: QA-023 leftovers, QA-007 follow-up
+
+def test_a_name_inside_a_hyphenated_word_is_not_the_company():
+    assert not src.names_company("Show HN: I built a non-linear UI for ChatGPT", "Linear")
+    assert not src.names_company("Linear-algebra flashcards", "Linear")
+    assert src.names_company("Linear raises $35M", "Linear")
+    assert src.names_company("Show HN: Linear \u2013 issue tracking", "Linear")
+    assert src.names_company("Launch HN: PostHog (YC W20) - open source analytics", "PostHog")
+
+
+def test_someone_elses_tool_that_connects_to_the_company_does_not_count():
+    domain = "linear.app"
+    other = "https://synclinear.com/"
+    assert not src.counts_as_news("Synclinear.com to Sync Linear.app with GitHub", "Linear", domain, other)
+    assert not src.counts_as_news("Show HN: I built a non-linear UI for ChatGPT", "Linear", domain,
+                                  "https://news.ycombinator.com/item?id=5")
+    assert not src.counts_as_news("Show HN: Sync Jira tickets with Linear", "Linear", domain, "https://syncer.example/")
+    assert src.counts_as_news("Show HN: Linear \u2013 issue tracking for software teams", "Linear", domain, "https://linear.app/")
+    assert src.counts_as_news("Linear raises $35M Series B led by Accel", "Linear", domain, "https://news.ycombinator.com/item?id=6")
+
+
+def test_an_unsupported_stored_currency_falls_back_to_gbp(app, db_session, make_org):
+    from app.services.application_cost_accessor import get_reporting_currency
+    from config import CurrencyConfig
+
+    org = make_org("currency")
+    org.reporting_currency = "usd"
+    db_session.commit()
+    assert get_reporting_currency(org.id) == CurrencyConfig.get_org_currency_code(organization_id=org.id) == "USD"
+    org.reporting_currency = "ZZZ"
+    db_session.commit()
+    assert get_reporting_currency(org.id) == "GBP"
+    assert CurrencyConfig.get_org_currency_code(organization_id=org.id) == "GBP"

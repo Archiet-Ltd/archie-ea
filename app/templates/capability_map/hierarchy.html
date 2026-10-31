@@ -44,7 +44,7 @@
                         :class="levelFilter === lvl ? getLevelBadgeClassActive(lvl) : 'bg-muted text-muted-foreground hover:text-foreground'">
                     <span class="inline-block w-2 h-2 rounded-full" :class="getLevelDotColor(lvl)"></span>
                     <span x-text="'L' + lvl"></span>
-                    <span class="text-xs opacity-70" x-text="'(' + countByLevel(lvl) + ')'"></span>
+                    <span class="text-xs" x-text="'(' + countByLevel(lvl) + ')'"></span>
                 </button>
             </template>
         </div>

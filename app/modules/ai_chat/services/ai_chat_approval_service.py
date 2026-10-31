@@ -131,6 +131,30 @@ def create_approval_record(
     return approval
 
 
+def _plain(code: Optional[str]) -> str:
+    """A stored code as words: ``tool_use`` reads "Tool use"."""
+    text = str(code or "").replace("_", " ").strip()
+    return text[:1].upper() + text[1:]
+
+
+def card_words(approval, payload: Dict[str, Any], people: Dict[int, str]) -> Dict[str, Any]:
+    """The words an inbox card shows for one approval: the one mapping from its source and kind to words.
+
+    The page shows these as they are; a stored code never reaches the card. ``people`` names the
+    organisation's users by id."""
+    if getattr(approval, "source_table", None) == "vendor_detection":
+        from app.services.vendor_detection import card_words as vendor_words
+
+        return vendor_words(approval, payload, people)
+    source = getattr(approval, "source_table", None)
+    return {
+        "operation": _plain(approval.operation_type),
+        "entity": _plain(approval.entity_type),
+        "source": "From " + _plain(source).lower() if source else None,
+        "requester": people.get(approval.user_id) or "Recorded by the system",
+    }
+
+
 class AIChatApprovalService:
     """
     Service for managing AI chat CRUD operation approvals.
@@ -759,6 +783,14 @@ class AIChatApprovalService:
 
                 result = execute_github_proposal(approval, data_service)
 
+            elif approval.operation_type in ("vendor_detection", "vendor_architecture"):
+                # A vendor product found on the organisation's website, in its domain records or in what
+                # a person told the assistant, and the catalogue's architecture for it once it is
+                # recorded. Queued and executed by app/services/vendor_detection.py.
+                from app.services.vendor_detection import execute_vendor_proposal
+
+                result = execute_vendor_proposal(approval, data_service)
+
             elif approval.operation_type == "create":
                 if approval.entity_type == "capability":
                     result = data_service.create_capability(payload)
@@ -1333,14 +1365,24 @@ class AIChatApprovalService:
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
         )
-        requester_ids = {approval.user_id for approval in approvals}
-        requesters = {
-            user.id: user
+        payloads = {approval.id: json.loads(approval.operation_payload) for approval in approvals}
+        requester_ids = {approval.user_id for approval in approvals} | {
+            p.get("requested_by") for p in payloads.values() if isinstance(p, dict)
+        }
+        requester_ids = {i for i in requester_ids if isinstance(i, int)}
+        people = {
+            user.id: " ".join(part for part in (user.first_name, user.last_name) if part) or user.email
             for user in User.query.filter(
                 User.organization_id == actor.organization_id,
                 User.id.in_(requester_ids),
             ).all()
         } if requester_ids else {}
+        words = {
+            approval.id: card_words(
+                approval, payloads[approval.id] if isinstance(payloads[approval.id], dict) else {}, people
+            )
+            for approval in approvals
+        }
         return {
             "success": True,
             "approvals": [
@@ -1348,10 +1390,13 @@ class AIChatApprovalService:
                     "id": approval.id,
                     "operation_type": approval.operation_type,
                     "entity_type": approval.entity_type,
+                    "operation_label": words[approval.id]["operation"],
+                    "entity_label": words[approval.id]["entity"],
+                    "source_label": words[approval.id]["source"],
                     "summary": approval.summary,
                     # This is the exact decoded JSON supplied to the executor;
                     # the modal renders it with x-text, never HTML insertion.
-                    "arguments": json.loads(approval.operation_payload),
+                    "arguments": payloads[approval.id],
                     "created_at": approval.created_at.isoformat() if approval.created_at else None,
                     "expires_at": approval.expires_at.isoformat() if approval.expires_at else None,
                     # The queue query filters to PENDING only, so every item
@@ -1367,12 +1412,7 @@ class AIChatApprovalService:
                     "source_id": getattr(approval, "source_id", None),
                     "requester": {
                         "id": approval.user_id,
-                        "display_name": " ".join(
-                            part for part in (
-                                getattr(requesters.get(approval.user_id), "first_name", None),
-                                getattr(requesters.get(approval.user_id), "last_name", None),
-                            ) if part
-                        ) or "Unknown requester",
+                        "display_name": words[approval.id]["requester"],
                     },
                 }
                 for approval in approvals

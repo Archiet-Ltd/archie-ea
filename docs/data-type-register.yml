@@ -1,0 +1,176 @@
+# Data-type register: for each kind of data the product shows, the one component that shows it.
+#
+# The pattern library (design/patterns.json, the 36 job patterns) says how a list, a dashboard or a
+# record looks. This register says what a page must use because of the data it holds: a page that
+# lists a solution's ArchiMate elements uses the element table, a page that shows risks uses the list
+# table and the risk matrix, and so on. Decided by the design-system lead, 26 Oct 2026 (ruling R31),
+# after the founder found a solution record whose tabs described their content instead of showing it.
+#
+# How it is enforced (scripts/check_data_types.py, run by scripts/verify.py in CI):
+#   declared   A page entry in docs/design-map.json lists the data types it holds under
+#              `data_types`, each with the test id the page renders for it and the browser journey
+#              that asserts it. The page must import the type's component, render the test id, and
+#              the journey must exist and name the test id. Zero tolerance.
+#   undecided  A page whose template shows the type's signals but neither declares the type nor uses
+#              its component. Counted; the count may only fall.
+#   retired    Imports of a component this register retires for a type. Counted; may only fall.
+#   hand-pagination  Page links built by hand from a pagination object. Counted; may only fall.
+#   placeholder-content  Signed-in pages that say content will come later instead of showing it.
+#              Counted; may only fall.
+#
+# Adding a data type, or changing the component a type uses, is a ruling by the design-system lead
+# recorded in the design calls; the product designer reviews it. A new component that shows a
+# registered type beside the canonical one is refused by the reuse register.
+
+version: 1
+decided: 2026-10-26
+ruling: R31
+
+types:
+  - id: archimate-elements
+    data: ArchiMate 3.2 elements of any layer (Motivation, Strategy, Business, Application, Technology,
+      Physical, Implementation and Migration) related to the record on the page
+    show_with: the element table, paged by 25, each name a link to the element's own record, with
+      Open in Composer beside it
+    components: [components/element_table.html]
+    requires: ["archimate.composer_page"]
+    pages: every record that relates elements (solutions, programmes, gaps, capabilities, applications,
+      work packages, an element's related elements)
+    signals:
+      - '\{%-?\s*for\s+\w+\s+in\s+[\w.]*(?:archimate_elements|elements_by_layer|related_elements|linked_elements)\b'
+      - '\b\w+\.(?:element_type|archimate_type)\b'
+    retired: [solutions/partials/_element_table.html]
+
+  - id: record-list
+    data: a list of records of one kind (applications, vendors, contracts, risks, requirements,
+      decisions, work packages, users, audit entries)
+    show_with: the list table on the library Table (basecoat/table.html + basecoat/pagination.html),
+      with search toolbar, column visibility menu, and pagination footer
+    components: [components/list_table.html, components/element_table.html, basecoat/table.html, basecoat/index.html, basecoat/macros.html]
+    pages: every list page and every list inside a record (pattern P03, P05)
+    signals:
+      - '<table\b'
+    retired: [components/dense_table.html, components/data_table.html, components/workbench_table.html]
+
+  - id: risks
+    data: risks with probability, impact, owner and status
+    show_with: the list table for the risks, the risk matrix for probability and impact, and the
+      register one click away
+    components: [components/list_table.html, components/risk_matrix.html]
+    pages: the risk register, every record that carries risks (solution, programme, application)
+    signals:
+      - '\{%-?\s*for\s+\w+\s+in\s+[\w.]*risks\b'
+      - '\b(?:likelihood|probability)\b[^\n]{0,80}\bimpact\b'
+    retired: [components/risk_detail_modal.html]
+
+  - id: headline-figures
+    data: the three or four numbers that matter at the top of a dashboard or record
+    show_with: the section card (card, card_header, card_description, card_title, card_action), at
+      most four in a row, each with a label and a comparison or explanation (pattern P24)
+    components: [components/figures.html, components/card.html, basecoat/card.html, basecoat/index.html, basecoat/macros.html]
+    pages: every dashboard
+    signals:
+      - 'stat-card|kpi-card|metric-card'
+    retired: [components/metrics_card.html, components/data_card.html, components/app_stats_grid.html]
+
+  - id: time-series-and-breakdowns
+    data: trends over time, category distributions, or primary chart + side breakdown on dashboards
+    show_with: the Chart + Side Panel Grid (lg:grid-cols-7 with lg:col-span-4 + lg:col-span-3) or
+      Equal 2-Column Grid (md:grid-cols-2) inside card / chart containers using var(--chart-1..5)
+    components: [components/card.html, basecoat/card.html, basecoat/chart.html, basecoat/index.html, basecoat/macros.html]
+    pages: analytical dashboards (spend analytics, rationalization, overview, errors, policy monitoring)
+    signals: []
+    retired: []
+
+  - id: record-facts
+    data: the facts about one record (owner, sponsor, dates, lifecycle, cost centre)
+    show_with: the fact list, label left and value right, a missing value saying what to do (P25)
+    components: [components/fact_list.html]
+    pages: every record page's properties, fact sheets, contract and licence detail
+    signals:
+      - 'detail-row|detail-label|<dl\b'
+    retired: [components/detail_meta.html]
+
+  - id: status
+    data: a state, severity, priority or confidence
+    show_with: the badge, with the word always present (pattern P23)
+    components: [components/figures.html, components/badge.html, basecoat/badge.html, basecoat/index.html, basecoat/macros.html]
+    pages: every cell and header that shows a state
+    signals:
+      - '\b(?:pill|chip|tag)-(?:success|warning|danger|info|neutral)\b'
+    retired: [components/status_badge.html, components/status_indicator.html]
+
+  - id: evidence
+    data: where a result came from (source, confidence, date)
+    show_with: the provenance component on every result (pattern P27)
+    components: [components/provenance.html]
+    pages: answers, impact results, cost figures and derived facts
+    signals:
+      - '>\s*Source:\s*<|>\s*Confidence:\s*<'
+    retired: []
+
+  - id: form-controls
+    data: editable fields, settings forms, and filter controls
+    show_with: single-column form (max-w-2xl space-y-6) with field wrappers, basecoat input/select/textarea/switch,
+      and a submit button (type="submit")
+    components: [components/input.html, components/select.html, components/form_field.html, basecoat/field.html, basecoat/input.html, basecoat/select.html, basecoat/index.html, basecoat/macros.html]
+    pages: forms, account settings, organisation settings, prompt configuration, feature flags
+    signals: []
+    retired: []
+
+  - id: canvas-9box
+    data: 9-box strategic grids (Business Model Canvas, Operating Model Canvas, Lean Canvas)
+    show_with: the canvas box component inside a structured 9-box grid
+    components: [components/canvas_box.html, components/canvas/business_model_canvas.html]
+    pages: business model canvas, operating model canvas
+    signals: []
+    retired: []
+
+  - id: board-kanban
+    data: stage or status-column boards (work packages, portfolio kanban)
+    show_with: the kanban board macro built on card, badge, and scroll area
+    components: [macros/kanban_board.html]
+    pages: work package boards, SAFe portfolio kanban
+    signals: []
+    retired: []
+
+  - id: diagram-canvas
+    data: interactive node-edge diagrams (ArchiMate Composer, dependency and hierarchy graphs)
+    show_with: the diagram toolbar, palette, minimap, finder, and properties sheet inside workspace_shell
+    components: [components/diagram/toolbar.html, components/diagram/palette.html, components/diagram/minimap.html]
+    pages: ArchiMate Composer and interactive model views
+    signals: []
+    retired: []
+
+  # Ruling R33, design-system lead, 29 Oct 2026. Tables the browser fills from JSON it already holds,
+  # in application rationalisation and its neighbours, are of two kinds:
+  #   - a list of records (roadmap work packages, triage, dependency risk, tracking, workbench results)
+  #     is a record-list: the route renders the rows, the page uses list_table, and search, filters,
+  #     sort and page live in query parameters so a link reproduces the view;
+  #   - a working grid that is not a list of records (the enrich grid a person edits in place, a CSV
+  #     import preview before it is saved, a side-by-side comparison of options or responses) is this
+  #     type.
+  # Not ruled: keeping hand-written table markup on tokens only (every table is built from the
+  # library's table parts), or a client-rendered mode in the library macro (no library change for
+  # Entelim; list_table stays the one record list).
+  - id: working-grid
+    data: a grid that is not a list of records, filled in the browser - cells edited in place, rows of
+      a file being imported before they are saved, or options and responses compared side by side
+    show_with: the library table parts (basecoat/table.html - table_container, table, table_header,
+      table_body, table_row, table_head, table_cell) with the row loop as a template x-for inside
+      table_body; editable cells use ui.input or ui.select; scrolls sideways inside table_container at
+      390 wide; no search toolbar or pagination footer, and a count line instead ("12 rows to import,
+      2 with problems"); every cell that is empty says why
+    components: [basecoat/table.html, basecoat/index.html, basecoat/macros.html]
+    pages: rationalization enrich grid, rationalization tracking CSV import preview, response
+      validation comparison, rationalization workbench comparison
+    signals: []
+    retired: []
+
+hand_pagination:
+  signal: '\b\w+\.(?:iter_pages\(|has_next\b|has_prev\b|next_num\b|prev_num\b)'
+  allowed_with: [components/pagination_controls.html, components/list_table.html, components/element_table.html, basecoat/pagination.html, basecoat/index.html, basecoat/macros.html]
+
+placeholder_content:
+  signed_in: 'layouts/admin_base\.html|layouts/app_base\.html'
+  signal: '(?i)\bwill (?:hold|show|appear) here\b|\bin a later (?:slice|release)\b|\bcoming soon\b|\bnot built yet\b'

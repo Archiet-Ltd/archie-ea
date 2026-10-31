@@ -182,37 +182,26 @@ def _surfaces(html):
 
 
 @pytest.mark.parametrize("default_pct", [0, 45, 100])
-def test_all_four_surfaces_agree(blueprint_client, default_pct):
+def test_the_record_shows_one_design_score_and_none_of_the_section_figures(blueprint_client, default_pct):
+    """The solution page is the record now: one design score, "n of 10", from the
+    one service, and none of the fifteen-section percentages (the completeness
+    ring, "N of M sections complete", "N of M sections need work")."""
     client, org, user, session = blueprint_client
     scores = _scores(default=default_pct)
     solution = _seed_solution(session, org, user, scores)
-    expected = compute_blueprint_completeness(scores)
     _login(client, user.id)
 
     resp = client.get(f"/solutions/{solution.id}")
     assert resp.status_code == 200, resp.headers.get("Location")
     html = resp.get_data(as_text=True)
-    # The blueprint page, not the legacy fallback.
-    assert "bp-governance-panel" in html
+    assert "bp-governance-panel" not in html
+    assert 'data-testid="solution-record"' in html
 
+    from app.services.solution_design_score_service import compute
+    expected = compute(solution).label
+    assert expected.endswith("of 10")
+    assert re.search(r'data-design-score="%s"' % re.escape(expected), html)
     got = _surfaces(html)
-
-    # (a) completeness ring
-    assert got["ring"] == expected["percent"]
-    # (b) "N of M sections complete" caption
-    assert got["caption"] == (expected["sections_complete"], expected["total_sections"])
-    # (d) gap badges — only rendered when the advisor is (i.e. work outstanding)
-    if expected["sections_needing_work"]:
-        # (c) "N of M sections need work"
-        assert got["need_work"] == (
-            expected["sections_needing_work"],
-            expected["total_sections"],
-        )
-        assert got["not_started"] == expected["sections_not_started"]
-        assert got["incomplete"] == expected["sections_partial"]
-        assert got["not_started"] + got["incomplete"] == got["need_work"][0]
-    else:
-        assert got["need_work"] is None
-
-    # And the denominator on the page is the rendered section count, not 14.
-    assert expected["total_sections"] == 15
+    assert got["caption"] is None and got["need_work"] is None
+    # The section percentages stay available to the API the editor reads.
+    assert compute_blueprint_completeness(scores)["total_sections"] == 15

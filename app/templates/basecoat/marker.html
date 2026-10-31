@@ -1,0 +1,19 @@
+{# marker: port of shadcn/ui marker.tsx (pinned in compliance/upstream). Macros: marker, marker_icon, marker_content #}
+
+{#- Marker -#}
+{% macro marker(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('marker', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MarkerIcon -#}
+{% macro marker_icon(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('marker-icon', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MarkerContent -#}
+{% macro marker_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('marker-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

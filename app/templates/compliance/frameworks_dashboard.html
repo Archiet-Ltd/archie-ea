@@ -2,6 +2,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/badge.html' import badge %}
 
 {% block title %}Regulatory Compliance{% endblock %}
 
@@ -99,13 +100,17 @@
                                :class="openId === {{ f.id }} ? 'rotate-90' : ''" aria-hidden="true"></i>
                             {{ f.code }}
                         </td>
-                        <td class="px-5 py-3 text-foreground">{{ f.name }}</td>
+                        <td class="px-5 py-3 text-foreground">
+                            {{ f.name }}
+                            {% if f.adopted %}<span class="ml-2" data-testid="framework-adopted" data-source="{{ f.source or '' }}">{% call badge('neutral') %}Adopted{% if f.source %} &middot; starter, chosen at sign-up{% endif %}{% endcall %}</span>{% endif %}
+                        </td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.category or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.jurisdiction or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.enforcement_level or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.penalty_risk or '—' }}</td>
                         <td class="px-5 py-3 text-right text-foreground">
                             {{ f.control_count if f.control_count else '—' }}
+                            {% if f.partly_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.partly_loaded }}. The rest of the standard is not loaded yet.</div>{% endif %}
                         </td>
                     </tr>
                     <tr x-show="openId === {{ f.id }}" x-cloak>
@@ -168,7 +173,7 @@
                     return;
                 }
                 this.loadingId = frameworkId;
-                Platform.fetch.get('/api/compliance/frameworks/' + frameworkId + '/controls')
+                Platform.fetch.get('{{ url_for("application_mgmt.get_compliance_frameworks") }}/' + frameworkId + '/controls')
                     .then((data) => {
                         this.controlsByFramework[frameworkId] = Array.isArray(data) ? data : [];
                     })

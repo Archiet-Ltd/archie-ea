@@ -7,8 +7,8 @@ cbc6a9e. Each source keeps OperateIQ's endpoint, its source type, its pause betw
 count. Each one returns the same small record (``Item``) so the service stores them alike.
 
 Free tiers only. A source that needs a key is skipped, and says so, until the key is set in the
-environment (``NEWSAPI_KEY``, ``ALPHAVANTAGE_API_KEY``, ``BRAVE_SEARCH_API_KEY``); the keys are only ever
-read from the environment and sent as request headers or parameters, never stored or logged.
+environment (``NEWSAPI_KEY``, ``ALPHAVANTAGE_API_KEY``, ``BRAVE_SEARCH_API_KEY``, ``LLMLAYER_API_KEY``);
+the keys are only ever read from the environment and sent as request headers or parameters, never stored or logged.
 
 Differences from the Rust, each deliberate: SEC EDGAR full-text search is a GET (a POST body is not what
 the endpoint accepts); the SEC filing link is the archive document when the hit names its accession and
@@ -37,6 +37,9 @@ SEC_USER_AGENT = "Entelim/1.0 (public filings search; support@entelim.com)"
 # OperateIQ's SourceType: Academic, Regulatory, Social, News, Market, Patent.
 KIND_BY_TYPE = {"news": "news", "regulatory": "filing", "market": "financial", "patent": "patent",
                 "academic": "research", "social": "mention"}
+
+# Default page limit for paginated sources (OperateIQ default).
+DEFAULT_PAGE_LIMIT = 3
 
 
 class SourceFailed(RuntimeError):
@@ -100,8 +103,17 @@ def _norm(text: str) -> str:
 
 
 def names_company(text: str, company: str) -> bool:
-    """True when the company's name stands in the text as whole words ("Go" is not found in "Google")."""
-    return bool(_norm(company)) and (" %s " % _norm(company)) in (" %s " % _norm(text))
+    """True when the company's name stands in the text as whole words ("Go" is not found in "Google", and
+    "Linear" is not found in "non-linear", where a hyphen joins it to another word)."""
+    wanted = _norm(company)
+    if not wanted:
+        return False
+    for hit in re.finditer(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(wanted).replace(r"\ ", r"[^a-z0-9]+"), (text or "").lower()):
+        before, after = (text or "").lower()[:hit.start()], (text or "").lower()[hit.end():]
+        if before.endswith("-") and before[:-1][-1:].isalnum() or after.startswith("-") and after[1:2].isalnum():
+            continue  # joined to another word by a hyphen: "non-linear", "linear-algebra"
+        return True
+    return False
 
 
 _LEGAL_ENDINGS = {"inc", "incorporated", "ltd", "limited", "llc", "llp", "plc", "corp", "corporation", "gmbh", "ag", "bv", "sa", "co"}
@@ -115,6 +127,13 @@ def name_variants(company: str) -> List[str]:
         words = words[:-1]
         variants.append(" ".join(words))
     return variants
+
+
+def legal_name_matches(filer: str, company: str) -> bool:
+    """True when a filer or assignee name is the company itself: the same name once legal endings (Inc., Corp, Ltd)
+    and bracketed tickers or numbers are set aside. "LINEAR TECHNOLOGY CORP" is not "Linear"."""
+    filer = re.sub(r"\([^)]*\)", " ", filer or "")
+    return bool(set(name_variants(filer)) & set(name_variants(company)))
 
 
 def names_domain(text: str, domain: Optional[str]) -> bool:
@@ -141,7 +160,7 @@ def link_is_on(link: Optional[str], domain: Optional[str]) -> bool:
 
 
 _LAUNCH_POST = re.compile(r"^\s*(show|launch|ask|tell)\s+hn\s*:", re.I)
-_COMPARING_BEFORE = re.compile(r"(\+|&|\bfor|\bvs\.?|\bversus|\blike|\bmeets|\binstead of|\b(alternatives?|competitors?|rivals?|replacement|clone) (to|of|for))\s*$", re.I)
+_COMPARING_BEFORE = re.compile(r"(\+|&|/|\bfor|\bvs\.?|\bversus|\blike|\bmeets|\binstead of|\b(alternatives?|competitors?|rivals?|replacement|clone) (to|of|for))\s*$", re.I)
 
 
 def _named_as_subject(title: str, variant: str) -> bool:
@@ -165,6 +184,75 @@ def uses_name_as_comparison(title: str, company: str) -> bool:
     variants = name_variants(company)
     present = [v for v in variants if names_company(title, v)]
     return bool(present) and not any(_named_as_subject(title, v) for v in present)
+
+
+_COMPANY_WORDS = {
+    "company", "startup", "founder", "founders", "ceo", "yc", "raises", "raised", "funding", "series", "valuation", "ipo",
+    "launches", "launched", "ships", "shipped", "releases", "released", "announces", "announced", "opens", "opened",
+    "acquires", "acquired", "acquisition", "hiring", "hires", "layoffs", "pricing", "roadmap", "changelog", "license",
+    "licence", "licensing", "open source", "closed source", "source code", "customers", "users", "product", "products",
+    "platform", "api", "sdk", "saas", "outage", "breach", "profile", "website",
+}
+_PREFIX = r"(?:(?:show|launch|ask|tell)\s+hn\s*:\s*)?"
+
+
+def has_company_context(title: str, company: str, words=()) -> bool:
+    """A name that is also an ordinary word needs company around it before a headline is about the company: the
+    headline opens with the name as its subject ("Linear: ...", "Linear's ...", "Launch HN: Linear"), or names what a
+    company does (raises, ships, pricing, open source) or one of its product words from the confirmed facts.
+    "Linear algebra", "Linear A" and "integer linear programming" have none of these."""
+    text = " ".join(re.findall(r"[a-z0-9]+", (title or "").lower()))
+    for v in name_variants(company):
+        shape = r"[^a-z0-9]*".join(re.escape(w) for w in v.split())
+        if re.match(r"^\W*%s%s(?:['\u2019]s\b|\s*[:\u2013\u2014|-](?:\s|$))" % (_PREFIX, shape), title or "", re.I):
+            return True
+        if re.match(r"^\W*(?:show|launch|ask|tell)\s+hn\s*:\s*%s(?=\s*(?:\(|[:\u2013\u2014|-]|$))" % shape, title or "", re.I):
+            return True
+    padded = " %s " % text
+    return any((" %s " % w) in padded for w in set(_COMPANY_WORDS) | set(words or ()))
+
+
+def is_single_name(company: str) -> bool:
+    """True when the name is one word (Linear, Cal.com, PostHog, Brand): other people's headlines reuse it, so it is
+    never enough alone. A name of two words or more (Northwind Freight) says which company it is."""
+    words = [w for w in re.split(r"[\s,]+", (company or "").strip()) if w]
+    while len(words) > 1 and words[-1].lower().strip(".") in _LEGAL_ENDINGS:
+        words.pop()
+    return len(words) == 1
+
+
+def counts_as_news(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None, words=()) -> bool:
+    """What a free-text search may keep: the company's web address is in the title or the story's own link is on it,
+    or the name is in the title as the company and not as a comparison, with company context around it."""
+    if link_is_on(link, domain):
+        return True
+    if is_integration_target(title, company, domain, link):
+        return False
+    host = (domain or "").strip().lower()
+    host = host[4:] if host.startswith("www.") else host
+    if names_domain(title, host) and _named_as_subject(title, host) and _norm(host) not in name_variants(company):
+        return True  # its web address, written in the title, when that address is not also the name others reuse (cal.com)
+    if not is_single_name(company):  # a name of two words or more says which company it is
+        return is_about(title, company)
+    return is_about(title, company) and has_company_context(title, company, words) \
+        and not is_integration_target(title, company, domain, link)
+
+
+_INTEGRATION_TARGET = re.compile(r"\b(?:to|with|for|into|from|on)\s+(?:sync|integrat\w*)?\s*", re.I)
+
+
+def is_integration_target(title: str, company: str, domain: Optional[str], link: Optional[str]) -> bool:
+    """True for a launch post by someone else (its own address is not the company's) that names the company as the thing
+    it connects to: "Synclinear.com to Sync Linear.app with GitHub", "Show HN: Sync X with Linear"."""
+    if link_is_on(link, domain) or not link:
+        return False
+    text = " ".join(re.findall(r"[a-z0-9.]+", (title or "").lower()))
+    for v in name_variants(company):
+        shape = r"\s+".join(re.escape(w) for w in v.split())
+        if re.search(r"\b(?:sync|syncs|syncing|connect|connects|import|imports|export|exports|integrat\w*|plugin|extension|bridge|bot)\b.*\b%s\b" % shape, text) \
+                or re.search(r"\b(?:to|with|into|for)\s+(?:sync\s+)?%s(?:\.\w+)?\b" % shape, text) and re.search(r"\bsync\w*\b", text):
+            return True
+    return False
 
 
 def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None) -> bool:
@@ -193,13 +281,29 @@ def news_api(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
             for a in data.get("articles") or [] if a.get("title") and a.get("url")]
 
 
+def _brave_keys() -> List[str]:
+    """Return the list of Brave API keys from BRAVE_SEARCH_API_KEYS (comma-separated), falling back to BRAVE_SEARCH_API_KEY."""
+    raw = os.environ.get("BRAVE_SEARCH_API_KEYS") or os.environ.get("BRAVE_SEARCH_API_KEY") or ""
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
 def brave_search(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
-    data = http.json("https://api.search.brave.com/res/v1/web/search", pause=1.2,
-                     params={"q": query, "count": 10},
-                     headers={"Accept": "application/json", "X-Subscription-Token": os.environ["BRAVE_SEARCH_API_KEY"]})
-    return [Item(title=r.get("title") or "", summary=_strip_html(r.get("description")), url=r.get("url"),
-                 published=r.get("page_age"))
-            for r in (data.get("web") or {}).get("results") or [] if r.get("title") and r.get("url")]
+    keys = _brave_keys()
+    if not keys:
+        raise SourceFailed("needs BRAVE_SEARCH_API_KEY or BRAVE_SEARCH_API_KEYS to be set")
+    last_error = None
+    for key in keys:
+        try:
+            data = http.json("https://api.search.brave.com/res/v1/web/search", pause=1.2,
+                             params={"q": query, "count": 10},
+                             headers={"Accept": "application/json", "X-Subscription-Token": key})
+            return [Item(title=r.get("title") or "", summary=_strip_html(r.get("description")), url=r.get("url"),
+                         published=r.get("page_age"))
+                    for r in (data.get("web") or {}).get("results") or [] if r.get("title") and r.get("url")]
+        except SourceFailed as exc:
+            last_error = exc
+            continue
+    raise last_error or SourceFailed("all Brave keys failed")
 
 
 # --------------------------------------------------------------------------- filings and patents
@@ -212,7 +316,7 @@ def sec_edgar(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
     for hit in (data.get("hits") or {}).get("hits") or []:
         src = hit.get("_source") or {}
         names = src.get("display_names") or []
-        if not any(names_company(n, query) for n in names):
+        if not any(legal_name_matches(n, query) for n in names):  # a filer that only shares a word with the name is another company
             continue
         form = src.get("form") or src.get("root_form") or "filing"
         ident, ciks = hit.get("_id") or "", src.get("ciks") or []
@@ -271,39 +375,132 @@ def open_alex(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
 # --------------------------------------------------------------------------- public conversation
 
 def reddit(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
-    data = http.json("https://www.reddit.com/r/all/search.json", pause=2.0,
-                     params={"q": query, "sort": "relevance", "limit": 50, "restrict_sr": 1},
-                     headers={"User-Agent": USER_AGENT})
-    items = []
-    for child in ((data.get("data") or {}).get("children")) or []:
-        post = child.get("data") or {}
-        if not post.get("title") or not post.get("permalink"):
-            continue
-        stamp = post.get("created_utc")
-        items.append(Item(title=post["title"], summary=post.get("selftext") or "",
-                          url="https://reddit.com%s" % post["permalink"],
-                          published=_utc(stamp).isoformat() if stamp else None,
-                          details={"subreddit": post.get("subreddit"), "score": post.get("score"),
-                                   "comments": post.get("num_comments")}))
+    """Reddit search with pagination, per-subreddit search, and sort order.
+    Pagination: up to DEFAULT_PAGE_LIMIT pages using the 'after' token.
+    Subreddit: from ctx['subreddit'] (default 'all').
+    Sort: from ctx['reddit_sort'] (default 'relevance').
+    """
+    subreddit = ctx.get("subreddit", "all")
+    sort = ctx.get("reddit_sort", "relevance")
+    page_limit = ctx.get("page_limit", DEFAULT_PAGE_LIMIT)
+
+    items: List[Item] = []
+    after = None
+    for _ in range(page_limit):
+        params = {"q": query, "sort": sort, "limit": 50, "restrict_sr": 1}
+        if after:
+            params["after"] = after
+        data = http.json("https://www.reddit.com/r/%s/search.json" % subreddit, pause=2.0,
+                         params=params, headers={"User-Agent": USER_AGENT})
+        for child in ((data.get("data") or {}).get("children")) or []:
+            post = child.get("data") or {}
+            if not post.get("title") or not post.get("permalink"):
+                continue
+            stamp = post.get("created_utc")
+            items.append(Item(title=post["title"], summary=post.get("selftext") or "",
+                              url="https://reddit.com%s" % post["permalink"],
+                              published=_utc(stamp).isoformat() if stamp else None,
+                              details={"subreddit": post.get("subreddit"), "score": post.get("score"),
+                                       "comments": post.get("num_comments")}))
+        after = (data.get("data") or {}).get("after")
+        if not after:
+            break
     return items
 
 
 def hackernews(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
-    data = http.json("https://hn.algolia.com/api/v1/search", pause=0.5,
-                     params={"query": query, "tags": "story", "page": 0})
-    items = []
-    for hit in data.get("hits") or []:
-        title, ident = hit.get("title"), hit.get("objectID")
-        if not title or not ident:
-            continue
-        items.append(Item(title=title, summary=hit.get("story_text") or "",
-                          url="https://news.ycombinator.com/item?id=%s" % ident, published=hit.get("created_at"),
-                          details={"points": hit.get("points"), "comments": hit.get("num_comments"),
-                                   "story_url": hit.get("url") or None}))
+    """Hacker News search with pagination, top stories, and Ask HN.
+    Mode: from ctx['hn_mode'] ('search' default, 'top', 'ask').
+    Pagination: up to DEFAULT_PAGE_LIMIT pages for search modes.
+    """
+    mode = ctx.get("hn_mode", "search")
+    page_limit = ctx.get("page_limit", DEFAULT_PAGE_LIMIT)
+
+    items: List[Item] = []
+
+    if mode == "top":
+        # Top stories: fetch IDs then details
+        data = http.json("https://hacker-news.firebaseio.com/v0/topstories.json", pause=0.5)
+        story_ids = data[:100]  # limit to first 100
+        for story_id in story_ids[:page_limit * 30]:  # approximate per-page
+            try:
+                item_data = http.json("https://hacker-news.firebaseio.com/v0/item/%d.json" % story_id, pause=0.1)
+                title = item_data.get("title")
+                if not title:
+                    continue
+                text = item_data.get("text") or title
+                url = item_data.get("url") or "https://news.ycombinator.com/item?id=%d" % story_id
+                stamp = item_data.get("time")
+                items.append(Item(title=title, summary=text,
+                                  url=url, published=_utc(stamp).isoformat() if stamp else None,
+                                  details={"points": item_data.get("score"), "comments": item_data.get("descendants"),
+                                           "story_url": item_data.get("url")}))
+            except SourceFailed:
+                continue
+        return items
+
+    if mode == "ask":
+        # Ask HN search
+        for page in range(page_limit):
+            data = http.json("https://hn.algolia.com/api/v1/search", pause=0.5,
+                             params={"query": query, "tags": "ask_hn", "page": page})
+            for hit in data.get("hits") or []:
+                title, ident = hit.get("title"), hit.get("objectID")
+                if not title or not ident:
+                    continue
+                items.append(Item(title=title, summary=hit.get("story_text") or "",
+                                  url="https://news.ycombinator.com/item?id=%s" % ident, published=hit.get("created_at"),
+                                  details={"points": hit.get("points"), "comments": hit.get("num_comments"),
+                                           "story_url": hit.get("url") or None, "type": "ask_hn"}))
+            if not data.get("hits"):
+                break
+        return items
+
+    # Default: search stories with pagination
+    for page in range(page_limit):
+        data = http.json("https://hn.algolia.com/api/v1/search", pause=0.5,
+                         params={"query": query, "tags": "story", "page": page})
+        hits = data.get("hits") or []
+        if not hits:
+            break
+        for hit in hits:
+            title, ident = hit.get("title"), hit.get("objectID")
+            if not title or not ident:
+                continue
+            items.append(Item(title=title, summary=hit.get("story_text") or "",
+                              url="https://news.ycombinator.com/item?id=%s" % ident, published=hit.get("created_at"),
+                              details={"points": hit.get("points"), "comments": hit.get("num_comments"),
+                                       "story_url": hit.get("url") or None}))
     return items
 
 
 def bluesky(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
+    """Bluesky search and author feed.
+    Mode: from ctx['bluesky_mode'] ('search' default, 'author').
+    Author: from ctx['bluesky_author'] (handle).
+    """
+    mode = ctx.get("bluesky_mode", "search")
+
+    if mode == "author":
+        handle = ctx.get("bluesky_author")
+        if not handle:
+            return []
+        data = http.json("https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed", pause=0.5,
+                         params={"actor": handle, "limit": 30})
+        items = []
+        for feed_item in data.get("feed") or []:
+            post = feed_item.get("post") or {}
+            text = (post.get("record") or {}).get("text") or ""
+            author_handle = (post.get("author") or {}).get("handle")
+            uri = post.get("uri") or ""
+            if not text or not author_handle or not uri:
+                continue
+            items.append(Item(title="@%s: %s" % (author_handle, text[:100]), summary=text,
+                              url="https://bsky.app/profile/%s/post/%s" % (author_handle, uri.rsplit("/", 1)[-1]),
+                              published=(post.get("record") or {}).get("createdAt")))
+        return items
+
+    # Default: search posts
     data = http.json("https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts", pause=0.5,
                      params={"q": query, "limit": 25})
     items = []
@@ -319,7 +516,28 @@ def bluesky(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
 
 
 def mastodon(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
-    data = http.json("https://mastodon.social/api/v2/search", pause=0.5,
+    """Mastodon search, public timeline, and configurable instance.
+    Mode: from ctx['mastodon_mode'] ('search' default, 'timeline').
+    Instance: from ctx['mastodon_instance'] (default 'https://mastodon.social').
+    """
+    mode = ctx.get("mastodon_mode", "search")
+    instance = ctx.get("mastodon_instance", "https://mastodon.social").rstrip("/")
+
+    if mode == "timeline":
+        data = http.json("%s/api/v1/timelines/public" % instance, pause=0.5,
+                         params={"limit": 20})
+        items = []
+        for status in data or []:
+            text = _strip_html(status.get("content"))
+            if not text or not status.get("url"):
+                continue
+            items.append(Item(title="@%s: %s" % ((status.get("account") or {}).get("username"), text[:100]), summary=text,
+                              url=status["url"], published=status.get("created_at"),
+                              details={"instance": instance}))
+        return items
+
+    # Default: search
+    data = http.json("%s/api/v2/search" % instance, pause=0.5,
                      params={"q": query, "type": "statuses", "limit": 20, "resolve": "false"})
     items = []
     for status in data.get("statuses") or []:
@@ -327,7 +545,8 @@ def mastodon(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
         if not text or not status.get("url"):
             continue
         items.append(Item(title="@%s: %s" % ((status.get("account") or {}).get("username"), text[:100]), summary=text,
-                          url=status["url"], published=status.get("created_at")))
+                          url=status["url"], published=status.get("created_at"),
+                          details={"instance": instance}))
     return items
 
 
@@ -428,6 +647,27 @@ def alpha_vantage(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
                  published=data.get("LatestQuarter"), details={"symbol": symbol, "exchange": data.get("Exchange")})]
 
 
+# --------------------------------------------------------------------------- LLMLayer (fallback web research)
+
+def llmlayer(http: Http, query: str, ctx: Dict[str, Any]) -> List[Item]:
+    """LLMLayer web search fallback. Skipped when LLMLAYER_API_KEY is absent."""
+    key = os.environ.get("LLMLAYER_API_KEY")
+    if not key:
+        raise SourceFailed("needs LLMLAYER_API_KEY to be set")
+    data = http.json("https://api.llmlayer.ai/api/v2/web_search", pause=2.0,
+                     params={"query": query, "count": 10},
+                     headers={"Authorization": "Bearer %s" % key, "Accept": "application/json"})
+    items = []
+    for r in data.get("results") or []:
+        title = r.get("title")
+        url = r.get("url")
+        if not title or not url:
+            continue
+        items.append(Item(title=title, summary=r.get("snippet") or "", url=url,
+                          published=None, details={}))
+    return items
+
+
 # --------------------------------------------------------------------------- the registry
 
 @dataclass(frozen=True)
@@ -459,6 +699,7 @@ REGISTRY: List[Source] = [
     Source("rss", "RSS feeds", "news", rss, needs_feeds=True, social=True),
     Source("yahoo_finance", "Yahoo Finance", "market", yahoo_finance),
     Source("alpha_vantage", "Alpha Vantage", "market", alpha_vantage, key_env="ALPHAVANTAGE_API_KEY"),
+    Source("llmlayer", "LLMLayer", "news", llmlayer, key_env="LLMLAYER_API_KEY", social=True, searched=True),
 ]
 BY_KEY = {s.key: s for s in REGISTRY}
 

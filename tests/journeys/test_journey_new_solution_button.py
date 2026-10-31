@@ -99,8 +99,8 @@ def test_new_solution_is_the_primary_header_button(app, client):
     )
     assert btn_match is not None, "btn-new-solution must be present"
     btn_tag = btn_match.group(0)
-    assert "bg-primary" in btn_tag, (
-        "New Solution must be the filled primary button (bg-primary), "
+    assert 'data-variant="default"' in btn_tag, (
+        "New Solution must be the filled primary button (default variant), "
         f"got: {btn_tag[:200]}"
     )
     # "Start Architecture Journey" must be an outline button, not filled
@@ -110,7 +110,7 @@ def test_new_solution_is_the_primary_header_button(app, client):
     )
     assert journey_match is not None, "btn-start-journey must be present"
     journey_tag = journey_match.group(0)
-    assert "bg-primary" not in journey_tag, (
+    assert 'data-variant="default"' not in journey_tag, (
         "Start Architecture Journey must not be the filled primary button, "
         f"got: {journey_tag[:200]}"
     )

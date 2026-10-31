@@ -16,10 +16,8 @@ adm_phases
 adm_stakeholder_concurrences
 adr_capability_links
 adr_process_links
-agent_charters
 agent_configurations
 agent_execution_history
-agent_run_records
 agent_schedules
 ai_audit_logs
 ai_chat_approval_audit_log
@@ -196,7 +194,6 @@ element_templates
 enterprise_capabilities
 equipment
 error_events
-exchange_rates
 exception_process
 experience_elements
 external_systems
@@ -252,7 +249,6 @@ manufacturing_value_streams
 mapping_metrics
 migration_plan_documents
 milestones
-model_providers
 motivation_assessments
 motivation_constraints
 motivation_drivers
@@ -283,14 +279,12 @@ process_actor_raci
 process_application_mapping
 process_embeddings
 process_role_raci
-product_inquiries
 product_taxonomy
 production_lines
 production_orders
 project_constraints
 project_notes
 project_resources
-public_visitor_events
 published_api_specs
 quality_attributes
 rag_metrics
@@ -327,7 +321,6 @@ scoring_configs
 scoring_configurations
 security_scans
 service_dependency
-service_incidents
 service_level_agreements
 service_realization
 sidebar_menu_items
@@ -385,7 +378,6 @@ spec_webhooks
 sprints
 sso_configs
 staging_elements
-stakeholder_communications
 stakeholder_inputs
 strategy_resources
 structural_groupings
@@ -465,11 +457,3 @@ workflow_nodes
 workflow_pipelines
 workflow_run_watchers
 workflow_templates
-# oauth_authorization_codes: redeemed by hash at the token endpoint before an organisation is known
-# oauth_clients: registered before any user or organisation exists (dynamic client registration)
-# oauth_tokens: looked up by token hash before the organisation is known; the row carries organization_id and every use is checked against it
-oauth_authorization_codes
-oauth_clients
-oauth_tokens
-# reference_number_counters: global allocation counters, no tenant data, runtime role insert/update only
-reference_number_counters

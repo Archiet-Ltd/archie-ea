@@ -31,7 +31,7 @@
           <option value="{{ app.id }}">{{ app.name }}</option>
           {% endfor %}
         </select>
-        <button type="button" @click="resolveAllConflicts()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" id="resolve-all-btn" disabled aria-label="Action">
+        <button type="button" @click="resolveAllConflicts()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" id="resolve-all-btn" disabled>
           Resolve All
         </button>
       </div>
@@ -59,7 +59,7 @@
 
   <!-- Comparison Table -->
   <div class="bg-card border border-border rounded-lg overflow-hidden">
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Response validation">
       <table class="dense-table w-full text-sm">
         <thead class="bg-muted">
           <tr>
@@ -203,7 +203,7 @@ function renderComparison(comparisons) {
         <td class="py-3 px-4 text-center">${statusIcon}</td>
         <td class="py-3 px-4 text-center">
           ${item.status === 'conflict' ?
-            `<button type="button" data-action="openResolutionModal" data-id="${idx}" class="text-primary hover:underline text-sm" aria-label="Action">Resolve</button>` :
+            `<button type="button" data-action="openResolutionModal" data-id="${idx}" class="text-primary hover:underline text-sm">Resolve</button>` :
             '<span class="text-muted-foreground text-sm">-</span>'
           }
         </td>

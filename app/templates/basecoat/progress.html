@@ -1,0 +1,13 @@
+{# progress: port of shadcn/ui progress.tsx (pinned in compliance/upstream). Macros: progress, progress_indicator #}
+
+{#- Progress -#}
+{% macro progress(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('progress', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- Progress -#}
+{% macro progress_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('progress-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

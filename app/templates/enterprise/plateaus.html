@@ -48,7 +48,7 @@
                 <div class="font-medium mb-1">Gaps</div>
                 {% for gap in (plateau_gaps or {}).get(plateau.id, []) %}
                 <div><a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                        class="hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
+                        class="inline-flex min-h-6 items-center hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
                 {% else %}
                 <span class="text-muted-foreground">—</span>
                 {% endfor %}

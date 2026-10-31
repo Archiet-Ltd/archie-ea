@@ -94,9 +94,10 @@ class ApplicabilityService:
 
     @classmethod
     def adopt_framework(
-        cls, organization_id: int, framework_id: int, adopted_by_id: int
+        cls, organization_id: int, framework_id: int, adopted_by_id: int, source: Optional[str] = None
     ) -> FrameworkAdoption:
-        """Adopt a framework for an organisation, copying its controls.
+        """Adopt a framework for an organisation, copying its controls. ``source`` says where the
+        adoption came from and is saved with it.
 
         Returns the new FrameworkAdoption row.
         """
@@ -117,6 +118,7 @@ class ApplicabilityService:
             adopted_by_id=adopted_by_id,
             adopted_at=_now_utc_naive(),
             status="active",
+            source=source,
         )
         db.session.add(adoption)
         db.session.flush()

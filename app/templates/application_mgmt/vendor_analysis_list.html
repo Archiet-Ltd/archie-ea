@@ -1,301 +1,91 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Vendor Options Analysis{% endblock %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_action %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
-{% from "components/page_header.html" import page_header %}
+{% block title %}Vendor options analysis{% endblock %}
+
+{% macro _actions() %}
+{% call ui.button(href=url_for('application_mgmt.vendor_analysis_new'), attrs={'data-testid': 'btn-new-analysis'}) %}{{ lucide('plus') }}New analysis{% endcall %}
+{% endmacro %}
+
+{% macro _status_filter() %}
+<form method="get" class="flex items-center" data-testid="vendor-analysis-status-filter">
+  {% call native_select_wrapper() %}
+    {% call native_select(name='status', size='sm', attrs={'aria-label': 'Status', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All statuses', value='') }}
+      {% for value, label in [('draft', 'Draft'), ('running', 'Running'), ('completed', 'Completed'), ('approved', 'Approved'), ('rejected', 'Rejected')] %}
+      {{ native_select_option(text=label, value=value, selected=(status == value)) }}
+      {% endfor %}
+    {% endcall %}
+  {% endcall %}
+</form>
+{% endmacro %}
+
+{% macro _clear_filter() %}{{ ui.button(text='Show all analyses', href=url_for('application_mgmt.vendor_analysis_list'), variant='outline', size='sm') }}{% endmacro %}
+
+{#- One row's ellipsis menu (the dropdown parts of row_actions, which cannot be used as a call block inside list_table's call block). -#}
+{% macro _row_menu(a) -%}
+{%- call ui.dropdown_menu() -%}
+  {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ a.name }}</span>{%- endcall -%}
+  {%- call ui.dropdown_menu_content(align='end', class='w-[160px]') -%}
+    {{ row_action('Open', href=url_for('application_mgmt.vendor_analysis_detail', analysis_id=a.id)) }}
+    {{ row_action('Delete', action=url_for('application_mgmt.vendor_analysis_list', delete=a.id, status=status or none), destructive=true, separator_before=true,
+                  confirm='Delete "' ~ (a.name or 'this analysis') ~ '"? This cannot be undone.', testid='vendor-analysis-delete') }}
+  {%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
 
 {% block content %}
-<div class="space-y-6" x-data="vendorAnalysisList()">
-  {{ page_header(
-      title='Vendor Options Analysis',
-      description='Compare vendor products with weighted scoring to support selection decisions',
-      breadcrumbs=[
-          {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Vendor Options Analysis'}
-      ],
-      actions=[
-          {'text': 'New Analysis', 'icon': 'plus', 'href': url_for('application_mgmt.vendor_analysis_new'), 'variant': 'default'}
-      ]
-  ) }}
+{%- set rows = analyses|default([]) -%}
+{%- set s = summary or {} -%}
+{%- set show_recommended = rows|selectattr('recommended_vendor')|list|length > 0 -%}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Vendor options analysis', subtitle='Compare vendor products with weighted scores to back a selection decision',
+              breadcrumb=[('Home', url_for('main.index')), ('Vendor options analysis', none)], actions_caller=(_actions if (s.total or 0) > 0 else none)) }}
 
-  <!-- Summary Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-    <div class="rounded-lg border border-border bg-card p-4">
-      <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <i data-lucide="bar-chart-3" class="h-5 w-5 text-primary"></i>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-foreground" x-text="summary.total">0</p>
-          <p class="text-sm text-muted-foreground">Total Analyses</p>
-        </div>
-      </div>
-    </div>
-    <div class="rounded-lg border border-border bg-card p-4">
-      <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-          <i data-lucide="check-circle" class="h-5 w-5 text-success"></i>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-foreground" x-text="summary.approved">0</p>
-          <p class="text-sm text-muted-foreground">Approved</p>
-        </div>
-      </div>
-    </div>
-    <div class="rounded-lg border border-border bg-card p-4">
-      <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-          <i data-lucide="clock" class="h-5 w-5 text-warning"></i>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-foreground" x-text="summary.in_progress">0</p>
-          <p class="text-sm text-muted-foreground">In Progress</p>
-        </div>
-      </div>
-    </div>
-    <div class="rounded-lg border border-border bg-card p-4">
-      <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <i data-lucide="trophy" class="h-5 w-5 text-primary"></i>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-foreground" x-text="summary.with_recommendation">0</p>
-          <p class="text-sm text-muted-foreground">With Recommendation</p>
-        </div>
-      </div>
-    </div>
-  </div>
+{% if (s.total or 0) > 0 %}
+{{ stat_cards([
+    {'label': 'Analyses', 'value': s.total, 'icon': 'chart-column', 'sentence': 'Vendor comparisons you have started', 'testid': 'va-stat-total'},
+    {'label': 'Approved', 'value': s.approved or 0, 'icon': 'circle-check', 'sentence': ('Signed off as the selection decision' if s.approved else 'None signed off yet'), 'testid': 'va-stat-approved'},
+    {'label': 'In progress', 'value': s.in_progress or 0, 'icon': 'clock', 'sentence': ('Still being scored' if s.in_progress else 'Nothing is being scored now'), 'testid': 'va-stat-in-progress'},
+    {'label': 'With a recommendation', 'value': s.with_recommendation or 0, 'icon': 'trophy', 'sentence': ('A preferred vendor has been worked out' if s.with_recommendation else 'No analysis has a preferred vendor yet'), 'testid': 'va-stat-recommended'},
+]) }}
 
-  <!-- Filter Bar -->
-  <div class="flex flex-wrap items-center gap-3">
-    <div class="relative flex-1 max-w-sm">
-      <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"></i>
-      <input type="text" x-model="searchQuery" @input.debounce.300ms="loadAnalyses(1)" placeholder="Search analyses..."
-        class="w-full pl-9 pr-3 py-2 border border-border rounded-md text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-        aria-label="Search analyses">
-    </div>
-    <select x-model="statusFilter" @change="loadAnalyses(1)" class="px-3 py-2 border border-border rounded-md text-sm bg-card text-foreground" aria-label="Filter by Status">
-      <option value="">All Statuses</option>
-      <option value="draft">Draft</option>
-      <option value="running">Running</option>
-      <option value="completed">Completed</option>
-      <option value="approved">Approved</option>
-      <option value="rejected">Rejected</option>
-    </select>
-    <select x-model="sortBy" @change="loadAnalyses(1)" class="px-3 py-2 border border-border rounded-md text-sm bg-card text-foreground" aria-label="Sort By">
-      <option value="created_at">Newest First</option>
-      <option value="name">Name A-Z</option>
-      <option value="updated_at">Recently Updated</option>
-    </select>
-    <span class="text-sm text-muted-foreground" x-show="loading" x-cloak>
-      <i data-lucide="loader-2" class="h-4 w-4 inline animate-spin"></i> Loading...
-    </span>
-  </div>
-
-  <!-- Analysis Table -->
-  <div class="rounded-lg border border-border bg-card">
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full">
-        <thead>
-          <tr class="border-b bg-muted/50">
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Vendors</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Recommended</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Created</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-if="loading && analyses.length === 0">
-            <tr>
-              <td colspan="6" class="px-4 py-3">
-                <div class="space-y-3">
-                  <template x-for="i in 5" :key="i">
-                    <div class="flex items-center gap-4">
-                      <div class="h-4 w-48 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-20 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-32 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
-                      <div class="h-4 w-16 bg-muted animate-pulse rounded ml-auto"></div>
-                    </div>
-                  </template>
-                </div>
-              </td>
-            </tr>
-          </template>
-          <template x-if="!loading && analyses.length === 0">
-            <tr>
-              <td colspan="6" class="px-4 py-12 text-center">
-                <div class="flex flex-col items-center gap-3">
-                  <i data-lucide="bar-chart-3" class="h-12 w-12 text-muted-foreground/30"></i>
-                  <p class="text-muted-foreground" x-text="searchQuery || statusFilter ? 'No analyses match your filters' : 'No vendor analyses yet'"></p>
-                  <a x-show="!searchQuery && !statusFilter" href="{{ url_for('application_mgmt.vendor_analysis_new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="plus" class="h-4 w-4"></i> Create Your First Analysis
-                  </a>
-                </div>
-              </td>
-            </tr>
-          </template>
-          <template x-for="a in analyses" :key="a.id">
-            <tr class="border-b hover:bg-muted/30 transition-colors">
-              <td class="px-4 py-3">
-                <a :href="'{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=0) }}'.replace('/0', '/' + a.id)" class="font-medium text-foreground hover:text-primary" x-text="a.name"></a>
-              </td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border"
-                  :class="{
-                    'bg-success/10 text-success-emphasis border-success/30': a.status === 'completed' || a.approval_status === 'approved',
-                    'bg-warning/10 text-warning-emphasis border-warning/30': a.status === 'draft' || a.status === 'running',
-                    'bg-destructive/10 text-destructive-emphasis border-destructive/30': a.approval_status === 'rejected',
-                    'bg-muted-foreground/10 text-foreground/80 border-muted-foreground/30': !['completed','draft','running'].includes(a.status) && !a.approval_status
-                  }"
-                  x-text="a.approval_status || a.status"></span>
-              </td>
-              <td class="px-4 py-3 text-sm text-muted-foreground" x-text="a.vendor_count + ' vendors'"></td>
-              <td class="px-4 py-3">
-                <span class="text-sm" :class="a.recommended_vendor ? 'text-success-emphasis font-medium' : 'text-muted-foreground'" x-text="a.recommended_vendor || 'Pending'"></span>
-              </td>
-              <td class="px-4 py-3 text-sm text-muted-foreground" x-text="a.created_at ? new Date(a.created_at).toLocaleDateString() : ''"></td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-2">
-                  <a :href="'{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=0) }}'.replace('/0', '/' + a.id)" class="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="View" aria-label="View analysis">
-                    <i data-lucide="eye" class="h-4 w-4"></i>
-                  </a>
-                  <button type="button" @click="confirmDelete(a.id, a.name)" class="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive-emphasis" title="Delete" aria-label="Delete analysis">
-                    <i data-lucide="trash-2" class="h-4 w-4"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <div x-show="pagination.pages > 1" x-cloak class="flex items-center justify-between px-4 py-3 border-t">
-      <p class="text-sm text-muted-foreground">
-        Showing <span x-text="((pagination.page - 1) * pagination.per_page) + 1"></span>-<span x-text="Math.min(pagination.page * pagination.per_page, pagination.total)"></span>
-        of <span x-text="pagination.total"></span>
-      </p>
-      <div class="flex items-center gap-1">
-        <button type="button" @click="loadAnalyses(pagination.page - 1)" :disabled="!pagination.has_prev"
-          class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">
-          Previous
-        </button>
-        <template x-for="p in paginationRange()" :key="'pg-'+p">
-          <button type="button" @click="typeof p === 'number' && loadAnalyses(p)"
-            class="px-3 py-1.5 text-sm border rounded-md min-w-[36px]"
-            :class="p === pagination.page ? 'bg-primary text-primary-foreground border-primary' : typeof p === 'number' ? 'border-border hover:bg-muted' : 'border-transparent cursor-default'"
-            :disabled="typeof p !== 'number'"
-            x-text="p"></button>
-        </template>
-        <button type="button" @click="loadAnalyses(pagination.page + 1)" :disabled="!pagination.has_next"
-          class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">
-          Next
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Delete Confirmation Modal -->
-  <div x-show="deleteTarget" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
-    @keydown.escape.window="deleteTarget = null" role="dialog" aria-modal="true" aria-label="Confirm deletion">
-    <div class="fixed inset-0 bg-overlay/50" @click="deleteTarget = null"></div>
-    <div class="relative bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 z-10">
-      <h3 class="text-lg font-semibold text-foreground mb-2">Delete Analysis</h3>
-      <p class="text-sm text-muted-foreground mb-4">
-        Are you sure you want to permanently delete "<span class="font-medium text-foreground" x-text="deleteTargetName"></span>"? This action cannot be undone.
-      </p>
-      <div class="flex justify-end gap-3">
-        <button type="button" @click="deleteTarget = null" class="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted">Cancel</button>
-        <button type="button" @click="executeDelete()" class="px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">Delete</button>
-      </div>
-    </div>
-  </div>
+{% macro _no_rec_notice() %}<span data-testid="vendor-analysis-no-recommendation">No analysis has a recommended vendor yet. Score the vendors in an analysis to get one.</span>{% endmacro %}
+{%- set columns = [{'label': 'Analysis', 'sortable': true}, ('Status', ''), {'label': 'Vendors', 'align': 'right', 'sortable': true}] -%}
+{%- if show_recommended %}{% set _ = columns.append({'label': 'Recommended', 'class': 'hidden md:table-cell'}) %}{% endif -%}
+{%- set _ = columns.append({'label': 'Created', 'sortable': true}) -%}
+{%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
+{% call(row) list_table(rows=rows, columns=columns, caption='Vendor options analyses', testid='vendor-analysis-table', row_testid='vendor-analysis-row',
+                        search_placeholder='Filter analyses...', toolbar=true, toolbar_actions=_status_filter,
+                        empty_message='No analyses match this status.', empty_action=_clear_filter,
+                        notice=(_no_rec_notice() if rows and not show_recommended else none)) %}
+  {%- set a = row.analysis -%}
+  {% call table_cell(class='max-w-[420px]') %}
+    <a href="{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=a.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="vendor-analysis-link">{{ a.name or 'Untitled analysis' }}</a>
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(a.approval_status or a.status or 'draft') }}{% endcall %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.vendor_count}) %}{{ row.vendor_count }}{% endcall %}
+  {% if show_recommended %}{% call table_cell(class='hidden md:table-cell max-w-[220px] truncate') %}{{ value_or_unset(row.recommended_vendor, 'Not decided') }}{% endcall %}{% endif %}
+  {% call table_cell(class='whitespace-nowrap text-muted-foreground', attrs={'data-sort': a.created_at.strftime('%Y%m%d%H%M') if a.created_at else ''}) %}
+    {{ a.created_at|format_date if a.created_at else value_or_unset(none, 'Unknown') }}
+  {% endcall %}
+  {% call table_cell(class='w-12 text-right') %}{{ _row_menu(a) }}{% endcall %}
+{% endcall %}
+{% else %}
+{% call ui.card(attrs={'data-testid': 'vendor-analysis-empty'}) %}
+  {% call ui.card_content() %}
+    {{ empty_state(icon='chart-column', title='No vendor analyses yet',
+                   description='Pick the vendors you are weighing up, set what matters and how much, and the scores show which fits best.',
+                   cta_text='New analysis', cta_icon='plus', cta_href=url_for('application_mgmt.vendor_analysis_new')) }}
+  {% endcall %}
+{% endcall %}
+{% endif %}
 </div>
-
-<script>
-function vendorAnalysisList() {
-  return {
-    analyses: [],
-    loading: true,
-    statusFilter: '',
-    searchQuery: '',
-    sortBy: 'created_at',
-    summary: { total: 0, approved: 0, in_progress: 0, with_recommendation: 0 },
-    pagination: { page: 1, per_page: 20, total: 0, pages: 0, has_next: false, has_prev: false },
-    deleteTarget: null,
-    deleteTargetName: '',
-
-    async init() {
-      await this.loadAnalyses(1);
-    },
-
-    async loadAnalyses(page) {
-      this.loading = true;
-      try {
-        let paramsObj = {
-          page: page || 1,
-          per_page: 20,
-          sort_by: this.sortBy,
-          sort_dir: this.sortBy === 'name' ? 'asc' : 'desc'
-        };
-        if (this.statusFilter) paramsObj.status = this.statusFilter;
-        if (this.searchQuery) paramsObj.search = this.searchQuery;
-
-        let data = await Platform.fetch.get('/dashboard/api/vendor-analyses', paramsObj, {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          silent: true
-        });
-        this.analyses = data.analyses || [];
-        this.summary = data.summary || this.summary;
-        this.pagination = data.pagination || this.pagination;
-      } catch (e) {
-        Platform.toast.error(e.message || 'Failed to load vendor analyses');
-      } finally {
-        this.loading = false;
-        this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
-      }
-    },
-
-    paginationRange() {
-      let pages = this.pagination.pages;
-      let current = this.pagination.page;
-      if (pages <= 7) {
-        let arr = [];
-        for (let i = 1; i <= pages; i++) arr.push(i);
-        return arr;
-      }
-      let range = [1];
-      if (current > 3) range.push('...');
-      for (let j = Math.max(2, current - 1); j <= Math.min(pages - 1, current + 1); j++) range.push(j);
-      if (current < pages - 2) range.push('...');
-      range.push(pages);
-      return range;
-    },
-
-    confirmDelete(id, name) {
-      this.deleteTarget = id;
-      this.deleteTargetName = name;
-    },
-
-    async executeDelete() {
-      if (!this.deleteTarget) return;
-      try {
-        await Platform.fetch.delete('/dashboard/api/vendor-analysis/' + this.deleteTarget, {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          silent: true
-        });
-        this.deleteTarget = null;
-        this.deleteTargetName = '';
-        await this.loadAnalyses(this.pagination.page);
-      } catch (e) {
-        Platform.toast.error(e.message || 'Failed to delete vendor analysis');
-      }
-    }
-  };
-}
-</script>
 {% endblock %}

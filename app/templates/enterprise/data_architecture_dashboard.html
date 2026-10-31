@@ -2,6 +2,8 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/answer_cascade.html' import answer_cascade %}
 
 {% block title %}Data Architecture Dashboard{% endblock %}
 
@@ -40,6 +42,44 @@
         {{ metrics_card(title='Data Lineage Flows', value=data_lineage_count|dash, icon='git-merge') }}
     </div>
 
+    {% if overview %}
+    <section class="space-y-2" aria-labelledby="data-entities-heading" data-testid="data-entities">
+        <h2 id="data-entities-heading" class="text-lg font-semibold">Data entities</h2>
+        {% if overview.entities %}
+        <p class="text-sm text-muted-foreground"><span data-testid="data-entity-count">{{ overview.entity_count }} {{ 'entity' if overview.entity_count == 1 else 'entities' }}</span>, each with the applications that create, read, update or delete it and who is accountable for it. <a class="text-primary underline underline-offset-2" data-testid="data-entities-link" href="{{ url_for('data_architecture.data_entity_catalog') }}">See every entity</a></p>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="data-entities-none">Your organisation has not recorded the data it holds yet. <a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.create_data_entity') }}">Add a data entity</a>, such as customers or invoices, then record which applications create, read, update or delete it.</p>
+        {% endif %}
+    </section>
+
+    {% if flow %}
+    <section id="data-flow" class="space-y-2" aria-labelledby="data-flow-heading" data-testid="data-flow"
+             x-data='{ flowRows: {{ flow.nodes | tojson }}, flowRoot: {{ flow.entity.name | tojson }}, flowQuestion: {{ ("Where does " ~ flow.entity.name ~ " data flow, and who is accountable at each step?") | tojson }} }'>
+        <h2 id="data-flow-heading" class="text-lg font-semibold">Where {{ flow.entity.name }} flows</h2>
+        <p class="text-sm text-muted-foreground" data-testid="data-flow-summary">{{ flow.recorded }} {{ 'step' if flow.recorded == 1 else 'steps' }} recorded in the model{% if flow.worked_out %}, {{ flow.worked_out }} worked out from them{% endif %}. Open the dot beside a step for its source. Another entity's flow opens from its row in <a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.data_entity_catalog') }}">the entity list</a>.</p>
+        {{ answer_cascade('data-flow-cascade', question='flowQuestion', rows='flowRows', root='flowRoot', row_attrs='data-flow-hop') }}
+    </section>
+    {% endif %}
+
+    <section class="space-y-2" aria-labelledby="personal-data-heading" data-testid="personal-data-applications">
+        <h2 id="personal-data-heading" class="text-lg font-semibold">Applications that handle personal data</h2>
+        {% if overview.personal_data_applications %}
+        <p class="text-sm text-muted-foreground">Every application recorded as using an entity marked as personal data.</p>
+        <ul class="divide-y divide-border rounded-lg border border-border bg-card" data-testid="personal-data-list">
+            {% for app in overview.personal_data_applications %}
+            <li class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-testid="personal-data-application">
+                {% set _h = row_href('unified_applications.application_detail', id=app.application_id)|trim if app.application_id else '' %}
+                <span class="text-sm font-medium text-foreground">{% if _h %}<a class="hover:underline underline-offset-4" href="{{ _h }}">{{ app.name }}</a>{% else %}{{ app.name }}{% endif %}</span>
+                <span class="flex flex-wrap gap-1">{% for name in app.entities %}{% call badge(variant='secondary') %}{{ name }}{% endcall %}{% endfor %}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="personal-data-none">No application is recorded as using personal data. Mark an entity as personal data on its edit page, and record which applications use it.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
     <!-- Quick Actions -->
     <div class="rounded-xl border-2 border-input bg-background p-6">
         <h2 class="text-xl font-semibold mb-6">Quick Actions</h2>
@@ -52,11 +92,11 @@
                 <i data-lucide="git-merge" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">Data Lineage</span>
             </a>
-            <span class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-muted/30 cursor-not-allowed opacity-60" title="Coming soon">
+            <span class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-muted/30 cursor-not-allowed" title="Coming soon">
                 <i data-lucide="bar-chart" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium text-muted-foreground">Analytics</span>
             </span>
-            <span class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-muted/30 cursor-not-allowed opacity-60" title="Coming soon">
+            <span class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-muted/30 cursor-not-allowed" title="Coming soon">
                 <i data-lucide="settings" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium text-muted-foreground">Settings</span>
             </span>
@@ -71,7 +111,7 @@
                 <p class="text-sm text-muted-foreground mt-1">Technical capabilities and products powering the data ecosystem</p>
             </div>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Data architecture capabilities">
             <table class="dense-table w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input">
                     <tr>

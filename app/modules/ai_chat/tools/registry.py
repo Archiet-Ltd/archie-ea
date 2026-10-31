@@ -746,7 +746,8 @@ TOOL_SCHEMAS = [
             "address. Use this for 'what breaks if X fails' (question=impact, with "
             "element_id), 'what breaks if these fail together' (question=set_impact, "
             "with element_ids or a filter) and 'which risks reach X' "
-            "(question=risk_propagation, with element_id). Read-only: the answer is "
+            "(question=risk_propagation, with element_id) and 'where does this data go' "
+            "(question=data_flow, with the data object's element_id). Read-only: the answer is "
             "stored as an immutable snapshot, nothing in the model changes. State "
             "only what the returned rows say, and name the records they name."
         ),
@@ -755,7 +756,7 @@ TOOL_SCHEMAS = [
             "properties": {
                 "question": {
                     "type": "string",
-                    "enum": ["impact", "set_impact", "risk_propagation"],
+                    "enum": ["impact", "set_impact", "risk_propagation", "data_flow"],
                     "description": "Which question to answer",
                 },
                 "element_id": {
@@ -786,6 +787,68 @@ TOOL_SCHEMAS = [
                 },
             },
             "required": ["question"],
+        },
+        "tier": "auto",
+    },
+    {
+        "name": "get_genome_slice",
+        "surfaces": ["chat", "mcp"],
+        "route": "app.modules.genome.slices.registry.get_slice",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Read one domain of the organisation's model as citeable facts: 'business' "
+            "(capabilities, the applications that support each, and which capabilities "
+            "nothing supports), 'implementation' (plateaus and work packages, with the "
+            "capability each work package changes), 'security' (controls bound to "
+            "requirements) or 'ai_systems'. The same facts the Capability Coverage page "
+            "and the roadmap show. Every node has an id such as business:cap:7; cite each "
+            "record you state as [ref:<node id>] and the page shows its name as a link. "
+            "State only what the nodes say. Read-only."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "enum": ["business", "implementation", "security", "ai_systems"],
+                    "description": "Which domain of the model to read",
+                },
+                "focus_ids": {
+                    "type": "array",
+                    "items": {"type": ["string", "integer"]},
+                    "maxItems": 20,
+                    "description": "Optional node ids (business:cap:7) or element ids to centre on",
+                },
+                "depth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2,
+                    "description": "Links to follow from the focus, 0 to 2 (default 1)",
+                },
+                "filters": {
+                    "type": "object",
+                    "description": "Optional filters the domain declares (kind, status, supported, framework)",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["cap", "app", "plateau", "wp", "control", "system"]},
+                        "supported": {"type": "boolean"},
+                        "status": {"type": "string", "maxLength": 40},
+                        "framework": {"type": "string", "maxLength": 40},
+                        "risk_class": {"type": "string", "maxLength": 40},
+                    },
+                    "additionalProperties": False,
+                },
+                "budget_tokens": {
+                    "type": "integer",
+                    "minimum": 500,
+                    "maximum": 6000,
+                    "description": "Size of the result, default 3000",
+                },
+            },
+            "required": ["domain"],
+            "additionalProperties": False,
         },
         "tier": "auto",
     },
@@ -1209,6 +1272,40 @@ TOOL_SCHEMAS = [
                     "default": False,
                 },
             },
+        },
+        "tier": "auto",
+    },
+    {
+        # Vendor detection: the products a person names are proposed into the approvals inbox, one per
+        # catalogue product, with their words as the evidence. Proposing writes no vendor, product or
+        # application; approving a proposal does (app/services/vendor_detection.py).
+        "name": "propose_vendors",
+        "surfaces": ["chat"],
+        "route": "vendor_detection.propose_from_names",
+        "fenced_fields": [],
+        "risk_class": "propose",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Propose the vendor products the user says the organisation uses (for example 'we use Okta, "
+            "Slack and Datadog'). Pass each product name as the user wrote it. Each one in the vendor "
+            "catalogue is queued in the approvals inbox for a person to confirm; nothing is recorded until "
+            "it is approved. Names not in the catalogue are returned so you can say so."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "The product names the user gave, e.g. ['Okta', 'Slack', 'Datadog'].",
+                },
+                "request": {
+                    "type": "string",
+                    "description": "The user's words, kept as the evidence for each proposal.",
+                },
+            },
+            "required": ["names"],
         },
         "tier": "auto",
     },
@@ -1912,6 +2009,38 @@ TOOL_SCHEMAS.extend([
             "answer for an ArchiMate element: the rows downstream, with their "
             "truth class, confidence, citations and the date it was worked out, "
             "at a permanent address."
+        ),
+    },
+    {
+        # Two reads behind one name. With an element_id it returns the stored
+        # data-flow answer envelope from the answer service, as ask_impact does;
+        # without one, the organisation's data entities and the applications
+        # that handle personal data, from the data architecture route.
+        **_route_read_tool(
+            "ask_data_flow",
+            "GET /architecture/api/data-flows",
+            "",
+            {
+                "type": "object",
+                "properties": {
+                    "element_id": {
+                        "type": "integer",
+                        "description": (
+                            "The data object's ArchiMate element id (each entity in the "
+                            "list carries it). Omit it to list the entities."
+                        ),
+                    },
+                },
+            },
+        ),
+        "description": (
+            "Ask where data flows and who is accountable at each step. Without an "
+            "element_id: every data entity, whether it holds personal data, the "
+            "applications that create, read, update or delete it, its owner and "
+            "steward, and which applications handle personal data. With a data "
+            "object's element_id: the flow hop by hop (the applications that write "
+            "it, those that read it, the copies lineage records), each hop with its "
+            "owner and source, recorded or worked out, at a permanent address."
         ),
     },
     _route_read_tool(

@@ -215,7 +215,7 @@ class StrategicInitiative(TenantMixin, db.Model):
             "budget_remaining": self.budget_remaining,
             "budget_utilization_percentage": self.budget_utilization_percentage,
             "owner_id": self.owner_id,
-            "owner_name": self.owner.username if self.owner else None,
+            "owner_name": self.owner.full_name() if self.owner else None,
             "business_value_score": self.business_value_score,
             "risk_level": self.risk_level,
             "strategic_alignment": self.get_strategic_alignment_list(),

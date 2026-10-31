@@ -162,7 +162,10 @@ class TestIndexHtmlNewTabs:
         # per-tab-button assertion (every <button> declares type=) no longer
         # applies since there is no longer a button row — check the <select>
         # that replaced it is properly labelled instead.
-        assert 'id="capability-lens"' in index_html_text
+        # The select is now drawn by the native_select macro, so the id is a
+        # macro argument (id='capability-lens') rather than a literal attribute.
+        import re
+        assert re.search(r"""id=['"]capability-lens['"]""", index_html_text)
         assert 'for="capability-lens"' in index_html_text
 
     def test_new_scripts_are_included(self, index_html_text):
@@ -185,8 +188,9 @@ class TestIndexHtmlNewTabs:
 
 class TestInvestmentMatrixBubbleChart:
     def test_keeps_existing_table(self, investment_matrix_text):
-        assert "All Capabilities" in investment_matrix_text
-        assert "<table" in investment_matrix_text
+        # The table of every capability is the shared list table now.
+        assert "caption='All capabilities'" in investment_matrix_text
+        assert "list_table(rows=caps" in investment_matrix_text
         assert "cap.strategic_importance" in investment_matrix_text
 
     def test_adds_bubble_canvas_and_script(self, investment_matrix_text):
@@ -201,5 +205,12 @@ class TestInvestmentMatrixBubbleChart:
         assert CHART_JS_SRC in investment_matrix_text
 
     def test_has_quadrant_legend(self, investment_matrix_text):
-        for label in ("Invest", "Migrate", "Tolerate", "Eliminate"):
-            assert label in investment_matrix_text
+        # The key for the bubble colours is Chart.js's own legend, drawn from one
+        # dataset per TIME quadrant (labelled Invest, Migrate, Tolerate,
+        # Eliminate), rather than a hand-drawn legend beside the canvas.
+        js = INVESTMENT_BUBBLE_JS.read_text(encoding="utf-8")
+        for quadrant in ("INVEST", "MIGRATE", "TOLERATE", "ELIMINATE"):
+            assert quadrant + ":" in js
+        assert "label: q.charAt(0) + q.slice(1).toLowerCase()" in js
+        assert "legend: { position: 'bottom' }" in js
+        assert "js/capability_map/investment_bubble.js" in investment_matrix_text

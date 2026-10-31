@@ -1,154 +1,107 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'components/empty_state.html' import empty_state %}
-{% block title %}License Entitlements{% endblock %}
+{% from 'basecoat/table.html' import table_cell %}
+{% block title %}Licences{% endblock %}
+
+{% macro _actions() %}
+<div class="flex flex-wrap items-center gap-2">
+  {% call ui.button(href=url_for('procurement.compliance_dashboard'), variant='outline') %}{{ lucide('shield-check') }}Compliance{% endcall %}
+  {% if may_open_procurement() %}
+  {% call ui.button(href=url_for('procurement.license_create')) %}{{ lucide('plus') }}New licence{% endcall %}
+  {% endif %}
+</div>
+{% endmacro %}
 
 {% block content %}
 <div class="p-6 space-y-6">
-    {{ page_header(
-        title='License Entitlements',
-        description='Track software licenses and utilization',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'License Entitlements'}
-        ],
-        actions=(
-            [{'text': 'New Licence', 'icon': 'plus', 'href': url_for('procurement.license_create'), 'variant': 'default'},
-             {'text': 'Compliance Status', 'icon': 'shield-check', 'href': url_for('procurement.compliance_dashboard'), 'variant': 'outline'}] if may_open_procurement() else []
-        )
-    ) }}
+{{ page_shell(title='Licences', subtitle='What each licence entitles you to, how much of it is in use and whether it is within its terms',
+              breadcrumb=[('Home', url_for('main.index')), ('Contracts and licences', url_for('procurement.contracts_list')), ('Licences', none)],
+              actions_caller=_actions) }}
 
-    {% if licenses %}
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4"
-         x-data="{
-            open: false,
-            loading: false,
-            error: null,
-            position: null,
-            generate() {
-                const self = this;
-                this.loading = true;
-                this.error = null;
-                return Platform.fetch('{{ url_for('procurement.licenses_ai_position') }}', {
-                        method: 'POST',
-                        silent: true
-                    })
-                    .then(function (body) {
-                        self.position = body.position;
-                        self.loading = false;
-                    })
-                    .catch(function (e) {
-                        self.position = null;
-                        self.error = e.message || 'AI licence position failed - check your connection and try again.';
-                        self.loading = false;
-                    });
-            }
-         }">
-        <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Licence Position (AI)</h2>
-            <button type="button" @click="open = !open; if (open && !position && !loading) generate()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <i data-lucide="sparkles" class="w-4 h-4"></i>
-                <span x-text="open ? 'Hide' : 'Generate position'"></span>
-            </button>
+{% if licenses %}
+{% call ui.card(attrs={'data-testid': 'licence-position',
+                       'x-data': "{ open: false, loading: false, error: null, position: null,
+                         generate() { const self = this; this.loading = true; this.error = null;
+                           return Platform.fetch('" ~ url_for('procurement.licenses_ai_position') ~ "', { method: 'POST', silent: true })
+                             .then(function (body) { self.position = body.position; self.loading = false; })
+                             .catch(function (e) { self.position = null; self.error = e.message || 'The licence position could not be written. Check your connection and try again.'; self.loading = false; }); } }"}) %}
+  {% call ui.card_header() %}
+    {{ ui.card_title('Licence position', tag='h2') }}
+    {{ ui.card_description('A short reading of where you are over or under your entitlements, written by the AI from the licences below') }}
+    {% call ui.card_action() %}
+      {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'open = !open; if (open && !position && !loading) generate()'}) %}
+        {{ lucide('sparkles') }}<span x-text="open ? 'Hide' : 'Write the position'">Write the position</span>
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {% call ui.card_content(attrs={'x-show': 'open', 'x-cloak': ''}) %}
+    <div class="space-y-4 text-sm">
+      <p x-show="loading" class="flex items-center gap-2 text-muted-foreground">{{ lucide('loader-circle', class_name='size-4 animate-spin') }}Reading your licences</p>
+      <p x-show="error" x-text="error" class="text-destructive"></p>
+      <template x-if="position">
+        <div class="space-y-4">
+          <p x-text="position.summary" class="leading-relaxed"></p>
+          <div x-show="position.anomalies && position.anomalies.length" class="space-y-1">
+            <p class="font-medium">Worth a look</p>
+            <ul class="list-disc space-y-1 pl-5 text-muted-foreground">
+              <template x-for="a in position.anomalies" :key="a"><li x-text="a"></li></template>
+            </ul>
+          </div>
+          <div x-show="position.recommended_actions && position.recommended_actions.length" class="space-y-1">
+            <p class="font-medium">What to do</p>
+            <ul class="list-disc space-y-1 pl-5 text-muted-foreground">
+              <template x-for="a in position.recommended_actions" :key="a"><li x-text="a"></li></template>
+            </ul>
+          </div>
         </div>
-
-        <div x-show="open" x-cloak class="space-y-3">
-            <div x-show="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
-                <span class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-                Generating licence position…
-            </div>
-            <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
-            <template x-if="position">
-                <div class="space-y-3 text-sm">
-                    <p x-text="position.summary"></p>
-                    <div x-show="position.anomalies && position.anomalies.length">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Anomalies</div>
-                        <ul class="list-disc list-inside space-y-0.5">
-                            <template x-for="a in position.anomalies" :key="a"><li x-text="a"></li></template>
-                        </ul>
-                    </div>
-                    <div x-show="position.recommended_actions && position.recommended_actions.length">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recommended actions</div>
-                        <ul class="list-disc list-inside space-y-0.5">
-                            <template x-for="a in position.recommended_actions" :key="a"><li x-text="a"></li></template>
-                        </ul>
-                    </div>
-                </div>
-            </template>
-        </div>
+      </template>
     </div>
+  {% endcall %}
+{% endcall %}
 
-    <div class="bg-card border border-border rounded-lg overflow-hidden">
-        <div class="overflow-x-auto">
-        <table class="dense-table w-full border-collapse">
-            <thead>
-                <tr class="bg-muted/40 border-b">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Product</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Entitled</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Consumed</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Used</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Utilization</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y">
-                {% for license in licenses %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                        <div class="font-medium">{{ license.product_name }}</div>
-                        <div class="text-sm text-muted-foreground">{{ license.license_type or '—' }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm">{{ license.vendor.name if license.vendor else '—' }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_entitled if license.quantity_entitled is not none else '—' }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_deployed if license.quantity_deployed is not none else '—' }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_used if license.quantity_used is not none else '—' }}</td>
-                    <td class="px-4 py-3 text-center">
-                        {% if license.quantity_deployed is none or not license.quantity_entitled %}
-                        <span class="text-sm text-muted-foreground">—</span>
-                        {% else %}
-                        {% set util = license.quantity_deployed / license.quantity_entitled * 100 %}
-                        <div class="flex items-center justify-center gap-2">
-                            <div class="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                <div class="h-full rounded-full
-                                    {% if util > 100 %}bg-destructive
-                                    {% elif util > 90 %}bg-warning
-                                    {% else %}bg-success{% endif %}"
-                                     style="width: {{ [util, 100]|min }}%"></div>
-                            </div>
-                            <span class="text-sm">{{ "{:.0f}".format(util) }}%</span>
-                        </div>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                            {% if license.compliance_status == 'compliant' %}bg-success/10 text-success-emphasis
-                            {% elif license.compliance_status == 'warning' %}bg-warning/10 text-warning-emphasis
-                            {% elif not license.compliance_status %}bg-muted text-muted-foreground
-                            {% else %}bg-destructive/10 text-destructive-emphasis{% endif %}">
-                            {# Stored snake_case; render as words. 'over_deployed' was shown verbatim. #}
-                    {{ (license.compliance_status or 'unknown') | replace('_', ' ') | title }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}"
-                           class="text-primary hover:underline text-sm">View</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
-    </div>
-    {% else %}
-    {{ empty_state(
-        icon='key',
-        title='No license entitlements',
-        description='License tracking data will appear here once imported.'
-    ) }}
-    {% endif %}
+{% set _cols = [('Licence', ''), ('Vendor', ''),
+                {'label': 'Entitled', 'align': 'right', 'sortable': true}, {'label': 'Deployed', 'align': 'right', 'sortable': true},
+                {'label': 'Used', 'align': 'right', 'sortable': true}, {'label': 'In use', 'align': 'right', 'sortable': true},
+                ('Status', ''), {'label': '', 'class': 'w-12'}] %}
+{% call(license) list_table(rows=licenses, columns=_cols, caption='Licence entitlements', testid='licenses-table', row_testid='license-row',
+                            search_placeholder='Filter licences...', toolbar=true) %}
+  {% call table_cell() %}
+    <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}" class="font-medium text-foreground hover:underline" data-testid="license-link">{{ license.product_name }}</a>
+    {% if license.license_type %}<span class="block text-xs text-muted-foreground">{{ license.license_type|replace('_', ' ')|capitalize }}</span>{% endif %}
+  {% endcall %}
+  {% call table_cell() %}{{ value_or_unset(license.vendor.name if license.vendor else none) }}{% endcall %}
+  {% for q in (license.quantity_entitled, license.quantity_deployed, license.quantity_used) %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': q if q is not none else -1}) %}{{ value_or_unset(q) }}{% endcall %}
+  {% endfor %}
+  {% set util = (license.quantity_deployed / license.quantity_entitled * 100) if (license.quantity_deployed is not none and license.quantity_entitled) else none %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': util if util is not none else -1}) %}
+    {% if util is none %}{{ value_or_unset(none, 'Not measured') }}{% else %}{{ '%.0f'|format(util) }}%{% endif %}
+  {% endcall %}
+  {% call table_cell() %}
+    {% if license.compliance_status %}
+      {{ state_badge(license.compliance_status|replace('_', ' ')|capitalize,
+                     tone={'compliant': 'positive', 'under_utilized': 'caution'}.get(license.compliance_status, 'negative')) }}
+    {% else %}{{ value_or_unset(none, 'Not checked') }}{% endif %}
+  {% endcall %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% call row_actions('Actions for ' ~ license.product_name) %}
+      {{ row_action('Open licence', href=url_for('procurement.license_detail', license_id=license.id), testid='license-open') }}
+      {% if may_open_procurement() %}{{ row_action('Edit licence', href=url_for('procurement.license_edit', license_id=license.id), testid='license-edit') }}{% endif %}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+{% else %}
+{% call ui.card(attrs={'data-testid': 'licenses-empty'}) %}
+  {{ empty_state(icon='key-round', title='No licences yet',
+                 description='Record a licence against its contract and this page shows how much of it is in use and whether you are within its terms.',
+                 cta_text=('New licence' if may_open_procurement() else none), cta_icon='plus',
+                 cta_href=(url_for('procurement.license_create') if may_open_procurement() else none)) }}
+{% endcall %}
+{% endif %}
 </div>
-<script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 {% endblock %}

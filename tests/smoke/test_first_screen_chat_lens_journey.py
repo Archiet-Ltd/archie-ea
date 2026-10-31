@@ -14,7 +14,12 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
-from .test_sign_up_first_screen_journey import SIZES, _assert_persona, _sign_up
+from .test_sign_up_first_screen_journey import SIZES, _skip_to_the_dashboard
+from .test_signup_brings_the_company_in_journey import (  # noqa: F401  (people is a fixture)
+    assert_is_a_startup_cto_not_an_administrator,
+    people,
+    sign_up,
+)
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -26,20 +31,22 @@ def _new_page(browser, viewport):
 
 
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
-def test_first_screen_offers_the_sample_once_and_says_nothing_about_the_server(browser, live_server, name, viewport):
+def test_first_screen_offers_the_sample_once_and_says_nothing_about_the_server(browser, live_server, people, app, name, viewport):
     context, page = _new_page(browser, viewport)
     try:
-        email = _sign_up(page, live_server)
-        _assert_persona(email)
+        email, _ = sign_up(page, live_server, people)
+        assert_is_a_startup_cto_not_an_administrator(app, email)
+        _skip_to_the_dashboard(page)
         # the page sign-up lands on carries the flash, so read it before navigating again
         page.wait_for_load_state("networkidle")
         landed = page.locator("body").inner_text()
         assert "server" not in landed.lower(), landed
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("chat-first-sample")).to_be_visible()
         body = page.locator("body").inner_text()
-        # one sample control, inside the card, and no second "Load sample" further down
-        assert page.locator('[data-testid="first-action-sample"]').count() == 1
-        assert page.locator('[data-testid="first-message"] [data-testid="first-action-sample"]').count() == 1
+        # one sample control, inside the first steps, and no second "Load sample" further down
+        assert page.locator('[data-testid="chat-first-sample"]').count() == 1
+        assert page.locator('[data-testid="startup-first-steps"] [data-testid="chat-first-sample"]').count() == 1
         assert page.get_by_role("button", name=re.compile("sample", re.I)).count() == 1
         assert "Load sample" not in body
         # no flash or any text names the server's mail settings
@@ -50,13 +57,14 @@ def test_first_screen_offers_the_sample_once_and_says_nothing_about_the_server(b
 
 
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
-def test_chat_opens_in_the_ctos_lens_with_a_one_line_toolbar(browser, live_server, name, viewport):
+def test_chat_opens_in_the_ctos_lens_with_a_one_line_toolbar(browser, live_server, people, app, name, viewport):
     context, page = _new_page(browser, viewport)
     try:
-        email = _sign_up(page, live_server)
-        _assert_persona(email)
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.locator('[data-testid="first-action-sample"]').click()
+        email, _ = sign_up(page, live_server, people)
+        assert_is_a_startup_cto_not_an_administrator(app, email)
+        _skip_to_the_dashboard(page)
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("chat-first-sample").click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
         # the dashboard's question line is in the body font, not a serif italic

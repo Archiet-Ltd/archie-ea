@@ -112,7 +112,8 @@ WORK: tuple = (
               aliases=("Application portfolio", "Services", "Owners", "Ownership", "Inventory", "Library")),
            _l("portfolio", "Portfolio", "unified_applications.rationalization_dashboard", job="1",
               aliases=("Rationalisation", "Rationalization", "Portfolio KPIs", "Application rationalisation",
-                       "Consolidation", "Savings")),
+                       "Consolidation", "Savings", "Gap findings"),
+              owns=("unified_applications.rationalization_",)),
            _l("data_register", "Data register", "data_architecture.data_entity_catalog", job="1",
               aliases=("Data entities", "Data catalogue", "Data objects", "Data model")),
            _l("interfaces", "Interfaces", "interface_register.index", job="1", requires="section:data_integration",
@@ -161,6 +162,8 @@ WORK: tuple = (
               aliases=("Cost", "Spend analytics", "Spend", "Procurement overview", "Vendor spend")),
            _l("vendors", "Vendors", "unified_applications.vendors", job="3", requires="spend_pages",
               aliases=("Suppliers", "Vendor list")),
+           _l("vendor_catalogue", "Vendor catalogue", "unified_applications.vendor_catalogue", job="3",
+              requires="spend_pages", aliases=("Catalogue", "Vendor products", "Product catalogue")),
            # Finance may open licences but not contracts: it is offered the licences page.
            _l("contracts", "Contracts and licences", "procurement.contracts_list", job="3", requires="costs",
               aliases=("Contracts", "Vendor contracts", "Licences", "Licenses", "Software licences"),
@@ -171,7 +174,8 @@ WORK: tuple = (
            _l("investments", "Investments", "enterprise.investment_matrix", job="3",
               aliases=("Investment", "Investment matrix", "Investment priorities", "Investment analysis")),
        ),
-       owns=("procurement.", "formula_register.")),
+       owns=("procurement.", "formula_register.", "unified_applications.vendor_catalogue_product",
+             "unified_applications.vendor_catalogue_link")),
     _l("compliance", "Compliance", "policy_monitoring.policy_dashboard", "shield-check", job="5", toggle=True,
        group="work",
        children=(
@@ -315,6 +319,8 @@ PLATFORM_ADMIN_TOOLS: tuple = (
        requires="platform_admin", aliases=("Prompts", "Solution prompts")),
     _l("errors", "Errors", "error_events.errors_dashboard", "alert-triangle", job="platform",
        requires="platform_admin", aliases=("Error log", "Exceptions")),
+    _l("signups", "Sign-ups", "platform_area.signups", "user-plus", job="platform",
+       requires="platform_admin", aliases=("New accounts", "Registrations", "Sign ups")),
     _l("feature_flags", "Feature flags", "admin.feature_flags", "toggle-right", job="platform",
        requires="platform_admin", aliases=("Flags", "Features")),
     _l("platform_health", "Platform health", "service_status.status_page", "activity", job="platform",
@@ -375,7 +381,6 @@ _CATALOGUE_HOME = (
     ("industry_apqc.", "systems"),
     ("architect_ui.roadmap_builder", "changes"),
     ("architect_ui.architecture_assistant", "changes"),
-    ("main.agentic_gaps_ui", "changes"),
     ("main.ea_workflows_dashboard", "changes"),
     ("roadmap_outcome.", "changes"),
     ("main.archimate_roadmap", "changes"),
@@ -525,8 +530,10 @@ def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: N
             child_url = href(child_link) if child_link else None
             if child_url:
                 here = _here(child_link, endpoint, values)
+                # a page the item holds (a Portfolio tab) lights the item; only its own page is current
+                held = bool(child.owns) and endpoint is not None and _holds(child, endpoint)
                 children.append(SidebarItem(child_link.key, child_link.label, child_url, None, child.job,
-                                            active=here, current=here))
+                                            active=here or held, current=here))
         if not children:
             return None
         in_entry = (current_entry is not None and current_entry.key == link.key) or any(c.current for c in children)
@@ -747,20 +754,23 @@ def search_pages(user, query: str, limit: int = 12) -> list:
     for order, row in enumerate(search_index(user)):
         best_exact = -1
         best_fuzzy = -1
+        whole = False
         for rank, term in enumerate(row["terms"]):
             t = normalise_search_text(term)
             exact, fuzzy = fuzzy_match_score(q, t)
             if exact == 0 and fuzzy == 0:
                 continue
+            # a name or alias that is the whole query ("Integrations") beats one that only holds it
+            whole = whole or t == q
             # Exact matches rank first (higher exact = better), then fuzzy matches
             # Within same match type, prefer earlier terms (lower rank)
             score = (-exact, -fuzzy, rank)
             if best_exact == -1 or score < ( -best_exact, -best_fuzzy, 999):
                 best_exact, best_fuzzy = exact, fuzzy
         if best_exact != -1:
-            scored.append((-best_exact, -best_fuzzy, order, row))
-    scored.sort()
-    return [row for _, _, _, row in scored[:limit]]
+            scored.append((-best_exact, not whole, -best_fuzzy, order, row))
+    scored.sort(key=lambda item: item[:4])
+    return [item[-1] for item in scored[:limit]]
 
 
 # ── Breadcrumbs ──────────────────────────────────────────────────────────────────────────
@@ -782,6 +792,64 @@ def trail(user, endpoint: str | None) -> list:
         return []
     return [{"label": entry.label, "href": href(chosen) if chosen is not None else None}]
 
+
+
+def _holds(link: NavLink, endpoint: str) -> bool:
+    # an entry that is a filtered view of a shared page (a layer of the model) does not own that page
+    if endpoint == link.endpoint and not link.url_values or (link.fallback is not None and endpoint == link.fallback.endpoint):
+        return True
+    return endpoint in link.owns or any(o.endswith((".", "_")) and endpoint.startswith(o) for o in link.owns)
+
+
+def filter_keys() -> set:
+    """The query keys a sidebar item filters a shared page by (layer, element type, viewpoint ...)."""
+    keys = set()
+
+    def walk(links):
+        for link in links:
+            keys.update(k for k, _ in link.url_values)
+            walk(link.children)
+
+    walk(ALL_ENTRIES)
+    return keys
+
+
+def page_trail(user, endpoint: str | None, args=None) -> list:
+    """[(label, href)] for where a page sits in the sidebar: its section, then its entry.
+
+    The page header puts Home in front and the page itself (or the record it shows) at the end,
+    so every breadcrumb reads the way the sidebar is laid out. A section such as Spend has no
+    page of its own, so it carries no link. Empty for Home and for pages the sidebar does not hold.
+    """
+    # A filtered view of a shared page (a layer of the model) sits where the sidebar item with that
+    # filter sits, not under the entry that owns the unfiltered page.
+    if args:
+        for parent in ALL_ENTRIES:
+            for c in parent.children if parent.toggle else ():
+                if c.url_values and c.endpoint == endpoint and all(args.get(k) == str(v) for k, v in c.url_values):
+                    chosen = resolve(user, c)
+                    return [(sentence_case(parent.label), None),
+                            (sentence_case(c.label), href(chosen) if chosen is not None else None)]
+    entry = entry_for_endpoint(endpoint)
+    if entry is None or entry.key == "home":
+        return []
+    if entry is _MODEL_ROOT:
+        # a model page the sidebar draws under a layer (Strategy > Value stream) sits there
+        for layer in MODEL:
+            child = next((c for c in layer.children if _holds(c, endpoint)), None) if layer.toggle else None
+            if child is not None:
+                chosen = resolve(user, child)
+                return [(sentence_case(layer.label), None),
+                        (sentence_case(child.label), href(chosen) if chosen is not None else None)]
+    if not entry.toggle:
+        chosen = resolve(user, entry)
+        return [(sentence_case(entry.label), href(chosen) if chosen is not None else None)]
+    crumbs = [(sentence_case(entry.label), None)]
+    child = next((c for c in entry.children if _holds(c, endpoint)), None)
+    if child is not None:
+        chosen = resolve(user, child)
+        crumbs.append((sentence_case(child.label), href(chosen) if chosen is not None else None))
+    return crumbs
 
 # ── Stage awareness ──────────────────────────────────────────────────────────────────────
 def has_connected_source(org_id) -> bool | None:

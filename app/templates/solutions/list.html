@@ -1,568 +1,319 @@
 {# design-block: data-table #}
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/disabled_action.html' import disabled_action %}
-{% from "components/filter_bar.html" import filter_bar %}
-{% from 'components/status_badge.html' import status_badge, status_badge_auto %}
-{% from "components/sol_confirm_modal.html" import sol_confirm_modal %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_action %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
-{% from 'macros/page_shell.html' import page_shell, stat_card %}
-{% from 'components/dropdown_menu.html' import dropdown_menu %}
-{% from 'components/button.html' import button %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
+{% block title %}Solutions{% endblock %}
 
-{% block title %}All Solutions{% endblock %}
+{#- Header: one primary action (New solution starts a solution through the page's solutionListCompare component), and
+    one "Start from" menu for the other ways in. -#}
+{% macro _solutions_page_actions() %}
+<div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
+  {% call ui.dropdown_menu() %}
+    {% call ui.dropdown_menu_trigger(variant='outline', attrs={'data-testid': 'solutions-more-menu'}) %}Start from{{ lucide('chevron-down') }}{% endcall %}
+    {% call ui.dropdown_menu_content(align='end', class='w-[220px]') %}
+      {{ ui.dropdown_menu_item(text='The architecture journey', href=url_for('architecture_journey.index'), attrs={'data-testid': 'btn-start-journey'}) }}
+      {{ ui.dropdown_menu_item(text='A template', attrs={'data-action': 'open-template-modal', 'data-testid': 'btn-new-from-template'}) }}
+      {% if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions %}
+      {{ ui.dropdown_menu_item(text='The reference catalogue', href=url_for('enterprise_crud.reference_catalog'), attrs={'data-testid': 'btn-reference-catalog'}) }}
+      {% endif %}
+    {% endcall %}
+  {% endcall %}
+  {% call ui.button(type='button', class='bg-primary', attrs={'@click': 'startSolution', ':disabled': 'startingSolution', 'data-testid': 'btn-new-solution', 'aria-label': 'Create a new solution'}) %}{{ lucide('plus') }}New solution{% endcall %}
+</div>
+{% endmacro %}
+
+{% macro _subtitle() %}<span data-testid="programme-solution-relationship">Every solution in design, what is blocking it and the next step</span>{% endmacro %}
+
+{%- set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In review', 'under_review': 'In review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In progress', 'proposed': 'Submitted'} -%}
+
+{#- Created: a period, not a date picker. "Today" is worked out from a stored date and days_until(), the one helper
+    templates have for comparing a date with today. -#}
+{%- set _periods = [] -%}
+{%- set _base = (solutions[0].created_at if solutions and solutions[0].created_at else none) -%}
+{%- if _base -%}
+  {%- set _today = _base.toordinal() - (days_until(_base) or 0) -%}
+  {%- for days, label in [(7, 'Last 7 days'), (30, 'Last 30 days'), (90, 'Last 90 days'), (365, 'Last 12 months')] -%}
+    {%- set _ = _periods.append((_base.fromordinal(_today - days).strftime('%Y-%m-%d'), label)) -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{% macro _filters() %}
+<form method="get" action="{{ request.path }}" class="flex flex-wrap items-center gap-2" data-testid="solutions-filter-form">
+  {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+  {% if selected_workspace %}<input type="hidden" name="status" value="{{ selected_workspace }}">{% endif %}
+  {% if created_before %}<input type="hidden" name="created_before" value="{{ created_before }}">{% endif %}
+  {% if show_all_override %}<input type="hidden" name="bu" value="all">{% endif %}
+  {% if per_page and per_page != 20 %}<input type="hidden" name="per_page" value="{{ per_page }}">{% endif %}
+  {% if not selected_workspace and statuses %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name='status', size='sm', attrs={'aria-label': 'Status', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All statuses', value='') }}
+      {% for st in statuses %}{{ native_select_option(text=(st|replace('_', ' ')|capitalize), value=st, selected=(st == selected_status)) }}{% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
+  {% if domains %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name='domain', size='sm', attrs={'aria-label': 'Domain', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All domains', value='') }}
+      {% for d in domains %}{{ native_select_option(text=d, value=d, selected=(d == selected_domain)) }}{% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
+  {% if solution_types %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name='type', size='sm', attrs={'aria-label': 'Type', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All types', value='') }}
+      {% for t in solution_types %}{{ native_select_option(text=(t|replace('_', ' ')|capitalize), value=t, selected=(t == selected_type)) }}{% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
+  {% if _periods or created_after %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name='created_after', size='sm', attrs={'aria-label': 'Created', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='Created any time', value='') }}
+      {% for value, label in _periods %}{{ native_select_option(text=label, value=value, selected=(value == created_after)) }}{% endfor %}
+      {% if created_after and created_after not in _periods|map('first')|list %}{{ native_select_option(text='Since ' ~ created_after, value=created_after, selected=true) }}{% endif %}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
+  <noscript>{{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}</noscript>
+</form>
+{% endmacro %}
+
+{% macro _select_all() -%}
+<input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all solutions on this page" data-select-all="solution-table">
+{%- endmacro %}
+
+{#- One row's ellipsis menu (the dropdown parts of row_actions, which cannot be used as a call block inside list_table's call block). -#}
+{% macro _row_menu(solution) -%}
+{%- call ui.dropdown_menu() -%}
+  {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ solution.name }}</span>{%- endcall -%}
+  {%- call ui.dropdown_menu_content(align='end', class='w-[190px]') -%}
+    {{ row_action('Open workspace', href=url_for('solution_design.view_solution', solution_id=solution.id)) }}
+    {{ row_action('Traceability', href='/solutions/' ~ solution.id ~ '/traceability') }}
+    {{ row_action('Risk heat map', href='/solutions/' ~ solution.id ~ '/risks/heatmap') }}
+    {% if can_modify_solution(solution) %}{{ row_action('Edit', href=url_for('solution_design.edit_solution', solution_id=solution.id)) }}{% endif %}
+    {{ row_action('Add to comparison', testid='solution-compare-' ~ solution.id) }}
+    {% if can_modify_solution(solution) %}
+    {{ row_action('Delete', action=url_for('solution_design.delete_solution', solution_id=solution.id), destructive=true, separator_before=true,
+                  confirm='Delete "' ~ solution.name ~ '"? This cannot be undone.', testid='solution-delete-' ~ solution.id) }}
+    {% endif %}
+  {%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto max-w-7xl" x-data="solutionListCompare()">
-    {# ─ PAGE HEADER — screen system: one primary action whose label matches
-       where it actually goes. Was: three competing creation CTAs, with the
-       visually-primary one ("New Programme") not matching the page's job
-       (browsing/resuming solutions), and "New Solution" opening a page
-       titled "Architecture Journey" — a label that lied about its
-       destination. ─ #}
-    {% macro _solutions_page_actions() %}
-    <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
-      {# Primary: New solution — creates a Solution directly (POST
-         /architecture-journey/start via the startSolution() Alpine method
-         on this page's x-data). A button that performs an action, not a
-         link to another page, so its label names the action instead of
-         quoting a destination <h1>. #}
-      {{ button(text='New solution', variant='default', size='sm', icon='plus', on_click='startSolution()', testid='btn-new-solution', aria_label='Create a new solution') }}
-      {# Secondary actions: outline buttons, visible 2xl+ #}
-      <div class="hidden 2xl:flex flex-wrap items-center gap-2">
-        {{ button(text='Start Architecture Journey', variant='outline', size='sm', icon='zap', href=url_for('architecture_journey.index'), testid='btn-start-journey', aria_label='Start the guided Architecture Journey to design a new solution') }}
-        {{ button(text='New from Template', variant='outline', size='sm', icon='layout-template', data_action='open-template-modal', testid='btn-new-from-template') }}
-        {% if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions %}
-        {{ button(text='Reference catalogue', variant='outline', size='sm', icon='library', href=url_for('enterprise_crud.reference_catalog'), testid='btn-reference-catalog', aria_label='Browse the reference catalogue of approved, reusable solutions') }}
-        {% endif %}
-      </div>
-      {# Below 2xl: secondary actions in a "More" dropdown #}
-      <div class="2xl:hidden">
-        {{ dropdown_menu(
-            id='solutions-more-menu',
-            trigger_text='More',
-            trigger_icon='more-horizontal',
-            trigger_variant='default',
-            items=[
-                {'text': 'Start Architecture Journey', 'icon': 'zap', 'href': url_for('architecture_journey.index')},
-                {'text': 'New from Template', 'icon': 'layout-template', 'data_action': 'open-template-modal'},
-            ] + ([
-                {'text': 'Reference catalogue', 'icon': 'library', 'href': url_for('enterprise_crud.reference_catalog')},
-            ] if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions else [])
-        ) }}
-      </div>
-    </div>
-    {% endmacro %}
-    {{ page_shell(
-         title="All Solutions",
-         subtitle="Resume solution design work, surface blockers, and launch architect workflows quickly.",
-         breadcrumb=[('Home', url_for('main.index')), ('Solutions', None)],
-         actions_caller=_solutions_page_actions,
-         stack_actions=True
-    ) }}
+<div class="p-6 space-y-6" x-data="solutionListCompare">
+{%- set _truly_empty = not solutions and not load_error and ((hidden_by_role_filter or 0) + (hidden_by_filters or 0)) == 0 -%}
+{{ page_shell(title='Solutions', subtitle_caller=_subtitle, breadcrumb=[('Home', url_for('main.index')), ('Solutions', none)],
+              actions_caller=(none if _truly_empty else _solutions_page_actions)) }}
 
-    {# Programme / Solution relationship — verified against the models: a
-       "Programme" (created via New Programme) is a StrategicInitiative row;
-       the Solution it creates alongside it is linked via
-       Solution.initiative_id, and further solutions can join the same
-       initiative (app/modules/solutions_strategic/v2/services/programme_setup_service.py,
-       _create_initiative_for). The Architecture Journey always designs one
-       Solution end-to-end and does not create an initiative. #}
-    <p class="text-sm text-muted-foreground -mt-4 mb-6" data-testid="programme-solution-relationship">
-        A Programme groups multiple solutions under one shared initiative; the Architecture Journey designs one solution end-to-end.
-    </p>
+{% if solutions %}
+{%- set ws_stats = workspace_stats or {} -%}
+{{ stat_cards([
+    {'label': 'Needs setup', 'value': ws_stats.get('needs_setup', 0), 'icon': 'sparkles', 'href': '?status=needs_setup', 'testid': 'solutions-stat-needs-setup',
+     'sentence': ('Missing a problem statement or capability framing' if ws_stats.get('needs_setup', 0) else 'Every solution has its problem framed')},
+    {'label': 'In design', 'value': ws_stats.get('in_design', 0), 'icon': 'pencil', 'href': '?status=in_design', 'testid': 'solutions-stat-in-design',
+     'sentence': ('Ready for the architect to work on' if ws_stats.get('in_design', 0) else 'Nothing is waiting for design work')},
+    {'label': 'Needs attention', 'value': ws_stats.get('needs_attention', 0), 'icon': 'triangle-alert', 'href': '?status=needs_attention', 'testid': 'solutions-stat-needs-attention',
+     'sentence': ('Open risks or governance gaps' if ws_stats.get('needs_attention', 0) else 'No risks or governance gaps open')},
+    {'label': 'Ready for review', 'value': ws_stats.get('ready_for_review', 0), 'icon': 'badge-check', 'href': '?status=ready_for_review', 'testid': 'solutions-stat-ready',
+     'sentence': ('Strong candidates for the review board' if ws_stats.get('ready_for_review', 0) else 'None is ready for the review board yet')},
+]) }}
 
-    {# ════════════════════════════════════════════════════════════════════════ #}
-    {# EXECUTIVE METRICS                                                        #}
-    {# ════════════════════════════════════════════════════════════════════════ #}
-    {% if solutions %}
-    {% set metric_cards = [
-        {'icon': 'sparkles', 'icon_gradient': 'bg-primary', 'label': 'Needs Setup', 'value': (workspace_stats or {}).get('needs_setup', 0), 'sublabel': 'Missing problem or capability framing', 'status_param': 'needs_setup'},
-        {'icon': 'drafting-compass', 'icon_gradient': 'bg-info', 'label': 'In Design', 'value': (workspace_stats or {}).get('in_design', 0), 'sublabel': 'Ready for architect iteration', 'status_param': 'in_design'},
-        {'icon': 'alert-triangle', 'icon_gradient': 'bg-warning', 'label': 'Needs Attention', 'value': (workspace_stats or {}).get('needs_attention', 0), 'sublabel': 'Risks or governance gaps', 'status_param': 'needs_attention'},
-        {'icon': 'badge-check', 'icon_gradient': 'bg-success', 'label': 'Ready for Review', 'value': (workspace_stats or {}).get('ready_for_review', 0), 'sublabel': 'Strong ARB candidates', 'status_param': 'ready_for_review'}
-    ] %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-      {% for metric in metric_cards %}
-      {{ stat_card(
-           label=metric.label,
-           value=metric.value,
-           hint=metric.sublabel,
-           href='?status=' ~ metric.status_param,
-           icon=metric.icon,
-           icon_bg=metric.icon_gradient,
-           active=(selected_workspace == metric.status_param)
-      ) }}
-      {% endfor %}
-    </div>
-    {% endif %}
+{#- What narrows this list, said once, with the way back. -#}
+{%- set _bucket_labels = {'needs_setup': 'Needs setup', 'in_design': 'In design', 'needs_attention': 'Needs attention', 'ready_for_review': 'Ready for review'} -%}
+{%- set _ws_labels = {'needs_setup': 'need setup', 'in_design': 'are in design', 'needs_attention': 'need attention', 'ready_for_review': 'are ready for review'} -%}
+{% if bu_filter_active and not show_all_override %}
+<p class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-testid="bu-scope-indicator" role="status">
+  {{ lucide('filter') }}Showing {{ bu_name }} only ({{ total_count }} solution{{ 's' if total_count != 1 else '' }}).
+  <a href="{{ request.path }}?bu=all" class="font-medium text-foreground underline underline-offset-4" aria-label="Show all solutions across all business units">Show all business units</a>
+</p>
+{% elif show_all_override %}
+<p class="flex items-center gap-2 text-sm text-muted-foreground" data-testid="bu-scope-indicator-all" role="status">{{ lucide('globe') }}Showing every business unit ({{ total_count }} solution{{ 's' if total_count != 1 else '' }}).</p>
+{% endif %}
 
-
-
-    {% if solutions %}
-    {# Solutions Table Card #}
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-        {# Filter Section #}
-        {% set status_options = [] %}
-        {% for status in statuses or [] %}
-            {% set _ = status_options.append({'value': status, 'label': status|title, 'selected': status == selected_status}) %}
-        {% endfor %}
-        {% set domain_options = [] %}
-        {% for domain in domains or [] %}
-            {% set _ = domain_options.append({'value': domain, 'label': domain, 'selected': domain == selected_domain}) %}
-        {% endfor %}
-        {% set type_options = [] %}
-        {% for solution_type in solution_types or [] %}
-            {% set _ = type_options.append({'value': solution_type, 'label': solution_type|replace('_', ' ')|title, 'selected': solution_type == selected_type}) %}
-        {% endfor %}
-        {{ filter_bar(
-            search_id='searchInput',
-            search_placeholder='Search solutions',
-            search_value=search|default(''),
-            filters=[
-                {'id': 'statusFilter', 'label': 'Status', 'options': status_options},
-                {'id': 'domainFilter', 'label': 'Domain', 'options': domain_options},
-                {'id': 'typeFilter', 'label': 'Type', 'options': type_options}
-            ]
-        ) }}
-        {# Date range filter #}
-        <div class="border px-4 sm:px-6 py-2 border-b bg-muted/20 flex flex-wrap items-center gap-3">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider shrink-0">Created:</span>
-          <div class="flex items-center gap-2">
-            <label for="createdAfterFilter" class="text-xs text-muted-foreground">From</label>
-            <input type="date" id="createdAfterFilter" value="{{ created_after|default('') }}" lang="en-GB"
-                   class="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          </div>
-          <div class="flex items-center gap-2">
-            <label for="createdBeforeFilter" class="text-xs text-muted-foreground">To</label>
-            <input type="date" id="createdBeforeFilter" value="{{ created_before|default('') }}" lang="en-GB"
-                   class="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          </div>
-          {% if created_after or created_before %}
-          <a href="{{ request.path }}?search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}"
-             class="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-1">Clear dates</a>
-          {% endif %}
-          <span class="ml-auto text-xs text-muted-foreground">
-            Showing {{ pagination.total }} solution{{ 's' if pagination.total != 1 else '' }}
-            · Page {{ pagination.page }} of {{ pagination.pages }}
-            {# S-01: never assert completeness while withholding rows. If the
-               default view hid empty draft shells, say so and offer the way to
-               see them, rather than leaving "Page 1 of 1" to imply this is all
-               there is. #}
-            {% if hidden_by_default_filter %}
-            · <a href="{{ url_for('solution_design.list_solutions', status='draft') }}"
-                 class="text-warning-emphasis hover:underline font-medium">{{ hidden_by_default_filter }} empty draft{{ 's' if hidden_by_default_filter != 1 else '' }} hidden</a>
-            {% endif %}
-          </span>
-        </div>
-
-        {# PLT-019: BU scope indicator #}
-        {% if bu_filter_active and not show_all_override %}
-        <div class="flex items-center gap-2 px-4 py-2 border-b bg-primary/5" data-testid="bu-scope-indicator" role="status" aria-live="polite">
-            <i data-lucide="filter" class="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true"></i>
-            <span class="text-xs text-primary font-medium">Showing: {{ bu_name }} ({{ total_count|dash }} solution{{ 's' if total_count != 1 else '' }})</span>
-            <a href="{{ request.path }}?bu=all" class="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2" aria-label="Show all solutions across all business units">Show all</a>
-        </div>
-        {% elif show_all_override %}
-        <div class="flex items-center gap-2 px-4 py-2 border-b bg-muted/30" data-testid="bu-scope-indicator-all" role="status">
-            <i data-lucide="globe" class="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true"></i>
-            <span class="text-xs text-muted-foreground">Showing: All ({{ total_count|dash }} solution{{ 's' if total_count != 1 else '' }})</span>
-        </div>
-        {% endif %}
-
-        {# Worklist filter indicator #}
-        {% if selected_workspace %}
-        {% set _ws_labels = {'needs_setup': 'Needs Setup', 'in_design': 'In Design', 'needs_attention': 'Needs Attention', 'ready_for_review': 'Ready for Review'} %}
-        <div class="flex items-center gap-2 px-4 py-2 border-b bg-warning/10" data-testid="worklist-filter-indicator" role="status" aria-live="polite">
-            <i data-lucide="list-filter" class="h-3.5 w-3.5 text-warning shrink-0" aria-hidden="true"></i>
-            <span class="text-xs text-warning-emphasis font-medium">Filtered by worklist: {{ _ws_labels.get(selected_workspace, selected_workspace) }} ({{ total_count|dash }} solution{{ 's' if total_count != 1 else '' }})</span>
-            <a href="{{ request.path }}" class="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2" aria-label="Clear worklist filter">Clear filter</a>
-        </div>
-        {% endif %}
-
-        {# Bulk Actions Bar #}
-        <div data-bulk-actions="solution-table" class="border hidden sticky top-0 z-20 px-5 py-2 border-b border-border/50 bg-primary/10 flex items-center gap-3">
-          <span class="text-sm font-medium text-foreground" data-selected-count="solution-table"></span>
-          {# Select-all-pages banner — shown when user checks the header checkbox on a filtered/paginated view #}
-          {% if total_count is defined %}
-          <span id="sol-select-all-pages-banner" class="hidden text-xs text-primary font-medium">
-            <button type="button" id="sol-select-all-pages-btn" class="underline underline-offset-2 hover:text-primary/80 transition-colors">
-              Select all {{ total_count|dash }} solution{{ 's' if total_count != 1 else '' }} matching this filter
-            </button>
-            <span id="sol-all-pages-active-label" class="hidden ml-1 text-muted-foreground">(all selected — delete will affect all {{ total_count|dash }})</span>
-          </span>
-          {% endif %}
-          <div class="flex items-center gap-2 ml-auto">
-              <button type="button" id="compareSolutionsBtn" @click="openSolutionCompare()" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border border-border/50 bg-card hover:bg-accent transition-colors" aria-label="Compare selected" title="Select 2 or 3 solutions to compare">
-                <i data-lucide="git-compare" class="h-3.5 w-3.5" aria-hidden="true"></i>Compare
-              </button>
-              <button type="button" data-action="bulk-export-solutions"
-                      class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border border-border/50 bg-card hover:bg-accent transition-colors" aria-label="Export selected">
-                <i data-lucide="download" class="h-3.5 w-3.5" aria-hidden="true"></i>Export
-              </button>
-              <button type="button" data-action="bulk-delete-solutions"
-                      class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border border-destructive/30 bg-card hover:bg-destructive/10 text-destructive-emphasis transition-colors" aria-label="Delete selected">
-                <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>Delete
-              </button>
-          </div>
-        </div>
-
-        {# Table #}
-        <div class="overflow-x-auto">
-            <table class="dense-table min-w-full solutions-table">
-                <thead>
-                    <tr class="border-b border-border/50 bg-muted/30">
-                        <th class="px-5 py-3.5 w-10"><input type="checkbox" data-select-all="solution-table" class="h-4 w-4 rounded border-input" aria-label="Select all solutions"></th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Solution</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Phase &amp; Status</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Design Maturity</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Architecture Scope</th>
-                        <th class="px-5 py-3.5 text-center text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Arch. Score</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Next Action</th>
-                        <th class="px-5 py-3.5 text-right text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border/50">
-                    {% for solution in solutions %}
-                        {% set ws = (workspace_summaries or {}).get(solution.id, {}) %}
-                        <tr class="hover:bg-muted/30 transition-colors group"
-                            data-name="{{ solution.name|lower }}"
-                            data-domain="{{ (solution.business_domain or '')|lower }}"
-                            data-status="{{ (solution.status or solution.governance_status or '')|lower }}"
-                            data-type="{{ (solution.solution_type or '')|lower }}"
-                            data-owner="{{ (ws.owner_display or '')|lower }}"
-                            data-next-action="{{ (ws.next_action or '')|lower }}">
-                            <td class="px-5 py-4 w-10">
-                                <input type="checkbox" data-select-row="solution-table" value="{{ solution.id }}" class="h-4 w-4 rounded border-input" aria-label="Select {{ solution.name }}">
-                            </td>
-                            <td class="px-5 py-4 min-w-[14rem]">
-                                <div class="space-y-1.5">
-                                    <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="text-sm font-semibold text-foreground hover:text-primary transition-colors">{{ solution.name }}</a>
-                                    <p class="text-xs text-muted-foreground leading-relaxed">{{ solution.description[:90] if solution.description else 'No summary yet.' }}{% if solution.description and solution.description|length > 90 %}...{% endif %}</p>
-                                    <div class="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.business_domain or 'No domain' }}</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.solution_type|replace('_', ' ')|title if solution.solution_type else 'Type not set' }}</span>
-                                        <span class="text-muted-foreground/60">Lead: {{ ws.owner_display or 'Unassigned' }}</span>
-                                    </div>
-                                    {# Below 2xl: Architecture Scope and Arch. Score inline #}
-                                    <div class="2xl:hidden flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground mt-1">
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.capability_count or 0 }} capabilities</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.application_count or 0 }} apps</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.archimate_count or 0 }} ArchiMate</span>
-                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.risk_count or 0 }} risks</span>
-                                        {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
-                                        {% set _score = _cs.get('score', 0) %}
-                                        <span class="px-2 py-0.5 rounded bg-muted/50 font-medium">Score: {{ _score }}%</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 whitespace-nowrap">
-                                <div class="space-y-2">
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        <span class="inline-flex items-center rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-semibold text-info-emphasis">{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}</span>
-                                        {{ status_badge_auto(solution.status or 'planned') }}
-                                    </div>
-                                    {% set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In Review', 'under_review': 'Under Review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In Progress', 'proposed': 'Submitted'} %}
-                                    {% set _gov = ws.governance_status or 'draft' %}
-                                    {% set _gov_label = GOV_LABELS.get(_gov, _gov|replace('_',' ')|title) %}
-                                    {% if _gov == 'approved' %}
-                                        {% set _gov_cls = 'bg-success/10 text-success-emphasis border border-success/20' %}
-                                    {% elif _gov in ('arb_review', 'under_review') %}
-                                        {% set _gov_cls = 'bg-warning/10 text-warning-emphasis border border-warning/20' %}
-                                    {% elif _gov == 'rejected' %}
-                                        {% set _gov_cls = 'bg-destructive/10 text-destructive border border-destructive/20' %}
-                                    {% else %}
-                                        {% set _gov_cls = 'bg-muted text-muted-foreground border border-border/50' %}
-                                    {% endif %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ _gov_cls }}">{{ _gov_label }}</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 whitespace-nowrap hidden xl:table-cell">
-                                <div class="space-y-2">
-                                    <div class="flex items-baseline gap-2">
-                                        <span class="text-2xl font-bold tracking-tight
- {% if (ws.readiness_pct or 0) >= 80 %}text-success
- {% elif (ws.readiness_pct or 0) >= 40 %}text-warning
- {% else %}text-foreground{% endif %}">{{ ws.readiness_pct or 0 }}%</span>
-                                    </div>
-                                    <div class="h-1.5 w-32 rounded-full bg-muted/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all
- {% if (ws.readiness_pct or 0) >= 80 %}bg-success
- {% elif (ws.readiness_pct or 0) >= 40 %}bg-warning
- {% else %}bg-primary{% endif %}"
-                                             style="width: {{ ws.readiness_pct or 0 }}%"></div>
-                                    </div>
-                                    <p class="text-xs text-muted-foreground">{{ ws.readiness_passed or 0 }}/{{ ws.readiness_total or 0 }} TOGAF maturity checks</p>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 hidden 2xl:table-cell">
-                                <div class="flex flex-wrap gap-1.5 max-w-xs">
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.capability_count or 0 }} capabilities</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.application_count or 0 }} apps</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} elements</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.risk_count or 0 }} risks</span>
-                                </div>
-                            </td>
-                            {# PLT-002: Architecture completeness score ring #}
-                            {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
-                            {% set _score = _cs.get('score', 0) %}
-                            <td class="px-5 py-4 whitespace-nowrap hidden 2xl:table-cell">
-                              <div class="flex flex-col items-center gap-1">
-                                <div class="relative flex items-center justify-center w-11 h-11">
-                                  <svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3" class="text-muted/40"/>
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" stroke-width="3"
-                                            stroke-dasharray="{{ _score }}, 100"
-                                            class="{{ 'text-success-emphasis' if _score >= 80 else ('text-warning' if _score >= 40 else 'text-destructive') }}"/>
-                                  </svg>
-                                  <span class="absolute text-2xs font-bold leading-none">{{ _score }}%</span>
-                                </div>
-                                <span class="text-xs text-muted-foreground">{{ _cs.get('filled_count', 0) }}/{{ _cs.get('total', 14) }}</span>
-                              </div>
-                            </td>
-                            {% set _disconnected = (ws.capability_count or 0) == 0 and (ws.application_count or 0) == 0 and (ws.archimate_count or 0) == 0 %}
-                            <td class="px-5 py-4">
-                                <div class="space-y-1 max-w-[200px]">
-                                    <p class="text-xs font-medium leading-relaxed {{ 'text-warning-emphasis' if _disconnected else 'text-foreground' }}">{{ ws.next_action or 'Continue modelling' }}</p>
-                                    <p class="text-xs text-muted-foreground">{{ solution.created_at | format_date }}</p>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 whitespace-nowrap text-right">
-                                <div class="flex flex-col items-end gap-2">
-                                    <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
-                                           title="Open Workspace">
-                                            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        <a href="/solutions/{{ solution.id }}/traceability"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
-                                           title="Traceability">
-                                            <i data-lucide="git-branch" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        <a href="/solutions/{{ solution.id }}/risks/heatmap"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
-                                           title="Risk Heatmap">
-                                            <i data-lucide="flame" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        {% if can_modify_solution(solution) %}
-                                        <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}"
-                                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
-                                           title="Edit">
-                                            <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </a>
-                                        {% else %}
-                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card text-muted-foreground opacity-50 cursor-not-allowed"
-                                              aria-disabled="true" role="img" aria-label="Edit is not available: only the person who made this solution or an administrator can edit it" title="Only the person who made this solution or an administrator can edit it. Ask an administrator in Team settings.">
-                                            <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                        </span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <button type="button" @click="toggleCompare({{ solution.id }})"
-                                                :class="isInCompare({{ solution.id }}) ? 'text-primary border-primary bg-primary/10' : 'text-muted-foreground border-border/50'"
-                                                class="text-xs px-2 py-1 rounded-md border font-medium transition-colors"
-                                                x-text="isInCompare({{ solution.id }}) ? '✓ Compare' : '+ Compare'"></button>
-                                        <button type="button" @click="window.deleteSolution({{ solution.id }}, '{{ solution.name|e }}')"
-                                                class="text-xs px-2 py-1 rounded-md border border-destructive/20 text-destructive-emphasis/70 hover:bg-destructive/10 hover:text-destructive-emphasis transition-colors" aria-label="Delete">Delete</button>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- ENT-010: Comparison panel (2-3 solutions) -->
-        <div id="solutionComparePanel" class="border hidden border-t border-border/50 px-3 py-2 bg-muted/20">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-semibold text-foreground">Solution comparison</h3>
-                    <button id="btn-close-compare" type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close comparison">
-                        <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div id="solutionCompareTableWrap" class="overflow-x-auto">
-                    <table class="dense-table w-full border-collapse text-sm" id="solutionCompareTable">
-                        <thead>
-                            <tr class="border-b border-border">
-                                <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Attribute</th>
-                                <th id="compareCol1" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground"></th>
-                                <th id="compareCol2" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground"></th>
-                                <th id="compareCol3" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="solutionCompareBody"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="flex items-center gap-2 mr-4">
-                <label class="text-xs text-muted-foreground">Per page:</label>
-                <select @change="changeSolPerPage($event.target.value)" class="h-8 w-16 rounded-md border border-border/50 bg-card px-2 py-1 text-xs font-medium" aria-label="Per page">
-                  {% for size in [10, 20, 50, 100] %}
-                  <option value="{{ size }}" {{ 'selected' if (per_page|default(20)) == size else '' }}>{{ size }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              {% if pagination.has_prev %}
-              <a href="?page={{ pagination.prev_num }}&per_page={{ per_page|default(20) }}&search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}&created_after={{ created_after|default('') }}&created_before={{ created_before|default('') }}"
-                 class="inline-flex items-center justify-center h-8 px-3 rounded-lg border border-border/50 bg-card hover:bg-muted text-xs font-medium transition-colors">
-                <i data-lucide="chevron-left" class="h-3.5 w-3.5 mr-1"></i>Prev
-              </a>
-              {% endif %}
-              <div class="flex items-center gap-1">
-                {% for page_num in pagination.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
-                  {% if page_num %}
-                    {% if page_num == pagination.page %}
-                    <span class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-primary text-primary-foreground text-xs font-semibold">{{ page_num }}</span>
-                    {% else %}
-                     <a href="?page={{ page_num }}&per_page={{ per_page|default(20) }}&search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}&created_after={{ created_after|default('') }}&created_before={{ created_before|default('') }}"
-                       class="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border/50 bg-card hover:bg-muted text-xs font-medium transition-colors">{{ page_num }}</a>
-                    {% endif %}
-                  {% else %}
-                    <span class="inline-flex items-center justify-center h-8 w-8 text-muted-foreground">...</span>
-                  {% endif %}
-                {% endfor %}
-                  {% if pagination.has_next %}
-                  <a href="?page={{ pagination.next_num }}&per_page={{ per_page|default(20) }}&search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}&created_after={{ created_after|default('') }}&created_before={{ created_before|default('') }}"
-                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Next<i data-lucide="chevron-right" class="h-4 w-4 ml-1"></i>
-                  </a>
-                  {% endif %}
-                </div>
-            </div>
-    </div>
-    {% else %}
-    {# Unified empty-state disclosure (round 4) — replaces the previous
-       per-filter-type conditional blocks (ownership, then BU, then
-       search/status) with a single canonical breakdown computed
-       unconditionally by the route: org_total (org-wide, same grain as the
-       Health Scorecard — D1), hidden_by_role_filter (ownership+BU combined),
-       hidden_by_filters (every active filter's combined effect, including
-       domain/type/dates/worklist-bucket — D2/D3), and
-       active_filter_descriptions (what's actually active, for the message).
-       A genuine server error (load_error) is its own distinct case, never
-       silently rendered as "no solutions found". #}
-    {% if load_error %}
-    <div data-slot="card" class="rounded-xl border border-destructive/30 bg-destructive/5" data-testid="solutions-load-error">
-        <div class="text-center py-16 px-4">
-            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-                <i data-lucide="alert-triangle" class="h-8 w-8 text-destructive" aria-hidden="true"></i>
-            </div>
-            <h2 class="mt-4 text-lg font-medium">Could not load solutions</h2>
-            <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto">{{ load_error }}</p>
-            <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <a href="{{ url_for('solution_design.list_solutions') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Try again
-                </a>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    {% set _hidden_total = (hidden_by_role_filter or 0) + (hidden_by_filters or 0) %}
-    {% if _hidden_total > 0 %}
-    {# Solutions exist but are hidden by role or filters #}
-    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="solutions-empty-state">
-        <div class="text-center py-16 px-4">
-            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                <i data-lucide="eye-off" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
-            </div>
-            {% if only_default_filter_active %}
-            {# Hidden-draft state: only the default filter's empty drafts are hidden #}
-            {% from 'components/empty_state.html' import empty_state %}
-            {{ empty_state(
-                icon='eye-off',
-                title='Your draft is waiting',
-                description='Untitled drafts stay out of this list until they have a problem statement.',
-                cta_text='Show drafts',
-                cta_href=url_for('solution_design.list_solutions', status='draft'),
-                secondary_cta_text='New Solution',
-                secondary_cta_onclick='startSolution()',
-                secondary_cta_icon='plus',
-                heading_testid='solutions-empty-state-heading',
-                description_testid='solutions-hidden-disclosure'
-            ) }}
-            {% else %}
-            {# Solutions hidden by role or user-set filters #}
-            <h2 class="mt-4 text-lg font-medium" data-testid="solutions-empty-state-heading">
-                Showing 0 of {{ org_total if org_total is not none else total }}
-            </h2>
-            <div class="mt-2 space-y-2 max-w-md mx-auto" data-testid="solutions-hidden-disclosure">
-                {% if hidden_by_role_filter and hidden_by_role_filter > 0 %}
-                <p class="text-sm text-muted-foreground" data-testid="solutions-role-filter-reason">
-                    {{ hidden_by_role_filter }} solution{{ 's' if hidden_by_role_filter != 1 else '' }} in your organisation
-                    {{ 'are' if hidden_by_role_filter != 1 else 'is' }} outside what your role can access
-                    (created by other people, or outside your business unit's domain scope).
-                </p>
-                {% endif %}
-                {% if hidden_by_filters and hidden_by_filters > 0 %}
-                <p class="text-sm text-muted-foreground" data-testid="solutions-filter-reason">
-                    {{ hidden_by_filters }} solution{{ 's are' if hidden_by_filters != 1 else ' is' }} hidden by
-                    your current filter{{ 's' if active_filter_descriptions|length != 1 else '' }}{% if active_filter_descriptions %}: {{ active_filter_descriptions|join(', ') }}{% endif %}.
-                </p>
-                {% endif %}
-            </div>
-            <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                {% if hidden_by_filters and hidden_by_filters > 0 %}
-                {{ button(text='Clear all filters', variant='default', href=clear_filters_url, testid='solutions-clear-filters') }}
-                {% endif %}
-                {% if hidden_by_role_filter and hidden_by_role_filter > 0 and bu_filter_active and not show_all_override %}
-                {{ button(text='View all business units', variant='outline', href=request.path ~ '?bu=all', testid='solutions-view-all-bu', aria_label='Show solutions across all business units') }}
-                {% endif %}
-                {% if hidden_by_role_filter and hidden_by_role_filter > 0 and 'arb.dashboard' in flask.current_app.view_functions %}
-                {{ button(text='Request review access', variant='outline', href=url_for('arb.dashboard')) }}
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% else %}
-    {# Truly empty: no solutions in the org at all #}
-    {% from 'components/empty_state.html' import empty_state %}
-    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="solutions-empty-state">
-        {{ empty_state(
-            icon='puzzle',
-            title='No solutions yet',
-            description='Create a solution to start its architecture blueprint.',
-            cta_text='New Solution',
-            cta_onclick='startSolution()',
-            cta_icon='plus',
-            heading_testid='solutions-empty-state-heading'
-        ) }}
-        <div class="flex flex-wrap items-center justify-center gap-3 pb-12 -mt-4">
-            {{ button(text='New from Template', variant='outline', icon='layout-template', data_action='open-template-modal') }}
-        </div>
-    </div>
-    {% endif %}
-    {% endif %}
-    {% endif %}
-
-  {# ENT-010: Sticky comparison bar #}
-  <div :class="($data.compareIds || []).length > 1 ? '' : 'hidden'"
-       class="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 z-40">
-    <div class="max-w-7xl mx-auto flex items-center gap-4">
-      <span class="text-sm font-medium text-foreground" x-text="`Comparing ${($data.compareIds || []).length} solutions`"></span>
-      <div class="flex gap-2 flex-1">
-        <template x-for="cid in ($data.compareIds || [])" :key="cid">
-          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted text-xs font-medium">
-            <span x-text="cid"></span>
-            <button type="button" @click="toggleCompare(cid)" class="hover:text-destructive-emphasis transition-colors">×</button>
-          </span>
-        </template>
-      </div>
-      <button type="button" @click="if($data.compareIds !== undefined){ compareIds=[]; compareMode=false; }" class="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear All</button>
-    </div>
+{# Selection bar: shown by Platform.selection once a row is ticked #}
+<div data-bulk-actions="solution-table" class="hidden flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+  <span class="text-sm font-medium" data-selected-count="solution-table"></span>
+  {% if total_count is defined and total_count %}
+  <span id="sol-select-all-pages-banner" class="hidden text-sm">
+    {% call ui.button(type='button', variant='link', size='sm', id='sol-select-all-pages-btn', class='h-auto p-0') %}Select all {{ total_count }} solution{{ 's' if total_count != 1 else '' }} matching this filter{% endcall %}
+    <span id="sol-all-pages-active-label" class="hidden text-muted-foreground">All {{ total_count }} selected. Delete will remove all of them.</span>
+  </span>
+  {% endif %}
+  <div class="ml-auto flex items-center gap-2">
+    {% call ui.button(type='button', variant='outline', size='sm', id='compareSolutionsBtn', attrs={'aria-label': 'Compare selected', 'title': 'Select 2 or 3 solutions to compare', 'data-action': 'compare-solutions'}) %}{{ lucide('git-branch') }}Compare{% endcall %}
+    {% call ui.button(type='button', variant='outline', size='sm', attrs={'aria-label': 'Export selected', 'data-action': 'bulk-export-solutions'}) %}{{ lucide('download') }}Export{% endcall %}
+    {% call ui.button(type='button', variant='outline', size='sm', attrs={'aria-label': 'Delete selected', 'data-action': 'bulk-delete-solutions'}) %}{{ lucide('trash-2') }}Delete{% endcall %}
   </div>
 </div>
-{# sol-bulk-delete-scope removed — bulkDeleteSolutions() now uses window.confirm directly #}
 
+{#- A fact the same on every row (no domain, one type, one lead) is said once above the table, not on each row; a missing domain or type is simply left out of the row. -#}
+{%- set _summaries = workspace_summaries or {} -%}
+{%- set _domains = solutions|map(attribute='business_domain')|map('default', '', true)|unique|list -%}
+{%- set _types = solutions|map(attribute='solution_type')|map('default', '', true)|unique|list -%}
+{%- set _leads = [] -%}
+{%- for sol in solutions %}{% set lead = (_summaries.get(sol.id, {}).owner_display or '') %}{% if lead not in _leads %}{% set _ = _leads.append(lead) %}{% endif %}{% endfor -%}
+{%- set vary = {'domain': _domains|length > 1, 'type': _types|length > 1, 'lead': _leads|length > 1} -%}
+{%- set _shared = [] -%}
+{%- if not vary.domain %}{% set _ = _shared.append(('every solution is in ' ~ _domains[0]) if _domains[0] else 'no solution has a business domain yet') %}{% endif -%}
+{%- if not vary.type %}{% set _ = _shared.append(('every solution is ' ~ _types[0]|replace('_', ' ')|lower) if _types[0] else 'no solution has a type yet') %}{% endif -%}
+{%- if not vary.lead %}{% set _ = _shared.append(('every solution is led by ' ~ _leads[0]) if _leads[0] else 'no solution has a lead yet') %}{% endif -%}
+{#- The table's footer: which solutions are shown, and Previous / Next when the server pages them. -#}
+{% macro _pager() -%}
+{%- set _q = {'per_page': per_page if per_page != 20 else none, 'search': search or none, 'status': (selected_workspace or selected_status) or none, 'domain': selected_domain or none,
+              'type': selected_type or none, 'created_after': created_after or none, 'created_before': created_before or none, 'bu': ('all' if show_all_override else none)} -%}
+{%- set _n = pagination.total if pagination else solutions|length -%}
+<div class="flex items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="solutions-pages">
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums">{% if pagination and pagination.pages > 1 %}Solutions {{ (pagination.page - 1) * pagination.per_page + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }}{% else %}{{ _n }} solution{{ 's' if _n != 1 else '' }}{% endif %}</p>
+  {% if pagination and pagination.pages > 1 %}
+  <div class="flex items-center gap-2">
+    {% if pagination.has_prev %}{{ ui.button(text='Previous', href=url_for('solution_design.list_solutions', page=pagination.prev_num, **_q), variant='outline', size='sm') }}{% else %}{{ ui.button(text='Previous', type='button', variant='outline', size='sm', attrs={'disabled': true}) }}{% endif %}
+    {% if pagination.has_next %}{{ ui.button(text='Next', href=url_for('solution_design.list_solutions', page=pagination.next_num, **_q), variant='outline', size='sm') }}{% else %}{{ ui.button(text='Next', type='button', variant='outline', size='sm', attrs={'disabled': true}) }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+{#- One notice above the table: what is filtered or hidden, then what is true of every row. -#}
+{%- set _has_filter = selected_workspace or search or created_before or hidden_by_default_filter -%}
+{% macro _notice() -%}
+{%- if _has_filter %}<span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="worklist-filter-indicator" role="status">
+  {% if selected_workspace %}<span>Showing solutions that {{ _ws_labels.get(selected_workspace, selected_workspace|replace('_', ' ')) }} ({{ total_count }}).</span>{% endif %}
+  {% if search %}<span>Matching "{{ search }}".</span>{% endif %}
+  {% if created_before %}<span>Created on or before {{ created_before }}.</span>{% endif %}
+  {% if selected_workspace or search or created_before %}<a href="{{ request.path }}" class="font-medium text-foreground underline underline-offset-4" aria-label="Clear filters">Clear filters</a>{% endif %}
+  {% if hidden_by_default_filter %}
+  <span>{{ hidden_by_default_filter }} empty draft{{ 's are' if hidden_by_default_filter != 1 else ' is' }} hidden.</span>
+  <a href="{{ url_for('solution_design.list_solutions', status='draft') }}" class="font-medium text-foreground underline underline-offset-4">Show drafts</a>
+  {% endif %}
+</span>{% endif -%}
+{%- if _has_filter and _shared %} {% endif -%}
+{%- if _shared %}<span data-testid="solutions-shared-facts">{{ (_shared|join('; ') ~ ' on this page.')|capitalize }}</span>{% endif -%}
+{%- endmacro %}
+{#- At 1440 the table shows selection, solution, status, readiness, created and the row menu; stage, review and next step join at 2xl. -#}
+{%- set columns = [{'label': _select_all(), 'class': 'w-10', 'sortable': false}, {'label': 'Solution', 'sortable': true}, {'label': 'Stage', 'class': 'hidden 2xl:table-cell'},
+                   {'label': 'Status', 'sortable': true}, {'label': 'Review', 'class': 'hidden 2xl:table-cell'},
+                   {'label': 'Readiness', 'align': 'right', 'sortable': true}, {'label': 'Next step', 'class': 'hidden 2xl:table-cell'},
+                   {'label': 'Created', 'sortable': true, 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}] -%}
+{% call(solution) list_table(rows=solutions, columns=columns, caption='Solutions', testid='solutions-table', row_testid='solution-row', page_size=50,
+                             search_placeholder='Filter this page...', toolbar=true, toolbar_actions=_filters,
+                             empty_message='No solutions match these filters.',
+                             notice=(_notice() if (_has_filter or _shared) else none), server_pagination=_pager) %}
+  {%- set ws = (workspace_summaries or {}).get(solution.id, {}) -%}
+  {%- set readiness = ws.readiness_pct or 0 -%}
+  {%- set gov = ws.governance_status or 'draft' -%}
+  {% call table_cell(class='w-10') %}
+    <input type="checkbox" value="{{ solution.id }}" class="size-4 accent-primary align-middle" aria-label="Select {{ solution.name }}" data-select-row="solution-table">
+  {% endcall %}
+  {%- set _line = [] -%}
+  {%- if vary.domain and solution.business_domain %}{% set _ = _line.append(solution.business_domain) %}{% endif -%}
+  {%- if vary.type and solution.solution_type %}{% set _ = _line.append(solution.solution_type|replace('_', ' ')|capitalize) %}{% endif -%}
+  {%- if vary.lead %}{% set _ = _line.append('Lead: ' ~ (ws.owner_display or 'unassigned')) %}{% endif -%}
+  {% call table_cell(class='max-w-[320px]') %}
+    <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="solution-link">{{ solution.name }}</a>
+    {% if _line %}<span class="block truncate text-xs text-muted-foreground">{{ _line|join(' · ') }}</span>{% endif %}
+    <span hidden data-sol-meta data-id="{{ solution.id }}" data-name="{{ solution.name }}" data-domain="{{ solution.business_domain or '' }}"
+          data-status="{{ (solution.status or 'planned')|replace('_', ' ')|capitalize }}" data-type="{{ solution.solution_type|replace('_', ' ')|capitalize if solution.solution_type else '' }}"
+          data-readiness="{{ readiness }}%" data-capabilities="{{ ws.capability_count or 0 }}" data-created="{{ solution.created_at|format_date }}"></span>
+  {% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
+  {%- set bucket = ws.work_bucket or 'in_design' -%}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'needs_setup': 1, 'in_design': 2, 'needs_attention': 3, 'ready_for_review': 4}.get(bucket, 0)}) %}{{ state_badge(_bucket_labels.get(bucket, bucket|replace('_', ' ')|capitalize), tone={'needs_setup': 'neutral', 'in_design': 'caution', 'needs_attention': 'negative', 'ready_for_review': 'positive'}.get(bucket, 'neutral')) }}{% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
+  {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness}) %}
+    <span class="inline-flex items-center justify-end gap-2" title="{{ ws.readiness_passed or 0 }} of {{ ws.readiness_total or 0 }} maturity checks pass">
+      <span class="w-10 text-right">{{ readiness }}%</span>
+    </span>
+  {% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell max-w-[260px] truncate') %}{{ ws.next_action or 'Continue modelling' }}{% endcall %}
+  {% call table_cell(class='hidden lg:table-cell whitespace-nowrap text-muted-foreground', attrs={'data-sort': solution.created_at.strftime('%Y%m%d%H%M') if solution.created_at else ''}) %}{{ solution.created_at|format_date }}{% endcall %}
+  {% call table_cell(class='w-12 text-right') %}{{ _row_menu(solution) }}{% endcall %}
+{% endcall %}
 
+{# Comparison of the ticked solutions, filled in by openSolutionCompare() #}
+<div id="solutionComparePanel" class="hidden" data-testid="solution-compare-panel">
+{% call ui.card() %}
+  {% call ui.card_header() %}
+    {{ ui.card_title(text='Solution comparison') }}
+    {% call ui.card_action() %}{% call ui.button(id='btn-close-compare', type='button', variant='ghost', size='icon', class='size-8', attrs={'aria-label': 'Close comparison'}) %}{{ lucide('x') }}{% endcall %}{% endcall %}
+  {% endcall %}
+  {% call ui.card_content() %}
+    <div class="overflow-hidden rounded-md border">
+    {% call table(id='solutionCompareTable') %}
+      {% call table_header() %}{% call table_row() %}{{ table_head(text='Attribute') }}{% endcall %}{% endcall %}
+      <tbody data-slot="table-body" id="solutionCompareBody"></tbody>
+    {% endcall %}
+    </div>
+  {% endcall %}
+{% endcall %}
+</div>
+
+{% elif load_error %}
+{% call ui.card(attrs={'data-testid': 'solutions-load-error'}) %}
+  {% call ui.card_content() %}
+    {{ empty_state(icon='circle-alert', title='The solution list could not be read', description=load_error ~ ' Try again in a moment.',
+                   cta_text='Try again', cta_href=url_for('solution_design.list_solutions')) }}
+  {% endcall %}
+{% endcall %}
+
+{% else %}
+{%- set _hidden_total = (hidden_by_role_filter or 0) + (hidden_by_filters or 0) -%}
+{% call ui.card(attrs={'data-testid': 'solutions-empty-state'}) %}
+  {% call ui.card_content() %}
+  {% if _hidden_total > 0 and only_default_filter_active %}
+    {{ empty_state(icon='eye-off', title='Your draft is waiting',
+                   description='Untitled drafts stay out of this list until they have a problem statement.',
+                   cta_text='Show drafts', cta_href=url_for('solution_design.list_solutions', status='draft'),
+                   heading_testid='solutions-empty-state-heading', description_testid='solutions-hidden-disclosure') }}
+  {% elif _hidden_total > 0 %}
+    <div class="py-12 text-center" role="status">
+      <div class="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted text-muted-foreground">{{ lucide('eye-off') }}</div>
+      <h3 class="text-lg font-medium" data-testid="solutions-empty-state-heading">Showing 0 of {{ org_total if org_total is not none else total }}</h3>
+      <div class="mx-auto mt-2 max-w-md space-y-2 text-sm text-muted-foreground" data-testid="solutions-hidden-disclosure">
+        {% if hidden_by_role_filter and hidden_by_role_filter > 0 %}
+        <p data-testid="solutions-role-filter-reason">{{ hidden_by_role_filter }} solution{{ 's' if hidden_by_role_filter != 1 else '' }} in your organisation {{ 'are' if hidden_by_role_filter != 1 else 'is' }} outside what your role can see: made by other people, or outside your business unit.</p>
+        {% endif %}
+        {% if hidden_by_filters and hidden_by_filters > 0 %}
+        <p data-testid="solutions-filter-reason">{{ hidden_by_filters }} solution{{ 's are' if hidden_by_filters != 1 else ' is' }} hidden by your current filter{{ 's' if active_filter_descriptions|length != 1 else '' }}{% if active_filter_descriptions %}: {{ active_filter_descriptions|join(', ') }}{% endif %}.</p>
+        {% endif %}
+      </div>
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
+        {% if hidden_by_filters and hidden_by_filters > 0 %}{{ ui.button(text='Clear all filters', href=clear_filters_url, attrs={'data-testid': 'solutions-clear-filters'}) }}{% endif %}
+        {% if hidden_by_role_filter and hidden_by_role_filter > 0 and bu_filter_active and not show_all_override %}
+        {{ ui.button(text='View all business units', href=request.path ~ '?bu=all', variant='outline', attrs={'data-testid': 'solutions-view-all-bu', 'aria-label': 'Show solutions across all business units'}) }}
+        {% endif %}
+        {% if hidden_by_role_filter and hidden_by_role_filter > 0 and 'arb.dashboard' in flask.current_app.view_functions %}
+        {{ ui.button(text='Request review access', href=url_for('arb.dashboard'), variant='outline') }}
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    {{ empty_state(icon='puzzle', title='No solutions yet', description='Create a solution to start its architecture blueprint.',
+                   heading_testid='solutions-empty-state-heading', padding='pt-12 pb-4') }}
+    <div class="flex flex-wrap items-center justify-center gap-2 pb-12">
+      {% call ui.button(type='button', class='bg-primary', attrs={'@click': 'startSolution', ':disabled': 'startingSolution', 'data-testid': 'btn-new-solution', 'aria-label': 'Create a new solution'}) %}{{ lucide('plus') }}New solution{% endcall %}
+      {{ ui.button(text='From a template', type='button', variant='outline', attrs={'data-action': 'open-template-modal', 'data-testid': 'btn-new-from-template'}) }}
+      {{ ui.button(text='Through the architecture journey', href=url_for('architecture_journey.index'), variant='outline', attrs={'data-testid': 'btn-start-journey'}) }}
+    </div>
+  {% endif %}
+  {% endcall %}
+{% endcall %}
+{% endif %}
+</div>
 {% endblock %}
 
 {% block extra_head_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
   window.__SOLUTION_LIST_CONFIG__ = {
     createSolutionUrl: '/architecture-journey/',
     listSolutionsUrl: '{{ url_for("solution_design.list_solutions") }}',
@@ -571,9 +322,9 @@
     currentUserEmail: '{{ current_user.email|default("", true) }}'
   };
 </script>
-<script src="{{ url_for('static', filename='js/capabilities-loader.js') }}"></script>
-<script src="{{ url_for('static', filename='js/solutions/list.js') }}"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/capabilities-loader.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/solutions/list.js') }}"></script>
+<script nonce="{{ csp_nonce }}">
   let _solSelectAllPages = false;
   let _solAllFilteredIds = {{ (all_filtered_ids or []) | tojson | safe }};
 
@@ -581,28 +332,19 @@
     if (window.Platform && Platform.selection) {
       Platform.selection.create({
         id: 'solution-table',
-        onChange: function(selectedIds) {
-          _updateSelectAllPagesBanner(selectedIds);
-        }
+        onChange: function(selectedIds) { _updateSelectAllPagesBanner(selectedIds); }
       });
     }
-    // "New from Template" buttons. Previously wired via Alpine @click calling a
-    // GLOBAL openTemplateModal() — the button sat inside x-data but the function
-    // is not a component method, so it only ran if Alpine's evaluator reached the
-    // window global, which under the production CSP-safe interpreter is fragile.
-    // A direct listener is CSP-safe and deterministic (matches the codebase's
-    // no-inline-handler rule).
+    // "New from template": a direct listener, CSP-safe.
     document.querySelectorAll('[data-action="open-template-modal"]').forEach(function(btn) {
       btn.addEventListener('click', function() { openTemplateModal(); });
     });
-
     let allPagesBtn = document.getElementById('sol-select-all-pages-btn');
     if (allPagesBtn) {
       allPagesBtn.addEventListener('click', function() {
         _solSelectAllPages = true;
-        let btn = document.getElementById('sol-select-all-pages-btn');
+        allPagesBtn.classList.add('hidden');
         let label = document.getElementById('sol-all-pages-active-label');
-        if (btn) btn.classList.add('hidden');
         if (label) label.classList.remove('hidden');
       });
     }
@@ -615,7 +357,6 @@
     let pageSize = document.querySelectorAll('[data-select-row="solution-table"]').length;
     let sel = Platform.selection && Platform.selection.get('solution-table');
     let count = sel ? sel.count() : 0;
-    // Show banner only when all rows on this page are selected AND there are more pages
     if (count > 0 && count === pageSize && totalCount > pageSize) {
       banner.classList.remove('hidden');
     } else {
@@ -628,14 +369,20 @@
     }
   }
 
-  function changeSolPerPage(value) {
-    let url = new URL(window.location.href);
-    url.searchParams.set('per_page', value);
-    url.searchParams.set('page', '1');
-    window.location.href = url.toString();
+  // The row menu's "Add to comparison" ticks that row, so Compare in the selection bar picks it up.
+  function _toggleCompareRow(solutionId) {
+    let box = document.querySelector('[data-select-row="solution-table"][value="' + solutionId + '"]');
+    if (!box) return;
+    box.checked = !box.checked;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  // Stores pending bulk-delete IDs while the confirm modal is open
+  function _selectedMeta(ids) {
+    return Array.prototype.slice.call(document.querySelectorAll('[data-sol-meta]'))
+      .filter(function(el) { return ids.indexOf(String(el.dataset.id)) !== -1; })
+      .map(function(el) { return el.dataset; });
+  }
+
   let _bulkDeletePendingIds = [];
 
   function bulkDeleteSolutions() {
@@ -645,58 +392,43 @@
     let deleteAll = _solSelectAllPages && _solAllFilteredIds.length > 0;
     let ids = deleteAll ? _solAllFilteredIds : pageIds;
     if (ids.length === 0) return;
-
-    // Populate and open the Platform modal (no window.confirm — works in all envs)
     _bulkDeletePendingIds = ids;
     let msgEl = document.getElementById('sol-bulk-delete-msg');
     if (msgEl) {
-      msgEl.textContent = 'You are about to permanently delete ' + ids.length +
-        ' solution' + (ids.length === 1 ? '' : 's') + '. This action cannot be undone.';
+      msgEl.textContent = 'You are about to permanently delete ' + ids.length + ' solution' + (ids.length === 1 ? '' : 's') + '. This cannot be undone.';
     }
-    if (window.Platform && Platform.modal) {
-      Platform.modal.open('sol-bulk-delete-confirm');
-    }
+    if (window.Platform && Platform.modal) Platform.modal.open('sol-bulk-delete-confirm');
   }
 
   function _executeBulkDelete() {
     let ids = _bulkDeletePendingIds;
     if (!ids || ids.length === 0) return;
     if (window.Platform && Platform.modal) Platform.modal.close('sol-bulk-delete-confirm');
-
     let deleteBtn = document.getElementById('sol-bulk-delete-btn');
-    if (deleteBtn) {
-      deleteBtn.disabled = true;
-      deleteBtn.innerHTML = '<svg class="animate-spin h-3.5 w-3.5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Deleting...';
-    }
-    if (window.Platform && Platform.toast) Platform.toast.success('Deleting ' + ids.length + ' solution(s)...');
-
-    Platform.fetch.post('{{ url_for("solution_design.bulk_delete_solutions") }}', 
-      { solution_ids: ids },
-      { 
-        // Platform.fetch will automatically add Content-Type: application/json and CSRF token
+    if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting...'; }
+    Platform.fetch.post('{{ url_for("solution_design.bulk_delete_solutions") }}', { solution_ids: ids }, {})
+      .then(function(data) {
+        if (data.success) {
+          Platform.toast.success('Deleted ' + data.deleted_count + ' solution(s)');
+          setTimeout(function() { window.location.reload(); }, 600);
+        } else {
+          if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
+          Platform.toast.error(data.error || 'Failed to delete solutions');
+        }
       })
-    .then(function(data) {
-      if (data.success) {
-        Platform.toast.success('Deleted ' + data.deleted_count + ' solution(s)');
-        setTimeout(function() { window.location.reload(); }, 600);
-      } else {
-        if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.innerHTML = '<i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete'; }
-        Platform.toast.error(data.error || 'Failed to delete solutions');
-      }
-    })
-    .catch(function(err) {
-      if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.innerHTML = '<i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete'; }
-      // Platform.fetch will show a toast automatically for non-ok responses
-      // But we need to handle network errors which are also thrown
-      // The error toast is already shown by Platform.fetch, so we don't need to show another one
-    })
-    .finally(function() { _bulkDeletePendingIds = []; });
+      .catch(function() { if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; } })
+      .finally(function() { _bulkDeletePendingIds = []; });
+  }
+
+  function _escape(text) {
+    let div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
   }
 
   function openTemplateModal() {
     if (window.Platform && Platform.modal) Platform.modal.open('template-picker');
     let list = document.getElementById('template-list');
-    // Event delegation — avoids inline onclick which is blocked by strict-dynamic CSP in production
     if (list && !list._delegated) {
       list.addEventListener('click', function(e) {
         let btn = e.target.closest('button[data-tid]');
@@ -705,38 +437,28 @@
       list._delegated = true;
     }
     let cfg = window.__SOLUTION_LIST_CONFIG__ || {};
-    Platform.fetch.get(cfg.templatesUrl || '/solutions/templates', null, { 
-      headers: { 'Accept': 'application/json' },
-      silent: true  // We'll handle the error inline below
-    })
+    Platform.fetch.get(cfg.templatesUrl || '/solutions/templates', null, { headers: { 'Accept': 'application/json' }, silent: true })
       .then(function(data) {
         if (!list) return;
         let templates = (data && data.templates) || [];
         list.innerHTML = templates.length === 0
-          ? '<p class="text-sm text-muted-foreground py-4 text-center">No templates yet. Save a solution as a template from its detail page.</p>'
+          ? '<p class="py-4 text-center text-sm text-muted-foreground">No templates yet. Save a solution as a template from its page.</p>'
           : templates.map(function(t) {
-              return '<div class="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">' +
-                '<div class="min-w-0"><p class="font-medium text-foreground">' + (t.name || 'Unnamed') + '</p>' +
-                '<p class="text-xs text-muted-foreground mt-0.5">' + (t.description || '').slice(0, 120) + (t.description && t.description.length > 120 ? '…' : '') + '</p>' +
-                '<span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">' + (t.domain || 'General') + '</span>' +
-                ' <span class="text-xs text-muted-foreground">· used ' + (t.usage_count || 0) + '×</span></div>' +
-                '<button type="button" data-tid="' + t.id + '" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">Use Template</button></div>';
+              let desc = (t.description || '').slice(0, 120) + (t.description && t.description.length > 120 ? '...' : '');
+              return '<div class="flex items-center justify-between gap-4 rounded-lg border p-4">' +
+                '<div class="min-w-0"><p class="font-medium">' + _escape(t.name || 'Unnamed') + '</p>' +
+                '<p class="mt-0.5 text-xs text-muted-foreground">' + _escape(desc) + '</p>' +
+                '<p class="mt-1 text-xs text-muted-foreground">' + _escape(t.domain || 'General') + ' · used ' + (t.usage_count || 0) + ' times</p></div>' +
+                '<but' + 'ton type="button" data-slot="button" data-size="sm" data-variant="outline" class="cn-button inline-flex shrink-0 items-center justify-center cn-button-size-sm cn-button-variant-outline" data-tid="' + Number(t.id) + '">Use template</button></div>';
             }).join('');
       })
-      .catch(function(err) {
-        // Platform.fetch throws on non-ok responses; we need to show an inline error
-        if (list) list.innerHTML = '<p class="text-sm text-muted-foreground py-4 text-center">Failed to load templates.</p>';
-        // The error toast is suppressed by silent:true, but we should still log for debugging
-        // However, console output is forbidden, so we'll just show the inline error
+      .catch(function() {
+        if (list) list.innerHTML = '<p class="py-4 text-center text-sm text-muted-foreground">The templates could not be loaded. Try again in a moment.</p>';
       });
   }
+
   function createFromTemplate(templateId) {
-    Platform.fetch.post('/architecture-journey/start-from-template', 
-      { template_id: templateId }, 
-      { 
-        headers: { 'Accept': 'application/json' },
-        // Platform.fetch will automatically add Content-Type: application/json and CSRF token
-      })
+    Platform.fetch.post('/architecture-journey/start-from-template', { template_id: templateId }, { headers: { 'Accept': 'application/json' } })
       .then(function(data) {
         if (data.success && data.redirect) {
           if (window.Platform && Platform.modal) Platform.modal.close('template-picker');
@@ -745,38 +467,30 @@
           Platform.toast.error(data.error || 'Failed to create solution');
         }
       })
-      .catch(function(err) {
-        // Platform.fetch will show a toast automatically, but we need to handle specific cases
-        // The error toast is already shown by Platform.fetch, so we don't need to show another one
-        // However, we should ensure the modal stays open if there's an error
-        // No need for console.error as per rules
-      });
+      .catch(function() {});
   }
+
   function openSolutionCompare() {
     let sel = Platform.selection ? Platform.selection.get('solution-table') : null;
-    let ids = sel ? sel.getSelected().map(Number) : [];
+    let ids = sel ? sel.getSelected().map(String) : [];
     if (ids.length < 2) { Platform.toast.error('Select at least 2 solutions to compare'); return; }
-    let rows = document.querySelectorAll('tbody tr');
-    let headers = ['Attribute'];
-    let bodyRows = {domain: ['Domain'], status: ['Status'], type: ['Type'], readiness: ['Readiness'], capabilities: ['Capabilities'], created: ['Created']};
-    rows.forEach(function(tr) {
-      let cb = tr.querySelector('[data-select-row="solution-table"]');
-      if (!cb || ids.indexOf(Number(cb.value)) === -1) return;
-      let cells = tr.querySelectorAll('td');
-      headers.push((cells[1] && cells[1].querySelector('.font-medium')?.textContent?.trim()) || 'Solution');
-      bodyRows.domain.push(tr.dataset.domain || '—');
-      bodyRows.status.push(tr.dataset.status || '—');
-      bodyRows.type.push(tr.dataset.type || '—');
-      bodyRows.readiness.push((cells[3] && cells[3].querySelector('.text-2xl')?.textContent?.trim()) || '—');
-      bodyRows.capabilities.push((cells[4] && cells[4].textContent?.trim()) || '—');
-      bodyRows.created.push((cells[5] && cells[5].querySelector('.text-xs')?.textContent?.trim()) || '—');
-    });
+    let picked = _selectedMeta(ids).slice(0, 3);
+    let fields = [['Domain', 'domain'], ['Status', 'status'], ['Type', 'type'], ['Readiness', 'readiness'], ['Capabilities', 'capabilities'], ['Created', 'created']];
     let headTr = document.querySelector('#solutionCompareTable thead tr');
-    if (headTr) headTr.innerHTML = headers.map(function(h) { return '<th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">' + h + '</th>'; }).join('');
+    if (headTr) {
+      headTr.innerHTML = ['Attribute'].concat(picked.map(function(m) { return m.name; }))
+        .map(function(h) { return '<th data-slot="table-head" class="cn-table-head">' + _escape(h) + '</th>'; }).join('');
+    }
     let tbody = document.getElementById('solutionCompareBody');
-    if (tbody) tbody.innerHTML = Object.values(bodyRows).map(function(row) { return '<tr class="border-b border-border">' + row.map(function(c, i) { return i === 0 ? '<td class="py-2 px-3 text-xs font-medium text-muted-foreground">' + c + '</td>' : '<td class="py-2 px-3 text-sm text-foreground">' + c + '</td>'; }).join('') + '</tr>'; }).join('');
+    if (tbody) {
+      tbody.innerHTML = fields.map(function(f) {
+        return '<tr data-slot="table-row" class="cn-table-row"><td data-slot="table-cell" class="cn-table-cell text-muted-foreground">' + f[0] + '</td>' +
+          picked.map(function(m) { return '<td data-slot="table-cell" class="cn-table-cell">' + _escape(m[f[1]] || 'Not set') + '</td>'; }).join('') + '</tr>';
+      }).join('');
+    }
     document.getElementById('solutionComparePanel').classList.remove('hidden');
   }
+
   function closeSolutionCompare() {
     document.getElementById('solutionComparePanel').classList.add('hidden');
   }
@@ -784,72 +498,53 @@
   function bulkExportSolutions() {
     let sel = Platform.selection.get('solution-table');
     if (!sel || sel.count() === 0) return;
-    let ids = sel.getSelected();
-
-    let rows = [['ID','Name','Domain','Status','Type','Created']];
-    document.querySelectorAll('tbody tr').forEach(function(tr) {
-      let cb = tr.querySelector('[data-select-row="solution-table"]');
-      if (!cb || ids.indexOf(cb.value) === -1) return;
-      let cells = tr.querySelectorAll('td');
-      rows.push([
-        cb.value,
-        (cells[1] && cells[1].querySelector('.font-medium')?.textContent?.trim()) || '',
-        tr.dataset.domain || '',
-        tr.dataset.status || '',
-        tr.dataset.type || '',
-        (cells[5] && cells[5].querySelector('.text-xs')?.textContent?.trim()) || ''
-      ]);
-    });
-
-    let csv = rows.map(function(r) { return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
-    let blob = new Blob([csv], { type: 'text/csv' });
+    let ids = sel.getSelected().map(String);
+    let rows = [['ID', 'Name', 'Domain', 'Status', 'Type', 'Created']];
+    _selectedMeta(ids).forEach(function(m) { rows.push([m.id, m.name, m.domain, m.status, m.type, m.created]); });
+    let csv = rows.map(function(r) { return r.map(function(c) { return '"' + String(c || '').replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
     let a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'solutions_export_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'solutions_export_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
     Platform.toast.success('Exported ' + ids.length + ' solution(s)');
   }
 
-  // CSP-safe event delegation — onclick attributes are blocked by strict-dynamic CSP.
-  // All bulk-action buttons use data-action attributes and are handled here instead.
+  // CSP-safe delegation: every button here uses a data attribute instead of an inline handler.
   document.addEventListener('click', function(e) {
+    let compareItem = e.target.closest('[data-testid^="solution-compare-"]');
+    if (compareItem) { _toggleCompareRow(compareItem.getAttribute('data-testid').replace('solution-compare-', '')); return; }
     let t = e.target.closest('[data-action]');
     if (!t) return;
     let action = t.getAttribute('data-action');
-    if (action === 'bulk-delete-solutions')      { bulkDeleteSolutions(); }
+    if (action === 'bulk-delete-solutions') { bulkDeleteSolutions(); }
     else if (action === 'bulk-export-solutions') { bulkExportSolutions(); }
-    else if (action === 'execute-bulk-delete')   { _executeBulkDelete(); }
-    else if (action === 'close-compare')         { closeSolutionCompare(); }
+    else if (action === 'execute-bulk-delete') { _executeBulkDelete(); }
+    else if (action === 'compare-solutions') { openSolutionCompare(); }
+    else if (action === 'close-compare') { closeSolutionCompare(); }
   });
-
-  let _closeCmpBtn = document.getElementById('btn-close-compare');
-  if (_closeCmpBtn) _closeCmpBtn.addEventListener('click', closeSolutionCompare);
+  document.addEventListener('DOMContentLoaded', function() {
+    let closeBtn = document.getElementById('btn-close-compare');
+    if (closeBtn) closeBtn.addEventListener('click', closeSolutionCompare);
+  });
 </script>
 {% endblock %}
 
 {% block modals %}
-{% call modal(id='sol-bulk-delete-confirm', title='Delete Solutions', size='sm') %}
+{% call modal(id='sol-bulk-delete-confirm', title='Delete solutions', size='sm') %}
 <div class="space-y-4">
-  <p id="sol-bulk-delete-msg" class="text-sm text-muted-foreground">You are about to permanently delete the selected solutions. This action cannot be undone.</p>
+  <p id="sol-bulk-delete-msg" class="text-sm text-muted-foreground">You are about to permanently delete the selected solutions. This cannot be undone.</p>
   <div class="flex justify-end gap-2">
-    <button type="button" data-modal-close="sol-bulk-delete-confirm"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel">
-      Cancel
-    </button>
-    <button type="button" data-action="execute-bulk-delete" id="sol-bulk-delete-btn"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Confirm delete">
-      Delete
-    </button>
+    {{ ui.button(text='Cancel', type='button', variant='outline', attrs={'data-modal-close': 'sol-bulk-delete-confirm'}) }}
+    {{ ui.button(text='Delete', type='button', variant='destructive', id='sol-bulk-delete-btn', attrs={'aria-label': 'Confirm delete', 'data-action': 'execute-bulk-delete'}) }}
   </div>
 </div>
 {% endcall %}
 
-{% call modal(id='template-picker', title='New from Template', description='Pick a pattern to pre-seed the Architecture Journey — the wizard runs in full, with LLM inference and ArchiMate wiring, starting from the template context', size='lg') %}
-<div class="space-y-3 max-h-[60vh] overflow-y-auto">
+{% call modal(id='template-picker', title='New from template', description='Pick a pattern to start the architecture journey from. The journey runs in full, starting from the template.', size='lg') %}
+<div class="max-h-[60vh] space-y-3 overflow-y-auto">
   <div id="template-list" class="space-y-2">
-    <p class="text-sm text-muted-foreground py-4 text-center">Loading templates…</p>
+    <p class="py-4 text-center text-sm text-muted-foreground">Loading templates...</p>
   </div>
 </div>
 {% endcall %}
-
 {% endblock %}

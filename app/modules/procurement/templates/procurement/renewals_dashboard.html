@@ -1,215 +1,159 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
-{% block title %}Renewal Alerts{% endblock %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% block title %}Renewals{% endblock %}
+
+{%- set WINDOWS = [(30, '30 days'), (60, '60 days'), (90, '90 days'), (180, '180 days'), (365, '1 year')] -%}
+{%- set window_label = (WINDOWS|selectattr(0, 'equalto', days_filter|int)|map(attribute=1)|first) or (days_filter ~ ' days') -%}
+
+{% macro _actions() %}
+{% call ui.button(href=url_for('procurement.contracts_list'), variant='outline') %}{{ lucide('list') }}All contracts{% endcall %}
+{% endmacro %}
+
+{% macro _window_filter() %}
+<form method="get" class="flex items-center" data-testid="renewals-window-filter">
+  {% call native_select_wrapper() %}
+    {% call native_select(name='days', size='sm', attrs={'aria-label': 'Renewing within', 'data-autosubmit': ''}) %}
+      {% for value, label in WINDOWS %}
+      {{ native_select_option(text='Within ' ~ label, value=value|string, selected=(days_filter|int == value)) }}
+      {% endfor %}
+    {% endcall %}
+  {% endcall %}
+</form>
+{% endmacro %}
+
+{% macro _empty_action() %}
+{% if summary.unknown %}{{ ui.button(text='Add renewal dates', href=url_for('procurement.contracts_list'), variant='outline', size='sm') }}
+{% elif days_filter|int < 365 %}{{ ui.button(text='Look a year ahead', href=url_for('procurement.renewals_dashboard', days=365), variant='outline', size='sm') }}{% endif %}
+{% endmacro %}
 
 {% block content %}
 <div class="p-6 space-y-6">
-    {{ page_header(
-        title='Renewal Alerts',
-        description='Track upcoming contract renewals and expirations',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Vendor Contracts', 'href': url_for('procurement.contracts_list')},
-            {'label': 'Renewal Alerts'}
-        ],
-        actions=[
-            {'text': 'All Contracts', 'icon': 'list', 'href': url_for('procurement.contracts_list'), 'variant': 'outline'}
-        ]
-    ) }}
+{{ page_shell(title='Renewals', subtitle='Vendor contracts coming up for renewal, soonest first',
+              breadcrumb=[('Home', url_for('main.index')), ('Contracts and licences', url_for('procurement.contracts_list')), ('Renewals', none)],
+              actions_caller=_actions) }}
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div class="bg-card border border-border rounded-lg p-4">
-            <div class="text-sm text-muted-foreground mb-1">Total Active</div>
-            <div class="text-2xl font-bold">{{ summary.total }}</div>
-        </div>
-        <div class="bg-card border border-destructive/50 rounded-lg p-4">
-            <div class="flex items-center gap-2 text-sm text-destructive-emphasis mb-1">
-                <i data-lucide="alert-circle" class="w-4 h-4"></i>
-                Critical (&lt;30d)
-            </div>
-            <div class="text-2xl font-bold text-destructive-emphasis">{{ summary.critical }}</div>
-        </div>
-        <div class="bg-card border border-warning/50 rounded-lg p-4">
-            <div class="flex items-center gap-2 text-sm text-warning-emphasis mb-1">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-                Warning (&lt;90d)
-            </div>
-            <div class="text-2xl font-bold text-warning-emphasis">{{ summary.warning }}</div>
-        </div>
-        <div class="bg-card border border-info/50 rounded-lg p-4">
-            <div class="flex items-center gap-2 text-sm text-info-emphasis mb-1">
-                <i data-lucide="clock" class="w-4 h-4"></i>
-                Upcoming (&lt;180d)
-            </div>
-            <div class="text-2xl font-bold text-info-emphasis">{{ summary.upcoming }}</div>
-        </div>
-        <div class="bg-card border border-success/50 rounded-lg p-4">
-            <div class="flex items-center gap-2 text-sm text-success-emphasis mb-1">
-                <i data-lucide="check-circle" class="w-4 h-4"></i>
-                OK (&gt;180d)
-            </div>
-            <div class="text-2xl font-bold text-success-emphasis">{{ summary.ok }}</div>
-        </div>
-        <div class="bg-card border border-border rounded-lg p-4">
-            <div class="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                <i data-lucide="help-circle" class="w-4 h-4"></i>
-                No Date
-            </div>
-            <div class="text-2xl font-bold">{{ summary.unknown }}</div>
-        </div>
-    </div>
+{% if not summary.total and not contracts %}
+  {% call ui.card(attrs={'data-testid': 'renewals-empty'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('calendar') }}</span>
+      <p class="text-base font-semibold">No active vendor contracts yet</p>
+      <p class="max-w-[60ch] text-sm text-muted-foreground">Add a contract with its end or renewal date and it shows here before it is due.</p>
+      {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Go to contracts{% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% elif not contracts and not ((summary.critical or 0) + (summary.warning or 0) + (summary.upcoming or 0) + (summary.ok or 0) + (summary.expired or 0)) %}
+  {# Active contracts exist but not one carries a date, so nothing can be tracked: say that once. #}
+  {% call ui.card(attrs={'data-testid': 'renewals-undated'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('calendar-days') }}</span>
+      <p class="text-base font-semibold">{{ 'Your active contract has' if summary.total == 1 else 'Your ' ~ summary.total ~ ' active contracts have' }} no renewal date yet</p>
+      <p class="max-w-[60ch] text-sm text-muted-foreground">Renewals can only be tracked once a contract carries its end or renewal date. Add the date on each contract and it shows here before it is due.</p>
+      {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Add renewal dates{% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% else %}
+  {%- set soon = summary.critical or 0 -%}
+  {%- set quarter = summary.warning or 0 -%}
+  {%- set half = summary.upcoming or 0 -%}
+  {%- set undated = summary.unknown or 0 -%}
+  {%- set expired = summary.expired or 0 -%}
+  {{ stat_cards([
+      ({'label': 'Renew within 30 days', 'value': soon, 'icon': 'triangle-alert', 'testid': 'renewals-critical',
+        'sentence': 'Decide now whether to renew, renegotiate or exit', 'href': url_for('procurement.renewals_dashboard', days=30)}
+       if soon else
+       {'label': 'Nothing renews in the next 30 days', 'value': none, 'icon': 'triangle-alert', 'testid': 'renewals-critical',
+        'sentence': (expired ~ ' contract' ~ ('' if expired == 1 else 's') ~ ' already past the end date') if expired else 'No decision is due this month'}),
+      ({'label': 'Renew within 90 days', 'value': quarter, 'icon': 'calendar', 'testid': 'renewals-warning',
+        'sentence': 'Time to compare options before the notice period', 'href': url_for('procurement.renewals_dashboard', days=90)}
+       if quarter else
+       {'label': 'Nothing more in the next 90 days', 'value': none, 'icon': 'calendar', 'testid': 'renewals-warning',
+        'sentence': 'No contract enters its notice window this quarter'}),
+      ({'label': 'Renew within 180 days', 'value': half, 'icon': 'clock', 'testid': 'renewals-upcoming',
+        'sentence': 'Coming up in the next six months', 'href': url_for('procurement.renewals_dashboard', days=180)}
+       if half else
+       {'label': 'Nothing more in six months', 'value': none, 'icon': 'clock', 'testid': 'renewals-upcoming',
+        'sentence': (summary.ok ~ ' contract' ~ ('' if summary.ok == 1 else 's') ~ ' renew later than that') if summary.ok else 'No contract renews in this half year'}),
+      ({'label': 'Without a renewal date', 'value': undated, 'icon': 'calendar-days', 'testid': 'renewals-unknown',
+        'sentence': 'Cannot be tracked until a date is added', 'href': url_for('procurement.contracts_list')}
+       if undated else
+       {'label': 'Every contract has a renewal date', 'value': none, 'icon': 'circle-check', 'testid': 'renewals-unknown',
+        'sentence': 'All ' ~ summary.total ~ ' active contracts can be tracked'}),
+  ], testid='renewals-summary') }}
 
-    <!-- Filter -->
-    <div class="bg-card border border-border rounded-lg p-4">
-        <form method="get" class="flex items-center gap-4">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Show contracts expiring within:</label>
-            <select name="days" data-autosubmit
-                    class="h-9 px-3 rounded-md border border-input bg-background text-sm" aria-label="Days">
-                <option value="30" {% if days_filter|int == 30 %}selected{% endif %}>30 days</option>
-                <option value="60" {% if days_filter|int == 60 %}selected{% endif %}>60 days</option>
-                <option value="90" {% if days_filter|int == 90 %}selected{% endif %}>90 days</option>
-                <option value="180" {% if days_filter|int == 180 %}selected{% endif %}>180 days</option>
-                <option value="365" {% if days_filter|int == 365 %}selected{% endif %}>1 year</option>
-            </select>
-        </form>
-    </div>
-
-    <!-- Expiring Contracts -->
-    {% if contracts %}
-    <div class="space-y-4">
-        {% for item in contracts %}
-        <div class="bg-card border rounded-lg p-4 hover:border-primary/50 transition-colors
-            {% if item.urgency == 'critical' %}border-destructive/50
-            {% elif item.urgency == 'warning' %}border-warning/50
-            {% elif item.urgency == 'expired' %}border-destructive
-            {% else %}border-border{% endif %}"
-            x-data="{
-                open: false,
-                loading: false,
-                error: null,
-                brief: null,
-                generate() {
-                    const self = this;
-                    this.loading = true;
-                    this.error = null;
-                    return Platform.fetch('{{ url_for('procurement.contract_ai_renewal_brief', contract_id=item.contract.id) }}', {
-                            method: 'POST',
-                            silent: true
-                        })
-                        .then(function (body) {
-                            self.brief = body.brief;
-                            self.loading = false;
-                        })
-                        .catch(function (e) {
-                            self.brief = null;
-                            self.error = e.message || 'AI renewal brief failed - check your connection and try again.';
-                            self.loading = false;
-                        });
-                }
-            }">
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-2">
-                        <h3 class="font-medium">{{ item.contract.contract_name }}</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                            {% if item.urgency == 'critical' %}bg-destructive/10 text-destructive-emphasis
-                            {% elif item.urgency == 'warning' %}bg-warning/10 text-warning-emphasis
-                            {% elif item.urgency == 'expired' %}bg-destructive/10 text-destructive-emphasis
-                            {% else %}bg-info/10 text-info-emphasis{% endif %}">
-                            {% if item.urgency == 'expired' %}EXPIRED
-                            {% elif item.urgency == 'critical' %}CRITICAL
-                            {% elif item.urgency == 'warning' %}WARNING
-                            {% else %}UPCOMING{% endif %}
-                        </span>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                            <span class="text-muted-foreground">Vendor:</span>
-                            <span class="ml-1">{{ item.contract.vendor.name if item.contract.vendor else '—' }}</span>
-                        </div>
-                        <div>
-                            <span class="text-muted-foreground">Contract #:</span>
-                            <span class="ml-1">{{ item.contract.contract_number or '—' }}</span>
-                        </div>
-                        <div>
-                            <span class="text-muted-foreground">Annual Cost:</span>
-                            <span class="ml-1">{{ item.contract.annual_cost|format_currency if item.contract.annual_cost else '—' }}</span>
-                        </div>
-                        <div>
-                            <span class="text-muted-foreground">Renewal Date:</span>
-                            <span class="ml-1">{{ (item.contract.renewal_date or item.contract.end_date).strftime('%d %b %Y') if (item.contract.renewal_date or item.contract.end_date) else '—' }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex flex-col items-end gap-2 ml-4">
-                    <div class="text-2xl font-bold
-                        {% if item.urgency == 'critical' or item.urgency == 'expired' %}text-destructive-emphasis
-                        {% elif item.urgency == 'warning' %}text-warning-emphasis
-                        {% else %}text-info-emphasis{% endif %}">
-                        {% if item.urgency == 'expired' %}Expired
-                        {% else %}{{ item.days_until_renewal }}d{% endif %}
-                    </div>
-                    <a href="{{ url_for('procurement.contract_detail', contract_id=item.contract.id) }}"
-                       class="text-sm text-primary hover:underline">View Details</a>
-                </div>
-            </div>
-
-            <div class="mt-3 pt-3 border-t border-border">
-                <button type="button" @click="open = !open; if (open && !brief && !loading) generate()"
-                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-                    <i data-lucide="sparkles" class="w-4 h-4"></i>
-                    <span x-text="open ? 'Hide AI brief' : 'AI brief'"></span>
-                </button>
-
-                <div x-show="open" x-cloak class="mt-3 space-y-3">
-                    <div x-show="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-                        Generating renewal brief…
-                    </div>
-                    <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
-                    <template x-if="brief">
-                        <div class="bg-muted/40 border border-border rounded-md p-3 space-y-2 text-sm">
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stance</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis" x-text="brief.stance"></span>
-                            </div>
-                            <p x-text="brief.summary"></p>
-                            <div x-show="brief.leverage_points && brief.leverage_points.length">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Leverage points</div>
-                                <ul class="list-disc list-inside space-y-0.5">
-                                    <template x-for="point in brief.leverage_points" :key="point"><li x-text="point"></li></template>
-                                </ul>
-                            </div>
-                            <div x-show="brief.risks && brief.risks.length">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Risks</div>
-                                <ul class="list-disc list-inside space-y-0.5">
-                                    <template x-for="risk in brief.risks" :key="risk"><li x-text="risk"></li></template>
-                                </ul>
-                            </div>
-                            <div x-show="brief.questions_for_vendor && brief.questions_for_vendor.length">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Questions for vendor</div>
-                                <ul class="list-disc list-inside space-y-0.5">
-                                    <template x-for="q in brief.questions_for_vendor" :key="q"><li x-text="q"></li></template>
-                                </ul>
-                            </div>
-                            <p class="text-muted-foreground italic" x-text="brief.rationale"></p>
-                        </div>
-                    </template>
-                </div>
-            </div>
+  {% if brief or brief_error %}
+  {% call ui.card(id='renewal-brief', attrs={'data-testid': 'renewal-brief'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Renewal brief: ' ~ brief_contract.contract_name) }}
+      {{ ui.card_description(text='Advice for the conversation with ' ~ (brief_contract.vendor.name if brief_contract.vendor else 'the vendor') ~ '. Nothing is changed on the contract.') }}
+      {% call ui.card_action() %}{{ ui.button(text='Close', href=url_for('procurement.renewals_dashboard', days=days_filter), variant='ghost', size='sm') }}{% endcall %}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4 text-sm') %}
+      {% if brief_error %}
+        <p class="text-muted-foreground" role="status">{{ brief_error }}</p>
+      {% else %}
+        {% if brief.stance %}<p class="flex items-center gap-2"><span class="font-medium">Recommended stance</span>{{ state_badge(brief.stance, tone='neutral') }}</p>{% endif %}
+        {% if brief.summary %}<p>{{ brief.summary }}</p>{% endif %}
+        <div class="grid gap-4 md:grid-cols-3">
+          {% for title, points in [('Leverage you have', brief.leverage_points), ('Risks', brief.risks), ('Questions for the vendor', brief.questions_for_vendor)] %}
+          {% if points %}
+          <div class="space-y-1">
+            <p class="font-medium">{{ title }}</p>
+            <ul class="list-disc space-y-0.5 pl-4 text-muted-foreground">{% for p in points %}<li>{{ p }}</li>{% endfor %}</ul>
+          </div>
+          {% endif %}
+          {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state(
-        icon='check-circle',
-        title='No expiring contracts',
-        description='No contracts are expiring within the next ' + days_filter|string + ' days.'
-    ) }}
-    {% endif %}
+        {% if brief.rationale %}<p class="text-muted-foreground">{{ brief.rationale }}</p>{% endif %}
+      {% endif %}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
+
+  {%- if contracts -%}
+    {%- set empty_msg = '' -%}
+  {%- elif undated -%}
+    {%- set empty_msg = 'No dated contract renews within ' ~ window_label ~ '. ' ~ undated ~ ' active contract' ~ (' has' if undated == 1 else 's have') ~ ' no renewal date, so ' ~ ('it is' if undated == 1 else 'they are') ~ ' not tracked here: add the date on each contract.' -%}
+  {%- else -%}
+    {%- set empty_msg = 'No contract renews within ' ~ window_label ~ '.' -%}
+  {%- endif -%}
+  {% call(item) list_table(rows=contracts, columns=[('Contract', ''), ('Vendor', ''), {'label': 'Annual cost', 'align': 'right', 'sortable': true}, {'label': 'Renews', 'sortable': true}, ('Status', ''), {'label': '', 'class': 'w-12'}],
+                           caption='Contracts renewing within ' ~ window_label, testid='renewals-table', row_testid='renewal-row',
+                           search_placeholder='Filter contracts...', toolbar=true, toolbar_actions=_window_filter,
+                           empty_message=empty_msg, empty_action=_empty_action) %}
+    {%- set c = item.contract -%}
+    {%- set when = c.renewal_date or c.end_date -%}
+    {% call table_cell(class='max-w-[320px]') %}
+      <a href="{{ url_for('procurement.contract_detail', contract_id=c.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="renewal-contract-link">{{ c.contract_name }}</a>
+      {% if c.contract_number %}<span class="block truncate text-xs text-muted-foreground">{{ c.contract_number }}</span>{% endif %}
+    {% endcall %}
+    {% call table_cell(class='max-w-[200px] truncate') %}{{ value_or_unset(c.vendor.name if c.vendor else none) }}{% endcall %}
+    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': c.annual_cost if c.annual_cost is not none else -1}) %}
+      {{ value_or_unset(c.annual_cost|format_currency if c.annual_cost is not none else none) }}
+    {% endcall %}
+    {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': item.days_until_renewal}) %}{{ when|format_date if when else value_or_unset(none) }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap') %}
+      {% if item.urgency == 'expired' %}
+        {{ state_badge('Expired ' ~ (-item.days_until_renewal) ~ (' day' if item.days_until_renewal == -1 else ' days') ~ ' ago', tone='negative') }}
+      {% elif item.days_until_renewal == 0 %}
+        {{ state_badge('Today', tone='negative') }}
+      {% else %}
+        {{ state_badge('In ' ~ item.days_until_renewal ~ (' day' if item.days_until_renewal == 1 else ' days'),
+                       tone={'critical': 'negative', 'warning': 'caution', 'upcoming': 'neutral'}.get(item.urgency, 'positive')) }}
+      {% endif %}
+    {% endcall %}
+    {% call table_cell(class='w-12 text-right') %}
+      {% call row_actions('Actions for ' ~ c.contract_name) %}
+          {{ row_action('Open contract', href=url_for('procurement.contract_detail', contract_id=c.id), testid='renewal-open') }}
+          {% if ai_available %}{{ row_action('Prepare renewal brief', href=url_for('procurement.renewals_dashboard', days=days_filter, brief=c.id) ~ '#renewal-brief', testid='renewal-brief-link') }}{% endif %}
+        {% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% endif %}
 </div>
-
-<script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 {% endblock %}

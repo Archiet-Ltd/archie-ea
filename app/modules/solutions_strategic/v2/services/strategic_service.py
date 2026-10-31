@@ -205,6 +205,7 @@ class StrategicService:
             initiative = StrategicInitiative(
                 name=data["name"],
                 description=data.get("description"),
+                record_kind=data.get("record_kind"),
                 status=data.get("status", "draft"),
                 priority=data.get("priority", "medium"),
                 budget_allocated=data.get("budget_allocated", 0.0),

@@ -15,6 +15,7 @@ import time
 import uuid
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 
@@ -211,7 +212,7 @@ def test_an_invited_teammate_joins_the_inviters_organisation(browser, mail_serve
         page.select_option("#role", "architect")
         page.get_by_role("button", name="Send invitation").click()
         page.wait_for_url("**/admin/team", timeout=PAGE_TIMEOUT)
-        row = page.locator('[data-invitation-email="%s"]' % invitee)
+        row = _invitation_row(page, invitee)
         row.wait_for(timeout=PAGE_TIMEOUT)
         assert row.locator('[data-invitation-delivery="sent"]').count() == 1
 
@@ -258,13 +259,20 @@ def test_an_invited_teammate_joins_the_inviters_organisation(browser, mail_serve
         context.close()
 
 
+def _invitation_row(page, address):
+    """The invitations table row for *address*: the e-mail cell names it, and
+    the delivery state and the row's actions sit in sibling cells."""
+    return page.locator('[data-testid="invitation-row"]').filter(
+        has=page.locator('[data-invitation-email="%s"]' % address))
+
+
 def _invite_from_team_page(page, base, address, role="architect"):
     page.goto(base + "/admin/team", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.fill("#email", address)
     page.select_option("#role", role)
     page.get_by_role("button", name="Send invitation").click()
     page.wait_for_url("**/admin/team", timeout=PAGE_TIMEOUT)
-    row = page.locator('[data-invitation-email="%s"]' % address)
+    row = _invitation_row(page, address)
     row.wait_for(timeout=PAGE_TIMEOUT)
     return row
 
@@ -332,9 +340,15 @@ def test_a_withdrawn_invitation_frees_the_address_to_register(browser, mail_serv
     page = context.new_page()
     try:
         _sign_in(page, mail_server, owner["email"])
-        _invite_from_team_page(page, mail_server, invitee)
+        row = _invite_from_team_page(page, mail_server, invitee)
         link = _link_in(smtp_sink.text_to(invitee), "/account/join/")
-        page.get_by_role("button", name="Withdraw invitation to %s" % invitee).click()
+        # Withdraw is in the row's actions menu and asks for confirmation.
+        row.get_by_role("button", name="Actions for %s" % invitee).click()
+        page.get_by_role("menuitem", name="Withdraw").click()
+        dialog = page.get_by_role("dialog")
+        expect(dialog).to_contain_text("Withdraw the invitation to %s?" % invitee)
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            dialog.get_by_role("button", name="Confirm").click()
         page.wait_for_url("**/admin/team", timeout=PAGE_TIMEOUT)
         page.reload(wait_until="domcontentloaded")
         assert page.locator('[data-invitation-email="%s"]' % invitee).count() == 0

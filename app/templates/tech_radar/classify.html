@@ -1,0 +1,129 @@
+{# design-block: record-detail #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import section, state_badge %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% block title %}{{ element.name or 'Technology' }} on the radar{% endblock %}
+
+{% macro human_type(t, fallback='Technology') -%}
+{%- if not t -%}{{ fallback }}{%- else -%}
+{%- set ns = namespace(out='') -%}
+{%- for ch in t|string -%}{%- if ch.isupper() and not loop.first -%}{%- set ns.out = ns.out ~ ' ' ~ ch|lower -%}{%- else -%}{%- set ns.out = ns.out ~ ch -%}{%- endif -%}{%- endfor -%}
+{{ ns.out|replace('_', ' ') }}
+{%- endif -%}
+{%- endmacro %}
+
+{%- set RING_TONE = {'adopt': 'positive', 'trial': 'caution', 'assess': 'neutral', 'hold': 'negative'} -%}
+
+{% block content %}
+<div class="p-6 space-y-6">
+{{ page_shell(title=element.name or 'Unnamed element',
+              subtitle=human_type(element.type) ~ (' in ' ~ ring_labels[current_ring] if current_ring else ', not yet on the radar'),
+              breadcrumb=[('Home', url_for('main.index')), ('Technology radar', url_for('tech_radar.index')), (element.name or 'Technology', none)]) }}
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+  {% call section('Place on the radar', 'The ring, why, and when to look at it again.', testid='radar-classify-section') %}
+    <form method="POST" action="{{ url_for('tech_radar.classify') }}" class="max-w-2xl space-y-6" data-testid="radar-classify-form-{{ element.id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="archimate_element_id" value="{{ element.id }}">
+      {% call ui.field() %}
+        {{ ui.field_label(text='Ring', attrs={'for': 'radar-ring-input'}) }}
+        {% call native_select_wrapper(class='w-full') %}
+          {% call native_select(name='ring', class='w-full', required=true, attrs={'id': 'radar-ring-input'}) %}
+            {% if not current_ring %}{{ native_select_option(text='Choose a ring', value='', selected=true, disabled=true) }}{% endif %}
+            {% for r in rings %}{{ native_select_option(text=ring_labels[r], value=r, selected=(r == current_ring)) }}{% endfor %}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Rationale', attrs={'for': 'radar-rationale-input'}) }}
+        {{ ui.textarea(id='radar-rationale-input', name='rationale', rows=3, maxlength=2000, class='w-full', text=(entry.rationale if entry and entry.rationale else '')) }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Review by', attrs={'for': 'radar-review-input'}) }}
+        {{ ui.input(id='radar-review-input', type='date', name='review_date', class='w-48', value=(entry.review_date.isoformat() if entry and entry.review_date else '')) }}
+      {% endcall %}
+      <div x-data="radarInitiativePicker" class="relative space-y-2"
+           data-id="{{ entry.requesting_initiative.id if entry and entry.requesting_initiative else '' }}"
+           data-name="{{ entry.requesting_initiative.name if entry and entry.requesting_initiative else '' }}" x-init="restore">
+        {{ ui.field_label(text='Requesting initiative', attrs={'for': 'radar-initiative'}) }}
+        <input type="hidden" name="requesting_initiative_id" :value="picked ? picked.id : ''">
+        {{ ui.input(id='radar-initiative', type='text', autocomplete='off', placeholder='Search initiatives and programmes',
+                    attrs={'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': "results.length > 0 ? 'true' : 'false'",
+                           'aria-controls': 'radar-initiative-results', 'x-model': 'query', '@input.debounce.300ms': 'search'}) }}
+        <ul id="radar-initiative-results" role="listbox" x-show="results.length" x-cloak
+            class="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover">
+          <template x-for="item in results" :key="item.id">
+            <li role="option" aria-selected="false">
+              {{ ui.button(type='button', variant='ghost', size='sm', class='h-auto w-full justify-start px-2 py-1.5 text-left', attrs={'@click': 'choose', ':data-id': 'item.id', ':data-name': 'item.name', 'x-text': 'item.name'}) }}
+            </li>
+          </template>
+        </ul>
+        <p class="text-sm text-muted-foreground" x-show="error" x-cloak x-text="error" role="alert"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        {{ ui.button(text='Save', type='submit', attrs={'data-testid': 'radar-classify-' ~ element.id}) }}
+        {{ ui.button(text='Cancel', href=url_for('tech_radar.index'), variant='outline') }}
+      </div>
+    </form>
+  {% endcall %}
+  </div>
+
+  <div>
+  {% call section('Same type in your model', 'Other ' ~ human_type(element.type)|lower ~ ' elements and where they sit.', testid='radar-same-type-' ~ element.id) %}
+    {% if peers %}
+    <ul class="divide-y text-sm">
+      {% for peer in peers[:20] %}
+      <li class="flex items-center justify-between gap-3 py-2">
+        <span class="min-w-0 truncate">{{ peer.name or 'Unnamed element' }}</span>
+        {% if peer.ring %}{{ state_badge(ring_labels[peer.ring], tone=RING_TONE.get(peer.ring)) }}{% else %}<span class="shrink-0 text-muted-foreground">Not placed</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if peers|length > 20 %}<p class="pt-2 text-sm text-muted-foreground">and {{ peers|length - 20 }} more</p>{% endif %}
+    {% else %}
+    <p class="text-sm text-muted-foreground">No other {{ human_type(element.type)|lower }} elements in your model.</p>
+    {% endif %}
+  {% endcall %}
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+  // Live-search picker over the organisation's initiatives and programmes.
+  window.radarInitiativePicker = function () {
+    return {
+      query: '',
+      results: [],
+      picked: null,
+      error: '',
+      // The initiative already recorded, read from the wrapper's data attributes.
+      restore() {
+        const id = this.$el.dataset.id;
+        const name = this.$el.dataset.name;
+        if (id) { this.picked = { id: id, name: name }; this.query = name; }
+      },
+      search() {
+        const q = this.query.trim();
+        this.error = '';
+        if (this.picked && q !== this.picked.name) this.picked = null;
+        if (q.length < 2) { this.results = []; return; }
+        Platform.fetch.get('/api/programmes/search?q=' + encodeURIComponent(q), null, { silent: true })
+          .then((rows) => { this.results = Array.isArray(rows) ? rows : []; })
+          .catch(() => { this.results = []; this.error = 'Initiatives could not be searched.'; });
+      },
+      choose(event) {
+        const el = event.currentTarget;
+        this.picked = { id: el.dataset.id, name: el.dataset.name };
+        this.query = el.dataset.name;
+        this.results = [];
+      },
+    };
+  };
+</script>
+{% endblock %}

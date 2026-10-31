@@ -1,0 +1,189 @@
+{# The list table: the one way a page lists records (data-type register: record-list).
+
+   shadcn's Data Table (ui.shadcn.com/examples/tasks), as flask-basecoat ports it in examples/ported/tasks.html:
+   a toolbar (filter, Reset, page actions, View menu to hide columns), the table in a rounded border, and a footer
+   (row count, Rows per page, Page X of Y, first / previous / next / last). Behaviour lives in
+   static/js/data-table.js, which the CSP allows; nothing here needs inline script or Alpine expressions.
+
+   {% from 'components/list_table.html' import list_table, row_actions, row_action %}
+   {% call(o) list_table(rows=options, columns=[('Option', ''), ('Cost', ''), {'label': 'Summary', 'class': 'hidden md:table-cell'}],
+                         caption='Options compared', testid='options-table', row_testid='option-row',
+                         empty_message='No options yet. Add the first one to compare.') %}
+     {% call table_cell(class='font-medium') %}{{ o.name }}{% endcall %}
+     ...
+   {% endcall %}
+
+   rows             the records; the call block renders one row's cells (table_cell from basecoat/table.html)
+   columns          (label, header classes) pairs or {'label', 'class', 'align': 'right', 'sortable': true} mappings
+   caption          what the table lists, read by screen readers
+   testid           the table's test id; the wrapper is <testid>-pager
+   row_testid       each row's test id
+   page_size        rows per page (10, 20, 25, 30, 40 or 50)
+   toolbar          true / false; by default shown once there are more than 8 rows
+   toolbar_actions  a macro rendering buttons at the right of the toolbar, before View
+   empty_message    shown in the table when there are no rows; empty_action is an optional macro for the next step
+   notice           one sentence about every row at once ("None of these contracts has a renewal date yet"), shown
+                    once at the top of the table, above its toolbar, so no row repeats it
+   server_pagination  set when the server pages the rows: every row given is shown, the table's own footer is left
+                    out, and a macro passed here renders the server's pager in its place
+   footer_count     a macro for the footer's left side in place of the row count ("0 of 21 row(s) selected")
+   Every named column sorts (by each cell's data-sort attribute, table_cell(attrs={'data-sort': value}), or its
+   text) unless its mapping says 'sortable': false. The footer shows whenever there are rows; with none, the table
+   shows its empty message without a header row.
+
+   A list of ArchiMate elements uses components/element_table.html, which is this table with the element's name
+   and link in the first column. #}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu, dropdown_menu_trigger, dropdown_menu_content, dropdown_menu_label, dropdown_menu_separator, dropdown_menu_item, dropdown_menu_checkbox_item, dropdown_menu_checkbox_item_indicator %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{%- macro _col(col) -%}
+{%- if col is mapping -%}{{ col.get('label', '') }}{%- else -%}{{ col[0] }}{%- endif -%}
+{%- endmacro -%}
+
+{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_action=none, server_pagination=none, notice=none, footer_count=none) %}
+{%- set cells = caller -%}
+{%- set rows = rows or [] -%}
+{%- set total = rows|length -%}
+{%- set show_toolbar = toolbar if toolbar is not none else (total > 8 or toolbar_actions) -%}
+{%- set show_footer = total > 0 and not server_pagination -%}
+{%- set page_size = (total or 1) if server_pagination else page_size -%}
+{%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
+<div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
+  {% if notice %}<p class="flex items-start gap-2 text-sm text-muted-foreground" data-slot="data-table-notice">{{ lucide('info', class='mt-0.5 size-4 shrink-0') }}<span>{{ notice }}</span></p>{% endif %}
+  {% if show_toolbar %}
+  <div class="flex items-center justify-between gap-2" data-slot="data-table-toolbar">
+    <div class="flex flex-1 items-center gap-2">
+      {% if total > 0 %}
+      {{ input(type='search', placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', attrs={'aria-label': search_placeholder, 'data-table-filter': ''}) }}
+      {% call button(variant='ghost', size='sm', class='h-8 px-2 lg:px-3', attrs={'data-table-reset': '', 'hidden': true}) %}Reset{{ lucide('x') }}{% endcall %}
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      {% if columns|length > 2 and total > 0 %}
+      {% call dropdown_menu() %}
+        {% call dropdown_menu_trigger(variant='outline', size='sm', class='ml-auto hidden h-8 lg:flex') %}{{ lucide('settings-2') }}View{% endcall %}
+        {% call dropdown_menu_content(align='end', class='w-[180px]') %}
+          {{ dropdown_menu_label(text='Toggle columns') }}
+          {{ dropdown_menu_separator() }}
+          {% for col in columns %}{% if not loop.first and _col(col)|trim %}
+            {% call dropdown_menu_checkbox_item(checked=true, attrs={'data-table-toggle': loop.index0, 'data-table-owner': testid}) %}
+              {% call dropdown_menu_checkbox_item_indicator(checked=true) %}{{ lucide('check') }}{% endcall %}{{ _col(col) }}
+            {% endcall %}
+          {% endif %}{% endfor %}
+        {% endcall %}
+      {% endcall %}
+      {% endif %}
+      {% if toolbar_actions %}{{ toolbar_actions() }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div data-slot="table-container" class="overflow-x-auto rounded-md border">
+    {% call table(attrs={'data-testid': testid}) %}
+      {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
+      {% if total > 0 %}
+      {% call table_header() %}
+        {% call table_row() %}
+          {% for col in columns %}
+            {%- set m = col if col is mapping else {'label': col[0], 'class': (col[1] if col|length > 1 else '')} -%}
+            {%- set cls = ((m.get('class') or '') ~ (' text-right' if m.get('align') == 'right' else ''))|trim -%}
+            {% call table_head(class=cls, attrs={'scope': 'col', 'data-col': loop.index0}) %}
+              {%- if m.get('sortable', (m.label or '')|trim != '') and total > 1 -%}
+                {%- set right = m.get('align') == 'right' -%}
+                {% call dropdown_menu() %}
+                  {% call dropdown_menu_trigger(variant='ghost', size='sm', class=('-mr-3 ml-auto flex-row-reverse' if right else '-ml-3') ~ ' h-8 data-[state=open]:bg-accent', attrs={'data-table-sort-trigger': loop.index0}) %}
+                    <span>{{ m.label }}</span><span class="contents" data-sort-icon="none">{{ lucide('chevrons-up-down') }}</span><span class="contents" data-sort-icon="asc" hidden>{{ lucide('arrow-up') }}</span><span class="contents" data-sort-icon="desc" hidden>{{ lucide('arrow-down') }}</span>
+                  {% endcall %}
+                  {% call dropdown_menu_content(align=('end' if right else 'start')) %}
+                    {% call dropdown_menu_item(attrs={'data-table-sort': loop.index0, 'data-dir': 'asc', 'data-table-owner': testid}) %}{{ lucide('arrow-up') }}Ascending{% endcall %}
+                    {% call dropdown_menu_item(attrs={'data-table-sort': loop.index0, 'data-dir': 'desc', 'data-table-owner': testid}) %}{{ lucide('arrow-down') }}Descending{% endcall %}
+                  {% endcall %}
+                {% endcall %}
+              {%- else -%}
+                {{ m.label }}
+              {%- endif -%}
+            {% endcall %}
+          {% endfor %}
+        {% endcall %}
+      {% endcall %}
+      {% endif %}
+      {% call table_body(attrs={'data-table-body': ''}) %}
+        {% for row in rows %}
+          {%- set attrs = {'data-testid': row_testid, 'data-row': loop.index0} -%}
+          {%- if loop.index > page_size %}{% set _ = attrs.update({'hidden': true}) %}{% endif -%}
+          {% call table_row(attrs=attrs) %}{{ cells(row) }}{% endcall %}
+        {% endfor %}
+        {% if total == 0 %}
+          {% call table_row(class='hover:bg-transparent', attrs={'data-table-none': ''}) %}
+            {% call table_cell(class='h-24 text-center whitespace-normal text-muted-foreground', attrs={'colspan': columns|length}) %}
+              <p>{{ empty_message }}</p>
+              {% if empty_action %}<div class="mt-3 flex justify-center">{{ empty_action() }}</div>{% endif %}
+            {% endcall %}
+          {% endcall %}
+        {% else %}
+          {% call table_row(class='hover:bg-transparent', attrs={'data-table-empty': '', 'hidden': true}) %}
+            {{ table_cell(text='No results.', class='h-24 text-center text-muted-foreground', attrs={'colspan': columns|length}) }}
+          {% endcall %}
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+  </div>
+
+  {% if server_pagination is callable %}{{ server_pagination() }}{% endif %}
+  {% if show_footer %}
+  <div class="flex items-center justify-between px-2" data-slot="data-table-pagination">
+    {% if footer_count %}{{ footer_count() }}{% else %}<div class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{{ total }} rows</div>{% endif %}
+    <div class="flex items-center space-x-6 lg:space-x-8">
+      <div class="hidden items-center space-x-2 sm:flex">
+        <p class="text-sm font-medium">Rows per page</p>
+        {% call native_select_wrapper(class='w-[72px]') %}
+          {% call native_select(size='sm', attrs={'aria-label': 'Rows per page', 'data-table-size': ''}) %}
+            {% for opt in [10, 20, 25, 30, 40, 50] %}{{ native_select_option(text=opt|string, value=opt|string, selected=(opt == page_size)) }}{% endfor %}
+          {% endcall %}
+        {% endcall %}
+      </div>
+      <div class="flex w-[100px] items-center justify-center text-sm font-medium tabular-nums" data-table-page>Page 1 of {{ pages }}</div>
+      <div class="flex items-center space-x-2">
+        {% call button(variant='outline', size='icon', class='hidden size-8 lg:flex', disabled=true, attrs={'data-table-pager': 'first'}) %}<span class="sr-only">Go to first page</span>{{ lucide('chevrons-left') }}{% endcall %}
+        {% call button(variant='outline', size='icon', class='size-8', disabled=true, attrs={'data-table-pager': 'prev'}) %}<span class="sr-only">Go to previous page</span>{{ lucide('chevron-left') }}{% endcall %}
+        {% call button(variant='outline', size='icon', class='size-8', disabled=(pages <= 1), attrs={'data-table-pager': 'next'}) %}<span class="sr-only">Go to next page</span>{{ lucide('chevron-right') }}{% endcall %}
+        {% call button(variant='outline', size='icon', class='hidden size-8 lg:flex', disabled=(pages <= 1), attrs={'data-table-pager': 'last'}) %}<span class="sr-only">Go to last page</span>{{ lucide('chevrons-right') }}{% endcall %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{#- The row's actions, as shadcn's tasks table has them: one ghost ellipsis button opening a menu.
+    {% call table_cell(class='w-12 text-right') %}{% call row_actions() %}
+      {{ row_action('Open', href=url) }}
+      {{ row_action('Delete', action=delete_url, destructive=true, confirm='Delete this contract? This cannot be undone.') }}
+    {% endcall %}{% endcall %} -#}
+{% macro row_actions(label='Open menu') -%}
+{#- the body is taken first: a nested call block cannot reach this macro's caller -#}
+{%- set body = caller() -%}
+{%- call dropdown_menu() -%}
+  {%- call dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">{{ label }}</span>{%- endcall -%}
+  {%- call dropdown_menu_content(align='end', class='w-[160px]') -%}{{ body }}{%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
+
+{#- One action in row_actions: a link (href), or a form post (action) with an optional confirmation. -#}
+{% macro row_action(text, href=none, action=none, destructive=false, confirm=none, separator_before=false, testid=none) -%}
+{%- if separator_before %}{{ dropdown_menu_separator() }}{% endif -%}
+{%- set attrs = {'data-testid': testid} if testid else {} -%}
+{%- if action -%}
+<form method="post" action="{{ action }}"{% if confirm %} data-confirm="{{ confirm }}"{% endif %}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {{ dropdown_menu_item(text=text, tag='button', type='submit', variant=('destructive' if destructive else none), class='w-full', attrs=attrs) }}
+</form>
+{%- elif href -%}
+{{ dropdown_menu_item(text=text, href=href, variant=('destructive' if destructive else none), attrs=attrs) }}
+{%- else -%}
+{{ dropdown_menu_item(text=text, variant=('destructive' if destructive else none), attrs=attrs) }}
+{%- endif -%}
+{%- endmacro %}

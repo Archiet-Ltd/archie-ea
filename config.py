@@ -103,6 +103,8 @@ else:
 
 
 class Config:
+    # Vendor detection reads the public DNS records of an organisation's own website domain.
+    VENDOR_DNS_LOOKUPS = True
     # Webhook and compliance-check URLs may point at loopback/private hosts only
     # where this is True. It is False everywhere by default; Development and
     # Testing can opt in with the environment variable of the same name. No
@@ -136,6 +138,16 @@ class Config:
             "for this session. Sessions will NOT persist across restarts. "
             "Set SECRET_KEY in your .env file for production use."
         )
+    # The Entelim GitHub App: lets a person connect GitHub with one click
+    # instead of pasting a token. All three must be set for the one-click
+    # button to appear; with any unset, the connect pages fall back to the
+    # token form, which always works. The id and slug are not secret; the
+    # private key is a file path, never the key's contents.
+    GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID", "")
+    GITHUB_APP_SLUG = os.environ.get("GITHUB_APP_SLUG", "")
+    GITHUB_APP_PRIVATE_KEY_PATH = os.environ.get("GITHUB_APP_PRIVATE_KEY_PATH", "")
+    GITHUB_APP_CLIENT_ID = os.environ.get("GITHUB_APP_CLIENT_ID", "")
+    GITHUB_APP_CLIENT_SECRET = os.environ.get("GITHUB_APP_CLIENT_SECRET", "")
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     # Separate from SECRET_KEY so database command capabilities can be rotated
     # without invalidating sessions. This value is shared only by the schema
@@ -266,6 +278,9 @@ class Config:
     # page, including /contact). Unset means enquiries are still stored, just
     # not emailed — see app/main/views.py:product_inquiry_submit.
     SALES_NOTIFY_EMAIL = os.environ.get("SALES_NOTIFY_EMAIL")
+    # Who hears of a new sign-up that has stalled, and gets the daily sign-up report
+    # (app/services/signup_attribution.py). Unset means neither is sent.
+    FOUNDER_ALERT_EMAIL = os.environ.get("FOUNDER_ALERT_EMAIL")
 
     # Analytics
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")
@@ -503,6 +518,13 @@ class Config:
     }
     UPLOAD_FOLDER = os.path.join(basedir, "uploads", "documents")
 
+    # Asset manifest reload (QA-015): the shared preview runs the production
+    # configuration (TestingConfig sets DEBUG=False), so we need a separate flag
+    # to control whether the manifest is reloaded when its mtime changes without
+    # a restart. True in every non-production config; False in production and
+    # its subclasses.
+    ASSET_MANIFEST_RELOAD = True
+
     @staticmethod
     def init_app(app):
         """Base class hook — subclasses override to customize app initialization."""
@@ -572,6 +594,8 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    # Tests use recorded DNS answers, never live lookups.
+    VENDOR_DNS_LOOKUPS = False
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
         "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
     ).lower() in ("1", "true", "yes")
@@ -596,8 +620,11 @@ class TestingConfig(Config):
     # design (it must not silently store a credential in plaintext). Generated
     # at import time rather than a literal, so nothing here reads as a real key.
     from cryptography.fernet import Fernet as _Fernet
-    CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
-    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
+    # A key set in the environment wins, so a preview server and the scripts
+    # that connect a source to it (or several worker processes) share one
+    # vault key; without one, each process gets its own generated key.
+    CREDENTIAL_ENCRYPTION_KEY = os.environ.get("CREDENTIAL_ENCRYPTION_KEY") or _Fernet.generate_key().decode()
+    ORG_ENCRYPTION_MASTER_KEY = os.environ.get("ORG_ENCRYPTION_MASTER_KEY") or _Fernet.generate_key().decode()
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per
@@ -702,6 +729,7 @@ class SmokeTestingConfig(TestingConfig):
 class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
+    ASSET_MANIFEST_RELOAD = False
 
     # Session cookie security.
     #
@@ -829,7 +857,7 @@ class CurrencyConfig:
         "EUR": {
             "symbol": "€",
             "code": "EUR",
-            "position": "suffix",
+            "position": "prefix",
             "decimal_places": 2,
             "thousands_separator": ".",
             "name": "Euro",
@@ -874,25 +902,39 @@ class CurrencyConfig:
         return config
 
     @classmethod
-    def get_org_currency_code(cls, organization=None):
+    def get_org_currency_code(cls, organization=None, organization_id=None):
         """H-04: single source of truth for "which currency does this org use".
 
-        Reads `organization.settings['currency_code']` (a plain JSON field
-        already on Organization — no schema change) and falls back to
-        DEFAULT_CURRENCY. Every server-rendered money figure AND the client
-        currencyManager default should both come from this, not from a
-        hardcoded '$' or '£' baked into a template.
+        Delegates to ``application_cost_accessor.get_reporting_currency`` which
+        reads the ``Organization.reporting_currency`` column (the one stored
+        currency value) and falls back to DEFAULT_CURRENCY. Every server-rendered
+        money figure AND the client currencyManager default both come from
+        this, not from a hardcoded '$' or '£' baked into a template.
+
+        Accepts either an ``organization`` object (with an ``id`` attribute) or
+        an explicit ``organization_id``. If neither is given, the current
+        organisation from the request context is used.
         """
-        code = None
-        try:
-            if organization is not None:
-                settings = getattr(organization, "settings", None) or {}
-                code = settings.get("currency_code")
-        except Exception:
-            code = None
-        if not code or not cls.is_supported(code):
-            code = cls.DEFAULT_CURRENCY
-        return code
+        from flask import has_app_context
+
+        # Resolve the organisation id from the given arguments.
+        org_id = None
+        if organization is not None:
+            org_id = getattr(organization, "id", None)
+        elif organization_id is not None:
+            org_id = organization_id
+
+        # Call get_reporting_currency inside an application context (request or CLI).
+        # Outside any context, fall back to DEFAULT_CURRENCY.
+        if has_app_context():
+            try:
+                from app.services.application_cost_accessor import get_reporting_currency
+
+                return get_reporting_currency(org_id)
+            except Exception:
+                pass
+
+        return cls.DEFAULT_CURRENCY
 
     @classmethod
     def get_org_currency_config(cls, organization=None):

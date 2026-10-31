@@ -424,9 +424,12 @@ def capability_roadmap():
     ROADMAP UNIFICATION (Feb 2026): Replaced redirect with dedicated page.
     Content unified from capability-map Roadmap tab + Plateaus + Work Packages.
     """
-    from app.models.unified_capability import BusinessDomain, UnifiedCapability
-    capability_count = UnifiedCapability.query.count()
-    domain_count = BusinessDomain.query.count()
+    from app.modules.capabilities.services.capability_count_service import (
+        count_capabilities,
+        count_domains,
+    )
+    capability_count = count_capabilities()
+    domain_count = count_domains()
     return render_template(
         "capability_roadmap/capability_roadmap.html",
         capability_count=capability_count,

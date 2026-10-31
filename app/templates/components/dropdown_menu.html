@@ -130,7 +130,7 @@
         {% else %}
         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 {{ 'h-8' if trigger_size == 'sm' else ('h-9' if trigger_size == 'md' else 'h-10') }} {{ ('w-8' if trigger_size == 'sm' else ('w-9' if trigger_size == 'md' else 'w-10')) if trigger_icon_only else ('px-3' if trigger_size in ('sm', 'md') else 'px-4 py-2') }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
         {% endif %}
-     aria-label="{{ trigger_aria_label or 'Open' }}"{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}{% for attr_name, attr_value in trigger_attrs_dict.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
+     {% if trigger_aria_label %} aria-label="{{ trigger_aria_label }}"{% endif %}{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}{% for attr_name, attr_value in trigger_attrs_dict.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
         {% if caller %}
         {{ caller() }}
         {% else %}
@@ -146,7 +146,7 @@
         <i data-lucide="chevron-down" class="ml-2 w-4 h-4" aria-hidden="true"></i>
         {% endif %}
         
-        <span class="sr-only">{% if trigger_text %}{{ trigger_text }} menu{% else %}Open menu{% endif %}</span>
+        {% if trigger_icon_only or not trigger_text %}<span class="sr-only">{% if trigger_text %}{{ trigger_text }} menu{% else %}Open menu{% endif %}</span>{% endif %}
         {% endif %}
     </button>
 

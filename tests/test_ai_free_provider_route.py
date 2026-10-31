@@ -237,6 +237,7 @@ def _runner_with_routes(monkeypatch, outcomes):
     for name in ("OPENAI", "ANTHROPIC", "AZURE", "GEMINI"):
         monkeypatch.delenv(name + "_API_KEY", raising=False)
     monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "nvidia,openrouter")
     monkeypatch.setenv("OPENROUTER_API_KEY", "key")
     monkeypatch.setenv("NVIDIA_API_KEY", "key")
     monkeypatch.setattr(module.AgentRunner, "_gate_mode", lambda self: "off", raising=False)

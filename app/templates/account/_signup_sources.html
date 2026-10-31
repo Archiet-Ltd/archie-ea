@@ -26,6 +26,11 @@
 
             <div class="space-y-3 border-t border-border pt-6" data-testid="signup-github">
                 <h2 class="text-sm font-semibold">GitHub</h2>
+                {% if github_app_install_url %}
+                <p class="text-sm text-muted-foreground">Install the Entelim GitHub App and the first read starts the moment you land back here.</p>
+                {{ button(text='Connect GitHub', icon='github', variant='primary', size='sm', href=github_app_install_url, testid='signup-github-app-connect') }}
+                <p class="text-sm text-muted-foreground">Or paste a read-only token:</p>
+                {% endif %}
                 <p class="text-sm text-muted-foreground">A read-only token is enough. It is stored encrypted for your organisation and never shown again.</p>
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-1.5">
@@ -37,7 +42,7 @@
                         {{ input(id='welcome-github-token', type='password', placeholder='Read-only token', attrs_dict={'autocomplete': 'off'}) }}
                     </div>
                 </div>
-                {{ button(text='Connect GitHub', icon='github', size='sm', testid='signup-github-connect', attrs_dict={'data-action': 'github'}) }}
+                {{ button(text='Connect GitHub', icon='github', variant=('outline' if github_app_install_url else 'default'), size='sm', testid='signup-github-connect', attrs_dict={'data-action': 'github'}) }}
                 <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="github" data-source="github" data-testid="signup-status-github">{{ (sources | selectattr('key', 'equalto', 'github') | first).text if (sources | selectattr('key', 'equalto', 'github') | first).state != 'not_given' else '' }}</p>
             </div>
 

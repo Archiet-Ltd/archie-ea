@@ -235,6 +235,14 @@ class User(UserMixin, db.Model):
     primary_concern = db.Column(db.Text)
     primary_frameworks = db.Column(db.Text)  # JSON array as string
     onboarding_completed_at = db.Column(db.DateTime)
+    # Where a self-serve sign-up came from (utm_source, utm_campaign and ref on the register link), when it
+    # happened, and when the founder was told it had stalled (app/services/signup_attribution.py). Nullable,
+    # plain text, length-limited; an invited member has none of them.
+    signup_source = db.Column(db.String(64), nullable=True)
+    signup_campaign = db.Column(db.String(64), nullable=True)
+    signup_ref = db.Column(db.String(64), nullable=True)
+    signup_at = db.Column(db.DateTime, nullable=True, index=True)
+    signup_alerted_at = db.Column(db.DateTime, nullable=True)
     # Dashboard "Welcome to Entelim" one-line banner, dismissed once per
     # user, forever (shell-wave-1 Task 5). Deliberately separate from
     # onboarding_completed_at: that column is set by /dashboard/api/
@@ -556,6 +564,7 @@ class User(UserMixin, db.Model):
         "solution_updates": True,
         "assignment_changes": True,
         "weekly_digest": True,
+        "alert_email": True,
         "digest_frequency": "weekly",
         "mention_notifications": True,
         "show_archimate_names": False,

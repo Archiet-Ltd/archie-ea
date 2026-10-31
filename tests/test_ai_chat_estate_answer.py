@@ -63,8 +63,15 @@ def test_another_organisation_gets_no_answer_and_cannot_open_the_address(client,
     # The outsider's organisation has no such service: the chat says it cannot answer, with
     # no stored answer, no connection from the owner's organisation and no record to open.
     assert "page_url" not in theirs and "address" not in theirs
-    assert "data-answer-row" not in theirs.get("html", "") and "Payments service" not in theirs.get("html", "")
-    assert "data-catalogue-record" not in theirs.get("html", "")
+    html = theirs.get("html", "")
+    assert "data-answer-row" not in html and "data-catalogue-record" not in html
+    # The empty state repeats the asked name (the outsider's own question) and nothing else: no
+    # connection, owner, source or record of the owner's organisation.
+    assert "Nothing recorded matches" in html
+    for fact in ("Imported from Sample company", "Sam Founder", "data-citation", "Health:"):
+        assert fact not in html, fact
+    for name in re.findall(r"data-answer-row[^>]*>\s*<a[^>]*>([^<]+)</a>", mine["html"]):
+        assert name.strip() == "Payments service" or name.strip() not in html, name
     assert client.get(mine["page_url"]).status_code == 404
 
 

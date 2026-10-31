@@ -42,11 +42,27 @@ class DiagramRenderService:
             )
 
         try:
+            # Find relationships connected to the initial elements
+            rels = ArchiMateRelationship.query.filter(
+                db.or_(
+                    ArchiMateRelationship.source_id.in_(element_ids),
+                    ArchiMateRelationship.target_id.in_(element_ids),
+                )
+            ).all()
+
+            # Get all unique element IDs from the initial set and the relationships
+            all_element_ids = set(element_ids)
+            for rel in rels:
+                all_element_ids.add(rel.source_id)
+                all_element_ids.add(rel.target_id)
+
+            # Fetch all elements that will be part of the diagram
             elements = ArchiMateElement.query.filter(
-                ArchiMateElement.id.in_(element_ids)
+                ArchiMateElement.id.in_(list(all_element_ids))
             ).all()
         except Exception:
             elements = []
+            rels = []
 
         if not elements:
             return (
@@ -137,12 +153,6 @@ class DiagramRenderService:
 
         # Relationships — drawn after elements so they appear on top of band fills
         try:
-            rels = ArchiMateRelationship.query.filter(
-                db.or_(
-                    ArchiMateRelationship.source_id.in_(element_ids),
-                    ArchiMateRelationship.target_id.in_(element_ids),
-                )
-            ).all()
             for rel in rels:
                 if rel.source_id in positions and rel.target_id in positions:
                     x1, y1 = positions[rel.source_id]

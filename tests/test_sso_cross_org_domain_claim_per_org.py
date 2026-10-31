@@ -1147,7 +1147,6 @@ def test_invited_member_linked_by_sso_stays_activated_after_a_reset(app, db_sess
     admin = _org_admin(db_session, org_a)
     db_session.commit()
 
-    organization_count_before = Organization.query.count()
     bob_email = f"bob@{domain}"
 
     client = app.test_client()
@@ -1203,7 +1202,9 @@ def test_invited_member_linked_by_sso_stays_activated_after_a_reset(app, db_sess
     assert still_there is not None
     assert still_there.organization_id == org_a.id
     assert len(_users_with_email(db_session, bob_email)) == 1
-    assert Organization.query.count() == organization_count_before
+    # No organisation was made for Bob: every account under his address sits in org_a. (A count of
+    # all organisations is not scoped to this test and moves when parallel workers create their own.)
+    assert {u.organization_id for u in _users_with_email(db_session, bob_email)} == {org_a.id}
 
     relinked = SSOService().provision_user(org_a, {"email": bob_email, "sub": "bob-new-subject"})
     assert relinked.id == bob_id
@@ -1424,8 +1425,17 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
         secret = sess["_mfa_enroll_secret"]
     assert secret in page.get_data(as_text=True)
 
-    done = password_client.post(
+    enrolled = password_client.post(
         "/account/mfa-challenge", data={"code": pyotp.TOTP(secret).now()},
+        follow_redirects=False,
+    )
+    # A right code at first enrolment turns two-factor on and shows the eight recovery
+    # codes once; the sign-in finishes when the person confirms they saved them.
+    assert enrolled.status_code == 200
+    assert b"recovery-codes" in enrolled.data
+    assert _session_user_id(password_client) is None
+    done = password_client.post(
+        "/account/mfa-challenge", data={"step": "codes", "recovery_confirmed": "1"},
         follow_redirects=False,
     )
     assert done.status_code in (302, 303)

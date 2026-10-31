@@ -111,7 +111,8 @@ class TestTechRadar:
         body = resp.get_data(as_text=True)
         # The never-invent-data rule: an empty tenant must not show a demo
         # radar with any ring populated.
-        assert "No technology-layer elements yet" in body
+        assert 'data-testid="radar-empty"' in body
+        assert "No technology in your model yet" in body
         assert 'data-testid="radar-count-adopt"' not in body
 
     def test_real_technology_element_appears_unclassified(self, app, db_session, client):
@@ -125,7 +126,20 @@ class TestTechRadar:
         assert resp.status_code == 200
         body = resp.get_data(as_text=True)
         assert "PROD-DB-01" in body
-        assert f'data-testid="radar-classify-{node.id}"' in body
+        # The technology is listed as waiting for a ring, and its row menu
+        # leads to the page where a person places it.
+        assert f'data-testid="radar-ring-{node.id}"' in body
+        assert "Not placed" in body
+        place_url = f"/technology/radar/{node.id}/place"
+        assert f'data-testid="radar-place-{node.id}"' in body
+        assert place_url in body
+
+        # Following that link lands on a page with the form to classify it.
+        place = client.get(place_url)
+        assert place.status_code == 200
+        place_body = place.get_data(as_text=True)
+        assert "PROD-DB-01" in place_body
+        assert f'data-testid="radar-classify-{node.id}"' in place_body
 
     def test_classify_creates_a_real_entry(self, app, db_session, client):
         from app.models.tech_radar import TechRadarEntry

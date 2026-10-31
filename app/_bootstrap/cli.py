@@ -551,6 +551,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+    # T-seed04: remove and re-seed the demonstration company
+    try:
+        from app.commands import reset_demo_company
+        reset_demo_company.init_app(app)
+        app.logger.info("Demo company reset CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register demo company reset CLI: {e}")
+
 # Domain element backfill
     try:
         from app.commands.backfill_domain_elements import init_app as init_domain_elements
@@ -605,6 +613,12 @@ def init_cli(app):
         app.logger.info("✅ Clear foreign assignees CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register clear foreign assignees CLI: {e}")
+
+    try:
+        from app.commands.vendor_catalogue import init_app as init_vendor_catalogue
+        init_vendor_catalogue(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register vendor catalogue CLI: {e}")
 
     try:
         from app.commands.scan_eol_alerts import init_app as init_scan_eol_alerts

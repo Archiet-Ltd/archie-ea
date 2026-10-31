@@ -557,6 +557,8 @@ function vendorAnalysisDetail(analysisId) {
         await this.discoverVendorsByCaps();
       } else if (this.selectionMode === 'processes') {
         await this.discoverVendorsByProcs();
+      } else if (this.selectionMode === 'valuestreams') {
+        await this.discoverVendorsByValueStreams();
       } else {
         await this.discoverVendorsByCaps();
       }
@@ -595,6 +597,22 @@ function vendorAnalysisDetail(analysisId) {
             total_products: v.total_products || v.product_count || 0
           };
         });
+        this.vendorSearchDone = true;
+        this.selectedVendorIds = new Set();
+        this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
+      } catch (e) {
+        this.showToast(e && e.type === 'NetworkError' ? 'Vendor discovery error' : 'Vendor discovery failed', 'error');
+      }
+      finally { this.loadingVendors = false; }
+    },
+
+    async discoverVendorsByValueStreams() {
+      if (this.vsSelectedStream.length === 0) return;
+      this.loadingVendors = true;
+      try {
+        this.discoveredVendors = await Platform.fetch.post('/dashboard/api/vendors/by-value-streams', {
+          value_stream_ids: this.vsSelectedStream.map(function(id) { return parseInt(id); })
+        }, { silent: true });
         this.vendorSearchDone = true;
         this.selectedVendorIds = new Set();
         this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
@@ -670,6 +688,22 @@ function vendorAnalysisDetail(analysisId) {
       }
     },
 
+    async resolveValueStreamCapabilityIds() {
+      if (this.selectionMode !== 'valuestreams' || this.vsSelectedStream.length === 0) return [];
+      try {
+        const caps = await Platform.fetch.post('/dashboard/api/value-stream-capabilities', {
+          value_stream_ids: this.vsSelectedStream.map(function(id) { return parseInt(id); })
+        }, { silent: true });
+        return caps.map(function(c) { return c.id; });
+      } catch (e) {
+        // Same reasoning as resolveProcessCapabilityIds: a failed lookup is not
+        // "nothing mapped", so report it and let the caller abort rather than
+        // read an empty array as an empty result.
+        this.showToast((e && e.data && e.data.error) || 'Could not resolve capabilities for the selected value streams', 'error');
+        return null;
+      }
+    },
+
     async getCapabilityIdsForPayload() {
       if (this.selectionMode === 'capabilities') {
         const caps = this.allCapabilities;
@@ -685,7 +719,17 @@ function vendorAnalysisDetail(analysisId) {
         }
         return resolved;
       }
-      this.showToast('Please select capabilities or processes', 'error');
+      if (this.selectionMode === 'valuestreams') {
+        if (this.vsSelectedStream.length === 0) { this.showToast('Select at least one value stream', 'error'); return null; }
+        const resolved = await this.resolveValueStreamCapabilityIds();
+        if (resolved === null) return null;   // load failed; already reported
+        if (resolved.length === 0) {
+          this.showToast('No capabilities could be resolved from selected value streams', 'error');
+          return null;
+        }
+        return resolved;
+      }
+      this.showToast('Select capabilities, processes, or value streams', 'error');
       return null;
     },
 

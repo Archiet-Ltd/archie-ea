@@ -89,7 +89,92 @@ STAGE_CAPABILITIES = {
     ("Plan to Produce", "Material Planning"): ["Inventory Management"],
     ("Plan to Produce", "Manufacture"): ["Shop Floor Execution"],
     ("Plan to Produce", "Quality Release"): ["Quality Management"],
+    # The Lantern Quay demonstration tenant's own value stream (seeded by
+    # `flask seed-demo-company`, _VALUE_STREAM in seed_demo_company.py) links
+    # each of these same stages to a capability already, but through
+    # UnifiedCapability via CapabilityValueStreamMapping -- a different table
+    # from the one vendor discovery's value-streams tab resolves through
+    # (value_stream_stage_capabilities). These four lines project the same,
+    # already-decided stage/capability pairing into that table, by the real
+    # business-capability name each stage already carries, rather than
+    # inventing a second assignment.
+    ("Calibration Request to Certificate", "Receive Request"): ["Order Fulfilment"],
+    ("Calibration Request to Certificate", "Schedule Engineer"): [
+        "Field Service Management", "Workforce Planning",
+    ],
+    ("Calibration Request to Certificate", "Calibrate and Test"): [
+        "Sensor Calibration", "Quality Assurance",
+    ],
+    ("Calibration Request to Certificate", "Certify and Report"): [
+        "Regulatory Compliance", "Water Quality Monitoring",
+    ],
 }
+
+# Vendor products and the (real, already-seeded) demo capabilities each
+# covers, so vendor discovery (app/application_mgmt/vendor_analysis_routes.py,
+# apqc_process_api_endpoints.py) finds matches on a freshly seeded demo tenant
+# instead of demoing empty. Coverage figures are illustrative placeholders for
+# a demonstration tenant, same spirit as APP_CAPABILITIES/STAGE_CAPABILITIES
+# above. Vendor organisations and products are shared reference data (no
+# `organization_id` -- see VendorOrganization's own docstring), so these are
+# created once, globally, the first time any tenant is seeded; only the
+# capability-coverage assessment below is written per organisation.
+#
+# (vendor org name, vendor org type, product name, product family,
+#  [(capability name, coverage %, maturity level 1-5, fit score 0-100), ...],
+#  [APQC process_code, ...])
+VENDOR_PRODUCTS = [
+    (
+        "SAP SE", "software_vendor", "SAP S/4HANA Cloud", "ERP",
+        [
+            ("Inventory Control", 85, 4, 82),
+            ("Order Fulfilment", 80, 4, 78),
+            ("Supplier Management", 75, 4, 74),
+        ],
+        ["3.1", "7.1"],
+    ),
+    (
+        "SAP SE", "software_vendor", "SAP Ariba", "PROCUREMENT",
+        [
+            ("Supplier Management", 88, 4, 85),
+            ("Regulatory Compliance", 70, 3, 68),
+        ],
+        ["3.2"],
+    ),
+    (
+        "ServiceNow", "software_vendor", "ServiceNow Field Service Management", "FSM",
+        [
+            ("Field Service Management", 90, 5, 88),
+            ("Workforce Planning", 80, 4, 78),
+            ("Incident Response", 82, 4, 80),
+        ],
+        ["6.7.1"],
+    ),
+    (
+        "Trimble Inc.", "software_vendor", "Trimble Field Service Platform", "FSM",
+        [
+            ("Sensor Calibration", 84, 4, 82),
+            ("Asset Lifecycle Management", 79, 4, 77),
+        ],
+        ["8.3"],
+    ),
+    (
+        "Siemens AG", "software_vendor", "Siemens Opcenter Quality", "QMS",
+        [
+            ("Quality Assurance", 86, 4, 84),
+            ("Regulatory Compliance", 81, 4, 79),
+        ],
+        ["3.3"],
+    ),
+    (
+        "Microsoft Corporation", "software_vendor", "Microsoft Power Platform", "ANALYTICS",
+        [
+            ("Data Analytics", 77, 3, 75),
+            ("Demand Forecasting", 70, 3, 68),
+        ],
+        [],
+    ),
+]
 
 
 def _applications(org_id):
@@ -127,11 +212,128 @@ def _stages(org_id):
     return {(vs_name, stage.name): stage for stage, vs_name in rows}
 
 
+def _seed_vendor_products(org_id, caps, dry_run=False):
+    """Vendor organisations, products, capability-coverage and APQC-process
+    coverage for VENDOR_PRODUCTS.
+
+    Vendor organisations and products are shared reference data (no
+    `organization_id`), so they are created once, globally, by whichever
+    tenant seeds first, and left alone (matched by name) on every later run
+    or tenant. The capability-coverage rows (VendorProductCapability) ARE
+    tenant-scoped and are written for every org this command runs against,
+    against that org's own capability ids. APQC-process coverage
+    (VendorProductAPQCMapping) is global like the vendor/product rows it
+    hangs off, and is written once.
+
+    Returns counts: vendor_product_created, vendor_capability_created,
+    vendor_apqc_mapping_created.
+    """
+    from app.models.apqc_process import APQCProcess
+    from app.models.vendor.vendor_organization import (
+        VendorOrganization, VendorProduct, VendorProductCapability,
+    )
+    from app.models.vendor_product_apqc_mapping import VendorProductAPQCMapping
+
+    stats = {
+        "vendor_product_created": 0,
+        "vendor_capability_created": 0,
+        "vendor_apqc_mapping_created": 0,
+    }
+
+    orgs_by_name = {o.name: o for o in db.session.query(VendorOrganization)}
+    products_by_key = {
+        (p.vendor_organization_id, p.name): p for p in db.session.query(VendorProduct)
+    }
+    existing_coverage = {
+        (row.vendor_product_id, row.business_capability_id)
+        for row in db.session.query(VendorProductCapability).filter(
+            VendorProductCapability.business_capability_id.in_(
+                [c.id for c in caps.values()] or [-1]
+            )
+        )
+    }
+    apqc_id_by_code = {row.process_code: row.id for row in db.session.query(APQCProcess)}
+    existing_apqc_mappings = {
+        (row.vendor_product_id, row.apqc_process_id)
+        for row in db.session.query(VendorProductAPQCMapping)
+    }
+
+    for org_name, org_type, product_name, family, coverage, apqc_codes in VENDOR_PRODUCTS:
+        # `org`/`product` stay None on a dry run against data that does not
+        # exist yet -- deliberately: nothing below can already exist for a
+        # product that was never created, so every coverage/APQC row for it
+        # counts as new, the same "report what would change" guarantee
+        # seed_demo_mappings gives for app/stage capabilities.
+        org = orgs_by_name.get(org_name)
+        if org is None and not dry_run:
+            org = VendorOrganization(
+                name=org_name, display_name=org_name, vendor_type=org_type,
+            )
+            db.session.add(org)
+            db.session.flush()
+            orgs_by_name[org_name] = org
+
+        product = products_by_key.get((org.id, product_name)) if org is not None else None
+        if product is None:
+            stats["vendor_product_created"] += 1
+            if not dry_run:
+                product = VendorProduct(
+                    vendor_organization_id=org.id, name=product_name,
+                    product_family_name=family,
+                )
+                db.session.add(product)
+                db.session.flush()
+                products_by_key[(org.id, product_name)] = product
+
+        for capability_name, coverage_pct, maturity_level, fit_score in coverage:
+            capability = caps.get(capability_name)
+            if capability is None:
+                continue
+            key = (product.id, capability.id) if product is not None else None
+            if key is not None and key in existing_coverage:
+                continue
+            stats["vendor_capability_created"] += 1
+            if not dry_run:
+                db.session.add(
+                    VendorProductCapability(
+                        organization_id=org_id,
+                        vendor_product_id=product.id,
+                        business_capability_id=capability.id,
+                        coverage_percentage=coverage_pct,
+                        maturity_level=maturity_level,
+                        fit_score=fit_score,
+                    )
+                )
+                existing_coverage.add((product.id, capability.id))
+
+        for process_code in apqc_codes:
+            apqc_process_id = apqc_id_by_code.get(process_code)
+            if apqc_process_id is None:
+                continue
+            key = (product.id, apqc_process_id) if product is not None else None
+            if key is not None and key in existing_apqc_mappings:
+                continue
+            stats["vendor_apqc_mapping_created"] += 1
+            if not dry_run:
+                db.session.add(
+                    VendorProductAPQCMapping(
+                        vendor_product_id=product.id,
+                        apqc_process_id=apqc_process_id,
+                        coverage_percentage=coverage[0][1] if coverage else 50,
+                    )
+                )
+                existing_apqc_mappings.add((product.id, apqc_process_id))
+
+    return stats
+
+
 def seed_demo_mappings(org_id, dry_run=False):
-    """Link a tenant's applications, capabilities and value-stream stages.
+    """Link a tenant's applications, capabilities, value-stream stages and
+    vendor-product capability coverage.
 
     Returns counts: app_capability_created, stage_capability_created,
-    already_present, skipped.
+    vendor_product_created, vendor_capability_created,
+    vendor_apqc_mapping_created, already_present, skipped.
     """
     from app.models.application_capability import ApplicationCapabilityMapping
     # An association db.Table, not a mapped class — writes go through Core.
@@ -144,6 +346,9 @@ def seed_demo_mappings(org_id, dry_run=False):
     stats = {
         "app_capability_created": 0,
         "stage_capability_created": 0,
+        "vendor_product_created": 0,
+        "vendor_capability_created": 0,
+        "vendor_apqc_mapping_created": 0,
         "already_present": 0,
         "skipped": 0,
     }
@@ -216,6 +421,11 @@ def seed_demo_mappings(org_id, dry_run=False):
             stats["stage_capability_created"] += 1
             existing_stage_caps.add((stage.id, capability.id))
 
+    vendor_stats = _seed_vendor_products(org_id, caps, dry_run=dry_run)
+    stats["vendor_product_created"] += vendor_stats["vendor_product_created"]
+    stats["vendor_capability_created"] += vendor_stats["vendor_capability_created"]
+    stats["vendor_apqc_mapping_created"] += vendor_stats["vendor_apqc_mapping_created"]
+
     if dry_run:
         # Discard anything pending, but KEEP the counts: the whole point of a
         # dry run is to report what would change. Zeroing them here made the
@@ -259,8 +469,11 @@ def seed_demo_mappings_command(org_id, dry_run):
         stats = seed_demo_mappings(org_id, dry_run=dry_run)
     verb = "would link" if dry_run else "linked"
     click.echo(
-        f"  {verb} {stats['app_capability_created']} application-capability and "
-        f"{stats['stage_capability_created']} stage-capability mapping(s); "
+        f"  {verb} {stats['app_capability_created']} application-capability, "
+        f"{stats['stage_capability_created']} stage-capability and "
+        f"{stats['vendor_capability_created']} vendor-capability mapping(s), "
+        f"{stats['vendor_product_created']} vendor product(s) and "
+        f"{stats['vendor_apqc_mapping_created']} vendor-process mapping(s); "
         f"{stats['already_present']} already present; {stats['skipped']} skipped "
         "(name not present in this organisation)."
     )

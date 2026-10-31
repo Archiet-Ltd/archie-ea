@@ -175,6 +175,12 @@ def _make_user(db_session, org, *, enterprise_role, platform_admin=False):
     user.enterprise_role = enterprise_role
     user.confirmed = True
     user.is_platform_admin = platform_admin
+    if platform_admin:
+        # Platform authority is the flag plus the Administrator role, never the persona.
+        from app.models.user import Role
+
+        Role.insert_roles()
+        user.role = Role.query.filter_by(name="Administrator").first()
     user.password = "Directory!12345"
     db_session.add(user)
     db_session.flush()
@@ -283,15 +289,34 @@ def test_role_exclusive_sections_are_hidden_from_other_personas(
 ):
     """The admin / procurement / my-applications zones are EXCLUSIVE_SECTIONS
     in role_access.py. The directory unions every role's zones, so without a
-    filter it advertised all three to everyone."""
+    filter it advertised all three to everyone.
+
+    One real link is excluded from the "/admin/" sweep: Connections
+    (m365_connector.connectors_index) lives in the Workspace zone, not the
+    Admin zone (role_access.py's `_WORKSPACE_LINKS`), and is deliberately
+    gated by `requires="connections"` -- CONNECTION_ARCHITECT_ROLES includes
+    enterprise_architect, the persona that brings a source in -- not by
+    EXCLUSIVE_SECTIONS["administration"]. Its URL happens to sit under
+    `/admin/connectors` only because that is the connector blueprint's
+    `url_prefix`; the same accident is called out in
+    test_formula_register_still_shown_to_its_own_personas below for
+    formula_register's own /admin/ URL. Excluding this one known, intentional
+    link keeps the check aimed at a genuine admin-zone leak rather than at
+    every route whose blueprint happens to be registered under /admin/."""
     user = _make_user(db_session, org, enterprise_role="enterprise_architect")
     login_as(client, user)
+
+    with app.test_request_context():
+        from flask import url_for
+
+        connections_href = url_for("m365_connector.connectors_index")
 
     hrefs = _rendered_hrefs(client)
     leaked = [
         h
         for h in hrefs
         if h.startswith(("/admin/", "/procurement/", "/my-applications/"))
+        and h != connections_href
     ]
     assert not leaked, f"role-exclusive surfaces shown to a non-owner: {leaked}"
 

@@ -266,7 +266,8 @@ def test_work_package_detail_shows_a_dash_for_what_is_missing(db_session, world,
     cell = lambda tid: re.sub(r"\s+", " ", re.search(  # noqa: E731
         r'data-testid="%s"[^>]*>(.*?)</dd>' % tid, html, re.S).group(1)).strip()
     assert cell("wp-progress") == "—"
-    assert cell("wp-owner") == "—"
+    # a missing owner is said in words with the way to name one, never a dash
+    assert "No owner yet" in cell("wp-owner") and 'data-testid="wp-assign-owner"' in cell("wp-owner")
     assert 'data-testid="wp-no-gaps"' in html
 
 

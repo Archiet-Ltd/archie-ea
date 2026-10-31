@@ -46,7 +46,7 @@
         {{ metrics_card(title='Total Mappings', value=stats.quality_metrics.total_mappings, description='Across all paths', icon='link') }}
         {{ metrics_card(
             title='Quality Score',
-            value=("%.1f"|format(stats.quality_metrics.quality_score) ~ '/5.0') if stats.quality_metrics.quality_score is not none else '—',
+            value=("%.1f"|format(stats.quality_metrics.quality_score) ~ '/5.0') if (stats.quality_metrics.quality_score is not none and stats.quality_metrics.quality_score > 0) else 'Not rated',
             description=stats.quality_metrics.high_quality_mappings ~ ' high-quality',
             icon='star'
         ) }}
@@ -199,9 +199,9 @@
                                 {% endif %}
                             </div>
                             <div class="flex flex-col items-end gap-1">
-                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
-                                    {{ mapping.mapping_strength }}/5
-                                </span>
+<span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
+                                        {{ mapping.mapping_strength if mapping.mapping_strength is not none else 'Not rated' }}
+                                    </span>
                                 {% if mapping.strategic_importance %}
                                 <span class="px-2 py-1 bg-{{ 'red' if mapping.strategic_importance == 'critical' else 'orange' if mapping.strategic_importance == 'high' else 'green' }}-100 text-{{ 'red' if mapping.strategic_importance == 'critical' else 'orange' if mapping.strategic_importance == 'high' else 'green' }}-800 text-xs rounded-full">
                                     {{ mapping.strategic_importance }}
@@ -243,9 +243,9 @@
                                 {% endif %}
                             </div>
                             <div class="flex flex-col items-end gap-1">
-                                <span class="px-2 py-1 bg-success/10 text-success-emphasis text-xs rounded-full">
-                                    {{ mapping.mapping_strength }}/5
-                                </span>
+<span class="px-2 py-1 bg-success/10 text-success-emphasis text-xs rounded-full">
+                                        {{ mapping.mapping_strength if mapping.mapping_strength is not none else 'Not rated' }}
+                                    </span>
                                 <span class="px-2 py-1 bg-accent text-primary text-xs rounded-full">
                                     ${{ mapping.business_value }}/10
                                 </span>
@@ -282,9 +282,9 @@
                             <p class="text-sm text-muted-foreground">{{ mapping.archimate_element_name }}</p>
                             <p class="text-xs text-muted-foreground">{{ mapping.archimate_type }} ({{ mapping.archimate_layer }})</p>
                         </div>
-                        <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
-                            {{ mapping.mapping_strength }}/5
-                        </span>
+<span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
+                                        {{ mapping.mapping_strength if mapping.mapping_strength is not none else 'Not rated' }}
+                                    </span>
                     </div>
                 </div>
                 {% endfor %}
@@ -312,7 +312,7 @@
                 Export Data
             </button>
             <button type="button" @click="window.print()"
-                    class="px-3 py-2 bg-muted-foreground text-primary-foreground rounded-md text-sm hover:bg-foreground/80 transition-colors" aria-label="Action">
+                    class="px-3 py-2 bg-muted-foreground text-primary-foreground rounded-md text-sm hover:bg-foreground/80 transition-colors">
                 <i data-lucide="printer" class="h-4 w-4 inline mr-1" aria-hidden="true"></i>
                 Print Report
             </button>

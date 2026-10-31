@@ -22,7 +22,7 @@ Chief Architect Workbench:
 
 import logging
 
-from flask import current_app, g, jsonify, redirect, render_template, request
+from flask import current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -62,15 +62,12 @@ def programmes_list():
 def solution_review_packet(solution_id):
     """Board-ready packet: conformance + decision + readiness for one solution."""
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.chief_architect_service import (
-        ChiefArchitectService,
-    )
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
         return render_template("errors/404.html"), 404
-    packet = ChiefArchitectService.solution_packet(solution_id)
-    return render_template("solutions/review_packet.html", solution=solution, packet=packet)
+    # The packet is the Review tab of the solution record now.
+    return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="review"))
 
 
 @solution_design_bp.route("/<int:solution_id>/review-packet/api", methods=["GET"])
@@ -296,17 +293,12 @@ def data_stewardship_classify():
 def solution_conformance(solution_id):
     """AI Technical Architect: conformance review against technical policy."""
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.conformance_reviewer import (
-        ConformanceReviewer,
-    )
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
         return render_template("errors/404.html"), 404
-    review = ConformanceReviewer.review(solution_id)
-    return render_template(
-        "solutions/conformance_review.html", solution=solution, review=review,
-    )
+    # The findings are on the Review tab of the solution record now.
+    return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="review"))
 
 
 @solution_design_bp.route("/<int:solution_id>/conformance/api", methods=["GET"])

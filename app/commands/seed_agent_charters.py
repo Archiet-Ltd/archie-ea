@@ -156,6 +156,60 @@ _CHARTER_BOUNDS = {
 }
 
 
+def default_charter_fields(persona):
+    """The current default charter of a persona as a dict of AgentCharter fields, or None.
+
+    The one place the defaults are turned into a charter; seed-charters and the executor's
+    fallback for an organisation that holds no charter both read it.
+    """
+    bounds = _CHARTER_BOUNDS.get(persona)
+    if bounds is None:
+        return None
+    purpose, readable, proposable, forbidden = bounds
+    return {
+        "purpose": purpose,
+        "readable_entities": list(readable),
+        "proposable_actions": proposable if isinstance(proposable, str) else list(proposable),
+        "forbidden_actions": list(forbidden),
+        "charter_text": CHARTERS.get(persona, ""),
+    }
+
+
+# A charter written through the agent registry always carries these rules in forbidden_actions;
+# a seeded default never does. It marks a charter an organisation authored, which is never replaced.
+_AUTHORED_MARKERS = ("no_fabrication", "cite_source", "propose_dont_dispose", "governance_wins")
+_COMPARED_FIELDS = ("purpose", "readable_entities", "proposable_actions", "forbidden_actions", "charter_text")
+
+
+def plan_charter_row(persona, rows):
+    """What one organisation needs for one persona: (version, fields) to append, or None.
+
+    rows are the organisation's existing charters for the persona (objects or dicts with
+    version and the compared fields). Nothing is ever deleted or rewritten: the answer is
+    always a new version on top.
+      - no charter: the default as version 1;
+      - the latest is a seeded version 1 that differs from today's default: the default as version 2;
+      - anything else (already current, edited by the organisation, authored through the registry): nothing.
+    """
+    fields = default_charter_fields(persona)
+    if fields is None:
+        return None
+    if not rows:
+        return 1, fields
+
+    def _get(row, name):
+        return row[name] if isinstance(row, dict) else getattr(row, name)
+
+    latest = max(rows, key=lambda r: _get(r, "version"))
+    if _get(latest, "version") != 1:
+        return None
+    if any(m in (_get(latest, "forbidden_actions") or []) for m in _AUTHORED_MARKERS):
+        return None
+    if all(_get(latest, f) == fields[f] for f in _COMPARED_FIELDS):
+        return None
+    return 2, fields
+
+
 @click.command("seed-charters")
 @click.option("--organization-id", type=int, default=None, help="Seed only this organisation. Default: all.")
 @with_appcontext
@@ -172,33 +226,35 @@ def seed_charters(organization_id):
     created = 0
     skipped = 0
     for org in orgs:
-        for persona in ARCHITECT_PERSONAS:
-            # Skip if already exists
-            existing = AgentCharter.query.filter_by(
-                persona=persona, version=1, organization_id=org.id
-            ).first()
-            if existing:
-                skipped += 1
-                continue
-            charter_text = CHARTERS.get(persona, "")
-            bounds = _CHARTER_BOUNDS.get(persona)
-            if bounds is None:
-                continue
-            purpose, readable, proposable, forbidden = bounds
-            charter = AgentCharter(
-                organization_id=org.id,
-                persona=persona,
-                version=1,
-                purpose=purpose,
-                readable_entities=readable,
-                proposable_actions=proposable,
-                forbidden_actions=forbidden,
-                charter_text=charter_text,
-            )
-            db.session.add(charter)
-            created += 1
+        made, kept = ensure_charters(org.id)
+        created += made
+        skipped += kept
     db.session.commit()
     click.echo(f"Seeded {created} charter(s) across {len(orgs)} organisation(s), skipped {skipped}.")
+
+
+def ensure_charters(organization_id):
+    """Give one organisation the default version-1 charter of every persona it lacks.
+
+    Idempotent: a persona that already has its version-1 charter is left as it is.
+    Adds to the session and flushes; the caller commits. Returns (created, skipped).
+    """
+    created = 0
+    skipped = 0
+    for persona in ARCHITECT_PERSONAS:
+        existing = AgentCharter.query.filter_by(
+            persona=persona, version=1, organization_id=organization_id
+        ).first()
+        if existing:
+            skipped += 1
+            continue
+        fields = default_charter_fields(persona)
+        if fields is None:
+            continue
+        db.session.add(AgentCharter(organization_id=organization_id, persona=persona, version=1, **fields))
+        created += 1
+    db.session.flush()
+    return created, skipped
 
 
 def register_seed_charters(app):

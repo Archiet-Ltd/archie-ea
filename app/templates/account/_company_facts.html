@@ -4,6 +4,13 @@
         <h2 class="text-sm font-semibold">What we read on {{ website.url }}</h2>
         {% if completeness %}<span class="text-xs text-muted-foreground" data-testid="signup-completeness">{{ ((completeness.value * 100) if completeness.value <= 1 else completeness.value) | round | int }}% of the profile found</span>{% endif %}
     </div>
+    {% set site_row = sources | selectattr('key', 'equalto', 'website') | first %}
+    {% if site_row and site_row.state == 'reading' %}
+    <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" role="status" data-testid="signup-facts-more">
+        More facts are still being worked out from your website.
+        <a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline" data-testid="signup-facts-refresh">Show them when they are ready</a>
+    </p>
+    {% endif %}
     <p class="text-xs text-muted-foreground">Tick what is right and change what is not. Each fact names the page it came from, and nothing is added to your model until you continue.</p>
     <ul class="max-h-56 divide-y divide-border overflow-auto rounded-md border border-border" data-testid="signup-facts-list">
         {% for fact in facts %}

@@ -14,20 +14,64 @@ import pytest
 
 
 def test_template_and_js_component_agree_on_bulk_confirm_field():
+    """The page no longer uses the Alpine component: bulk delete is a plain form
+    that the selected rows' checkboxes join, with the shared confirmation dialog
+    (data-confirm), so no typed field can disagree with a component again."""
     template = open(
         "app/templates/enterprise/work_packages.html", encoding="utf-8"
-    ).read()
-    js = open(
-        "app/static/js/enterprise/work_packages_table.js", encoding="utf-8"
     ).read()
 
     assert "deleteConfirmText" not in template, (
         "the mismatched field name should be gone from the template"
     )
-    assert 'x-model="bulkConfirmText"' in template
-    assert "bulkConfirmText" in js
-    # The JS component must actually declare the field the template binds to.
-    assert re.search(r"bulkConfirmText:\s*''", js)
+    assert "bulkConfirmText" not in template
+    form = re.search(r'<form id="wp-bulk-form"[^>]*>', template)
+    assert form, "the bulk delete form is missing"
+    assert 'method="post"' in form.group(0)
+    assert "data-confirm=" in form.group(0)
+    # Each row's checkbox submits its id with that form, and the toolbar's
+    # Delete selected button submits it.
+    assert 'name="ids" value="{{ wp.id }}" form="wp-bulk-form"' in template
+    assert "'form': 'wp-bulk-form'" in template
+
+
+@pytest.mark.usefixtures("db_session")
+def test_bulk_delete_form_removes_the_selected_work_packages(app, db_session, make_org, tenant_ctx):
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.models.user import User
+    from app.services import work_package_service
+
+    org = make_org("wp-bulk-form")
+    other = make_org("wp-bulk-form-other")
+    with tenant_ctx(other.id):
+        foreign = work_package_service.create_work_package(organization_id=other.id, name="ZZ-AUDIT foreign")
+        foreign_id = foreign.id
+    with tenant_ctx(org.id):
+        doomed = work_package_service.create_work_package(organization_id=org.id, name="ZZ-AUDIT doomed")
+        kept = work_package_service.create_work_package(organization_id=org.id, name="ZZ-AUDIT kept")
+        user = User(email=f"wpform-{org.id}@example.com", organization_id=org.id,
+                    enterprise_role="enterprise_architect", confirmed=True)
+        db_session.add(user)
+        db_session.commit()
+        doomed_id, kept_id = doomed.id, kept.id
+
+        from tests.test_ba_tenant_and_authz import _login
+        c = app.test_client()
+        with app.app_context():
+            _login(c, user.id)
+            listed = c.get("/enterprise/implementation/work-packages").get_data(as_text=True)
+            assert "ZZ-AUDIT doomed" in listed and "ZZ-AUDIT kept" in listed
+            resp = c.post("/enterprise/implementation/work-packages",
+                          data={"ids": [str(doomed_id), str(foreign_id)]})
+            assert resp.status_code == 302, resp.get_data(as_text=True)
+
+            assert db_session.get(UnifiedWorkPackage, doomed_id) is None
+            assert db_session.get(UnifiedWorkPackage, kept_id) is not None
+    # Another organisation's id in the form is ignored, never deleted (read in
+    # that organisation's own context: the isolation layer hides it from org's).
+    db_session.expire_all()
+    with tenant_ctx(other.id):
+        assert db_session.get(UnifiedWorkPackage, foreign_id) is not None
 
 
 @pytest.mark.usefixtures("db_session")

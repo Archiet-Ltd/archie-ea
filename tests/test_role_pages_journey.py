@@ -8,11 +8,9 @@ here asserts a status code or that an element exists without also asserting what
 visitor reads.
 """
 import json
-import threading
 
 import pytest
 from playwright.sync_api import sync_playwright
-from werkzeug.serving import make_server
 
 DESKTOP = {"width": 1440, "height": 900}
 PHONE = {"width": 390, "height": 844}
@@ -45,19 +43,6 @@ HERO_WORDS = {
 
 
 @pytest.fixture(scope="module")
-def base_url(app):
-    server = make_server("127.0.0.1", 0, app, threaded=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
-
-
-@pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
@@ -65,8 +50,8 @@ def browser():
         browser.close()
 
 
-def _open_from_roles_menu(page, base_url, slug):
-    page.goto(base_url + "/", wait_until="domcontentloaded")
+def _open_from_roles_menu(page, site_url, slug):
+    page.goto(site_url + "/", wait_until="domcontentloaded")
     trigger = page.locator("header").get_by_role("button", name="Roles", exact=True)
     trigger.click()
     panel = page.locator("#" + trigger.get_attribute("aria-controls"))
@@ -74,17 +59,17 @@ def _open_from_roles_menu(page, base_url, slug):
     assert link.count() == 1, f"the Roles menu has no link to /roles/{slug}"
     assert link.is_visible(), f"the Roles menu link to /roles/{slug} is not visible"
     link.click()
-    page.wait_for_url(base_url + f"/roles/{slug}")
+    page.wait_for_url(site_url + f"/roles/{slug}")
 
 
 @pytest.mark.parametrize("slug", sorted(ROLE_PAGES))
-def test_role_page_serves_the_role_from_the_menu_to_the_next_step(browser, base_url, slug):
+def test_role_page_serves_the_role_from_the_menu_to_the_next_step(browser, site_url, slug):
     context = browser.new_context(viewport=DESKTOP)
     page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     try:
-        _open_from_roles_menu(page, base_url, slug)
+        _open_from_roles_menu(page, site_url, slug)
 
         # the site navbar and footer, as on every other page
         assert page.locator("header").get_by_role("button", name="Roles", exact=True).is_visible()
@@ -123,7 +108,7 @@ def test_role_page_serves_the_role_from_the_menu_to_the_next_step(browser, base_
             assert src not in seen, f"{slug} shows {src} twice"
             seen.add(src)
             assert len(img.get_attribute("alt") or "") >= 40, f"{slug}: alt text of {src} is too short"
-            response = page.request.get(base_url + src)
+            response = page.request.get(site_url + src)
             assert response.status == 200 and len(response.body()) > 5000, f"{src} did not load"
             page.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=img.element_handle())
             box = img.bounding_box()
@@ -153,7 +138,7 @@ def test_role_page_serves_the_role_from_the_menu_to_the_next_step(browser, base_
         for href in hrefs:
             if href in ("", "/register") or href.startswith("/account/"):
                 continue
-            r = page.request.get(base_url + href)
+            r = page.request.get(site_url + href)
             assert r.status == 200, f"{slug} links to {href}, which answers {r.status}"
     finally:
         assert errors == [], errors
@@ -161,11 +146,11 @@ def test_role_page_serves_the_role_from_the_menu_to_the_next_step(browser, base_
 
 
 @pytest.mark.parametrize("slug", sorted(ROLE_PAGES))
-def test_role_page_has_no_sideways_scroll_on_a_phone(browser, base_url, slug):
+def test_role_page_has_no_sideways_scroll_on_a_phone(browser, site_url, slug):
     context = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True)
     page = context.new_page()
     try:
-        page.goto(base_url + f"/roles/{slug}", wait_until="load")
+        page.goto(site_url + f"/roles/{slug}", wait_until="load")
         page.locator('[data-testid="landing-hero-figure"] img').wait_for(state="visible")
         widths = page.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")
         assert widths[0] <= widths[1], f"{slug} scrolls sideways on a phone: {widths}"
@@ -174,11 +159,11 @@ def test_role_page_has_no_sideways_scroll_on_a_phone(browser, base_url, slug):
         context.close()
 
 
-def test_roles_hub_links_every_role_that_has_a_page_and_no_link_is_a_404(browser, base_url):
+def test_roles_hub_links_every_role_that_has_a_page_and_no_link_is_a_404(browser, site_url):
     context = browser.new_context(viewport=DESKTOP)
     page = context.new_page()
     try:
-        page.goto(base_url + "/roles", wait_until="domcontentloaded")
+        page.goto(site_url + "/roles", wait_until="domcontentloaded")
         hub = page.locator("main")
         hrefs = set(hub.evaluate_all("els => els.flatMap(m => Array.from(m.querySelectorAll('a[href]')).map(a => a.getAttribute('href')))"))
         for slug in ROLE_PAGES:
@@ -187,21 +172,24 @@ def test_roles_hub_links_every_role_that_has_a_page_and_no_link_is_a_404(browser
             path = href.split("#")[0]
             if not path.startswith("/") or path.startswith("/account/") or path == "/register":
                 continue
-            response = page.request.get(base_url + path)
+            response = page.request.get(site_url + path)
             assert response.status == 200, f"/roles links to {href}, which answers {response.status}"
-        # a role without a page is listed by name, and is not a link to a page that does not exist
-        catalogue = page.locator("[data-role-catalogue]")
-        assert catalogue.locator("li", has_text="Chief Financial Officer").count() == 1
-        assert catalogue.get_by_role("link", name="Chief Financial Officer").count() == 0
+        # the hub offers only roles that have a page (the registry's rule, since the roles page became cards):
+        # one card per page, each a link to a page that exists, and a role without a page is not offered at all
+        cards = hub.locator("[data-role-card]")
+        card_hrefs = [cards.nth(i).get_attribute("href") for i in range(cards.count())]
+        assert len(card_hrefs) == len(set(card_hrefs)), f"a role page is offered twice: {card_hrefs}"
+        assert {f"/roles/{slug}" for slug in ROLE_PAGES} <= set(card_hrefs), card_hrefs
+        assert hub.get_by_role("link", name="Chief Financial Officer").count() == 0
     finally:
         context.close()
 
 
-def test_scale_up_cto_page_leads_with_connecting_github_or_jira_then_the_spreadsheet(browser, base_url):
+def test_scale_up_cto_page_leads_with_connecting_github_or_jira_then_the_spreadsheet(browser, site_url):
     context = browser.new_context(viewport=DESKTOP)
     page = context.new_page()
     try:
-        page.goto(base_url + "/roles/scale-up-cto-and-vp-engineering", wait_until="domcontentloaded")
+        page.goto(site_url + "/roles/scale-up-cto-and-vp-engineering", wait_until="domcontentloaded")
         hero = page.locator('[data-testid="landing-hero"]')
         top = (hero.locator("h1").inner_text() + " " + hero.locator("p").first.inner_text())
         assert "GitHub" in top and "Jira" in top, top
@@ -215,11 +203,11 @@ def test_scale_up_cto_page_leads_with_connecting_github_or_jira_then_the_spreads
         context.close()
 
 
-def test_scale_up_cto_page_shows_a_phone_sized_capture_on_a_phone(browser, base_url):
+def test_scale_up_cto_page_shows_a_phone_sized_capture_on_a_phone(browser, site_url):
     context = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True, device_scale_factor=1)
     page = context.new_page()
     try:
-        page.goto(base_url + "/roles/scale-up-cto-and-vp-engineering", wait_until="load")
+        page.goto(site_url + "/roles/scale-up-cto-and-vp-engineering", wait_until="load")
         img = page.locator('[data-testid="landing-hero-figure"] img')
         img.wait_for(state="visible")
         page.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=img.element_handle())

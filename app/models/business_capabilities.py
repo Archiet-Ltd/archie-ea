@@ -697,6 +697,43 @@ def _project_capability_row(connection, target):
         )
         return
 
+    # A row already deprecated in favor of a capability that is not itself
+    # this row's own projection (source_table/source_id do not match) has
+    # already been consolidated by some other process -- an import, a
+    # migration, a human edit. Projecting it here would insert a second
+    # unified_capabilities row carrying the same name as the one it was
+    # already pointed at, which is the exact disagreement ADR 0008 exists to
+    # prevent, and is what made a capability list render its name twice
+    # (two UnifiedCapability rows, one query, no de-duplication to hide
+    # behind). The normal self-link (set by the CLI's own backlink pass
+    # after this listener's own projection) still projects/updates as usual.
+    if target.deprecated_in_favor_of_id is not None:
+        already_self_projected = connection.execute(
+            text(
+                """
+                SELECT 1 FROM unified_capabilities
+                 WHERE id = :uc_id
+                   AND source_table = :source_table
+                   AND source_id = :source_id
+                """
+            ),
+            {
+                "uc_id": target.deprecated_in_favor_of_id,
+                "source_table": SOURCE_TABLE,
+                "source_id": str(target.id),
+            },
+        ).first()
+        if not already_self_projected:
+            _logger.info(
+                "business_capability id=%s is already deprecated in favor of "
+                "unified_capabilities id=%s, which is not this row's own "
+                "projection; skipping write-time projection rather than "
+                "insert a second row for the same capability.",
+                target.id,
+                target.deprecated_in_favor_of_id,
+            )
+            return
+
     # `_PROJECT_SQL`'s ON CONFLICT target is (source_table, source_id) and its
     # DO UPDATE deliberately excludes organization_id/code (see that module's
     # comment -- they're policed by four partial unique indexes, and mutating

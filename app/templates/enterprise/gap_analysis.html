@@ -1,222 +1,199 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state, stat_card, section_card %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/button.html' import button %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset, section %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Gap Analysis{% endblock %}
+{% block title %}Gap analysis{% endblock %}
 
-{% macro _gap_actions() %}
-{{ button(text='Identify Gap', variant='default', icon='plus') }}
+{% macro _new_gap() %}
+{% if can_change_model() %}
+{% call ui.button(href=url_for('archimate_crud.create_element', layer='implementation', element_type='Gap'), attrs={'data-testid': 'btn-new-gap'}) %}{{ lucide('plus') }}New gap{% endcall %}
+{% endif %}
+{% endmacro %}
+
+{% macro _gap_url(gap) %}{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}{% endmacro %}
+
+{#- A gap's title, said once: generated gaps carry the prefix "Gap: " (sometimes twice), which this page drops. -#}
+{% macro _unprefixed(text) -%}
+{%- set ns = namespace(t=(text or '')|trim) -%}
+{%- for _ in range(3) %}{% if ns.t.startswith('Gap: ') %}{% set ns.t = ns.t[5:]|trim %}{% endif %}{% endfor -%}
+{{ ns.t }}
+{%- endmacro %}
+
+{#- The second line: "Capability: Gap: X" becomes "Capability: X"; a line that only repeats the title (or names a capability of the same name) is left out. -#}
+{% macro _detail(gap, dupes) -%}
+{%- set d = (gap.description or '')|trim -%}
+{%- set title = _unprefixed(gap.name) -%}
+{%- if d.startswith('Capability: ') %}{% set d = '' if _unprefixed(d[12:]) == title else 'Capability: ' ~ _unprefixed(d[12:]) %}{% endif -%}
+{%- if d and d != title %}<span class="block truncate text-xs text-muted-foreground">{{ d }}</span>
+{%- elif title in dupes %}<span class="block truncate text-xs text-muted-foreground">Reference {{ gap.id }}{% if gap.created_at is defined and gap.created_at %} · recorded {{ gap.created_at|format_date }}{% endif %}</span>{% endif -%}
+{%- endmacro %}
+
+{% macro _words(value) %}{{ (value|replace('_', ' ')|trim|capitalize) if value else 'Not recorded' }}{% endmacro %}
+
+{#- One row's ellipsis menu: open the gap, or convert it into a work package (posted by the script below). -#}
+{% macro _row_menu(gap) -%}
+{%- call ui.dropdown_menu() -%}
+  {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ _unprefixed(gap.name) or 'this gap' }}</span>{%- endcall -%}
+  {%- call ui.dropdown_menu_content(align='end', class='w-[220px]') -%}
+    {{ ui.dropdown_menu_item(text='Open', href=_gap_url(gap)) }}
+    {{ ui.dropdown_menu_item(text='Convert to a work package', tag='button', type='button', class='w-full',
+                             attrs={'title': 'Convert this gap to a work package', 'data-convert-gap': gap.id, 'data-gap-name': _unprefixed(gap.name) or 'this gap',
+                                    'data-convert-url': '/capability-map/api/roadmap/gaps/' ~ gap.id ~ '/work-packages', 'data-wp-url': url_for('implementation_planning.work_package_detail', work_package_id=0)}) }}
+  {%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
+
+{% macro _sev_rank(gap) %}{{ {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get((gap.severity or '')|lower, 0) }}{% endmacro %}
+
+{#- The register. Columns whose value is the same on every row are left out by the caller and said once above. -#}
+{% macro _gaps_table(gaps, wp_by_gap, columns, show, dupes, notice=none) %}
+{% call(gap) list_table(rows=gaps, columns=columns, caption='Recorded gaps', testid='gaps-table', row_testid='gap-row',
+                        search_placeholder='Filter gaps...', toolbar=true, empty_message='No gaps recorded yet.', notice=notice) %}
+  {%- set wps = wp_by_gap.get(gap.id, []) -%}
+  {% call table_cell(class='max-w-[380px]') %}
+    <span id="gap-{{ gap.id }}" class="scroll-mt-24"></span>
+    <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
+    {{ _detail(gap, dupes) }}
+    {% if show.severity %}<span class="mt-1 block md:hidden" data-testid="gap-severity-narrow">{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}</span>{% endif %}
+    {% if not show.work %}<span class="block" data-testid="gap-work-packages-{{ gap.id }}">{% if wps %}<a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="block truncate text-xs text-foreground hover:underline" data-testid="gap-work-package-link">Work package: {{ wps[0].name or 'Untitled work package' }}{% if wps|length > 1 %} and {{ wps|length - 1 }} more{% endif %}</a>{% endif %}</span>{% endif %}
+  {% endcall %}
+  {% if show.type %}{% call table_cell(class='hidden lg:table-cell whitespace-nowrap') %}{{ (gap.gap_type|replace('_', ' ')|capitalize) if gap.gap_type else 'Unclassified' }}{% endcall %}{% endif %}
+  {% if show.severity %}{% call table_cell(class='hidden md:table-cell', attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
+  {% if show.status %}{% call table_cell() %}{{ state_badge(gap.resolution_status or 'identified') }}{% endcall %}{% endif %}
+  {% if show.impact %}{% call table_cell(class='hidden lg:table-cell whitespace-nowrap') %}{{ _words(gap.impact) }}{% endcall %}{% endif %}
+  {% if show.work %}
+  {% call table_cell(class='max-w-[240px]') %}
+    <span class="flex min-w-0 items-center gap-1 whitespace-nowrap" data-testid="gap-work-packages-{{ gap.id }}">
+      {% if wps %}
+      <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="truncate text-foreground hover:underline" data-testid="gap-work-package-link">{{ wps[0].name or 'Untitled work package' }}</a>
+      {% if wps|length > 1 %}<a href="{{ _gap_url(gap) }}" class="shrink-0 text-xs text-muted-foreground hover:underline">+{{ wps|length - 1 }}</a>{% endif %}
+      {% endif %}
+    </span>
+  {% endcall %}
+  {% endif %}
+  {% call table_cell(class='w-12 text-right') %}{{ _row_menu(gap) }}{% endcall %}
+{% endcall %}
 {% endmacro %}
 
 {% block content %}
-{# The one stored severity of a gap: the same field the prioritised action list ranks by. #}
-{% macro severity_badge(gap) %}
-    {% set sev = (gap.severity or '')|lower %}
-    {% if sev == 'critical' %}
-        {% call badge('destructive') %}Critical{% endcall %}
-    {% elif sev == 'high' %}
-        {% call badge('warning') %}High{% endcall %}
-    {% elif sev %}
-        {% call badge('neutral') %}{{ sev|capitalize }}{% endcall %}
-    {% else %}
-        <span class="text-sm text-muted-foreground">Not recorded</span>
-    {% endif %}
-{% endmacro %}
-{% macro gap_type_cell(gap) %}
-    {% if gap.gap_type %}{{ gap.gap_type }}{% else %}
-    <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-       class="text-sm text-muted-foreground hover:underline" data-testid="gap-type-unset">Not set: open the gap to classify it</a>
-    {% endif %}
-{% endmacro %}
-<div class="flex flex-col space-y-8 animate-in fade-in duration-500">
-    {{ page_shell(
-        title='Gap Analysis',
-        subtitle='Analyze gaps between baseline and target architectures.',
-        breadcrumb=[('Home', url_for('main.index')), ('Enterprise Architecture', url_for('enterprise.enterprise_dashboard')), ('Gap Analysis', None)],
-        actions_caller=_gap_actions
-    ) }}
+{%- set gaps = gaps|default([]) -%}
+{%- set wp_by_gap = work_packages_by_gap or {} -%}
+{%- set critical = gaps|selectattr('severity', 'equalto', 'critical')|list|length -%}
+{%- set in_progress = gaps|selectattr('resolution_status', 'equalto', 'in_progress')|list|length -%}
+{%- set resolved = gaps|selectattr('resolution_status', 'equalto', 'resolved')|list|length -%}
+{%- set recorded = [total_gap_count or 0, gaps|length]|max -%}
+{#- The second table lists the gaps the first shows with no work package, from the same links, so the two never disagree. -#}
+{%- set unaddressed = [] -%}
+{%- for g in gaps %}{% if not wp_by_gap.get(g.id) %}{% set _ = unaddressed.append(g) %}{% endif %}{% endfor -%}
+{#- A fact that is the same on every row is said once, not repeated in a column. -#}
+{%- set types = gaps|map(attribute='gap_type')|map('default', '', true)|unique|list -%}
+{%- set sevs = gaps|map(attribute='severity')|map('default', '', true)|unique|list -%}
+{%- set statuses = gaps|map(attribute='resolution_status')|map('default', 'identified', true)|unique|list -%}
+{%- set impacts = gaps|map(attribute='impact')|map('default', '', true)|unique|list -%}
+{%- set show = {'type': types|length > 1, 'severity': sevs|length > 1, 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': (gaps|length - unaddressed|length) * 2 > gaps|length} -%}
+{%- set facts = [] -%}
+{%- if gaps and not show.status %}{% set _ = facts.append('every gap is ' ~ statuses[0]|replace('_', ' ')|lower) %}{% endif -%}
+{%- if gaps and not show.severity %}{% set _ = facts.append(('every gap is rated ' ~ sevs[0]|lower) if sevs[0] else 'no gap has a severity yet') %}{% endif -%}
+{%- if gaps and not show.impact %}{% set _ = facts.append(('every gap has ' ~ impacts[0]|replace('_', ' ')|lower ~ ' impact') if impacts[0] else 'no gap has its impact recorded') %}{% endif -%}
+{%- if gaps and not show.type %}{% set _ = facts.append(('every gap is a ' ~ types[0]|replace('_', ' ')|lower ~ ' gap') if types[0] else 'no gap is classified yet') %}{% endif -%}
+{%- if gaps and not show.work %}{% set _ = facts.append(('no gap has a work package yet') if unaddressed|length == gaps|length else ((gaps|length - unaddressed|length) ~ ' of ' ~ gaps|length ~ ' gaps have a work package, named under the gap')) %}{% endif -%}
+{#- Titles shared by more than one gap get a reference line so the rows can be told apart. -#}
+{%- set _seen = [] -%}{%- set dupes = [] -%}
+{%- for g in gaps %}{% set t = _unprefixed(g.name) %}{% if t in _seen and t not in dupes %}{% set _ = dupes.append(t) %}{% endif %}{% set _ = _seen.append(t) %}{% endfor -%}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Gap analysis', subtitle='What separates today\'s architecture from the target, and the work that closes each gap',
+              breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Gap analysis', none)],
+              actions_caller=(_new_gap if gaps else none)) }}
 
-    <!-- Gap Summary -->
-    <div class="grid gap-4 md:grid-cols-4">
-        {{ stat_card(label='Recorded Gaps', value=total_gap_count|default(0), icon='target', hint='ArchiMate Gap elements in the register') }}
-        {{ stat_card(label='Critical', value=gaps|selectattr('severity', 'equalto', 'critical')|list|length|default(0), icon='alert-triangle', hint='By the severity recorded on each gap', variant='warning') }}
-        {{ stat_card(label='In Progress', value=gaps|selectattr('status', 'equalto', 'In Progress')|list|length|default(0), icon='loader') }}
-        {{ stat_card(label='Resolved', value=gaps|selectattr('status', 'equalto', 'Resolved')|list|length|default(0), icon='check-circle') }}
-    </div>
+{% if gaps %}
+{{ stat_cards([
+    {'label': 'Recorded gaps', 'value': recorded, 'icon': 'target', 'sentence': 'Gaps recorded between the current and target architecture', 'testid': 'gap-stat-recorded'},
+    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': ('Rated critical on the gap itself' if critical else 'No gap is rated critical'), 'testid': 'gap-stat-critical'},
+    {'label': 'In progress', 'value': in_progress, 'icon': 'loader', 'sentence': ('Being closed by work under way' if in_progress else 'No gap is being worked on yet'), 'testid': 'gap-stat-in-progress'},
+    {'label': 'Resolved', 'value': resolved, 'icon': 'circle-check', 'sentence': ('Closed by delivered work' if resolved else 'No gap has been closed yet'), 'testid': 'gap-stat-resolved'},
+]) }}
 
-    <!-- Gaps Table -->
-    {% call section_card(title='Identified Gaps') %}
-        {% call table() %}
-            {% call table_header() %}
-                <tr>
-                    {% macro sort_th(key, label) %}
-                    {% set next_dir = 'desc' if current_sort == key and current_dir == 'asc' else 'asc' %}
-                    {% call table_head() %}
-                        <a href="{{ request.path }}?sort={{ key }}&dir={{ next_dir }}"
-                           class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                           aria-label="Sort by {{ label }}{{ ', currently ' ~ current_dir ~ 'ending' if current_sort == key }}">
-                            {{ label }}
-                            {% if current_sort == key %}
-                            <i data-lucide="{{ 'arrow-up' if current_dir == 'asc' else 'arrow-down' }}" class="h-3 w-3" aria-hidden="true"></i>
-                            {% else %}
-                            <i data-lucide="chevrons-up-down" class="h-3 w-3 opacity-40" aria-hidden="true"></i>
-                            {% endif %}
-                        </a>
-                    {% endcall %}
-                    {% endmacro %}
-                    {{ sort_th('name', 'Gap') }}
-                    {{ sort_th('gap_type', 'Type') }}
-                    {{ sort_th('severity', 'Severity') }}
-                    {{ sort_th('resolution_status', 'Status') }}
-                    {{ sort_th('impact', 'Impact') }}
-                    {% call table_head() %}Work packages{% endcall %}
-                    {% call table_head() %}Actions{% endcall %}
-                </tr>
-            {% endcall %}
-            {% call table_body() %}
-                {% for gap in gaps|default([]) %}
-                <tr id="gap-{{ gap.id }}" class="hover:bg-muted/50 scroll-mt-24 target:bg-primary/10 target:outline target:outline-2 target:outline-primary" data-testid="gap-row" data-severity="{{ gap.severity|default('', true) }}">
-                    {% call table_cell() %}
-                        <div class="font-medium">
-                            <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                               class="hover:underline" data-testid="gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
-                        </div>
-                        <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
-                        <div class="mt-1 md:hidden" data-testid="gap-severity-narrow">{{ severity_badge(gap) }}</div>
-                    {% endcall %}
-                    {% call table_cell() %}{{ gap_type_cell(gap) }}{% endcall %}
-                    {% call table_cell() %}{{ severity_badge(gap) }}{% endcall %}
-                    {% call table_cell() %}
-                        {% if gap.resolution_status == 'resolved' %}
-                            {% call badge('success') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
-                        {% elif gap.resolution_status == 'in_progress' %}
-                            {% call badge('info') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
-                        {% else %}
-                            {% call badge('neutral') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
-                        {% endif %}
-                    {% endcall %}
-                    {% call table_cell() %}<span class="text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</span>{% endcall %}
-                    {% call table_cell() %}
-                        <span data-testid="gap-work-packages-{{ gap.id }}">
-                        {% for wp in (work_packages_by_gap or {}).get(gap.id, []) %}
-                        <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
-                                class="text-primary hover:underline" data-testid="gap-work-package-link">{{ wp.name|default('—', true) }}</a></div>
-                        {% else %}
-                        <span class="text-muted-foreground" data-testid="gap-no-work-package">None yet: use Convert to Work Package</span>
-                        {% endfor %}
-                        </span>
-                    {% endcall %}
-                    {% call table_cell() %}
-                        <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                                @click='convertToWorkPackage({{ gap.id }}, {{ (gap.name|default("this gap"))|tojson }})' 
-                                :disabled="busyId === {{ gap.id }} || convertedIds.includes({{ gap.id }})"
-                                aria-label="Convert this gap to a work package">
-                            <span x-show="busyId !== {{ gap.id }} && !convertedIds.includes({{ gap.id }})">Convert to Work Package</span>
-                            <span x-show="busyId === {{ gap.id }}">Converting…</span>
-                            <span x-show="busyId !== {{ gap.id }} && convertedIds.includes({{ gap.id }})">Converted</span>
-                        </button>
-                    {% endcall %}
-                </tr>
-                {% else %}
-                {{ table_empty_state(message='No gaps identified', icon='target') }}
-                {% endfor %}
-            {% endcall %}
-        {% endcall %}
-    {% endcall %}
+{%- set columns = [{'label': 'Gap', 'sortable': true}] -%}
+{%- if show.type %}{% set _ = columns.append({'label': 'Type', 'sortable': true, 'class': 'hidden lg:table-cell'}) %}{% endif -%}
+{%- if show.severity %}{% set _ = columns.append({'label': 'Severity', 'sortable': true, 'class': 'hidden md:table-cell'}) %}{% endif -%}
+{%- if show.status %}{% set _ = columns.append({'label': 'Status', 'sortable': true}) %}{% endif -%}
+{%- if show.impact %}{% set _ = columns.append({'label': 'Impact', 'sortable': true, 'class': 'hidden lg:table-cell'}) %}{% endif -%}
+{%- if show.work %}{% set _ = columns.append(('Work package', '')) %}{% endif -%}
+{%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
+{%- set facts_line = (facts|join('; ') ~ '.')|capitalize if facts else '' -%}
 
-    <!-- Gaps Not Addressed -->
-    {% call section_card(title='Gaps Not Addressed by Any Work Package') %}
-        <p class="text-sm text-muted-foreground mb-4">
-            These gaps have no work package linked to them. They remain open risks
-            in the transition from baseline to target architecture.
-        </p>
-        {% call table() %}
-            {% call table_header() %}
-                <tr>
-                    {% call table_head() %}Gap{% endcall %}
-                    {% call table_head() %}Type{% endcall %}
-                    {% call table_head() %}Severity{% endcall %}
-                    {% call table_head() %}Status{% endcall %}
-                    {% call table_head() %}Actions{% endcall %}
-                </tr>
-            {% endcall %}
-            {% call table_body() %}
-                {% for gap in not_addressed_gaps|default([]) %}
-                <tr class="hover:bg-muted/50" data-severity="{{ gap.severity|default('', true) }}">
-                    {% call table_cell() %}
-                        <div class="font-medium">
-                            <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                               class="hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
-                        </div>
-                        <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
-                    {% endcall %}
-                    {% call table_cell() %}{{ gap_type_cell(gap) }}{% endcall %}
-                    {% call table_cell() %}{{ severity_badge(gap) }}{% endcall %}
-                    {% call table_cell() %}
-                        {% if gap.resolution_status == 'resolved' %}
-                            {% call badge('success') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
-                        {% elif gap.resolution_status == 'in_progress' %}
-                            {% call badge('info') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
-                        {% else %}
-                            {% call badge('neutral') %}{{ gap.resolution_status|default('identified') }}{% endcall %}
-                        {% endif %}
-                    {% endcall %}
-                    {% call table_cell() %}
-                        <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                           class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted inline-block">
-                            View Details
-                        </a>
-                    {% endcall %}
-                </tr>
-                {% else %}
-                {{ table_empty_state(message='All gaps are addressed by work packages.', icon='check-circle') }}
-                {% endfor %}
-            {% endcall %}
-        {% endcall %}
-    {% endcall %}
+{% if show.work and unaddressed %}
+{#- Two sections: the register, and the gaps nothing covers yet. -#}
+{% call section('Recorded gaps', description=(facts_line or 'Open a gap to classify it, or convert it into a work package that closes it'), testid='gaps-section') %}
+  {{ _gaps_table(gaps, wp_by_gap, columns, show, dupes) }}
+{% endcall %}
+{% call section('Gaps with no work package', description='Each stays an open risk in the move to the target architecture until a work package covers it', testid='gaps-not-addressed') %}
+{% call(gap) list_table(rows=unaddressed, columns=([{'label': 'Gap', 'sortable': true}] + ([{'label': 'Severity', 'sortable': true}] if show.severity else []) + ([('Status', '')] if show.status else [])),
+                        caption='Gaps with no work package', testid='gaps-not-addressed-table', row_testid='not-addressed-gap-row',
+                        search_placeholder='Filter gaps...', empty_message='Every gap has a work package.') %}
+  {% call table_cell(class='max-w-[420px]') %}
+    <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
+    {{ _detail(gap, dupes) }}
+  {% endcall %}
+  {% if show.severity %}{% call table_cell(attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
+  {% if show.status %}{% call table_cell() %}{{ state_badge(gap.resolution_status or 'identified') }}{% endcall %}{% endif %}
+{% endcall %}
+{% endcall %}
+{% else %}
+{#- One table: shown bare under the header, its shared facts said once. -#}
+{{ _gaps_table(gaps, wp_by_gap, columns, show, dupes, notice=(facts_line or none)) }}
+{% endif %}
+
+{% else %}
+{% call ui.card(attrs={'data-testid': 'gaps-empty'}) %}
+  {% call ui.card_content() %}
+    {{ empty_state(icon='target', title='No gaps recorded yet',
+                   description='A gap is something the target architecture needs that today\'s does not have. Each one you record shows here with its severity and the work that closes it.',
+                   cta_text=('New gap' if can_change_model() else none), cta_icon='plus',
+                   cta_href=(url_for('archimate_crud.create_element', layer='implementation', element_type='Gap') if can_change_model() else none)) }}
+  {% endcall %}
+{% endcall %}
+{% endif %}
 </div>
-<script>
-    function gapAnalysisTable() {
-        return {
-            busyId: null,
-            convertedIds: [],
-            showWorkPackage(gapId, wp) {
-                const cell = document.querySelector('[data-testid="gap-work-packages-' + gapId + '"]');
-                if (!cell || !wp || !wp.id) return;
-                cell.querySelectorAll('.text-muted-foreground').forEach((el) => el.remove());
-                const row = document.createElement('div');
-                const link = document.createElement('a');
-                link.href = '/implementation/work-packages/' + wp.id;
-                link.className = 'text-primary hover:underline';
-                link.setAttribute('data-testid', 'gap-work-package-link');
-                link.textContent = wp.name || 'Work package';
-                row.appendChild(link);
-                cell.appendChild(row);
-            },
-            convertToWorkPackage(gapId, gapName) {
-                if (this.busyId !== null || this.convertedIds.includes(gapId)) return;
-                this.busyId = gapId;
-                Platform.fetch.post('/capability-map/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
-                    .then((data) => {
-                        if (data && data.success === false) {
-                            Platform.toast.error(data.error || 'Could not convert "' + gapName + '" to a work package.');
-                            return;
-                        }
-                        this.convertedIds.push(gapId);
-                        this.showWorkPackage(gapId, data && data.work_package);
-                        Platform.toast.success('"' + gapName + '" converted to a work package.');
-                    })
-                    .catch((err) => {
-                        Platform.toast.error('Could not convert "' + gapName + '" to a work package.');
-                        throw err;
-                    })
-                    .finally(() => {
-                        this.busyId = null;
-                    });
-            }
-        };
-    }
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('click', function (event) {
+  var button = event.target.closest('[data-convert-gap]');
+  if (!button || button.disabled) return;
+  var gapId = button.getAttribute('data-convert-gap');
+  var gapName = button.getAttribute('data-gap-name');
+  button.disabled = true;
+  Platform.fetch.post(button.getAttribute('data-convert-url'), { template: 'auto' }, { silent: true })
+    .then(function (data) {
+      if (data && data.success === false) {
+        button.disabled = false;
+        Platform.toast.error(data.error || 'Could not convert "' + gapName + '" to a work package.');
+        return;
+      }
+      var wp = data && data.work_package;
+      var cell = document.querySelector('[data-testid="gap-work-packages-' + gapId + '"]');
+      if (cell && wp && wp.id) {
+        var link = document.createElement('a');
+        link.href = button.getAttribute('data-wp-url').replace(/\/0$/, '/' + wp.id);
+        link.className = 'block truncate text-xs text-foreground hover:underline';
+        link.setAttribute('data-testid', 'gap-work-package-link');
+        link.textContent = wp.name || 'Work package';
+        cell.appendChild(link);
+      }
+      button.title = 'Converted to a work package';
+      Platform.toast.success('"' + gapName + '" converted to a work package.');
+    })
+    .catch(function () {
+      button.disabled = false;
+      Platform.toast.error('Could not convert "' + gapName + '" to a work package.');
+    });
+});
 </script>
 {% endblock %}

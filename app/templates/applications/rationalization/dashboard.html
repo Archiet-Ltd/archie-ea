@@ -1,768 +1,273 @@
 {% extends "layouts/admin_base.html" %}
 {# design-block: dashboard #}
-{% import 'components/card.html' as card %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% block title %}Application Rationalization{% endblock %}
+{% from 'components/figures.html' import stat_cards, section %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% block title %}Application rationalization{% endblock %}
 
 {% block guided_mode_steps %}
 <script id="guided-mode-steps-data" type="application/json">
 [
-  {"title": "Step 1 — Portfolio Overview", "text": "The table shows all applications scored by strategic fit. Red rows are retirement candidates."},
-  {"title": "Step 2 — Filter by Lifecycle", "text": "Use the Lifecycle filter to isolate 'Retire' or 'Decommission' apps and build your roadmap."},
-  {"title": "Step 3 — Review Scores", "text": "Click any application row to see its full scorecard and the data gaps driving a low score."}
+  {"title": "Step 1: Portfolio overview", "text": "The figures show how many applications you have, how many possible duplicates were found and what consolidating them could save."},
+  {"title": "Step 2: Score the portfolio", "text": "Score your applications against the TIME framework to see their health and what to do with each one."},
+  {"title": "Step 3: Act on the results", "text": "Review duplicate groups in the workbench and add the ones to merge to the consolidation list."}
 ]
 </script>
 {% endblock %}
 
-{% from 'components/inline_hint.html' import inline_hint %}
-{% block page_hint %}
-{{ inline_hint(
-    hint_id='rationalization',
-    text='This page scores your applications by strategic fit and lifecycle status.',
-    action_text='Filter to Retired apps now',
-    action_href='#lifecycle-filter'
-) }}
-{% endblock %}
+{#- A money figure for a headline: the symbol once, abbreviated (£1.7m, £137.7k). -#}
+{% macro _money(v) -%}
+{%- set a = v|abs -%}
+{%- if a >= 1000000 -%}{{ currency_symbol }}{{ ('%.1f'|format(v / 1000000))|replace('.0', '') }}m
+{%- elif a >= 1000 -%}{{ currency_symbol }}{{ ('%.1f'|format(v / 1000))|replace('.0', '') }}k
+{%- else -%}{{ currency_symbol }}{{ '%.0f'|format(v) }}{%- endif -%}
+{%- endmacro %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Applications', 'href': url_for('unified_applications.application_list')},
-    {'text': 'Rationalization', 'href': url_for('unified_applications.rationalization_dashboard')},
-    {'text': 'Dashboard', 'current': true}
-]) }}
-{% endblock %}
+{#- One empty state, drawn the same way wherever this page has nothing to show. -#}
+{% macro _empty(icon, title, sentence, action=none, testid=none) -%}
+{% call ui.empty(class='p-6 md:p-10', attrs=({'data-testid': testid} if testid else {})) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide(icon) }}{% endcall %}
+    {{ ui.empty_title(text=title) }}
+    {{ ui.empty_description(text=sentence) }}
+  {% endcall %}
+  {% if action %}{% call ui.empty_content() %}{{ action() }}{% endcall %}{% endif %}
+{% endcall %}
+{%- endmacro %}
+
+{% macro _to_applications() %}{% call ui.button(href=url_for('unified_applications.application_list')) %}{{ lucide('layers') }}Go to applications{% endcall %}{% endmacro %}
+
+{#- The page's one primary button: scoring the portfolio. -#}
+{% macro _score_button(text='Score portfolio', variant='default') -%}
+{% call ui.button(type='button', variant=variant, size='sm', attrs={'@click': 'scorePortfolio', ':disabled': 'isScoring', 'data-testid': 'score-portfolio'}) %}
+  <span x-show="isScoring" x-cloak class="inline-flex animate-spin">{{ lucide('loader-circle') }}</span>{{ text }}
+{% endcall %}
+{%- endmacro %}
+
+{#- Header actions: the business-case export once anything is scored, and one menu for everything else. -#}
+{% macro _header_actions() -%}
+{%- set is_scored = stats and stats.time_scored_count -%}
+<div class="flex items-center gap-2">
+  {% if is_scored %}
+  {% call native_select_wrapper() %}
+    {% call native_select(size='sm', attrs={'aria-label': 'Export format', 'x-model': 'exportFormat'}) %}
+      {{ native_select_option(text='Excel workbook', value='excel', selected=true) }}
+      {{ native_select_option(text='CSV data', value='csv') }}
+      {{ native_select_option(text='Executive summary (HTML)', value='pdf') }}
+    {% endcall %}
+  {% endcall %}
+  {% call ui.button(type='button', variant='outline', size='sm', attrs={'@click': 'doExport', ':disabled': 'exportLoading', 'data-testid': 'export-business-case'}) %}{{ lucide('download') }}Export business case{% endcall %}
+  {% endif %}
+  {% if stats %}
+  {% call ui.dropdown_menu() %}
+    {% call ui.dropdown_menu_trigger(variant='outline', size='icon', class='size-8', attrs={'data-testid': 'rationalization-more'}) %}{{ lucide('ellipsis') }}<span class="sr-only">More actions</span>{% endcall %}
+    {% call ui.dropdown_menu_content(align='end', class='w-56') %}
+      {% if is_scored %}
+      {{ ui.dropdown_menu_item(text='Score again', tag='button', type='button', class='w-full', attrs={'@click': 'scorePortfolio', ':disabled': 'isScoring'}) }}
+      <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" data-testid="run-detection-menu-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="from_dashboard" value="1">
+        <input type="hidden" name="strategy" value="hybrid">
+        <input type="hidden" name="similarity_threshold" value="0.55">
+        {{ ui.dropdown_menu_item(text='Run detection again', tag='button', type='submit', class='w-full') }}
+      </form>
+      {% endif %}
+      {% if stats.duplicate_groups %}
+      {{ ui.dropdown_menu_item(text='Resolve exact matches', tag='button', type='button', class='w-full', attrs={'@click': 'autoResolveExact', ':disabled': 'autoResolveLoading'}) }}
+      {% endif %}
+      {% if is_scored or stats.duplicate_groups %}{{ ui.dropdown_menu_separator() }}{% endif %}
+      {{ ui.dropdown_menu_item(text='Review duplicate groups', href=url_for('unified_duplicate.duplicate_dashboard')) }}
+      {{ ui.dropdown_menu_item(text='Open the consolidation list', href='/consolidation-list') }}
+      {{ ui.dropdown_menu_item(text='Capability gaps', href=url_for('enterprise.gap_analysis'), attrs={'data-testid': 'rationalization-gaps-link'}) }}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
+</div>
+{%- endmacro %}
 
 {% block content %}
-<div x-data="rationalizationDashboard()" x-init="load()">
+<div class="p-6 space-y-6" x-data="rationalizationDashboard()" x-init="load">
+{{ page_shell(title='Application rationalization', subtitle='Find applications that do the same job, score them and plan what to keep, merge or retire',
+              breadcrumb=[('Home', url_for('main.index')), ('Applications', url_for('unified_applications.application_list')), ('Rationalization', none)],
+              actions_caller=_header_actions) }}
 
-    {# ── Page Header ──────────────────────────────────────────────── #}
-    {{ page_shell(title='Application Rationalization', subtitle='Identify duplicates, consolidate applications, and optimize your portfolio') }}
+{% include 'applications/rationalization/_sub_nav.html' %}
 
-    {# ── Sub-Navigation ───────────────────────────────────────────── #}
-    {% include 'applications/rationalization/_sub_nav.html' %}
+{% if not stats %}
+  {% call ui.alert(variant='destructive', attrs={'role': 'alert', 'data-testid': 'rationalization-load-error'}) %}
+    {{ lucide('circle-alert') }}
+    {{ ui.alert_title(text='Rationalization figures could not be read') }}
+    {{ ui.alert_description(text='Refresh the page to try again. Nothing in your portfolio has changed.') }}
+  {% endcall %}
+{% elif not stats.total_applications %}
+  {% call ui.card() %}
+    {{ _empty('layers', 'No applications to rationalize yet',
+              'Add or import your applications first. This page then finds the ones that do the same job and shows what merging them could save.',
+              _to_applications, 'rationalization-empty') }}
+  {% endcall %}
+{% else %}
+{%- set total = stats.total_applications -%}
+{%- set scored = stats.time_scored_count or 0 -%}
+{%- set groups_found = stats.duplicate_groups or 0 -%}
+{%- set insuf = insufficient_count or 0 -%}
+{%- set savings = stats.estimated_savings or 0 -%}
+{%- set decom = stats.decommissioned_applications or 0 -%}
 
-    {# ── 1. Pipeline Stepper (RATA-017: percentages + links) ────── #}
-    {% set total_apps = stats.total_applications|default(1) %}
-    {# The stepper prints a count, a total and a percentage for every stage.
-       With no stats it would draw a complete, all-zero pipeline. #}
-    {% if stats %}
-    <nav class="mb-8" aria-label="Rationalization pipeline">
-    {% call card.card(class='p-4') %}
-        <div class="flex items-center justify-between">
-            {# H7: Plan's 'total' used to be stats.time_scored_count -- a count from
-               a different table (ApplicationRationalizationScore) with no subset
-               relationship to consolidation_count (ConsolidationListEntry), so the
-               numerator could exceed the denominator ("2/0 (0%)") whenever
-               consolidation entries existed ahead of TIME scoring. Detect and Score
-               already share total_apps as their denominator; Plan now does too, so
-               every stage answers "how much of the portfolio", one population. #}
-            {% set steps = [
-                {'label': 'Detect', 'count': stats.duplicate_groups|default(0), 'total': total_apps, 'unit': 'groups', 'url': url_for('unified_duplicate.duplicate_dashboard'), 'icon': 'search'},
-                {'label': 'Score', 'count': stats.time_scored_count|default(0), 'total': total_apps, 'unit': 'scored', 'url': url_for('unified_applications.rationalization_workbench'), 'icon': 'bar-chart'},
-                {'label': 'Plan', 'count': stats.consolidation_count|default(0), 'total': total_apps, 'unit': 'in plan', 'url': '/consolidation-list', 'icon': 'clipboard-list'},
-                {'label': 'Roadmap', 'count': stats.roadmap_count|default(0), 'total': stats.consolidation_count|default(1), 'unit': 'items', 'url': url_for('unified_applications.rationalization_tracking'), 'icon': 'map'},
-                {'label': 'Track', 'count': 0, 'total': stats.roadmap_count|default(1), 'unit': 'active', 'url': url_for('unified_applications.rationalization_tracking'), 'icon': 'trending-up'}
-            ] %}
-            {% for step in steps %}
-            {% set pct = ((step.count / step.total * 100)|round|int) if step.total > 0 else 0 %}
-            <a href="{{ step.url }}" class="flex flex-col items-center text-center group flex-1 {{ 'opacity-50' if step.count == 0 else '' }}">
-                <div class="flex items-center justify-center w-10 h-10 rounded-full border-2 {{ 'border-primary bg-primary/10 text-primary' if step.count > 0 else 'border-border text-muted-foreground' }} group-hover:border-primary/70 transition-colors mb-1.5">
-                    <i data-lucide="{{ step.icon }}" class="h-4 w-4"></i>
-                </div>
-                <span class="text-xs font-semibold">{{ step.label }}</span>
-                <span class="text-xs text-muted-foreground">{{ step.count }}/{{ step.total }} ({{ pct }}%)</span>
-            </a>
-            {% if not loop.last %}
-            <div class="flex-shrink-0 w-8 h-px bg-border mx-1 mt-[-16px]"></div>
-            {% endif %}
-            {% endfor %}
+{# ── Getting started, only while nothing is scored: detection and consolidation live in their steps ── #}
+{% if scored == 0 %}
+{% call section('Get started', 'Four steps take your portfolio from a list of applications to a plan for what to keep, merge or retire.', testid='rationalization-get-started') %}
+  <ol class="divide-y">
+    <li class="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">1</span>
+        <div>
+          <p class="text-sm font-medium">Score your portfolio</p>
+          <p class="text-sm text-muted-foreground">Score all {{ total }} applications against the TIME framework: tolerate, invest, migrate or eliminate.</p>
+          <p class="text-sm text-destructive" x-show="scoringResult && !scoringResult.success" x-cloak role="alert">Scoring did not finish. Try again in a moment.</p>
         </div>
-    {% endcall %}
-    </nav>
-    {% endif %}
-
-    {# ── 1b. First-Run Wizard (RATA-016) ─────────────────────────── #}
-    <div x-show="showWizard" x-cloak class="border rounded-md border-2 border-primary/40 bg-primary/10 px-3 py-2 mb-8"
-         x-transition>
-        <div class="flex items-start gap-4 mb-6">
-            <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-info-emphasis shrink-0">
-                <i data-lucide="rocket" class="h-6 w-6"></i>
-            </div>
-            <div>
-                <h2 class="text-lg font-bold text-foreground">Get Started with Rationalization</h2>
-                <p class="text-sm text-muted-foreground mt-1">Follow these steps to activate your portfolio rationalization pipeline.</p>
-            </div>
+      </div>
+      <div class="shrink-0 sm:pl-4">{{ _score_button() }}</div>
+    </li>
+    <li class="space-y-3 py-4">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">2</span>
+        <div>
+          <p class="text-sm font-medium">Find possible duplicates</p>
+          <p class="text-sm text-muted-foreground" data-testid="rationalization-last-run">
+            {% if latest_run %}Last run {{ latest_run.created_at.strftime('%d %b %Y') if latest_run.created_at else 'on a date not recorded' }}: {{ groups_found }} {{ 'group' if groups_found == 1 else 'groups' }} of applications that may do the same job.
+            {% else %}Not run yet. Detection compares names, acronyms and business context to find applications that may do the same job.{% endif %}
+          </p>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
-                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold mb-3">1</div>
-                <p class="text-sm font-medium text-foreground mb-1">Score Your Portfolio</p>
-                <p class="text-xs text-muted-foreground mb-3">You have {{ stats.total_applications|dash }} apps. Score them using the TIME framework.</p>
-                <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    <span x-show="isScoring" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1.5"></span>
-                    Score Portfolio
-                </button>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
-                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">2</div>
-                <p class="text-sm font-medium text-foreground mb-1">Review Duplicates</p>
-                <p class="text-xs text-muted-foreground mb-3">{{ stats.duplicate_groups|dash }} duplicate groups detected. Review them.</p>
-                <a href="{{ url_for('unified_applications.rationalization_workbench') }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Open Workbench
-                </a>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
-                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">3</div>
-                <p class="text-sm font-medium text-foreground mb-1">Add Dependencies</p>
-                <p class="text-xs text-muted-foreground mb-3">Import dependency data to plan retirements safely.</p>
-                <a href="{{ url_for('unified_applications.rationalization_tracking') }}#dependencies"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Import Dependencies
-                </a>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
-                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">4</div>
-                <p class="text-sm font-medium text-foreground mb-1">Plan Consolidations</p>
-                <p class="text-xs text-muted-foreground mb-3">Create consolidation plans to realize savings.</p>
-                <a href="/consolidation-list"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Consolidation List
-                </a>
-            </div>
+      </div>
+      <form method="post" action="{{ url_for('unified_applications.rationalization_run_detection') }}" class="grid gap-3 pl-11 sm:grid-cols-[1fr_1fr_auto] sm:items-end" data-testid="run-detection-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="from_dashboard" value="1">
+        {% call ui.field() %}
+          {{ ui.field_label(text='How to compare', attrs={'for': 'detection-strategy'}) }}
+          {% call native_select_wrapper(class='w-full') %}
+            {% call native_select(name='strategy', id='detection-strategy', size='sm', class='w-full') %}
+              {{ native_select_option(text='Hybrid (recommended)', value='hybrid', selected=true) }}
+              {{ native_select_option(text='Fast: names and acronyms', value='fast') }}
+              {{ native_select_option(text='Enhanced: adds business context', value='enhanced') }}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.field() %}
+          {{ ui.field_label(text='How alike they must be', attrs={'for': 'detection-threshold'}) }}
+          {% call native_select_wrapper(class='w-full') %}
+            {% call native_select(name='similarity_threshold', id='detection-threshold', size='sm', class='w-full') %}
+              {% for pct in range(30, 101, 5) %}
+              {{ native_select_option(text=pct ~ '%' ~ (' (more results)' if pct == 30 else ' (exact matches only)' if pct == 100 else ''), value='%.2f'|format(pct / 100), selected=(pct == 55)) }}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        <div class="flex items-center gap-2">
+          {% call ui.button(type='submit', variant='outline', size='sm') %}{{ lucide('search') }}Run detection{% endcall %}
+          {% if groups_found %}{{ ui.button(text='Review groups', href=url_for('unified_duplicate.duplicate_dashboard'), variant='outline', size='sm') }}{% endif %}
         </div>
-    </div>
-
-    {# ── 2. Stat Cards ────────────────────────────────────────────── #}
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10">
-                    <i data-lucide="layers" class="h-5 w-5 text-primary"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Apps</p>
-                    <p class="text-2xl font-bold text-foreground">{{ stats.total_applications|dash }}</p>
-                </div>
-            </div>
-            <a href="/applications" class="text-xs text-primary hover:underline mt-2 inline-block">View portfolio &rarr;</a>
+      </form>
+    </li>
+    <li class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">3</span>
+        <div>
+          <p class="text-sm font-medium">Add dependencies</p>
+          <p class="text-sm text-muted-foreground">Record what depends on each application so retiring one is safe.</p>
         </div>
-
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/10">
-                    <i data-lucide="briefcase" class="h-5 w-5 text-warning"></i>
-                </div>
-                <div>
-                    {# Active Portfolio = total apps minus resolved duplicates #}
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active Portfolio</p>
-                    <p class="text-2xl font-bold text-foreground">{% if stats %}{{ (stats.total_applications|default(0)) - (stats.resolved_groups|default(0)) }}{% else %}&mdash;{% endif %}</p>
-                </div>
-            </div>
-            <a href="/applications" class="text-xs text-primary hover:underline mt-2 inline-block">View active apps &rarr;</a>
+      </div>
+      <div class="shrink-0 sm:pl-4">{{ ui.button(text='Add dependencies', href=url_for('unified_applications.rationalization_tracking') ~ '#dependencies', variant='outline', size='sm') }}</div>
+    </li>
+    <li class="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold tabular-nums">4</span>
+        <div>
+          <p class="text-sm font-medium">Plan consolidations</p>
+          <p class="text-sm text-muted-foreground" data-testid="rationalization-consolidation-counts">
+            {% if stats.consolidation_count %}{{ stats.consolidation_count }} on the consolidation list, {{ stats.roadmap_count or 0 }} on the roadmap.
+            {% else %}Put the applications to merge on the consolidation list and see what that saves.{% endif %}
+          </p>
         </div>
+      </div>
+      <div class="shrink-0 sm:pl-4">{{ ui.button(text='Open consolidation list', href='/consolidation-list', variant='outline', size='sm') }}</div>
+    </li>
+  </ol>
+{% endcall %}
+{% endif %}
 
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/10">
-                    <i data-lucide="clock" class="h-5 w-5 text-warning"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scored</p>
-                    <p class="text-2xl font-bold text-foreground">{{ stats.time_scored_count|dash }}</p>
-                </div>
-            </div>
-        </div>
+{# ── Headline figures ── #}
+{%- set cards = [
+  {'label': 'Applications', 'value': total, 'icon': 'layers', 'href': url_for('unified_applications.application_list'), 'testid': 'stat-total-apps',
+   'sentence': ('Plus ' ~ decom ~ ' decommissioned') if decom else 'In use across your portfolio'},
+  {'label': 'Possible duplicate groups', 'value': groups_found, 'icon': 'copy', 'href': url_for('unified_duplicate.duplicate_dashboard'), 'testid': 'stat-duplicate-groups',
+   'sentence': (((stats.pending_groups or 0) ~ ' waiting for a decision') if stats.pending_groups else 'Every group has a decision') if groups_found else 'Run detection to look for them'},
+  {'label': 'Scored', 'value': scored ~ ' of ' ~ total, 'icon': 'chart-bar', 'href': url_for('unified_applications.rationalization_workbench'), 'testid': 'stat-scored',
+   'sentence': ((insuf ~ ' need more evidence before a decision') if insuf else 'Each has enough evidence for a decision') if scored else 'Score the portfolio to see health'},
+  {'label': 'Estimated savings a year', 'value': _money(savings), 'icon': 'piggy-bank', 'testid': 'stat-savings',
+   'sentence': ((stats.consolidation_count ~ ' on the consolidation list') if stats.consolidation_count else 'From duplicate groups and the consolidation list') if savings > 0 else 'Appears once duplicates carry a cost'},
+] -%}
+{{ stat_cards(cards) }}
 
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
-                    <i data-lucide="check-circle-2" class="h-5 w-5 text-success"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Insufficient Evidence</p>
-                    <p class="text-2xl font-bold text-foreground">{{ insufficient_count|dash }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
-                    <i data-lucide="piggy-bank" class="h-5 w-5 text-success"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Est. Savings</p>
-                    <p class="text-2xl font-bold text-foreground">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol }}{{ '{:,.0f}'.format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10">
-                    <i data-lucide="shield-check" class="h-5 w-5 text-info"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Decision Ready</p>
-                    <p class="text-2xl font-bold text-foreground" x-text="execSummary.decision_ready_count != null ? execSummary.decision_ready_count : '...'"></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {# ── 2b. Stale Score Nudge ─────────────────────────────────────── #}
-    {# TODO: Backend needs to pass lastScoredDaysAgo (or last_scored_at timestamp)
-       to Alpine data. Once available, uncomment the banner below and wire the variable
-       in rationalizationDashboard() init from the executive-summary API response. #}
-    {#
-    <div x-show="lastScoredDaysAgo > 30" x-cloak
-         class="rounded-xl border border-warning/30 bg-warning/5 p-4 mb-8 flex items-center gap-3">
-        <i data-lucide="clock" class="h-5 w-5 text-warning flex-shrink-0"></i>
-        <p class="text-sm text-muted-foreground">
-            Scores are <span class="font-semibold text-foreground" x-text="lastScoredDaysAgo"></span> days old.
-            <button type="button" @click="scorePortfolio()" class="text-primary hover:underline ml-1">Re-run scoring</button>
-            to reflect recent changes.
-        </p>
-    </div>
-    #}
-
-    {# ── 3. Health & Disposition Charts (RATA-005: empty states) ──── #}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="rounded-lg border border-border bg-card p-5">
-            <h3 class="text-sm font-semibold text-foreground mb-3">Health Distribution</h3>
-            <template x-if="execSummary.loaded && hasScores">
-                <div class="space-y-2">
-                    <template x-for="(item, idx) in execSummary.health_distribution" :key="idx">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xs font-medium w-16 text-muted-foreground" x-text="item.label"></span>
-                            <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-500"
-                                     :class="item.color"
-                                     :style="'width:' + item.pct + '%'"></div>
-                            </div>
-                            <span class="text-xs font-semibold w-8 text-right" x-text="item.count"></span>
-                        </div>
-                    </template>
-                </div>
-            </template>
-            <template x-if="execSummary.loaded && !hasScores">
-                <div class="flex flex-col items-center py-8 text-center">
-                    <i data-lucide="bar-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
-                    <p class="text-sm text-muted-foreground mb-3">No applications scored yet. Score your portfolio to see health distribution.</p>
-                    <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        <span x-show="isScoring" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
-                        Score Portfolio
-                    </button>
-                </div>
-            </template>
-            <template x-if="!execSummary.loaded && !execSummary.error">
-                <div class="space-y-3 animate-pulse">
-                    <div class="h-5 bg-muted rounded w-full"></div>
-                    <div class="h-5 bg-muted rounded w-4/5"></div>
-                    <div class="h-5 bg-muted rounded w-3/5"></div>
-                </div>
-            </template>
-            <template x-if="execSummary.error">
-                <div class="text-sm text-destructive-emphasis flex items-center gap-2">
-                    <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                    <span>Failed to load.</span>
-                    <button type="button" @click="load()" class="text-primary hover:underline text-xs">Retry</button>
-                </div>
-            </template>
-        </div>
-
-        <div class="rounded-lg border border-border bg-card p-5">
-            <h3 class="text-sm font-semibold text-foreground mb-3">Disposition Breakdown</h3>
-            <template x-if="execSummary.loaded && hasScores">
-                <div class="space-y-2">
-                    <template x-for="(item, idx) in execSummary.disposition_breakdown" :key="idx">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xs font-medium w-20 text-muted-foreground" x-text="item.label"></span>
-                            <div class="flex-1 h-5 rounded-full overflow-hidden"
-                                 :class="item.label.toLowerCase().includes('insufficient') ? 'border border-dashed border-border bg-muted' : 'bg-muted'">
-                                <div class="h-full rounded-full transition-all duration-500"
-                                     :class="item.color"
-                                     :style="'width:' + item.pct + '%'"></div>
-                            </div>
-                            <span class="text-xs font-semibold w-8 text-right" x-text="item.count"></span>
-                        </div>
-                    </template>
-                </div>
-            </template>
-            <template x-if="execSummary.loaded && !hasScores">
-                <div class="flex flex-col items-center py-8 text-center">
-                    <i data-lucide="pie-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
-                    <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see disposition breakdown.</p>
-                    <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Score Portfolio
-                    </button>
-                </div>
-            </template>
-            <template x-if="!execSummary.loaded && !execSummary.error">
-                <div class="space-y-3 animate-pulse">
-                    <div class="h-5 bg-muted rounded w-full"></div>
-                    <div class="h-5 bg-muted rounded w-4/5"></div>
-                    <div class="h-5 bg-muted rounded w-3/5"></div>
-                </div>
-            </template>
-            <template x-if="execSummary.error">
-                <div class="text-sm text-destructive-emphasis flex items-center gap-2">
-                    <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                    <span>Failed to load.</span>
-                    <button type="button" @click="load()" class="text-primary hover:underline text-xs">Retry</button>
-                </div>
-            </template>
-        </div>
-    </div>
-
-    {# ── 3b. TIME Quadrant Chart (RATA-010) ────────────────────────── #}
-    <div class="rounded-lg border border-border bg-card text-card-foreground p-6 mb-8" data-slot="card">
-        <h3 class="text-base font-semibold text-foreground mb-4">TIME Quadrant — Portfolio View</h3>
-        <template x-if="hasScores">
-            <div class="relative h-[400px]">
-                <canvas id="timeQuadrantChart"></canvas>
-            </div>
+{# ── Once anything is scored: health, disposition and the TIME quadrant in one section ── #}
+{% if scored %}
+{% call section('Scores', 'Health, the recommended disposition, and each application by business value and technical health', testid='rationalization-scores') %}
+  <div class="grid gap-6 md:grid-cols-2">
+    {% for title, key in [('Health', 'health_distribution'), ('Disposition', 'disposition_breakdown')] %}
+    <div class="space-y-3">
+      <p class="text-sm font-medium">{{ title }}</p>
+      <div x-show="execSummary.loaded" x-cloak class="space-y-3">
+        <template x-for="(item, idx) in execSummary.{{ key }}" :key="idx">
+          <div class="flex items-center gap-3 text-sm">
+            <span class="w-28 shrink-0 text-muted-foreground" x-text="item.label"></span>
+            <progress class="h-2 flex-1 overflow-hidden rounded-full accent-primary" max="100" :value="item.pct"></progress>
+            <span class="w-8 text-right font-medium tabular-nums" x-text="item.count"></span>
+          </div>
         </template>
-        <template x-if="!hasScores && execSummary.loaded">
-            <div class="flex flex-col items-center justify-center py-12 text-center">
-                <i data-lucide="scatter-chart" class="h-12 w-12 text-muted-foreground/40 mb-4"></i>
-                <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see the TIME quadrant visualization.</p>
-                <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Score Portfolio
-                </button>
-            </div>
-        </template>
-    </div>
-
-    {# ── 3c. Data Quality Health Panel (RAT-001) ────────────────────── #}
-    {% set dq = data_quality|default({}) %}
-    {% set fc = (dq or {}).get('field_coverage', {}) %}
-    {% set cost_pct = (fc or {}).get('cost', 0)|default(0) %}
-    {% set owner_pct = (fc or {}).get('owner', 0)|default(0) %}
-    {% set risk_pct = (fc or {}).get('risk', 0)|default(0) %}
-    {% set lifecycle_pct = (fc or {}).get('lifecycle', 0)|default(0) %}
-    {# _build_data_quality_report supplies 'vendor'. It is deliberately NOT
-       defaulted to 0 here: a missing key means "not measured", and rendering
-       that as 0% drew a full-width red bar telling the user their vendor data
-       was absent when every application had a vendor. None -> em dash. #}
-    {% set vendor_pct = (fc or {}).get('vendor') %}
-    <div class="rounded-lg border border-border bg-card text-card-foreground p-6 mb-8" data-slot="card">
-        <div class="flex items-start gap-3 mb-5">
-            <div class="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="activity" class="h-5 w-5 text-primary"></i>
-            </div>
-            <div>
-                <h3 class="text-base font-semibold text-foreground">Data Quality Health</h3>
-                <p class="text-xs text-muted-foreground mt-0.5">Field coverage across your application portfolio</p>
-            </div>
-        </div>
-        <div class="space-y-3">
-            {# Cost Coverage #}
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-medium w-32 text-muted-foreground">Cost Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if cost_pct < 25 else ('bg-warning' if cost_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ cost_pct }}%"></div>
-                </div>
-                <span class="text-xs font-semibold w-10 text-right">{{ cost_pct }}%</span>
-            </div>
-            {# Ownership Coverage #}
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-medium w-32 text-muted-foreground">Ownership Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if owner_pct < 25 else ('bg-warning' if owner_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ owner_pct }}%"></div>
-                </div>
-                <span class="text-xs font-semibold w-10 text-right">{{ owner_pct }}%</span>
-            </div>
-            {# Vendor Coverage #}
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-medium w-32 text-muted-foreground">Vendor Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    {% if vendor_pct is not none %}
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if vendor_pct < 25 else ('bg-warning' if vendor_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ vendor_pct }}%"></div>
-                    {% endif %}
-                </div>
-                <span class="text-xs font-semibold w-10 text-right">{{ (vendor_pct ~ '%') if vendor_pct is not none else '—' }}</span>
-            </div>
-            {# Risk Coverage #}
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-medium w-32 text-muted-foreground">Risk Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if risk_pct < 25 else ('bg-warning' if risk_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ risk_pct }}%"></div>
-                </div>
-                <span class="text-xs font-semibold w-10 text-right">{{ risk_pct }}%</span>
-            </div>
-            {# Labelled for what it actually measures. This bar plots lifecycle_pct;
-               it was previously captioned "Business Criticality", which is a different
-               field the backend does not yet supply. Rename here only when a real
-               business_criticality value is passed in. #}
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-medium w-32 text-muted-foreground">Lifecycle Coverage</span>
-                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500 {{ 'bg-destructive' if lifecycle_pct < 25 else ('bg-warning' if lifecycle_pct <= 75 else 'bg-success') }}"
-                         style="width: {{ lifecycle_pct }}%"></div>
-                </div>
-                <span class="text-xs font-semibold w-10 text-right">{{ lifecycle_pct }}%</span>
-            </div>
-        </div>
-        {% set insuf = insufficient_count or 0 %}
-        {% set scored = stats.time_scored_count or 0 %}
-        {% if insuf > 0 and insuf >= scored %}
-        <div class="mt-4 pt-4 border-t border-border">
-            <p class="text-sm text-muted-foreground">
-                <i data-lucide="alert-triangle" class="h-3.5 w-3.5 text-warning inline-block mr-1"></i>
-                <strong class="text-foreground">{{ insuf }}/{{ scored }} applications need data enrichment</strong> before disposition decisions can be made.
-                <a href="/applications/rationalization/enrich" class="text-primary hover:underline ml-1">Start enrichment &rarr;</a>
-            </p>
-        </div>
+        {% if loop.first %}
+        <p class="text-sm text-muted-foreground"><span class="font-medium text-foreground tabular-nums" x-text="execSummary.decision_ready_count"></span> ready for a decision</p>
         {% endif %}
+      </div>
+      <div x-show="!execSummary.loaded && !execSummary.error" class="space-y-3" role="status">
+        {{ ui.skeleton(class='h-4 w-full') }}{{ ui.skeleton(class='h-4 w-4/5') }}{{ ui.skeleton(class='h-4 w-3/5') }}
+      </div>
+      <div x-show="execSummary.error" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground" role="alert">
+        <span>These figures could not be loaded.</span>
+        {{ ui.button(text='Try again', type='button', variant='link', size='sm', class='h-auto p-0', attrs={'@click': 'load'}) }}
+      </div>
     </div>
+    {% endfor %}
+  </div>
+  <template x-if="hasScores">
+    <div class="relative mt-6 h-[400px] border-t pt-6"><canvas id="timeQuadrantChart" aria-label="TIME quadrant chart"></canvas></div>
+  </template>
+{% endcall %}
+{% endif %}
 
-    {# ── 4. Detection & Consolidation Summaries ───────────────────── #}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="rounded-lg border border-border bg-card p-5">
-            <h3 class="text-sm font-semibold text-foreground mb-2">Detection Summary</h3>
-            {# RATA-005: Use latest_run model object instead of runs[0] dict #}
-            {% if latest_run %}
-            <div class="text-sm text-muted-foreground space-y-1">
-                <p>Last run: <span class="text-foreground font-medium">{{ latest_run.created_at.strftime('%Y-%m-%d %H:%M') if latest_run.created_at else 'Unknown' }}</span></p>
-                <p>Strategy: <span class="text-foreground font-medium">{{ (latest_run.strategy or 'Unknown')|capitalize }}</span></p>
-                <p>Groups found: <span class="text-foreground font-medium">{{ latest_run.total_duplicates_found or stats.total_groups or 0 }}</span></p>
-            </div>
-            {% else %}
-            <div class="flex flex-col items-center py-4 text-center">
-                <i data-lucide="search" class="h-8 w-8 text-muted-foreground/50 mb-2"></i>
-                <p class="text-sm text-muted-foreground">No detection runs yet.</p>
-                <p class="text-xs text-muted-foreground">Run your first detection to find duplicates.</p>
-            </div>
-            {% endif %}
-            <a href="{{ url_for('unified_duplicate.duplicate_dashboard') }}" class="text-xs text-primary hover:underline mt-3 inline-block">View all detection results &rarr;</a>
-        </div>
-
-        <div class="rounded-lg border border-border bg-card p-5">
-            <h3 class="text-sm font-semibold text-foreground mb-2">Consolidation Summary</h3>
-            {% if stats.consolidation_count|default(0) > 0 %}
-            <div class="text-sm text-muted-foreground space-y-1">
-                <p>Active entries: <span class="text-foreground font-medium">{{ stats.consolidation_count }}</span></p>
-                <p>Roadmap items: <span class="text-foreground font-medium">{{ stats.roadmap_count|default(0) }}</span></p>
-            </div>
-            {% else %}
-            <div class="flex flex-col items-center py-4 text-center">
-                <i data-lucide="git-merge" class="h-8 w-8 text-muted-foreground/50 mb-2"></i>
-                <p class="text-sm text-muted-foreground">No consolidation entries yet.</p>
-                <p class="text-xs text-muted-foreground">Start planning after reviewing duplicate groups.</p>
-            </div>
-            {% endif %}
-            <a href="/consolidation-list" class="text-xs text-primary hover:underline mt-3 inline-block">View consolidation list &rarr;</a>
-        </div>
-    </div>
-
-    {# ── 5. Quick Actions ─────────────────────────────────────────── #}
-    <h2 class="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {# RATA-004: Score Portfolio button #}
-        <button type="button" @click="scorePortfolio()"
-                :disabled="isScoring"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
-                    <template x-if="isScoring">
-                        <span class="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-                    </template>
-                    <template x-if="!isScoring">
-                        <i data-lucide="bar-chart" class="h-5 w-5"></i>
-                    </template>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground" x-text="isScoring ? 'Scoring Portfolio...' : 'Score Portfolio'"></h3>
-                    <p class="text-xs text-muted-foreground mt-0.5" x-show="!scoringResult" x-cloak>Score all applications using the TIME framework</p>
-                    <p class="text-xs text-success-emphasis mt-0.5" x-show="scoringResult && scoringResult.success" x-cloak
-                       x-text="'Scored: ' + (scoringResult?.scored || 0) + ' apps'"></p>
-                    <p class="text-xs text-destructive-emphasis mt-0.5" x-show="scoringResult && !scoringResult.success" x-cloak
-                       x-text="'Error: ' + (scoringResult?.error || 'unknown')"></p>
-                </div>
-            </div>
-        </button>
-
-        <button type="button" @click="showDetectionModal = true"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
-                    <i data-lucide="search" class="h-5 w-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground">Run Detection</h3>
-                    <p class="text-xs text-muted-foreground mt-0.5">Find duplicate applications using fast, hybrid, or enhanced strategies</p>
-                </div>
-            </div>
-        </button>
-
-        <button type="button" @click="autoResolveExact()"
-                :disabled="autoResolveLoading"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10 text-success-emphasis group-hover:bg-success/20 transition-colors">
-                    <i data-lucide="check-check" class="h-5 w-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground">Auto-Resolve Exact Matches</h3>
-                    <p class="text-xs text-muted-foreground mt-0.5">Automatically resolve 100% similarity duplicates</p>
-                </div>
-            </div>
-        </button>
-
-        <a href="/consolidation-list"
-           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10 text-primary group-hover:bg-info/20 transition-colors">
-                    <i data-lucide="list-checks" class="h-5 w-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground">Consolidation List</h3>
-                    <p class="text-xs text-muted-foreground mt-0.5">Manage consolidation planning and roadmap items</p>
-                </div>
-            </div>
-        </a>
-
-        <a href="{{ url_for('unified_duplicate.duplicate_dashboard') }}"
-           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/10 text-warning-emphasis group-hover:bg-warning/20 transition-colors">
-                    <i data-lucide="eye" class="h-5 w-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground">Review Exact Matches</h3>
-                    <p class="text-xs text-muted-foreground mt-0.5">Review and decide on detected duplicate groups</p>
-                </div>
-            </div>
-        </a>
-
-        <a href="/applications"
-           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10 text-info group-hover:bg-info/20 transition-colors">
-                    <i data-lucide="layout-grid" class="h-5 w-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground">Application Portfolio</h3>
-                    <p class="text-xs text-muted-foreground mt-0.5">View all applications in the portfolio</p>
-                </div>
-            </div>
-        </a>
-
-        {# RATA-018: Export Business Case button #}
-        <button type="button" @click="showExportModal = true" x-show="hasScores" x-cloak
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
-            <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
-                    <i data-lucide="download" class="h-5 w-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-sm text-foreground">Export Business Case</h3>
-                    <p class="text-xs text-muted-foreground mt-0.5">Download PDF, Excel, or CSV export for leadership</p>
-                </div>
-            </div>
-        </button>
-    </div>
-
-    {# ── RATA-018: Export Modal ──────────────────────────────────── #}
-    <div x-show="showExportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
-         @keydown.escape.window="showExportModal = false"
-         role="dialog" aria-modal="true" aria-labelledby="export-title">
-        <div class="absolute inset-0 bg-overlay/50" @click="showExportModal = false"></div>
-        <div class="relative bg-card rounded-lg border border-border w-full max-w-sm mx-4 p-6">
-            <h3 id="export-title" class="text-base font-semibold text-foreground mb-4">Export Business Case</h3>
-            <div class="space-y-3">
-                <label class="block text-xs font-medium text-muted-foreground mb-1">Format</label>
-                <div class="space-y-2">
-                    <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" x-model="exportFormat" value="excel" class="rounded border-border"> Excel Workbook (.xlsx)
-                    </label>
-                    <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" x-model="exportFormat" value="csv" class="rounded border-border"> CSV Data Export
-                    </label>
-                    <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" x-model="exportFormat" value="pdf" class="rounded border-border"> Executive Summary (HTML)
-                    </label>
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 mt-5">
-                <button type="button" @click="showExportModal = false"
-                        class="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted">Cancel</button>
-                <button type="button" @click="doExport()"
-                        :disabled="exportLoading"
-                        class="px-4 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                    <span x-show="exportLoading" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1"></span>
-                    Download
-                </button>
-            </div>
-        </div>
-    </div>
-
-    {# ── AI Gap Analysis ──────────────────────────────────────────── #}
-    <div x-data="aiGapAnalysisPanel()" x-init="init()"
-         data-testid="ai-gap-panel"
-         data-summary-url="/api/ai-gap-detection/summary"
-         data-critical-gaps-url="/api/ai-gap-detection/critical-gaps"
-         data-rationalization-url="/api/ai-gap-detection/rationalization"
-         data-vendor-lifecycle-url="/api/ai-gap-detection/vendor-lifecycle"
-         class="rounded-lg border border-border bg-card text-card-foreground p-6 mb-8" data-slot="card">
-        <div class="flex items-start gap-3 mb-5">
-            <div class="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="sparkles" class="h-4 w-4 text-primary"></i>
-            </div>
-            <div>
-                <h3 class="text-base font-semibold text-foreground">AI Gap Analysis</h3>
-                <p class="text-xs text-muted-foreground mt-0.5">AI-detected capability gaps, rationalization opportunities and vendor lifecycle risk</p>
-            </div>
-        </div>
-
-        {# Section tabs #}
-        <div class="flex flex-wrap gap-2 mb-5 border-b border-border">
-            <template x-for="tab in tabs" :key="tab.key">
-                <button type="button"
-                        @click="openTab(tab.key)"
-                        class="px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors"
-                        :class="activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                        x-text="tab.label"></button>
-            </template>
-        </div>
-
-        {# ── Summary ─────────────────────────────────────────────── #}
-        <div x-show="activeTab === 'summary'" x-cloak>
-            <template x-if="sections.summary.error">
-                <p class="text-sm text-destructive-emphasis flex items-center gap-2">
-                    <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                    <span x-text="sections.summary.error"></span>
-                    <button type="button" @click="loadSection('summary')" class="text-primary hover:underline text-xs">Retry</button>
-                </p>
-            </template>
-            <template x-if="!sections.summary.error && !sections.summary.loaded">
-                <div class="space-y-3 animate-pulse">
-                    <div class="h-5 bg-muted rounded w-full"></div>
-                    <div class="h-5 bg-muted rounded w-4/5"></div>
-                </div>
-            </template>
-            <template x-if="!sections.summary.error && sections.summary.loaded">
-                <dl class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                        <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Critical Gaps</dt>
-                        <dd class="text-xl font-bold text-foreground" x-text="fmt(sections.summary.data.critical_gaps)"></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uncovered Capabilities</dt>
-                        <dd class="text-xl font-bold text-foreground" x-text="fmt(sections.summary.data.no_coverage_count)"></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rationalization Ops</dt>
-                        <dd class="text-xl font-bold text-foreground" x-text="fmt(sections.summary.data.rationalization_opportunities)"></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vendor Risks</dt>
-                        <dd class="text-xl font-bold text-foreground" x-text="fmt(sections.summary.data.vendor_lifecycle_risks)"></dd>
-                    </div>
-                </dl>
-            </template>
-        </div>
-
-        {# ── Critical Gaps ───────────────────────────────────────── #}
-        <div x-show="activeTab === 'critical-gaps'" x-cloak>
-            <template x-if="sections.criticalGaps.error">
-                <p class="text-sm text-destructive-emphasis flex items-center gap-2">
-                    <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                    <span x-text="sections.criticalGaps.error"></span>
-                    <button type="button" @click="loadSection('criticalGaps')" class="text-primary hover:underline text-xs">Retry</button>
-                </p>
-            </template>
-            <template x-if="!sections.criticalGaps.error && !sections.criticalGaps.loaded">
-                <div class="space-y-3 animate-pulse">
-                    <div class="h-5 bg-muted rounded w-full"></div>
-                    <div class="h-5 bg-muted rounded w-4/5"></div>
-                </div>
-            </template>
-            <template x-if="!sections.criticalGaps.error && sections.criticalGaps.loaded && sections.criticalGaps.data.length === 0">
-                <p class="text-sm text-muted-foreground">No critical gaps detected.</p>
-            </template>
-            <ul class="space-y-2" x-show="!sections.criticalGaps.error && sections.criticalGaps.loaded && sections.criticalGaps.data.length > 0">
-                <template x-for="(item, idx) in sections.criticalGaps.data" :key="idx">
-                    <li class="flex items-center justify-between border border-border rounded-lg px-3 py-2">
-                        <span class="text-sm text-foreground" x-text="item.capability_name || item.name || '—'"></span>
-                        <span class="text-xs text-muted-foreground" x-text="item.gap_severity || item.urgency_level || '—'"></span>
-                    </li>
-                </template>
-            </ul>
-        </div>
-
-        {# ── Rationalization Opportunities ───────────────────────── #}
-        <div x-show="activeTab === 'rationalization'" x-cloak>
-            <template x-if="sections.rationalization.error">
-                <p class="text-sm text-destructive-emphasis flex items-center gap-2">
-                    <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                    <span x-text="sections.rationalization.error"></span>
-                    <button type="button" @click="loadSection('rationalization')" class="text-primary hover:underline text-xs">Retry</button>
-                </p>
-            </template>
-            <template x-if="!sections.rationalization.error && !sections.rationalization.loaded">
-                <div class="space-y-3 animate-pulse">
-                    <div class="h-5 bg-muted rounded w-full"></div>
-                    <div class="h-5 bg-muted rounded w-4/5"></div>
-                </div>
-            </template>
-            <template x-if="!sections.rationalization.error && sections.rationalization.loaded && sections.rationalization.data.length === 0">
-                <p class="text-sm text-muted-foreground">No rationalization opportunities detected.</p>
-            </template>
-            <ul class="space-y-2" x-show="!sections.rationalization.error && sections.rationalization.loaded && sections.rationalization.data.length > 0">
-                <template x-for="(item, idx) in sections.rationalization.data" :key="idx">
-                    <li class="flex items-center justify-between border border-border rounded-lg px-3 py-2">
-                        <span class="text-sm text-foreground" x-text="item.capability_name || item.name || '—'"></span>
-                        <span class="text-xs text-muted-foreground" x-text="item.estimated_annual_savings != null ? formatCurrency(item.estimated_annual_savings) : '—'"></span>
-                    </li>
-                </template>
-            </ul>
-        </div>
-
-        {# ── Vendor Lifecycle Risks ──────────────────────────────── #}
-        <div x-show="activeTab === 'vendor-lifecycle'" x-cloak>
-            <template x-if="sections.vendorLifecycle.error">
-                <p class="text-sm text-destructive-emphasis flex items-center gap-2">
-                    <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                    <span x-text="sections.vendorLifecycle.error"></span>
-                    <button type="button" @click="loadSection('vendorLifecycle')" class="text-primary hover:underline text-xs">Retry</button>
-                </p>
-            </template>
-            <template x-if="!sections.vendorLifecycle.error && !sections.vendorLifecycle.loaded">
-                <div class="space-y-3 animate-pulse">
-                    <div class="h-5 bg-muted rounded w-full"></div>
-                    <div class="h-5 bg-muted rounded w-4/5"></div>
-                </div>
-            </template>
-            <template x-if="!sections.vendorLifecycle.error && sections.vendorLifecycle.loaded && sections.vendorLifecycle.data.length === 0">
-                <p class="text-sm text-muted-foreground">No vendor lifecycle risks detected.</p>
-            </template>
-            <ul class="space-y-2" x-show="!sections.vendorLifecycle.error && sections.vendorLifecycle.loaded && sections.vendorLifecycle.data.length > 0">
-                <template x-for="(item, idx) in sections.vendorLifecycle.data" :key="idx">
-                    <li class="flex items-center justify-between border border-border rounded-lg px-3 py-2">
-                        <span class="text-sm text-foreground" x-text="item.product_name || '—'"></span>
-                        <span class="text-xs text-muted-foreground" x-text="item.risk_level || item.status || '—'"></span>
-                    </li>
-                </template>
-            </ul>
-        </div>
-    </div>
-
-    {# ── Detection Modal ──────────────────────────────────────────── #}
-    {% include 'applications/rationalization/_detection_modal.html' %}
-
+{# ── Data quality ── #}
+{% set fc = (data_quality or {}).get('field_coverage', {}) or {} %}
+{% call section('Data quality', 'How much of your portfolio has each field filled in', content_class='space-y-3', testid='data-quality') %}
+  {% for label, key in [('Cost', 'cost'), ('Owner', 'owner'), ('Vendor', 'vendor'), ('Risk', 'risk'), ('Lifecycle', 'lifecycle')] %}
+  {%- set pct = fc.get(key) if key == 'vendor' else (fc.get(key) or 0) -%}
+  <div class="flex items-center gap-3 text-sm">
+    <span class="w-28 shrink-0 text-muted-foreground">{{ label }}</span>
+    {% if pct is not none %}
+    {%- set p = [[pct|round|int, 0]|max, 100]|min -%}
+    {% call ui.progress(value=p, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': label ~ ' coverage', 'role': 'progressbar', 'aria-valuemin': '0'}) %}{{ ui.progress_indicator(value=p) }}{% endcall %}
+    <span class="w-24 text-right font-medium tabular-nums">{{ pct|round|int }}%</span>
+    {% else %}
+    <span class="flex-1 text-muted-foreground">Not measured yet</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if insuf > 0 and insuf >= scored %}
+  <div class="flex flex-col gap-2 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-muted-foreground"><span class="font-medium text-foreground">{{ insuf }} of {{ scored }} scored applications</span> need more data before a decision can be made.</p>
+    {{ ui.button(text='Start enrichment', href='/applications/rationalization/enrich', variant='outline', size='sm') }}
+  </div>
+  {% endif %}
+{% endcall %}
+{% endif %}
 </div>
 {% endblock %}
 
@@ -770,5 +275,4 @@
 {# RATA-010: Chart.js for TIME quadrant #}
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/applications/rationalization_dashboard.js') }}"></script><!-- entity-picker-ok -->
-<script src="{{ url_for('static', filename='js/applications/ai_gap_analysis_panel.js') }}"></script>
 {% endblock %}

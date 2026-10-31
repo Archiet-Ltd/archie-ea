@@ -105,9 +105,9 @@ def backfill_organisation(organization_id: int, dry_run: bool = False) -> Dict:
     from app.models.enterprise_intelligence import ApplicationCost
     from app.services.application_cost_accessor import (
         FACT_COLUMNS,
-        get_reporting_currency,
         sync_cost_fact,
     )
+    from config import CurrencyConfig
     from app.services.cost_fact_store import upsert_fact
 
     before = source_counts(organization_id)
@@ -119,7 +119,7 @@ def backfill_organisation(organization_id: int, dry_run: bool = False) -> Dict:
     results[SOURCE_APP_COLUMNS]["read"] = before[SOURCE_APP_COLUMNS]
     results[SOURCE_APP_COSTS]["read"] = before[SOURCE_APP_COSTS]
     results[SOURCE_CAPABILITY]["read"] = before[SOURCE_CAPABILITY]
-    reporting = get_reporting_currency(organization_id)
+    reporting = CurrencyConfig.get_org_currency_code(organization_id=organization_id)
 
     apps = db.session.execute(
         db.select(ApplicationComponent).where(ApplicationComponent.organization_id == organization_id)

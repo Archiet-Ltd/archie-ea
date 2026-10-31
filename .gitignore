@@ -338,3 +338,7 @@ recheck.py
 docs/superpowers/evidence/
 route_verification.json
 route_verification.accum.json
+
+# compiled Python caches never belong in the repository
+__pycache__/
+*.pyc

@@ -1,240 +1,160 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/tabs.html' import section_tabs %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge, section %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu_item, dropdown_menu_separator, dropdown_menu_label %}
 
-{% block title %}Team Management{% endblock %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% block title %}Team{% endblock %}
+
+{% macro _role_label(r) -%}{{ (r or '')|replace('_', ' ')|capitalize }}{%- endmacro %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
-        title='Team Management',
-        description='Manage organisation members and their roles.',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Team'}
-        ]
-    ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Team', subtitle='Who belongs to this organisation, what role each person has, and who is still to accept an invitation',
+              breadcrumb=[('Admin', url_for('admin.index')), ('Team', none)]) }}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="mb-6 space-y-2">
-                {% for category, message in messages %}
-                    <div class="rounded-md p-4 {% if category == 'error' %}bg-destructive/5 text-destructive-emphasis{% else %}bg-success/5 text-success-emphasis{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+{{ section_tabs([('Members', url_for('team.team'), tab != 'permissions', 'team-tab-members'),
+                 ('Permissions', url_for('team.team', tab='permissions'), tab == 'permissions', 'team-tab-permissions')],
+                label='Team sections', testid='team-tabs') }}
 
-    <nav class="flex gap-4 border-b border-border mb-6" aria-label="Team sections" data-testid="team-tabs">
-        <a href="{{ url_for('team.team') }}" data-testid="team-tab-members"
-           class="px-1 pb-2 text-sm font-medium {% if tab != 'permissions' %}border-b-2 border-primary text-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}"
-           {% if tab != 'permissions' %}aria-current="page"{% endif %}>Members</a>
-        <a href="{{ url_for('team.team', tab='permissions') }}" data-testid="team-tab-permissions"
-           class="px-1 pb-2 text-sm font-medium {% if tab == 'permissions' %}border-b-2 border-primary text-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}"
-           {% if tab == 'permissions' %}aria-current="page"{% endif %}>Permissions</a>
-    </nav>
+{% if member_error %}
+{% call ui.alert(variant='destructive', class='max-w-2xl', attrs={'data-team-member-error': '', 'data-testid': 'team-member-error', 'role': 'alert'}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=member_error) }}{% endcall %}
+{% endif %}
 
-    {% if tab == 'permissions' %}
-    {% include 'admin/_team_permissions.html' %}
+{% if tab == 'permissions' %}
+{% include 'admin/_team_permissions.html' %}
+{% else %}
+
+{% call section('Invite a teammate', ('They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.' if mail_is_available else 'Invite someone who already has an account here; they join the next time they sign in.'), testid='team-invite') %}
+  {% if invite_error %}
+  {% call ui.alert(variant='destructive', class='mb-6 max-w-2xl', attrs={'data-team-invite-error': ''}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=invite_error) }}{% endcall %}
+  {% endif %}
+  {% if not mail_is_available and current_user.is_platform_admin %}
+  {% call ui.alert(class='mb-6 max-w-2xl', attrs={'data-team-mail-unavailable': ''}) %}{{ lucide('info') }}{{ ui.alert_description(text='Invitation e-mails are switched off on this server, so people without an account cannot be invited until e-mail is set up.') }}{% endcall %}
+  {% endif %}
+  <form method="POST" action="{{ url_for('team.team_invite') }}" class="max-w-2xl space-y-6" data-testid="team-invite-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% call ui.field() %}
+      {{ ui.field_label(text='Email', attrs={'for': 'email'}) }}
+      {{ ui.input(id='email', name='email', type='email', required=true, autocomplete='off', placeholder='name@company.com') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Persona', attrs={'for': 'persona'}) }}
+      {% call native_select_wrapper(class='w-full') %}{% call native_select(id='persona', name='persona', class='w-full') %}
+        {% for value, label in personas %}{{ native_select_option(label, value=value) }}{% endfor %}
+      {% endcall %}{% endcall %}
+      {{ ui.field_description(text='Sets what they see first when they sign in.') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Role', attrs={'for': 'role'}) }}
+      {% call native_select_wrapper(class='w-full') %}{% call native_select(id='role', name='role', class='w-full') %}
+        {% for r in valid_roles %}{{ native_select_option(_role_label(r), value=r, selected=(r == 'viewer')) }}{% endfor %}
+      {% endcall %}{% endcall %}
+      {{ ui.field_description(text='What they may change. You can change it later from the member list.') }}
+    {% endcall %}
+    {{ ui.button(text='Send invitation', type='submit') }}
+  </form>
+{% endcall %}
+
+{% if invitations %}
+{% call section('Invitations not yet accepted', 'Resend an invitation that went astray, or withdraw one that is no longer needed.', testid='team-invitations') %}
+<div data-team-invitations>
+{% call(inv) list_table(rows=invitations, columns=[('Email', ''), ('Role', ''), ('Open until', ''), ('Delivery', ''), {'label': '', 'class': 'w-12'}],
+                         caption='Invitations not yet accepted', testid='invitations-table', row_testid='invitation-row', search_placeholder='Filter invitations...') %}
+  {% call table_cell(class='max-w-[320px]', attrs={'data-invitation-email': inv.user.email}) %}
+    <span class="block truncate font-medium">{{ inv.user.email }}</span>
+    {% if inv.user_id in has_account_ids %}<span class="block text-xs text-muted-foreground" data-invitation-kind="has-account">Has an account: accepts after signing in</span>{% endif %}
+  {% endcall %}
+  {% call table_cell() %}{{ _role_label(inv.role) if inv.role else 'Viewer' }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}
+    {% if inv.state == 'expired' %}{{ state_badge('Expired', tone='negative') }}{% else %}{{ inv.effective_expiry.strftime('%d %b %Y') }}{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-invitation-delivery': inv.delivery_status or 'unknown'}) %}
+    {% if inv.delivery_status == 'sent' %}
+      {{ state_badge('Sent ' ~ inv.delivered_at.strftime('%d %b %Y'), tone='positive') }}
+    {% elif inv.delivery_status == 'failed' %}
+      <span class="text-sm text-destructive-emphasis" data-testid="invitation-not-sent">Not sent: {{ inv.delivery_error or 'no reason was given' }}</span>
+    {% elif not inv.token_hash %}
+      <span class="text-sm text-muted-foreground">Not e-mailed</span>
     {% else %}
-    <!-- Invite Member -->
-    <div class="bg-background rounded-lg mb-8 p-6">
-        <h2 class="text-lg font-semibold text-foreground mb-1">Invite a teammate</h2>
-        <p class="text-sm text-muted-foreground mb-4">They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.</p>
-        {% if invite_error %}
-        <div role="alert" data-team-invite-error
-             class="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
-            {{ invite_error }}
-        </div>
-        {% endif %}
-        {% if not mail_is_available %}
-        <div role="alert" data-team-mail-unavailable
-             class="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
-            E-mail is not available on this server, so invitations cannot be sent to people who do not have an account yet.
-        </div>
-        {% endif %}
-        <form method="POST" action="{{ url_for('team.team_invite') }}" class="flex flex-wrap gap-3 items-end">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="w-full sm:w-auto">
-                <label for="email" class="block text-sm font-medium text-muted-foreground mb-1">Email</label>
-                <input id="email" name="email" type="email" required autocomplete="off"
-                    class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    placeholder="user@example.com">
-            </div>
-            <div>
-                <label for="persona" class="block text-sm font-medium text-muted-foreground mb-1">Persona</label>
-                <select id="persona" name="persona"
-                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    {% for value, label in personas %}
-                        <option value="{{ value }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="role" class="block text-sm font-medium text-muted-foreground mb-1">Role</label>
-                <select id="role" name="role"
-                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    {% for r in valid_roles %}
-                        <option value="{{ r }}"{% if r == 'viewer' %} selected{% endif %}>{{ r }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Send invitation
-            </button>
-        </form>
-    </div>
-
-    <!-- Open invitations -->
-    <div class="bg-background rounded-lg mb-8 overflow-hidden" data-team-invitations>
-        <div class="px-6 py-4 border-b border-border">
-            <h2 class="text-lg font-semibold text-foreground">Invitations not yet accepted</h2>
-        </div>
-        {% if invitations %}
-        <ul class="divide-y divide-border">
-            {% for inv in invitations %}
-            <li class="px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-invitation-email="{{ inv.user.email }}">
-                <div class="min-w-0 space-y-1">
-                    <p class="text-sm font-medium text-foreground break-words">{{ inv.user.email }}</p>
-                    <p class="text-sm text-muted-foreground">
-                        Role: {{ inv.role or '—' }}
-                        <span aria-hidden="true">·</span>
-                        {% if inv.state == 'expired' %}Expired{% else %}Open until {{ inv.effective_expiry.strftime('%d %b %Y') }}{% endif %}
-                    </p>
-                    {% if inv.user_id in has_account_ids %}
-                    <p class="text-sm text-muted-foreground" data-invitation-kind="has-account">Has an account: accepts after signing in</p>
-                    {% endif %}
-                    <p class="text-sm" data-invitation-delivery="{{ inv.delivery_status or 'unknown' }}">
-                        {% if inv.delivery_status == 'sent' %}
-                            <span class="text-foreground">Sent {{ inv.delivered_at.strftime('%d %b %Y %H:%M') }} UTC</span>
-                        {% elif inv.delivery_status == 'failed' %}
-                            <span class="text-destructive-emphasis">Not sent: {{ inv.delivery_error or '—' }}</span>
-                        {% elif not inv.token_hash %}
-                            <span class="text-muted-foreground">Not e-mailed</span>
-                        {% else %}
-                            <span class="text-muted-foreground">Delivery —</span>
-                        {% endif %}
-                    </p>
-                </div>
-                <div class="flex shrink-0 gap-2">
-                    <form method="POST" action="{{ url_for('team.team_invitation_resend', invitation_id=inv.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" aria-label="Resend invitation to {{ inv.user.email }}"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                            Resend
-                        </button>
-                    </form>
-                    <form method="POST" action="{{ url_for('team.team_invitation_revoke', invitation_id=inv.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" aria-label="Withdraw invitation to {{ inv.user.email }}"
-                            class="inline-flex items-center justify-center rounded-md text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
-                            Withdraw
-                        </button>
-                    </form>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="px-6 py-4 text-sm text-muted-foreground">No open invitations.</p>
-        {% endif %}
-    </div>
-
-    <!-- Members Table -->
-    <div class="bg-background rounded-lg overflow-x-auto" data-team-members>
-        <table class="dense-table min-w-full divide-y divide-border">
-            <thead class="bg-muted/30">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-background divide-y divide-border">
-                {% for member in members %}
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                        {{ member.full_name() }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                        {{ member.email }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                        <form method="POST" action="{{ url_for('team.team_change_role') }}" class="flex items-center gap-2">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="user_id" value="{{ member.id }}">
-                            {# Determine current role with fallbacks #}
-                            {% set _role_from_map = '' %}
-                            {% if role_map is defined and member.id in role_map %}
-                                {% set _role_from_map = role_map[member.id] %}
-                            {% endif %}
-                            {% set _role_from_member = member.role|default('') %}
-                            {% set _raw_role = _role_from_map if _role_from_map else _role_from_member %}
-                            {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
-                            <select name="role" data-autosubmit
-                                class="h-9 rounded-md border-border focus:border-primary focus:ring-primary sm:text-sm" aria-label="Role">
-                                {% for r in valid_roles %}
-                                    <option value="{{ r }}" {% if current_role == r %}selected{% endif %}>
-                                        {{ r }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </form>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div class="flex items-center justify-end gap-3">
-                        {% if member.external_id and not member.is_platform_admin %}
-                        <form method="POST" action="{{ url_for('team.team_reset_sign_in', user_id=member.id) }}" data-team-reset-sign-in>
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" aria-label="Reset single sign-on for {{ member.email }}"
-                                class="text-foreground hover:text-primary">Reset single sign-on</button>
-                        </form>
-                        {% endif %}
-                        {% if member.id != current_user.id %}
-                        <button type="button"
-                            data-action="remove-member"
-                            data-member-id="{{ member.id }}"
-                            data-member-name="{{ member.full_name()|e }}"
-                            data-remove-url="{{ url_for('team.team_remove_member', user_id=member.id) }}"
-                            class="text-destructive-emphasis hover:text-destructive-emphasis">Remove</button>
-                        {% else %}
-                        <span class="text-muted-foreground/60 text-xs">(you)</span>
-                        {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" class="px-6 py-4 text-center text-sm text-muted-foreground">No members found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+      {{ state_badge('Waiting to send', tone='caution') }}
     {% endif %}
+  {% endcall %}
+  {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ inv.user.email) %}
+    {{ row_action('Resend', action=url_for('team.team_invitation_resend', invitation_id=inv.id), testid='invitation-resend') }}
+    {{ row_action('Withdraw', action=url_for('team.team_invitation_revoke', invitation_id=inv.id), destructive=true, separator_before=true, confirm='Withdraw the invitation to ' ~ inv.user.email ~ '?', testid='invitation-withdraw') }}
+  {% endcall %}{% endcall %}
+{% endcall %}
+</div>
+{% endcall %}
+{% endif %}
+
+{% call section('Members', 'Change someone’s role from the menu at the end of their row; it applies on the next page they open.', testid='team-members') %}
+<div data-team-members>
+{% call(member) list_table(rows=members, columns=[('Name', ''), {'label': 'Email', 'class': 'hidden md:table-cell'}, ('Role', ''), {'label': '', 'class': 'w-12'}],
+                            caption='Organisation members', testid='members-table', row_testid='member-row', search_placeholder='Filter members...',
+                            empty_message='Nobody has joined yet. Invite a teammate above.', page_size=25) %}
+  {% call table_cell(class='max-w-[300px]') %}
+    <span class="block truncate font-medium">{{ member.full_name() }}</span>
+    {% if member.id == current_user.id %}<span class="block text-xs text-muted-foreground">You</span>{% endif %}
+  {% endcall %}
+  {% call table_cell(class='hidden md:table-cell max-w-[300px] truncate text-muted-foreground') %}{{ member.email }}{% endcall %}
+  {% set _role_from_map = role_map[member.id] if (role_map is defined and member.id in role_map) else '' %}
+  {% set _raw_role = _role_from_map or (member.role|default('')) %}
+  {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-testid': 'member-role'}) %}{{ _role_label(current_role) }}{% endcall %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% call row_actions('Actions for ' ~ member.email) %}
+      {{ dropdown_menu_label(text='Change role') }}
+      {% for r in valid_roles if r != current_role %}
+      <form method="POST" action="{{ url_for('team.team_change_role') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="user_id" value="{{ member.id }}">
+        <input type="hidden" name="role" value="{{ r }}">
+        {{ dropdown_menu_item(text='Make ' ~ _role_label(r)|lower, tag='button', type='submit', class='w-full', attrs={'data-testid': 'member-role-' ~ r}) }}
+      </form>
+      {% endfor %}
+      {% if member.external_id and not member.is_platform_admin %}
+      {{ dropdown_menu_separator() }}
+      {{ row_action('Reset single sign-on', action=url_for('team.team_reset_sign_in', user_id=member.id), testid='member-reset-sign-in') }}
+      {% endif %}
+      {% if member.id != current_user.id %}
+      {{ dropdown_menu_separator() }}
+      {{ dropdown_menu_item(text='Remove from organisation', variant='destructive', attrs={'data-action': 'remove-member', 'data-member-id': member.id, 'data-member-name': member.full_name(), 'data-remove-url': url_for('team.team_remove_member', user_id=member.id), 'data-testid': 'member-remove'}) }}
+      {% endif %}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+</div>
+{% endcall %}
+{% endif %}
 </div>
 {% endblock %}
-<script>
-(function() {
-    // CSRF token is automatically injected by Platform.fetch for mutating methods
-    document.addEventListener('click', async function(e) {
-        let btn = e.target.closest('[data-action="remove-member"]');
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    // Remove a member: the route takes DELETE, so the menu item posts through Platform.fetch after a confirm.
+    document.addEventListener('click', async function (e) {
+        var btn = e.target.closest('[data-action="remove-member"]');
         if (!btn) return;
-        let name = btn.dataset.memberName || 'this member';
-        if (!(await Platform.modal.confirm('Remove ' + name + ' from the org?'))) return;
-        let url = btn.dataset.removeUrl;
+        var name = btn.dataset.memberName || 'this member';
+        if (!(await Platform.modal.confirm('Remove ' + name + ' from the organisation?'))) return;
+        var url = btn.dataset.removeUrl;
         if (!url) return;
         try {
-            // Platform.fetch.delete automatically injects CSRF token and throws on non-ok responses
             await Platform.fetch.delete(url, { silent: true });
             location.reload();
         } catch (error) {
-            // Platform.fetch already logged the error; show a custom user message
-            Platform.toast.error('Failed to remove member: ' + (error.message || 'Unknown error'));
+            Platform.toast.error('Could not remove ' + name + ': ' + (error.message || 'please try again'));
         }
     });
 })();
 </script>
+{% endblock %}

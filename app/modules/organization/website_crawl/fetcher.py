@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
 import requests
+import urllib3
 
 from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
 
@@ -69,7 +70,10 @@ class Fetcher:
                 if response.status_code in (301, 302, 303, 307, 308) and response.headers.get("Location"):
                     current = _checked(urljoin(current, response.headers["Location"]), self.site)
                     continue
-                body = response.raw.read(MAX_BYTES + 1, decode_content=True)
+                try:
+                    body = response.raw.read(MAX_BYTES + 1, decode_content=True)
+                except urllib3.exceptions.HTTPError as exc:  # a body that stops arriving is a failed page, not a crash
+                    raise requests.exceptions.ConnectionError("the page body did not arrive: %s" % exc) from exc
                 encoding = response.encoding or "utf-8"
                 return Page(current, response.status_code, response.headers.get("Content-Type", ""),
                             body[:MAX_BYTES].decode(encoding, errors="replace"))

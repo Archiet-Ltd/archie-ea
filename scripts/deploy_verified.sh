@@ -90,6 +90,10 @@
 #                           unset, step 5 is SKIPPED with a printed warning —
 #                           never silently treated as a pass.
 #   AUTO_ROLLBACK           1 (default) or 0 — see AUTO-ROLLBACK above.
+#   DEPLOY_BACKUP_COMMAND   command run on the droplet before anything changes
+#                           (default `bash deploy/archie-backup.sh`); empty skips
+#   ALLOW_DOWNTIME_MIGRATIONS / FORCE_FULL_SCHEMA_PASS
+#                           passed to schema-deploy (see deploy-schema.sh)
 #   DEPLOY_STATE_FILE       where the last verified SHA is recorded (default
 #                           <repo>/.deploy-state/last-verified-sha, gitignored
 #                           — this is local machine state, not shared via git,
@@ -154,21 +158,19 @@ EXPECTED_SHORT=""
 # failures for the rest of it. depends_on is a startup-ordering hint for a
 # full `docker compose up`, not a guarantee under a single targeted
 # `--force-recreate <service>` call — so the one-shot chain
-# (database-bootstrap -> schema-deploy -> database-acl) is now run
-# explicitly and synchronously in the foreground first. Each is `restart:
-# "no"`, so `docker compose up <service>` (no `-d`) blocks until it exits
-# and propagates its exit code — `up database-acl` alone is enough to also
-# run its own upstream dependencies (schema-deploy, database-bootstrap) in
-# order first, since compose still resolves depends_on within one `up`
-# invocation for services actually being started this call.
+# (database-bootstrap -> schema-deploy -> database-acl) is run explicitly and
+# synchronously first, as the steps listed inside do_deploy below.
 # ---------------------------------------------------------------------------
 do_deploy() {
     local ref=$1
     say "deploying $ref to $DROPLET:$APP_DIR"
-    remote "$APP_DIR" "$ref" <<'REMOTE'
+    remote "$APP_DIR" "$ref" "${DEPLOY_BACKUP_COMMAND-bash deploy/archie-backup.sh}" "${ALLOW_DOWNTIME_MIGRATIONS:-0}" "${FORCE_FULL_SCHEMA_PASS:-0}" <<'REMOTE'
 set -euo pipefail
 APP_DIR=$1
 REF=$2
+DEPLOY_BACKUP_COMMAND=$3
+ALLOW_DOWNTIME_MIGRATIONS=$4
+FORCE_FULL_SCHEMA_PASS=$5
 cd "$APP_DIR"
 git fetch --prune origin
 # Resolve to a full SHA now, after fetch, so a branch name means its current
@@ -193,30 +195,99 @@ else
     TARGET=$(git rev-parse --verify "$REF")
 fi
 CURRENT=$(git rev-parse HEAD)
+echo "RESOLVED_COMMIT=$TARGET"
+# The old server keeps serving until the new one is ready to take over, and it
+# serves its code, templates and static files from the bind-mounted live tree.
+# So nothing may change in the live tree until the swap: the build and the
+# one-shot schema steps run from a separate copy of TARGET (git archive into a
+# temporary directory, used as the compose project directory), and the live
+# tree is checked out to TARGET only just before the server is replaced. Every
+# step that can fail runs BEFORE the swap and a failure leaves the old server
+# and the live tree untouched (set -e stops here; nothing below the failing line
+# runs). The exit trap asserts that, whatever the failure.
+#   1. back up the database (DEPLOY_BACKUP_COMMAND);
+#   2. build the images the one-shot steps and the server use, from the copy;
+#   (every docker call has its stdin closed: this script arrives on stdin, and
+#   a command that reads it would swallow the steps after it and end the deploy early)
+#   3. run database-bootstrap, schema-deploy and database-acl in that order, from
+#      the copy. `run --rm --no-deps` starts exactly one container, waits for it,
+#      and returns its exit code, so a failing step stops the script. schema-deploy
+#      skips init-db, schema-upgrade and reconcile-schema when the database is at
+#      head and matches the models, and always runs the backfills; a pending
+#      migration marked as needing downtime stops it with exit 3 (rerun with
+#      ALLOW_DOWNTIME_MIGRATIONS=1 inside an agreed window);
+#   4. only then check TARGET out in the live tree and replace the server
+#      container. --no-deps stops compose from re-running the one-shot chain
+#      through depends_on, and --force-recreate still guarantees a fresh
+#      container from current config (see incident above: neither `restart` nor
+#      a plain `up -d` does).
+LIVE_DIR=$(pwd)
+# The copy is a different directory, so pin what compose derives from the
+# directory: the project name (containers, networks, volumes, image names) and
+# the default backup folder, which is not tracked. The shell environment beats
+# .env in compose, so a default is exported only when neither the environment
+# nor the live .env defines the value; otherwise the copied .env decides.
+# Read the way compose reads it: blanks are allowed around "=", and an empty
+# value is not a definition (compose then falls back to its own default).
+env_defines() {
+    [ -f "$LIVE_DIR/.env" ] && grep -Eq "^[[:space:]]*(export[[:space:]]+)?$1[[:space:]]*=[[:space:]]*[^[:space:]]" "$LIVE_DIR/.env"
+}
+if [ -z "${COMPOSE_PROJECT_NAME:-}" ] && ! env_defines COMPOSE_PROJECT_NAME; then
+    export COMPOSE_PROJECT_NAME=$(basename "$LIVE_DIR" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')
+fi
+if [ -z "${ARCHIE_BACKUP_HOST_DIR:-}" ] && ! env_defines ARCHIE_BACKUP_HOST_DIR; then
+    export ARCHIE_BACKUP_HOST_DIR=$LIVE_DIR/deploy/backups
+fi
+BUILD_TREE=$(mktemp -d)
+SWAPPED=0
+leave() {
+    local rc=$?
+    rm -rf "$BUILD_TREE"
+    if [ "$SWAPPED" = 0 ]; then
+        local live
+        live=$(git -C "$LIVE_DIR" rev-parse HEAD 2>/dev/null || echo unknown)
+        if [ "$live" != "$CURRENT" ]; then
+            echo "DEPLOY-VERIFY FAIL: the live tree is at $live before the swap; it must stay at $CURRENT until the server is replaced" >&2
+            rc=1
+        fi
+    fi
+    exit "$rc"
+}
+trap leave EXIT
+git archive "$TARGET" | tar -x -C "$BUILD_TREE"
+if [ -f "$LIVE_DIR/.env" ]; then
+    cp -p "$LIVE_DIR/.env" "$BUILD_TREE/.env"
+fi
+if [ -n "${DEPLOY_BACKUP_COMMAND:-}" ]; then
+    echo "backup: $DEPLOY_BACKUP_COMMAND"
+    bash -c "$DEPLOY_BACKUP_COMMAND" </dev/null
+fi
+cd "$BUILD_TREE"
+docker compose build server schema-deploy </dev/null
+docker compose run --rm --no-deps -T database-bootstrap </dev/null
+docker compose run --rm --no-deps -T -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy </dev/null
+docker compose run --rm --no-deps -T database-acl </dev/null
+cd "$LIVE_DIR"
 if [ "$CURRENT" != "$TARGET" ]; then
-    git checkout --detach "$TARGET"
-    git reset --hard "$TARGET"
+    if ! { git checkout --detach "$TARGET" && git reset --hard "$TARGET"; }; then
+        echo "DEPLOY-VERIFY FAIL: checking $TARGET out in the live tree failed; the server was not replaced" >&2
+        # HEAD may already have moved (a hook can fail after the checkout): put
+        # the live tree back where the running server expects it. A failing hook
+        # also fails this checkout, so judge the result by where HEAD ended up.
+        git checkout --detach "$CURRENT" >/dev/null 2>&1 || true
+        git reset --hard "$CURRENT" >/dev/null 2>&1 || true
+        if [ "$(git rev-parse HEAD 2>/dev/null)" = "$CURRENT" ]; then
+            echo "the live tree was restored to $CURRENT" >&2
+        else
+            echo "DEPLOY-VERIFY FAIL: restoring the live tree to $CURRENT also failed" >&2
+        fi
+        exit 1
+    fi
 else
     echo "already at $TARGET; checkout skipped (verification still runs)"
 fi
-echo "RESOLVED_COMMIT=$TARGET"
-# Force a fresh run of the whole one-shot schema chain on every deploy —
-# these are restart:"no" containers, so an already-Exited container from a
-# prior deploy would otherwise satisfy depends_on's completed_successfully
-# condition without re-running against the NEW schema at all.
-#
-# --exit-code-from is required, not cosmetic: `docker compose up <service>`
-# on its own always exits 0 regardless of whether the SERVICE's container
-# exited 0 or failed — verified directly (18 Sep 2026) by a database-acl run
-# that crashed with a real RuntimeError inside configure_roles.py yet the
-# surrounding `docker compose up` command still reported exit code 0. Without
-# --exit-code-from, `set -e` above would never see the failure and this
-# script would go on to force-recreate server anyway, on a schema that may
-# not have its grants applied — the exact failure mode this whole synchronous
-# reordering exists to close.
-docker compose rm -f database-bootstrap schema-deploy database-acl
-docker compose up --exit-code-from database-acl database-acl
-docker compose up -d --force-recreate server
+SWAPPED=1
+docker compose up -d --no-deps --force-recreate server </dev/null
 REMOTE
 }
 

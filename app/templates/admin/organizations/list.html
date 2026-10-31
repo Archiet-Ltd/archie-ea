@@ -1,100 +1,44 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Organizations — {{ config.APP_NAME }}{% endblock %}
+{% block title %}Organisations{% endblock %}
+
+{% macro _actions() %}
+{% call ui.button(href=url_for('admin.organization_create')) %}{{ lucide('plus') }}New organisation{% endcall %}
+{% endmacro %}
 
 {% block content %}
-<div class="space-y-6">
-    {{ page_header(
-        title='Organizations',
-        description='Manage tenant organizations (' ~ organizations|length ~ ' total)',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Organizations'}
-        ],
-        actions=[
-            {'text': 'New Organization', 'icon': 'plus', 'href': url_for('admin.organization_create'), 'variant': 'default'}
-        ]
-    ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Organisations', subtitle='Every customer organisation on the platform, its plan and how many seats it uses',
+              breadcrumb=[('Admin', url_for('admin.index')), ('Organisations', none)], actions_caller=_actions) }}
 
-    {% if organizations %}
-    <div class="bg-card rounded-lg border border-border">
-        <div class="overflow-x-auto">
-            <table class="dense-table min-w-full divide-y divide-border">
-                <thead class="bg-muted/50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Slug</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Plan</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Users</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-card divide-y divide-border">
-                    {% for item in organizations %}
-                    <tr class="hover:bg-accent/50 transition-colors">
-                        <td class="px-6 py-4">
-                            <a href="{{ url_for('admin.organization_detail', org_id=item.org.id) }}" class="text-sm font-medium text-foreground hover:underline">
-                                {{ item.org.name }}
-                            </a>
-                        </td>
-                        <td class="px-6 py-4">
-                            <code class="text-xs bg-muted px-1.5 py-0.5 rounded">{{ item.org.slug }}</code>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
-                                {% if item.limits.plan_key == 'enterprise' %}bg-primary/10 text-primary border border-primary/30
-                                {% elif item.limits.plan_key in ('startup', 'team') %}bg-info/10 text-info border border-info/30
-                                {% else %}bg-secondary text-secondary-foreground{% endif %}">
-                                {{ item.limits.plan_name }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-muted-foreground">
-                            {{ item.user_count }} / {{ item.limits.limit if item.limits.limit is not none else 'no limit' }}
-                        </td>
-                        <td class="px-6 py-4">
-                            {% if item.org.is_active %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                                Active
-                            </span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">
-                                Inactive
-                            </span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                <a href="{{ url_for('admin.organization_detail', org_id=item.org.id) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
-                                   title="View details">
-                                    <i data-lucide="eye" class="w-4 h-4" aria-hidden="true"></i>
-                                </a>
-                                <a href="{{ url_for('admin.organization_edit', org_id=item.org.id) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
-                                   title="Edit">
-                                    <i data-lucide="edit" class="w-4 h-4" aria-hidden="true"></i>
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% else %}
-    <div class="bg-card rounded-lg border border-border p-12 text-center">
-        <i data-lucide="building-2" class="w-12 h-12 mx-auto text-muted-foreground mb-4" aria-hidden="true"></i>
-        <h3 class="text-lg font-semibold mb-2">No organizations yet</h3>
-        <p class="text-muted-foreground mb-4">Create your first organization to enable multi-tenancy.</p>
-        <a href="{{ url_for('admin.organization_create') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>
-            Create Organization
-        </a>
-    </div>
-    {% endif %}
+{% call(item) list_table(rows=organizations, columns=[('Organisation', ''), ('Plan', ''), {'label': 'Seats used', 'align': 'right', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Created', 'sortable': true, 'class': 'hidden lg:table-cell'}, {'label': '', 'class': 'w-12'}],
+                          caption='Organisations', testid='organizations-table', row_testid='organization-row', search_placeholder='Filter organisations...',
+                          toolbar=true, page_size=25,
+                          empty_message='No organisations yet. Use New organisation to add the first customer.') %}
+  {% call table_cell(class='max-w-[420px]') %}
+    <a href="{{ url_for('admin.organization_detail', org_id=item.org.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ item.org.name }}</a>
+    <span class="block truncate font-mono text-xs text-muted-foreground">{{ item.org.slug }}</span>
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=item.limits.plan_name or 'No plan', variant=('default' if item.limits.plan_key == 'enterprise' else 'secondary' if item.limits.plan_key in ('startup', 'team') else 'outline')) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': item.user_count or 0}) %}
+    {{ item.user_count }}{% if item.limits.limit is not none %} of {{ item.limits.limit }}{% else %} <span class="text-muted-foreground">(no limit)</span>{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge('Active' if item.org.is_active else 'Inactive', tone=('positive' if item.org.is_active else 'neutral')) }}{% endcall %}
+  {% call table_cell(class='hidden lg:table-cell whitespace-nowrap tabular-nums', attrs={'data-sort': item.org.created_at.strftime('%Y%m%d%H%M%S') if item.org.created_at else ''}) %}
+    {{ item.org.created_at|format_date if item.org.created_at else value_or_unset(none, 'Unknown') }}
+  {% endcall %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% call row_actions('Actions for ' ~ item.org.name) %}
+        {{ row_action('View', href=url_for('admin.organization_detail', org_id=item.org.id), testid='organization-view') }}
+        {{ row_action('Edit', href=url_for('admin.organization_edit', org_id=item.org.id), testid='organization-edit') }}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
 </div>
 {% endblock %}

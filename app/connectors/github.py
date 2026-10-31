@@ -113,8 +113,9 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _SLUG_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
-def is_valid_organization(name) -> bool:
-    """True for a GitHub organisation name that is safe to put in a request path."""
+def is_valid_github_name(name) -> bool:
+    """True for a GitHub organisation or user name that is safe to put in a request path.
+    GitHub uses the same login rules for both."""
     return isinstance(name, str) and bool(_ORG_RE.match(name.strip()))
 
 
@@ -594,19 +595,46 @@ class GitHubConnector(BaseConnector):
     def _organization(self) -> str:
         organization = (self.config.config or {}).get("organization")
         if not isinstance(organization, str) or not _ORG_RE.match(organization.strip()):
-            raise GitHubConnectorError("The GitHub organisation name in the connector settings is not valid")
+            raise GitHubConnectorError("The GitHub organisation or account name in the connector settings is not valid")
         return organization.strip()
+
+    def _account_type(self, client: GitHubAPIClient) -> str:
+        """Detect whether the configured name is a User or Organization.
+        Returns 'User' or 'Organization'. Caches the result in config."""
+        config = self.config.config or {}
+        cached = config.get("account_type")
+        if cached in ("User", "Organization"):
+            return cached
+        organization = self._organization()
+        data = self._get(client, f"users/{organization}")
+        account_type = data.get("type")
+        if account_type not in ("User", "Organization"):
+            raise GitHubConnectorError(f"GitHub returned an unexpected account type: {account_type}")
+        # Persist the detected type so we don't re-detect on every sync
+        # Create a clean config without the token (token is in the vault)
+        clean_config = {k: v for k, v in config.items() if k != "api_token"}
+        clean_config["account_type"] = account_type
+        from app.services.connector_framework import _load_org_connector, apply_connector_change
+        from app.services.connector_framework import CONNECTOR_ACTION_UPDATE
+        existing = _load_org_connector(getattr(self.config, "organization_id", None), connector_type="github")
+        if existing:
+            apply_connector_change(
+                org_id=getattr(self.config, "organization_id", None),
+                action=CONNECTOR_ACTION_UPDATE,
+                payload={"connector_type": "github", "connector_id": existing.id, "name": "GitHub", "config": clean_config, "status": "active"},
+                delegated=True,
+            )
+        return account_type
 
     def _client(self) -> GitHubAPIClient:
         settings = self.config.config or {}
         token = settings.get("api_token")
         if not token:
-            raise GitHubConnectorError("No GitHub token is stored for this organisation")
+            raise GitHubConnectorError("No GitHub token is stored for this organisation or account")
         base_url = self._checked_base_url() if settings.get("base_url") else None
         return GitHubAPIClient(api_token=token, base_url=base_url, rate_limit_per_minute=RATE_LIMIT_PER_MINUTE)
 
-    @staticmethod
-    def _failure(response) -> GitHubConnectorError:
+    def _failure(self, response) -> GitHubConnectorError:
         status = getattr(response, "status_code", None)
         if status is None:
             return GitHubConnectorError((response.error or "The GitHub request failed")[:300])
@@ -615,7 +643,7 @@ class GitHubConnector(BaseConnector):
         if status in (403, 429):
             return GitHubConnectorError(
                 f"GitHub refused the request (HTTP {status}): the token may lack read access "
-                "to the organisation, or the API rate limit was reached"
+                "to the organisation or account, or the API rate limit was reached"
             )
         if status == 404:
             return GitHubConnectorError("GitHub could not find it, or the token cannot see it (HTTP 404)")
@@ -655,7 +683,13 @@ class GitHubConnector(BaseConnector):
 
     async def test_connection(self) -> bool:
         try:
-            self._get(self._client(), f"orgs/{self._organization()}")
+            client = self._client()
+            organization = self._organization()
+            account_type = self._account_type(client)
+            if account_type == "Organization":
+                self._get(client, f"orgs/{organization}")
+            else:
+                self._get(client, f"users/{organization}")
             return True
         except Exception as exc:  # the reason is ours and safe; the page shows only pass or fail
             logger.warning("GitHub connection test failed: %s", exc)
@@ -665,7 +699,7 @@ class GitHubConnector(BaseConnector):
         return {"status": "ignored", "records_processed": 0, "reason": "GitHub events are not read"}
 
     async def batch_sync(self, since: Optional[datetime] = None) -> Dict[str, Any]:
-        """Read every repository of the organisation and write what it is evidence for.
+        """Read every repository of the organisation or account and write what it is evidence for.
 
         ``since`` is not used: GitHub has no updated-since filter for an
         organisation's repositories, and noticing a deleted repository needs the
@@ -676,14 +710,25 @@ class GitHubConnector(BaseConnector):
             raise ConnectorWriteRefused("A connector sync cannot write to the model without an organisation.")
         organization = self._organization()
         client = self._client()
+        account_type = self._account_type(client)
 
-        repos = self._get_paged(client, f"orgs/{organization}/repos")
+        if account_type == "Organization":
+            repos_path = f"orgs/{organization}/repos"
+        else:
+            # For a personal account, read public repos via /users/{name}/repos
+            # and private repos via /user/repos with affiliation parameter
+            repos_path = f"users/{organization}/repos"
+        repos = self._get_paged(client, repos_path)
         notes: List[str] = []
-        try:
-            admins = self._admin_teams(client, organization)
-        except GitHubConnectorError as exc:
-            admins = {}
-            notes.append(f"Team ownership was not read: {exc}")
+        admins: Dict[str, List[str]] = {}
+        if account_type == "Organization":
+            try:
+                admins = self._admin_teams(client, organization)
+            except GitHubConnectorError as exc:
+                admins = {}
+                notes.append(f"Team ownership was not read: {exc}")
+        else:
+            notes.append("Team ownership is not available for a personal account")
 
         # Oldest push first, so when several repositories are evidence for one
         # component the most recently active one supplies its facts, every run.
@@ -695,7 +740,7 @@ class GitHubConnector(BaseConnector):
             to_element=lambda raw: self._repo_to_record(raw, organization),
             evidence=evidence,
         )
-        # The links the code states between the organisation's repositories, as proposals.
+        # The links the code states between the repositories, as proposals.
         try:
             with db.session.begin_nested():
                 result["relationships_proposed"] = evidence.propose_relationships()
@@ -1424,10 +1469,15 @@ def connect_and_start(org_id, organization, token, *, task=None, extra=None) -> 
     organization = (organization or "").strip()
     token = (token or "").strip()
     existing = _load_org_connector(org_id, connector_type="github")
-    has_token = OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None
-    if not is_valid_organization(organization):
-        raise ConnectRefused("Enter your GitHub organisation name exactly as it appears in github.com/<name>.")
-    if not token and not has_token:
+    vault = OrgCredentialVault()
+    has_token = vault.get_masked(org_id, "github", "api_token") is not None
+    # A GitHub App installation (app/connectors/github_app.py) is also a connection
+    # with nothing to paste: the state and the installation are confirmed with
+    # GitHub before this is ever called, so its presence here is enough.
+    has_installation = vault.get_masked(org_id, "github", "installation_id") is not None
+    if not is_valid_github_name(organization):
+        raise ConnectRefused("Enter your GitHub organisation or account name exactly as it appears in github.com/<name>.")
+    if not token and not has_token and not has_installation:
         raise ConnectRefused("Paste a read-only GitHub token to connect.")
     if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
         raise ConnectRefused("That does not look like a GitHub token.")

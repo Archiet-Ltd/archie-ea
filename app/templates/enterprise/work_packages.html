@@ -1,331 +1,167 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state, section_card %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% from 'components/button.html' import button %}
-{% from 'components/input.html' import input %}
-{% from 'components/select.html' import native_select %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/dialog.html' import dialog %}
-{% from 'components/pagination_controls.html' import pagination_controls %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_action %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Work Packages{% endblock %}
+{% block title %}Work packages{% endblock %}
 
-{% macro _wp_actions() %}
-{{ button(text='New Work Package', variant='default', icon='plus', on_click='openCreateModal()') }}
+{% macro _actions() %}
+{% call ui.button(href=url_for('implementation_planning.create_work_package'), attrs={'data-testid': 'btn-new-work-package'}) %}{{ lucide('plus') }}New work package{% endcall %}
 {% endmacro %}
 
-{% block extra_head_js %}
-<meta name="csrf-token" content="{{ csrf_token() }}">
-<script src="{{ url_for('static', filename='js/enterprise/work_packages_table.js') }}"></script>
-{% endblock %}
+{% macro _bulk_delete() %}
+{% call ui.button(type='submit', variant='outline', size='sm', class='h-8', attrs={'form': 'wp-bulk-form', 'data-testid': 'wp-bulk-delete', 'data-bulk-delete': '', 'hidden': true}) %}{{ lucide('trash-2') }}Delete selected{% endcall %}
+{% endmacro %}
+
+{#- The row's ellipsis menu, built from the same dropdown parts as row_actions in components/list_table.html
+    (that macro cannot be used as a call block inside list_table's own call block: Jinja reports "No caller defined"). -#}
+{% macro _row_menu(wp) -%}
+{%- call ui.dropdown_menu() -%}
+  {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ wp.name or 'this work package' }}</span>{%- endcall -%}
+  {%- call ui.dropdown_menu_content(align='end', class='w-[160px]') -%}
+    {{ row_action('Open', href=url_for('implementation_planning.work_package_detail', work_package_id=wp.id)) }}
+    {{ row_action('Edit', href=url_for('implementation_planning.edit_work_package', work_package_id=wp.id), testid='work-package-edit') }}
+    {{ row_action('Delete', action=url_for('enterprise.work_packages', delete=wp.id), destructive=true, separator_before=true,
+                  confirm='Delete "' ~ (wp.name or 'this work package') ~ '"? This cannot be undone.', testid='work-package-delete') }}
+  {%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
+
+{% macro _selected_count() -%}
+<p class="flex-1 text-sm text-muted-foreground tabular-nums" data-wp-selected-count data-total="{{ work_packages|length }}">0 of {{ work_packages|length }} row(s) selected.</p>
+{%- endmacro %}
+
+{% macro _select_all() -%}
+<input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all work packages on this page" data-wp-select-all>
+{%- endmacro %}
 
 {% block content %}
-<div class="space-y-6" x-data="workPackagesTable()" x-cloak>
+{%- set wps = work_packages|default([]) -%}
+{%- set gaps_by_wp = gaps_by_wp or {} -%}
+{%- set counts = {'in_progress': 0, 'completed': 0, 'overdue': 0} -%}
+{%- for wp in wps -%}
+  {%- set st = (wp.status or 'planned')|lower|replace(' ', '_') -%}
+  {%- if st == 'in_progress' %}{% set _ = counts.update({'in_progress': counts.in_progress + 1}) %}{% endif -%}
+  {%- if st in ('completed', 'complete', 'done') %}{% set _ = counts.update({'completed': counts.completed + 1}) %}
+  {%- elif wp.end_date and (days_until(wp.end_date) or 0) < 0 %}{% set _ = counts.update({'overdue': counts.overdue + 1}) %}{% endif -%}
+{%- endfor -%}
+{%- set no_gap = wps|rejectattr('id', 'in', gaps_by_wp|dictsort|selectattr(1)|map(attribute=0)|list)|list|length -%}
+{%- set show_gaps = no_gap < wps|length -%}
+{%- set show_progress = wps|selectattr('progress_percentage', 'ne', none)|list|length > 0 -%}
+{%- set show_due = wps|selectattr('end_date')|list|length > 0 -%}
+{%- set no_due = wps|rejectattr('end_date')|list|length -%}
+{%- set no_progress = wps|selectattr('progress_percentage', 'none')|list|length -%}
+{%- set _missing = [] -%}
+{%- if show_due and no_due %}{% set _ = _missing.append(no_due ~ ' ha' ~ ('s' if no_due == 1 else 've') ~ ' no due date') %}{% endif -%}
+{%- if show_gaps and no_gap %}{% set _ = _missing.append(no_gap ~ ' ha' ~ ('s' if no_gap == 1 else 've') ~ ' no linked gap') %}{% endif -%}
+{%- if show_progress and no_progress %}{% set _ = _missing.append(no_progress ~ ' ha' ~ ('s' if no_progress == 1 else 've') ~ ' no progress recorded') %}{% endif -%}
+{%- if not show_due %}{% set _ = _missing.append('none has a due date yet') %}{% endif -%}
+{%- if not show_gaps %}{% set _ = _missing.append('none is linked to a gap yet') %}{% endif -%}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Work packages', subtitle='The pieces of work that close architecture gaps, with their status, progress and due dates',
+              breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Work packages', none)],
+              actions_caller=(_actions if wps else none)) }}
 
-    {{ page_shell(
-        title='Work Packages',
-        subtitle='Manage implementation work packages and track progress.',
-        breadcrumb=[('Home', url_for('main.index')), ('Enterprise Architecture', url_for('enterprise.enterprise_dashboard')), ('Work Packages', None)],
-        actions_caller=_wp_actions
-    ) }}
+{% if wps %}
+{{ stat_cards([
+    {'label': 'Work packages', 'value': wps|length, 'icon': 'package', 'sentence': 'Planned, running and finished work', 'testid': 'wp-stat-total'},
+    {'label': 'In progress', 'value': counts.in_progress, 'icon': 'loader', 'sentence': ('Being delivered now' if counts.in_progress else 'Nothing is being delivered yet'), 'testid': 'wp-stat-in-progress'},
+    {'label': 'Completed', 'value': counts.completed, 'icon': 'circle-check', 'sentence': ('Delivered and closed' if counts.completed else 'Nothing has been delivered yet'), 'testid': 'wp-stat-completed'},
+    {'label': 'Overdue', 'value': counts.overdue, 'icon': 'clock', 'sentence': ('Past their due date and not finished' if counts.overdue else 'Nothing is past its due date'), 'testid': 'wp-stat-overdue'},
+]) }}
 
-    {# Table Card #}
-    {% call section_card() %}
+<form id="wp-bulk-form" method="post" action="{{ url_for('enterprise.work_packages') }}" data-confirm="Delete the selected work packages? This cannot be undone." data-testid="wp-bulk-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
 
-        {# Toolbar #}
-        <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between">
-            <div class="relative flex-1 max-w-sm">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
-                <input type="search" placeholder="Search work packages..." class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    @input.debounce.300ms="setSearch($event.target.value)" aria-label="Search work packages...">
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-                {% call native_select(id='per-page', aria_label='Work packages per page', attrs_dict={'@change': 'setPerPage($event.target.value)'}) %}
-                    <option value="10">10 / page</option>
-                    <option value="25" selected>25 / page</option>
-                    <option value="50">50 / page</option>
-                    <option value="100">100 / page</option>
-                {% endcall %}
-            </div>
-        </div>
-
-        {# Bulk action bar #}
-        <div x-show="_selectedIds.length > 0 || selectAllState === 'cross-page'" x-cloak
-             x-transition:enter="transition ease-out duration-150"
-             x-transition:enter-start="opacity-0 -translate-y-1"
-             x-transition:enter-end="opacity-100 translate-y-0"
-             class="flex items-center gap-3 px-4 py-2 bg-primary/5 border-b text-sm"
-             role="status" aria-live="polite">
-            <span class="font-medium" x-text="selectionCount() + ' selected'"></span>
-            <div class="h-4 w-px bg-border"></div>
-            {{ button(text='Delete selected', variant='destructive', icon='trash-2', on_click='confirmBulkDelete()') }}
-            {{ button(text='Clear', variant='ghost', icon='x', on_click='clearSelection()', class='ml-auto') }}
-        </div>
-
-        {# Cross-page select-all banner #}
-        <div x-show="selectAllState === 'page' && totalItems > pageSize" x-cloak
-             class="px-4 py-2 bg-primary/5 border-b text-sm text-center">
-            <span x-text="items.length + ' on this page selected.'"></span>
-            <button type="button" @click="selectAllCrossPage()"
-                    class="ml-1 font-medium text-primary hover:underline">
-                Select all <span x-text="totalItems"></span> items
-            </button>
-        </div>
-
-        {# Table #}
-        {% call table() %}
-            {% call table_header() %}
-                <tr>
-                    {% call table_head() %}
-                        <input aria-label="Select all work packages" type="checkbox"
-                               class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
-                               :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
-                               @change="toggleSelectAll()"
-                               aria-label="Select all on this page">
-                    {% endcall %}
-                    {% call table_head(class='tabular-nums') %}#{% endcall %}
-                    {% call table_head() %}
-                        <button type="button" class="inline-flex items-center gap-1 hover:text-foreground transition-colors" @click="setSort('name')">
-                            Name
-                            <i data-lucide="arrow-up-down" class="h-3.5 w-3.5"></i>
-                        </button>
-                    {% endcall %}
-                    {% call table_head() %}Status{% endcall %}
-                    {% call table_head() %}Priority{% endcall %}
-                    {% call table_head() %}Gap{% endcall %}
-                    {% call table_head() %}Progress{% endcall %}
-                    {% call table_head() %}Due Date{% endcall %}
-                    {% call table_head(class='text-right') %}Actions{% endcall %}
-                </tr>
-            {% endcall %}
-            {% call table_body() %}
-                {# Loading state #}
-                <tr x-show="loading" x-cloak>
-                    <td colspan="9" class="px-4 py-12 text-center">
-                        <div class="flex flex-col items-center gap-2">
-                            <i data-lucide="loader-2" class="h-6 w-6 text-muted-foreground animate-spin"></i>
-                            <p class="text-sm text-muted-foreground">Loading...</p>
-                        </div>
-                    </td>
-                </tr>
-                {# Error state #}
-                <tr x-show="!loading && errorMsg" x-cloak>
-                    <td colspan="9" class="px-4 py-12 text-center text-destructive-emphasis text-sm" x-text="errorMsg"></td>
-                </tr>
-                {# Empty state #}
-                <tr x-show="!loading && !errorMsg && items.length === 0" x-cloak>
-                    <td colspan="9" class="px-4 py-12 text-center">
-                        <div class="flex flex-col items-center gap-2">
-                            <i data-lucide="inbox" class="h-8 w-8 text-muted-foreground/40"></i>
-                            <p class="text-sm text-muted-foreground">No work packages found</p>
-                        </div>
-                    </td>
-                </tr>
-                {# Data rows #}
-                <template x-for="(row, rowIdx) in items" :key="row.id">
-                    <tr class="border-b transition-colors hover:bg-muted/50"
-                        :class="isSelected(row.id) ? 'bg-primary/5' : ''">
-                        {% call table_cell() %}
-                            <input type="checkbox"
-                                   class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
-                                   :checked="isSelected(row.id)"
-                                   @change="handleRowCheckboxClick($event, rowIdx)"
-                                   aria-label="Select row">
-                        {% endcall %}
-                        {% call table_cell(class='tabular-nums') %}<span class="text-muted-foreground text-sm" x-text="row.row_number"></span>{% endcall %}
-                        {% call table_cell() %}
-                            <template x-if="row.detail_url">
-                                <a :href="row.detail_url" class="font-medium text-primary hover:underline" data-testid="work-package-link" x-text="row.name"></a>
-                            </template>
-                            <template x-if="!row.detail_url">
-                                <div class="font-medium" x-text="row.name"></div>
-                            </template>
-                            <div class="text-sm text-muted-foreground" x-text="row.summary || ''"></div>
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <span class="px-2 py-1 text-xs rounded-full" :class="statusClass(row.status)" x-text="row.status || 'Planned'"></span>
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <span class="px-2 py-1 text-xs rounded-full" :class="priorityClass(row.priority)" x-text="row.priority || 'Normal'"></span>
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <span data-testid="work-package-gaps">
-                                <template x-if="!row.gaps || row.gaps.length === 0"><span class="text-muted-foreground">—</span></template>
-                                <template x-for="g in (row.gaps || [])" :key="g.id">
-                                    <div x-text="g.name"></div>
-                                </template>
-                            </span>
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <div class="w-24">
-                                <div class="h-2 bg-secondary rounded-full overflow-hidden">
-                                    <div class="h-full bg-primary" :style="'width: ' + progressWidth(row.percent_complete)"></div>
-                                </div>
-                                <span class="text-xs text-muted-foreground" x-text="row.percent_complete == null ? '—' : row.percent_complete + '%'"></span>
-                            </div>
-                        {% endcall %}
-                        {% call table_cell() %}<span class="text-sm text-muted-foreground" x-text="row.target_date || 'TBD'"></span>{% endcall %}
-                        {% call table_cell(class='text-right') %}
-                            {{ button(text='Edit', variant='default', icon='pencil', size='sm', on_click='openEditModal(row)') }}
-                            {{ button(text='Delete', variant='destructive', size='sm', on_click='deleteRow(row)') }}
-                        {% endcall %}
-                    </tr>
-                </template>
-            {% endcall %}
-        {% endcall %}
-
-        {# Pagination #}
-        <div x-show="totalItems > pageSize" x-cloak class="border-t px-4 py-3 bg-muted/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <p class="text-sm text-muted-foreground" aria-live="polite">
-                Showing <span class="font-medium text-foreground" x-text="pageStart"></span>-<span class="font-medium text-foreground" x-text="pageEnd"></span>
-                of <span class="font-medium text-foreground" x-text="totalItems"></span> items
-            </p>
-            {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is the block above. #}
-            <nav class="flex items-center gap-1" aria-label="Pagination">
-                {{ button(text='', variant='outline', size='icon', icon='chevron-left', aria_label='Previous page', on_click='prevPage()', disabled='!hasPrev') }}
-                <template x-for="(pg, idx) in getVisiblePages()" :key="'pg-' + idx">
-                    <span>
-                        <button type="button" x-show="pg !== '...'" x-cloak
-                                class="min-w-[2rem] h-8 rounded-md text-sm font-medium transition-colors"
-                                :class="pg === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"
-                                @click="goToPage(pg)" x-text="pg"></button>
-                        <span x-show="pg === '...'" x-cloak class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
-                    </span>
-                </template>
-                {{ button(text='', variant='outline', size='icon', icon='chevron-right', aria_label='Next page', on_click='nextPage()', disabled='!hasNext') }}
-            </nav>
-        </div>
-
-    {% endcall %}
-
-    {# Edit Work Package dialog #}
-    {% call dialog(trigger_text='Edit Work Package', title='Edit Work Package', start_hidden=true, open_expr='editDialogOpen', close_expr='editDialogOpen = false') %}
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" x-model="editForm.name" required
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                       placeholder="Work package name" aria-label="Name">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Summary</label>
-                <textarea x-model="editForm.summary" rows="2"
-                          class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          placeholder="Brief summary" aria-label="Summary"></textarea>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Status</label>
-                    {% call native_select(attrs_dict={'x-model': 'editForm.status', 'aria-label': 'Status'}) %}
-                        <option value="Planned">Planned</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Blocked">Blocked</option>
-                        <option value="On Hold">On Hold</option>
-                    {% endcall %}
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Priority</label>
-                    {% call native_select(attrs_dict={'x-model': 'editForm.priority', 'aria-label': 'Priority'}) %}
-                        <option value="Critical">Critical</option>
-                        <option value="High">High</option>
-                        <option value="Normal">Normal</option>
-                        <option value="Low">Low</option>
-                    {% endcall %}
-                </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Progress %</label>
-                    <input type="number" x-model="editForm.percent_complete" min="0" max="100"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                           placeholder="0" aria-label="Progress %">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Due Date</label>
-                    <input type="date" x-model="editForm.target_date"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Due Date">
-                </div>
-            </div>
-            <div x-show="editError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="editError"></div>
-        </div>
-        <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-            {{ button(text='Cancel', variant='outline', on_click='editDialogOpen = false') }}
-            {{ button(text='Save Changes', variant='default', on_click='saveWorkPackage()', disabled='editSaving') }}
-        </div>
-    {% endcall %}
-
-    {# Create Work Package dialog #}
-    {% call dialog(trigger_text='New Work Package', title='New Work Package', start_hidden=true, open_expr='createDialogOpen', close_expr='createDialogOpen = false') %}
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" x-model="createForm.name" required
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                       placeholder="Work package name" aria-label="Name">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Summary</label>
-                <textarea x-model="createForm.summary" rows="2"
-                          class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          placeholder="Brief summary" aria-label="Summary"></textarea>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Status</label>
-                    {% call native_select(attrs_dict={'x-model': 'createForm.status', 'aria-label': 'Status'}) %}
-                        <option value="Planned">Planned</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Blocked">Blocked</option>
-                        <option value="On Hold">On Hold</option>
-                    {% endcall %}
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Priority</label>
-                    {% call native_select(attrs_dict={'x-model': 'createForm.priority', 'aria-label': 'Priority'}) %}
-                        <option value="Critical">Critical</option>
-                        <option value="High">High</option>
-                        <option value="Normal" selected>Normal</option>
-                        <option value="Low">Low</option>
-                    {% endcall %}
-                </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Progress %</label>
-                    <input type="number" x-model="createForm.percent_complete" min="0" max="100"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                           placeholder="0" aria-label="Progress %">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Due Date</label>
-                    <input type="date" x-model="createForm.target_date"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Due Date">
-                </div>
-            </div>
-            <div x-show="createError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis" x-text="createError"></div>
-        </div>
-        <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-            {{ button(text='Cancel', variant='outline', on_click='createDialogOpen = false') }}
-            {{ button(text='Create', variant='default', on_click='submitCreateWorkPackage()', disabled='createSaving') }}
-        </div>
-    {% endcall %}
-
-    {# Bulk delete confirm dialog #}
-    {% call dialog(trigger_text='Delete Work Packages?', title='Delete Work Packages?', start_hidden=true, open_expr='bulkDeleteDialogOpen', close_expr='bulkDeleteDialogOpen = false') %}
-        <p class="text-sm text-muted-foreground mb-4">
-            This will permanently delete the selected work packages and cannot be undone.
-            Type <strong class="text-foreground font-mono">DELETE</strong> to confirm.
-        </p>
-        <input type="text" x-model="bulkConfirmText"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
-               placeholder="DELETE" @keydown.enter="executeBulkDelete()" aria-label="DELETE">
-        <div class="flex justify-end gap-3">
-            {{ button(text='Cancel', variant='outline', on_click='bulkDeleteDialogOpen = false') }}
-            {{ button(text='Delete', variant='destructive', on_click='executeBulkDelete()', disabled='bulkConfirmText !== "DELETE" || deleteInProgress') }}
-        </div>
-    {% endcall %}
-
+{%- set columns = [{'label': _select_all(), 'class': 'w-10', 'sortable': false}, {'label': 'Name', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Priority', 'sortable': true, 'class': 'hidden md:table-cell'}] -%}
+{%- if show_gaps %}{% set _ = columns.append({'label': 'Gaps', 'class': 'hidden lg:table-cell'}) %}{% endif -%}
+{%- if show_progress %}{% set _ = columns.append({'label': 'Progress', 'align': 'right', 'sortable': true}) %}{% endif -%}
+{%- if show_due %}{% set _ = columns.append({'label': 'Due', 'sortable': true}) %}{% endif -%}
+{%- set _ = columns.append({'label': '', 'class': 'w-12'}) -%}
+{#- Up to 50 rows the table shows them all, with the selection count as its footer; beyond that the table pages them. -#}
+{% call(wp) list_table(rows=wps, columns=columns, caption='Work packages', testid='work-packages-table', row_testid='work-package-row',
+                       search_placeholder='Filter work packages...', toolbar=true, toolbar_actions=_bulk_delete,
+                       empty_message='No work packages yet.',
+                       notice=(('Of these work packages, ' ~ _missing|join('; ') ~ '. Those cells are left empty.') if _missing else none),
+                       footer_count=_selected_count) %}
+  {% call table_cell(class='w-10') %}
+    <input type="checkbox" name="ids" value="{{ wp.id }}" form="wp-bulk-form" class="size-4 accent-primary align-middle" aria-label="Select {{ wp.name or 'this work package' }}" data-wp-select>
+  {% endcall %}
+  {% call table_cell(class='max-w-[360px]') %}
+    <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="work-package-link">{{ wp.name or 'Untitled work package' }}</a>
+    {% if wp.summary %}<span class="block truncate text-xs text-muted-foreground">{{ wp.summary }}</span>{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(wp.status or 'planned') }}{% endcall %}
+  {% set pr_rank = {'critical': 4, 'high': 3, 'medium': 2, 'normal': 2, 'low': 1}.get((wp.priority or 'normal')|lower, 0) %}
+  {% call table_cell(class='hidden md:table-cell whitespace-nowrap', attrs={'data-sort': pr_rank}) %}{{ state_badge(wp.priority or 'normal') }}{% endcall %}
+  {% if show_gaps %}
+  {% call table_cell(class='hidden lg:table-cell max-w-[220px]') %}
+    {% set wp_gaps = gaps_by_wp.get(wp.id, []) %}
+    <span class="block" data-testid="work-package-gaps">
+      {% if wp_gaps %}
+        <span class="block truncate">{{ wp_gaps[0].name }}</span>
+        {% if wp_gaps|length > 1 %}<span class="block text-xs text-muted-foreground">and {{ wp_gaps|length - 1 }} more</span>{% endif %}
+      {% endif %}
+    </span>
+  {% endcall %}
+  {% endif %}
+  {% if show_progress %}
+  {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': wp.progress_percentage if wp.progress_percentage is not none else -1}) %}
+    {% if wp.progress_percentage is not none %}
+    <span class="inline-flex items-center justify-end gap-2">
+      <progress class="h-1.5 w-16 overflow-hidden rounded-full accent-primary" max="100" value="{{ wp.progress_percentage }}" aria-hidden="true"></progress>
+      <span class="w-10 text-right">{{ wp.progress_percentage|round|int }}%</span>
+    </span>
+    {% endif %}
+  {% endcall %}
+  {% endif %}
+  {% if show_due %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': wp.end_date.strftime('%Y%m%d') if wp.end_date else '99999999'}) %}
+    {{ wp.end_date|format_date if wp.end_date else '' }}
+  {% endcall %}
+  {% endif %}
+  {% call table_cell(class='w-12 text-right') %}
+    {{ _row_menu(wp) }}
+  {% endcall %}
+{% endcall %}
+{% else %}
+{% call ui.card(attrs={'data-testid': 'work-packages-empty'}) %}
+  {% call ui.card_content() %}
+    {{ empty_state(icon='package', title='No work packages yet',
+                   description='A work package is a piece of work that closes one or more gaps. Add one here, or convert a gap on the gap analysis page.',
+                   cta_text='New work package', cta_icon='plus', cta_href=url_for('implementation_planning.create_work_package')) }}
+  {% endcall %}
+{% endcall %}
+{% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  function boxes() { return Array.prototype.slice.call(document.querySelectorAll('[data-wp-select]')); }
+  function sync() {
+    var picked = boxes().filter(function (b) { return b.checked; }).length;
+    var button = document.querySelector('[data-bulk-delete]');
+    if (button) {
+      button.hidden = picked === 0;
+      button.lastChild.textContent = picked ? 'Delete ' + picked + ' selected' : 'Delete selected';
+    }
+    var count = document.querySelector('[data-wp-selected-count]');
+    if (count) count.textContent = picked + ' of ' + count.getAttribute('data-total') + ' row(s) selected.';
+  }
+  document.addEventListener('change', function (event) {
+    var all = event.target.closest('[data-wp-select-all]');
+    if (all) {
+      boxes().forEach(function (b) { if (!b.closest('tr').hidden) b.checked = all.checked; });
+    }
+    if (all || event.target.closest('[data-wp-select]')) sync();
+  });
+})();
+</script>
 {% endblock %}

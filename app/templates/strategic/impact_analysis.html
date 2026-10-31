@@ -1,4 +1,8 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Architecture Impact Analysis{% endblock %}
@@ -27,14 +31,14 @@
                 <button type="button" 
                     @click="$dispatch('open-impact-scenario-comparison.window')"
                     :class="analysisResult ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'"
-                    class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors" aria-label="Open">
+                    class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors">
                     <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>
                     Compare Scenarios
                 </button>
                 <button type="button" 
                     @click="$dispatch('open-initiative-change-request-modal')"
                     :class="analysisResult ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'"
-                    class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors" aria-label="Open">
+                    class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors">
                     <i data-lucide="git-branch" class="h-4 w-4" aria-hidden="true"></i>
                     Create Change Request
                 </button>
@@ -79,7 +83,7 @@
                             class="mt-2 border rounded-md max-h-48 overflow-y-auto bg-popover text-popover-foreground">
                             <template x-for="item in searchResults" :key="item.id">
                                 <button type="button" @click="selectElement(item)"
-                                    class="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors border-b last:border-0" aria-label="Action">
+                                    class="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors border-b last:border-0">
                                     <span x-text="item.name"></span>
                                     <span class="text-xs text-muted-foreground block" x-text="rowDetail(item)"></span>
                                 </button>
@@ -110,7 +114,7 @@
                         </select>
                     </div>
                     <button type="button" @click="performAnalysis()" :disabled="!selectedElement || loading"
-                        class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" aria-label="Action">
+                        class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
                         {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
                         <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
                         <span x-show="loading" x-cloak class="mr-2 inline-flex"><i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i></span>
@@ -868,19 +872,23 @@
 ) }}
 </div>
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='change-request-modal', kind='change_request', button_text='Create Change Request') }}
+</div>
 
 {{ initiative_modal(
     id='change-request-modal',
     title='Create Change Request',
     endpoint='/strategic/api/initiatives/from-impact',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Change Title', 'required': True, 'placeholder': 'e.g., Modernize Payment Processing'},
+        {'name': 'name', 'type': 'text', 'label': 'Change Title', 'required': True, 'placeholder': 'e.g., Modernize Payment Processing'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the proposed change...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('critical', 'Critical'), ('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'medium'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Change sponsor'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
-        {'name': 'cost_estimate', 'type': 'number', 'label': 'Cost Estimate ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 

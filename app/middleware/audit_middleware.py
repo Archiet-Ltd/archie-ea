@@ -185,26 +185,36 @@ def _listeners_for(table_label: str):
     return _LISTENERS[table_label]
 
 
-def _make_after_insert(table_label: str):
+def record_create(connection, table_label: str, target) -> None:
+    """Write the first version of ``target`` to the change history, dated when a demonstration load asks.
+
+    The mapper's after_insert listener calls this. A row that a mapper event writes with a Core insert
+    (a strategy-layer mirror element) has no flush of its own, so its writer calls this with a transient
+    instance, and the row gets its create entry like every other.
+    """
     from app.services.change_source import current_change_context
 
+    try:
+        record_id = getattr(target, "id", None)
+        recorded_at = None
+        dating = current_change_context()["dating"]
+        if dating is not None:
+            try:
+                recorded_at = dating.date_new_record(connection, table_label, target)
+            except Exception:
+                # The record is still audited, with today's date, rather than not at all.
+                logger.warning("audit dating failed for %s", table_label, exc_info=True)
+        _write_audit(
+            connection, "create", table_label, record_id,
+            new_value=_column_snapshot(target), target=target, recorded_at=recorded_at,
+        )
+    except Exception:
+        logger.debug("audit after_insert failed for %s", table_label, exc_info=True)
+
+
+def _make_after_insert(table_label: str):
     def _after_insert(mapper, connection, target):
-        try:
-            record_id = getattr(target, "id", None)
-            recorded_at = None
-            dating = current_change_context()["dating"]
-            if dating is not None:
-                try:
-                    recorded_at = dating.date_new_record(connection, table_label, target)
-                except Exception:
-                    # The record is still audited, with today's date, rather than not at all.
-                    logger.warning("audit dating failed for %s", table_label, exc_info=True)
-            _write_audit(
-                connection, "create", table_label, record_id,
-                new_value=_column_snapshot(target), target=target, recorded_at=recorded_at,
-            )
-        except Exception:
-            logger.debug("audit after_insert failed for %s", table_label, exc_info=True)
+        record_create(connection, table_label, target)
 
     return _after_insert
 

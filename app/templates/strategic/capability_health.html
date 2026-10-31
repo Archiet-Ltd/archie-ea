@@ -1,4 +1,8 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -26,7 +30,7 @@
         title='Capability Health Dashboard',
         description='Real-time assessment of business capabilities based on maturity, coverage, and technical risk.',
         actions=[
-            {'text': 'Create Plan', 'icon': 'lightbulb', 'onclick': "document.dispatchEvent(new CustomEvent('open-initiative-health-remediation-modal'))", 'variant': 'default'}
+            {'text': 'Create Plan', 'icon': 'lightbulb', 'onclick': "$dispatch('open-initiative-health-remediation-modal')", 'variant': 'default'}
         ]
     ) }}
 
@@ -82,7 +86,7 @@
                     <div class="space-y-2">
                         <div class="flex items-center justify-between text-sm font-medium">
                             <div class="flex items-center">
-                                <span class="mr-2">{{ domain.name }}</span>
+                                <span class="mr-2">{{ domain.name if domain.name is not none else 'Unnamed domain' }}</span>
                                 <span class="text-xs text-muted-foreground font-normal">({{ domain.count }} caps)</span>
                             </div>
                             <span class="{% if domain.score is none %}text-muted-foreground{% elif domain.score < 60 %}text-destructive-emphasis{% elif domain.score < 80 %}text-warning-emphasis{% else %}text-success-emphasis{% endif %}">
@@ -158,7 +162,7 @@
                                 {{ item.application_count }} apps · {{ item.planned_solution_count }} solutions · {{ item.requirement_count }} reqs
                             </div>
                         </td>
-                        <td class="p-4 text-muted-foreground">{{ item.domain }}</td>
+                        <td class="p-4 text-muted-foreground">{{ item.domain if item.domain is not none else 'Domain not assigned' }}</td>
                         <td class="p-4">
                             <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {% if item.maturity_gap > 1 %}border-destructive text-destructive{% else %}border-muted text-muted-foreground{% endif %}">
                                 L{{ item.maturity_gap }} Gap
@@ -253,20 +257,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 ) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='health-remediation-modal', kind='remediation_plan', button_text='Create Plan') }}
+</div>
 
 {{ initiative_modal(
     id='health-remediation-modal',
     title='Create Remediation Plan',
     endpoint='/strategic/api/initiatives/from-health',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Remediation: Finance Capability'},
+        {'name': 'name', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Remediation: Finance Capability'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the remediation approach...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Team or individual responsible'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
         {'name': 'target_completion_date', 'type': 'date', 'label': 'Target Completion', 'required': False},
-        {'name': 'budget', 'type': 'number', 'label': 'Budget ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 

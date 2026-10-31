@@ -206,6 +206,7 @@ def index():
         chat_bootstrap_error=chat_bootstrap_error,
         default_chat_persona=default_chat_persona,
         llm_configured=llm_provider_info["configured"],
+        llm_paused=bool(llm_provider_info.get("paused")),
         llm_provider=llm_provider_info.get("provider"),
         startup_first_steps=startup_first_steps,
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",

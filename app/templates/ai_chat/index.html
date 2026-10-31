@@ -110,9 +110,10 @@
                                 {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
                                 {% endif %}
                                 {% if startup_first_steps.sample %}
-                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}">
+                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-sample-form data-testid="chat-first-sample-form">
                                     {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                                     {{ button(text='See a sample company', type='submit', variant='outline' if startup_first_steps.connect else 'default', testid='chat-first-sample') }}
+                                    <p class="mt-2 text-sm text-muted-foreground" role="status" hidden data-sample-busy data-testid="chat-first-sample-busy">Loading the sample company. This takes a few seconds.</p>
                                 </form>
                                 {% endif %}
                             </div>
@@ -134,9 +135,9 @@
                not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
             <div class="shrink-0 px-4 pb-2">
                 {% if current_user.is_admin() %}
-                {{ alert('warning', text='No AI model. Records still answer.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Records still answer.'), link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% else %}
-                {{ alert('warning', text='No AI model. Ask an administrator.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Ask an administrator.'), testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% endif %}
             </div>
             {% endif %}
@@ -390,15 +391,15 @@
                 {% call card(class='space-y-2 p-4') %}
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs font-medium capitalize"
+                            <span class="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs font-medium"
                                   :class="item.operation_type === 'create' ? 'bg-success/10 text-success-emphasis' : (item.operation_type === 'delete' ? 'bg-destructive/10 text-destructive-emphasis' : 'bg-warning/10 text-warning-emphasis')"
-                                  x-text="item.operation_type"></span>
-                            <span class="text-sm font-medium capitalize text-foreground" x-text="item.entity_type"></span>
+                                  x-text="item.operation_label"></span>
+                            <span class="text-sm font-medium text-foreground" x-text="item.entity_label"></span>
                         </div>
                         <span class="text-xs text-muted-foreground" x-text="$store.approvals.formatDate(item.created_at)"></span>
                     </div>
                     <p class="text-sm text-muted-foreground" x-text="item.summary"></p>
-                    <p class="text-xs text-muted-foreground">Requested by: <span class="text-foreground" x-text="item.requester?.display_name || 'Unknown requester'"></span></p>
+                    <p class="text-xs text-muted-foreground">Requested by: <span class="text-foreground" x-text="item.requester?.display_name"></span></p>
                     <p class="text-xs text-muted-foreground">Expires: <span x-text="$store.approvals.formatDate(item.expires_at)"></span></p>
                     {# The arguments that will run stay behind a disclosure, never as the primary text. #}
                     <details class="text-xs" x-show="item.arguments !== null">

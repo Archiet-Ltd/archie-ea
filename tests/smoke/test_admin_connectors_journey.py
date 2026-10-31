@@ -9,12 +9,17 @@ because the approval path refuses both self-approval and a non-admin
 approver (H3) -- a real journey here needs a second admin to approve.
 """
 
+import re
 import uuid
 
 import pytest
 
 from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD
 from tests.smoke.fresh_org import api, sign_in
+
+# Masked credential characters: bullets, or a run of asterisks (a single
+# asterisk marks a required field and is not a mask).
+_MASK = re.compile("[\u2022\u25cf]|\\*{2,}")
 
 
 def _create_two_admins():
@@ -69,10 +74,14 @@ def test_add_approve_and_see_connector_with_masked_credential(browser, live_serv
         # Proposer adds a connector with a credential.
         sign_in(page, live_server, org["emails"]["proposer"])
         page.goto(live_server + "/admin/connectors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.select_option("#connector_type", "jira")
-        page.fill("#name", "Journey Jira")
-        page.fill("#config_json", '{"instance_url": "https://journey.example.com"}')
-        page.fill("#credential", "journey-secret-token")
+        # The form is found by its labels, as a person finds it.
+        assert page.get_by_label("Display name").get_attribute("placeholder") == "Jira Cloud, production"
+        assert page.get_by_label("Connector type").locator("option").first.inner_text() == "Choose a connector type"
+        page.get_by_label("Connector type").select_option("jira")
+        page.get_by_label("Display name").fill("Journey Jira")
+        page.get_by_label("Configuration (JSON, non-secret)").fill('{"instance_url": "https://journey.example.com"}')
+        page.get_by_label("Credential").fill("journey-secret-token")
+        assert page.get_by_label("Enable connector").is_checked()
         page.get_by_role("button", name="Save connector").click()
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
 
@@ -114,7 +123,19 @@ def test_add_approve_and_see_connector_with_masked_credential(browser, live_serv
         body_text = page.inner_text("body")
         assert "Journey Jira" in body_text
         assert "journey-secret-token" not in body_text
-        row = page.locator("tr:has-text('Journey Jira')").inner_text()
+        row_locator = page.locator("tr:has-text('Journey Jira')")
+        row = row_locator.inner_text()
         assert "queued" not in row.lower()
+        # The credential column reads "Stored" and no masked characters
+        # appear anywhere on the page.
+        assert "Stored" in row
+        assert not _MASK.search(page.inner_text("body"))
+
+        # The connector can be synchronised from its row.
+        row_locator.get_by_role("button", name="Sync").click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        assert "Journey Jira" in page.inner_text("body")
+        assert "journey-secret-token" not in page.inner_text("body")
+        assert not _MASK.search(page.inner_text("body"))
     finally:
         context.close()

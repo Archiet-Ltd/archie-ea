@@ -243,9 +243,30 @@ def get_user_role(user) -> str:
     if not user:
         return DEFAULT_ROLE
     try:
-        return getattr(user, "enterprise_role", None) or DEFAULT_ROLE
+        persona = getattr(user, "enterprise_role", None)
     except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
         return DEFAULT_ROLE
+    return _narrowed_persona(user, persona) or DEFAULT_ROLE
+
+
+def _narrowed_persona(user, persona):
+    """A stored persona may narrow what the roles allow, never widen it.
+
+    ``platform_admin`` is the widest persona, and accounts created before it
+    stopped being the default still store it. It counts only for a person who
+    holds platform authority or administers the active organisation; for anyone
+    else it reads as no persona.
+    """
+    if persona != ROLE_PLATFORM_ADMIN:
+        return persona
+    try:
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        if is_platform_admin(user):
+            return persona
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        pass
+    return persona if _is_org_administrator(user) else None
 
 
 def _is_org_administrator(user) -> bool:
@@ -277,6 +298,7 @@ def get_effective_role(user) -> str:
         persona = getattr(user, "enterprise_role", None)
     except Exception:  # noqa: BLE001
         return DEFAULT_ROLE
+    persona = _narrowed_persona(user, persona)
     if persona:
         return persona
     return ROLE_PLATFORM_ADMIN if _is_org_administrator(user) else DEFAULT_ROLE
@@ -374,7 +396,7 @@ def may_load_sample_company(user) -> bool:
     the estate, and administrators."""
     try:
         return bool(
-            getattr(user, "enterprise_role", None)
+            _narrowed_persona(user, getattr(user, "enterprise_role", None))
             in ("enterprise_architect", "solution_architect", "platform_admin")
         ) or bool(user.is_admin())
     except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
@@ -1158,7 +1180,6 @@ SIDEBAR_ZONES: Dict[str, List[Dict]] = {
 NOT_READY_ENDPOINTS = {
     "implementation_planning.implementation_dashboard": "not available yet",
     "main.integrations": "refused for the demonstration user",
-    "main.agentic_gaps_ui": "page says it is still being built",
     "dynamic_dashboards.model_registry_index": "page says it is still being built",
     "application_mgmt.compliance_frameworks_dashboard": "compliance views are empty",
     "architecture.investment_priorities": "asks for setup before it shows anything",

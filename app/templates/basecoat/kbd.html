@@ -1,0 +1,13 @@
+{# kbd: port of shadcn/ui kbd.tsx (pinned in compliance/upstream). Macros: kbd, kbd_group #}
+
+{#- Kbd -#}
+{% macro kbd(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('kbd', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- KbdGroup -#}
+{% macro kbd_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('kbd-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

@@ -204,7 +204,9 @@ def test_an_invited_person_joins_through_the_e_mail_and_is_signed_in(browser, ma
         page.select_option("#role", "architect")
         page.get_by_role("button", name="Send invitation").click()
         page.wait_for_url("**/admin/team", timeout=PAGE_TIMEOUT)
-        row = page.locator('[data-invitation-email="%s"]' % invitee)
+        # The e-mail cell names the invitation; its delivery state is a sibling cell in the same row.
+        row = page.locator('[data-testid="invitation-row"]').filter(
+            has=page.locator('[data-invitation-email="%s"]' % invitee))
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
         assert row.locator('[data-invitation-delivery="sent"]').count() == 1
         message = smtp_sink.text_to(invitee)
@@ -341,9 +343,9 @@ def test_a_new_person_buys_startup_at_checkout_and_then_cancels(browser, checkou
         # The pricing page's price is the catalogue's price, and its button leads to that plan.
         page.goto(base + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         card = page.get_by_test_id("plan-card-startup")
-        assert "$%d" % startup.display_price_annual in card.locator(".pp-price").inner_text()
+        assert "USD %d" % startup.display_price_annual in card.locator(".pp-price").inner_text()
         page.get_by_label("Monthly", exact=True).check()
-        assert "$%d" % startup.display_price_monthly in card.locator(".pp-price").inner_text()
+        assert "USD %d" % startup.display_price_monthly in card.locator(".pp-price").inner_text()
         _shoot(page, "buy-pricing-monthly")
         page.get_by_label("Annual", exact=False).check()
         _shoot(page, "buy-pricing")
@@ -434,5 +436,107 @@ def test_a_new_person_buys_startup_at_checkout_and_then_cancels(browser, checkou
                 __import__("app.models.organization", fromlist=["Organization"]).Organization, org_id))
             assert billing_plans.effective_plan(subscription).key == "free"
             db.session.remove()
+    finally:
+        context.close()
+
+
+# --------------------------------------------------------------------------- #
+# 6. Every figure names its currency
+# --------------------------------------------------------------------------- #
+
+def test_currency_is_named_on_overview_and_prices_are_usd(browser, server, people, app):
+    """A person sees the currency named on the overview, and every plan price reads USD."""
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, str(server), people)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Finish").click()
+        organisation = _organisation_name_of(app, email)
+        _assert_signed_in_on_dashboard(page, organisation)
+
+        # The overview names its currency in the subtitle.
+        expect(page.locator("#main-content")).to_contain_text("Figures in GBP", timeout=PAGE_TIMEOUT)
+
+        # The public pricing page shows every plan price as USD.
+        page.goto(server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        from app.services import billing_plans
+
+        for plan in (billing_plans.get_plan("startup"), billing_plans.get_plan("team"),
+                     billing_plans.get_plan("enterprise")):
+            card = page.get_by_test_id(f"plan-card-{plan.key}")
+            expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
+            price_text = card.locator(".pp-price").inner_text()
+            assert "USD" in price_text, f"plan {plan.key} card price missing USD: {price_text}"
+            assert "$" not in price_text, f"plan {plan.key} card price uses bare $: {price_text}"
+
+        # The pricing page's note text also says USD, never a bare $.
+        for key in ("startup", "team"):
+            card = page.get_by_test_id(f"plan-card-{key}")
+            note_text = card.locator(".pp-note").inner_text()
+            assert "USD" in note_text, f"plan {key} note missing USD: {note_text}"
+            assert "$" not in note_text, f"plan {key} note uses bare $: {note_text}"
+
+        # The empty overview's links all lead somewhere with content.
+        page.goto(server + "/dashboard/overview", wait_until="domcontentloaded")
+        for link in page.locator("main a").all():
+            href = link.get_attribute("href") or ""
+            if not href or href.startswith("#") or href.startswith("javascript:"):
+                continue
+            if not href.startswith("http"):
+                target = server.rstrip("/") + href
+                new_page_obj = context.new_page()
+                try:
+                    new_page_obj.goto(target, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+                    assert new_page_obj.locator("main").inner_text().strip(), f"empty page at {href}"
+                finally:
+                    new_page_obj.close()
+    finally:
+        context.close()
+
+
+# --------------------------------------------------------------------------- #
+# 7. One currency source: reporting_currency drives every money figure
+# --------------------------------------------------------------------------- #
+
+def test_org_currency_reads_reporting_currency_column(browser, server, people, app):
+    """An org whose reporting_currency is EUR shows the euro sign on the overview,
+    names EUR once, and the overview reads the one stored column."""
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, str(server), people)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Finish").click()
+        organisation = _organisation_name_of(app, email)
+        _assert_signed_in_on_dashboard(page, organisation)
+
+        # A fresh sign-up gets the platform default currency.
+        expect(page.locator("#main-content")).to_contain_text("Figures in GBP", timeout=PAGE_TIMEOUT)
+
+        # Change the organisation's reporting_currency to EUR.
+        with app.app_context():
+            from app import db
+            from app.models.organization import Organization
+            from app.models.user import User
+
+            user = User.find_by_email(email)
+            org = db.session.get(Organization, user.organization_id)
+            org.reporting_currency = "EUR"
+            db.session.commit()
+            db.session.remove()
+
+        # After reload, the overview reads the one stored column and shows EUR.
+        page.goto(server + "/dashboard/overview", wait_until="domcontentloaded")
+        expect(page.locator("#main-content")).to_contain_text("Figures in EUR", timeout=PAGE_TIMEOUT)
+
+        # The currency is named exactly once on the page.
+        main_text = page.locator("#main-content").inner_text()
+        assert main_text.count("Figures in EUR") == 1, (
+            "currency named %d times, expected once" % main_text.count("Figures in EUR"))
     finally:
         context.close()

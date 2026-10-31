@@ -16,7 +16,7 @@ from app.modules.account.forms.account_forms import (
     RequestResetPasswordForm,
 )
 from app.modules.account.services.account_service import AccountService
-from app.services import buy_intent
+from app.services import buy_intent, signup_attribution
 
 MAIL_UNAVAILABLE_RESET = (
     "E-mail is not available on this server, so a reset link cannot be sent. "
@@ -57,12 +57,14 @@ def register_view():
 
         log_signup_started()
     if form.validate_on_submit():
+        origin = signup_attribution.held()  # read before sign-in starts a fresh session
         _user, confirmation = AccountService.sign_up(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             email=form.email.data,
             password=form.password.data,
         )
+        signup_attribution.record(_user, origin)
         from app.services.public_analytics_service import log_signup_completed
 
         log_signup_completed()

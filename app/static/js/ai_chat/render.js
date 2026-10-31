@@ -210,7 +210,11 @@
         var cited = Array.isArray(sources) && sources.length > 0;
 
         var state, summary;
-        if (ran) {
+        if (o.paused) {
+            /* The platform's pause: nothing was read, nothing answered, so no source is claimed. */
+            state = 'paused';
+            summary = 'Answers are paused; nothing was read for this reply.';
+        } else if (ran) {
             state = 'retrieved';
             summary = trail.length + (trail.length === 1 ? ' lookup' : ' lookups')
                     + (cited ? ', ' + sources.length + ' record' + (sources.length === 1 ? '' : 's') + ' cited' : '');
@@ -244,7 +248,7 @@
            Unretrieved states have to reach a screen-reader user with the same
            prominence as Retrieved, because those are the ones that change
            whether an answer can be taken to an ARB. */
-        var icon = state === 'retrieved' ? 'database' : (state === 'context' ? 'layers' : 'help-circle');
+        var icon = state === 'retrieved' ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
         return '<div class="mt-3 pt-2 border-t border-border text-xs">' +
                  '<button type="button" class="js-evidence-toggle inline-flex items-center gap-1.5 ' +
                     'text-muted-foreground hover:text-foreground transition-colors" ' +
@@ -431,6 +435,7 @@
         return renderApiSettingsNotice(m.error) +
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
+                   paused: m.paused,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +
@@ -510,6 +515,7 @@
               '</div>';
 
         div.innerHTML = avatar + bubble;
+        if (isAi && metadata.genomeHtml) applyGenomeAnswer(div, metadata.genomeHtml);
         if (container) container.appendChild(div);
 
         // ENT-122: inject "Open in Composer" button for ArchiMate responses
@@ -658,11 +664,24 @@
        whole element and re-appended a fresh one through appendMessage, so the
        transcript flashed and jumped on every completion — at the exact moment
        the reader had started reading. */
+    /* An answer that read the organisation's model is drawn on the server: its
+       links are built from the records the model was given, never from the model's
+       text, and it carries the AI notice and the time the facts were read. It is
+       sanitised again here because it is inserted as markup. */
+    function applyGenomeAnswer(el, html) {
+        var body = el.querySelector('.message-content');
+        if (!body || !window.DOMPurify) return false;
+        body.innerHTML = DOMPurify.sanitize(html);
+        el.setAttribute('data-testid', 'genome-answer');
+        return true;
+    }
+
     function finaliseStreamedMessage(el, text, meta) {
         if (!el) return null;
         meta = meta || {};
         var body = el.querySelector('.message-content');
         if (body) body.innerHTML = renderMarkdown(text);
+        if (meta.genomeHtml) applyGenomeAnswer(el, meta.genomeHtml);
         var caret = el.querySelector('.stream-caret');
         if (caret) caret.remove();
         el.removeAttribute('aria-busy');

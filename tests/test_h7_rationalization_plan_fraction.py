@@ -32,17 +32,30 @@ def _render(app, stats):
         )
 
 
-def _plan_fraction(body: str) -> tuple[int, int]:
-    # The Plan step prints "<count>/<total> (<pct>%)" right after its label.
-    match = re.search(r"Plan</span>\s*<span[^>]*>(\d+)/(\d+)", body)
-    assert match, "could not find the Plan step's count/total in rendered output"
-    return int(match.group(1)), int(match.group(2))
+def _consolidation_count(body: str):
+    """The consolidation figure a person reads ("<n> on the consolidation
+    list"), taken from the Get started step while nothing is scored, or from
+    the savings card's sentence once scoring has begun. None when the page
+    prints no count (an empty list)."""
+    match = re.search(r"(\d+) on the consolidation list", body)
+    return int(match.group(1)) if match else None
+
+
+def _total_applications(body: str) -> int:
+    # The Score step states the denominator in words while nothing is scored.
+    match = re.search(r"Score all (\d+) applications", body)
+    assert match, "could not find the portfolio total in the rendered output"
+    return int(match.group(1))
 
 
 def test_plan_fraction_never_has_numerator_exceeding_denominator(app):
     """The exact reported scenario: consolidation entries exist (2) but zero
     applications have been TIME-scored yet -- the old code compared these two
-    unrelated counts directly and produced 2/0."""
+    unrelated counts directly and produced 2/0.
+
+    With nothing scored the page now opens on its Get started steps instead
+    of the Progress card, so no fraction is drawn at all; once one application
+    is scored the Plan step reads against total_applications."""
     stats = {
         "total_applications": 50,
         "duplicate_groups": 3,
@@ -52,9 +65,19 @@ def test_plan_fraction_never_has_numerator_exceeding_denominator(app):
         "roadmap_count": 1,
     }
     body = _render(app, stats)
-    count, total = _plan_fraction(body)
-    assert total >= count, f"Plan rendered {count}/{total} -- numerator exceeds denominator"
-    assert total == 50, "Plan's denominator should be total_applications (shared with Detect/Score)"
+    assert 'data-testid="rationalization-get-started"' in body
+    assert not re.search(r"\b2 ?(/|of) ?0\b", body), "Plan rendered 2/0"
+    assert "Score all 50 applications" in body
+
+    count = _consolidation_count(body)
+    assert count == 2
+    assert count <= _total_applications(body), "consolidation count exceeds the portfolio"
+
+    # Once scoring has begun the page still reads the count against nothing
+    # smaller than the portfolio, and never as a "2 of 0" style fraction.
+    body = _render(app, dict(stats, time_scored_count=1))
+    assert not re.search(r"2 ?(/|of) ?0", body), "Plan rendered 2/0"
+    assert _consolidation_count(body) in (None, 2)
 
 
 def test_plan_fraction_stays_sane_across_arbitrary_counts(app):
@@ -72,7 +95,13 @@ def test_plan_fraction_stays_sane_across_arbitrary_counts(app):
             "time_scored_count": time_scored_count,
             "roadmap_count": 0,
         }
-        body = _render(app, stats)
-        count, total = _plan_fraction(body)
+        body = _render(app, dict(stats, time_scored_count=0))
+        assert 'data-testid="rationalization-get-started"' in body
+        total = _total_applications(body)
         assert total == total_apps
-        assert count == consolidation_count
+        count = _consolidation_count(body)
+        if consolidation_count:
+            assert count == consolidation_count
+            assert count <= total, f"{count} on the list but only {total} applications"
+        else:
+            assert count is None

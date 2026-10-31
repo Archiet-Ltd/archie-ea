@@ -242,7 +242,8 @@ function llmRecommendationsComponent(dashboard) {
     
     <!-- Rating Modal -->
     <div x-show="ratingRecommendation !== null" x-cloak
-         x-cloak
+         @keydown.escape.window="ratingRecommendation = null; resetRatingForm()"
+         role="dialog" aria-modal="true" aria-label="Rate Recommendation"
          class="modal-root fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
          @click="ratingRecommendation = null; resetRatingForm()">
         

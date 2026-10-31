@@ -43,7 +43,7 @@
 {% macro user_info(user) %}
     {% call card() %}
     {% call card_content() %}
-            <div class="space-y-4">
+            <dl class="space-y-4">
                 <div class="flex justify-between items-start py-3 border-b border-border">
                     <dt class="font-medium text-sm text-muted-foreground">Full name</dt>
                     <dd class="text-sm">{{ user.full_name() }}</dd>
@@ -61,7 +61,7 @@
                         {% endif %}
                     </dd>
                 </div>
-            </div>
+            </dl>
     {% endcall %}
     {% endcall %}
 
@@ -124,7 +124,7 @@
 
     {# Industry and frameworks: chosen at sign-up, changed here. #}
     {% if company %}
-    <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-testid="company-choices-card">
+    <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-url-remove-starter="{{ url_for('account.welcome_starter_remove') }}" data-testid="company-choices-card">
         {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
         {% call card() %}
             {% call card_header() %}
@@ -134,6 +134,10 @@
             {% call card_content(class='space-y-6') %}
                 {% include 'account/_company_choices.html' %}
                 <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="choices"></p>
+                <div class="flex flex-wrap items-center gap-3{% if not company.removable %} hidden{% endif %}" data-starter-offer data-testid="starter-offer">
+                    <p class="text-sm text-muted-foreground" data-starter-offer-text>{% if company.removable %}You no longer use the {{ company.removable[0].model }} starter capabilities. {{ company.removable[0].count }} of them are as they were loaded.{% endif %}</p>
+                    {{ button(text='Remove the unchanged ones', variant='outline', testid='starter-remove', attrs_dict={'data-action': 'remove-starter', 'data-model': (company.removable[0].model if company.removable else '')}) }}
+                </div>
             {% endcall %}
             {% call card_footer() %}
                 {{ button(text='Save', testid='company-choices-save', attrs_dict={'data-action': 'save-choices'}) }}
@@ -181,11 +185,13 @@
                         <td class="px-2 py-2 align-top">
                             {% if sig.url %}<a href="{{ sig.url }}" class="font-medium text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ sig.title }}</a>{% else %}<span class="font-medium">{{ sig.title }}</span>{% endif %}
                             <p class="mt-0.5 text-xs text-muted-foreground" data-testid="signal-cite">{{ sig.source }} &middot; {% if sig.published_at %}{{ sig.published_at.strftime('%d %b %Y') }}{% else %}read {{ sig.fetched_at.strftime('%d %b %Y') }}{% endif %}</p>
+                            {% if sig.reports > 1 %}<p class="text-xs text-muted-foreground" data-testid="signal-reports">{{ sig.reports }} reports of this story</p>{% endif %}
                         </td>
                         <td class="px-2 py-2 align-top">
-                            <div class="flex flex-wrap gap-1">
+                            <div class="flex flex-wrap gap-1"{% if sig.pestle_reason %} title="Tagged {{ sig.pestle_factor | capitalize }} because {{ sig.pestle_reason }}"{% endif %}>
                             {% if sig.pestle_factor %}{% call badge('neutral') %}{{ sig.pestle_factor | capitalize }}{% endcall %}{% endif %}
                             {% if sig.swot_quadrant %}{% call badge('info') %}{{ sig.swot_quadrant | capitalize }}{% endcall %}{% endif %}
+                            {% if sig.pestle_reason %}<p class="w-full text-xs text-muted-foreground" data-testid="signal-reason">Because {{ sig.pestle_reason }}</p>{% endif %}
                             {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-xs text-muted-foreground" data-testid="signal-informs-none">Not matched to PESTLE or SWOT</span>{% endif %}
                             </div>
                         </td>
@@ -211,7 +217,7 @@
     {% call card() %}
     {% call card_content() %}
             <h3 class="text-sm font-semibold mb-4">Security Information</h3>
-            <div class="space-y-4">
+            <dl class="space-y-4">
                 {# V-06: sourced from the audit log (soc2_audit_log), the same store
                    /admin/audit-log reads, so the two cannot disagree. An em dash means
                    "no prior login recorded" -- never a fabricated placeholder. #}
@@ -253,7 +259,7 @@
                         {% endif %}
                     </dd>
                 </div>
-            </div>
+            </dl>
     {% endcall %}
     {% endcall %}
     </div>
@@ -264,6 +270,7 @@
         ('solution_updates',    'Solution updates',    'Receive notifications when a solution you own advances to a new ADM phase.'),
         ('assignment_changes',  'Assignment changes',  'Receive notifications when an ArchiMate element is assigned or re-assigned to you.'),
         ('weekly_digest',       'Weekly digest',       'Receive a weekly summary of activity across your solutions and architecture portfolio.'),
+        ('alert_email',         'Daily alert email',   'One email a day listing the alerts about what you own: support dates, owners, costs and overdue review conditions. The bell shows them either way.'),
         ('mention_notifications','Mentions',           'Receive notifications when you are mentioned in a comment or review.')
     ] %}
     <div class="mt-6">
@@ -285,7 +292,7 @@
                             </div>
                             <div class="flex-shrink-0 pt-0.5">
                                 {{ switch(id='pref_' + pref_key + '_btn', bind_checked='checked', on_click='checked = !checked', aria_label=pref_label) }}
-                                {{ input(type='checkbox', id='pref_' + pref_key, name=pref_key, value='on',
+                                {{ input(type='checkbox', id='pref_' + pref_key, name=pref_key, value='on', aria_label=pref_label,
                                           class='sr-only', attrs_dict={'x-model': 'checked'}) }}
                             </div>
                         </div>
@@ -318,7 +325,7 @@
                         </div>
                         <div class="flex-shrink-0 pt-0.5">
                             {{ switch(id='pref_show_archimate_btn', bind_checked='checked', on_click='checked = !checked', aria_label='Show ArchiMate names') }}
-                            {{ input(type='checkbox', id='pref_show_archimate', name='show_archimate_names', value='on',
+                            {{ input(type='checkbox', id='pref_show_archimate', name='show_archimate_names', value='on', aria_label='Show ArchiMate names',
                                       class='sr-only', attrs_dict={'x-model': 'checked'}) }}
                         </div>
                     </div>

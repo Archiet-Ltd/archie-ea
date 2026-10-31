@@ -163,7 +163,9 @@ class CapabilityHeatmapService:
 
                     # Transform to same format as UnifiedCapability results
                     # (cap object, domain_name, domain_code)
-                    capabilities = [(cap, cap.business_domain or "Unknown", cap.code or "UNK") for cap in cap_data]
+                    # Group by the domain name; a capability with none goes to the
+                    # no-domain group (key None), not one group per capability code.
+                    capabilities = [(cap, cap.business_domain, cap.business_domain or None) for cap in cap_data]
 
                 except (ImportError, Exception) as e:
                     logger.warning(f"BusinessCapability fallback failed: {e}, using empty result")

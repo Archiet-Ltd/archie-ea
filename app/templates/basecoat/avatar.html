@@ -1,0 +1,37 @@
+{# avatar: port of shadcn/ui avatar.tsx (pinned in compliance/upstream). Macros: avatar, avatar_image, avatar_fallback, avatar_badge, avatar_group, avatar_group_count #}
+
+{#- Avatar -#}
+{% macro avatar(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('avatar', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AvatarImage -#}
+{% macro avatar_image(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('avatar-image', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AvatarFallback -#}
+{% macro avatar_fallback(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('avatar-fallback', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AvatarBadge -#}
+{% macro avatar_badge(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('avatar-badge', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AvatarGroup -#}
+{% macro avatar_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('avatar-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AvatarGroupCount -#}
+{% macro avatar_group_count(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('avatar-group-count', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

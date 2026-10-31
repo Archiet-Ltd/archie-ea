@@ -28,6 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.services.relationship_origin import manual_origin_text
 from app.models.archimate_element_types import is_application_kind
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
@@ -576,7 +577,7 @@ def _row_origin(rel) -> Dict[str, Any]:
     if kind == "import" and label:
         text = f"Imported from {label}"
     elif kind == "manual" and label:
-        text = f"Drawn by {label}"
+        text = manual_origin_text(label)
     elif kind in ("connector", "derived") and label:
         text = label
     created = getattr(rel, "created_at", None)
@@ -669,6 +670,171 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
             # No origin: only the creation date is a recorded date.
             origin["recorded_at"] = created_at
             relation["computed_at"] = created_at
+
+
+# --------------------------------------------------------------------------- #
+# Data flow: who writes a data object, who reads it, where it is copied
+# --------------------------------------------------------------------------- #
+
+_ACCESS_WORDS = {"C": "creates", "R": "reads", "U": "updates", "D": "deletes"}
+_WRITE_WORDS = frozenset({"creates", "updates", "deletes", "writes"})
+DATA_FLOW_RULE = "data-flow-writer-to-reader"
+
+
+def _access_words(rel) -> List[str]:
+    """What an access relationship says the application does with the data, in
+    plain words: the recorded C/R/U/D letters, else the ArchiMate access mode."""
+    crud = (getattr(rel, "crud_operations", None) or "").upper()
+    if crud:
+        return [_ACCESS_WORDS[letter] for letter in "CRUD" if letter in crud]
+    mode = (getattr(rel, "access_mode", None) or "").lower()
+    return {"read": ["reads"], "write": ["writes"], "readwrite": ["reads", "writes"]}.get(mode, ["uses"])
+
+
+def _words(words: List[str]) -> str:
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def _data_flow_walk(object_id: int, object_name: str, level: int, chain: List[int],
+                    chain_elements: List[int], seen: set, max_depth: int,
+                    rows: List[Dict[str, Any]], org_id: int, computed_at: str) -> None:
+    """Rows for one data object, in cascade order: the applications that write
+    it; under them the applications that read it and the data objects it is
+    copied to; under each copy, the same again. Applications are recognised by
+    the element registry's application kinds, never by a type string."""
+    from app.models import ArchiMateElement, ArchiMateRelationship, DataLineage
+
+    accesses = [
+        rel for rel in db.session.execute(
+            db.select(ArchiMateRelationship)
+            .where(ArchiMateRelationship.target_id == object_id)
+            .order_by(ArchiMateRelationship.id)
+        ).scalars()
+        if (rel.type or "").strip().lower() == "access"
+    ]
+    sources = {}
+    if accesses:
+        sources = {
+            el.id: el for el in db.session.execute(
+                db.select(ArchiMateElement).where(
+                    ArchiMateElement.id.in_({rel.source_id for rel in accesses}),
+                    ArchiMateElement.organization_id == org_id,
+                )
+            ).scalars()
+            if is_application_kind(el.type)
+        }
+    users = sorted(
+        ((rel, sources[rel.source_id], _access_words(rel)) for rel in accesses if rel.source_id in sources),
+        key=lambda item: (item[1].name or "").lower(),
+    )
+    writers = [item for item in users if _WRITE_WORDS.intersection(item[2])]
+    readers = [item for item in users if not _WRITE_WORDS.intersection(item[2])]
+
+    for rel, app, words in writers:
+        row = _explicit_row(rel, len(chain) + 1, chain + [rel.id], chain_elements + [app.id], app.id)
+        row.update({"level": level, "hop": "writes", "access": words, "data_object_id": object_id})
+        rows.append(row)
+
+    under = level + 1 if writers else level
+    writer_names = _words([app.name for _rel, app, _w in writers]) if writers else None
+    for rel, app, words in readers:
+        if writers:
+            # Worked out from two recorded facts: the writers write this data
+            # and this application reads it, so the data flows from them to it.
+            text = (f"Worked out: {writer_names} {'write' if len(writers) > 1 else 'writes'} "
+                    f"{object_name}, and {app.name} {_words(words)} it")
+            row = {
+                "element_id": app.id,
+                "_endpoints": (writers[0][1].id, app.id),
+                "relation": {
+                    "kind": "derived",
+                    "type": "flow",
+                    "depth": len(chain) + 2,
+                    "rule_id": DATA_FLOW_RULE,
+                    "chain": chain + [w.id for w, _a, _x in writers] + [rel.id],
+                    "chain_elements": chain_elements + [writers[0][1].id, app.id],
+                    "confidence": None,
+                    "provenance": {"basis": "derived", "kind": "derived", "label": None,
+                                   "text": text, "recorded_at": None},
+                    "computed_at": computed_at,
+                    "stale": False,
+                    "derived_id": None,
+                    "engine_version": None,
+                    "plain_terms": text,
+                },
+            }
+        else:
+            row = _explicit_row(rel, len(chain) + 1, chain + [rel.id], chain_elements + [app.id], app.id)
+        row.update({"level": under, "hop": "reads", "access": words, "data_object_id": object_id})
+        rows.append(row)
+
+    copies = db.session.execute(
+        db.select(DataLineage)
+        .where(DataLineage.archimate_element_id == object_id)
+        .where(DataLineage.target_archimate_element_id.isnot(None))
+        .order_by(DataLineage.id)
+    ).scalars().all()
+    targets = {}
+    if copies:
+        targets = {
+            el.id: el for el in db.session.execute(
+                db.select(ArchiMateElement).where(
+                    ArchiMateElement.id.in_({c.target_archimate_element_id for c in copies}),
+                    ArchiMateElement.organization_id == org_id,
+                )
+            ).scalars()
+        }
+    for copy in copies:
+        target = targets.get(copy.target_archimate_element_id)
+        if target is None:
+            continue
+        recorded = copy.created_at.isoformat() if copy.created_at else None
+        kind_of = f" ({copy.lineage_type})" if copy.lineage_type else ""
+        rows.append({
+            "element_id": target.id,
+            "_endpoints": (object_id, target.id),
+            "relation": {
+                "kind": "explicit",
+                "type": "lineage",
+                "depth": len(chain) + 1,
+                "rule_id": None,
+                "chain": list(chain),
+                "chain_elements": chain_elements + [target.id],
+                "lineage_id": copy.id,
+                "confidence": RECORDED_CONFIDENCE,
+                "provenance": {"basis": "explicit", "kind": "lineage", "label": copy.lineage_type,
+                               "text": f"Copy recorded in the data lineage{kind_of}",
+                               "recorded_at": recorded},
+                "computed_at": recorded,
+                "stale": False,
+                "derived_id": None,
+                "engine_version": None,
+                "plain_terms": None,
+            },
+            "level": under,
+            "hop": "copied to",
+            "access": [],
+            "data_object_id": object_id,
+        })
+        if target.id not in seen and under + 1 < max_depth:
+            seen.add(target.id)
+            _data_flow_walk(target.id, target.name, under + 1, list(chain),
+                            chain_elements + [target.id], seen, max_depth, rows, org_id, computed_at)
+
+
+def _stewards_by_element(element_ids: List[int], org_id: int) -> Dict[int, Optional[str]]:
+    """The data steward recorded on the domain of each data object's entity."""
+    from app.models.process_data import DataDomain, DataEntity
+
+    if not element_ids:
+        return {}
+    pairs = db.session.execute(
+        db.select(DataEntity.archimate_element_id, DataDomain.data_steward)
+        .join(DataDomain, DataDomain.id == DataEntity.domain_id)
+        .where(DataEntity.archimate_element_id.in_(element_ids))
+        .where(DataEntity.organization_id == org_id)
+    ).all()
+    return {eid: (steward or "").strip() or None for eid, steward in pairs}
 
 
 def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
@@ -1272,6 +1438,79 @@ class IntelligenceQueryService:
             "maturity_flags": maturity_flags,
             "total": total,
             "next_cursor": next_cursor,
+        }
+
+    @staticmethod
+    def data_flow(element_id: int, *, max_depth: int = 4) -> Dict[str, Any]:
+        """Where the data in one data object goes: the applications that write
+        it, the ones that read it and the data objects it is copied to, hop by
+        hop, each row resting on the record it came from.
+
+        Two stores and no other: ArchiMate access relationships (an application
+        creates, reads, updates or deletes the data object) and DataLineage rows
+        (the data is copied to another data object). An access or a copy is an
+        explicit row citing its record; a reader under a writer is a derived
+        row ("worked out"), citing both accesses. Rows come in cascade order,
+        each child after its parent, with its ``level``. Owners come from the
+        same batch readers ``cross_layer_impact`` uses; a data object row
+        carries the steward of its entity's domain.
+        """
+        import datetime as _dt
+
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
+        org_id = current_org_id()
+        summary = {"explicit_count": 0, "derived_count": 0, "stale_count": 0,
+                   "derivation_state": "not_computed"}
+        if org_id is None:
+            return {"rows": [], "summary": summary, "reasons": [NO_TENANT_CONTEXT_REASON],
+                    "elements": {}, "total": 0}
+        from app.models import ArchiMateElement
+
+        root = db.session.execute(
+            db.select(ArchiMateElement).where(
+                ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id
+            )
+        ).scalar_one_or_none()
+        if root is None:
+            return {"rows": [], "summary": summary, "reasons": [ELEMENT_NOT_FOUND_REASON],
+                    "elements": {}, "total": 0}
+
+        rows: List[Dict[str, Any]] = []
+        computed_at = _dt.datetime.utcnow().isoformat()
+        _data_flow_walk(root.id, root.name, 0, [], [root.id], {root.id}, max_depth, rows, org_id, computed_at)
+        for row in rows:
+            row.pop("_endpoints", None)
+        elements = _resolve_elements_batch(_element_ids_in_rows(rows) + [root.id], org_id)
+        _attach_origins(rows, org_id)
+
+        ids = [row["element_id"] for row in rows]
+        owners_by_element = _resolve_owners_batch(ids, org_id)
+        application_owners = _resolve_application_owners_batch(ids, org_id, elements)
+        stewards = _stewards_by_element(ids + [root.id], org_id)
+        for row in rows:
+            owner, _reason = owners_by_element.get(row["element_id"], (None, NO_OWNERSHIP_REASON))
+            row["owner"] = owner
+            row["owners"] = application_owners.get(row["element_id"], [])
+            row["steward"] = stewards.get(row["element_id"]) if row["hop"] == "copied to" else None
+            accountable = row["owner"] or row["owners"] or row["steward"]
+            row["reason"] = None if accountable else NO_OWNERSHIP_REASON
+
+        explicit = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
+        summary = {
+            "explicit_count": explicit,
+            "derived_count": len(rows) - explicit,
+            "stale_count": 0,
+            "derivation_state": "computed",
+            "root_steward": stewards.get(root.id),
+        }
+        return {
+            "rows": rows,
+            "summary": summary,
+            "reasons": [],
+            "elements": elements,
+            "root_element_id": root.id,
+            "total": len(rows),
         }
 
     @staticmethod
@@ -2456,6 +2695,16 @@ class IntelligenceQueryService:
                 )
 
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
+
+    @staticmethod
+    def owners_for_element(element_id: int) -> List[Dict[str, str]]:
+        """The element's own recorded owners ([{name, role}]), from the one owner store.
+
+        The same reader accountability_for_element and the impact rows use, so every surface
+        that names an owner for an element names the same one."""
+        org_id = current_org_id()
+        elements = _resolve_elements_batch([element_id], org_id)
+        return _resolve_application_owners_batch([element_id], org_id, elements).get(element_id, [])
 
     @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:

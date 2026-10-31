@@ -150,15 +150,15 @@
     <span><span class="legend-dot bg-muted-foreground"></span>Neutral</span>
     <span><span class="legend-dot bg-warning"></span>Skeptic</span>
     <span><span class="legend-dot bg-destructive"></span>Blocker</span>
-    <span class="ml-4 text-muted-foreground/60">Node size = engagement weight</span>
-    <span class="text-muted-foreground/60">Click a stakeholder for an AI engagement strategy</span>
+    <span class="ml-4 text-muted-foreground">Node size = engagement weight</span>
+    <span class="text-muted-foreground">Click a stakeholder for an AI engagement strategy</span>
   </div>
 
   {# ── Empty state ────────────────────────────────── #}
   <div x-show="!loading && loadError" x-cloak
        class="flex flex-col items-center justify-center py-20 text-center bg-background border border-destructive rounded-xl">
     <p class="text-destructive-emphasis font-medium text-lg mb-1" x-text="loadError"></p>
-    <p class="text-muted-foreground/60 text-sm mb-4">The map was not read — this is not a solution without stakeholders.</p>
+    <p class="text-muted-foreground text-sm mb-4">The map was not read — this is not a solution without stakeholders.</p>
     <button type="button" @click="loadData()"
             class="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition">
       Retry
@@ -172,7 +172,7 @@
       <path stroke-linecap="round" d="M14 9h.01M9 14h.01"/>
     </svg>
     <p class="text-muted-foreground font-medium text-lg mb-1" x-text="(selectedSolution || selectedProgramme) ? 'No stakeholders yet' : 'Select a solution or a programme'"></p>
-    <p class="text-muted-foreground/60 text-sm mb-4" x-text="(selectedSolution || selectedProgramme) ? 'Add stakeholders to visualise your Power/Interest grid' : 'Choose a solution or a transformation programme above to view its stakeholder map'"></p>
+    <p class="text-muted-foreground text-sm mb-4" x-text="(selectedSolution || selectedProgramme) ? 'Add stakeholders to visualise your Power/Interest grid' : 'Choose a solution or a transformation programme above to view its stakeholder map'"></p>
     {# Found 13 Sep 2026 (full-app design pass): this button used to render
        unconditionally, including in the "no solution selected yet" state --
        clicking it there immediately failed with a "Select a solution first"
@@ -399,7 +399,7 @@
         </label>
         <input x-model.number="form.influence_level" type="range" min="1" max="5" step="1"
                class="stk-range w-full" aria-label="Influence level"/>
-        <div class="flex justify-between text-xs text-muted-foreground/60 mt-0.5">
+        <div class="flex justify-between text-xs text-muted-foreground mt-0.5">
           <span>Low</span><span>High</span>
         </div>
       </div>
@@ -409,7 +409,7 @@
         </label>
         <input x-model.number="form.interest_level" type="range" min="1" max="5" step="1"
                class="stk-range w-full" aria-label="Interest level"/>
-        <div class="flex justify-between text-xs text-muted-foreground/60 mt-0.5">
+        <div class="flex justify-between text-xs text-muted-foreground mt-0.5">
           <span>Low</span><span>High</span>
         </div>
       </div>

@@ -85,6 +85,8 @@ def login():
 
             _sso_cfg = SSOService().config_for_login(form.email.data, form.password.data)
             if _sso_cfg is not None:
+                # Keep where the person was going (a connector set-up, say) through the identity provider.
+                session["_post_login_next"] = buy_intent.next_candidate() or ""
                 return redirect(
                     url_for("sso.sso_initiate", email=form.email.data)
                 )
@@ -490,6 +492,7 @@ def save_preferences():
         "solution_updates",
         "assignment_changes",
         "weekly_digest",
+        "alert_email",
         "mention_notifications",
     ]
     try:
@@ -576,6 +579,10 @@ def sso_login(provider):
     state = secrets.token_urlsafe(32)
     session["sso_state"] = state
     session["sso_provider"] = provider
+    from app.utils.safe_redirect import is_safe_next_url
+
+    _requested_next = request.args.get("next")
+    session["_post_login_next"] = _requested_next if is_safe_next_url(_requested_next) else ""
 
     callback_url = url_for("account.sso_callback", provider=provider, _external=True)
     return client.authorize_redirect(callback_url, state=state)
@@ -701,11 +708,13 @@ def sso_callback(provider):
     # registered, so whichever is live stays internally consistent between
     # its own MFA and non-MFA paths.
     from app.services import mfa_service
+    from app.utils.safe_redirect import safe_next_url
 
+    _post_next = session.pop("_post_login_next", "") or ""
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
-        session["_mfa_pending_next"] = ""
+        session["_mfa_pending_next"] = _post_next
         return redirect(url_for("account.mfa_challenge"))
 
     session_registry.login_and_register(user)
@@ -719,4 +728,4 @@ def sso_callback(provider):
         audit_logger.log_authentication(success=True, method=f"sso:{provider}")
     except Exception:
         _log.warning("Audit log failed on SSO success for %s", provider)
-    return redirect(url_for("main.index"))
+    return redirect(safe_next_url(_post_next, url_for("main.index")))

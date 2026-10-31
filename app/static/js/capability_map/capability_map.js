@@ -123,7 +123,7 @@
                     <div class="${colors.bg} ${colors.border} border-2 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                          role="button" tabindex="0"
                          data-cmx-action="filter-acm-domain" data-domain="${cmxEscapeAttr(domain.domain)}"
-                         aria-label="Filter capabilities to ${cmxEscapeAttr(domain.name)}">
+                         title="Filter capabilities to ${cmxEscapeAttr(domain.name)}">
                         <div class="flex items-start justify-between mb-3">
                             <div class="p-2 rounded-lg ${colors.bg}">
                                 <i data-lucide="${colors.icon}" class="w-6 h-6 ${colors.text}"></i>
@@ -1236,7 +1236,7 @@
                     <div class="${cs.bg} border-2 ${cs.border} rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                          role="button" tabindex="0"
                          data-cmx-action="filter-unified-domain" data-domain-code="${cmxEscapeAttr(domain.code)}"
-                         aria-label="Filter capabilities to domain ${cmxEscapeAttr(domain.code)}">
+                         title="Filter capabilities to domain ${cmxEscapeAttr(domain.code)}">
                         <div class="flex items-start justify-between mb-3">
                             <span class="text-xs font-bold ${cs.textBold} ${cs.badge} px-2 py-0.5 rounded">${domain.code}</span>
                             <div class="w-2 h-2 rounded-full ${statusColor}"></div>

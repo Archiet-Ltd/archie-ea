@@ -15,6 +15,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from tests.smoke.website_wait import wait_for_the_model_pass
 from tests.smoke.chat_ask import ask
 from tests.smoke.conftest import PAGE_TIMEOUT
 from tests.smoke.test_signup_brings_the_company_in_journey import (  # noqa: F401  (these are fixtures)
@@ -127,6 +128,9 @@ def test_a_founder_watches_the_reading_confirms_what_it_found_and_asks_the_chat_
         expect(facts.first).to_be_visible()
         assert facts.count() == facts_said, (facts.count(), facts_said)
         shoot(page, "confirm", width)
+        # What the model works out follows as its own job; the person sees it when they open the step again.
+        wait_for_the_model_pass(page)
+        facts_said = facts.count()
 
         # The person corrects the company name and confirms what is ticked.
         name = facts.filter(has=page.get_by_test_id("fact-label").get_by_text("Company name", exact=True))

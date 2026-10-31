@@ -26,7 +26,7 @@ class Organization(db.Model):  # migration-exempt
     max_users = db.Column(db.Integer, default=10)  # retired, see plan above
     # Currency the organisation reports costs in; NULL means the platform default
     # (read through application_cost_accessor.get_reporting_currency).
-    reporting_currency = db.Column(db.String(3))
+    reporting_currency = db.Column(db.String(3), server_default="GBP")
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 

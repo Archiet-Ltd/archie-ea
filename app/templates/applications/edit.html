@@ -158,6 +158,9 @@
             {% endif %}
           {% endcall %}
         </div>
+        {% call form_group(id='end_of_life_date', label='End-of-support date', help_text='Owners are alerted when this date comes within 180 days.') %}
+          {{ input(type="date", id=("end_of_life_date"), name=("end_of_life_date"), value=(application.end_of_life_date.isoformat() if application.end_of_life_date else ''), size='sm', class="w-full") }}
+        {% endcall %}
         {% call form_group(id='business_domain', label='Business Domain') %}
           {{ input(type="text", id=("business_domain"), name=("business_domain"), value=(application.business_domain or ''), placeholder=("e.g. Manufacturing, Finance, HR"), size='sm', class="w-full") }}
         {% endcall %}

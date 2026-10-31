@@ -24,14 +24,20 @@ definitions, so the canonical macros are never counted against themselves:
                 call with no title argument, or an element with role="dialog"
                 whose aria-labelledby names no element in the template;
   empty-state   a hand-written "No ... yet" block with its own icon, instead
-                of the empty_state macro;
+                of the ui.empty block (basecoat/empty.html);
   legacy-macro  a call to an old macro (empty_state, page_header, modal,
-                dense_table, shadcn_*) outside the files that define it;
+                dense_table, shadcn_*) outside the files that define it,
+                counted whether the call is direct or through an aliased
+                import or a namespace import;
   raw-button    a hand-written <button> outside a macro definition, instead
                 of the button component;
   missing-value a bare dash, "N/A" or zero shown where a value is missing
                 ({{ x or '—' }}, |default('—'), {% else %}—), instead of
                 explained_value with its reason and next step;
+  second-library  a macro defined outside app/templates/components and
+                app/templates/basecoat under a name the library already
+                exports (read from those folders), or a page importing such a
+                name from anywhere but the library;
   form-field    a form control inside a <form> that is not rendered by
                 form_field or placed inside a form_group call (label, control,
                 description and error together).
@@ -39,7 +45,7 @@ definitions, so the canonical macros are never counted against themselves:
 Usage:
     python scripts/check_ui_contract.py            # list violations by rule
     python scripts/check_ui_contract.py --count    # print only the total (gate)
-    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value [--count|--list]
+    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value|second-library [--count|--list]
 """
 from __future__ import annotations
 
@@ -242,7 +248,7 @@ def _rule_empty_state(rel: str, text: str, view: str):
         ln = _line_of(view, m.start() + 1)
         window = "\n".join(lines[max(0, ln - 9):ln])
         if _ICON.search(window):
-            out.append((ln, "hand-written empty state; use the empty_state macro"))
+            out.append((ln, "hand-written empty state; use the ui.empty block (basecoat/empty.html)"))
     return out
 
 
@@ -264,13 +270,22 @@ def _rule_form_field(rel: str, text: str, view: str):
 
 # Old macros kept only as compatibility wrappers. A call elsewhere is the
 # second implementation the design system retires.
+_LEGACY_NAME_PATTERN = r"empty_state|page_header|modal|dense_table|shadcn_\w+"
 _LEGACY_CALL = re.compile(
     r"(?:{{-?|{%-?\s*call(?:\([^)]*\))?)\s*"
-    r"(empty_state|page_header|modal|dense_table|shadcn_\w+)\s*\(")
+    r"(" + _LEGACY_NAME_PATTERN + r")\s*\(")
 _LEGACY_HOMES = (
     "components/empty_state.html", "components/page_header.html",
     "components/modal.html", "components/dense_table.html",
     "macros/page_shell.html", "macros/shadcn_compat.html")
+# `{% from '<legacy home>' import <name> as <alias> %}` then a call through
+# the alias, or `{% import '<legacy home>' as <ns> %}` then a call through
+# `ns.<name>(` — both reach the old macro exactly as a direct call does, so
+# renaming the import is not a way out of the ratchet.
+_IMPORT_NS = re.compile(
+    r"{%-?\s*import\s+['\"]([^'\"]+)['\"]\s+as\s+(\w+)\s*-?%}")
+_LEGACY_ITEM = re.compile(
+    r"^\s*(" + _LEGACY_NAME_PATTERN + r")\s*(?:as\s+(\w+))?\s*$")
 _BUTTON_TAG = re.compile(r"<button\b", re.IGNORECASE)
 # A value expression whose last step substitutes a placeholder:
 # {{ x or '—' }}, {{ a if x else 'N/A' }}, {{ x|default('-') }}. A bare 0 is a
@@ -286,11 +301,38 @@ _MISSING_ELSE = re.compile(
     r"{%-?\s*else\s*-?%}\s*(?:<(\w+)[^>]*>\s*)?" + _PLACEHOLDER + r"\s*(?:</\1>\s*)?{%-?\s*endif")
 
 
+def _legacy_message(name: str) -> str:
+    if name == "empty_state":
+        return f"{name}() is an old macro; use the ui.empty block (basecoat/empty.html)"
+    return f"{name}() is an old macro; use the component"
+
+
+def _legacy_call_rx(target: str) -> re.Pattern:
+    return re.compile(r"(?:{{-?|{%-?\s*call(?:\([^)]*\))?)\s*" + target + r"\s*\(")
+
+
 def _rule_legacy_macro(rel: str, text: str, view: str):
     if rel.replace("\\", "/").endswith(_LEGACY_HOMES):
         return []
-    return [(_line_of(text, m.start()), f"{m.group(1)}() is an old macro; use the component")
-            for m in _LEGACY_CALL.finditer(view)]
+    out = [(_line_of(text, m.start()), _legacy_message(m.group(1)))
+           for m in _LEGACY_CALL.finditer(view)]
+    for m in _FROM_IMPORT.finditer(view):
+        if not m.group(1).replace("\\", "/").endswith(_LEGACY_HOMES):
+            continue
+        for item in m.group(2).split(","):
+            im = _LEGACY_ITEM.match(item)
+            if not im or not im.group(2):
+                continue  # no "as alias": already counted as a direct call above
+            name, alias = im.group(1), im.group(2)
+            out += [(_line_of(text, c.start()), _legacy_message(name))
+                    for c in _legacy_call_rx(re.escape(alias)).finditer(view)]
+    for m in _IMPORT_NS.finditer(view):
+        if not m.group(1).replace("\\", "/").endswith(_LEGACY_HOMES):
+            continue
+        rx = _legacy_call_rx(re.escape(m.group(2)) + r"\s*\.\s*(" + _LEGACY_NAME_PATTERN + r")")
+        out += [(_line_of(text, c.start()), _legacy_message(c.group(1)))
+                for c in rx.finditer(view)]
+    return out
 
 
 def _rule_raw_button(rel: str, text: str, view: str):
@@ -307,6 +349,48 @@ def _rule_missing_value(rel: str, text: str, view: str):
     return out
 
 
+_MACRO_DEF = re.compile(r"{%-?\s*macro\s+(\w+)\s*\(")
+_FROM_IMPORT = re.compile(r"{%-?\s*from\s+['\"]([^'\"]+)['\"]\s+import\s+(.*?)\s*-?%}", re.DOTALL)
+_LIBRARY_DIRS = ("components", "basecoat")
+
+
+def _library_macro_names() -> frozenset:
+    """Macro names exported by the component library, read from its files."""
+    names = set()
+    for sub in _LIBRARY_DIRS:
+        for path in (TPL / sub).rglob("*.html"):
+            text = _JINJA_COMMENT.sub("", path.read_text(encoding="utf-8", errors="replace"))
+            names.update(n for n in _MACRO_DEF.findall(text) if not n.startswith("_"))
+    return frozenset(names)
+
+
+def _outside_library(rel: str) -> bool:
+    try:
+        parts = Path(rel).resolve().relative_to(TPL.resolve()).parts
+    except ValueError:
+        return True
+    return not parts or parts[0] not in _LIBRARY_DIRS
+
+
+def _rule_second_library(rel: str, text: str, view: str):
+    if not _outside_library(rel):
+        return []
+    names = _library_macro_names()
+    plain = _HTML_COMMENT.sub(_mask, _JINJA_COMMENT.sub(_mask, text))
+    out = [(_line_of(text, m.start()),
+            f"macro {m.group(1)}() duplicates a library component; use the library's")
+           for m in _MACRO_DEF.finditer(plain) if m.group(1) in names]
+    for m in _FROM_IMPORT.finditer(plain):
+        if m.group(1).split("/")[0] in _LIBRARY_DIRS:
+            continue
+        for item in m.group(2).split(","):
+            name = item.strip().split()[0] if item.strip() else ""
+            if name in names:
+                out.append((_line_of(text, m.start()),
+                            f"imports {name} from {m.group(1)}, not from the library"))
+    return out
+
+
 COMPONENT_RULES = {
     "dialog-title": _rule_dialog_title,
     "empty-state": _rule_empty_state,
@@ -314,6 +398,7 @@ COMPONENT_RULES = {
     "legacy-macro": _rule_legacy_macro,
     "raw-button": _rule_raw_button,
     "missing-value": _rule_missing_value,
+    "second-library": _rule_second_library,
 }
 
 

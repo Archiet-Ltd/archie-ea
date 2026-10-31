@@ -93,6 +93,10 @@ def apply_admin_role_change(user, new_role):
         user.grant_org_admin()
         OrgRole.set_role(user.organization_id, user.id, "org_admin")
     elif was_admin and not wants_admin:
+        # The organisation must keep an Administrator: refuse before any write.
+        from app.services.administrator_guard import ensure_keeps_administrator
+
+        ensure_keeps_administrator(user.organization_id, [user.id])
         user.revoke_org_admin(fallback_role=new_role)
         if not user.is_admin():
             # The revoke actually took effect (not a platform-admin no-op):

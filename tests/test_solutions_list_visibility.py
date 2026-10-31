@@ -43,6 +43,9 @@ def _login(client, user_id):
 def org_client(app, db_session, make_org):
     from app.models.user import User
 
+    from app.models.user import Role
+
+    Role.insert_roles()
     org = make_org("solvis")
     user = User(
         email=f"solvis-{uuid.uuid4().hex[:8]}@example.com",
@@ -51,6 +54,8 @@ def org_client(app, db_session, make_org):
         organization_id=org.id,
         confirmed=True,
         enterprise_role="platform_admin",
+        is_org_admin=True,
+        role=Role.query.filter_by(name="Administrator").first(),
     )
     db_session.add(user)
     db_session.flush()

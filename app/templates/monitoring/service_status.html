@@ -1,121 +1,83 @@
-{% extends 'layouts/admin_base.html' %}
-{% from 'components/button.html' import button %}
-{% from 'components/input.html' import hidden_input %}
-{% from 'components/table.html' import table %}
-{% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/empty_state.html' import empty_state %}
+{# design-block: public #}
+{# Public, read-only service status: platform-wide component states, the time of the last
+   check and recent incidents. No organisation or user data is read or shown here.
+   smoke-coverage-ok: covered by tests/smoke/test_status_page_public_journey.py #}
+{% extends 'layouts/public_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Service status{% endblock %}
 
-{% macro state_badge(state) -%}
-{%- if state == 'operational' -%}
-<span class="inline-flex items-center rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Operational</span>
-{%- elif state == 'degraded' -%}
-<span class="inline-flex items-center rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">Degraded</span>
-{%- elif state == 'outage' -%}
-<span class="inline-flex items-center rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">Outage</span>
-{%- else -%}
-<span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">—</span>
-{%- endif -%}
-{%- endmacro %}
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+
+{% block body_theme %}theme-marketing{% endblock %}
 
 {% block content %}
-{{ page_shell(
-    'Service status',
-    subtitle='Whether the platform is working normally right now, and the incidents of the last 90 days.',
-    breadcrumb=[('Home', url_for('dashboard.overview')), ('Service status', None)],
-    icon='activity'
-) }}
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-12 sm:px-6" data-testid="service-status-page">
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-semibold tracking-tight text-foreground">Service status</h1>
+    <p class="text-sm text-muted-foreground" data-testid="service-status-state" data-state="{{ status.state }}">{{ status.label }}</p>
+    <p class="text-xs text-muted-foreground" data-testid="status-last-checked">Last checked {{ status.checked_at.strftime('%d %b %Y %H:%M') }} UTC</p>
+  </header>
 
-<div class="space-y-6" data-testid="service-status-page">
-    <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="current-status-heading">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div>
-                <h2 id="current-status-heading" class="text-sm font-medium text-muted-foreground">Current status</h2>
-                <p class="mt-1 text-xl font-semibold text-foreground" data-testid="service-status-state" data-state="{{ status.state }}">{{ status.label }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">Checked {{ status.checked_at.strftime('%d %b %Y %H:%M') }} UTC</p>
+  <section aria-labelledby="components-heading" class="flex flex-col gap-3">
+    <h2 id="components-heading" class="text-base font-semibold text-foreground">Components</h2>
+    {% for c in status.components %}
+    {% call ui.card(attrs={'data-testid': 'status-component-' ~ c.key}) %}
+      {% call ui.card_content(class='flex items-center justify-between gap-4') %}
+        <div class="min-w-0">
+          <p class="font-medium text-foreground">{{ c.name }}</p>
+          <p class="text-sm text-muted-foreground">{{ c.detail }}</p>
+        </div>
+        {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground', attrs={'data-testid': 'status-badge-' ~ c.key}) %}<span class="size-1.5 shrink-0 rounded-full {{ {'operational': 'bg-success', 'degraded': 'bg-warning', 'outage': 'bg-destructive'}.get(c.state, 'bg-muted-foreground') }}" aria-hidden="true"></span>{{ c.label }}{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% endfor %}
+  </section>
+
+  {% if status.open_incidents %}
+  <section aria-labelledby="open-incidents-heading" class="flex flex-col gap-3" data-testid="service-status-open-incidents">
+    <h2 id="open-incidents-heading" class="text-base font-semibold text-foreground">Ongoing incidents</h2>
+    {% for incident in status.open_incidents %}
+    {% call ui.card() %}
+      {% call ui.card_content(class='flex flex-col gap-1') %}
+        <div class="flex items-center justify-between gap-3">
+          <span class="font-medium text-foreground">{{ incident.title }}</span>
+          {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground') %}<span class="size-1.5 shrink-0 rounded-full {{ 'bg-destructive' if incident.impact == 'outage' else 'bg-warning' }}" aria-hidden="true"></span>{{ 'Down' if incident.impact == 'outage' else 'Degraded' }}{% endcall %}
+        </div>
+        {% if incident.summary %}<p class="text-sm text-muted-foreground">{{ incident.summary }}</p>{% endif %}
+        <p class="text-xs text-muted-foreground">Since {{ incident.started_at.strftime('%d %b %Y %H:%M') }} UTC</p>
+      {% endcall %}
+    {% endcall %}
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="incident-history-heading" class="flex flex-col gap-3">
+    <h2 id="incident-history-heading" class="text-base font-semibold text-foreground">Incident history</h2>
+    {% if not status.incidents_checked %}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='Incident history is not available right now') }}{{ ui.empty_description(text='The incident record could not be read during this check. The component states above are still current.') }}{% endcall %}{% endcall %}
+    {% elif status.history %}
+    <ul class="flex flex-col gap-2" data-testid="service-status-history">
+      {% for incident in status.history %}
+      <li data-testid="service-incident-{{ incident.id }}">
+        {% call ui.card() %}
+          {% call ui.card_content(class='flex flex-col gap-1') %}
+            <div class="flex items-center justify-between gap-3">
+              <span class="font-medium text-foreground">{{ incident.title }}</span>
+              {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground') %}<span class="size-1.5 shrink-0 rounded-full {{ 'bg-destructive' if incident.impact == 'outage' else 'bg-warning' }}" aria-hidden="true"></span>{{ 'Down' if incident.impact == 'outage' else 'Degraded' }}{% endcall %}
             </div>
-            <form method="post" action="{{ url_for('service_status.update_subscription') }}" data-testid="service-status-subscription">
-                {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
-                {% if subscribed %}
-                <p class="mb-2 text-sm text-foreground" data-testid="service-status-subscribed">You are subscribed to status updates.</p>
-                {{ hidden_input(("subscribe"), value=("0")) }}
-                {% call button(type="submit", variant="outline", class="justify-center whitespace-nowrap justify-center", attrs_dict={"data-testid": ("service-status-unsubscribe")}) %}
-                    <i data-lucide="bell-off" class="h-4 w-4" aria-hidden="true"></i> Unsubscribe
-                {% endcall %}
-                {% else %}
-                <p class="mb-2 text-sm text-muted-foreground" data-testid="service-status-not-subscribed">Get told when an incident opens or is resolved.</p>
-                {{ hidden_input(("subscribe"), value=("1")) }}
-                {% call button(type="submit", variant="default", class="justify-center whitespace-nowrap justify-center", attrs_dict={"data-testid": ("service-status-subscribe")}) %}
-                    <i data-lucide="bell" class="h-4 w-4" aria-hidden="true"></i> Subscribe
-                {% endcall %}
-                {% endif %}
-            </form>
-        </div>
-
-        <ul class="mt-5 divide-y divide-border rounded-md border border-border" data-testid="service-status-checks">
-            {% for check in status.checks %}
-            <li class="flex items-center justify-between gap-4 px-4 py-2.5 text-sm">
-                <span class="font-medium text-foreground">{{ check.name }}</span>
-                <span class="flex items-center gap-3">
-                    <span class="text-muted-foreground">{{ check.detail }}</span>
-                    {{ state_badge(check.state) }}
-                </span>
-            </li>
-            {% endfor %}
-        </ul>
-    </section>
-
-    {% if status.open_incidents %}
-    <section aria-labelledby="open-incidents-heading" data-testid="service-status-open-incidents">
-        <h2 id="open-incidents-heading" class="mb-2 text-base font-semibold text-foreground">Ongoing incidents</h2>
-        <ul class="space-y-2">
-            {% for incident in status.open_incidents %}
-            <li class="rounded-lg border border-border bg-card p-4">
-                <div class="flex items-center justify-between gap-3">
-                    <span class="font-medium text-foreground">{{ incident.title }}</span>
-                    {{ state_badge(incident.impact) }}
-                </div>
-                {% if incident.summary %}<p class="mt-1 text-sm text-muted-foreground">{{ incident.summary }}</p>{% endif %}
-                <p class="mt-1 text-xs text-muted-foreground">Since {{ incident.started_at.strftime('%d %b %Y %H:%M') }} UTC</p>
-            </li>
-            {% endfor %}
-        </ul>
-    </section>
+            <p class="text-xs text-muted-foreground">Started {{ incident.started_at.strftime('%d %b %Y %H:%M') }} UTC · {{ 'Resolved ' ~ incident.resolved_at.strftime('%d %b %Y %H:%M') ~ ' UTC' if incident.resolved_at else 'Ongoing' }}</p>
+          {% endcall %}
+        {% endcall %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No incidents in the last 90 days') }}{{ ui.empty_description(text='When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.') }}{% endcall %}{% endcall %}
     {% endif %}
-
-    <section aria-labelledby="incident-history-heading">
-        <h2 id="incident-history-heading" class="mb-2 text-base font-semibold text-foreground">Incident history</h2>
-        {% if status.history %}
-        <div class="overflow-x-auto rounded-lg border border-border">
-            {% call table(class="dense-table w-full text-sm", attrs_dict={"data-testid": ("service-status-history")}) %}
-                <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                        <th class="px-4 py-2.5">Incident</th>
-                        <th class="px-4 py-2.5">Impact</th>
-                        <th class="px-4 py-2.5">Started</th>
-                        <th class="px-4 py-2.5">Resolved</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    {% for incident in status.history %}
-                    <tr data-testid="service-incident-{{ incident.id }}">
-                        <td class="px-4 py-2.5 font-medium text-foreground">{{ incident.title }}</td>
-                        <td class="px-4 py-2.5">{{ state_badge(incident.impact) }}</td>
-                        <td class="px-4 py-2.5 text-muted-foreground">{{ incident.started_at.strftime('%d %b %Y %H:%M') }}</td>
-                        <td class="px-4 py-2.5 text-muted-foreground">{{ incident.resolved_at.strftime('%d %b %Y %H:%M') if incident.resolved_at else 'Ongoing' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            {% endcall %}
-        </div>
-        {% else %}
-        {{ empty_state(
-            title='No incidents in the last 90 days',
-            description='When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.',
-            icon='shield-check'
-        ) }}
-        {% endif %}
-    </section>
+  </section>
 </div>
+{% include 'components/public_footer.html' %}
 {% endblock %}

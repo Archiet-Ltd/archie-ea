@@ -98,7 +98,8 @@ class TestActivationGating:
         from app.models.user import Role, User
 
         Role.insert_roles()
-        architect_role = Role.query.filter_by(name="Architect").one()
+        # An organisation administrator: authority comes from the role, not the persona.
+        architect_role = Role.query.filter_by(name="Administrator").one()
         org_a = make_org("agent-reg-route-fence-a")
         org_b = make_org("agent-reg-route-fence-b")
         reg_a = create_registration(organization_id=org_a.id, name="A's Agent")

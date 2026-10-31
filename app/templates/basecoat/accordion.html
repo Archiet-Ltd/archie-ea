@@ -1,0 +1,31 @@
+{# accordion: port of shadcn/ui accordion.tsx (pinned in compliance/upstream). Macros: accordion, accordion_item, accordion_trigger, accordion_trigger_icon, accordion_content #}
+
+{#- Accordion -#}
+{% macro accordion(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('accordion', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AccordionItem -#}
+{% macro accordion_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('accordion-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AccordionTrigger -#}
+{% macro accordion_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('accordion-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AccordionTrigger -#}
+{% macro accordion_trigger_icon(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('accordion-trigger-icon', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AccordionContent -#}
+{% macro accordion_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('accordion-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

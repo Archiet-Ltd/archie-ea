@@ -48,6 +48,7 @@ from app.extensions import csrf
 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 from app.modules.ai_chat.tools.route_read_tools import (
     connector_tools,
+    absolutise_connector_urls,
     fence_connector_result,
     resolve_connector_tool,
     scrub_credentials,
@@ -281,6 +282,8 @@ def mcp_endpoint():
                     propagate_errors=True,
                 )
             ))
+            # Addresses leave the product, so they are absolute (public base URL).
+            result = absolutise_connector_urls(result, current_app.config.get("PUBLIC_BASE_URL"))
             elapsed_ms = int((time.monotonic() - start) * 1000)
 
             logger.info(

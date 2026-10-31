@@ -1,5 +1,8 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -79,17 +82,17 @@
                         <tbody class="divide-y divide-border">
                             {% for risk in capability_risks|default([]) %}
                             <tr class="hover:bg-muted/50">
-                                <td class="p-3 text-sm">{{ risk.capability_name|default('No capability linked') }}</td>
+                                <td class="p-3 text-sm">{{ risk.capability_name|default('No capability linked', true) }}</td>
                                 <td class="p-3">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
                                         {% if risk.risk_level == 'CRITICAL' %}bg-destructive/10 text-destructive-emphasis border border-destructive/30
                                         {% elif risk.risk_level == 'HIGH' %}bg-warning/10 text-warning-emphasis border border-warning/30
                                         {% elif risk.risk_level == 'MEDIUM' %}bg-primary/10 text-primary border border-primary/30
                                         {% else %}bg-success/10 text-success-emphasis border border-success/30{% endif %}">
-                                        {{ risk.risk_level|default('Low') }}
+                                        {{ risk.risk_level|default('Low', true) }}
                                     </span>
                                 </td>
-                                <td class="p-3 text-sm tabular-nums">{{ risk.overall_risk_score|default(0) }}</td>
+                                <td class="p-3 text-sm tabular-nums">{{ risk.overall_risk_score|default(0, true) }}</td>
                                 <td class="p-3 text-sm text-muted-foreground">
                                     {% if risk.risk_factors %}
                                         {% if risk.risk_factors is string %}
@@ -103,7 +106,7 @@
                                             {{ risk.risk_factors }}
                                         {% endif %}
                                     {% else %}
-                                        None
+                                        <span class="text-muted-foreground">No risk factors identified</span>
                                     {% endif %}
                                 </td>
                                 <td class="p-3">
@@ -122,7 +125,7 @@
                                     <button type="button"
                                         @click="$dispatch('open-risk-detail', {{ risk.capability_id }})"
                                         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                     aria-label="View risk details">
+                                     title="View risk details">
                                         <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>
                                         View Details
                                     </button>
@@ -181,20 +184,24 @@
     }
 ) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='risk-mitigation-modal', kind='risk_mitigation', button_text='Mitigate Risk') }}
+</div>
 
 {{ initiative_modal(
     id='risk-mitigation-modal',
     title='Create Risk Mitigation Plan',
     endpoint='/strategic/api/initiatives/from-risk',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Mitigate Legacy System Risk'},
+        {'name': 'name', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Mitigate Legacy System Risk'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the mitigation strategy...'},
         {'name': 'risk_level', 'type': 'select', 'label': 'Risk Level', 'required': True, 'options': [('critical', 'Critical'), ('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Risk owner'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
         {'name': 'target_completion_date', 'type': 'date', 'label': 'Target Completion', 'required': False},
-        {'name': 'cost_estimate', 'type': 'number', 'label': 'Cost Estimate ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 

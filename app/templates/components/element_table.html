@@ -1,0 +1,20 @@
+{# The element table: the one way a page lists ArchiMate elements (data-type register:
+   archimate-elements; ruling R30, 25 Oct 2026).
+
+   Built on components/list_table.html and basecoat/table.html (table_cell) with the element's
+   name in the first column, a link to the element's own record, and its single-line truncated
+   description under it. The caller renders the other cells using table_cell.
+#}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+
+{% macro element_table(rows, columns, caption, testid, first='Element', row_testid='element-row', link_testid='element-link', page_size=25, search_placeholder='Filter elements...', toolbar=none, toolbar_actions=none, empty_message='No elements yet.') %}
+{%- set cells = caller -%}
+{% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table', search_placeholder=search_placeholder, toolbar=toolbar, toolbar_actions=toolbar_actions, empty_message=empty_message) %}
+  {% call table_cell() %}
+    {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
+    {% if row.description %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
+  {% endcall %}
+  {{ cells(row) }}
+{% endcall %}
+{% endmacro %}

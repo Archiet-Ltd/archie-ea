@@ -32,7 +32,6 @@ from app.models.batch_import import (  # dead-code-ok
 from app.services.application_cost_accessor import (
     apply_cost_to_application,
     detect_cost_columns_from_dict,
-    get_reporting_currency,
     map_import_cost_columns,
 )
 
@@ -643,7 +642,9 @@ class BatchApprovalService:
         # Apply cost fields through the accessor
         cost_mapping = self._extract_cost_mapping(source)
         if cost_mapping:
-            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=get_reporting_currency())
+            from config import CurrencyConfig
+
+            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=CurrencyConfig.get_org_currency_code())
             apply_cost_to_application(new_app, parsed["cost_fields"])
 
         db.session.add(new_app)
@@ -744,7 +745,9 @@ class BatchApprovalService:
         # Apply cost fields through the accessor
         cost_mapping = self._extract_cost_mapping(source)
         if cost_mapping:
-            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=get_reporting_currency())
+            from config import CurrencyConfig
+
+            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=CurrencyConfig.get_org_currency_code())
             apply_cost_to_application(existing, parsed["cost_fields"])
         
         return existing

@@ -1,0 +1,100 @@
+{# dropdown-menu: port of shadcn/ui dropdown-menu.tsx (pinned in compliance/upstream). Macros: dropdown_menu, dropdown_menu_portal, dropdown_menu_trigger, dropdown_menu_content, dropdown_menu_group, dropdown_menu_item, dropdown_menu_checkbox_item, dropdown_menu_checkbox_item_indicator, dropdown_menu_radio_group, dropdown_menu_radio_item, dropdown_menu_radio_item_indicator, dropdown_menu_label, dropdown_menu_separator, dropdown_menu_shortcut, dropdown_menu_sub, dropdown_menu_sub_trigger, dropdown_menu_sub_content #}
+
+{#- DropdownMenu: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro dropdown_menu(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- DropdownMenuPortal: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro dropdown_menu_portal(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- DropdownMenuTrigger -#}
+{% macro dropdown_menu_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuContent -#}
+{% macro dropdown_menu_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuGroup -#}
+{% macro dropdown_menu_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuItem -#}
+{% macro dropdown_menu_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuCheckboxItem -#}
+{% macro dropdown_menu_checkbox_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-checkbox-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuCheckboxItem -#}
+{% macro dropdown_menu_checkbox_item_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-checkbox-item-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuRadioGroup -#}
+{% macro dropdown_menu_radio_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-radio-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuRadioItem -#}
+{% macro dropdown_menu_radio_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-radio-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuRadioItem -#}
+{% macro dropdown_menu_radio_item_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-radio-item-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuLabel -#}
+{% macro dropdown_menu_label(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-label', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuSeparator -#}
+{% macro dropdown_menu_separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuShortcut -#}
+{% macro dropdown_menu_shortcut(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-shortcut', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuSub: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro dropdown_menu_sub(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- DropdownMenuSubTrigger -#}
+{% macro dropdown_menu_sub_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-sub-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- DropdownMenuSubContent -#}
+{% macro dropdown_menu_sub_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('dropdown-menu-sub-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

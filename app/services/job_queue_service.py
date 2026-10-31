@@ -13,8 +13,20 @@ from typing import Any, Dict, List, Optional
 
 from app import db
 from app.models import Job, JobStatus
+from app.models.registry import import_all_models
+
+# The worker maps every model on its first look at the queue, so all of them are loaded before it can run.
+import_all_models()
 
 logger = logging.getLogger(__name__)
+
+WORKER_THREADS = 2  # a long job holds one thread; another organisation's first read has the other
+# A job that has been running for longer than its task allows was cut off (a restart, a crash); one table holds the limits.
+STALE_AFTER_MINUTES = {"website_profile_crawl": 15, "website_profile_crawl_more": 15}
+DEFAULT_STALE_AFTER_MINUTES = 30
+SWEEP_EVERY_SECONDS = 60
+# Jobs that take long and can wait: they are picked after every first read that is waiting.
+LONG_TASKS = ("website_profile_crawl_more",)
 
 
 class JobQueueService:
@@ -25,6 +37,9 @@ class JobQueueService:
     def __init__(self):
         self._shutdown_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
+        self._worker_threads: List[threading.Thread] = []
+        self._last_sweep = 0.0
+        self._sweep_lock = threading.Lock()
 
     def create_job(
         self,
@@ -125,22 +140,103 @@ class JobQueueService:
         return True
 
     def start_worker(self):
-        """Start the background worker thread."""
-        if self._worker_thread and self._worker_thread.is_alive():
-            logger.warning("Worker thread already running")
+        """Start the background worker threads (after recovering the jobs a restart cut off)."""
+        if any(t.is_alive() for t in self._worker_threads):
+            logger.warning("Worker threads already running")
             return
 
         self._shutdown_event.clear()
-        self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
-        self._worker_thread.start()
-        logger.info("Job queue worker started")
+        try:
+            self.recover_stale_jobs()
+        except Exception:
+            logger.warning("could not recover interrupted jobs at worker start", exc_info=True)
+        self._worker_threads = [
+            threading.Thread(target=self._worker_loop, name="job-worker-%d" % number, daemon=True)
+            for number in range(1, WORKER_THREADS + 1)
+        ]
+        for thread in self._worker_threads:
+            thread.start()
+        self._worker_thread = self._worker_threads[0]
+        logger.info("Job queue worker started (%d threads)", len(self._worker_threads))
 
     def stop_worker(self):
-        """Stop the background worker thread."""
-        if self._worker_thread:
+        """Stop the background worker threads."""
+        if self._worker_threads:
             self._shutdown_event.set()
-            self._worker_thread.join(timeout=5)
+            for thread in self._worker_threads:
+                thread.join(timeout=5)
             logger.info("Job queue worker stopped")
+
+    def recover_stale_jobs(self, now: Optional[datetime] = None) -> int:
+        """Fail the jobs a restart or a crash cut off, and read the websites again.
+
+        A job that has been ``in_progress`` for longer than its task allows (``STALE_AFTER_MINUTES``) is failed with the
+        reason "interrupted" and a plain sentence. A website job also gets one new job of the same task, unless one is
+        already waiting for that organisation. Returns how many jobs were failed.
+        """
+        from datetime import timedelta
+
+        now = now or datetime.utcnow()
+        shortest = min([DEFAULT_STALE_AFTER_MINUTES, *STALE_AFTER_MINUTES.values()])
+        recovered = 0
+        with self.app.app_context():
+            running = Job.query.filter(
+                Job.status == JobStatus.IN_PROGRESS.value, Job.started_at < now - timedelta(minutes=shortest)
+            ).all()
+            for job in running:
+                allowed = STALE_AFTER_MINUTES.get(job.task, DEFAULT_STALE_AFTER_MINUTES)
+                if job.started_at is None or job.started_at > now - timedelta(minutes=allowed):
+                    continue
+                job.status = JobStatus.FAILED.value
+                job.finished_at = now
+                job.result = {
+                    "success": False, "reason": "interrupted",
+                    "message": "The work was cut off by a restart before it finished, and has been queued again."
+                    if job.task in STALE_AFTER_MINUTES else "The work was cut off by a restart before it finished.",
+                }
+                job.error = "interrupted: running for more than %d minutes" % allowed
+                recovered += 1
+                org_id = (job.payload or {}).get("organization_id") if isinstance(job.payload, dict) else None
+                if job.task in STALE_AFTER_MINUTES and org_id is not None:
+                    waiting = self.list_jobs(org_id, limit=5, task=job.task, statuses=[JobStatus.PENDING.value])
+                    if not waiting:
+                        payload = {k: v for k, v in (job.payload or {}).items() if k not in ("job_id", "not_before")}
+                        self.create_job(job.name, job.task, payload)
+            db.session.commit()
+        if recovered:
+            logger.warning("failed %d job(s) that were cut off by a restart", recovered)
+        return recovered
+
+    def _sweep_if_due(self) -> None:
+        """About once a minute, whichever worker thread gets there first."""
+        if time.monotonic() - self._last_sweep < SWEEP_EVERY_SECONDS:
+            return
+        if not self._sweep_lock.acquire(blocking=False):
+            return
+        try:
+            self._last_sweep = time.monotonic()
+            self.recover_stale_jobs()
+        except Exception:
+            logger.warning("the sweep for interrupted jobs failed", exc_info=True)
+            self._reset_session(rollback=True)
+        finally:
+            self._sweep_lock.release()
+
+    def _claim(self, job_id: int) -> bool:
+        """Take a pending job for this thread: exactly one thread's update finds it still pending."""
+        result = db.session.execute(
+            db.update(Job).where(Job.id == job_id, Job.status == JobStatus.PENDING.value)
+            .values(status=JobStatus.IN_PROGRESS.value, started_at=datetime.utcnow())
+        )
+        db.session.commit()
+        return bool(result.rowcount)
+
+    def _next_job(self) -> Optional[Job]:
+        """The oldest due pending job; first reads come before the long jobs that can wait."""
+        pending = Job.query.filter_by(status=JobStatus.PENDING.value).order_by(Job.id).limit(50).all()
+        due = [j for j in pending if self._is_due(j)]
+        due.sort(key=lambda j: (j.task in LONG_TASKS, j.id))
+        return due[0] if due else None
 
     def _reset_session(self, rollback: bool = False):
         """Clear worker-thread DB session state after each loop or DB failure."""
@@ -158,15 +254,14 @@ class JobQueueService:
         while not self._shutdown_event.is_set():
             try:
                 # Use application context for database operations
+                self._sweep_if_due()
                 with self.app.app_context():
-                    # Get next pending job
-                    pending = Job.query.filter_by(status=JobStatus.PENDING.value)
-                    job = pending.first()
+                    job = self._next_job()
 
-                    if job:
+                    if job and self._claim(job.id):
                         self._process_job(job)
                     else:
-                        # No jobs, sleep briefly
+                        # No jobs (or another thread took it first), sleep briefly
                         time.sleep(1)
 
             except Exception as e:
@@ -184,11 +279,23 @@ class JobQueueService:
 
         logger.info("Job queue worker loop ended")
 
+    @staticmethod
+    def _is_due(job: Job) -> bool:
+        """A job whose payload names ``not_before`` (UTC, ISO) waits until then."""
+        not_before = (job.payload or {}).get("not_before") if isinstance(job.payload, dict) else None
+        if not not_before:
+            return True
+        try:
+            return datetime.fromisoformat(str(not_before)) <= datetime.utcnow()
+        except ValueError:
+            return True
+
     def _process_job(self, job: Job):
         """Process a single job."""
         try:
-            # Mark as in progress
-            self.update_job_status(job.id, JobStatus.IN_PROGRESS.value)
+            # The worker loop has already marked it in progress (_claim, atomically); a direct caller has not
+            if job.status != JobStatus.IN_PROGRESS.value:
+                self.update_job_status(job.id, JobStatus.IN_PROGRESS.value)
 
             # Check if job was cancelled before we started
             with self.app.app_context():
@@ -229,10 +336,18 @@ class JobQueueService:
             from app.modules.organization.website_crawl import run_website_crawl_job
 
             return run_website_crawl_job({**payload, "job_id": job_id})
+        elif task == "website_profile_crawl_more":
+            from app.modules.organization.website_crawl import run_website_retry_job
+
+            return run_website_retry_job(payload)
         elif task == "company_signals_refresh":
             from app.modules.organization.public_signals import run_signals_job
 
             return run_signals_job(payload)
+        elif task == "onboarding_starter_data":
+            from app.modules.account.services import onboarding_service
+
+            return onboarding_service.run_starter_data(payload["organization_id"])
         elif task in ("onboarding_github_import", "onboarding_jira_import"):
             return self._execute_onboarding_import(task, payload)
         else:

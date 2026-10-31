@@ -111,10 +111,10 @@ def test_gap_analysis_recorded_gaps_metric_is_register_count(
     html = resp.data.decode("utf-8")
 
     match = re.search(
-        r"Recorded Gaps</p>\s*<div data-slot=\"card-title\"[^>]*>\s*([0-9]+)\s*</div>",
+        r"data-testid=\"gap-stat-recorded-value\">\s*([0-9]+)\s*<",
         html,
     )
-    assert match is not None, "Recorded Gaps metric not found in rendered page"
+    assert match is not None, "Recorded gaps metric not found in rendered page"
     recorded = int(match.group(1))
 
     assert recorded == 501, (

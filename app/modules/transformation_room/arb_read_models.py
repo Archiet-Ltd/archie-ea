@@ -498,7 +498,7 @@ class TypedARBReadModel:
         if review is None:
             return cls._failed_review("arb_review_not_found")
         if review.review_cycle_id is None:
-            return cls._legacy_generic(review)
+            return cls._legacy_generic(review, cls._comments(session, actor, review))
         cycle = cls._load_cycle(session, actor, review.review_cycle_id)
         if cycle is None or review.organization_id != cycle.organization_id:
             return cls._failed_review("arb_review_cycle_not_found")
@@ -588,7 +588,7 @@ class TypedARBReadModel:
         }
 
     @classmethod
-    def _legacy_generic(cls, review) -> dict[str, Any]:
+    def _legacy_generic(cls, review, comments=None) -> dict[str, Any]:
         identity = cls._empty_identity()
         identity["review_item_id"] = review.id
         identity["review_number"] = review.review_number
@@ -607,7 +607,7 @@ class TypedARBReadModel:
             "decision": None,
             "conditions": [],
             "history": [],
-            "comments": [],
+            "comments": comments or [],
             "allowed_actions": cls._no_actions(),
             "command_keys": {},
         }

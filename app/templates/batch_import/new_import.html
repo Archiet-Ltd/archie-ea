@@ -16,7 +16,7 @@
     <!-- Breadcrumb -->
     {% call breadcrumb.breadcrumb() %}
         {% call breadcrumb.breadcrumb_item(href=home_url()) %}
-            <i data-lucide="home" class="h-4 w-4" aria-hidden="true"></i>
+            <i data-lucide="home" class="h-4 w-4" aria-hidden="true"></i><span class="sr-only">Home</span>
         {% endcall %}
         {{ breadcrumb.breadcrumb_separator() }}
         {% call breadcrumb.breadcrumb_item(href=url_for('batch_import_view.dashboard')) %}
@@ -409,6 +409,10 @@
                 <!-- Submit Button -->
                 {% call card.card() %}
                     <div class="p-6">
+                        <div x-show="existingJob" x-cloak role="alert" class="mb-3 rounded-md border border-border bg-muted p-3 text-sm" data-testid="existing-job">
+                            <p x-text="existingJob && existingJob.message"></p>
+                            <a :href="existingJob && existingJob.url" class="mt-1 inline-block font-medium text-primary underline underline-offset-2">Open the existing import</a>
+                        </div>
                         {% call button(type="submit", variant="default", class="w-full justify-center", attrs_dict={":disabled": ("!canSubmit || submitting")}) %}
                             <span x-show="!submitting" x-cloak class="flex items-center">
                                 <i data-lucide="upload" class="mr-2 h-5 w-5" aria-hidden="true"></i>
@@ -466,6 +470,7 @@ function newImportForm() {
         loadingApplications: false,
         appSearchQuery: '',
         submitting: false,
+        existingJob: null,
 
         archimateModesOptions: [
             {
@@ -740,7 +745,9 @@ function newImportForm() {
 
                 if (data.success) {
                     const jobId = data.job_id || (data.data && data.data.id) || (data.job && data.job.id);
-                    this.showToast('Import job created successfully', 'success');
+                    const source = this.form.source_type === 'file' && this.form.file ? this.form.file.name
+                        : (this.form.name || 'your data');
+                    this.showToast('Importing ' + source + '; it appears in the list below.', 'success');
                     if (jobId) {
                         window.location.href = `/batch-import/jobs/${jobId}`;
                     }
@@ -748,6 +755,10 @@ function newImportForm() {
                     this.showToast(data.message || data.error || 'Failed to create import job', 'error');
                 }
             } catch (error) {
+                if (error && error.data && error.data.existing_job_url) {
+                    this.existingJob = { url: error.data.existing_job_url, message: error.message };
+                    return;
+                }
                 this.showToast('Failed to create import job — ' + (error && error.message ? error.message : 'request failed'), 'error');
             } finally {
                 this.submitting = false;

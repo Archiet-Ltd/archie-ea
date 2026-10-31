@@ -78,9 +78,12 @@ def test_kanban_assignee_label_and_owner_name_only_users_of_the_cards_organisati
 
     org_a, org_b, mine, theirs = _world(db_session)
 
-    phase = ADMPhase(name="Test Phase A", code="A", order=1)
-    db_session.add(phase)
-    db_session.flush()
+    # adm_phases.code is unique and a seeded database already has phase A: reuse it.
+    phase = db_session.query(ADMPhase).filter_by(code="A").first()
+    if phase is None:
+        phase = ADMPhase(name="Test Phase A", code="A", order=1)
+        db_session.add(phase)
+        db_session.flush()
 
     board = KanbanBoard(
         name="Test Board", board_type="architecture_development",

@@ -63,6 +63,21 @@ def _content(page):
     return page.locator("main").first.inner_text().strip()
 
 
+def _greeting(email):
+    """"Welcome" on this user's first-ever session, "Welcome back" on every later one --
+    read from the user_sessions rows the login just created/extended, not assumed from
+    test order (round welcome01)."""
+    from app import create_app
+    from app.models.user import User
+    from app.models.user_session import UserSession
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        sessions = UserSession.query.filter_by(user_id=user.id).count()
+    return "Welcome" if sessions <= 1 else "Welcome back"
+
+
 def _assert_role(email, expected):
     from app import create_app
     from app.middleware.tenant_decorators import is_platform_admin
@@ -102,7 +117,7 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
 
         # welcome card: first name, the applications the Systems list shows, and the share of facts with a source
         first = "Launch" if persona == "enterprise_architect" else "Owen"
-        expect(dash.get_by_text("Welcome back, %s" % first)).to_be_visible()
+        expect(dash.get_by_text("%s, %s" % (_greeting(email), first))).to_be_visible()
         assert _int(dash.locator('[data-testid="welcome-applications"] span').first.inner_text()) == 3
         assert re.fullmatch(r"\d+%", dash.locator('[data-testid="welcome-sourced"] span').first.inner_text().strip())
 
@@ -112,8 +127,14 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         assert _int(dash.locator('[data-testid="card-relationships-value"]').inner_text()) == info["relationships"]
         assert "most connected" in dash.locator('[data-testid="card-relationships-sentence"]').inner_text()
         cost_sentence = dash.locator('[data-testid="card-run-cost-sentence"]').inner_text()
-        assert "Northbeam" in cost_sentence and "80%" in cost_sentence, cost_sentence
-        assert dash.locator('[data-testid="card-run-cost-value"]').inner_text().strip() == "£250k"
+        if persona == "enterprise_architect":
+            # the enterprise architect may not see spend: the card carries no figure and names no vendor
+            assert "Northbeam" not in cost_sentence and "%" not in cost_sentence, cost_sentence
+            assert dash.locator('[data-testid="card-run-cost-value"]').count() == 0
+            assert not re.search(r"[£$€]\s?\d", body), body
+        else:
+            assert "Northbeam" in cost_sentence and "80%" in cost_sentence, cost_sentence
+            assert dash.locator('[data-testid="card-run-cost-value"]').inner_text().strip() == "£250k"
         for testid in ("card-run-cost", "card-relationships", "card-no-owner"):
             text = dash.locator('[data-testid="%s"]' % testid).inner_text()
             assert not re.search(r"(^|\s)(—|-|0)(\s|$)", text), (testid, text)
@@ -140,7 +161,11 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
         table_text = page.locator('[data-testid="applications-table"]').inner_text()
         assert "Old Billing" not in table_text and "(Duplicate)" not in table_text
         assert "Dana Reed" in table_text and "No owner" in table_text
-        assert page.locator('[data-testid="monthly-cost-value"]').inner_text().strip()
+        if persona == "enterprise_architect":
+            assert page.locator('[data-testid="monthly-cost-value"]').count() == 0
+            assert "£" not in table_text
+        else:
+            assert page.locator('[data-testid="monthly-cost-value"]').inner_text().strip()
 
         # every card opens a page that has content
         page.locator('[data-testid="card-no-owner"]').click()
@@ -215,6 +240,11 @@ def test_another_company_never_appears(browser, live_server, orgs):
         assert "Zeta Intake" in text and "Sales" in text
         assert _int(page.locator('[data-testid="welcome-applications"] span').first.inner_text()) == 2
         assert _int(page.locator('[data-testid="card-no-owner-value"]').inner_text()) == 2
+        assert "Harlow" not in page.locator('[data-testid="card-run-cost-sentence"]').inner_text()
+        # the owner may see spend: the run cost names the company's own vendor and no other
+        context.close()
+        context, page = _page(browser, FOLD)
+        _open(page, live_server, b["emails"]["owner"])
         assert "Harlow" in page.locator('[data-testid="card-run-cost-sentence"]').inner_text()
     finally:
         context.close()
@@ -325,7 +355,7 @@ def test_the_range_select_keeps_its_arrow_clear_of_its_text(browser, live_server
 
 def test_money_is_short_on_cards_and_whole_pounds_in_the_table(browser, live_server, orgs):
     info = orgs["a"]
-    email = _signed_in_as_the_architect(info)
+    email = info["emails"]["owner"]  # the owner may see spend; the architect reads no money here
     context, page = _page(browser, FOLD)
     try:
         _open(page, live_server, email)
@@ -381,7 +411,7 @@ def test_run_cost_and_the_applications_table_agree_or_say_why(browser, live_serv
     """The run cost comes from contracts, the table from per-application cost; the page says how they differ."""
     context, page = _page(browser, FOLD)
     try:
-        _open(page, live_server, _signed_in_as_the_architect(orgs["a"]))
+        _open(page, live_server, orgs["a"]["emails"]["owner"])  # the owner may see spend
         card = page.locator('[data-testid="card-run-cost"]').inner_text()
         assert "From 2 active contracts" in card
         costs = page.locator('[data-testid="applications-row"] td:last-child').all_inner_texts()
@@ -393,7 +423,7 @@ def test_run_cost_and_the_applications_table_agree_or_say_why(browser, live_serv
         # a company whose applications state no cost has nothing to reconcile and is not told a difference
         context.close()
         context, page = _page(browser, FOLD)
-        _open(page, live_server, orgs["b"]["emails"]["enterprise_architect"])
+        _open(page, live_server, orgs["b"]["emails"]["owner"])
         text = page.locator('[data-testid="card-run-cost"]').inner_text()
         assert "From 1 active contract" in text and "not yet tied" not in text
     finally:

@@ -1,146 +1,86 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
-{% block title %}Vendor Contracts{% endblock %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% block title %}Contracts and licences{% endblock %}
+
+{% macro _actions() %}
+<div class="flex flex-wrap items-center gap-2">
+  {% call ui.button(href=url_for('procurement.licenses_list'), variant='outline') %}{{ lucide('key-round') }}Licences{% endcall %}
+  {% if may_open_procurement() %}
+  {% call ui.button(href=url_for('procurement.contract_create')) %}{{ lucide('plus') }}New contract{% endcall %}
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro _status_filter() %}
+<form method="get" class="flex items-center" data-testid="contracts-status-filter">
+  {% call native_select_wrapper() %}
+    {% call native_select(name='status', size='sm', attrs={'aria-label': 'Status', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All statuses', value='') }}
+      {% for value, label in [('active', 'Active'), ('expired', 'Expired'), ('draft', 'Draft'), ('terminated', 'Terminated')] %}
+      {{ native_select_option(text=label, value=value, selected=(status == value)) }}
+      {% endfor %}
+    {% endcall %}
+  {% endcall %}
+</form>
+{% endmacro %}
+
+{% macro _clear_filter() %}{{ ui.button(text='Show all contracts', href=url_for('procurement.contracts_list'), variant='outline', size='sm') }}{% endmacro %}
 
 {% block content %}
 <div class="p-6 space-y-6">
-    {{ page_header(
-        title='Vendor Contracts',
-        description='Manage vendor contracts and agreements',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Vendor Contracts'}
-        ],
-        actions=(
-            [{'text': 'New Contract', 'icon': 'plus', 'href': url_for('procurement.contract_create'), 'variant': 'default'}] if may_open_procurement() else []
-        ) + [
-            {'text': 'Renewal Alerts', 'icon': 'calendar-clock', 'href': url_for('procurement.renewals_dashboard'), 'variant': 'outline'},
-            {'text': 'Licences', 'icon': 'key-round', 'href': url_for('procurement.licenses_list'), 'variant': 'outline'}
-        ]
-    ) }}
+{{ page_shell(title='Contracts and licences', subtitle='Every vendor agreement, what it costs a year and when it comes up for renewal',
+              breadcrumb=[('Home', url_for('main.index')), ('Contracts and licences', none)], actions_caller=_actions) }}
 
-    <!-- Filters -->
-    <div class="bg-card border border-border rounded-lg p-4">
-        <form method="get" class="flex flex-wrap items-center gap-4">
-            <div class="flex-1 min-w-[200px]">
-                <input type="text" name="search" value="{{ search or '' }}"
-                       placeholder="Search contracts..."
-                       class="h-9 w-full px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search contracts...">
-            </div>
-            <select name="status" class="h-9 px-3 rounded-md border border-input bg-background text-sm" aria-label="Filter by Status">
-                <option value="">All Statuses</option>
-                <option value="active" {{ 'selected' if status == 'active' }}>Active</option>
-                <option value="expired" {{ 'selected' if status == 'expired' }}>Expired</option>
-                <option value="draft" {{ 'selected' if status == 'draft' }}>Draft</option>
-                <option value="terminated" {{ 'selected' if status == 'terminated' }}>Terminated</option>
-            </select>
-            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
-                Filter
-            </button>
-        </form>
-    </div>
-
-    <!-- Contracts Table -->
-    {% if contracts %}
-    <div class="bg-card border border-border rounded-lg overflow-hidden">
-        <div class="overflow-x-auto">
-        <table class="dense-table w-full border-collapse">
-            <thead>
-                <tr class="bg-muted/40 border-b">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contract</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual Cost</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Renewal</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y">
-                {% for item in contracts %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                        <div class="font-medium">{{ item.contract.contract_name }}</div>
-                        <div class="text-sm text-muted-foreground">{{ item.contract.contract_number or '—' }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                        {{ item.contract.vendor.name if item.contract.vendor else '—' }}
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                        {% if item.annual_cost is not none %}
-                            {{ item.annual_cost|format_currency }}
-                        {% else %}
-                            <span class="text-muted-foreground">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                            {% if item.contract.status == 'active' %}bg-success/10 text-success-emphasis
-                            {% elif item.contract.status == 'expired' %}bg-destructive/10 text-destructive-emphasis
-                            {% elif item.contract.status == 'draft' %}bg-muted text-muted-foreground
-                            {% else %}bg-warning/10 text-warning-emphasis{% endif %}">
-                            {# Stored values are snake_case; render them as words.
-                               "under_negotiation" was shown to the user verbatim. #}
-                            {{ (item.contract.status or 'unknown') | replace('_', ' ') | title }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if item.days_until_renewal is not none %}
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                                    {% if item.urgency == 'critical' %}bg-destructive/10 text-destructive-emphasis
-                                    {% elif item.urgency == 'warning' %}bg-warning/10 text-warning-emphasis
-                                    {% elif item.urgency == 'upcoming' %}bg-info/10 text-info-emphasis
-                                    {% elif item.urgency == 'expired' %}bg-destructive/10 text-destructive-emphasis
-                                    {% else %}bg-success/10 text-success-emphasis{% endif %}">
-                                    {% if item.urgency == 'expired' %}Expired
-                                    {% else %}{{ item.days_until_renewal }} days{% endif %}
-                                </span>
-                            </div>
-                        {% else %}
-                            <span class="text-muted-foreground text-sm">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <a href="{{ url_for('procurement.contract_detail', contract_id=item.contract.id) }}"
-                           class="text-primary hover:underline text-sm">View</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
-    </div>
-
-    <!-- Pagination -->
-    {% if total > 20 %}
-    <div class="flex items-center justify-between">
-        <div class="text-sm text-muted-foreground">
-            Showing {{ (page - 1) * 20 + 1 }} - {{ [page * 20, total]|min }} of {{ total }} contracts
-        </div>
-        <div class="flex items-center gap-2">
-            {% if page > 1 %}
-            <a href="?page={{ page - 1 }}{% if status %}&status={{ status }}{% endif %}{% if search %}&search={{ search }}{% endif %}"
-               class="px-3 py-1 rounded border border-border hover:bg-accent text-sm">Previous</a>
-            {% endif %}
-            {% if page * 20 < total %}
-            <a href="?page={{ page + 1 }}{% if status %}&status={{ status }}{% endif %}{% if search %}&search={{ search }}{% endif %}"
-               class="px-3 py-1 rounded border border-border hover:bg-accent text-sm">Next</a>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
+{% set _cols = [('Contract', ''), ('Vendor', ''), {'label': 'Annual cost', 'align': 'right', 'sortable': true}, ('Status', '')] + ([{'label': 'Renewal', 'sortable': true}] if any_renewal else []) + [{'label': '', 'class': 'w-12'}] %}
+{% call(item) list_table(rows=contracts, columns=_cols,
+                          caption='Vendor contracts', testid='contracts-table', row_testid='contract-row', search_placeholder='Filter contracts...',
+                          toolbar=true, toolbar_actions=_status_filter,
+                          notice=('None of these contracts has a renewal date yet. Add one on a contract and its renewal shows here and on Renewals.' if contracts and not any_renewal else none),
+                          empty_message=('No contracts match these filters.' if (search or status) else 'No vendor contracts yet. Add the first one and its cost and renewal date show here.'),
+                          empty_action=(_clear_filter if (search or status) else none)) %}
+  {% call table_cell() %}
+    <a href="{{ url_for('procurement.contract_detail', contract_id=item.contract.id) }}" class="font-medium text-foreground hover:underline" data-testid="contract-link">{{ item.contract.contract_name }}</a>
+    {% if item.contract.contract_number %}<span class="block text-xs text-muted-foreground">{{ item.contract.contract_number }}</span>{% endif %}
+  {% endcall %}
+  {% call table_cell() %}{{ value_or_unset(item.contract.vendor.name if item.contract.vendor else none) }}{% endcall %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': item.annual_cost if item.annual_cost is not none else -1}) %}
+    {{ value_or_unset(item.annual_cost|format_currency if item.annual_cost is not none else none) }}
+  {% endcall %}
+  {% call table_cell() %}{{ state_badge(item.contract.status) }}{% endcall %}
+  {% if any_renewal %}
+  {% call table_cell(attrs={'data-sort': item.days_until_renewal if item.days_until_renewal is not none else 99999}) %}
+    {% if item.urgency == 'expired' %}
+      {{ state_badge('Expired', tone='negative') }}
+    {% elif item.days_until_renewal is not none %}
+      {{ state_badge('In ' ~ item.days_until_renewal ~ (' day' if item.days_until_renewal == 1 else ' days'),
+                     tone={'critical': 'negative', 'warning': 'caution', 'upcoming': 'neutral'}.get(item.urgency, 'positive')) }}
     {% else %}
-    {{ empty_state(
-        icon='file-text',
-        title='No contracts found',
-        description=('No contracts match your search criteria.' if search else 'There are no vendor contracts in the system yet.'),
-        cta_text=('Clear filters' if search else None),
-        cta_href=(url_for('procurement.contracts_list') if search else None)
-    ) }}
+      {{ value_or_unset(none, 'No renewal date') }}
     {% endif %}
-</div>
+  {% endcall %}
+  {% endif %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% call row_actions('Actions for ' ~ item.contract.contract_name) %}
+      {{ row_action('Open contract', href=url_for('procurement.contract_detail', contract_id=item.contract.id), testid='contract-open') }}
+      {% if may_open_procurement() %}{{ row_action('Edit contract', href=url_for('procurement.contract_edit', contract_id=item.contract.id), testid='contract-edit') }}{% endif %}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
 
-<script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
+{% if total > 20 %}
+<div class="flex items-center justify-between gap-2" data-testid="contracts-pages">
+  <p class="text-sm text-muted-foreground tabular-nums">Contracts {{ (page - 1) * 20 + 1 }} to {{ [page * 20, total]|min }} of {{ total }}</p>
+  <div class="flex items-center gap-2">
+    {% if page > 1 %}{{ ui.button(text='Previous', href=url_for('procurement.contracts_list', page=page - 1, status=status or none), variant='outline', size='sm') }}{% endif %}
+    {% if page * 20 < total %}{{ ui.button(text='Next', href=url_for('procurement.contracts_list', page=page + 1, status=status or none), variant='outline', size='sm') }}{% endif %}
+  </div>
+</div>
+{% endif %}
+</div>
 {% endblock %}

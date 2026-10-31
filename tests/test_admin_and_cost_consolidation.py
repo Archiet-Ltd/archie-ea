@@ -1019,10 +1019,19 @@ def test_change_user_role_away_from_administrator_revokes_org_role_and_column(
         email=f"change-role-revoke-{uuid.uuid4().hex[:8]}@example.com",
         organization_id=org.id, confirmed=True, role=admin_role,
     )
-    db_session.add(user)
+    # A second Administrator so demoting the first does not leave the
+    # organisation without one (the last-Administrator guard).
+    keeper = User(
+        first_name="Keep", last_name="Admin",
+        email=f"change-role-keeper-{uuid.uuid4().hex[:8]}@example.com",
+        organization_id=org.id, confirmed=True, role=admin_role,
+    )
+    db_session.add_all([user, keeper])
     db_session.commit()
     OrgRole.set_role(org.id, user.id, "org_admin")
     user._is_org_admin = True
+    OrgRole.set_role(org.id, keeper.id, "org_admin")
+    keeper._is_org_admin = True
     db_session.commit()
 
     AdminUserService.change_user_role(user, architect_role)

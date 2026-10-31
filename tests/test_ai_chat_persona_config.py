@@ -127,8 +127,13 @@ def test_the_compliance_and_data_architecture_scopes_are_offered():
 
     tpl = (Path(__file__).resolve().parents[1]
            / "app/templates/ai_chat/index.html").read_text(encoding="utf-8")
+    import re
+
+    # The scope selector is built from the select macro's option pairs
+    # ('key', 'Label'); a raw <option value="key"> is the other way to offer one.
     for domain in ("compliance", "data_architecture"):
-        assert 'value="%s"' % domain in tpl, (
+        offered = re.search(r"\(\s*'%s'\s*,\s*'[^']+'\s*\)" % domain, tpl) or ('value="%s"' % domain) in tpl
+        assert offered, (
             f"the {domain} scope has a server-side loader and no way to reach it"
         )
 

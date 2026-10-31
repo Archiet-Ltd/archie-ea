@@ -43,26 +43,26 @@ def test_every_price_on_the_page_is_a_price_in_the_catalogue(app, client):
     team = billing_plans.get_plan("team")
     enterprise = billing_plans.get_plan("enterprise")
     for expected in (
-        "$%d /year" % startup.display_price_annual,
-        "$%d /month" % startup.display_price_monthly,
-        "$%d /editor/year" % team.display_price_annual,
-        "$%d /editor/month" % team.display_price_monthly,
-        "$%s /year" % format(enterprise.display_price_floor_annual, ","),
+        "USD %d a year" % startup.display_price_annual,
+        "USD %d a month" % startup.display_price_monthly,
+        "USD %d per editor a year" % team.display_price_annual,
+        "USD %d per editor a month" % team.display_price_monthly,
+        "From USD %s a year" % format(enterprise.display_price_floor_annual, ","),
     ):
         assert expected in text, (expected, text[:400])
     # No other dollar figure appears in a plan card.
     cards = re.findall(r'data-testid="plan-card-[^"]+".*?</article>', html, re.S)
     assert len(cards) == 4
     allowed = {
-        "$%d" % startup.display_price_annual, "$%d" % startup.display_price_monthly,
-        "$%d" % team.display_price_annual, "$%d" % team.display_price_monthly,
-        "$%s" % format(enterprise.display_price_floor_annual, ","),
+        "USD %d" % startup.display_price_annual, "USD %d" % startup.display_price_monthly,
+        "USD %d" % team.display_price_annual, "USD %d" % team.display_price_monthly,
+        "USD %s" % format(enterprise.display_price_floor_annual, ","),
         # What annual billing saves: twelve months of the monthly price, less the annual price.
-        "$%d" % (12 * startup.display_price_monthly - startup.display_price_annual),
-        "$%d" % (12 * team.display_price_monthly - team.display_price_annual),
+        "USD %d" % (12 * startup.display_price_monthly - startup.display_price_annual),
+        "USD %d" % (12 * team.display_price_monthly - team.display_price_annual),
     }
     for card in cards:
-        for figure in re.findall(r"\$[\d,]+", re.sub(r"<[^>]+>", " ", card)):
+        for figure in re.findall(r"USD [\d,]+", re.sub(r"<[^>]+>", " ", card)):
             assert figure in allowed, figure
 
 
