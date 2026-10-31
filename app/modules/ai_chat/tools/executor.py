@@ -2353,6 +2353,32 @@ class ToolExecutor:
     # Genome patch (ADR 0009 / 0010)                                      #
     # ------------------------------------------------------------------ #
 
+    def _tool_propose_vendors(self, args: dict) -> dict:
+        """Queue the named vendor products as proposals in the approvals inbox. Records nothing else."""
+        from app.services.vendor_detection import INBOX_PATH, propose_from_names
+
+        names = args.get("names") or []
+        if isinstance(names, str):
+            names = [part.strip() for part in names.replace(" and ", ",").split(",")]
+        result = propose_from_names(self._get_organization_id(), names, words=args.get("request") or "",
+                                    requested_by=self.user_id)
+        proposed = [p["product"] for p in result["proposed"]]
+        parts = []
+        if proposed:
+            parts.append("Proposed for confirmation in the approvals inbox: %s." % ", ".join(proposed))
+        if result["known"]:
+            parts.append("Already recorded or proposed: %s." % ", ".join(result["known"]))
+        if result["not_in_catalogue"]:
+            parts.append("Not in the vendor catalogue yet: %s." % ", ".join(result["not_in_catalogue"]))
+        return {
+            "success": True,
+            "proposed": result["proposed"],
+            "known": result["known"],
+            "not_in_catalogue": result["not_in_catalogue"],
+            "inbox_url": INBOX_PATH,
+            "message": " ".join(parts) or "No product names were given.",
+        }
+
     def _tool_propose_genome_patch(self, args: dict) -> dict:
         """Validate an LLM-proposed genome patch and QUEUE it for approval.
 

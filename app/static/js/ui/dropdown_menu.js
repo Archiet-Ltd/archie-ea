@@ -75,6 +75,7 @@
         panel.style.left = left + 'px';
         panel.style.top = top + 'px';
         panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
         panel.style.margin = '0';
         lift(root);
     }

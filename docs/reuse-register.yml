@@ -76,6 +76,8 @@ entries:
         reason: standalone document rendered server-side to PDF (WeasyPrint) with its own styles, the same
           category as export_blueprint.html and export_sad.html; not named in the task that added this
           entry, found by running the gate
+      - path: app/static/css/basecoat_ui.css
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
   - id: badge
     concept: Badges, status pills and the category pill above a public-page heading
     status: active
@@ -96,6 +98,75 @@ entries:
       - path: app/templates/capability_maturity/line_of_sight.html
         reason: authenticated page's local pill macro, predates the register; repointing it is outside the
           public-page scope
+      - path: app/templates/basecoat/
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
+
+  - id: element-table
+    concept: A list of ArchiMate elements on a record page (a solution's design or requirements, a programme's
+      elements, an element's related elements) as dense rows, the name a link to the element's own record,
+      paged by 25
+    status: active
+    canonical:
+      path: app/templates/components/element_table.html
+      symbols: [element_table]
+    reuse: >
+      import `element_table` from components/element_table.html and render the other cells in its
+      call block (design-system lead ruling R30, 25 Oct 2026); do not define another element or elements
+      table macro, and do not hand-roll a table whose first column is an element name linking to its record
+    must_not_create:
+      - id: element-table-macro
+        regex: '{%-?\s*macro\s+(\w*element_table\w*|\w*elements_table\w*|\w*element_list_table\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: list-table
+    concept: A list of records on any page, built on the library Table, paged by 25 (data-type register
+      record-list; ruling R31, 26 Oct 2026)
+    status: active
+    canonical:
+      path: app/templates/components/list_table.html
+      symbols: [list_table]
+    reuse: >
+      import `list_table` from components/list_table.html and render one row's cells in its call block;
+      a list of ArchiMate elements uses `element_table`, which is this table with the element link first.
+      dense_table, data_table and workbench_table are retired for new lists (docs/data-type-register.yml)
+    must_not_create:
+      - id: list-table-macro
+        regex: '{%-?\s*macro\s+\w*(?:list|record|records|item|items)_table\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: risk-matrix
+    concept: Risks by probability and impact as a five by five grid that counts the risks in each cell
+      (data-type register risks; ruling R31)
+    status: active
+    canonical:
+      path: app/templates/components/risk_matrix.html
+      symbols: [risk_matrix]
+    reuse: >
+      import `risk_matrix` from components/risk_matrix.html and pass the grid the service builds; do not
+      draw another heat map or risk grid
+    must_not_create:
+      - id: risk-matrix-macro
+        regex: '{%-?\s*macro\s+\w*(?:risk_matrix|risk_grid|heat_?map)\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: fact-list
+    concept: The facts about one record, label left and value right (data-type register record-facts;
+      pattern P25; ruling R31)
+    status: active
+    canonical:
+      path: app/templates/components/fact_list.html
+      symbols: [fact_list]
+    reuse: >
+      import `fact_list` from components/fact_list.html and render each value in its call block; do not
+      hand-build another definition list of record properties
+    must_not_create:
+      - id: fact-list-macro
+        regex: '{%-?\s*macro\s+\w*(?:fact_list|key_value|kv_list|property_list)\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
 
   - id: capability-visibility
     concept: A capability looked up by id and caller's organisation
@@ -325,20 +396,24 @@ entries:
     concept: Empty state shown when a list or page has no data
     status: active
     canonical:
-      path: app/templates/components/empty_state.html
-      symbols: [empty_state]
+      path: app/templates/basecoat/empty.html
+      symbols: [empty, empty_header, empty_icon, empty_title, empty_description, empty_content]
     reuse: >
-      {% from 'components/empty_state.html' import empty_state %} (see DESIGN.md). Do not define another
-      empty_state macro or inline an empty-state block; two macros with incompatible signatures 500 the page
-      that imports the wrong one.
+      {% import 'basecoat/index.html' as ui %} (see DESIGN.md). ui.empty holds ui.empty_header with an
+      icon, a title and a description, then ui.empty_content with the next-step button: every empty state
+      says why the area is empty and offers the next step. Do not define another empty-state macro or
+      inline an empty-state block; two macros with incompatible signatures 500 the page that imports the
+      wrong one.
     must_not_create:
       - id: empty-state-macro
         regex: '{%-?\s*macro\s+(empty_state\w*|render_empty\w*|no_data\w*)\s*\('
         scope: [app/templates]
         suffixes: [.html]
     known_exceptions:
+      - path: app/templates/components/empty_state.html
+        reason: legacy empty_state macro kept as a compatibility wrapper; new and touched empty states migrate to the ui.empty block (basecoat/empty.html) instead
       - path: app/templates/macros/page_shell.html
-        reason: second empty_state macro (icon, headline, body) predating the register; to be merged into the canonical one
+        reason: second empty_state macro (icon, headline, body) predating the register; migrate from it to the ui.empty block (basecoat/empty.html)
 
   - id: loading-state
     concept: Loading and skeleton states
@@ -357,6 +432,8 @@ entries:
     known_exceptions:
       - path: app/templates/components/skeleton.html
         reason: the skeleton family (table, list, card, text, avatar) is the companion canonical file
+      - path: app/templates/basecoat/
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
 
   - id: outbox-test-cleanup
     concept: Purging outbox events between tests
@@ -518,6 +595,8 @@ entries:
     known_exceptions:
       - path: app/static/css/basecoat_components.css
         reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/archimate_composer.css
         reason: authenticated-app composer toolbar and search buttons, moved unchanged out of the composer page where the baseline already recorded them; not a public-site button
       - path: app/static/css/vendor/
@@ -549,6 +628,8 @@ entries:
     known_exceptions:
       - path: app/static/css/basecoat_components.css
         reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/accessibility.css
         reason: authenticated-app skip-link and focus styles, not the public inline link
       - path: app/static/css/app.css
@@ -589,6 +670,8 @@ entries:
     known_exceptions:
       - path: app/static/css/basecoat_components.css
         reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -623,6 +706,8 @@ entries:
     known_exceptions:
       - path: app/static/css/basecoat_components.css
         reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -668,6 +753,8 @@ entries:
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
         reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+      - path: app/static/css/basecoat_ui.css
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
 
   - id: public-stepper
     concept: The public site roadmap stepper (a row of stages with a line and a dot)
@@ -863,3 +950,5 @@ entries:
     known_exceptions:
       - path: app/templates/components/ui_sidebar.html
         reason: the canonical parts
+      - path: app/templates/basecoat/
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"

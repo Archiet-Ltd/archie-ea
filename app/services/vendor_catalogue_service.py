@@ -247,15 +247,18 @@ def link_vendor_product(vendor_product_id: int, product: VendorProductDetail, us
     if vendor_product_id not in allowed:
         raise LinkRefused(NOT_YOURS)
     org_id = current_org_id()
+    # Read before a new link joins the session: a product expired by an earlier commit reloads here, and
+    # the reload's autoflush must not meet a link without its product.
+    product_id = product.id
     link = VendorCatalogueLink.query.filter_by(
         vendor_product_id=vendor_product_id, organization_id=org_id
     ).first()
     if link is None:
         link = VendorCatalogueLink(
-            organization_id=org_id, vendor_product_id=vendor_product_id
+            organization_id=org_id, vendor_product_id=vendor_product_id, product_detail_id=product_id
         )
         db.session.add(link)
-    link.product_detail_id = product.id
+    link.product_detail_id = product_id
     link.linked_by_id = user_id
     link.linked_at = datetime.utcnow()
     db.session.commit()

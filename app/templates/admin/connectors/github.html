@@ -3,6 +3,8 @@
 {% block title %}Connect GitHub{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/alert.html' import alert as quiet_alert %}
+{% from 'components/input.html' import input, hidden_input %}
+{% from 'components/button.html' import button %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -26,23 +28,29 @@
         {% endif %}
     {% endwith %}
 
+    {% if github_app_configured %}
+    <div class="mb-6 space-y-3" data-testid="github-app-connect">
+        <p class="text-sm text-muted-foreground">Install the Entelim GitHub App on your organisation; the first read starts the moment you land back here.</p>
+        {{ button(text='Connect GitHub', icon='github', variant='primary', size='default', href=github_app_install_url, testid='github-app-connect-link') }}
+        <p class="text-sm text-muted-foreground">Or paste a read-only token:</p>
+    </div>
+    {% endif %}
+
     <form method="POST" action="{{ url_for('m365_connector.github_connect_save') }}" class="space-y-6" data-testid="github-connect-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ hidden_input('csrf_token', csrf_token()) }}
 
         <div data-slot="card" class="rounded-lg border border-border bg-card">
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
-                    <label for="organization" class="block text-sm font-medium text-muted-foreground mb-1">GitHub organisation</label>
-                    <input type="text" id="organization" name="organization" required autocomplete="off"
-                        value="{{ status.organization or '' }}" placeholder="acme"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
-                    <p class="text-xs text-muted-foreground mt-1">The name in github.com/&lt;name&gt;.</p>
+                    <label for="organization" class="block text-sm font-medium text-muted-foreground mb-1">GitHub organisation or account</label>
+                    {{ input(id='organization', name='organization', type='text', required=true, autocomplete='off',
+                        value=status.organization or '', placeholder='acme', size='sm', class='font-mono') }}
+                    <p class="text-xs text-muted-foreground mt-1">The name in github.com/<name> (organisation or personal account).</p>
                 </div>
                 <div>
                     <label for="api_token" class="block text-sm font-medium text-muted-foreground mb-1">Read-only token</label>
-                    <input type="password" id="api_token" name="api_token" autocomplete="off" {% if not status.has_token %}required{% endif %}
-                        placeholder="{% if status.has_token %}A token is stored; paste a new one to replace it{% else %}Paste your token{% endif %}"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                    {{ input(id='api_token', name='api_token', type='password', autocomplete='off', required=not status.has_token,
+                        placeholder='A token is stored; paste a new one to replace it' if status.has_token else 'Paste your token', size='sm', class='font-mono') }}
                     <p class="text-xs text-muted-foreground mt-1">
                         A fine-grained token with read-only access to repository contents and metadata, and to organisation members, is enough.
                         It is stored encrypted for your organisation and never shown again.
@@ -52,10 +60,8 @@
         </div>
 
         <div class="flex items-center justify-end gap-3">
-            <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                {% if status.state == 'not_connected' %}Connect and read my repositories{% else %}Save and read again{% endif %}
-            </button>
+            {{ button(text='Connect and read my repositories' if status.state == 'not_connected' else 'Save and read again',
+                type='submit', variant='primary', size='default') }}
         </div>
     </form>
 
