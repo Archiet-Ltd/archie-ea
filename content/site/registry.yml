@@ -110,6 +110,8 @@ product:
          blurb: "Coming soon: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+      - {label: AI employees, icon: lightbulb, href: /modules/ai-employees,
+         blurb: "Coming soon: AI employees that start work on their own and propose actions."}
 
 solutions:
   label: Solutions
@@ -139,6 +141,8 @@ solutions:
          blurb: "Coming soon: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+      - {label: AI employees, icon: lightbulb, href: /modules/ai-employees,
+         blurb: "Coming soon: AI employees that start work on their own and propose actions."}
 
 # Role families, in menu order. The menu and the hub list only the roles that
 # have a page, each a link; a family with no role page is left out of the menu.

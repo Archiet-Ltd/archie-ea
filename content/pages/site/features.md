@@ -322,3 +322,4 @@ These are not available yet. Open one to join its waiting list and we will tell 
 
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.
+- [AI employees](/modules/ai-employees): AI employees that start work on their own and propose actions for approval.
