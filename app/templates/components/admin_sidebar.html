@@ -223,7 +223,9 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     {% endif %}
 
     {# Stage awareness: until the organisation has connected a source. Not part of the icon rail. #}
-    {% if nav.connected is sameas false and nav.connect_url %}
+    {# Not on the connectors pages themselves: the person is already doing what the card offers. #}
+    {% set show_connect_card = nav.connected is sameas false and nav.connect_url and not request.path.startswith(nav.connect_url) %}
+    {% if show_connect_card %}
     <div class="sidebar-connect-card mt-auto px-2 pt-4 group-data-[collapsible=icon]:hidden" data-slot="sidebar-group" data-testid="connect-source-card">
         {% call card.card(class='border-border bg-background') %}
             {% call card.card_header(class='space-y-1 p-4') %}
@@ -238,7 +240,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     {% endif %}
 
     {% if nav.secondary %}
-    <div class="{{ '' if (nav.connected is sameas false and nav.connect_url) else 'mt-auto' }}" data-testid="nav-secondary">
+    <div class="{{ '' if show_connect_card else 'mt-auto' }}" data-testid="nav-secondary">
     {% call sidebar_group() %}
         {% call sidebar_menu() %}{% for item in nav.secondary %}{{ _entry(item) }}{% endfor %}{% endcall %}
     {% endcall %}
