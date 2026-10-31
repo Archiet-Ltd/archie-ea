@@ -151,58 +151,17 @@ def world(github_app_server, app):
 
 
 def remove_organisations(app, org_ids):
-    from sqlalchemy import text
-
+    """Remove the journey's organisations through the deletion service, the same path the
+    organisation delete journey uses; no row is removed by hand and no trigger is disabled."""
     from app import db
+    from app.models.organization import Organization
+    from app.services.org_deletion_service import OrganizationDeletionService
 
     with app.app_context():
-        db.session.execute(text("SET lock_timeout = '30s'"))
-        db.session.commit()
-        tables = [
-            row[0]
-            for row in db.session.execute(
-                text(
-                    "SELECT c.table_name FROM information_schema.columns c "
-                    "JOIN information_schema.tables t USING (table_schema, table_name) "
-                    "WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE' "
-                    "AND c.column_name = 'organization_id' AND c.table_name <> 'organizations'"
-                )
-            )
-        ]
-        db.session.rollback()
-        ids = {"ids": list(org_ids)}
-        for statement in (
-            "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
-            "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
-            "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
-        ):
-            with db.session.begin_nested():
-                db.session.execute(text(statement), ids)
-        db.session.execute(text("SET LOCAL session_replication_role = replica"))
-        for name in ("transformation_outbox_events",):
-            db.session.execute(text('DELETE FROM "%s" WHERE organization_id = ANY(:ids)' % name), ids)
-        db.session.execute(text("SET LOCAL session_replication_role = DEFAULT"))
-        db.session.commit()
-        evidence = ("arb_submission_evidence_snapshots", "workbench_artifact_evidence")
-        pending = [name for name in tables if name not in evidence]
-        for _ in range(8):
-            still = []
-            for name in pending:
-                try:
-                    with db.session.begin_nested():
-                        db.session.execute(
-                            text('DELETE FROM "%s" WHERE organization_id = ANY(:ids)' % name.replace('"', "")),
-                            {"ids": list(org_ids)},
-                        )
-                except Exception:
-                    still.append(name)
-            db.session.commit()
-            if not still or still == pending:
-                pending = still
-                break
-            pending = still
-        db.session.execute(text("DELETE FROM organizations WHERE id = ANY(:ids)"), ids)
-        db.session.commit()
+        for org_id in org_ids:
+            db.session.remove()
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
         db.session.remove()
 
 
