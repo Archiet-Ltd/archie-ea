@@ -106,19 +106,19 @@ class ADMAuditLog(db.Model):
     changed_fields = Column(JSON)  # List of field names that changed
 
     # Context
-    board_id = Column(Integer, ForeignKey("kanban_boards.id"))
-    card_id = Column(Integer, ForeignKey("kanban_cards.id"))
-    approval_id = Column(Integer, ForeignKey("adm_phase_approvals.id"))
-    phase_id = Column(Integer, ForeignKey("adm_phases.id"))
+    board_id = Column(Integer, ForeignKey("kanban_boards.id", ondelete="SET NULL"))
+    card_id = Column(Integer, ForeignKey("kanban_cards.id", ondelete="SET NULL"))
+    approval_id = Column(Integer, ForeignKey("adm_phase_approvals.id", ondelete="SET NULL"))
+    phase_id = Column(Integer, ForeignKey("adm_phases.id", ondelete="SET NULL"))
 
     # Phase transition context (if applicable)
-    source_phase_id = Column(Integer, ForeignKey("adm_phases.id"))
-    target_phase_id = Column(Integer, ForeignKey("adm_phases.id"))
+    source_phase_id = Column(Integer, ForeignKey("adm_phases.id", ondelete="SET NULL"))
+    target_phase_id = Column(Integer, ForeignKey("adm_phases.id", ondelete="SET NULL"))
     source_phase_code = Column(String(10))
     target_phase_code = Column(String(10))
 
     # Actor information
-    actor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     actor_email = Column(String(255))
     actor_role = Column(String(100))  # Role at time of action
 

@@ -10,6 +10,10 @@ the app imports at boot, which never include it. A database built from
 migrations (a new environment, a restore drill, a test database) therefore had
 no table for the audit service to write to. Guarded, so production, which has
 the table, is unchanged.
+
+The foreign keys carry the rules production has: removing a user removes their
+audit rows, removing a board, card, approval or phase leaves the row with that
+key empty.
 """
 import sqlalchemy as sa
 from alembic import op
@@ -67,13 +71,13 @@ def upgrade():
             sa.Column("timestamp", sa.DateTime(), nullable=False),
             sa.Column("recorded_at", sa.DateTime(), nullable=True),
             sa.PrimaryKeyConstraint("id"),
-            sa.ForeignKeyConstraint(["actor_id"], ["users.id"]),
-            sa.ForeignKeyConstraint(["approval_id"], ["adm_phase_approvals.id"]),
-            sa.ForeignKeyConstraint(["board_id"], ["kanban_boards.id"]),
-            sa.ForeignKeyConstraint(["card_id"], ["kanban_cards.id"]),
-            sa.ForeignKeyConstraint(["phase_id"], ["adm_phases.id"]),
-            sa.ForeignKeyConstraint(["source_phase_id"], ["adm_phases.id"]),
-            sa.ForeignKeyConstraint(["target_phase_id"], ["adm_phases.id"]),
+            sa.ForeignKeyConstraint(["actor_id"], ["users.id"], ondelete="CASCADE"),
+            sa.ForeignKeyConstraint(["approval_id"], ["adm_phase_approvals.id"], ondelete="SET NULL"),
+            sa.ForeignKeyConstraint(["board_id"], ["kanban_boards.id"], ondelete="SET NULL"),
+            sa.ForeignKeyConstraint(["card_id"], ["kanban_cards.id"], ondelete="SET NULL"),
+            sa.ForeignKeyConstraint(["phase_id"], ["adm_phases.id"], ondelete="SET NULL"),
+            sa.ForeignKeyConstraint(["source_phase_id"], ["adm_phases.id"], ondelete="SET NULL"),
+            sa.ForeignKeyConstraint(["target_phase_id"], ["adm_phases.id"], ondelete="SET NULL"),
             sa.UniqueConstraint("audit_id"),
         )
     for name, columns in _INDEXES:
