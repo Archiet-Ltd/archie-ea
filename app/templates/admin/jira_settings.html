@@ -1,755 +1,369 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/input.html' import hidden_input %}
 {% block title %}Jira Push Integration{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+
+{% macro stat_row(label, value, id) -%}
+<div class="flex items-center justify-between gap-3">
+  <span class="text-muted-foreground">{{ label }}</span>
+  {{ ui.badge(text=value, variant='outline', class='tabular-nums', attrs={'id': id}) }}
+</div>
+{%- endmacro %}
+
+{% macro field_errors(field) -%}
+{%- for err in field.errors -%}{{ ui.field_error(text=err) }}{%- endfor -%}
+{%- endmacro %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
-        title='Jira Push Integration', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Jira Push Integration'}],
-        description='Push enriched application portfolio data to Jira for cross-team collaboration on architecture decisions.'
-    ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Jira Push Integration',
+              subtitle='Push enriched application portfolio data to Jira so other teams can work on architecture decisions together.',
+              breadcrumb=[('Home', url_for('main.index')), ('Admin', url_for('admin.index')), ('Jira Push Integration', none)]) }}
 
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="mb-6 space-y-2">
-                {% for category, message in messages %}
-                    <div class="rounded-md border p-4 {% if category == 'success' %}bg-primary/10 border-primary/20 text-foreground{% elif category == 'error' %}bg-destructive/10 border-destructive/20 text-destructive-emphasis{% else %}bg-accent border-border text-foreground{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
+<div class="max-w-2xl space-y-6">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      {% call ui.alert(variant=('destructive' if category == 'error' else 'default'), attrs={'data-testid': 'jira-message', 'role': 'status'}) %}
+        {{ ui.alert_description(text=message) }}
+      {% endcall %}
+    {% endfor %}
+  {% endwith %}
+
+  {% call ui.card(attrs={'data-testid': 'jira-status'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Connection status') }}
+      {{ ui.card_description(text='Whether Jira accepts the saved credentials, and when data was last pushed.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4 text-sm') %}
+      {% if jira_config %}
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Status</span>
+          {% if jira_config.connection_status == 'connected' %}{{ ui.badge(text='Connected', variant='outline', attrs={'data-testid': 'jira-state'}) }}
+          {% elif jira_config.connection_status == 'error' %}{{ ui.badge(text='Error', variant='destructive', attrs={'data-testid': 'jira-state'}) }}
+          {% else %}{{ ui.badge(text='Not tested', variant='secondary', attrs={'data-testid': 'jira-state'}) }}{% endif %}
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Last push</span>
+          <span class="font-medium">{{ jira_config.last_sync_at.strftime('%Y-%m-%d %H:%M:%S') if jira_config.last_sync_at else 'Never' }}</span>
+        </div>
+        {% if jira_config.last_error %}
+          {% call ui.alert(variant='destructive') %}{{ ui.alert_title(text='Last error') }}{{ ui.alert_description(text=jira_config.last_error) }}{% endcall %}
         {% endif %}
-    {% endwith %}
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Status Panel -->
-        <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Connection Status</h3>
-                </div>
-                <div class="p-4 sm:p-6 space-y-4">
-                    {% if jira_config %}
-                        <div>
-                            <p class="text-sm text-muted-foreground mb-2">Status</p>
-                            <div class="flex items-center gap-2">
-                                {% if jira_config.connection_status == 'connected' %}
-                                    <div class="h-3 w-3 rounded-full bg-primary"></div>
-                                    <span class="font-medium text-foreground">Connected</span>
-                                {% elif jira_config.connection_status == 'error' %}
-                                    <div class="h-3 w-3 rounded-full bg-destructive"></div>
-                                    <span class="font-medium text-destructive-emphasis">Error</span>
-                                {% else %}
-                                    <div class="h-3 w-3 rounded-full bg-muted-foreground"></div>
-                                    <span class="font-medium text-muted-foreground">Not Tested</span>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div>
-                            <p class="text-sm text-muted-foreground mb-2">Last Push</p>
-                            <p class="font-medium">
-                                {% if jira_config.last_sync_at %}
-                                    {{ jira_config.last_sync_at.strftime('%Y-%m-%d %H:%M:%S') }}
-                                {% else %}
-                                    Never
-                                {% endif %}
-                            </p>
-                        </div>
-
-                        {% if jira_config.last_error %}
-                            <div class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md">
-                                <p class="text-sm text-destructive-emphasis font-medium mb-1">Last Error:</p>
-                                <p class="text-xs text-destructive-emphasis/80">{{ jira_config.last_error }}</p>
-                            </div>
-                        {% endif %}
-
-                        <!-- Manual Actions -->
-                        <div class="pt-4 border-t space-y-3">
-                            <button type="button" id="test-connection-btn"
-                                    class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-                                    aria-label="Test connection">
-                                <i data-lucide="wifi" class="w-4 h-4" aria-hidden="true"></i>
-                                Test Connection
-                            </button>
-                            <button type="button" id="push-btn"
-                                    class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                                    {% if not jira_config.enabled %}disabled{% endif %}
-                                    aria-label="Push to Jira">
-                                <i data-lucide="upload" class="w-4 h-4" aria-hidden="true"></i>
-                                Push to Jira
-                            </button>
-                        </div>
-                    {% elif env_configured %}
-                        <div>
-                            <p class="text-sm text-muted-foreground mb-2">Status</p>
-                            <div class="flex items-center gap-2">
-                                <div class="h-3 w-3 rounded-full bg-warning"></div>
-                                <span class="font-medium text-foreground">Configured via .env</span>
-                            </div>
-                        </div>
-                        <div class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md">
-                            <p class="text-xs text-warning-emphasis">Credentials loaded from environment variables. Save settings to persist to database for full management.</p>
-                        </div>
-                        <!-- Save to Database -->
-                        <div class="pt-4 border-t space-y-3">
-                            <form method="POST" action="{{ url_for('admin.save_env_jira_config') }}">
-                                {{ form.hidden_tag() }}
-                                <button type="submit"
-                                        class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                                        aria-label="Save Jira configuration to database">
-                                    <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
-                                    Save to Database
-                                </button>
-                            </form>
-                            <button type="button" id="test-connection-btn"
-                                    class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-                                    aria-label="Test connection">
-                                <i data-lucide="wifi" class="w-4 h-4" aria-hidden="true"></i>
-                                Test Connection
-                            </button>
-                        </div>
-                    {% else %}
-                        <p class="text-sm text-muted-foreground">No Jira configuration found. Configure settings below to get started.</p>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Push Status Summary -->
-            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Push Status</h3>
-                </div>
-                <div class="p-4 sm:p-6">
-                    <div id="push-status-panel">
-                        {% if push_status %}
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Total Tracked</span>
-                                <span class="font-bold text-foreground" id="ps-total">{{ push_status.total_tracked }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Pushed</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" id="ps-pushed">{{ push_status.pushed }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Pending</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30" id="ps-pending">{{ push_status.pending }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Drift Detected</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30" id="ps-drift">{{ push_status.drift_detected }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Failed</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30" id="ps-failed">{{ push_status.failed }}</span>
-                            </div>
-                            {% if push_status.get('last_webhook_at') %}
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Last Webhook</span>
-                                <span class="text-sm text-foreground">{{ push_status.last_webhook_at }}</span>
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% else %}
-                        <p class="text-sm text-muted-foreground">No push data available yet.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Job Status -->
-            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Latest Job</h3>
-                </div>
-                <div class="p-4 sm:p-6">
-                    <div id="job-status">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="h-3 w-3 rounded-full bg-muted-foreground" id="job-indicator"></div>
-                            <span class="font-medium text-muted-foreground" id="job-text">Loading...</span>
-                        </div>
-                        <div class="text-xs text-muted-foreground" id="job-details">Checking...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Kanban Tasks Push Status -->
-            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Kanban Tasks</h3>
-                </div>
-                <div class="p-4 sm:p-6 space-y-4">
-                    <div id="kanban-push-status-panel">
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Pushed</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" id="kps-pushed">—</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Pending</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30" id="kps-pending">—</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-muted-foreground">Failed</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30" id="kps-failed">—</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="pt-4 border-t space-y-2">
-                        <button type="button" id="kanban-push-btn"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                                {% if not jira_config and not env_configured %}disabled{% endif %}
-                                aria-label="Push Kanban Tasks to Jira">
-                            <i data-lucide="layers" class="w-4 h-4" aria-hidden="true"></i>
-                            Push Kanban Tasks
-                        </button>
-                        <button type="button" id="push-epics-btn"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-                                {% if not push_status or push_status.pushed == 0 %}disabled{% endif %}
-                                aria-label="Push ADM Phase Epics to Jira as Plateaus">
-                            <i data-lucide="layers" class="w-4 h-4" aria-hidden="true"></i>
-                            Push Phase Epics
-                        </button>
-                        <button type="button" id="push-dependencies-btn"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-                                {% if not push_status or push_status.pushed == 0 %}disabled{% endif %}
-                                aria-label="Push card dependencies as Jira Subtasks and Blocks links">
-                            <i data-lucide="git-merge" class="w-4 h-4" aria-hidden="true"></i>
-                            Push Dependencies
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Application Components Section -->
-            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Application Components</h3>
-                    <p class="text-sm text-muted-foreground mt-1">ArchiMate Application Layer — Phase C/D</p>
-                </div>
-                <div class="p-4 sm:p-6">
-                    <div class="pt-4 border-t">
-                        <button type="button" id="push-applications-btn"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                                {% if not jira_config and not env_configured %}disabled{% endif %}
-                                aria-label="Push Application Components to Jira">
-                            <i data-lucide="cpu" class="w-4 h-4" aria-hidden="true"></i>
-                            Push Applications
-                        </button>
-                    </div>
-                </div>
-            </div>
+      {% elif env_configured %}
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Status</span>
+          {{ ui.badge(text='Configured from the environment', variant='secondary') }}
         </div>
+        <p class="text-muted-foreground">Credentials are loaded from environment variables. Save them to the database to manage them here.</p>
+      {% else %}
+        <p class="text-muted-foreground">Jira is not set up yet. Fill in the settings below and save to get started.</p>
+      {% endif %}
+    {% endcall %}
+    {% if jira_config or env_configured %}
+    {% call ui.card_footer(class='justify-end gap-2') %}
+      {% if not jira_config and env_configured %}
+      <form method="POST" action="{{ url_for('admin.save_env_jira_config') }}">
+        {{ form.hidden_tag() }}
+        {{ ui.button(text='Save to database', type='submit') }}
+      </form>
+      {% endif %}
+      {{ ui.button(text='Test Connection', type='button', variant='outline', attrs={'id': 'test-connection-btn'}) }}
+      {% if jira_config %}
+      {{ ui.button(text='Push to Jira', type='button', attrs={'id': 'push-btn', 'disabled': (none if jira_config.enabled else 'disabled')}) }}
+      {% endif %}
+    {% endcall %}
+    {% endif %}
+  {% endcall %}
 
-        <!-- Configuration Form -->
-        <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Configuration</h3>
-                </div>
-                <form method="POST" action="{{ url_for('admin.jira_settings') }}" class="p-4 sm:p-6">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-
-                    <div class="space-y-6">
-                        <!-- Connection Settings -->
-                        <div>
-                            <h4 class="text-sm font-medium mb-4">Connection Settings</h4>
-                            <div class="space-y-4">
-                                <div>
-                                    <label for="base_url" class="block text-sm font-medium text-muted-foreground mb-1">
-                                        Jira Base URL <span class="text-destructive-emphasis">*</span>
-                                    </label>
-                                    <input type="text"
-                                           id="base_url"
-                                           name="base_url"
-                                           value="{{ form.base_url.data or '' }}"
-                                           placeholder="https://your-org.atlassian.net"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                           required>
-                                    <p class="text-xs text-muted-foreground mt-1">Your Jira Cloud or Data Center URL</p>
-                                </div>
-
-                                <div>
-                                    <label for="username" class="block text-sm font-medium text-muted-foreground mb-1">
-                                        Username / Email <span class="text-destructive-emphasis">*</span>
-                                    </label>
-                                    <input type="text"
-                                           id="username"
-                                           name="username"
-                                           value="{{ form.username.data or '' }}"
-                                           placeholder="user@example.com"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                           required>
-                                    <p class="text-xs text-muted-foreground mt-1">Jira account email used for API authentication</p>
-                                </div>
-
-                                <div>
-                                    <label for="api_token" class="block text-sm font-medium text-muted-foreground mb-1">
-                                        API Token {% if not jira_config %}<span class="text-destructive-emphasis">*</span>{% endif %}
-                                    </label>
-                                    <input type="password"
-                                           id="api_token"
-                                           name="api_token"
-                                           value=""
-                                           placeholder="{% if jira_config %}Leave blank to keep existing{% else %}Your Jira API token{% endif %}"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                           {% if not jira_config %}required{% endif %} autocomplete="new-password">
-                                    <p class="text-xs text-muted-foreground mt-1">Generate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener" class="text-primary hover:underline">Atlassian API tokens</a></p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Project Settings -->
-                        <div>
-                            <h4 class="text-sm font-medium mb-4">Project Settings</h4>
-                            <div class="space-y-4">
-                                <div class="grid grid-cols-1 gap-4">
-                                    <div>
-                                        <label for="project_key" class="block text-sm font-medium text-muted-foreground mb-1">
-                                            Project Key <span class="text-destructive-emphasis">*</span>
-                                        </label>
-                                        <input type="text"
-                                               id="project_key"
-                                               name="project_key"
-                                               value="{{ form.project_key.data or '' }}"
-                                               placeholder="EA"
-                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                               required>
-                                        <p class="text-xs text-muted-foreground mt-1">Jira project key to push issues to</p>
-                                    </div>
-                                    <div>
-                                        <label for="issue_type" class="block text-sm font-medium text-muted-foreground mb-1">
-                                            Issue Type
-                                        </label>
-                                        <input type="text"
-                                               id="issue_type"
-                                               name="issue_type"
-                                               value="{{ form.issue_type.data or 'Task' }}"
-                                               placeholder="Task"
-                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                        <p class="text-xs text-muted-foreground mt-1">Jira issue type (default: Task)</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Filter Settings -->
-                        <div>
-                            <h4 class="text-sm font-medium mb-4">Data Filters</h4>
-                            <div class="space-y-4">
-                                <div class="p-3 bg-accent/50 rounded-md space-y-3">
-                                    <div>
-                                        <label for="filter_countries" class="block text-sm font-medium text-muted-foreground mb-1">Country Filter</label>
-                                        <p class="text-xs text-muted-foreground">Comma-separated list of countries to include in push scope</p>
-                                    </div>
-                                    <input type="text"
-                                           id="filter_countries"
-                                           name="filter_countries"
-                                           value="{{ form.filter_countries.data or '' }}"
-                                           placeholder="United Kingdom, Ireland"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Enable Toggle -->
-                        <div>
-                            <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
-                                <div>
-                                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Integration</label>
-                                    <p class="text-xs text-muted-foreground">Allow pushing data to Jira</p>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox"
-                                           id="enabled"
-                                           name="enabled"
-                                           value="true"
-                                           {% if form.enabled.data or not jira_config %}checked{% endif %}
-                                           class="sr-only peer">
-                                    <div class="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-ring/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-background after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Submit -->
-                        <div class="flex items-center gap-3 pt-4 border-t">
-                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save settings">
-                                <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
-                                Save Settings
-                            </button>
-                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                                Cancel
-                            </a>
-                        </div>
-                    </div>
-                </form>
+  {% call ui.card(attrs={'data-testid': 'jira-config'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Configuration') }}
+      {{ ui.card_description(text='Where to push, who pushes, and which data is in scope.') }}
+    {% endcall %}
+    <form method="POST" action="{{ url_for('admin.jira_settings') }}" class="space-y-6"
+          x-data="{ on: {{ 'true' if (form.enabled.data or not jira_config) else 'false' }} }">
+      {% call ui.card_content() %}
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        <div class="space-y-6">
+          {% call ui.field() %}
+            {{ ui.field_label(text='Jira Base URL', attrs={'for': 'base_url'}) }}
+            {{ ui.input(id='base_url', name='base_url', type='text', required=true, value=(form.base_url.data or ''), placeholder='https://your-org.atlassian.net', class='w-full font-mono') }}
+            {{ ui.field_description(text='Your Jira Cloud or Data Center address.') }}
+            {{ field_errors(form.base_url) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Username / Email', attrs={'for': 'username'}) }}
+            {{ ui.input(id='username', name='username', type='text', required=true, value=(form.username.data or ''), placeholder='user@example.com', class='w-full') }}
+            {{ ui.field_description(text='The Jira account email used to sign in to the API.') }}
+            {{ field_errors(form.username) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='API Token', attrs={'for': 'api_token'}) }}
+            {{ ui.input(id='api_token', name='api_token', type='password', required=(not jira_config), autocomplete='new-password', class='w-full font-mono',
+                        placeholder=('Leave blank to keep the existing value' if jira_config else 'Paste your Jira API token')) }}
+            {{ ui.field_description(text=('A token is stored (encrypted). Enter a new one to replace it.' if jira_config else 'Create one at id.atlassian.com under security, API tokens. It is stored encrypted and never shown again.')) }}
+            {{ field_errors(form.api_token) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Project Key', attrs={'for': 'project_key'}) }}
+            {{ ui.input(id='project_key', name='project_key', type='text', required=true, value=(form.project_key.data or ''), placeholder='EA', class='w-full font-mono') }}
+            {{ ui.field_description(text='The Jira project that receives the issues.') }}
+            {{ field_errors(form.project_key) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Issue Type', attrs={'for': 'issue_type'}) }}
+            {{ ui.input(id='issue_type', name='issue_type', type='text', value=(form.issue_type.data or 'Task'), placeholder='Task', class='w-full') }}
+            {{ ui.field_description(text='The Jira issue type to create. Defaults to Task.') }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Country Filter', attrs={'for': 'filter_countries'}) }}
+            {{ ui.input(id='filter_countries', name='filter_countries', type='text', value=(form.filter_countries.data or ''), placeholder='United Kingdom, Ireland', class='w-full') }}
+            {{ ui.field_description(text='Comma-separated countries to include when pushing.') }}
+          {% endcall %}
+          <div class="flex items-center justify-between gap-3 rounded-md border p-3">
+            <div class="space-y-1">
+              {{ ui.field_label(text='Enable Integration', attrs={'for': 'enabled'}) }}
+              <p class="text-sm text-muted-foreground">Allow pushing data to Jira.</p>
             </div>
-
-            <!-- Field Mapping Reference -->
-            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Field Mapping</h3>
-                    <p class="text-sm text-muted-foreground mt-1">How A.R.C.I.E fields map to Jira issue fields</p>
-                </div>
-                <div class="p-4 sm:p-6">
-                    <div class="overflow-x-auto">
-                        <table class="dense-table w-full text-sm">
-                            <thead>
-                                <tr class="border-b">
-                                    <th class="text-left py-2 px-3 font-medium text-muted-foreground">A.R.C.I.E Field</th>
-                                    <th class="text-left py-2 px-3 font-medium text-muted-foreground">Jira Field</th>
-                                    <th class="text-left py-2 px-3 font-medium text-muted-foreground">Authority</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="border-b"><td class="py-2 px-3">name</td><td class="py-2 px-3">summary</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">description</td><td class="py-2 px-3">description (ADF)</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">business_criticality</td><td class="py-2 px-3">priority</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">A.R.C.I.E</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">lifecycle_status</td><td class="py-2 px-3">labels</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">business_domain</td><td class="py-2 px-3">component</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">business_owner</td><td class="py-2 px-3">custom field</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">vendor_name</td><td class="py-2 px-3">custom field</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">A.R.C.I.E</span></td></tr>
-                                <tr><td class="py-2 px-3 text-muted-foreground" colspan="3">+ 8 more custom fields (TCO, rationalization score, etc.)</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-4">
-                        <button type="button" id="discover-fields-btn"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                aria-label="Discover Jira fields">
-                            <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
-                            Discover Jira Custom Fields
-                        </button>
-                        <div id="discovery-result" class="mt-2 text-sm text-muted-foreground hidden"></div>
-                    </div>
-                </div>
-            </div>
+            {% call ui.switch(id='enabled', attrs={'@click': 'on = !on', ':aria-checked': 'on', ':data-state': "on ? 'checked' : 'unchecked'", 'aria-label': 'Enable Integration'}) %}{{ ui.switch_thumb() }}{% endcall %}
+            {{ ui.input(type='hidden', name='enabled', attrs={':value': "on ? 'true' : 'false'"}) }}
+          </div>
         </div>
-    </div>
+      {% endcall %}
+      {% call ui.card_footer(class='justify-end gap-2') %}
+        {{ ui.button(text='Cancel', href=url_for('admin.index'), variant='outline') }}
+        {{ ui.button(text='Save settings', type='submit') }}
+      {% endcall %}
+    </form>
+  {% endcall %}
 
-    <!-- 3-System Authority Info -->
-    <div class="mt-8">
-        <div data-slot="card" class="rounded-lg border border-input bg-card p-4 sm:p-6">
-            <h3 class="text-lg font-semibold mb-4">3-System Authority Model</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
-                    <h4 class="font-medium text-primary mb-2">Abacus Wins</h4>
-                    <p class="text-sm text-muted-foreground">Asset identity: name, description, lifecycle, owners, country, business domain</p>
-                </div>
-                <div class="px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
-                    <h4 class="font-medium text-primary mb-2">A.R.C.I.E Wins</h4>
-                    <p class="text-sm text-muted-foreground">Enrichment: criticality, TCO, rationalization score, vendor, technology stack</p>
-                </div>
-                <div class="px-3 py-2 rounded-md bg-warning/10 border border-warning/40">
-                    <h4 class="font-medium text-warning-emphasis mb-2">Jira Wins</h4>
-                    <p class="text-sm text-muted-foreground">Workflow: status, assignee, sprint, resolution (never overwritten by push)</p>
-                </div>
-            </div>
+  {% call ui.card(attrs={'data-testid': 'jira-push-status'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Push status') }}
+      {{ ui.card_description(text='What has been pushed, what is waiting and what drifted since.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-3 text-sm') %}
+      <div id="push-status-panel" class="space-y-3">
+      {% if push_status %}
+        {{ stat_row('Total tracked', push_status.total_tracked, 'ps-total') }}
+        {{ stat_row('Pushed', push_status.pushed, 'ps-pushed') }}
+        {{ stat_row('Pending', push_status.pending, 'ps-pending') }}
+        {{ stat_row('Drift detected', push_status.drift_detected, 'ps-drift') }}
+        {{ stat_row('Failed', push_status.failed, 'ps-failed') }}
+        {% if push_status.get('last_webhook_at') %}
+        <div class="flex items-center justify-between gap-3"><span class="text-muted-foreground">Last webhook</span><span>{{ push_status.last_webhook_at }}</span></div>
+        {% endif %}
+      {% else %}
+        <p class="text-muted-foreground">Nothing has been pushed yet, so there are no counts to show.</p>
+      {% endif %}
+      </div>
+      <div id="job-status" class="space-y-1 border-t pt-3">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Latest job</span>
+          {{ ui.badge(text='Loading', variant='secondary', attrs={'id': 'job-text'}) }}
         </div>
-    </div>
+        <p class="text-muted-foreground" id="job-details">Checking.</p>
+      </div>
+    {% endcall %}
+  {% endcall %}
+
+  {% call ui.card(attrs={'data-testid': 'jira-kanban'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Kanban tasks') }}
+      {{ ui.card_description(text='Push the ADM Kanban board to Jira as tasks, phase epics and dependencies.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-3 text-sm') %}
+      <div id="kanban-push-status-panel" class="space-y-3">
+        {{ stat_row('Pushed', '—', 'kps-pushed') }}
+        {{ stat_row('Pending', '—', 'kps-pending') }}
+        {{ stat_row('Failed', '—', 'kps-failed') }}
+      </div>
+    {% endcall %}
+    {% call ui.card_footer(class='flex-wrap justify-end gap-2') %}
+      {{ ui.button(text='Push Kanban Tasks', type='button', attrs={'id': 'kanban-push-btn', 'aria-label': 'Push Kanban Tasks to Jira', 'disabled': ('disabled' if (not jira_config and not env_configured) else none)}) }}
+      {{ ui.button(text='Push Phase Epics', type='button', variant='outline', attrs={'id': 'push-epics-btn', 'aria-label': 'Push ADM Phase Epics to Jira as Plateaus', 'disabled': ('disabled' if (not push_status or push_status.pushed == 0) else none)}) }}
+      {{ ui.button(text='Push Dependencies', type='button', variant='outline', attrs={'id': 'push-dependencies-btn', 'aria-label': 'Push card dependencies as Jira Subtasks and Blocks links', 'disabled': ('disabled' if (not push_status or push_status.pushed == 0) else none)}) }}
+    {% endcall %}
+  {% endcall %}
+
+  {% call ui.card(attrs={'data-testid': 'jira-applications'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Application components') }}
+      {{ ui.card_description(text='ArchiMate application layer, phases C and D.') }}
+    {% endcall %}
+    {% call ui.card_footer(class='justify-end') %}
+      {{ ui.button(text='Push Applications', type='button', attrs={'id': 'push-applications-btn', 'aria-label': 'Push Application Components to Jira', 'disabled': ('disabled' if (not jira_config and not env_configured) else none)}) }}
+    {% endcall %}
+  {% endcall %}
+
+  {% call ui.card(attrs={'data-testid': 'jira-field-mapping'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Field mapping') }}
+      {{ ui.card_description(text='How fields in this platform map to Jira issue fields, and which system is the authority for each.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4') %}
+      {% call ui.table_container() %}{% call ui.table() %}
+        {% call ui.table_header() %}{% call ui.table_row() %}
+          {% call ui.table_head() %}Platform field{% endcall %}{% call ui.table_head() %}Jira field{% endcall %}{% call ui.table_head() %}Authority{% endcall %}
+        {% endcall %}{% endcall %}
+        {% call ui.table_body() %}
+          {% for src, dst, who in [('name', 'summary', 'Abacus'), ('description', 'description (ADF)', 'Abacus'), ('business_criticality', 'priority', 'Entelim'), ('lifecycle_status', 'labels', 'Abacus'), ('business_domain', 'component', 'Abacus'), ('business_owner', 'custom field', 'Abacus'), ('vendor_name', 'custom field', 'Entelim')] %}
+          {% call ui.table_row() %}
+            {% call ui.table_cell() %}{{ src }}{% endcall %}{% call ui.table_cell() %}{{ dst }}{% endcall %}{% call ui.table_cell() %}{{ ui.badge(text=who, variant='outline') }}{% endcall %}
+          {% endcall %}
+          {% endfor %}
+          {% call ui.table_row() %}{% call ui.table_cell(attrs={'colspan': '3'}) %}<span class="text-muted-foreground">Plus 8 more custom fields (cost of ownership, rationalization score and others).</span>{% endcall %}{% endcall %}
+        {% endcall %}
+      {% endcall %}{% endcall %}
+      <div class="space-y-2">
+        {{ ui.button(text='Discover Jira Custom Fields', type='button', variant='outline', attrs={'id': 'discover-fields-btn', 'aria-label': 'Discover Jira fields'}) }}
+        <div id="discovery-result" class="hidden text-sm text-muted-foreground" role="status"></div>
+      </div>
+    {% endcall %}
+  {% endcall %}
+
+  {% call ui.card() %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Which system wins') }}
+      {{ ui.card_description(text='Each field has one system of record, so a push never overwrites work done elsewhere.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-3 text-sm') %}
+      <div><h3 class="font-medium">Abacus wins</h3><p class="text-muted-foreground">Asset identity: name, description, lifecycle, owners, country, business domain.</p></div>
+      <div><h3 class="font-medium">Entelim wins</h3><p class="text-muted-foreground">Enrichment: criticality, cost of ownership, rationalization score, vendor, technology stack.</p></div>
+      <div><h3 class="font-medium">Jira wins</h3><p class="text-muted-foreground">Workflow: status, assignee, sprint, resolution. A push never overwrites these.</p></div>
+    {% endcall %}
+  {% endcall %}
 </div>
+</div>
+{% endblock %}
 
-<!-- Initialize Lucide & JS -->
-<script>
-    lucide.createIcons();
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var HEADERS = { headers: { 'X-Requested-With': 'XMLHttpRequest' } };
+    var opts = { silent: true, headers: HEADERS.headers };
+    var pollInterval = null;
+    var kanbanPollInterval = null;
+    function el(id) { return document.getElementById(id); }
 
-    let pollInterval = null;
-    let kanbanPollInterval = null;
-
-    // Test Connection
-    document.getElementById('test-connection-btn')?.addEventListener('click', function() {
-        const btn = this;
+    // Runs one button's request: the button says what it is doing, answers in a toast, and is restored.
+    function run(btn, busyText, request, answer) {
+        var label = btn.textContent;
         btn.disabled = true;
-        btn.textContent = 'Testing...';
-
-        Platform.fetch.post('{{ url_for("admin.jira_test_connection") }}', undefined,
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="wifi" class="w-4 h-4"></i> Test Connection';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            if (data.success) {
-                Platform.toast.success('Connection successful');
-                location.reload();
-            } else {
-                Platform.toast.error('Connection failed: ' + data.message);
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="wifi" class="w-4 h-4"></i> Test Connection';
-            Platform.toast.error('Error: ' + err.message);
+        btn.textContent = busyText;
+        request().then(function (data) { answer(data); })
+            .catch(function (err) { Platform.toast.error('Error: ' + err.message); })
+            .then(function () { btn.disabled = false; btn.textContent = label; });
+    }
+    function onClick(id, confirmText, busyText, request, answer) {
+        var btn = el(id);
+        if (!btn) { return; }
+        btn.addEventListener('click', function () {
+            var go = function () { run(btn, busyText, request, answer); };
+            if (confirmText) { Platform.modal.confirm(confirmText).then(function (ok) { if (ok) { go(); } }); } else { go(); }
         });
+    }
+    function post(url, body) { return function () { return Platform.fetch.post(url, body, opts); }; }
+
+    onClick('test-connection-btn', null, 'Testing…', post('{{ url_for("admin.jira_test_connection") }}', undefined), function (data) {
+        if (data.success) { Platform.toast.success('Connection successful'); location.reload(); }
+        else { Platform.toast.error('Connection failed: ' + data.message); }
+    });
+    onClick('push-btn', 'Push all in-scope applications to Jira? This will create or update Jira issues.', 'Pushing…', post('{{ url_for("admin.jira_trigger_push") }}', { force: false }), function (data) {
+        if (data.success) {
+            var r = data.result;
+            Platform.toast.info('Push complete: ' + r.created + ' created, ' + r.updated + ' updated, ' + r.skipped + ' skipped, ' + r.failed + ' failed');
+            refreshPushStatus();
+        } else { Platform.toast.error('Push failed: ' + (data.error || 'Unknown error')); }
+    });
+    onClick('kanban-push-btn', 'Push all un-synced ADM Kanban tasks to Jira?', 'Pushing…', post('{{ url_for("admin.jira_trigger_kanban_push") }}', {}), function (data) {
+        if (data.success) { Platform.toast.info('Kanban push complete: ' + data.pushed + ' pushed, ' + data.failed + ' failed'); refreshKanbanStatus(); }
+        else { Platform.toast.error('Push failed: ' + (data.error || 'Unknown error')); }
+    });
+    onClick('push-epics-btn', 'Create one Jira Epic per ADM phase as an ArchiMate Plateau?', 'Pushing…', post('{{ url_for("admin.jira_push_epics") }}', {}), function (data) {
+        if (data.success) { Platform.toast.info('Phase Epics push complete: ' + data.pushed + ' pushed, ' + data.failed + ' failed'); }
+        else { Platform.toast.error('Push failed: ' + (data.error || 'Unknown error')); }
+    });
+    onClick('push-dependencies-btn', 'Create Jira Subtasks from card depends_on and Blocks links from card blocks[]?', 'Pushing…', post('{{ url_for("admin.jira_push_dependencies") }}', undefined), function (data) {
+        if (data.success) { Platform.toast.info('Dependencies push complete: ' + data.linked + ' linked, ' + data.failed + ' failed'); }
+        else { Platform.toast.error('Push failed: ' + (data.error || 'Unknown error')); }
+    });
+    onClick('push-applications-btn', 'Push all ApplicationComponents (Phase C/D) to Jira?', 'Pushing…', post('{{ url_for("admin.jira_push_applications") }}', {}), function (data) {
+        if (data.success) { Platform.toast.info('Applications push complete: ' + (data.created || 0) + ' created, ' + (data.updated || 0) + ' updated, ' + (data.failed || 0) + ' failed'); }
+        else { Platform.toast.error('Push failed: ' + (data.error || 'Unknown error')); }
+    });
+    onClick('discover-fields-btn', null, 'Discovering…', function () { return Platform.fetch('{{ url_for("admin.jira_field_discovery") }}', opts); }, function (data) {
+        var out = el('discovery-result');
+        out.classList.remove('hidden');
+        if (data.success && data.fields) {
+            out.textContent = 'Found ' + data.fields.length + ' fields: ' + data.fields.slice(0, 20).map(function (f) { return f.key + ' (' + (f.name || 'unnamed') + ')'; }).join(', ');
+        } else { out.textContent = 'Discovery failed: ' + (data.message || 'Unknown'); }
     });
 
-    // Push to Jira
-    document.getElementById('push-btn')?.addEventListener('click', async function() {
-        if (!(await Platform.modal.confirm('Push all in-scope applications to Jira? This will create or update Jira issues.'))) return;
-
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = 'Pushing...';
-
-        Platform.fetch.post('{{ url_for("admin.jira_trigger_push") }}', {force: false},
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="upload" class="w-4 h-4"></i> Push to Jira';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            if (data.success) {
-                const r = data.result;
-                Platform.toast.info(`Push complete: ${r.created} created, ${r.updated} updated, ${r.skipped} skipped, ${r.failed} failed`);
-                refreshPushStatus();
-            } else {
-                Platform.toast.error('Push failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="upload" class="w-4 h-4"></i> Push to Jira';
-            Platform.toast.error('Error: ' + err.message);
-        });
-    });
-
-    // Discover Fields
-    document.getElementById('discover-fields-btn')?.addEventListener('click', function() {
-        const btn = this;
-        const resultDiv = document.getElementById('discovery-result');
-        btn.disabled = true;
-        btn.textContent = 'Discovering...';
-
-        Platform.fetch('{{ url_for("admin.jira_field_discovery") }}',
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="search" class="w-4 h-4"></i> Discover Jira Custom Fields';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            resultDiv.classList.remove('hidden');
-            if (data.success && data.fields) {
-                resultDiv.innerHTML = '<strong>Found ' + data.fields.length + ' fields:</strong><br>' +
-                    data.fields.slice(0, 20).map(f => f.key + ' (' + (f.name || 'unnamed') + ')').join('<br>');
-            } else {
-                resultDiv.textContent = 'Discovery failed: ' + (data.message || 'Unknown');
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            resultDiv.classList.remove('hidden');
-            resultDiv.textContent = 'Error: ' + err.message;
-        });
-    });
-
-    // Kanban push status polling
-    let kanbanStatusFailing = false;
+    // Counters the server did not send are shown as a dash, never as a zero.
+    var kanbanStatusFailing = false;
     function refreshKanbanStatus() {
-        const el = (id) => document.getElementById(id);
-        // Platform.fetch throws on a non-ok response, so the 4xx/5xx case that a
-        // bare request would silently resolve lands in the .catch below.
-        Platform.fetch('{{ url_for("admin.jira_kanban_push_status") }}',
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            if (!data.success || !data.kanban_status) throw new Error(data.message || 'kanban status unavailable');
-            const ks = data.kanban_status;
-            if (el('kps-pushed')) el('kps-pushed').textContent = ks.pushed !== undefined ? ks.pushed : '—';
-            if (el('kps-pending')) el('kps-pending').textContent = ks.pending !== undefined ? ks.pending : '—';
-            if (el('kps-failed')) el('kps-failed').textContent = ks.failed !== undefined ? ks.failed : '—';
+        Platform.fetch('{{ url_for("admin.jira_kanban_push_status") }}', opts)
+        .then(function (data) {
+            if (!data.success || !data.kanban_status) { throw new Error(data.message || 'kanban status unavailable'); }
+            var ks = data.kanban_status;
+            ['pushed', 'pending', 'failed'].forEach(function (k) {
+                if (el('kps-' + k)) { el('kps-' + k).textContent = ks[k] !== undefined ? ks[k] : '—'; }
+            });
             kanbanStatusFailing = false;
         })
-        .catch(() => {
-            // Blank the counters rather than leaving the last good poll on
-            // screen: "unknown" must not be readable as a current figure.
-            ['kps-pushed', 'kps-pending', 'kps-failed'].forEach(id => {
-                if (el(id)) el(id).textContent = '—';
-            });
-            // Polls every 5s: one toast per outage, not one per tick.
-            if (!kanbanStatusFailing) {
-                kanbanStatusFailing = true;
-                Platform.toast.error('Could not load Kanban push status.');
-            }
+        .catch(function () {
+            ['kps-pushed', 'kps-pending', 'kps-failed'].forEach(function (id) { if (el(id)) { el(id).textContent = '—'; } });
+            if (!kanbanStatusFailing) { kanbanStatusFailing = true; Platform.toast.error('Could not load Kanban push status.'); }
         });
     }
 
-    // Push Kanban Tasks button
-    document.getElementById('kanban-push-btn')?.addEventListener('click', async function() {
-        if (!(await Platform.modal.confirm('Push all un-synced ADM Kanban tasks to Jira?'))) return;
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = 'Pushing...';
-
-        Platform.fetch.post('{{ url_for("admin.jira_trigger_kanban_push") }}', {},
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i> Push Kanban Tasks';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            if (data.success) {
-                Platform.toast.info(`Kanban push complete: ${data.pushed} pushed, ${data.failed} failed`);
-                refreshKanbanStatus();
-            } else {
-                Platform.toast.error('Push failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i> Push Kanban Tasks';
-            Platform.toast.error('Error: ' + err.message);
-        });
-    });
-
-    // Push Phase Epics button
-    document.getElementById('push-epics-btn')?.addEventListener('click', async function() {
-        if (!(await Platform.modal.confirm('Create one Jira Epic per ADM phase as an ArchiMate Plateau?'))) return;
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = 'Pushing...';
-
-        Platform.fetch.post('{{ url_for("admin.jira_push_epics") }}', {},
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i> Push Phase Epics';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            if (data.success) {
-                Platform.toast.info(`Phase Epics push complete: ${data.pushed} pushed, ${data.failed} failed`);
-            } else {
-                Platform.toast.error('Push failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i> Push Phase Epics';
-            Platform.toast.error('Error: ' + err.message);
-        });
-    });
-
-    // Push Dependencies button (JIRA-008 — Subtasks + Blocks links)
-    document.getElementById('push-dependencies-btn')?.addEventListener('click', async function() {
-        if (!(await Platform.modal.confirm('Create Jira Subtasks from card depends_on and Blocks links from card blocks[]?'))) return;
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = 'Pushing...';
-        Platform.fetch.post('{{ url_for("admin.jira_push_dependencies") }}', undefined,
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="git-merge" class="w-4 h-4"></i> Push Dependencies';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            if (data.success) {
-                Platform.toast.info(`Dependencies push complete: ${data.linked} linked, ${data.failed} failed`);
-            } else {
-                Platform.toast.error('Push failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="git-merge" class="w-4 h-4"></i> Push Dependencies';
-            Platform.toast.error('Error: ' + err.message);
-        });
-    });
-
-    // Poll push status
-    let pushStatusFailing = false;
+    var pushStatusFailing = false;
     function refreshPushStatus() {
-        const el = (id) => document.getElementById(id);
-        // Platform.fetch throws on a non-ok response, so the 4xx/5xx case that a
-        // bare request would silently resolve lands in the .catch below.
-        Platform.fetch('{{ url_for("admin.jira_push_status") }}',
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            const ps = data.push_status || {};
-            // `?? '—'`, not `|| 0`: a counter the server did not send is
-            // unknown, and a 0 there is indistinguishable from a real zero.
-            if (el('ps-total')) el('ps-total').textContent = ps.total_tracked ?? '—';
-            if (el('ps-pushed')) el('ps-pushed').textContent = ps.pushed ?? '—';
-            if (el('ps-pending')) el('ps-pending').textContent = ps.pending ?? '—';
-            if (el('ps-drift')) el('ps-drift').textContent = ps.drift_detected ?? '—';
-            if (el('ps-failed')) el('ps-failed').textContent = ps.failed ?? '—';
+        Platform.fetch('{{ url_for("admin.jira_push_status") }}', opts)
+        .then(function (data) {
+            var ps = data.push_status || {};
+            [['ps-total', 'total_tracked'], ['ps-pushed', 'pushed'], ['ps-pending', 'pending'], ['ps-drift', 'drift_detected'], ['ps-failed', 'failed']].forEach(function (p) {
+                if (el(p[0])) { el(p[0]).textContent = (ps[p[1]] === undefined || ps[p[1]] === null) ? '—' : ps[p[1]]; }
+            });
             pushStatusFailing = false;
-
-            const job = data.latest_job;
-            const ind = el('job-indicator');
-            const txt = el('job-text');
-            const det = el('job-details');
+            var job = data.latest_job;
             if (!job) {
-                if (txt) txt.textContent = 'No push jobs yet';
-                if (det) det.textContent = '';
+                if (el('job-text')) { el('job-text').textContent = 'No push jobs yet'; }
+                if (el('job-details')) { el('job-details').textContent = ''; }
                 return;
             }
-            const statusColors = {
-                completed: 'bg-primary',
-                in_progress: 'bg-primary animate-pulse',
-                failed: 'bg-destructive',
-                pending: 'bg-warning',
-            };
-            if (ind) ind.className = 'h-3 w-3 rounded-full ' + (statusColors[job.status] || 'bg-muted-foreground');
-            if (txt) txt.textContent = (job.status || 'unknown').replace('_', ' ');
-            let detail = 'Job #' + job.id;
-            if (job.created_at) detail += ' | ' + new Date(job.created_at).toLocaleString();
+            if (el('job-text')) { el('job-text').textContent = (job.status || 'unknown').replace('_', ' '); }
+            var detail = 'Job #' + job.id;
+            if (job.created_at) { detail += ' | ' + new Date(job.created_at).toLocaleString(); }
             if (job.result) {
-                const r = job.result;
-                detail += ` | Created: ${r.created || 0}, Updated: ${r.updated || 0}, Skipped: ${r.skipped || 0}, Failed: ${r.failed || 0}`;
+                var r = job.result;
+                detail += ' | Created: ' + (r.created || 0) + ', Updated: ' + (r.updated || 0) + ', Skipped: ' + (r.skipped || 0) + ', Failed: ' + (r.failed || 0);
             }
-            if (job.error) detail += ' | Error: ' + job.error;
-            if (det) det.textContent = detail;
+            if (job.error) { detail += ' | Error: ' + job.error; }
+            if (el('job-details')) { el('job-details').textContent = detail; }
         })
-        .catch(() => {
-            ['ps-total', 'ps-pushed', 'ps-pending', 'ps-drift', 'ps-failed'].forEach(id => {
-                if (el(id)) el(id).textContent = '—';
-            });
-            const ind = el('job-indicator');
-            const txt = el('job-text');
-            const det = el('job-details');
-            // Distinct from "No push jobs yet" — a failed status read must not
-            // be mistaken for a confirmed absence of jobs.
-            if (ind) ind.className = 'h-3 w-3 rounded-full bg-destructive';
-            if (txt) txt.textContent = 'status unavailable';
-            if (det) det.textContent = '';
-            // Polls every 5s: one toast per outage, not one per tick.
-            if (!pushStatusFailing) {
-                pushStatusFailing = true;
-                Platform.toast.error('Could not load Jira push status.');
-            }
+        .catch(function () {
+            ['ps-total', 'ps-pushed', 'ps-pending', 'ps-drift', 'ps-failed'].forEach(function (id) { if (el(id)) { el(id).textContent = '—'; } });
+            // Distinct from "No push jobs yet": a failed read is not a confirmed absence of jobs.
+            if (el('job-text')) { el('job-text').textContent = 'Status unavailable'; }
+            if (el('job-details')) { el('job-details').textContent = ''; }
+            if (!pushStatusFailing) { pushStatusFailing = true; Platform.toast.error('Could not load Jira push status.'); }
         });
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         refreshPushStatus();
         refreshKanbanStatus();
         pollInterval = setInterval(refreshPushStatus, 5000);
         kanbanPollInterval = setInterval(refreshKanbanStatus, 5000);
     });
-
-    // Push Application Components button
-    document.getElementById('push-applications-btn')?.addEventListener('click', async function() {
-        if (!(await Platform.modal.confirm('Push all ApplicationComponents (Phase C/D) to Jira?'))) return;
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = 'Pushing...';
-
-        Platform.fetch.post('{{ url_for("admin.jira_push_applications") }}', {},
-            { silent: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="cpu" class="w-4 h-4"></i> Push Applications';
-            lucide.createIcons({attrs: {class: 'w-4 h-4'}});
-            if (data.success) {
-                Platform.toast.info(`Applications push complete: ${data.created || 0} created, ${data.updated || 0} updated, ${data.failed || 0} failed`);
-            } else {
-                Platform.toast.error('Push failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="cpu" class="w-4 h-4"></i> Push Applications';
-            Platform.toast.error('Error: ' + err.message);
-        });
+    window.addEventListener('beforeunload', function () {
+        if (pollInterval) { clearInterval(pollInterval); }
+        if (kanbanPollInterval) { clearInterval(kanbanPollInterval); }
     });
-
-    window.addEventListener('beforeunload', function() {
-        if (pollInterval) clearInterval(pollInterval);
-        if (kanbanPollInterval) clearInterval(kanbanPollInterval);
-    });
+})();
 </script>
 {% endblock %}
