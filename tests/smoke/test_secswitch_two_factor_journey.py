@@ -24,8 +24,10 @@ def world(app):
     return sup.seed(app)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def page(browser, server):
+    """Each test, and so each identity, gets its own browser context: no cookie
+    or request in flight from one person can reach the next."""
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     context.set_default_timeout(30000)
     context.set_default_navigation_timeout(60000)
@@ -69,3 +71,5 @@ def test_05_a_member_of_another_organisation_signs_in_with_the_password_alone(pa
     sup.sign_in(page, server, world["other"])
     page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
     assert "mfa" not in page.url
+    # This member, and nobody else, is the person signed in.
+    expect(page.locator("#user-menu-btn")).to_have_attribute("aria-label", re.compile(re.escape(world["other"])))

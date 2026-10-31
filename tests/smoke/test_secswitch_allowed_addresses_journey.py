@@ -19,7 +19,7 @@ SENTENCE = "Sign-in from this address is not allowed by your organisation. Ask y
 
 @pytest.fixture(scope="module")
 def server(request, ai_protocol_stub, app):
-    return boot_live_server(request, ai_protocol_stub, app, extra_env={"FLASK_CONFIG": "testing"})
+    return boot_live_server(request, ai_protocol_stub, app, extra_env={"FLASK_CONFIG": "testing", "TRUST_PROXY": "1"})
 
 
 @pytest.fixture(scope="module")
@@ -100,4 +100,17 @@ def test_05_another_organisation_is_not_limited_by_this_organisations_list(brows
     page = context.new_page()
     sup.sign_in(page, server, world["other"])
     page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
+    context.close()
+
+
+def test_06_a_wrong_password_from_an_unlisted_address_gets_the_same_sentence(browser, server, world):
+    context = _context(browser, OUTSIDE)
+    page = context.new_page()
+    page.goto(server + "/account/login", wait_until="domcontentloaded")
+    page.fill("#email", world["plain"])
+    page.fill("#password", "not-the-password")
+    page.locator("#submit").click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/dashboard" not in page.url
+    assert SENTENCE in page.locator("body").inner_text()
     context.close()

@@ -97,15 +97,13 @@ def login():
         except Exception as _sso_exc:
             _log.warning("SSO domain check failed; falling back to the password path", exc_info=True)
 
-        user = None if _sso_conflict else _svc.authenticate(form.email.data, form.password.data)
-        # An organisation's allowed-addresses switch refuses the sign-in like a failed one.
-        _address_refusal = None
-        if user is not None:
-            from app.services import org_security
+        # An organisation's allowed-addresses switch is decided from the account
+        # before the password is checked, so a right and a wrong password from an
+        # unlisted address get the same answer.
+        from app.services import org_security
 
-            _address_refusal = org_security.check_sign_in(user)
-            if _address_refusal:
-                user = None
+        _address_refusal = None if _sso_conflict else org_security.check_sign_in_for_email(form.email.data)
+        user = None if (_sso_conflict or _address_refusal) else _svc.authenticate(form.email.data, form.password.data)
         if user is not None:
             # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
             # multi-factor before the login finishes, whether they are

@@ -87,7 +87,7 @@ def validate_and_store(org_id, settings):
         return EMPTY_LIST_REASON
     for name, value in present.items():
         if name in (TWO_FACTOR, ADDRESS_SWITCH):
-            value = bool(value)
+            value = value.strip().lower() in ("true", "1", "on", "yes") if isinstance(value, str) else bool(value)
         else:
             value = str(value or "")
         db.session.execute(
@@ -140,14 +140,11 @@ def sign_in_refusal(user, ip):
 
 
 def client_address():
-    """The address the request came from, as the nearest proxy saw it.
-
-    The right-most X-Forwarded-For entry is the one our own proxy appended;
-    anything to its left is supplied by the caller and is not trusted."""
+    """The address the request came from. Trust in a proxy's forwarded address
+    is decided in one place (ProxyFix / TRUST_PROXY), which sets remote_addr."""
     from flask import request
 
-    forwarded = [p.strip() for p in (request.headers.get("X-Forwarded-For") or "").split(",") if p.strip()]
-    return forwarded[-1] if forwarded else (request.remote_addr or "")
+    return (request.remote_addr or "").strip()
 
 
 def check_sign_in(user):
@@ -155,3 +152,14 @@ def check_sign_in(user):
 
     The caller records the refusal like a failed sign-in."""
     return sign_in_refusal(user, client_address())
+
+
+def check_sign_in_for_email(email):
+    """The refusal sentence for ``email`` from this request's address, decided
+    from the account alone so a right and a wrong password get the same answer."""
+    from app.models.user import User
+
+    email = (email or "").strip()
+    if not email:
+        return None
+    return check_sign_in(User.find_by_email(email))

@@ -40,7 +40,7 @@
         {{ button(text='Save all changes', variant='primary', icon='save', testid='btn-save-all', aria_label='Save all settings', on_click='save()', attrs_dict={':disabled': 'saving'}) }}
     </div>
     {% endmacro %}
-    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform-wide configuration. Changes apply to every organisation.', actions_caller=_ps_actions) }}
+    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform settings. The sign-in switches below apply to your organisation.', actions_caller=_ps_actions) }}
 
     <div x-show="loadFailed" x-cloak>
         {{ quiet_alert(kind='warning', title='Saved settings could not be loaded', text='The values shown are the defaults, not what is saved. Reload the page before changing anything.') }}

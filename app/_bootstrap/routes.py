@@ -474,14 +474,21 @@ def _register_api_auth(app, csrf):
 
         user = User.find_by_email(email)
 
+        # The address decision comes before the password check, so a right and
+        # a wrong password from an unlisted address get the same answer.
+        from app.services import auth_audit as _aa, org_security as _os
+
+        _refusal = _os.check_sign_in(user)
+        if _refusal:
+            _aa.record_login_failure(email)
+            return jsonify({"success": False, "error": "address_not_allowed", "message": _refusal}), 401
+
         if (
             user is None
             or user.password_hash is None
             or not user.verify_password(password)
         ):
-            from app.services import auth_audit
-
-            auth_audit.record_login_failure(email)
+            _aa.record_login_failure(email)
             return jsonify(
                 {"success": False, "error": "Invalid email or password"}
             ), 401
@@ -491,15 +498,7 @@ def _register_api_auth(app, csrf):
         # API with no API-based TOTP-code submission step (out of scope to
         # add here), so the only safe behaviour is to refuse the login
         # outright -- never call login_and_register -- and tell the caller
-        # why. Mirrors the gate app/modules/account/v2/routes/account_routes.py's
-        # login() already applies to the form-based login.
-        from app.services import auth_audit as _aa, org_security as _os
-
-        _refusal = _os.check_sign_in(user)
-        if _refusal:
-            _aa.record_login_failure(user.email)
-            return jsonify({"success": False, "error": "address_not_allowed", "message": _refusal}), 401
-
+        # why.
         if mfa_service.required_for(user):
             return jsonify(
                 {

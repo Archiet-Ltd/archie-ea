@@ -1464,7 +1464,7 @@ def save_system_settings():
             return jsonify({"status": "error", "message": org_error, "fields": [org_security.ADDRESS_LIST]}), 400
 
         for key, value in settings_data.items():
-            if key in org_security.ORG_KEYS or key == "data-encryption":
+            if key in org_security.ORG_KEYS or key == "data-encryption" or str(key).startswith("org:"):
                 continue
             db.session.execute(
                 db.text(
