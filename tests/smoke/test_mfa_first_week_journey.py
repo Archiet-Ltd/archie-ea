@@ -33,7 +33,8 @@ def week_server(request, ai_protocol_stub, app):
     return boot_live_server(request, ai_protocol_stub, app, extra_env={"FLASK_CONFIG": "testing"})
 
 
-@pytest.fixture(scope="module", params=[(1440, "light"), (390, "dark")], ids=["desktop-light", "phone-dark"])
+@pytest.fixture(scope="module", params=[(1440, "light"), (1440, "dark"), (390, "light"), (390, "dark")],
+                ids=["desktop-light", "desktop-dark", "phone-light", "phone-dark"])
 def journey(request, browser, week_server):
     width, theme = request.param
     context = browser.new_context(viewport={"width": width, "height": 900})
