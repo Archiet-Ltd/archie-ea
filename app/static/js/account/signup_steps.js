@@ -67,6 +67,12 @@
                 fill.style.transform = 'translateX(-' + (100 - row.progress.percent) + '%)';
             }
         }
+        var lead = block.querySelector('[data-reading-line]');
+        if (lead) {
+            lead.textContent = row.state === 'reading' && row.reading_line ? row.reading_line : '';
+            lead.classList.toggle('hidden', !lead.textContent);
+            lead.setAttribute('data-state', row.state);
+        }
         var actions = block.querySelector('[data-reading-actions]');
         if (!actions) return;
         var wanted = [];
@@ -120,6 +126,7 @@
     function paint(sources) {
         (sources || []).forEach(function (row) {
             var line = root.querySelector('[data-source="' + row.key + '"]');
+            if (row.key === 'website' && !line && row.state !== 'not_given') paintReading(row);
             if (!line || row.state === 'not_given') return;
             line.textContent = row.text;
             line.setAttribute('data-state', row.state);
@@ -227,7 +234,7 @@
                 window.location.assign(button.getAttribute('data-next'));
             }).catch(function (error) {
                 busy(button, false);
-                say('choices', (error.message || 'Your choices were not saved.') + ' You can set them later in Settings.', true);
+                say('choices', (error.message || 'Your choices were not saved.') + ' You can set them later in Account settings.', true);
             });
         } else if (action === 'save-choices') {
             busy(button, true);
@@ -256,6 +263,16 @@
             }).then(function () { busy(button, false); });
         }
     });
+
+    // While the website is still being read, the step refreshes itself every ten seconds (what the person typed is
+    // saved first), so the facts found appear without the person doing anything.
+    var refreshEvery = parseInt(root.getAttribute('data-refresh-seconds') || '0', 10);
+    if (refreshEvery > 0) {
+        window.setInterval(function () {
+            if (!root.querySelector('[data-state="waiting"], [data-state="reading"]')) return;
+            saveEverything().then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
+        }, refreshEvery * 1000);
+    }
 
     rememberChatTab();
     if (root.hasAttribute('data-reload-when-read') || root.querySelector('[data-assistant-connected]')) poll();

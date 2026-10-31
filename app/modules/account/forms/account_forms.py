@@ -8,9 +8,23 @@ from flask import url_for
 from flask_wtf import FlaskForm
 from wtforms import ValidationError
 from wtforms.fields import BooleanField, EmailField, PasswordField, StringField, SubmitField
+from wtforms.widgets import PasswordInput
 from wtforms.validators import Email, EqualTo, InputRequired, Length
 
 from app.models import User
+
+
+def deliverable_email(form, field):
+    """Accept any syntactically valid address, reserved domains included; refuse only what mail cannot be sent to."""
+    from email_validator import EmailNotValidError, validate_email
+
+    from app.models.validators import validate_email as model_accepts
+
+    try:
+        validate_email(field.data or "", check_deliverability=False, globally_deliverable=False, test_environment=True)
+        model_accepts(field.data or "")  # the account record refuses what its own pattern refuses
+    except (EmailNotValidError, ValueError):
+        raise ValidationError("We cannot send to this address. Check it for a typing mistake.")
 
 
 class LoginForm(FlaskForm):
@@ -25,13 +39,14 @@ class LoginForm(FlaskForm):
 class RegistrationForm(FlaskForm):
     first_name = StringField("First name", validators=[InputRequired(), Length(1, 64)])
     last_name = StringField("Last name", validators=[InputRequired(), Length(1, 64)])
-    email = EmailField("Email", validators=[InputRequired(), Length(1, 64), Email()])
+    email = EmailField("Email", validators=[InputRequired(), Length(1, 64), deliverable_email])
     password = PasswordField(
-        "Password", validators=[InputRequired(), EqualTo("password2", "Passwords must match")]
-    ,
+        "Password", validators=[InputRequired(), EqualTo("password2", "Passwords must match")],
+        widget=PasswordInput(hide_value=False),
         render_kw={"autocomplete": "new-password"},
     )
     password2 = PasswordField("Confirm password", validators=[InputRequired()],
+        widget=PasswordInput(hide_value=False),
         render_kw={"autocomplete": "new-password"},
     )
     submit = SubmitField("Register")

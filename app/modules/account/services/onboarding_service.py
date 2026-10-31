@@ -487,7 +487,10 @@ def website_state(org) -> Dict[str, Any]:
             text = "Opening %s. Up to %d pages will be read." % (_address(progress.get("current")) or host, limit)
         else:
             text = "Read %d of up to %d pages. Reading now: %s." % (read, limit, _address(progress.get("current")))
-        return {"state": "reading", "text": text, "progress": {"read": read, "limit": limit, "percent": percent}}
+        lead = ("We are reading %s: page %d of up to %d. Answer the questions below now; "
+                "the facts we find will be waiting on your Overview to confirm" % (host, max(read, 1), limit)) if read else None
+        return {"state": "reading", "text": text, "reading_line": lead,
+                "progress": {"read": read, "limit": limit, "percent": percent}}
     return {"state": "waiting", "text": "Company website is connected. Reading starts in a moment; carry on."}
 
 

@@ -59,6 +59,7 @@
                     {% endfor %}
 
                     {{ f.end_form(form) }}
+                    <p class="mt-2 text-center text-sm text-muted-foreground {{ 'hidden' if form.password.data else '' }}" role="status" data-testid="register-disabled-reason">Enter a password to continue</p>
 
                     <div class="mt-4 text-center text-sm text-muted-foreground" data-testid="register-signin">
                         Already have an account?
@@ -69,6 +70,17 @@
         </div>
     </div>
     {{ check.password_check('password', 0) }}
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var password = document.getElementById('password');
+        var reason = document.querySelector('[data-testid="register-disabled-reason"]');
+        if (!password || !reason) return;
+        var submit = document.getElementById('submit');
+        function show() { reason.classList.toggle('hidden', !(submit && submit.disabled)); }
+        password.addEventListener('input', show);
+        show();
+      });
+    </script>
     {% elif step == 2 %}
     {% for notice in get_flashed_messages(category_filter=['signup-notice']) %}
     {% call alert('success', testid='signup-notice') %}{{ notice }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}

@@ -11,7 +11,6 @@
             {% call card_description() %}Optional. Ask about your company inside the AI chat you already use, or use {{ config.APP_NAME }}'s own chat.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}
-            {% if website %}{% include 'account/_website_reading.html' %}{% endif %}
             {% if mcp_address %}
             <div class="style-vega space-y-4" data-testid="signup-ai-chat" data-mcp-address="{{ mcp_address }}">
                 <p class="text-sm text-muted-foreground">Add your workspace to the AI chat you already use. Sign in when it asks, allow read access, and ask your first question there. Until a source is connected, answers come from the sample company or the facts read from your website.</p>

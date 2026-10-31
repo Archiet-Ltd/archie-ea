@@ -109,8 +109,10 @@ def test_a_founder_watches_the_reading_confirms_what_it_found_and_asks_the_chat_
         shoot(page, "company-reading", width)
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=4")
-        expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile(r"of up to 30 pages|Opening 127|facts wait"), timeout=PAGE_TIMEOUT)
+        # The reading line belongs to step 3 only; the AI chat step does not repeat it.
+        expect(page.get_by_test_id("signup-status-website")).to_have_count(0)
         shoot(page, "ai-reading", width)
+        page.goto(str(server) + "/account/welcome", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # When the facts are ready, the screen says how many and offers the way to them.
         ready = page.get_by_test_id("website-next")

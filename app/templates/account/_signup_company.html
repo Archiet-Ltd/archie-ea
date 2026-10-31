@@ -4,19 +4,20 @@
      data-url-profile="{{ url_for('account.welcome_profile') }}"
      data-url-status="{{ url_for('account.welcome_status') }}"
      {% set site_row = sources | selectattr('key', 'equalto', 'website') | first %}
-     {% if website and not facts and site_row.state in ('waiting', 'reading') %}data-reload-when-read="true"{% endif %}
+     {% if website and not facts and site_row.state in ('waiting', 'reading') %}data-reload-when-read="true" data-refresh-seconds="10"{% endif %}
      class="space-y-6" data-testid="signup-company">
     {% call card() %}
         {% call card_header() %}
             {% call card_title(class='text-xl') %}About your company{% endcall %}
-            {% call card_description() %}Optional. Confirm what we read, answer three questions, and change any of it later in Settings.{% endcall %}
+            {% call card_description() %}Optional. Confirm what we read, answer three questions, and change any of it later in <a class="underline underline-offset-4" href="{{ url_for('account.manage') }}">Account settings</a>.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}
             {% if facts %}
+            {% if website and site_row.state == 'reading' %}{% set reading_lead = true %}{% set lead_only = true %}{% include 'account/_website_reading.html' %}{% endif %}
             {% include 'account/_company_facts.html' %}
             {% if more_coming %}<p class="text-sm text-muted-foreground" role="status" data-testid="more-facts-coming">{{ more_coming }}</p>{% endif %}
             {% elif website %}
-            {% include 'account/_website_reading.html' %}
+            {% set reading_lead = true %}{% include 'account/_website_reading.html' %}
             {% endif %}
             {% include 'account/_company_asked.html' %}
             {% include 'account/_company_choices.html' %}
