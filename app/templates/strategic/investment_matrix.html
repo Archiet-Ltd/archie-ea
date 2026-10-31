@@ -1,5 +1,8 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -624,19 +627,22 @@ if (investmentCanvas) {
 {{ roi_calculator_modal() }}
 {{ scenario_comparison_modal(capability_scores) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='investment-proposal-modal', kind='investment_proposal', button_text='Create Proposal') }}
+</div>
 
 {{ initiative_modal(
     id='investment-proposal-modal',
     title='Create Investment Proposal',
     endpoint='/strategic/api/initiatives/from-investment',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Proposal Title', 'required': True, 'placeholder': 'e.g., Customer Service Platform Investment'},
+        {'name': 'name', 'type': 'text', 'label': 'Proposal Title', 'required': True, 'placeholder': 'e.g., Customer Service Platform Investment'},
         {'name': 'description', 'type': 'textarea', 'label': 'Business Case', 'required': True, 'placeholder': 'Describe the investment rationale...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Executive sponsor'},
-        {'name': 'budget', 'type': 'number', 'label': 'Requested Budget ($)', 'required': True, 'placeholder': '0'},
-        {'name': 'expected_roi', 'type': 'text', 'label': 'Expected ROI', 'required': False, 'placeholder': 'e.g., 200% in 2 years'}
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Requested Budget', 'required': True, 'placeholder': '0'}
     ]
 ) }}
 
