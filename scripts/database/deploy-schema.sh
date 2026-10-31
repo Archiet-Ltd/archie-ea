@@ -9,6 +9,39 @@ set -eu
 # rather than start new code on a schema it does not expect. On an existing
 # database the baseline revision changes nothing; a database recorded at a
 # pre-baseline revision is re-stamped (record only) and the old id is printed.
+# Quick exit. The old server is still serving while this runs, so a deploy that
+# changes nothing in the database should not hold up the swap. Taken only when
+# schema-status says nothing is pending AND a reconcile-schema dry run finds no
+# column to add and no table missing. Anything else, including a status command
+# that prints nothing, runs the full pass below. A pending revision is never
+# skipped: it makes schema-status exit non-zero, and the full pass applies it.
+# FORCE_FULL_SCHEMA_PASS=1 runs the full pass regardless (use it when a deploy
+# adds a backfill step below without a revision).
+#
+# A revision that cannot run beside the old code declares REQUIRES_DOWNTIME =
+# True. Unless ALLOW_DOWNTIME_MIGRATIONS=1, the pass stops here (exit 3) before
+# changing anything, so the old server keeps serving until a window is agreed.
+status_out=$(flask --app manage schema-status 2>&1) && status_rc=0 || status_rc=$?
+printf '%s\n' "$status_out"
+case "$status_out" in
+    *"schema-status: downtime-required"*)
+        if [ "${ALLOW_DOWNTIME_MIGRATIONS:-0}" != "1" ]; then
+            echo 'STOP: a pending migration is marked as needing downtime. Nothing was changed and the old server is still serving. Schedule a downtime window, then rerun with ALLOW_DOWNTIME_MIGRATIONS=1.' >&2
+            exit 3
+        fi ;;
+esac
+if [ "${FORCE_FULL_SCHEMA_PASS:-0}" != "1" ] && [ "$status_rc" -eq 0 ] \
+        && printf '%s' "$status_out" | grep -q 'schema-status: at head'; then
+    drift_out=$(flask --app manage reconcile-schema --dry-run 2>&1) && drift_rc=0 || drift_rc=$?
+    case "$drift_out" in
+        *"reconcile-schema: 0 column(s) would add."*)
+            if [ "$drift_rc" -eq 0 ] && ! printf '%s' "$drift_out" | grep -q 'table(s) absent\|FAILED'; then
+                echo 'schema-deploy: database is already at the latest revision and matches the models; nothing to do.'
+                exit 0
+            fi ;;
+    esac
+fi
+
 flask --app manage init-db
 flask --app manage schema-upgrade
 flask --app manage reconcile-schema
