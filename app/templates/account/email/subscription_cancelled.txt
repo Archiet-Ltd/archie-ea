@@ -2,7 +2,7 @@ Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},
 
 Your {{ plan_name }} subscription for {{ organisation_name }} is cancelled. It will not renew.
 
-{% if ends_on %}The {{ plan_name }} plan stays in place until {{ ends_on.strftime('%d %b %Y') }}. After that, {{ organisation_name }} moves to the Community plan.{% else %}The {{ plan_name }} plan stays in place until the end of the period you have paid for. After that, {{ organisation_name }} moves to the Community plan, and nothing you have saved is deleted.{% endif %}
+{% if ends_on %}The {{ plan_name }} plan stays in place until {{ ends_on.strftime('%d %b %Y') }}. After that, {{ organisation_name }} moves to the Community plan.{% else %}The {{ plan_name }} plan stays in place until the end of the period you have paid for. After that, {{ organisation_name }} moves to the Community plan.{% endif %}
 
 Changed your mind? You can keep your subscription from the billing page before then:
 
