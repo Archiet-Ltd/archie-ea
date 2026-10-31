@@ -90,6 +90,17 @@
         line.setAttribute('data-client', found.client);
     }
 
+    // The connected time is shown only once it is in the person's local time, so no UTC time flashes first.
+    function showLocalTime() {
+        root.querySelectorAll('[data-local-time]').forEach(function (holder) {
+            var stamp = holder.querySelector('time');
+            var when = stamp ? new Date(stamp.getAttribute('datetime')) : null;
+            if (!when || isNaN(when.getTime())) return;
+            stamp.textContent = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            holder.hidden = false;
+        });
+    }
+
     var CHAT_TAB = 'entelim-signup-chat';
     function rememberChatTab() {
         var tabs = root.querySelector('[data-chat-tabs]');
@@ -257,6 +268,7 @@
         }
     });
 
+    showLocalTime();
     rememberChatTab();
     if (root.hasAttribute('data-reload-when-read') || root.querySelector('[data-assistant-connected]')) poll();
     var reading = root.querySelector('[data-state="waiting"], [data-state="reading"]');

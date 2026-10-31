@@ -369,7 +369,8 @@ def assistant_connection(user) -> Optional[Dict[str, Any]]:
     connected_at = newest.get("connected_at")
     return {
         "client": newest["client_name"],
-        "connected_at": connected_at.isoformat() if connected_at else None,
+        # stored as UTC without a zone mark; the mark lets the browser show the person's own local time
+        "connected_at": (connected_at.isoformat() + ("Z" if connected_at.tzinfo is None else "")) if connected_at else None,
     }
 
 

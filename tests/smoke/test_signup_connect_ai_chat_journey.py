@@ -198,3 +198,34 @@ def test_a_second_organisation_never_sees_the_first_ones_connection(browser, ser
     finally:
         first.close()
         second.close()
+
+
+def test_the_connected_time_is_never_shown_before_it_is_in_local_time(browser, server, people, app):
+    """A person in Auckland: the step, loaded with its script held back, shows no time at all; with the script it shows local time."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True, timezone_id="Pacific/Auckland", locale="en-GB")
+    context.set_default_timeout(PAGE_TIMEOUT)
+    try:
+        page = context.new_page()
+        sign_up(page, server, people)
+        helper = context.new_page()
+        _sign_in_from_the_chat(helper, server, _register_client(app, "Claude"))
+        helper.close()
+
+        held = context.new_page()
+        held.route("**/js/account/signup_steps.js*", lambda route: route.abort())
+        block = _step_four(held, server)
+        line = block.get_by_test_id("assistant-connected")
+        expect(line).to_contain_text("Connected: Claude")
+        expect(line.locator("time")).to_be_hidden()  # no UTC time flashes while the script has not run
+        assert not re.search(r"\d\d:\d\d", line.inner_text()), line.inner_text()
+        held.close()
+
+        block = _step_four(page, server)
+        stamp = block.get_by_test_id("assistant-connected").locator("time")
+        expect(stamp).to_be_visible()
+        local = stamp.evaluate("el => new Date(el.getAttribute('datetime')).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})")
+        assert stamp.inner_text() == local, (stamp.inner_text(), local)
+        utc = stamp.evaluate("el => el.getAttribute('datetime').slice(11, 16)")
+        assert stamp.inner_text() != utc, "the time is still the UTC time: %s" % utc  # Auckland is 12 or 13 hours ahead
+    finally:
+        context.close()
