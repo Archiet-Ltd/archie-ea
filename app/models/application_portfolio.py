@@ -499,14 +499,16 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
         """Data completeness percentage (0-100) -- see
         app.services.application_fact_sheet.compute_completeness for the rubric."""
         from app.services.application_fact_sheet import compute_completeness
-        return compute_completeness(self, getattr(self, "owner_record_count", None))["pct"]
+        # A list page reads every row's owner count in one grouped statement and
+        # leaves it here, so the ring does not count owners again for each row.
+        return compute_completeness(self, getattr(self, "_listed_owner_count", None))["pct"]
 
     @property
     def completeness_gaps(self):
         """List of missing field labels -- see
         app.services.application_fact_sheet.compute_completeness for the rubric."""
         from app.services.application_fact_sheet import compute_completeness
-        return compute_completeness(self, getattr(self, "owner_record_count", None))["missing"]
+        return compute_completeness(self)["missing"]
 
     # Relationships
     capability_mappings = relationship(
