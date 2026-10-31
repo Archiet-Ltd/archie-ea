@@ -1272,26 +1272,44 @@ def test_platform_admin_installs_an_extension_and_runs_a_migration_as_the_runtim
 def test_platform_admin_seeds_the_shared_industry_frameworks_as_the_runtime_role(app, rls, world, client, login_as):
     home = world.org("home")
     admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    from app.modules.industry_apqc.framework_data import FRAMEWORKS
+
+    # The shared database already holds every default framework, so the route would have nothing
+    # to write. Set one aside under a held code (its processes stay attached) and restore it after.
+    target = FRAMEWORKS[0]["industry_code"]
+    held = f"H{uuid.uuid4().hex[:8]}".upper()
     with rls.owner.begin() as connection:
-        # Remove the default frameworks that carry no processes so the route has rows to write.
-        removed = connection.execute(
-            text(
-                "DELETE FROM industry_apqc_framework f WHERE NOT EXISTS "
-                "(SELECT 1 FROM industry_apqc_process p WHERE p.industry_framework_id = f.id) "
-                "RETURNING industry_code"
+        connection.execute(
+            text("UPDATE industry_apqc_framework SET industry_code = :h WHERE industry_code = :c AND organization_id IS NULL"),
+            {"h": held, "c": target},
+        )
+    try:
+        with _app_runs_as(app, rls.runtime):
+            response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
+            assert response.status_code == 200, response.get_data(as_text=True)
+        body = response.get_json()
+        created = [row["industry_code"] for row in body["created_frameworks"]]
+        assert body["total_created"] == len(created)
+        assert created == [target]
+        with rls.owner.connect() as connection:
+            row = connection.execute(
+                text("SELECT organization_id FROM industry_apqc_framework WHERE industry_code = :c"), {"c": target}
+            ).one()
+        assert row.organization_id is None
+    finally:
+        with rls.owner.begin() as connection:
+            connection.execute(
+                text(
+                    "DELETE FROM industry_apqc_process WHERE industry_framework_id IN "
+                    "(SELECT id FROM industry_apqc_framework WHERE industry_code = :c)"
+                ),
+                {"c": target},
             )
-        ).scalars().all()
-    with _app_runs_as(app, rls.runtime):
-        response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
-        assert response.status_code == 200, response.get_data(as_text=True)
-    body = response.get_json()
-    created = [row["industry_code"] for row in body["created_frameworks"]]
-    world.extra_deletes.append(("industry_apqc_framework", "industry_code", created))
-    assert body["total_created"] == len(created) > 0
-    assert set(removed) <= set(created)
-    with rls.owner.connect() as connection:
-        present = set(connection.execute(text("SELECT industry_code FROM industry_apqc_framework")).scalars())
-    assert set(created) <= present
+            connection.execute(text("DELETE FROM industry_apqc_framework WHERE industry_code = :c"), {"c": target})
+            connection.execute(
+                text("UPDATE industry_apqc_framework SET industry_code = :c WHERE industry_code = :h"),
+                {"h": held, "c": target},
+            )
 
 
 def _service_calls(world):
