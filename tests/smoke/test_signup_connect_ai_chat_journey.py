@@ -229,3 +229,33 @@ def test_the_connected_time_is_never_shown_before_it_is_in_local_time(browser, s
         assert stamp.inner_text() != utc, "the time is still the UTC time: %s" % utc  # Auckland is 12 or 13 hours ahead
     finally:
         context.close()
+
+
+def test_the_status_poll_backs_off_and_stops_with_a_sentence(browser, server, people):
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
+    context.set_default_timeout(PAGE_TIMEOUT)
+    try:
+        page = context.new_page()
+        sign_up(page, server, people)
+        page.clock.install()
+        asked = []
+        page.on("request", lambda request: asked.append(request.url) if "/account/welcome/status" in request.url else None)
+        block = _step_four(page, server)
+        expect(block).to_be_visible()
+
+        def run(seconds):
+            for _ in range(seconds // 30):
+                page.clock.run_for(30000)
+                page.wait_for_timeout(120)
+
+        run(60)
+        in_first_minute = len(asked)
+        assert 1 <= in_first_minute <= 10, in_first_minute  # a steady three-second poll would ask twenty times
+        run(11 * 60)
+        line = block.get_by_test_id("assistant-connected")
+        expect(line).to_contain_text("Still waiting for your assistant; reload this step once you have connected it")
+        stopped_at = len(asked)
+        run(5 * 60)
+        assert len(asked) == stopped_at, (stopped_at, len(asked))
+    finally:
+        context.close()
