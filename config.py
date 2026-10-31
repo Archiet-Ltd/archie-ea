@@ -746,6 +746,8 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", True)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    # Links built outside a request (emails sent from a job) start with this scheme.
+    PREFERRED_URL_SCHEME = os.environ.get("PREFERRED_URL_SCHEME", "https")
     REMEMBER_COOKIE_SECURE = _env_bool("REMEMBER_COOKIE_SECURE", True)
     REMEMBER_COOKIE_HTTPONLY = True
     # Was unset, so the remember-me cookie had no SameSite protection at all

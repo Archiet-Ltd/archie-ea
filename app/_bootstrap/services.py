@@ -2,7 +2,21 @@
 Service initialization — job queue, audit, prometheus, LLM validation.
 """
 
+import json
+import logging
 import os
+from urllib.parse import urlparse
+
+BOOT_LINE_KEYS = (
+    "config",
+    "testing",
+    "debug",
+    "job_worker",
+    "csp",
+    "mail_suppressed",
+    "mail_host",
+    "ai_providers",
+)
 
 
 def job_worker_wanted(config_name, environ) -> bool:
@@ -61,6 +75,53 @@ def start_job_worker(app, config_name):
         app.logger.info("✅ Job queue worker initialized successfully")
     except Exception as e:
         app.logger.warning(f"Failed to initialize job queue worker: {e}")
+
+
+def _mail_host(raw) -> str:
+    """Hostname only: never a user, password, port or scheme."""
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
+    return urlparse(raw if "://" in raw else "//" + raw).hostname or ""
+
+
+def boot_line(app, config_name, worker_running) -> dict:
+    """The configuration this process runs under, with no secret in it."""
+    try:
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+        providers = list(LLMService.provider_order())
+    except Exception:
+        providers = []
+    return {
+        "config": config_name,
+        "testing": bool(app.config.get("TESTING")),
+        "debug": bool(app.debug),
+        "job_worker": bool(worker_running),
+        "csp": "development" if app.debug else "production",
+        "mail_suppressed": bool(app.config.get("MAIL_SUPPRESS_SEND")),
+        "mail_host": _mail_host(app.config.get("MAIL_SERVER")),
+        "ai_providers": providers,
+    }
+
+
+def log_boot_line(app, config_name):
+    """Write the boot line once per process, at INFO, for the release gate to read."""
+    if getattr(app, "_boot_line_logged", False):
+        return
+    app._boot_line_logged = True
+    try:
+        from app.services.job_queue_service import get_job_queue_service
+
+        running = any(t.is_alive() for t in get_job_queue_service()._worker_threads)
+    except Exception:
+        running = False
+    # Its own logger, so the line is written at INFO whatever level the root logger runs at.
+    log = logging.getLogger("entelim.boot")
+    log.setLevel(logging.INFO)
+    if not log.handlers:
+        log.addHandler(logging.StreamHandler())
+    log.info("ENTELIM-BOOT %s", json.dumps(boot_line(app, config_name, running), sort_keys=True))
 
 
 def _check_session_configuration(app, config_name):
