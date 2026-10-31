@@ -2082,3 +2082,80 @@ def test_runtime_role_cannot_hang_a_row_from_another_organisations_parent(app, r
         s=sol_a,
         o=a,
     ) == 1
+
+
+def test_runtime_role_row_naming_its_organisation_cannot_hang_from_another_organisations_parent(
+    app, rls, world
+):
+    """Organisation A is signed in and writes organization_id = A on a row that names B's solution,
+    while the app runs as the runtime role. Naming its own organisation must not switch the parent
+    check off: nothing is stored under A or B. The same row naming A's own solution is stored."""
+    from flask import g
+
+    from app import db
+    from app.middleware.tenant_isolation import TenantParentMismatch
+    from app.models.solution_sad_models import SolutionQualityAttribute
+
+    a, b = world.org("a"), world.org("b")
+    sol_a, sol_b = _solution(world, a, "Named own A"), _solution(world, b, "Named other B")
+    world.extra_deletes.append(("solution_quality_attributes", "solution_id", [sol_a, sol_b]))
+    world.extra_deletes.append(("solutions", "id", [sol_a, sol_b]))
+
+    with _app_runs_as(app, rls.runtime), app.test_request_context():
+        db.session.remove()
+        g.current_org_id = a
+        db.session.add(
+            SolutionQualityAttribute(solution_id=sol_b, attribute_name="planted", organization_id=a)
+        )
+        with pytest.raises(TenantParentMismatch):
+            db.session.flush()
+        db.session.rollback()
+
+        g.current_org_id = a
+        db.session.add(
+            SolutionQualityAttribute(solution_id=sol_a, attribute_name="own", organization_id=a)
+        )
+        db.session.commit()
+
+    assert _owner_value(
+        rls, "SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s", s=sol_b
+    ) == 0
+    assert _owner_value(
+        rls,
+        "SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s AND organization_id = :o",
+        s=sol_a,
+        o=a,
+    ) == 1
+
+
+def test_runtime_role_platform_scope_row_takes_the_organisation_of_its_parent(app, rls, world):
+    """Inside a platform scope no organisation is signed in, so a child row takes the organisation
+    of the parent it hangs from: A's child under A's solution is stored as A, B's as B. The runtime
+    role can see both parents only because the platform scope is on."""
+    from app import db
+    from app.jobs.tenant_safe_job import platform_scope
+    from app.models.solution_sad_models import SolutionQualityAttribute
+
+    a, b = world.org("a"), world.org("b")
+    sol_a, sol_b = _solution(world, a, "Scope own A"), _solution(world, b, "Scope own B")
+    world.extra_deletes.append(("solution_quality_attributes", "solution_id", [sol_a, sol_b]))
+    world.extra_deletes.append(("solutions", "id", [sol_a, sol_b]))
+
+    with _app_runs_as(app, rls.runtime), app.test_request_context():
+        db.session.remove()
+        with platform_scope("test: a job writes children for two organisations"):
+            db.session.add_all(
+                [
+                    SolutionQualityAttribute(solution_id=sol_a, attribute_name="job"),
+                    SolutionQualityAttribute(solution_id=sol_b, attribute_name="job"),
+                ]
+            )
+            db.session.commit()
+
+    for solution, org in ((sol_a, a), (sol_b, b)):
+        assert _owner_value(
+            rls,
+            "SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s AND organization_id = :o",
+            s=solution,
+            o=org,
+        ) == 1
