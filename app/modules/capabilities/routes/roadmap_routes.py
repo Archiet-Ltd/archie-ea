@@ -200,6 +200,34 @@ def api_roadmap_capabilities():
 # =============================================================================
 
 
+def _recorded_roadmap_gaps():
+    """Gaps saved directly from the roadmap (no source capability), as list rows."""
+    from app.models.implementation_migration import Gap
+
+    rows = (
+        Gap.query.filter(Gap.source_capability_id.is_(None), Gap.auto_generated.is_(False))
+        .order_by(Gap.created_at.desc(), Gap.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": gap.id,
+            "recorded": True,
+            "name": gap.name,
+            "description": gap.description,
+            "capability_type": "business",
+            "gap_type": gap.gap_type,
+            "gap_types": [gap.gap_type or "custom"],
+            "gap_details": [gap.description] if gap.description else [],
+            "primary_gap": gap.gap_type or "custom",
+            "priority": gap.priority or "medium",
+            "resolution_status": gap.resolution_status,
+            "target_plateau_id": gap.target_plateau_id,
+        }
+        for gap in rows
+    ]
+
+
 @capability_map.route("/api/roadmap/gaps")
 @login_required
 @rate_limit(60, "1m")
@@ -227,6 +255,11 @@ def api_roadmap_gaps():
         type: string
         required: false
         description: Filter by gap type (coverage, quality, retirement, modernization)
+      - name: include
+        in: query
+        type: string
+        required: false
+        description: Pass "recorded" to add the gaps recorded by hand to the derived analysis
     responses:
       200:
         description: Comprehensive gap analysis data
@@ -668,6 +701,15 @@ def api_roadmap_gaps():
             except Exception as proc_error:
                 current_app.logger.warning(f"Error loading process gaps: {proc_error}")
 
+        # The roadmap page asks for the gaps a person recorded by hand as well
+        # (?include=recorded); without them a gap that was just saved vanished
+        # on the next read. The default answer stays the derived analysis only,
+        # which is the population the gap register page reconciles against.
+        if request.args.get("include") == "recorded" and (
+            not capability_type_filter or capability_type_filter == "business"
+        ):
+            gaps.extend(_recorded_roadmap_gaps())
+
         # Filter by gap type if specified
         if gap_type_filter:
             gaps = [g for g in gaps if gap_type_filter in g["gap_types"]]
@@ -762,6 +804,7 @@ def api_roadmap_create_gap():
             "success": True,
             "gap": {
                 "id": gap.id,
+                "recorded": True,
                 "name": gap.name,
                 "description": gap.description,
                 "gap_type": gap.gap_type,

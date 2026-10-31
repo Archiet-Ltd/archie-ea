@@ -154,7 +154,7 @@
         <div class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-2' : 'grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
             {% call card(class='bg-muted/30') %}
-              <div class="flex items-start justify-between p-4">
+              <div class="flex items-start justify-between p-4" :data-row-key="'plateau-' + plateau.id">
                 <div>
                   <p class="text-sm font-semibold text-foreground" x-text="plateau.name" data-testid="roadmap-plateau-name"></p>
                   <p class="mt-0.5 text-xs text-muted-foreground" x-text="plateau.description || 'No description'"></p>
@@ -170,6 +170,53 @@
           </template>
         </div>
       </template>
+    {% endcall %}
+  {% endcall %}
+
+  {# ── Recorded Gaps Table ── #}
+  {% call card() %}
+    {% call card_header() %}
+      <h2 class="text-base font-semibold text-foreground">Recorded Gaps</h2>
+    {% endcall %}
+    {% call card_content() %}
+      {% call table() %}
+        {% call table_header() %}
+          <tr>
+            {% call table_head() %}Gap{% endcall %}
+            {% call table_head() %}Type{% endcall %}
+            {% call table_head() %}Priority{% endcall %}
+            {% call table_head(attrs_dict={'class': 'text-right'}) %}Actions{% endcall %}
+          </tr>
+        {% endcall %}
+        {% call table_body() %}
+          <template x-if="!loading && !errorMessage && recordedGaps.length === 0">
+            <tr>
+              <td colspan="4" class="p-4 text-center text-sm text-muted-foreground">
+                No gaps recorded by hand yet. Use Add Gap at the top of the page to record one; gaps detected from capabilities are counted in the figure above.
+              </td>
+            </tr>
+          </template>
+          <template x-for="gap in (loading ? [] : recordedGaps)" :key="gap.id">
+            {% call table_row(attrs_dict={'class': 'hover:bg-muted/30', ':data-row-key': "'gap-' + gap.id", 'data-testid': 'roadmap-gap-row'}) %}
+              {% call table_cell() %}
+                <span class="font-medium text-foreground" x-text="gap.name"></span>
+                <p class="mt-0.5 text-xs text-muted-foreground" x-show="gap.description" x-text="gap.description"></p>
+              {% endcall %}
+              {% call table_cell(attrs_dict={'class': 'capitalize'}) %}<span x-text="gap.gap_type || 'custom'"></span>{% endcall %}
+              {% call table_cell() %}
+                <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
+                  :class="priorityClass(gap.priority)" x-text="gap.priority || 'medium'"></span>
+              {% endcall %}
+              {% call table_cell(attrs_dict={'class': 'text-right'}) %}
+                <div class="inline-flex items-center gap-2">
+                  {% call button(text='Edit', variant='outline', size='xs', on_click='openEditGapModal(gap)') %}{% endcall %}
+                  {% call button(text='Delete', variant='destructive', size='xs', on_click='deleteGap(gap)') %}{% endcall %}
+                </div>
+              {% endcall %}
+            {% endcall %}
+          </template>
+        {% endcall %}
+      {% endcall %}
     {% endcall %}
   {% endcall %}
 
@@ -223,7 +270,7 @@
             </tr>
           </template>
           <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
-            {% call table_row(attrs_dict={'class': 'hover:bg-muted/30'}) %}
+            {% call table_row(attrs_dict={'class': 'hover:bg-muted/30', ':data-row-key': "'wp-' + wp.id"}) %}
               {% call table_cell() %}
                 <input type="checkbox" class="rounded border-input"
                   :value="wp.gap_id"
@@ -551,6 +598,24 @@
       editingWp: null,
       pendingGapForWp: null,
       pendingGapIds: [],
+      // Read a list again from the server, so a saved record shows what the
+      // register really holds rather than what the browser guessed.
+      async reload(kind) {
+        const source = {
+          gaps: ['/capability-map/api/roadmap/gaps?include=recorded', 'gaps'],
+          plateaus: ['/capability-map/api/roadmap/plateaus', 'plateaus'],
+          workPackages: ['/capability-map/api/roadmap/work-packages', 'work_packages'],
+        }[kind];
+        const d = await Platform.fetch(source[0], { silent: true });
+        this[kind] = d[source[1]] || [];
+      },
+      // Scroll the row for a just-saved record into view once Alpine has drawn it.
+      bringIntoView(testId) {
+        Alpine.nextTick(() => {
+          const row = document.querySelector('[data-row-key="' + testId + '"]');
+          if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+      },
     });
   });
 
@@ -566,6 +631,7 @@
       // ── One source of truth: the page reads the same store the dialogs
       // write, so a save is visible the moment it lands (no reload). ──
       get gaps() { return Alpine.store('rdm').gaps; },
+      get recordedGaps() { return this.gaps.filter(g => g.recorded); },
       get plateaus() { return Alpine.store('rdm').plateaus; },
       get workPackages() { return Alpine.store('rdm').workPackages; },
 
@@ -611,8 +677,7 @@
 
       async loadGaps() {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
-          Alpine.store('rdm').gaps = d.gaps || [];
+          await Alpine.store('rdm').reload('gaps');
         } catch (e) {
           Alpine.store('rdm').gaps = [];
           this.errorMessage = 'Failed to load gaps (' + e.message + ').';
@@ -621,8 +686,7 @@
 
       async loadPlateaus() {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/plateaus', { silent: true });
-          Alpine.store('rdm').plateaus = d.plateaus || [];
+          await Alpine.store('rdm').reload('plateaus');
         } catch (e) {
           Alpine.store('rdm').plateaus = [];
           this.errorMessage = 'Failed to load plateaus (' + e.message + ').';
@@ -631,8 +695,7 @@
 
       async loadWorkPackages() {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/work-packages', { silent: true });
-          Alpine.store('rdm').workPackages = d.work_packages || [];
+          await Alpine.store('rdm').reload('workPackages');
         } catch (e) {
           Alpine.store('rdm').workPackages = [];
           this.errorMessage = 'Failed to load work packages (' + e.message + ').';
@@ -780,7 +843,7 @@
       },
 
       async submitGapForm() {
-        if (!this.form.name) return;
+        if (!this.form.name || this.isSubmitting) return;
         this.isSubmitting = true;
         const editing = Alpine.store('rdm').editingGap;
         const method = editing ? 'PUT' : 'POST';
@@ -807,7 +870,9 @@
             store.gaps = [saved, ...store.gaps];
           }
           Platform.modal.close('rdm-create-gap-modal');
-          Alpine.store('announcer').assertive(
+          try { await store.reload('gaps'); } catch (e) { /* swallow-ok: the saved gap is already shown from the response; the next page read corrects the list */ }
+          store.bringIntoView('gap-' + saved.id);
+          Alpine.store('announcer').announce(
             'Gap "' + saved.name + '" ' + (editing ? 'updated' : 'added') + '.'
           );
         } catch (e) {
@@ -827,7 +892,7 @@
       initFromGlobal() {},
 
       async submitPlateauForm() {
-        if (!this.form.name || !this.form.sequence_order) return;
+        if (!this.form.name || !this.form.sequence_order || this.isSubmitting) return;
         this.isSubmitting = true;
         try {
           const d = await Platform.fetch.post('/capability-map/api/roadmap/plateaus', this.form, { silent: true });
@@ -836,7 +901,9 @@
           store.plateaus = [...store.plateaus, d.plateau].sort((a, b) => a.sequence_order - b.sequence_order);
           this.form = { name: '', sequence_order: store.plateaus.length + 1, target_date: '', description: '' };
           Platform.modal.close('rdm-create-plateau-modal');
-          Alpine.store('announcer').assertive('Plateau "' + d.plateau.name + '" added.');
+          try { await store.reload('plateaus'); } catch (e) { /* swallow-ok: the saved plateau is already shown from the response; the next page read corrects the list */ }
+          store.bringIntoView('plateau-' + d.plateau.id);
+          Alpine.store('announcer').announce('Plateau "' + d.plateau.name + '" added.');
         } catch (e) {
           Platform.alert(e.message || 'Failed to create plateau.');
         } finally {
@@ -903,6 +970,7 @@
       },
 
       async submitWpForm() {
+        if (this.isSubmitting) return;
         if (!this.form.name || !this.form.start_date || !this.form.target_date) {
           Platform.alert('Name, start date, and target date are required.');
           return;
@@ -940,7 +1008,9 @@
             store.workPackages = [saved, ...store.workPackages];
           }
           Platform.modal.close('rdm-create-wp-modal');
-          Alpine.store('announcer').assertive(
+          try { await store.reload('workPackages'); } catch (e) { /* swallow-ok: the saved work package is already shown from the response; the next page read corrects the list */ }
+          store.bringIntoView('wp-' + saved.id);
+          Alpine.store('announcer').announce(
             'Work package "' + saved.name + '" ' + (editing ? 'updated' : 'added') + '.'
           );
         } catch (e) {
