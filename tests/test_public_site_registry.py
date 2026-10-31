@@ -39,6 +39,7 @@ PRODUCT_ITEMS = [
 PRODUCT_SOON = [
     ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("AI employees", "Coming soon: AI employees that start work on their own and propose actions."),
 ]
 SOLUTIONS = [
     ("Application rationalisation", "Find overlapping applications and decide which to keep, consolidate or retire."),
@@ -51,6 +52,7 @@ SOLUTIONS = [
 SOLUTIONS_SOON = [
     ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("AI employees", "Coming soon: AI employees that start work on their own and propose actions."),
 ]
 
 
@@ -220,7 +222,7 @@ def test_the_footer_is_one_set_of_columns_with_coming_soon_in_one_group(home_htm
     assert columns == ["product", "solutions", "roles", "compare", "resources", "company", "legal", "coming-soon"]
     assert "Ask anything" not in foot
     soon = foot[foot.index('data-footer-column="coming-soon"'):]
-    assert "Scenarios" in soon and "Software and tool discovery" in soon
+    assert "Scenarios" in soon and "Software and tool discovery" in soon and "AI employees" in soon
     for live in ("Build your model from your tools", "Every answer shows its sources"):
         assert live not in soon
         assert live in foot

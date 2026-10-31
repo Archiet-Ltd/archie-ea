@@ -152,8 +152,8 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site
     expect(soon.get_by_text("Coming soon", exact=True)).to_be_visible()
     expect(soon.get_by_text("Not available yet. Join the waiting list.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
-    assert rows.count() == 2
-    for text in ("Scenarios", "Software and tool discovery"):
+    assert rows.count() == 3
+    for text in ("Scenarios", "Software and tool discovery", "AI employees"):
         expect(soon.get_by_role("link", name=text)).to_be_visible()
     # nothing delivered sits in the Coming soon group, and nothing coming soon sits among delivered ones
     live_labels = page.eval_on_selector_all("#menu-product a[data-availability='live']", "els => els.map(e => e.textContent)")
@@ -178,6 +178,46 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site
     expect(page.get_by_test_id("feature-interest-thanks")).to_be_visible()
 
 
+def test_ai_employees_coming_soon_is_reachable_and_shows_the_four_jobs(desktop, site_url):
+    """A signed-out visitor opens the Product menu's Coming soon group, reaches
+    the AI employees page, sees Coming soon and the four planned roles, and
+    finds the waiting list as the call to action."""
+    page = desktop
+    _trigger(page, "Product").click()
+    soon = page.locator("#menu-product [data-menu-group='coming-soon']")
+    expect(soon).to_be_visible()
+    soon.get_by_role("link", name="AI employees").click()
+    expect(page).to_have_url(site_url + "/modules/ai-employees")
+    expect(page.locator("h1").first).to_be_visible()
+    body = page.locator("main").inner_text()
+    assert "Coming soon" in body
+    for job in ("Architecture analyst", "Portfolio analyst", "Change coordinator", "Risk and compliance assistant"):
+        assert job in body, f"{job} not found on the AI employees page"
+    form = page.get_by_test_id("feature-interest-form")
+    expect(form).to_be_visible()
+    # the page's own content: no media, no pricing links, no register links
+    own = page.evaluate("""() => {
+        const inside = (selector) => Array.from(document.querySelectorAll('main ' + selector)).filter(e => !e.closest('footer'));
+        return {
+            media: inside('img, picture, video, figure').length,
+            plans: inside('a').filter(a => /^\\/pricing/.test(a.getAttribute('href')) || /register/.test(a.getAttribute('href'))).length,
+        };
+    }""")
+    assert own == {"media": 0, "plans": 0}, f"a coming soon page shows a picture or sells: {own}"
+    form.get_by_label("Email").fill("visitor-ai-employees@example.com")
+    form.get_by_label("Used to tell you when this becomes available, and for nothing else.").check()
+    form.get_by_test_id("feature-interest-submit").click()
+    expect(page.get_by_test_id("feature-interest-thanks")).to_be_visible()
+    # every "today" link lands on a page with content
+    for link in page.locator("main a:not(footer a)").all():
+        href = link.get_attribute("href")
+        if href and href.startswith("/"):
+            response = page.goto(site_url + href, wait_until="domcontentloaded")
+            assert response.status == 200, f"{href} answers {response.status}"
+            assert len(page.locator("main").inner_text().split()) >= 25, f"{href} has too little content"
+            page.goto(site_url + "/modules/ai-employees")
+
+
 def test_everything_coming_soon_lands_on_the_features_list(desktop, site_url):
     page = desktop
     _trigger(page, "Product").click()
@@ -185,7 +225,7 @@ def test_everything_coming_soon_lands_on_the_features_list(desktop, site_url):
     expect(page).to_have_url(site_url + "/features#coming-soon")
     section = page.locator("#coming-soon")
     expect(section).to_be_visible()
-    for text in ("Scenarios", "Software and tool discovery"):
+    for text in ("Scenarios", "Software and tool discovery", "AI employees"):
         expect(page.locator("article").get_by_role("link", name=text, exact=True)).to_be_visible()
 
 
