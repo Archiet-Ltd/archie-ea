@@ -444,7 +444,7 @@ entries:
     reuse: >
       Delete a test organisation through OrganizationDeletionService.delete_organization in test fixtures and
       teardown. It removes every row the organisation holds, append-only rows included, through the same
-      transaction-local marker a platform administrator's delete uses (ADR-org-deletion-01); no trigger is
+      transaction-local marker a platform administrator's delete uses; no trigger is
       disabled. Retired 29 Oct 2026: tests/_outbox_cleanup.py (SET LOCAL session_replication_role = replica) no
       longer exists. Do not write another outbox-purging or organisation-cleanup helper in a test module.
     must_not_create:

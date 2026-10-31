@@ -1234,7 +1234,7 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
             ),
             {"result_id": first.operation_result_id},
         )
-        # Flagged exception (T-teardown-fk-02): this receipt has already reached
+        # Flagged exception: this receipt has already reached
         # 'succeeded' with a real operation_result_id, and
         # archie_guard_transformation_receipt correctly refuses to clear a
         # succeeded result's object link from any state — that refusal is the
@@ -1381,7 +1381,7 @@ def test_stale_generation_is_rejected_before_first_real_domain_write(
 
     def reclaim_then_write(session, claim):
         with db.engine.begin() as connection:
-            # Flagged exception (T-teardown-fk-02): bumps lease_generation out
+            # Flagged exception: bumps lease_generation out
             # of band to simulate a concurrent reclaim mid-handler.
             # archie_guard_transformation_receipt's "reclaim" branch requires a
             # fresh, distinct claim_token and advancing attempt_count together
@@ -1731,7 +1731,7 @@ def test_damaged_receipt_reconciles_natural_key_and_exact_response(command_fixtu
     first = _execute(command_fixture, key="damaged")
     receipt = _receipt(command_fixture, "damaged")
     with db.engine.begin() as connection:
-        # Flagged exception (T-teardown-fk-02): resets a terminal
+        # Flagged exception: resets a terminal
         # ('succeeded') receipt back to 'in_progress' with an expired lease,
         # simulating external damage. No branch of
         # archie_guard_transformation_receipt admits a terminal-to-in_progress

@@ -1,6 +1,6 @@
 """Tests stop switching triggers off to reach an append-only row.
 
-ADR-org-deletion-01: deleting an organisation admits its own append-only rows through a
+Deleting an organisation admits its own append-only rows through a
 transaction-local marker the guard functions check (``archie_org_deletion_admits``), never by
 disabling a trigger. ``session_replication_role`` disables every trigger in the session,
 including the ones that keep the audit chain true, so a test that uses it can no longer be

@@ -236,7 +236,7 @@ def _expire_and_remove_result(scope, *, operation, command_key, result_id):
     This organisation is not being deleted, so the org-deletion marker does not apply here
     and would not help regardless: the guard's unconditional first check on this table
     refuses to null an already-set ``operation_result_id`` under any admission, by design
-    (ADR-org-deletion-01 — the marker is never allowed to admit an UPDATE, only a DELETE).
+    (the marker is never allowed to admit an UPDATE, only a DELETE).
     No real caller writes this exact "lost envelope, result discarded" shape in one
     transaction, so it is modelled directly here with the trigger switched off for this
     transaction only.

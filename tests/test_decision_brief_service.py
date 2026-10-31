@@ -430,12 +430,12 @@ def test_brief_hash_uses_stored_python_canonical_utf8_document(decision_scope):
         }
     }
     with db.engine.begin() as connection:
-        # Flagged exception (T-teardown-fk-02): mutates a committed evidence_records
+        # Flagged exception: mutates a committed evidence_records
         # row's own value directly to construct an exact float/Unicode payload SQL
         # itself would re-render, bypassing the application layer this test is
         # specifically checking does NOT round-trip through SQL. The append-only
         # guard correctly refuses every UPDATE on this table; the deletion marker
-        # only ever admits a DELETE, never an UPDATE, by design (ADR-org-deletion-01).
+        # only ever admits a DELETE, never an UPDATE, by design.
         # Needs a new, named admission path on a production append-only guard for a
         # mutation this test intentionally performs outside any real write path —
         # out of scope here. Left for the lead/founder to decide.
@@ -681,7 +681,7 @@ def test_readiness_uses_only_latest_versions_in_exact_candidate_scope(decision_s
         command_key="workstream-only-option",
     ).object_ids["option_version_id"]
     with db.engine.begin() as connection:
-        # Flagged exception (T-teardown-fk-02): mutates a committed, frozen
+        # Flagged exception: mutates a committed, frozen
         # transformation_option_versions row to simulate silent data corruption.
         # archie_reject_transformation_mutation correctly refuses every UPDATE on
         # this table; the deletion marker only ever admits a DELETE, by design.
@@ -979,7 +979,7 @@ def test_citation_records_effective_expiry_at_freeze(decision_scope, evidence_sc
     )
     expiring_id = expiring.object_ids["evidence_record_id"]
     with db.engine.begin() as connection:
-        # Flagged exception (T-teardown-fk-02): mutates a committed evidence_records
+        # Flagged exception: mutates a committed evidence_records
         # row to construct a stale stored 'fresh' label past its own expiry.
         # archie_reject_transformation_mutation correctly refuses every UPDATE on
         # this table; the deletion marker only ever admits a DELETE, by design.

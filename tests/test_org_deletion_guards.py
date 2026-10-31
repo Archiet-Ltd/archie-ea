@@ -1,6 +1,6 @@
 """The guard that admits deleting an organisation's own append-only rows.
 
-ADR-org-deletion-01: each of the delete-refusing trigger functions admits exactly one thing it
+Each of the delete-refusing trigger functions admits exactly one thing it
 did not before — a DELETE, never an UPDATE, while the transaction-local marker
 ``archie.deleting_organisation`` names the row's own organisation. Every other mutation is
 refused exactly as before. These tests exercise the shared helper

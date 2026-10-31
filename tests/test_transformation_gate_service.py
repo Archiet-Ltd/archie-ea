@@ -637,7 +637,7 @@ def test_real_task6_rows_allow_discovery_only_while_current_and_fresh(
     assert ready.allowed is True
 
     with db.engine.begin() as connection:
-        # Flagged exception (T-teardown-fk-02): mutates a committed evidence_records
+        # Flagged exception: mutates a committed evidence_records
         # row to construct an already-expired freshness window. The append-only
         # guard correctly refuses every UPDATE on this table; the deletion marker
         # only ever admits a DELETE, by design. Needs a new, named admission path
