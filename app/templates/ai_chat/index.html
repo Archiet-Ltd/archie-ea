@@ -145,7 +145,7 @@
             <div class="shrink-0 px-4 pt-3" data-testid="two-factor-notice"
                  x-data="{ hidden: window.localStorage.getItem('entelim-two-factor-notice-{{ current_user.id }}') === '1' }" x-show="!hidden" x-cloak>
                 <div class="mx-auto w-full max-w-3xl">
-                    {% call alert('info', title='Protect your workspace') %}
+                    {% call alert('info', title='Protect your workspace') %} {# ui-contract-ok: the alert macro, not a native dialog #}
                     Set up two-factor sign-in now, it takes a minute. Required from {{ two_factor_notice.ends_on.strftime('%-d %B %Y') }}, or before you invite your team.
                     <span class="mt-2 flex flex-wrap items-center gap-2">
                         {{ button(text='Set it up', size='sm', href=url_for('account.mfa_enrol', **{'return': url_for('unified_ai_chat.index')}), testid='two-factor-set-up') }}
