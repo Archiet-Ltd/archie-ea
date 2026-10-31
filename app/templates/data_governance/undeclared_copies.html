@@ -1,8 +1,8 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/button.html' import button %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Undeclared copies — {{ config.APP_NAME }}{% endblock %}
@@ -36,8 +36,7 @@
     {% endfor %}
   {% endcall %}
   {% else %}
-  {{ empty_state(icon='copy-check', title='No undeclared copies',
-      description='No data entity is held by more than one application without a declared system of record.') }}
+  {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No undeclared copies') }}{{ ui.empty_description(text='No data entity is held by more than one application without a declared system of record.') }}{% endcall %}{% endcall %}
   {% endif %}
 </div>
 {% endblock %}

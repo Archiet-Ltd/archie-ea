@@ -1,8 +1,8 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% import 'components/card.html' as card %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/input.html' import input %}
 
 {% block title %}Security Control Matrix{% endblock %}
@@ -50,11 +50,7 @@
   {% if rendered_matrix %}
     {{ rendered_matrix }}
   {% elif org_id is none %}
-    {{ empty_state(
-        icon='shield',
-        title='No organisation in context',
-        description='Append ?org_id=<id> to the URL to scope the matrix.'
-    ) }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No organisation in context') }}{{ ui.empty_description(text='Append ?org_id=<id> to the URL to scope the matrix.') }}{% endcall %}{% endcall %}
   {% endif %}
 </div>
 {% endblock %}

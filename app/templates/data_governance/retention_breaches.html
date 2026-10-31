@@ -1,7 +1,7 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/dense_table.html' import dense_table %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Retention breaches — {{ config.APP_NAME }}{% endblock %}
@@ -33,7 +33,7 @@
     {% endfor %}
   {% endcall %}
   {% else %}
-  {{ empty_state(icon='shield-check', title='No retention breaches', description='No data entity exceeds its retention policy right now.') }}
+  {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No retention breaches') }}{{ ui.empty_description(text='No data entity exceeds its retention policy right now.') }}{% endcall %}{% endcall %}
   {% endif %}
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/input.html' import input %}
 
 {% block title %}AI Systems Register — {{ config.APP_NAME }}{% endblock %}
@@ -33,11 +33,7 @@
     {% if register_html %}
       {{ register_html }}
     {% else %}
-      {{ empty_state(
-          icon='bot',
-          title='No organisation context',
-          description='The AI Systems Register is org-scoped and needs a signed-in tenant.'
-      ) }}
+      {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No organisation context') }}{{ ui.empty_description(text='The AI Systems Register is org-scoped and needs a signed-in tenant.') }}{% endcall %}{% endcall %}
     {% endif %}
   </div>
 </div>

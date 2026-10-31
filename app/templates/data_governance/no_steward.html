@@ -1,9 +1,9 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Critical entities with no steward — {{ config.APP_NAME }}{% endblock %}
@@ -43,8 +43,7 @@
     {% endfor %}
   {% endcall %}
   {% else %}
-  {{ empty_state(icon='users', title='All critical entities have a steward',
-      description='Every data entity in a mission-critical or business-critical domain has at least one steward assigned.') }}
+  {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='All critical entities have a steward') }}{{ ui.empty_description(text='Every data entity in a mission-critical or business-critical domain has at least one steward assigned.') }}{% endcall %}{% endcall %}
   {% endif %}
 </div>
 {% endblock %}

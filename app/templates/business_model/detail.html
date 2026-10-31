@@ -1,5 +1,6 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/button.html' import button %}
@@ -164,7 +165,7 @@
   </div>
 </form>
 {% else %}
-{{ empty_state(icon='gem', title='No ' ~ (zones[priceable_box_key].label | lower) ~ ' yet', description='Add one first, then give it a price.') }}
+{% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No ' ~ (zones[priceable_box_key].label | lower) ~ ' yet') }}{{ ui.empty_description(text='Add one first, then give it a price.') }}{% endcall %}{% endcall %}
 {% endif %}
 {% endcall %}
 {% endif %}

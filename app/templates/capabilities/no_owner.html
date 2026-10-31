@@ -1,6 +1,7 @@
 {# shadcn-reference: example:tasks@e55b60b #}
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
@@ -22,7 +23,7 @@
   ) }}
 
   {% if not capabilities %}
-    {{ empty_state(title='Every capability has an owner', description='Nothing to show here right now.') }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='Every capability has an owner') }}{{ ui.empty_description(text='Nothing to show here right now.') }}{% endcall %}{% endcall %}
   {% else %}
   <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="overflow-x-auto">

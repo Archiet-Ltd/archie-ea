@@ -1,6 +1,7 @@
 {# design-block: data-table #}
 {# shadcn-reference: example:tasks@e55b60b #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -8,7 +9,6 @@
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
 {% from 'components/checkbox.html' import checkbox %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Definition of Done Templates{% endblock %}
 
@@ -103,11 +103,7 @@
         {% endcall %}
       </template>
       <template x-if="!getTemplate('story')">
-        {{ empty_state(
-          icon='file-x',
-          title='No template found',
-          description='No template found for this scope.'
-        ) }}
+        {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No template found') }}{{ ui.empty_description(text='No template found for this scope.') }}{% endcall %}{% endcall %}
       </template>
     {% endcall %}
 
@@ -180,11 +176,7 @@
         {% endcall %}
       </template>
       <template x-if="!getTemplate('sprint')">
-        {{ empty_state(
-          icon='file-x',
-          title='No template found',
-          description='No template found for this scope.'
-        ) }}
+        {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No template found') }}{{ ui.empty_description(text='No template found for this scope.') }}{% endcall %}{% endcall %}
       </template>
     {% endcall %}
 
@@ -257,11 +249,7 @@
         {% endcall %}
       </template>
       <template x-if="!getTemplate('epic')">
-        {{ empty_state(
-          icon='file-x',
-          title='No template found',
-          description='No template found for this scope.'
-        ) }}
+        {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No template found') }}{{ ui.empty_description(text='No template found for this scope.') }}{% endcall %}{% endcall %}
       </template>
     {% endcall %}
   {% endcall %}

@@ -1,7 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
 {% import 'components/card.html' as card %}
 {% from 'components/badge.html' import badge %}
 
@@ -47,7 +47,7 @@
         {% endfor %}
     </ul>
     {% else %}
-    {{ empty_state(icon='workflow', title='No industry frameworks are installed', description='The frameworks load with the platform. Ask a platform administrator to check the installation.') }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No industry frameworks are installed') }}{{ ui.empty_description(text='The frameworks load with the platform. Ask a platform administrator to check the installation.') }}{% endcall %}{% endcall %}
     {% endif %}
 
     <p class="text-xs text-muted-foreground">APQC Process Classification Framework (PCF) &copy; APQC. Used under APQC's terms of use. APQC is the owner of the framework and its content.</p>

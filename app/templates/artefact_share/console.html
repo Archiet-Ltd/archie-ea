@@ -5,6 +5,7 @@
    this page never receives another organisation's links.
 #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Share Architecture Artefacts{% endblock %}
 
@@ -23,7 +24,6 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/confirmation_dialog.html' import confirmation_dialog %}
 <div class="p-6 space-y-6" x-data="artefactShareConsole()" x-cloak>
 
@@ -53,11 +53,7 @@
     {% call card.card_content(class='p-0') %}
       <template x-if="(links['{{ artefact.key }}'] || []).length === 0">
         <div class="p-4">
-          {{ empty_state(
-              icon='link-2',
-              title='No share links yet',
-              description='Create a link above to share this artefact with anyone outside your organisation.'
-          ) }}
+          {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No share links yet') }}{{ ui.empty_description(text='Create a link above to share this artefact with anyone outside your organisation.') }}{% endcall %}{% endcall %}
         </div>
       </template>
 
