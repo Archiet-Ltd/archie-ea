@@ -836,10 +836,11 @@ class RegulatoryFrameworkService:
                 continue
 
             # Extract controls separately
-            controls_data = framework_data.pop("controls", [])
+            # (read, not popped: the fallback list is shared by every call in the process)
+            controls_data = framework_data.get("controls", [])
 
             # Create framework
-            framework = RegulatoryFramework(**framework_data)
+            framework = RegulatoryFramework(**{k: v for k, v in framework_data.items() if k != "controls"})
             framework.last_updated = datetime.utcnow()
             framework.next_review_date = datetime.utcnow() + timedelta(days=365)
 

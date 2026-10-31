@@ -26,12 +26,14 @@ BIAN_STARTER = (
     )),
     ("Risk and Compliance", (
         ("Customer Credit Rating", "Rating how likely a customer is to repay."),
-        ("Fraud Detection", "Spotting transactions that look fraudulent."),
+        ("Fraud Evaluation", "Spotting transactions that look fraudulent."),
         ("Regulatory Compliance", "Meeting the rules that apply to the bank and showing it has."),
     )),
     ("Business Support", (
         ("Financial Accounting", "Keeping the bank's own books and producing its statements."),
+        ("Products and Services Direction", "Setting the direction for the products and services the bank offers."),
+    )),
+    ("Bank Treasury", (
         ("Corporate Treasury", "Managing the bank's own cash, funding and liquidity."),
-        ("Product Design", "Designing new products and changing existing ones."),
     )),
 )

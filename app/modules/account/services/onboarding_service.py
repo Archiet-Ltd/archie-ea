@@ -593,10 +593,13 @@ def _bian_entries() -> List[Dict[str, Any]]:
     from app.seed_data.bian_starter import BIAN_STARTER
 
     entries = []
-    for area, domains in BIAN_STARTER:
-        entries.append({"name": area, "description": None, "level": 1, "parent": None, "domain": area})
+    for number, (area, domains) in enumerate(BIAN_STARTER, start=1):
+        code = "BIAN-%d" % number
+        entries.append({"name": area, "description": None, "level": 1, "parent": None, "domain": area, "domain_code": code})
         for name, description in domains:
-            entries.append({"name": name, "description": description, "level": 2, "parent": area, "domain": area})
+            entries.append(
+                {"name": name, "description": description, "level": 2, "parent": area, "domain": area, "domain_code": code}
+            )
     return entries
 
 
@@ -605,12 +608,16 @@ def _apqc_entries() -> List[Dict[str, Any]]:
     from app.modules.industry_apqc.framework_data import CATEGORIES, PROCESS_GROUPS
 
     categories = dict(CATEGORIES)
+    codes = {name: "APQC-%s" % code.split(".")[0] for code, name in CATEGORIES}
     entries = [
-        {"name": name, "description": None, "level": 1, "parent": None, "domain": name} for _code, name in CATEGORIES
+        {"name": name, "description": None, "level": 1, "parent": None, "domain": name, "domain_code": codes[name]}
+        for _code, name in CATEGORIES
     ]
     for code, name in PROCESS_GROUPS:
         parent = categories[code.split(".")[0] + ".0"]
-        entries.append({"name": name, "description": None, "level": 2, "parent": parent, "domain": parent})
+        entries.append(
+            {"name": name, "description": None, "level": 2, "parent": parent, "domain": parent, "domain_code": codes[parent]}
+        )
     return entries
 
 
@@ -644,6 +651,37 @@ def _load_capabilities(org_id: int, model: str) -> int:
     return added
 
 
+def _place_on_the_map(org_id: int, model: str) -> None:
+    """Give the map rows projected from this organisation's starter capabilities the domain their framework
+    names (the BIAN business area, the APQC category), so no card reads Uncategorised."""
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import BusinessDomain, UnifiedCapability
+
+    entries = {(e["name"], e["level"]): e for e in _ENTRIES[model]()}
+    domains: Dict[str, int] = {}
+    ids_by_domain: Dict[str, List[str]] = {}
+    for row in BusinessCapability.query.filter_by(organization_id=org_id, discovery_source=_starter_source(model)).all():
+        entry = entries.get((row.name, row.level))
+        if entry is None:
+            continue
+        if entry["domain_code"] not in domains:
+            domain = BusinessDomain.query.filter_by(code=entry["domain_code"]).first()
+            if domain is None:
+                domain = BusinessDomain(code=entry["domain_code"], name=entry["domain"])
+                db.session.add(domain)
+                db.session.flush()
+            domains[entry["domain_code"]] = domain.id
+        ids_by_domain.setdefault(entry["domain_code"], []).append(str(row.id))
+    for code, source_ids in ids_by_domain.items():
+        UnifiedCapability.query.filter(
+            UnifiedCapability.organization_id == org_id,
+            UnifiedCapability.source_table == "business_capability",
+            UnifiedCapability.source_id.in_(source_ids),
+            UnifiedCapability.domain_id.is_(None),
+        ).update({"domain_id": domains[code]}, synchronize_session=False)
+    db.session.commit()
+
+
 def _adopt_frameworks(org_id: int, keys: List[str]) -> int:
     """Adopt each chosen framework that has a catalogue and is not adopted yet; returns how many were adopted."""
     from app.models.compliance_models import RegulatoryFramework
@@ -663,9 +701,10 @@ def _adopt_frameworks(org_id: int, keys: List[str]) -> int:
             continue
         if FrameworkAdoption.query.filter_by(organization_id=org_id, framework_id=framework.id).first():
             continue
-        adoption = ApplicabilityService.adopt_framework(org_id, framework.id, adopted_by_id=None)
-        adoption.source = "starter:%s" % dict((k, label) for k, label, _n in FRAMEWORKS)[key]
-        db.session.commit()
+        ApplicabilityService.adopt_framework(
+            org_id, framework.id, adopted_by_id=None,
+            source="starter:%s" % dict((k, label) for k, label, _n in FRAMEWORKS)[key],
+        )
         adopted += 1
     return adopted
 
@@ -682,6 +721,8 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
     model = _starter_model(chosen["industry"])
     capabilities = _load_capabilities(org_id, model) if model else 0
     db.session.commit()
+    if model:
+        _place_on_the_map(org_id, model)
     _refresh_capability_map(org_id)
     adopted = _adopt_frameworks(org_id, chosen["frameworks"])
     _mark_elements_as_starter(org_id)
@@ -739,10 +780,37 @@ def remove_unedited_starter_rows(org, model: str) -> int:
     if model not in _ENTRIES or model == _starter_model(choices(org)["industry"]):
         raise ValueError("Choose a starter model you are no longer using.")
     removed = 0
+    mirrored = []
     for row in _removable_rows(org.id, model):
+        if row.archimate_element_id:
+            mirrored.append((row.archimate_element_id, row.name, row.description))
         db.session.delete(row)
         db.session.flush()
         removed += 1
+    for element_id, name, description in mirrored:
+        _remove_unchanged_element(org.id, element_id, name, description)
     db.session.commit()
     _refresh_capability_map(org.id)
     return removed
+
+
+def _remove_unchanged_element(org_id: int, element_id: int, name: str, description: Optional[str]) -> None:
+    """Remove the model element mirrored from a removed starter capability, unless somebody has changed it
+    or linked it to something. The element goes through the session, so the audit log records it."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
+    if element is None or element.source_kind != "starter" or element.name != name:
+        return
+    if (element.description or None) not in (description or None, "Business capability: %s" % name):
+        return
+    linked = ArchiMateRelationship.query.filter(
+        db.or_(ArchiMateRelationship.source_id == element_id, ArchiMateRelationship.target_id == element_id)
+    ).first()
+    if linked is not None:
+        return
+    try:
+        with db.session.begin_nested():
+            db.session.delete(element)
+    except Exception:
+        _log.warning("could not remove model element %s for organisation %s", element_id, org_id, exc_info=True)

@@ -645,6 +645,17 @@ def _api_hierarchy_context():
                 }
             domains_map[domain_name]["capabilities"].append(cap)
 
+        def not_assessed(cap, mapping_count):
+            """A starter capability nobody has rated or mapped an application to: it has no health or
+            coverage to show yet, and a figure for it would be invented."""
+            if cap.source_table != "business_capability" or not starter_sources.get(str(cap.source_id)):
+                return False
+            recorded = (
+                cap.current_maturity_level, cap.target_maturity_level, cap.reliability_score,
+                cap.performance_score, cap.security_score, cap.scalability_score,
+            )
+            return all(value is None for value in recorded) and not mapping_count
+
         # Helper to compute health score (simplified - based on maturity, coverage, etc.)
         def compute_health_score(cap, mapping_count, children):
             # Simple health calculation: based on maturity gap, application coverage, and children health
@@ -669,7 +680,7 @@ def _api_hierarchy_context():
                 weights.append(0.4)
 
             # Application coverage component (30% weight)
-            if mapping_count is not None:
+            if mapping_count is not None and not not_assessed(cap, mapping_count):
                 if mapping_count > 0:
                     score_components.append(100)
                 else:
@@ -763,6 +774,7 @@ def _api_hierarchy_context():
                 "investmentPlanned": investment_planned,
                 # Health lens
                 "healthScore": health_score,
+                "notAssessed": not_assessed(cap, mapping_count),
                 "healthFromQuality": health_from_quality,
                 "reliabilityScore": cap.reliability_score,
                 "performanceScore": cap.performance_score,

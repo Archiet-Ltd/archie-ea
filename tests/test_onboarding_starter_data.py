@@ -234,3 +234,124 @@ def test_starter_rows_are_not_the_persons_own_model_so_the_overview_still_asks_f
         "SELECT DISTINCT source_kind FROM archimate_elements WHERE organization_id = :o AND deleted_at IS NULL"),
         {"o": two["one"].id}).scalars().all()
     assert kinds == ["starter"], kinds
+
+
+def _elements(org, names=None):
+    from app import db
+
+    rows = db.session.execute(
+        db.text("SELECT id, name, type FROM archimate_elements WHERE organization_id = :o AND deleted_at IS NULL"),
+        {"o": org.id},
+    ).all()
+    return {r.name for r in rows} if names is None else {r.name for r in rows} & set(names)
+
+
+def test_removing_the_old_starter_model_removes_its_model_repository_elements(client, login_as, two):
+    from app import db
+
+    for key in ("one", "two"):
+        _choose(client, login_as, two["%s_owner" % key], "banking", [])
+    old = {"Current Account", "Payment Execution", "Sales and Service"}
+    assert old <= _elements(two["one"]) and old <= _elements(two["two"])
+    db.session.execute(
+        db.text("UPDATE archimate_elements SET description = 'Kept by a person' "
+                "WHERE organization_id = :o AND name = 'Savings Account'"),
+        {"o": two["one"].id},
+    )
+    db.session.commit()
+    two_before = _elements(two["two"])
+    _choose(client, login_as, two["one_owner"], "software", [])
+    login_as(client, two["one_owner"])
+    assert client.post("/account/welcome/starter/remove", json={"model": "BIAN"}).status_code == 200
+    left = _elements(two["one"])
+    assert not old & left, "the removed capabilities must leave the model repository too"
+    assert "Savings Account" in left, "an element a person changed stays"
+    assert "Develop Vision and Strategy" in left
+    assert _elements(two["two"]) == two_before, "another organisation's elements are untouched"
+
+
+def test_the_bian_starter_names_are_service_domains_of_the_published_landscape():
+    from app.seed_data.bian_starter import BIAN_STARTER
+
+    areas = {area: [name for name, _d in domains] for area, domains in BIAN_STARTER}
+    every = {name for names in areas.values() for name in names}
+    assert "Fraud Detection" not in every and "Fraud Evaluation" in every
+    assert "Product Design" not in every
+    treasury = [area for area, names in areas.items() if "Corporate Treasury" in names]
+    assert len(treasury) == 1 and "Treasury" in treasury[0]
+
+
+def _map_rows(client, login_as, user):
+    login_as(client, user)
+    return [c for d in client.get("/capability-map/api/capabilities/hierarchy").get_json()["domains"] for c in d["capabilities"]]
+
+
+def test_starter_capabilities_have_a_domain_and_no_invented_assessment(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], "banking", [])
+    rows = _map_rows(client, login_as, two["one_owner"])
+    assert rows
+    assert {c["domainName"] for c in rows} == {c["name"] for c in rows if c["level"] == 1}
+    assert "Uncategorised" not in {c["domainName"] for c in rows}
+    for cap in rows:
+        assert cap["healthScore"] is None and cap["notAssessed"] is True, cap["name"]
+    _choose(client, login_as, two["two_owner"], "software", [])
+    other = _map_rows(client, login_as, two["two_owner"])
+    assert "Uncategorised" not in {c["domainName"] for c in other}
+    assert all(c["healthScore"] is None for c in other)
+
+
+def test_a_capability_somebody_assessed_keeps_its_figures(client, login_as, two):
+    from app import db
+
+    _choose(client, login_as, two["one_owner"], "banking", [])
+    row = BusinessCapability.query.filter_by(organization_id=two["one"].id, name="Sales and Service").one()
+    row.current_maturity_level, row.target_maturity_level = 2, 3
+    db.session.commit()
+    cap = next(c for c in _map_rows(client, login_as, two["one_owner"]) if c["name"] == "Sales and Service")
+    assert cap["notAssessed"] is False and cap["healthScore"] is not None
+
+
+def test_a_partly_loaded_standard_says_how_much_of_it_is_loaded(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    compliance = client.get("/dashboard/compliance").get_data(as_text=True)
+    gallery = client.get("/frameworks/").get_data(as_text=True)
+    for name, page in (("compliance", compliance), ("gallery", gallery)):
+        assert "3 of 93" in page, name
+    assert "Adopted in full" not in compliance
+
+
+def test_the_adoption_source_is_set_before_the_adoption_is_saved(client, login_as, two):
+    from sqlalchemy import event
+
+    seen = []
+
+    def record(mapper, connection, target):
+        seen.append(target.source)
+
+    event.listen(FrameworkAdoption, "after_insert", record)
+    try:
+        _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    finally:
+        event.remove(FrameworkAdoption, "after_insert", record)
+    assert seen == ["starter:ISO 27001"]
+
+
+def test_the_frameworks_gallery_reads_the_adoptions_once(client, login_as, two):
+    from sqlalchemy import event
+
+    from app import db
+    from app.modules.industry_apqc.routes import frameworks_gallery_routes as gallery
+
+    _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    statements = []
+
+    def count(conn, cursor, statement, *rest):
+        if "FROM framework_adoptions" in statement:
+            statements.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", count)
+    try:
+        gallery._compliance_cards(two["one"].id)
+    finally:
+        event.remove(db.engine, "before_cursor_execute", count)
+    assert len(statements) == 1

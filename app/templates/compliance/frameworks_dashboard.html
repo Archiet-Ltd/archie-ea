@@ -110,6 +110,7 @@
                         <td class="px-5 py-3 text-muted-foreground">{{ f.penalty_risk or '—' }}</td>
                         <td class="px-5 py-3 text-right text-foreground">
                             {{ f.control_count if f.control_count else '—' }}
+                            {% if f.partly_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.partly_loaded }}. The rest of the standard is not loaded yet.</div>{% endif %}
                         </td>
                     </tr>
                     <tr x-show="openId === {{ f.id }}" x-cloak>

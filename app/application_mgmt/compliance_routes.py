@@ -8,6 +8,7 @@ from app.application_mgmt import application_mgmt
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+from app.seed_data.standard_control_totals import controls_loaded_text
 from app.utils.route_guards import require_entity
 
 
@@ -44,6 +45,7 @@ def compliance_frameworks_dashboard():
             organization_id=getattr(g, "current_org_id", None), status="active"
         ).all()
     }
+    counts = {f.id: f.controls.count() for f in frameworks}
     framework_rows = [
         {
             "adopted": f.id in adopted,
@@ -55,7 +57,8 @@ def compliance_frameworks_dashboard():
             "jurisdiction": f.jurisdiction,
             "enforcement_level": f.enforcement_level,
             "penalty_risk": f.penalty_risk,
-            "control_count": f.controls.count(),
+            "control_count": counts[f.id],
+            "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
         }
         for f in frameworks
     ]
@@ -95,7 +98,8 @@ def get_compliance_frameworks():
                 "description": f.description,
                 "category": f.category,
                 "enforcement_level": f.enforcement_level,
-                "control_count": f.controls.count(),
+                "control_count": counts[f.id],
+            "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
             }
             for f in frameworks
         ]
