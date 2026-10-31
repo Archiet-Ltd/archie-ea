@@ -226,12 +226,6 @@ NAVIGATION_REGISTRY = {
                 "url_fallback": "/architecture-assistant/",
             },
             {
-                "label": "Gap Discovery",
-                "icon": "search",
-                "endpoint": "main.agentic_gaps_ui",
-                "url_fallback": "/agentic-gaps",
-            },
-            {
                 "label": "Market Intelligence",
                 "icon": "trending-up",
                 "endpoint": "architect_ui.market_intelligence",

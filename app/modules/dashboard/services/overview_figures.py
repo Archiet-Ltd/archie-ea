@@ -152,12 +152,13 @@ def _applications(org_id, now):
 
 
 def _sourced_share(org_id):
-    """Share of model elements that record where they came from, and the least-sourced layer."""
+    """Share of model elements that record where they came from, and the least-sourced layer.
+    Elements loaded as a starting point at sign-up are not counted: they are not what the person brought."""
     from app.models import ArchiMateElement as E
 
     rows = db.session.execute(
         db.select(E.layer, func.count(E.id), func.count(E.source_kind))
-        .where(E.organization_id == org_id, E.deleted_at.is_(None))
+        .where(E.organization_id == org_id, E.deleted_at.is_(None), E.source_kind.is_distinct_from("starter"))
         .group_by(E.layer)
     ).all()
     total = sum(r[1] for r in rows)

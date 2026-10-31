@@ -31,10 +31,13 @@ def test_the_chat_answers_what_breaks_with_a_cited_card_for_every_connection(cli
     assert html.count("data-citation>") == rows
     assert "Source not recorded" not in html
     assert "Imported from Sample company" in html
-    # Applications carry the health the dashboard shows, and an owner named once.
+    # Applications carry the health the dashboard shows. Corrected: this already
+    # failed on the line, asserting an owner "named once" -- the signed-in person,
+    # Sam Founder, who merely clicked Load the sample company. The sample names no
+    # real owner, so none is invented; every row reads "No owner recorded" instead.
     assert 'aria-label="Health: Healthy"' in html
-    assert 'aria-label="Owner: Sam Founder"' in html
-    assert "Sam Founder, Sam Founder" not in html
+    assert "No owner recorded" in html
+    assert "Sam Founder" not in html
     # The card opens the stored answer, which has content.
     assert body["page_url"] == "/intelligence/answers/" + body["address"]
     page = client.get(body["page_url"])
@@ -72,6 +75,7 @@ def test_another_organisation_gets_no_answer_and_cannot_open_the_address(client,
         assert fact not in html, fact
     for name in re.findall(r"data-answer-row[^>]*>\s*<a[^>]*>([^<]+)</a>", mine["html"]):
         assert name.strip() == "Payments service" or name.strip() not in html, name
+    assert "Add &#34;Payments service&#34; to your model" in theirs.get("html", "")
     assert client.get(mine["page_url"]).status_code == 404
 
 

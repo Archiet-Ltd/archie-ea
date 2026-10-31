@@ -294,3 +294,23 @@ def test_a_relationship_drawn_through_the_drawing_service_names_the_signed_in_pe
     relation = _only_row(_impact(app, org.id, source_id))
     assert relation["provenance"]["text"] == "Drawn by Ada Lovelace"
     assert relation["computed_at"] is not None
+
+
+def test_a_source_label_describing_a_kind_of_source_is_not_drawn_by(app, db_session, make_org):
+    org = make_org("pa2-kind-label")
+    a, b = _element(db_session, org.id, "Root"), _element(db_session, org.id, "Dep")
+    _link(db_session, org.id, a, b, source_kind="manual", source_label="Entered by the team")
+    db_session.commit()
+
+    relation = _only_row(_impact(app, org.id, a.id))
+
+    assert relation["provenance"]["text"] == "Entered by the team"
+    assert "Drawn by" not in relation["provenance"]["text"]
+
+
+def test_the_origin_words_for_a_name_and_for_a_kind_of_source():
+    from app.services.relationship_origin import manual_origin_text
+
+    assert manual_origin_text("Ada Lovelace") == "Drawn by Ada Lovelace"
+    assert manual_origin_text("Entered by the team") == "Entered by the team"
+    assert manual_origin_text("Imported from GitHub") == "Imported from GitHub"

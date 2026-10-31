@@ -592,6 +592,19 @@ function applicationCreateForm() {
   return {
     submitting: false,
     errorMsg: '',
+
+    // A chat answer that named an application not yet in the model links here with
+    // ?add_name=<name> (the existing form, prefilled, never a second "add" dialog).
+    init() {
+      try {
+        const addName = new URLSearchParams(window.location.search).get('add_name');
+        if (addName) {
+          this.form.name = addName.slice(0, 255);
+          this.scheduleCheck();
+          this.$nextTick(() => Platform.modal.open('modal-create'));
+        }
+      } catch (e) { /* swallow-ok: the prefill is a convenience; the form still opens empty */ }
+    },
     // ARCH-041/ARCH-042: per-field errors keyed by form field name, rendered
     // next to the corresponding input with aria-invalid + aria-describedby,
     // instead of a single opaque banner (or, worse, the raw HTTP status

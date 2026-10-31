@@ -976,7 +976,7 @@ def application_delete(id):
         if is_ajax:
             message = f"Application '{app_name}' deleted"
             if mirror["errors"]:
-                message += "; its ArchiMate element could not be removed"
+                message += "; " + "; ".join(mirror["errors"])
             return jsonify(
                 {
                     "success": True,
@@ -1141,7 +1141,7 @@ def api_delete_application(app_id):
 
         message = f"Application {app_name} deleted successfully"
         if mirror["errors"]:
-            message += "; its ArchiMate element could not be removed"
+            message += "; " + "; ".join(mirror["errors"])
         return jsonify(
             {
                 "success": True,

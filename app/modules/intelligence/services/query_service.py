@@ -28,6 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.services.relationship_origin import manual_origin_text
 from app.models.archimate_element_types import is_application_kind
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
@@ -576,9 +577,11 @@ def _row_origin(rel) -> Dict[str, Any]:
     if kind == "import" and label:
         text = f"Imported from {label}"
     elif kind == "manual" and label:
-        text = f"Drawn by {label}"
+        text = manual_origin_text(label)
     elif kind in ("connector", "derived") and label:
         text = label
+    elif kind == "sample":
+        text = "Sample data"
     created = getattr(rel, "created_at", None)
     recorded = getattr(rel, "source_recorded_at", None) or created
     person_ids: List[int] = []

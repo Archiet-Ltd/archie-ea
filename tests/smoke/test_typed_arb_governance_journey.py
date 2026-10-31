@@ -113,7 +113,7 @@ CAPABILITY_SECRET = os.environ["TRANSFORMATION_COMMAND_CAPABILITY_SECRET"]
 #                                    arb_condition_evidence_service._SUBMIT_ROLES
 #                                    (so it may capture and submit condition
 #                                    evidence) and arb_decision_service.
-#                                    _DECISION_ROLES (so it clears the
+#                                    DECISION_ROLES (so it clears the
 #                                    verification ROLE gate). That combination is
 #                                    what makes C.3 meaningful: the refusal must
 #                                    come from separation of duties, not from a

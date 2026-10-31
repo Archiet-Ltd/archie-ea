@@ -203,3 +203,67 @@ def test_providerless_saved_guide_can_be_opened_and_cleared_without_affecting_ot
             context.close()
     assert not inference_requests, f'History-only journey requested inference: {inference_requests}'
     assert not errors, 'Providerless history page errors:\n' + '\n'.join(errors)
+
+
+ADMIN_SENTENCE_TAIL = 'An administrator can add an AI key under Settings, AI and models.'
+ASK_SENTENCE_TAIL = 'Ask your administrator to add an AI key under Settings, AI and models.'
+FORBIDDEN_SNIPPETS = ('LLM provider', 'provider must be configured', "'chat'")
+
+
+def _ask_the_guide(page, app_url):
+    assert page.goto(app_url, wait_until='domcontentloaded').status == 200
+    trigger = page.locator('#page-guide-trigger')
+    expect(trigger).to_be_visible()
+    trigger.click()
+    page.fill('#page-guide-input', 'What does this page do?')
+    with page.expect_response(
+        lambda r: r.url.endswith('/ai-chat/guide/message') and r.request.method == 'POST',
+        timeout=PAGE_TIMEOUT,
+    ) as resp:
+        page.locator('#page-guide-submit').click()
+    assert resp.value.status == 503, resp.value.text()
+    error = page.locator('#page-guide-error')
+    expect(error).to_be_visible()
+    return error.inner_text()
+
+
+def test_assistant_not_set_up_wording_for_a_non_administrator(
+    browser, live_server, seeded, providerless_guide_configuration
+):
+    """T-ai-plain-01: the page guide -- the third AI control the launch-cut
+    sweep found carrying the words "LLM provider" -- reads the same plain
+    sentence every other AI control does, asking a non-administrator to ask
+    one rather than naming a provider."""
+    context = browser.new_context(viewport={'width': 1440, 'height': 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        email = seeded['emails']['enterprise_architect']
+        _login(page, live_server, email)
+        text = _ask_the_guide(page, live_server + f"/applications/{seeded['ids']['application']}")
+        assert 'The assistant is not set up for your organisation yet.' in text
+        assert ASK_SENTENCE_TAIL in text
+        for bad in FORBIDDEN_SNIPPETS:
+            assert bad not in text, text
+    finally:
+        context.close()
+
+
+def test_assistant_not_set_up_wording_for_an_administrator(
+    browser, live_server, seeded, providerless_guide_configuration
+):
+    """The same control, as an organisation administrator: same sentence,
+    told they -- not someone else -- can add the key."""
+    context = browser.new_context(viewport={'width': 1440, 'height': 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        email = seeded['emails']['platform_admin']
+        _login(page, live_server, email)
+        text = _ask_the_guide(page, live_server + f"/applications/{seeded['ids']['application']}")
+        assert 'The assistant is not set up for your organisation yet.' in text
+        assert ADMIN_SENTENCE_TAIL in text
+        for bad in FORBIDDEN_SNIPPETS:
+            assert bad not in text, text
+    finally:
+        context.close()
