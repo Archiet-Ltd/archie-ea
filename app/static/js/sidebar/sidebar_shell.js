@@ -43,8 +43,10 @@
             drawer = document.createElement('div');
             drawer.setAttribute('data-fb-sidebar-mobile', '');
             drawer.hidden = true;
-            drawer.innerHTML = '<div data-slot="sheet-overlay" data-state="open"></div>' +
-                '<div data-slot="sheet-content" data-state="open" data-side="left" role="dialog" aria-modal="true" aria-label="Navigation" data-sidebar="sidebar" data-mobile="true"><div class="flex h-full w-full flex-col" data-fb-mobile-slot></div></div>';
+            // The drawer carries no data-state on its parts: the library's sheet script opens (and moves to <body>) any sheet
+            // marked open, which unpins the drawer from its fixed wrapper. This script owns the drawer's state.
+            drawer.innerHTML = '<div data-slot="sheet-overlay"></div>' +
+                '<div data-slot="sheet-content" data-side="left" role="dialog" aria-modal="true" aria-label="Navigation" data-sidebar="sidebar" data-mobile="true"><div class="flex h-full w-full flex-col" data-fb-mobile-slot></div></div>';
             document.body.appendChild(drawer);
             drawer.firstElementChild.addEventListener('click', function () { setDrawer(false); });
         }
