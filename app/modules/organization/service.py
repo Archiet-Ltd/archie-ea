@@ -264,6 +264,27 @@ def upsert_raci_cell(stakeholder_type, stakeholder_id, stakeholder_name, capabil
     return assignment
 
 
+def keep_raci_stakeholder(stakeholder_type, stakeholder_id, stakeholder_name):
+    """Keep a stakeholder on the matrix with no cell set: a row with no capability and no
+    designation, which the matrix lists as a stakeholder and never as a cell."""
+    if stakeholder_type not in STAKEHOLDER_TYPES:
+        raise ValueError(f"Invalid stakeholder_type: {stakeholder_type}")
+    if not stakeholder_id:
+        raise ValueError("stakeholder_id is required")
+    assignment = EnterpriseRaciAssignment.query.filter_by(
+        stakeholder_type=stakeholder_type, stakeholder_id=stakeholder_id
+    ).first()
+    if assignment is None:
+        assignment = EnterpriseRaciAssignment(
+            stakeholder_type=stakeholder_type,
+            stakeholder_id=stakeholder_id,
+            stakeholder_name=stakeholder_name,
+        )
+        db.session.add(assignment)
+        db.session.commit()
+    return assignment
+
+
 def delete_raci_cell(stakeholder_type, stakeholder_id, capability_id):
     """Clear the RACI designation for one (stakeholder, capability) cell."""
     assignment = EnterpriseRaciAssignment.query.filter_by(

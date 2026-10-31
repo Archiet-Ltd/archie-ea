@@ -78,6 +78,10 @@ POLICY = {
     # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
     "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
+    # The RACI matrix page is @login_required only, so every archetype reads it; setting,
+    # clearing and adding a stakeholder carry the same require_roles("admin", "architect",
+    # "business_architect") and are pinned in tests/smoke/test_raci_clear_journey.py.
+    "/organization/raci":      set(ARCHETYPES),
     # Twin map: the page carries @login_required and no role gate, so every
     # archetype is expected to reach it (it redirects to the Composer). Stating
     # that in a row is what makes a role gate added later show up here as a row

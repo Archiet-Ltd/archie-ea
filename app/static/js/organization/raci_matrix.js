@@ -216,7 +216,17 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        addStakeholder(result) {
+        async addStakeholder(result) {
+            try {
+                await Platform.fetch.post('/organization/raci/api/stakeholder/keep', {
+                    stakeholder_type: result.type,
+                    stakeholder_id: result.id,
+                    stakeholder_name: result.name,
+                });
+            } catch (e) {
+                // Platform.fetch already surfaces the refusal; the stakeholder is not added.
+                return;
+            }
             const exists = this.stakeholders.some(sh => sh.type === result.type && sh.id === result.id);
             if (!exists) {
                 this.stakeholders.push({ type: result.type, id: result.id, name: result.name });

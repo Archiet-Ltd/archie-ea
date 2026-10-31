@@ -316,7 +316,7 @@ def raci_cell_save():
 
 @organization_bp.route("/raci/api/cell", methods=["DELETE"])
 @login_required
-@require_roles("admin")
+@require_roles("admin", "architect", "business_architect")
 def raci_cell_delete():
     """Clear one RACI matrix cell.
 
@@ -345,6 +345,23 @@ def stakeholder_search():
     q = request.args.get("q", "")
     results = service.search_stakeholders(q, limit=10)
     return jsonify({"results": results})
+
+
+@organization_bp.route("/raci/api/stakeholder/keep", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def raci_stakeholder_keep():
+    """Save a stakeholder on the matrix before any cell is set, so a reload keeps them."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        assignment = service.keep_raci_stakeholder(
+            stakeholder_type=payload.get("stakeholder_type"),
+            stakeholder_id=payload.get("stakeholder_id"),
+            stakeholder_name=payload.get("stakeholder_name"),
+        )
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response(assignment.to_dict())
 
 
 @organization_bp.route("/raci/api/stakeholder", methods=["POST"])
