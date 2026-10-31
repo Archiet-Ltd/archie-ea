@@ -710,6 +710,8 @@ def violation_page(*, organization_id=None, address=None, user=None, since=None,
             connection.execute(
                 text("SELECT set_config('archie.organization_id', :o, true)"), {"o": str(organization_id)}
             )
+        # tenancy-ok: scoped through clause, which carries v.organization_id = :org
+        # when an organisation is given; platform scope is set above otherwise.
         total = connection.execute(
             text(  # nosec B608 - clause is built from fixed fragments, values are bound
                 "SELECT COUNT(*) FROM rate_limit_violations v "
@@ -717,6 +719,8 @@ def violation_page(*, organization_id=None, address=None, user=None, since=None,
             ),
             params,
         ).scalar()
+        # tenancy-ok: scoped through clause, which carries v.organization_id = :org
+        # when an organisation is given; platform scope is set above otherwise.
         rows = connection.execute(
             text(  # nosec B608 - clause is built from fixed fragments, values are bound
                 "SELECT v.id, v.created_at, v.address, u.email, v.route, v.rule "

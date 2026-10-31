@@ -21,6 +21,8 @@ OTHER = _BLOCK + ".78"
 def _forget_own(connection):
     connection.execute(text("DELETE FROM rate_limit_rules WHERE value LIKE :p"), {"p": _BLOCK + ".%"})
     connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+    # tenancy-ok: test cleanup of only the rows this run created, by address prefix,
+    # under platform scope set on the line above.
     connection.execute(text("DELETE FROM rate_limit_violations WHERE address LIKE :p"), {"p": _BLOCK + ".%"})
 
 
