@@ -1,9 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/form_field.html' import form_group %}
-{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/skeleton.html' import skeleton_table %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import explained_value %}
 {% from 'components/completeness_ring.html' import completeness_ring %}
@@ -48,7 +46,7 @@
     currency_symbol    str
 
   Built only from component macros (button, badge, alert, input, select_native,
-  checkbox, dropdown_menu, dense_table, card, empty_state, modal).
+  checkbox, dropdown_menu, card and the library table, empty and dialog blocks).
 #}
 {%- set STATUS_MAP = {
   'production':        {'label': 'Production',       'variant': 'success'},
@@ -349,94 +347,121 @@
     {% if not applications %}
     {# ─ Empty: one state for every width, saying why and what to do next ─ #}
     {% if has_filters %}
-    {{ empty_state(icon='search-x', title='No applications match your filters.',
-                   description='Nothing in the portfolio matches the current search and filters. Clear them to see every application again.',
-                   cta_text='Clear filters', cta_onclick='clearFilters()', cta_icon='x') }}
+    {% call ui.empty(class='py-4 md:py-8', attrs={'role': 'status'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('search') }}{% endcall %}
+        {{ ui.empty_title(text='No applications match your filters.') }}
+        {{ ui.empty_description(text='Nothing in the portfolio matches the current search and filters. Clear them to see every application again.') }}
+      {% endcall %}
+      {% call ui.empty_content() %}{% call button(text='Clear filters', icon='x', on_click='clearFilters()') %}{% endcall %}{% endcall %}
+    {% endcall %}
     {% elif not include_decom and stats.total and stats.total == stats.decommissioned %}
-    {{ empty_state(icon='archive', title='Every application is decommissioned.',
-                   description='The portfolio has ' ~ stats.total ~ ' application' ~ ('s' if stats.total != 1 else '') ~ ', all decommissioned, so the active list is empty.',
-                   cta_text='Show decommissioned', cta_href=request.path ~ '?include_decom=true', cta_icon='eye') }}
+    {% call ui.empty(class='py-4 md:py-8', attrs={'role': 'status'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('archive') }}{% endcall %}
+        {{ ui.empty_title(text='Every application is decommissioned.') }}
+        {{ ui.empty_description(text='The portfolio has ' ~ stats.total ~ ' application' ~ ('s' if stats.total != 1 else '') ~ ', all decommissioned, so the active list is empty.') }}
+      {% endcall %}
+      {% call ui.empty_content() %}{{ button(text='Show decommissioned', icon='eye', href=request.path ~ '?include_decom=true') }}{% endcall %}
+    {% endcall %}
     {% elif can_populate %}
-    {{ empty_state(icon='layout-grid', title='No applications yet.',
-                   description='Your application portfolio is empty. Add your first application to start mapping it to capabilities, owners and cost.',
-                   cta_text='Import Applications', cta_onclick="Platform.modal.open('application-import-modal')", cta_icon='upload',
-                   secondary_cta_text='Add an application', secondary_cta_onclick="Platform.modal.open('modal-create')", secondary_cta_icon='plus') }}
+    {% call ui.empty(class='py-4 md:py-8', attrs={'role': 'status'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('layout-grid') }}{% endcall %}
+        {{ ui.empty_title(text='No applications yet.') }}
+        {{ ui.empty_description(text='Your application portfolio is empty. Add your first application to start mapping it to capabilities, owners and cost.') }}
+      {% endcall %}
+      {% call ui.empty_content() %}
+        {{ button(text='Import Applications', icon='upload', on_click="Platform.modal.open('application-import-modal')") }}
+        {{ button(text='Add an application', icon='plus', variant='outline', on_click="Platform.modal.open('modal-create')") }}
+      {% endcall %}
+    {% endcall %}
     {% else %}
     {# Populating the portfolio is a platform-admin action; the way forward for everyone
        else is to ask their admin, which the copy says.
        empty-state-ok: role-scoped, non-admins cannot add applications #}
-    {{ empty_state(icon='layout-grid', title='No applications yet.',
-                   description='The portfolio has not been populated. Ask your platform admin to import or add applications.') }}
+    {% call ui.empty(class='py-4 md:py-8', attrs={'role': 'status'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('layout-grid') }}{% endcall %}
+        {{ ui.empty_title(text='No applications yet.') }}
+        {{ ui.empty_description(text='The portfolio has not been populated. Ask your platform admin to import or add applications.') }}
+      {% endcall %}
+    {% endcall %}
     {% endif %}
     {% else %}
 
     {# ─ Desktop table ─ #}
     <div class="hidden lg:block">
-{% set _dt_header %}
-            <th scope="col" class="h-10 w-10 px-2 text-left align-middle">
+{% call ui.table_container(class='max-h-[70vh] overflow-x-auto overflow-y-auto') %}{% call ui.table(attrs={'data-testid': 'applications-table'}) %}
+{% call ui.table_header(class='sticky top-0 z-10 bg-card') %}{% call ui.table_row() %}
+
+            {% call ui.table_head(class='h-10 w-10 px-2 text-left align-middle', attrs={'scope': 'col'}) %}
               {{ checkbox(id='select-all-desktop',
                           attrs_dict={'aria-label': 'Select all', 'data-testid': 'select-all', ':checked': 'allSelected()', ':indeterminate': 'someSelected()', '@change': 'toggleSelectAll($event.target.checked)'}) }}
-            </th>
-            <th scope="col" class="h-10 min-w-[180px] px-2 text-left align-middle">
+            {% endcall %}
+            {% call ui.table_head(class='h-10 min-w-[180px] px-2 text-left align-middle', attrs={'scope': 'col'}) %}
               {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Application name', testid='th-sort-name', on_click="sortBy('name')") %}Application<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'name' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'name' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
-            </th>
-            <th scope="col" class="h-10 min-w-[120px] px-2 text-left align-middle">
+            {% endcall %}
+            {% call ui.table_head(class='h-10 min-w-[120px] px-2 text-left align-middle', attrs={'scope': 'col'}) %}
               {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Type', testid='th-sort-type', on_click="sortBy('type')") %}Type<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
-            </th>
-            <th scope="col" class="h-10 min-w-[110px] px-2 text-left align-middle" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">ArchiMate</th>
-            <th scope="col" class="h-10 min-w-[160px] px-2 text-left align-middle">
+            {% endcall %}
+            {% call ui.table_head(class='h-10 min-w-[110px] px-2 text-left align-middle', attrs={'scope': 'col', 'title': 'ArchiMate: whether this application has a linked ArchiMate element', 'aria-label': 'ArchiMate link status'}) %}ArchiMate{% endcall %}
+            {% call ui.table_head(class='h-10 min-w-[160px] px-2 text-left align-middle', attrs={'scope': 'col'}) %}
               {% call button(variant='ghost', size='sm', class='-ml-2', aria_label='Sort by Lifecycle Status', testid='th-sort-lifecycle-status', on_click="sortBy('lifecycle_status')") %}Lifecycle Status<i data-lucide="chevron-up" class="ml-1 h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="ml-1 h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>{% endcall %}
-            </th>
-            <th scope="col" class="h-10 min-w-[140px] px-2 text-left align-middle">Owner</th>
-            <th scope="col" class="h-10 w-20 px-2 text-center align-middle">Record</th>
-            <th scope="col" class="h-10 min-w-[150px] px-2 text-left align-middle">Capability</th>
-            <th scope="col" class="h-10 w-14 px-2 text-right align-middle"><span class="sr-only">Actions</span></th>
-{% endset %}
-{% call dense_table(header=_dt_header, testid='applications-table', flush=true, max_height='calc(100vh - 280px)') %}
+            {% endcall %}
+            {% call ui.table_head(class='h-10 min-w-[140px] px-2 text-left align-middle', attrs={'scope': 'col'}) %}Owner{% endcall %}
+            {% call ui.table_head(class='h-10 w-20 px-2 text-center align-middle', attrs={'scope': 'col'}) %}Record{% endcall %}
+            {% call ui.table_head(class='h-10 min-w-[150px] px-2 text-left align-middle', attrs={'scope': 'col'}) %}Capability{% endcall %}
+            {% call ui.table_head(class='h-10 w-14 px-2 text-right align-middle', attrs={'scope': 'col'}) %}<span class="sr-only">Actions</span>{% endcall %}
+
+{% endcall %}{% endcall %}
+{% call ui.table_body() %}
           {% for app in applications %}
           {%- set status_text = app.lifecycle_status or app.deployment_status or 'Not set' -%}
           {%- set pc = app.capability_mappings | selectattr('business_capability') | first -%}
-          <tr class="group transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
-            <td class="px-2 align-middle">
+          {% call ui.table_row(class='group transition-colors hover:bg-muted/50', attrs={'data-app-id': app.id, 'data-testid': 'app-row-' ~ app.id}) %}
+            {% call ui.table_cell(class='px-2 align-middle') %}
               {{ checkbox(class='row-select',
                           attrs_dict={'aria-label': 'Select ' ~ app.name, 'data-testid': 'row-select-' ~ app.id, ':checked': 'selectedIds.has(' ~ app.id ~ ')', '@change': 'toggleRow(' ~ app.id ~ ', $event.target.checked)'}) }}
-            </td>
-            <td class="px-2 align-middle">
+            {% endcall %}
+            {% call ui.table_cell(class='px-2 align-middle') %}
               <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block max-w-[220px] truncate text-sm font-medium text-foreground hover:underline" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</a>
-            </td>
-            <td class="px-2 align-middle">
+            {% endcall %}
+            {% call ui.table_cell(class='px-2 align-middle') %}
               {% if app.component_type %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">{{ app.component_type[:1] | upper }}{{ app.component_type[1:] }}</span>
               {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">{{ explained_value('Not set', 'Open to classify') }}</a>
               {% else %}{{ explained_value('Not set') }}{% endif %}
-            </td>
-            <td class="px-2 align-middle">
+            {% endcall %}
+            {% call ui.table_cell(class='px-2 align-middle') %}
               {# role="img" makes the aria-label legal: a bare span is a generic element. #}
               {% if app.archimate_element_id %}
               <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><span role="img" class="inline-block h-2.5 w-2.5 rounded-full bg-primary" title="ArchiMate linked" aria-label="Linked to an ArchiMate element"></span>Linked</span>
               {% else %}
               <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><span class="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" title="No ArchiMate link" role="img" aria-label="Not linked to an ArchiMate element"></span>Not linked</span>
               {% endif %}
-            </td>
-            <td class="px-2 align-middle">{{ status_cell(status_text, STATUS_MAP) }}</td>
-            <td class="px-2 align-middle">{{ owner_cell(app, owner_names_by_app.get(app.id)) }}</td>
-            <td class="px-2 text-center align-middle">
+            {% endcall %}
+            {% call ui.table_cell(class='px-2 align-middle') %}{{ status_cell(status_text, STATUS_MAP) }}{% endcall %}
+            {% call ui.table_cell(class='px-2 align-middle') %}{{ owner_cell(app, owner_names_by_app.get(app.id)) }}{% endcall %}
+            {% call ui.table_cell(class='px-2 text-center align-middle') %}
               {% if app.completeness_score is not none %}
                 {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
               {% else %}
                 <span class="text-xs text-muted-foreground">—</span>
               {% endif %}
-            </td>
-            <td class="px-2 align-middle">
+            {% endcall %}
+            {% call ui.table_cell(class='px-2 align-middle') %}
               {% if pc %}
               <span class="block max-w-[150px] truncate text-xs text-foreground" title="{{ pc.business_capability.name | e }}" data-testid="app-capability-{{ app.id }}">{{ pc.business_capability.name }}</span>
               {% else %}
               <span class="text-xs text-muted-foreground" data-testid="app-capability-{{ app.id }}">Not mapped</span>
               {% endif %}
-            </td>
-            <td class="px-2 text-right align-middle">{{ row_menu(app) }}</td>
-          </tr>
+            {% endcall %}
+            {% call ui.table_cell(class='px-2 text-right align-middle') %}{{ row_menu(app) }}{% endcall %}
+          {% endcall %}
           {% endfor %}
+
 {% endcall %}
+{% endcall %}{% endcall %}
     </div>
 
     {# ─ Mobile cards ─ #}
@@ -528,7 +553,14 @@
   {% endcall %}{# end table card #}
 
   {# AI Map modal — inside the appPortfolio() x-data scope, which owns aiMap state #}
-  {% call modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs={'data-testid': 'ai-map-modal'}) %}
+  <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+  <template x-teleport="body">
+  {% call ui.dialog_content(id='ai-map-modal', class='max-h-[90vh] overflow-y-auto', attrs={'data-testid': 'ai-map-modal'}) %}
+  {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+      {% call ui.dialog_header() %}
+        {{ ui.dialog_title(text='AI Map Applications') }}
+        {{ ui.dialog_description(text='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.') }}
+      {% endcall %}
       <div class="flex-1 space-y-4 overflow-y-auto">
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
           {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
@@ -579,13 +611,7 @@
         {% call button(testid='btn-ai-map-accept', aria_label='Accept and save mappings', on_click='acceptAiMap()', attrs_dict={'x-show': 'aiMap.result && !aiMap.acceptResult', 'x-cloak': '', ':disabled': 'aiMap.accepting'}) %}<span x-text="aiMap.accepting ? 'Saving...' : 'Accept & Save'">Accept &amp; Save</span>{% endcall %}
       </div>
   {% endcall %}
-</div>{# end app-portfolio-root #}
-
-{# ─ Include existing unified mapping modal ─ #}
-{% include 'components/unified_mapping_modal.html' %}
-{# ─ Include import modal ─ #}
-{% include 'application_mgmt/application_import_modal.html' %}
-
+  </template>
 {# ─ Create Application Modal ─ #}
 {%- set type_choices = [('application', 'Application'), ('service', 'Service'), ('platform', 'Platform'), ('infrastructure', 'Infrastructure'), ('integration', 'Integration'), ('database', 'Database'), ('other', 'Other')] -%}
 {#- Values MUST stay inside VALID_CRITICALITY in app/schemas/api_schemas.py; any other
@@ -594,7 +620,14 @@
 {%- set deployment_choices = [('production', 'Production'), ('staging', 'Staging'), ('development', 'Development'), ('retired', 'Retired'), ('planned', 'Planned')] -%}
 {%- set create_status_choices = [] -%}
 {%- for opt in filter_options.lifecycle_statuses -%}{%- set _ = create_status_choices.append((opt.value, opt.label)) -%}{%- endfor -%}
-{% call modal(id='modal-create', title='New Application', description='Register a new application in the portfolio.') %}
+<template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+<template x-teleport="body">
+{% call ui.dialog_content(id='modal-create', class='max-h-[90vh] overflow-y-auto') %}
+{% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}
+      {{ ui.dialog_title(text='New Application') }}
+      {{ ui.dialog_description(text='Register a new application in the portfolio.') }}
+    {% endcall %}
     <div class="flex-1 overflow-y-auto" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
         <div class="grid grid-cols-1 gap-4">
@@ -662,6 +695,13 @@
       </form>
     </div>
 {% endcall %}
+</template>
+</div>{# end app-portfolio-root #}
+
+{# ─ Include existing unified mapping modal ─ #}
+{% include 'components/unified_mapping_modal.html' %}
+{# ─ Include import modal ─ #}
+{% include 'application_mgmt/application_import_modal.html' %}
 
 {# ─ Notification toast ─ #}
 <div aria-live="polite" aria-atomic="true"

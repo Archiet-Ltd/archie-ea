@@ -2,7 +2,7 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
-{% from 'components/empty_state.html' import empty_state %}
+{% import 'basecoat/index.html' as ui %}
 {# One lens answer drawn as cards in the chat: a heading card that says what was asked of
    which element, then a card per record the lens returned, or a plain sentence saying why
    there is none. Every figure arrives already redacted for the signed-in person by the API
@@ -33,7 +33,7 @@
     {% endcall %}
 
     {% if data is none %}
-        {{ empty_state(icon='circle-alert', title='We could not look that up just now', description='Ask again in a moment.', padding='py-6') }}
+        {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('circle-alert') }}{% endcall %}{{ ui.empty_title(text='We could not look that up just now') }}{{ ui.empty_description(text='Ask again in a moment.') }}{% endcall %}{% endcall %}
 
     {% elif lens == 'strategy' %}
         {% for item in data.initiatives %}
@@ -53,7 +53,7 @@
             </div>
         {% endcall %}
         {% else %}
-            {{ empty_state(icon='target', title='No initiatives recorded against this element', description='Nothing is missing from this answer: no initiative is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('target') }}{% endcall %}{{ ui.empty_title(text='No initiatives recorded against this element') }}{{ ui.empty_description(text='Nothing is missing from this answer: no initiative is linked to ' ~ name ~ ' yet.') }}{% endcall %}{% endcall %}
         {% endfor %}
 
     {% elif lens == 'programme' %}
@@ -71,7 +71,7 @@
             </div>
         {% endcall %}
         {% else %}
-            {{ empty_state(icon='target', title='No work packages recorded against this element', description='Nothing is missing from this answer: no work package is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('target') }}{% endcall %}{{ ui.empty_title(text='No work packages recorded against this element') }}{{ ui.empty_description(text='Nothing is missing from this answer: no work package is linked to ' ~ name ~ ' yet.') }}{% endcall %}{% endcall %}
         {% endfor %}
 
     {% elif lens == 'risk' %}
@@ -89,7 +89,7 @@
             </div>
         {% endcall %}
         {% else %}
-            {{ empty_state(icon='shield', title='No risks recorded against this element', description='Nothing is missing from this answer: no risk is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('shield') }}{% endcall %}{{ ui.empty_title(text='No risks recorded against this element') }}{{ ui.empty_description(text='Nothing is missing from this answer: no risk is linked to ' ~ name ~ ' yet.') }}{% endcall %}{% endcall %}
         {% endfor %}
 
     {% elif lens == 'portfolio' %}
@@ -101,7 +101,7 @@
             </div>
         {% endcall %}
         {% else %}
-            {{ empty_state(icon='layers', title='This is not something the rationalization view tracks', description=name ~ ' is not an application, so it has no rationalization record to open.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('layers') }}{% endcall %}{{ ui.empty_title(text='This is not something the rationalization view tracks') }}{{ ui.empty_description(text=name ~ ' is not an application, so it has no rationalization record to open.') }}{% endcall %}{% endcall %}
         {% endif %}
 
     {% elif lens == 'accountability' %}
@@ -117,13 +117,13 @@
             </div>
         {% endcall %}
         {% else %}
-            {{ empty_state(icon='users', title='Ownership data is not yet connected', description='No owner is recorded for ' ~ name ~ ' or anything it affects.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('users') }}{% endcall %}{{ ui.empty_title(text='Ownership data is not yet connected') }}{{ ui.empty_description(text='No owner is recorded for ' ~ name ~ ' or anything it affects.') }}{% endcall %}{% endcall %}
         {% endfor %}
         <p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>
 
     {% elif lens == 'data' %}
         {% if not data.data_objects and not data.flows %}
-            {{ empty_state(icon='database', title='This element has no linked data objects or flows yet', description='Link a data object or a flow to ' ~ name ~ ' in the model and it will be listed here.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('database') }}{% endcall %}{{ ui.empty_title(text='This element has no linked data objects or flows yet') }}{{ ui.empty_description(text='Link a data object or a flow to ' ~ name ~ ' in the model and it will be listed here.') }}{% endcall %}{% endcall %}
         {% else %}
             {% for item in data.data_objects %}
             {% call card(class='p-4') %}
@@ -151,7 +151,7 @@
 
     {% elif lens == 'compliance' %}
         {% if not data.controls and not data.open_violations %}
-            {{ empty_state(icon='shield-check', title='No compliance controls are recorded for this element yet', description='Nothing is missing from this answer: no control is mapped to ' ~ name ~ ' yet.', padding='py-6') }}
+            {% call ui.empty(class='py-6', attrs={'role': 'status'}) %}{% call ui.empty_header() %}{% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}{{ ui.empty_title(text='No compliance controls are recorded for this element yet') }}{{ ui.empty_description(text='Nothing is missing from this answer: no control is mapped to ' ~ name ~ ' yet.') }}{% endcall %}{% endcall %}
         {% else %}
             {% for item in data.controls %}
             {% call card(class='p-4') %}

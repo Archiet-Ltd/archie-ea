@@ -86,6 +86,14 @@
         return global.document.getElementById(id);
     }
 
+    // A dialog drawn with the library's dialog macros (data-slot="dialog-content") is opened and
+    // closed by the library runtime, which puts fbOpen / fbClose on the element. Callers keep using
+    // Platform.modal.open(id) / close(id) and data-modal-open / data-modal-close for both kinds.
+    function _libraryLayer(id) {
+        const el = _getEl(id);
+        return (el && el.getAttribute('data-slot') === 'dialog-content' && typeof el.fbOpen === 'function') ? el : null;
+    }
+
     function _focusOrigin(returnFocus) {
         if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
             return returnFocus;
@@ -276,6 +284,12 @@
     // options.returnFocus may name an explicit invoking element, including for
     // pointer/async callers where activeElement is not the invoking control.
     function open(id, payload, options) {
+        const layer = _libraryLayer(id);
+        if (layer) {
+            _syncAlpine(id, true, payload);
+            layer.fbOpen(_focusOrigin(options && options.returnFocus));
+            return true;
+        }
         if (!_registry[id]) {
             // Auto-register if element exists
             if (!register(id)) return false;
@@ -320,6 +334,12 @@
 
     // ── Close ────────────────────────────────────────────────────────────────
     function close(id, result) {
+        const layer = _libraryLayer(id);
+        if (layer) {
+            layer.fbClose();
+            _syncAlpine(id, false);
+            return true;
+        }
         const entry = _registry[id];
         if (!entry || !entry.isOpen) return false;
 
@@ -812,6 +832,8 @@
                 let role = target.getAttribute && target.getAttribute('role');
                 if (role !== 'dialog' && role !== 'alertdialog') continue;
                 if (!target.id) continue;
+                // A library dialog (data-slot="dialog-content") runs its own focus trap, Escape and scroll lock.
+                if (target.hasAttribute('data-slot')) continue;
 
                 // Check if element is now visible
                 let isHidden = target.hasAttribute('hidden') ||
