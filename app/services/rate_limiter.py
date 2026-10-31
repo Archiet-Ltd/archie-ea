@@ -23,81 +23,32 @@ logger = logging.getLogger(__name__)
 class RateLimitExceeded(Exception):
     """Raised when rate limit is exceeded."""
 
-    def __init__(self, limit: int, window: str, retry_after: int = None):
+    def __init__(self, limit: int, window: str, retry_after: int = None, verdict=None):
         self.limit = limit
         self.window = window
         self.retry_after = retry_after
+        self.verdict = verdict
         super().__init__(f"Rate limit exceeded: {limit} per {window}")
 
 
 class RateLimiter:
-    """
-    Hybrid rate limiter: in-memory token bucket + database-backed counting.
+    """Named-key limiter over the one shared counter store.
 
-    The in-memory bucket provides fast checking for normal operation.
-    Database-backed counting via LLMInteraction ensures rate limits
-    survive server restarts and cannot be bypassed by restarting the process.
+    There is no per-process state here: every count lives in the database table that backs the
+    request limiter, so two workers, or a restart, cannot change what a key has used.
     """
-
-    def __init__(self):
-        self._buckets = {}  # key -> {'tokens': int, 'last_update': float}
-        self._cleanup_threshold = 10000  # Clean up every N accesses
 
     def check_rate_limit(
         self, key: str, limit: int, window_seconds: int
     ) -> tuple[bool, Optional[int]]:
-        """
-        Check if action is within rate limit using in-memory token bucket.
-
-        Args:
-            key: Unique identifier (user_id, ip, etc.)
-            limit: Maximum number of actions
-            window_seconds: Time window in seconds
-
-        Returns:
-            Tuple of (allowed: bool, retry_after: Optional[int])
-        """
-        now = time.time()
-
-        # Initialize bucket if not exists
-        if key not in self._buckets:
-            self._buckets[key] = {"tokens": limit, "last_update": now}
-
-        bucket = self._buckets[key]
-
-        # Calculate tokens to add based on time elapsed
-        time_elapsed = now - bucket["last_update"]
-        tokens_to_add = (time_elapsed / window_seconds) * limit
-        bucket["tokens"] = min(limit, bucket["tokens"] + tokens_to_add)
-        bucket["last_update"] = now
-
-        # Check if we have tokens available
-        if bucket["tokens"] >= 1:
-            bucket["tokens"] -= 1
-            return True, None
-        else:
-            # Calculate retry_after in seconds
-            tokens_needed = 1 - bucket["tokens"]
-            retry_after = int((tokens_needed / limit) * window_seconds) + 1
-            return False, retry_after
+        """Count one action against ``key``. Returns (allowed, retry_after seconds or None)."""
+        verdict = count_hit("key", key, limit, window_seconds, honour_switch=False)
+        return verdict.allowed, (None if verdict.allowed else verdict.retry_after)
 
     def check_db_rate_limit(
         self, user_id: int, limit: int, window_seconds: int
     ) -> tuple[bool, Optional[int]]:
-        """
-        Check rate limit using database-backed counting via LLMInteraction table.
-
-        Survives server restarts - counts actual recorded interactions in the
-        time window. Falls back to in-memory check if DB query fails.
-
-        Args:
-            user_id: User ID to check
-            limit: Maximum number of actions allowed
-            window_seconds: Time window in seconds
-
-        Returns:
-            Tuple of (allowed: bool, retry_after: Optional[int])
-        """
+        """Check the user's recorded LLM interactions in the window (counted, not incremented)."""
         try:
             from app import db
             from app.models.models import LLMInteraction
@@ -139,30 +90,13 @@ class RateLimiter:
         except Exception as e:
             logger.warning(
                 f"DB rate limit check failed for user {user_id}, "
-                f"falling back to in-memory: {e}"
+                f"counting in the shared store instead: {e}"
             )
-            # Fall back to in-memory check if DB is unavailable
-            key = f"db_fallback:user:{user_id}"
-            return self.check_rate_limit(key, limit, window_seconds)
+            return self.check_rate_limit(f"db_fallback:user:{user_id}", limit, window_seconds)
 
     def reset(self, key: str):
         """Reset rate limit for a key."""
-        if key in self._buckets:
-            del self._buckets[key]
-
-    def cleanup_old_buckets(self, max_age_seconds: int = 3600):
-        """Remove buckets not accessed recently."""
-        now = time.time()
-        to_remove = [
-            key
-            for key, bucket in self._buckets.items()
-            if now - bucket["last_update"] > max_age_seconds
-        ]
-        for key in to_remove:
-            del self._buckets[key]
-
-        if to_remove:
-            logger.info(f"Cleaned up {len(to_remove)} old rate limit buckets")
+        counter_storage().clear(_counter_key("key", key, None))
 
 
 # Global rate limiter instance
@@ -219,12 +153,10 @@ def rate_limit(
             else:
                 key = f"ip:{request.remote_addr}:{endpoint}"
 
-            # Check rate limit
-            allowed, retry_after = _rate_limiter.check_rate_limit(key, limit, window_seconds)
-
-            if not allowed:
+            verdict = count_hit("route", key, limit, window_seconds)
+            if not verdict.allowed:
                 logger.warning(f"Rate limit exceeded for {key}: {limit}/{window}")
-                raise RateLimitExceeded(limit, window, retry_after)
+                raise RateLimitExceeded(limit, window, verdict.retry_after, verdict)
 
             return f(*args, **kwargs)
 
@@ -238,7 +170,7 @@ def check_pipeline_rate_limit(user_id: int) -> tuple[bool, Optional[str]]:
     Check if user can execute another pipeline.
 
     Uses database-backed counting (LLMInteraction table) to survive server
-    restarts. Falls back to in-memory check if DB is unavailable.
+    restarts. Falls back to the shared counter if the interaction table cannot be read.
 
     Args:
         user_id: User ID
@@ -263,7 +195,7 @@ def check_llm_rate_limit(user_id: int) -> tuple[bool, Optional[str]]:
     Check if user can make another LLM API call.
 
     Uses database-backed counting (LLMInteraction table) to survive server
-    restarts. Falls back to in-memory check if DB is unavailable.
+    restarts. Falls back to the shared counter if the interaction table cannot be read.
 
     Args:
         user_id: User ID
@@ -306,12 +238,6 @@ def track_api_usage(user_id: int, endpoint: str):
     except Exception as e:
         logger.error(f"Failed to track API usage: {e}")
         # Don't fail the request if tracking fails
-
-
-# Periodic cleanup task (call from scheduler)
-def cleanup_rate_limiters():
-    """Clean up old rate limiter buckets (call periodically)."""
-    _rate_limiter.cleanup_old_buckets(max_age_seconds=7200)  # 2 hours
 
 
 # ---------------------------------------------------------------------------------------------
@@ -430,6 +356,121 @@ if _LimitsStorage is not None:
 
 else:  # pragma: no cover
     DatabaseStorage = None
+
+
+# ---- one counter for every limiter -----------------------------------------------------------
+#
+# The request limiter, the route decorators, the import and ADM limiters, the webhook receiver and
+# the sign-up limits all count here, in DatabaseStorage. Nothing in the application keeps a count in
+# process memory.
+
+class Verdict:
+    """What one counted action came to: allowed or not, and the allowance left in its window."""
+
+    __slots__ = ("allowed", "limit", "count", "remaining", "retry_after", "reset_at")
+
+    def __init__(self, allowed, limit, count, retry_after, reset_at):
+        self.allowed = allowed
+        self.limit = limit
+        self.count = count
+        self.remaining = max(0, limit - count)
+        self.retry_after = retry_after
+        self.reset_at = reset_at
+
+
+_storage_override = {"storage": None}
+
+
+def counter_storage():
+    """The shared counter store. A test may hand each simulated worker its own connection pool."""
+    return _storage_override["storage"] or DatabaseStorage()
+
+
+def _counter_key(scope, identity):
+    return "%s:%s" % (scope, identity)
+
+
+def count_hit(scope, identity, limit, window_seconds, *, honour_switch=True):
+    """Count one action for ``identity`` under ``scope`` in the shared store and say if it is allowed.
+
+    The window starts at the first action and every worker sees the same count. A caller on the
+    administrator's allow list, or a deployment with throttling switched off, is allowed and not
+    counted. A store that cannot be reached lets the action through (and says so in the log) rather
+    than turning a database fault into a refusal of everything.
+    """
+    now = time.time()
+    if honour_switch:
+        from flask import g
+
+        if not current_app.config.get("RATE_LIMITING_ENABLED", True) or getattr(g, "_rate_limit_allowed", False):
+            return Verdict(True, limit, 0, None, now + window_seconds)
+    key = _counter_key(scope, identity)
+    storage = counter_storage()
+    try:
+        count = storage.incr(key, window_seconds)
+        reset_at = storage.get_expiry(key)
+    except Exception as exc:
+        logger.warning("rate limit store unavailable, not counting %s: %s", scope, exc)
+        return Verdict(True, limit, 0, None, now + window_seconds)
+    allowed = count <= limit
+    retry_after = None if allowed else max(1, int(-(-(reset_at - now) // 1)))
+    verdict = Verdict(allowed, limit, count, retry_after, reset_at)
+    note_verdict(verdict)
+    return verdict
+
+
+def peek_count(scope, identity):
+    """How many actions are counted for ``identity`` under ``scope`` right now, without adding one."""
+    try:
+        return counter_storage().get(_counter_key(scope, identity))
+    except Exception as exc:
+        logger.warning("rate limit store unavailable, not reading %s: %s", scope, exc)
+        return 0
+
+
+def note_verdict(verdict):
+    """Remember the tightest verdict of this request so its response can report the allowance."""
+    try:
+        from flask import g
+
+        held = getattr(g, "_counted_verdict", None)
+        if held is None or verdict.remaining <= held.remaining:
+            g._counted_verdict = verdict
+    except RuntimeError:  # no request: nothing to report to
+        pass
+
+
+def apply_headers(response, verdict=None):
+    """Put RateLimit-Limit / -Remaining / -Reset (and Retry-After on a refusal) on a response."""
+    if verdict is None:
+        from flask import g
+
+        verdict = getattr(g, "_counted_verdict", None)
+    if verdict is None:
+        return response
+    response.headers["RateLimit-Limit"] = str(verdict.limit)
+    response.headers["RateLimit-Remaining"] = str(verdict.remaining)
+    response.headers["RateLimit-Reset"] = str(int(verdict.reset_at))
+    if not verdict.allowed and verdict.retry_after:
+        response.headers["Retry-After"] = str(verdict.retry_after)
+    return response
+
+
+def client_address():
+    """The connection's address. A forwarded-for header sent by the caller is never read."""
+    return request.remote_addr or "unknown"
+
+
+def wait_phrase(seconds):
+    """A wait as a person says it, rounded up so it is never understated: '45 seconds', '12 minutes', '2 hours'."""
+    seconds = max(1, int(-(-(seconds or 0) // 1)))
+    if seconds < 90:
+        n, unit = seconds, "second"
+    elif seconds < 3600 - 30:
+        n, unit = -(-seconds // 60), "minute"
+    else:
+        n, unit = -(-seconds // 3600), "hour"
+    return "%d %s%s" % (n, unit, "" if n == 1 else "s")
 
 
 # ---- allow and deny lists --------------------------------------------------------------------

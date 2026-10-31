@@ -8,9 +8,9 @@ designs. Rather than forcibly merging them, this module provides:
 2. Re-exports so that ``from app.core.security.rate_limiter import ...`` works.
 
 Existing sources:
-- app/utils/adm_rate_limiter.py  — ADMRateLimiter (Redis-backed, per-user)
+- app/utils/adm_rate_limiter.py  — ADMRateLimiter (shared counter, per-user)
 - app/utils/ai_rate_limiter.py   — AIUsageTracker (DB-backed, per-user)
-- app/utils/import_rate_limiter.py — ImportRateLimiter (memory/Redis, per-IP)
+- app/utils/import_rate_limiter.py — import_rate_limit (shared counter)
 """
 
 import logging

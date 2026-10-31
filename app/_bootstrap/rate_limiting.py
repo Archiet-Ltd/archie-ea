@@ -188,6 +188,39 @@ def _install_access_lists(app):
         return resp
 
 
+def refuse(retry_after, rule, verdict=None):
+    """The one refusal for a limit that has been reached: JSON for an API caller, else the 429 page.
+
+    Says how long to wait, logs the refusal, and carries the RateLimit and Retry-After headers.
+    """
+    from flask import current_app, render_template
+
+    from app.services.rate_limiter import apply_headers, wait_phrase
+
+    _log_refusal(rule)
+    sentence = "Rate limit exceeded. Slow down and retry shortly."
+    if retry_after:
+        sentence = "Rate limit exceeded. Try again in %s." % wait_phrase(retry_after)
+    if _wants_json():
+        resp = _json_refusal(sentence, "rate_limited")
+    else:
+        try:
+            resp = current_app.make_response(
+                render_template(
+                    "errors/429.html", retry_after=retry_after,
+                    wait_text=wait_phrase(retry_after) if retry_after else None,
+                )
+            )
+        except Exception:
+            resp = current_app.make_response(sentence)
+    resp.status_code = 429
+    if verdict is not None:
+        apply_headers(resp, verdict)
+    if retry_after:
+        resp.headers["Retry-After"] = str(retry_after)
+    return resp
+
+
 def init_rate_limiting(app):
     """Install Flask-Limiter with global default limits.
 
@@ -254,27 +287,23 @@ def init_rate_limiting(app):
 
     @app.errorhandler(429)
     def _too_many_requests(err):
-        from flask import render_template
-
         retry_after = getattr(err, "retry_after", None) or getattr(
             getattr(err, "response", None), "headers", {}
         ).get("Retry-After")
-        _log_refusal(getattr(err, "description", None) or "rate limit")
-        if _wants_json():
-            resp = _json_refusal("Rate limit exceeded. Slow down and retry shortly.", "rate_limited")
-        else:
-            try:
-                resp = app.make_response(
-                    render_template("errors/429.html", retry_after=retry_after)
-                )
-            except Exception:
-                resp = app.make_response(
-                    "Rate limit exceeded. Please retry shortly."
-                )
-        resp.status_code = 429
-        if retry_after:
-            resp.headers["Retry-After"] = str(retry_after)
-        return resp
+        try:
+            retry_after = int(retry_after) if retry_after else None
+        except (TypeError, ValueError):
+            retry_after = None
+        return refuse(retry_after, getattr(err, "description", None) or "rate limit")
+
+    @app.after_request
+    def _report_allowance(response):
+        """Say what is left of the tightest limit counted for this request (RateLimit-* headers)."""
+        from app.services.rate_limiter import apply_headers
+
+        if "RateLimit-Limit" not in response.headers:
+            apply_headers(response)
+        return response
 
     app.logger.info(
         "Rate limiting enabled=%s defaults=%s writes=%s",

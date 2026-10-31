@@ -11,11 +11,13 @@ Sidebar API Routes - HARDENED SECURE VERSION
 """
 
 import logging
+from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from functools import wraps
 
 from app.models.application_portfolio import ApplicationComponent
+from app.services.rate_limiter import apply_headers, client_address, count_hit
 from app.models.vendor.vendor_organization import VendorOrganization
 
 # ArchiMate 3.2 layers the detail-page route accepts (archimate_crud.detail_element's
@@ -48,45 +50,18 @@ sidebar_api_bp = Blueprint("sidebar_api", __name__, url_prefix="/api/sidebar")
 # RATE LIMITING
 # ============================================================================
 
-from datetime import datetime, timedelta
-from collections import defaultdict
-
-_rate_limit_cache = defaultdict(list)
-
-
 def rate_limit(calls_per_minute=60):
-    """
-    ✅ FIX: Simple rate limiting to prevent DOS
-    Allow N calls per minute per IP
-    """
+    """Allow N calls per minute per address, counted in the shared store."""
 
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # Get client IP (handles proxies)
-            client_ip = request.remote_addr
-            if request.headers.get("X-Forwarded-For"):
-                client_ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
-
-            key = f"{client_ip}:{request.endpoint}"
-            now = datetime.utcnow()
-
-            # Clean old entries (older than 1 minute)
-            _rate_limit_cache[key] = [
-                timestamp
-                for timestamp in _rate_limit_cache[key]
-                if now - timestamp < timedelta(minutes=1)
-            ]
-
-            # Check if limit exceeded
-            if len(_rate_limit_cache[key]) >= calls_per_minute:
-                logger.warning(f"Rate limit exceeded for {key}")
-                return jsonify(
-                    {"error": "Too many requests. Please try again later."}
-                ), 429
-
-            # Record this request
-            _rate_limit_cache[key].append(now)
+            verdict = count_hit("sidebar", f"{client_address()}:{request.endpoint}", calls_per_minute, 60)
+            if not verdict.allowed:
+                logger.warning("Rate limit exceeded for %s", request.endpoint)
+                refusal = jsonify({"error": "Too many requests. Please try again later."})
+                refusal.status_code = 429
+                return apply_headers(refusal, verdict)
 
             return f(*args, **kwargs)
 

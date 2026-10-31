@@ -1,21 +1,16 @@
 """
 ADM Rate Limiter
 
-Per-user rate limits for ADM Kanban API endpoints.
-Prevents abuse and ensures fair usage.
+Per-user rate limits for ADM Kanban API endpoints, counted in the one shared counter store
+(``app.services.rate_limiter.count_hit``) so every worker sees the same count.
 """
 
 import logging
-import time
 from typing import Any, Dict
 
+from flask import current_app
 
-
-# redis_client is optional — import lazily to avoid ImportError when Redis is not configured
-try:
-    from app import redis_client  # type: ignore[attr-defined]
-except ImportError:
-    redis_client = None  # type: ignore[assignment]
+from app.services.rate_limiter import _counter_key, count_hit, counter_storage
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +18,10 @@ logger = logging.getLogger(__name__)
 class ADMRateLimitExceeded(Exception):
     """Exception raised when rate limit is exceeded."""
 
-    def __init__(self, message: str, retry_after: int = 60):
+    def __init__(self, message: str, retry_after: int = 60, verdict=None):
         self.message = message
         self.retry_after = retry_after
+        self.verdict = verdict
         super().__init__(self.message)
 
 
@@ -45,19 +41,15 @@ class ADMRateLimiter:
         "admin": {"requests": 50, "window": 60},  # 50 admin ops per minute
     }
 
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        self.redis = redis_client
-
-    def _get_key(self, user_id: int, action_type: str) -> str:
-        """Generate Redis key for rate limit tracking."""
-        return f"adm_ratelimit:{user_id}:{action_type}"
+    @staticmethod
+    def _scope(action_type: str) -> str:
+        return "adm-" + action_type
 
     def check_rate_limit(
         self, user_id: int, action_type: str = "read"
     ) -> Dict[str, Any]:
         """
-        Check if user has exceeded rate limit.
+        Count one action for the user and check the limit.
 
         Args:
             user_id: User ID to check
@@ -69,59 +61,37 @@ class ADMRateLimiter:
         Raises:
             ADMRateLimitExceeded: If rate limit exceeded
         """
-        if not self.redis:
-            # Redis not available, allow request
+        limit_config = self.DEFAULT_LIMITS.get(action_type, self.DEFAULT_LIMITS["read"])
+        if not current_app.config.get("RATE_LIMITING_ENABLED", True):
             return {"allowed": True, "remaining": -1}
 
-        limit_config = self.DEFAULT_LIMITS.get(action_type, self.DEFAULT_LIMITS["read"])
-        max_requests = limit_config["requests"]
-        window = limit_config["window"]
-
-        key = self._get_key(user_id, action_type)
-        now = time.time()
-
-        # Get current count
-        pipe = self.redis.pipeline()
-        pipe.zremrangebyscore(key, 0, now - window)
-        pipe.zcard(key)
-        pipe.zadd(key, {str(now): now})
-        pipe.expire(key, window)
-        results = pipe.execute()
-
-        current_count = results[1]
-
-        if current_count >= max_requests:
-            # Rate limit exceeded
-            retry_after = window - (now % window)
+        verdict = count_hit(
+            self._scope(action_type), str(user_id), limit_config["requests"], limit_config["window"]
+        )
+        if not verdict.allowed:
             raise ADMRateLimitExceeded(
-                f"Rate limit exceeded for {action_type}. Try again in {retry_after} seconds.",
-                retry_after=int(retry_after),
+                f"Rate limit exceeded for {action_type}. Try again in {verdict.retry_after} seconds.",
+                retry_after=verdict.retry_after,
+                verdict=verdict,
             )
-
         return {
             "allowed": True,
-            "remaining": max_requests - current_count - 1,
-            "limit": max_requests,
-            "window": window,
+            "remaining": verdict.remaining,
+            "limit": verdict.limit,
+            "window": limit_config["window"],
         }
 
     def get_rate_limit_status(self, user_id: int) -> Dict[str, Any]:
         """Get current rate limit status for all action types."""
-
+        storage = counter_storage()
         status = {}
-        for action_type in self.DEFAULT_LIMITS.keys():
-            key = self._get_key(user_id, action_type)
-            if self.redis:
-                current = self.redis.zcard(key)
-                limit = self.DEFAULT_LIMITS[action_type]["requests"]
-                status[action_type] = {
-                    "used": current,
-                    "remaining": max(0, limit - current),
-                    "limit": limit,
-                }
-            else:
-                status[action_type] = {"used": 0, "remaining": -1, "limit": -1}
-
+        for action_type, config in self.DEFAULT_LIMITS.items():
+            used = storage.get(_counter_key(self._scope(action_type), str(user_id)))
+            status[action_type] = {
+                "used": used,
+                "remaining": max(0, config["requests"] - used),
+                "limit": config["requests"],
+            }
         return status
 
 

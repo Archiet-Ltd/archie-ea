@@ -31,12 +31,19 @@
             </div>
             <h1 class="code">429</h1>
             <h2 class="title">Too Many Requests</h2>
-            <p class="copy">You have sent too many requests in a short period and have been temporarily throttled to keep the service responsive for everyone. {% if retry_after %}Try again in about {{ retry_after }} seconds.{% else %}Wait a moment, then try again.{% endif %}</p>
+            <p class="copy">You have sent too many requests in a short period and have been temporarily throttled to keep the service responsive for everyone. {% if wait_text %}Try again in about {{ wait_text }}.{% elif retry_after %}Try again in about {{ retry_after }} seconds.{% else %}Wait a moment, then try again.{% endif %}{% if not current_user.is_authenticated %} If you already have an account, you can sign in.{% endif %}</p>
             <div class="actions">
+                {% if current_user.is_authenticated %}
                 <a href="/" class="button button-primary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>
                     Go to Dashboard
                 </a>
+                {% else %}
+                <a href="{{ url_for('account.login') }}" class="button button-primary">
+                    <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><path d="m10 17 5-5-5-5"></path><path d="M15 12H3"></path></svg>
+                    Sign in
+                </a>
+                {% endif %}
                 <button id="btn-go-back-429" type="button" class="button button-secondary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
                     Go Back
