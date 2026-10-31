@@ -211,7 +211,7 @@
                             </template>
 
                             <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                                <span x-text="cap.domainName"></span>
+                                <span x-text="cap.domainLabel || cap.domainName"></span>
                                 <span class="text-muted-foreground">·</span>
                                 <span x-text="cap.type || '—'"></span>
                             </div>
@@ -364,7 +364,7 @@
                                     <span class="block text-xs font-normal text-muted-foreground" data-testid="capability-source" x-text="'Starter capability from ' + cap.starterModel + ', chosen at sign-up'"></span>
                                 </template>
                             </td>
-                            <td class="px-4 py-3 text-muted-foreground" x-text="cap.domainName"></td>
+                            <td class="px-4 py-3 text-muted-foreground" x-text="cap.domainLabel || cap.domainName"></td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + cap.level"></span>
                             </td>
@@ -495,7 +495,7 @@
                     </template>
                     <div class="flex items-center gap-2 mt-1">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + capability.level"></span>
-                        <span class="text-sm text-muted-foreground" x-text="capability.domainName"></span>
+                        <span class="text-sm text-muted-foreground" x-text="capability.domainLabel || capability.domainName"></span>
                         <span class="text-sm text-muted-foreground">·</span>
                         <span class="text-sm text-muted-foreground" x-text="capability.type || '—'"></span>
                     </div>

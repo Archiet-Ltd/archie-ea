@@ -141,6 +141,9 @@ def redirect_search():
 # /capability-map/'s initial HTML. They are fetched from here the first time
 # something opens one. The allow-list is explicit so the variant name — which
 # arrives from the client — can never select an arbitrary template.
+# What a top-level starter capability is, in its framework's words, shown instead of repeating its own name.
+_FRAMEWORK_TOP_LEVEL = {"BIAN": "BIAN business area", "APQC": "APQC category"}
+
 LAZY_MODAL_VARIANTS = frozenset(
     {
         "mapping-modal",
@@ -741,19 +744,26 @@ def _api_hierarchy_context():
             # Application coverage: count of mapped applications
             application_coverage = mapping_count
 
+            domain_name = cap.domain.name if cap.domain else "Uncategorised"
+            starter_model = (
+                starter_sources.get(str(cap.source_id), "")[len("starter:"):] or None
+                if cap.source_table == "business_capability" else None
+            )
             return {
                 "id": cap.id,
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,
-                "domainName": cap.domain.name if cap.domain else "Uncategorised",
+                "domainName": domain_name,
+                # What a card or panel shows beside the name: never the capability's own name.
+                "domainLabel": (
+                    _FRAMEWORK_TOP_LEVEL.get(starter_model, "Top-level capability")
+                    if domain_name == cap.name else domain_name
+                ),
                 "domainCode": cap.domain.code if cap.domain else "UNCAT",
                 "type": cap.capability_type or cap.category or "business",
                 "code": cap.code,
-                "starterModel": (
-                    starter_sources.get(str(cap.source_id), "")[len("starter:"):] or None
-                    if cap.source_table == "business_capability" else None
-                ),
+                "starterModel": starter_model,
                 "businessOwner": cap.business_owner,
                 "itOwner": cap.it_owner,
                 "capabilityOwner": cap.capability_owner,

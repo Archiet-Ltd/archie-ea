@@ -301,8 +301,73 @@ def test_the_bian_starter_names_are_service_domains_of_the_published_landscape()
     every = {name for names in areas.values() for name in names}
     assert "Fraud Detection" not in every and "Fraud Evaluation" in every
     assert "Product Design" not in every
-    treasury = [area for area, names in areas.items() if "Corporate Treasury" in names]
-    assert len(treasury) == 1 and "Treasury" in treasury[0]
+    assert set(areas) <= PUBLISHED_BIAN_BUSINESS_AREAS, sorted(set(areas) - PUBLISHED_BIAN_BUSINESS_AREAS)
+    assert "Bank Treasury" not in areas and "Corporate Treasury" not in every
+
+
+# The business areas of the BIAN service landscape v10, as the landscape names them (it writes "&" where
+# the product writes "and").
+PUBLISHED_BIAN_BUSINESS_AREAS = {
+    "Sales and Service", "Operations and Execution", "Risk and Compliance", "Business Support",
+    "Reference Data", "Business Direction",
+}
+
+
+def test_a_domain_is_keyed_by_its_framework_code_not_by_list_position(monkeypatch):
+    from app.seed_data import bian_starter
+
+    before = {e["name"]: e["domain_code"] for e in onboarding._bian_entries() if e["level"] == 1}
+    monkeypatch.setattr(bian_starter, "BIAN_STARTER", tuple(reversed(bian_starter.BIAN_STARTER)))
+    after = {e["name"]: e["domain_code"] for e in onboarding._bian_entries() if e["level"] == 1}
+    assert before == after and len(set(after.values())) == len(after)
+
+
+def test_two_organisations_loading_at_once_create_one_domain(app):
+    import threading
+
+    from app import db
+
+    code, results, barrier = "T%s" % uuid.uuid4().hex[:8], [], threading.Barrier(2)
+
+    def load(name):
+        with app.app_context():
+            with db.engine.connect() as conn:
+                barrier.wait()
+                try:
+                    conn.execute(onboarding._insert_domain(code, name))
+                    conn.commit()
+                    results.append("ok")
+                except Exception as exc:  # pragma: no cover - the failure being tested for
+                    results.append(repr(exc))
+
+    threads = [threading.Thread(target=load, args=(n,)) for n in ("First", "Second")]
+    try:
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(30)
+        assert results == ["ok", "ok"], results
+        with db.engine.connect() as conn:
+            rows = conn.execute(db.text("SELECT name FROM business_domains WHERE code = :c"), {"c": code}).all()
+        assert len(rows) == 1
+    finally:
+        with db.engine.connect() as conn:
+            conn.execute(db.text("DELETE FROM business_domains WHERE code = :c"), {"c": code})
+            conn.commit()
+
+
+def test_a_top_level_capability_shows_its_framework_never_its_own_name(client, login_as, two):
+    for key, industry, label in (("one", "banking", "BIAN business area"), ("two", "software", "APQC category")):
+        _choose(client, login_as, two["%s_owner" % key], industry, [])
+        login_as(client, two["%s_owner" % key])
+        caps = client.get("/capability-map/api/capabilities/hierarchy").get_json()
+        rows = [c for d in caps["domains"] for c in d["capabilities"]]
+        tops = [c for c in rows if c["level"] == 1]
+        assert tops and all(c["domainLabel"] == label for c in tops), [c["domainLabel"] for c in tops]
+        assert all(c["domainLabel"] != c["name"] for c in rows)
+        for c in rows:
+            if c["level"] == 2:
+                assert c["domainLabel"] in {t["name"] for t in tops}
 
 
 def _map_rows(client, login_as, user):

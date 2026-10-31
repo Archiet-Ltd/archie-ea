@@ -2,8 +2,8 @@
 
 BIAN (the Banking Industry Architecture Network) publishes a service landscape of business areas and
 service domains. This is the starter selection of that landscape: the business areas become
-level 1 capabilities and the service domains under them level 2. It is a starting point to keep,
-change or remove, not the full landscape.
+level 1 capabilities and the service domains under them level 2. Corporate Treasury is left out until its
+place on the landscape is confirmed. It is a starting point to keep, change or remove, not the full landscape.
 """
 
 BIAN_STARTER = (
@@ -33,7 +33,13 @@ BIAN_STARTER = (
         ("Financial Accounting", "Keeping the bank's own books and producing its statements."),
         ("Products and Services Direction", "Setting the direction for the products and services the bank offers."),
     )),
-    ("Bank Treasury", (
-        ("Corporate Treasury", "Managing the bank's own cash, funding and liquidity."),
-    )),
 )
+
+# The stable code of each business area's row in the shared list of domains. It belongs to the area, not to
+# its place in BIAN_STARTER, so reordering the list never renames a domain.
+BIAN_AREA_CODES = {
+    "Sales and Service": "BIAN-SS",
+    "Operations and Execution": "BIAN-OE",
+    "Risk and Compliance": "BIAN-RC",
+    "Business Support": "BIAN-BS",
+}

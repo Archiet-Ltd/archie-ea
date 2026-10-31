@@ -590,11 +590,11 @@ def _starter_model(industry: Optional[str]) -> Optional[str]:
 
 def _bian_entries() -> List[Dict[str, Any]]:
     """(name, description, level, parent name, domain) for each BIAN starter capability, parents first."""
-    from app.seed_data.bian_starter import BIAN_STARTER
+    from app.seed_data.bian_starter import BIAN_AREA_CODES, BIAN_STARTER
 
     entries = []
-    for number, (area, domains) in enumerate(BIAN_STARTER, start=1):
-        code = "BIAN-%d" % number
+    for area, domains in BIAN_STARTER:
+        code = BIAN_AREA_CODES[area]
         entries.append({"name": area, "description": None, "level": 1, "parent": None, "domain": area, "domain_code": code})
         for name, description in domains:
             entries.append(
@@ -651,11 +651,28 @@ def _load_capabilities(org_id: int, model: str) -> int:
     return added
 
 
+def _insert_domain(code: str, name: str):
+    from sqlalchemy.dialects.postgresql import insert
+
+    from app.models.unified_capability import BusinessDomain
+
+    return insert(BusinessDomain.__table__).values(code=code, name=name).on_conflict_do_nothing(index_elements=["code"])
+
+
+def _shared_domain(code: str, name: str):
+    """The shared domain row for a framework item's stable code, created if it is not there yet. The insert
+    does nothing when the code exists, so two organisations loading at once end up with one row."""
+    from app.models.unified_capability import BusinessDomain
+
+    db.session.execute(_insert_domain(code, name))
+    return BusinessDomain.query.filter_by(code=code).one()
+
+
 def _place_on_the_map(org_id: int, model: str) -> None:
     """Give the map rows projected from this organisation's starter capabilities the domain their framework
     names (the BIAN business area, the APQC category), so no card reads Uncategorised."""
     from app.models.business_capabilities import BusinessCapability
-    from app.models.unified_capability import BusinessDomain, UnifiedCapability
+    from app.models.unified_capability import UnifiedCapability
 
     entries = {(e["name"], e["level"]): e for e in _ENTRIES[model]()}
     domains: Dict[str, int] = {}
@@ -665,11 +682,7 @@ def _place_on_the_map(org_id: int, model: str) -> None:
         if entry is None:
             continue
         if entry["domain_code"] not in domains:
-            domain = BusinessDomain.query.filter_by(code=entry["domain_code"]).first()
-            if domain is None:
-                domain = BusinessDomain(code=entry["domain_code"], name=entry["domain"])
-                db.session.add(domain)
-                db.session.flush()
+            domain = _shared_domain(entry["domain_code"], entry["domain"])
             domains[entry["domain_code"]] = domain.id
         ids_by_domain.setdefault(entry["domain_code"], []).append(str(row.id))
     for code, source_ids in ids_by_domain.items():
