@@ -3,6 +3,7 @@ citation on every fact -- never a fixed value from the frozen scenario service
 (ADR-003 addendum). The portfolio health block carries no fixed value either:
 the unprinted trend computation is removed with it.
 """
+import re
 from pathlib import Path
 
 from tests.test_sample_company_working_data import _architect
@@ -67,8 +68,10 @@ def test_what_if_retire_answers_from_the_impact_answer_with_a_citation_on_every_
     fact_lines = [ln for ln in block.splitlines() if ln.strip().startswith("-")]
     assert fact_lines, block
     for line in fact_lines:
-        assert "cited:" in line, "every fact in the block must carry a citation: %r" % line
-        assert "/api/v1/elements/" in line, line
+        assert re.search(
+            r"\((drawn|derived) from your model, as of \d{1,2} [A-Z][a-z]{2} \d{4}\)$", line
+        ), "every fact in the block must carry a source and a date: %r" % line
+        assert "/api/" not in line, "a person reads a record name, never an internal path: %r" % line
 
     # Never the frozen fixed-value scenario service's report shape.
     assert "RETIREMENT IMPACT ANALYSIS" not in block
