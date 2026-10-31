@@ -6249,16 +6249,30 @@ def teams_meetings_integration():
     """GET/POST /admin/integrations/teams-meetings — meeting transcript config."""
     from app.services.teams_meeting_service import TeamsMeetingService
 
+    config = TeamsMeetingService.get_config()
     if request.method == "POST":
         notification_url = (request.form.get("notification_url") or "").strip()
-        transcript_analysis = request.form.get("transcript_analysis") == "1"
-        signal_creation = request.form.get("signal_creation") == "1"
+        transcript_analysis = _form_on(request.form.get("transcript_analysis"))
+        signal_creation = _form_on(request.form.get("signal_creation"))
+        errors = {}
+        if notification_url and not notification_url.lower().startswith("https://"):
+            errors["notification_url"] = (
+                "Microsoft Graph only sends notifications to a public https address. "
+                "Enter an address that starts with https://."
+            )
+        if errors:
+            view = dict(
+                config,
+                notification_url=notification_url,
+                transcript_analysis=transcript_analysis,
+                signal_creation=signal_creation,
+            )
+            return render_template("admin/integrations_teams_meetings.html", config=view, errors=errors), 400
         TeamsMeetingService.save_config(notification_url, transcript_analysis, signal_creation)
         flash("Teams Meetings configuration saved.", "success")
         return redirect(url_for("admin.teams_meetings_integration"))
 
-    config = TeamsMeetingService.get_config()
-    return render_template("admin/integrations_teams_meetings.html", config=config)
+    return render_template("admin/integrations_teams_meetings.html", config=config, errors={})
 
 
 @admin_bp_v2.route("/ai-corrections", methods=["GET"])

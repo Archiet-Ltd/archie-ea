@@ -1,185 +1,160 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'components/switch.html' import switch %}
+{% from 'components/input.html' import hidden_input %}
 
 {% block title %}Teams Meeting Intelligence{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+{% set errors = errors or {} %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_shell(
         title='Teams Meeting Intelligence',
-        description='Subscribe to Microsoft Teams meeting transcripts via Graph API. Entelim analyses transcripts after meetings end and creates governance signals from architectural decisions and risks.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Teams Meeting Intelligence'}
+        subtitle='Subscribe to Microsoft Teams meeting transcripts via Graph API. Entelim analyses transcripts after meetings end and creates governance signals from architectural decisions and risks.',
+        breadcrumb=[
+            ('Home', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('Teams Meeting Intelligence', None)
         ]
     ) }}
 
-    <div id="tm-alert" hidden class="mb-6 rounded-md border p-4 text-sm"></div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-6 space-y-2" data-testid="tm-saved">
+                {% for category, message in messages %}
+                    {% call ui.alert(variant='destructive' if category == 'error' else 'default', attrs={'role': 'status'}) %}{{ ui.alert_description(text=message) }}{% endcall %}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
-    <!-- Prerequisites -->
     {% if not config.m365_configured %}
-    <div class="mb-6 rounded-md border border-warning/40 bg-warning/10 text-warning-emphasis px-3 py-2 text-sm">
-        <strong>M365 not configured.</strong>
-        Teams Meeting Intelligence requires the Microsoft 365 connector to be set up first.
-        <a href="{{ url_for('connectors.dashboard') }}" class="underline font-medium">Configure M365 →</a>
+    <div class="mb-6" data-testid="tm-m365-missing">
+        {% call ui.alert() %}
+            {{ ui.alert_title(text='Microsoft 365 is not set up') }}
+            {% call ui.alert_description() %}Teams Meeting Intelligence needs the Microsoft 365 connector first. <a href="{{ url_for('m365_connector.connectors_index') }}" class="font-medium underline underline-offset-4">Set up Microsoft 365</a>{% endcall %}
+        {% endcall %}
     </div>
     {% endif %}
 
-    <!-- Config card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div>
-                <h2 class="text-base font-semibold">Graph Subscription Settings</h2>
-                <p class="text-sm text-muted-foreground mt-0.5">
-                    Requires
-                    <code class="text-xs bg-muted px-1 py-0.5 rounded">CallRecords.Read.All</code> and
-                    <code class="text-xs bg-muted px-1 py-0.5 rounded">OnlineMeetingTranscript.Read.All</code>
-                    application permissions on the M365 app registration.
-                </p>
-            </div>
-            {% if config.subscription_id %}
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium
-                         bg-success/10 text-success-emphasis border border-success/30">
-                <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span>
-                Subscribed
-            </span>
-            {% else %}
-            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium
-                         bg-muted text-muted-foreground border border-border">
-                Not subscribed
-            </span>
-            {% endif %}
-        </div>
+    <form method="POST" action="{{ url_for('admin.teams_meetings_integration') }}" class="space-y-6" data-testid="tm-form" novalidate>
+        {{ hidden_input('csrf_token', csrf_token()) }}
 
-        <div class="px-6 py-5">
-            <form method="POST" action="{{ url_for('admin.teams_meetings_integration') }}"
-                  class="grid grid-cols-1 gap-5">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                <div class="flex items-start justify-between gap-4">
+                    <div class="space-y-1.5">
+                        {{ ui.card_title(text='Graph subscription settings') }}
+                        {{ ui.card_description(text='Needs the CallRecords.Read.All and OnlineMeetingTranscript.Read.All application permissions on the Microsoft 365 app registration.') }}
+                    </div>
+                    {{ state_badge('Subscribed' if config.subscription_id else 'Not subscribed', tone=('positive' if config.subscription_id else 'neutral'), testid='tm-state') }}
+                </div>
+            {% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Notification URL', attrs={'for': 'notification_url'}) }}
+                    {{ ui.input(id='notification_url', name='notification_url', type='url', autocomplete='off', class='font-mono',
+                        value=config.notification_url or '', placeholder='https://your-public-url.com/api/webhooks/teams/notifications',
+                        attrs=({'aria-invalid': 'true'} if errors.notification_url else {})) }}
+                    {% if errors.notification_url %}{{ ui.field_error(text=errors.notification_url, attrs={'data-testid': 'tm-error-notification_url'}) }}{% else %}
+                    {{ ui.field_description(text='A public https address. Microsoft Graph posts to it when a meeting ends; point it at /api/webhooks/teams/notifications on your production host, or a tunnel while testing.') }}{% endif %}
+                {% endcall %}
 
-                <div class="flex flex-col gap-1.5">
-                    <label for="notification_url" class="block text-sm font-medium text-muted-foreground mb-1">Notification URL</label>
-                    <input id="notification_url" name="notification_url" type="url"
-                           value="{{ config.notification_url or '' }}"
-                           placeholder="https://your-public-url.com/api/webhooks/teams/notifications"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
-                    <p class="text-xs text-muted-foreground">
-                        Must be a publicly reachable HTTPS URL. Microsoft Graph will POST to this URL when a meeting ends.
-                        Point it at <code class="font-mono">/api/webhooks/teams/notifications</code> on your production host.
-                        If running behind a corporate proxy, use a tunnel (ngrok / Cloudflare Tunnel) for dev/test.
-                    </p>
+                <div class="space-y-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="space-y-1">
+                            <label for="transcript_analysis" class="text-sm font-medium">Transcript analysis</label>
+                            <p class="text-sm text-muted-foreground">Fetch and analyse the transcript after each meeting, extracting architectural decisions, application mentions and risk signals.</p>
+                        </div>
+                        {{ switch(name='transcript_analysis', id='transcript_analysis', checked=config.transcript_analysis, aria_label='Transcript analysis') }}
+                    </div>
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="space-y-1">
+                            <label for="signal_creation" class="text-sm font-medium">Create governance signals</label>
+                            <p class="text-sm text-muted-foreground">Push high-priority decisions and risks as in-app notifications to enterprise architects and platform admins.</p>
+                        </div>
+                        {{ switch(name='signal_creation', id='signal_creation', checked=config.signal_creation, aria_label='Create governance signals') }}
+                    </div>
                 </div>
 
-                <!-- Feature toggles -->
-                <div class="flex flex-col gap-3">
-                    <p class="text-sm font-medium">Features</p>
-                    <label class="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" name="transcript_analysis" value="1"
-                               {% if config.transcript_analysis %}checked{% endif %}
-                               class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />
-                        <span>
-                            <span class="text-sm font-medium">Transcript analysis</span><br>
-                            <span class="text-xs text-muted-foreground">Fetch and analyse the transcript after each meeting. Extracts architectural decisions, application mentions, and risk signals using the AI Architect.</span>
-                        </span>
-                    </label>
-                    <label class="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" name="signal_creation" value="1"
-                               {% if config.signal_creation %}checked{% endif %}
-                               class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />
-                        <span>
-                            <span class="text-sm font-medium">Create governance signals</span><br>
-                            <span class="text-xs text-muted-foreground">Push high-priority decisions and risks as in-app notifications to enterprise architects and platform admins.</span>
-                        </span>
-                    </label>
+                <div id="tm-result-ok" hidden data-testid="tm-result-ok" aria-live="polite">
+                    {% call ui.alert() %}{{ ui.alert_description(text='', attrs={'id': 'tm-result-ok-text'}) }}{% endcall %}
                 </div>
-
-                <div class="flex items-center gap-3">
-                    <button type="submit"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Save settings
-                    </button>
-                    <button type="button" id="subscribe-btn"
-                            {% if not config.m365_configured %}disabled{% endif %}
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Subscribe to call records
-                    </button>
+                <div id="tm-result-error" hidden data-testid="tm-result-error" aria-live="polite">
+                    {% call ui.alert(variant='destructive') %}{{ ui.alert_description(text='', attrs={'id': 'tm-result-error-text'}) }}{% endcall %}
                 </div>
-            </form>
-        </div>
-    </div>
+            {% endcall %}
+            {% call ui.card_footer(class='justify-end gap-3') %}
+                {{ ui.button(text='Subscribe to call records', type='button', variant='outline',
+                    attrs=({'id': 'tm-subscribe-btn'} if config.m365_configured else {'id': 'tm-subscribe-btn', 'disabled': 'disabled'})) }}
+                {{ ui.button(text='Save settings', type='submit') }}
+            {% endcall %}
+        {% endcall %}
+    </form>
 
-    <!-- Subscription status -->
     {% if config.subscription_id %}
-    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
-        <div class="px-6 py-4 border-b border-border">
-            <h2 class="text-base font-semibold">Active Subscription</h2>
-        </div>
-        <div class="px-6 py-5 space-y-2 text-sm">
-            <div class="flex gap-2">
-                <span class="text-muted-foreground w-40 shrink-0">Subscription ID</span>
-                <code class="font-mono text-xs break-all">{{ config.subscription_id }}</code>
-            </div>
-            <div class="flex gap-2">
-                <span class="text-muted-foreground w-40 shrink-0">Notification URL</span>
-                <code class="font-mono text-xs break-all">{{ config.notification_url or '—' }}</code>
-            </div>
-            <p class="text-xs text-muted-foreground pt-2">
-                Graph subscriptions expire after 3 days. Click "Subscribe to call records" again to renew.
-            </p>
-        </div>
+    <div class="mt-6">
+    {% call ui.card() %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='Active subscription') }}
+            {{ ui.card_description(text='Graph subscriptions expire after 3 days. Choose Subscribe to call records again to renew.') }}
+        {% endcall %}
+        {% call ui.card_content(class='space-y-2 text-sm') %}
+            <div class="flex gap-2"><span class="w-40 shrink-0 text-muted-foreground">Subscription ID</span><code class="break-all font-mono text-xs">{{ config.subscription_id }}</code></div>
+            <div class="flex gap-2"><span class="w-40 shrink-0 text-muted-foreground">Notification URL</span><code class="break-all font-mono text-xs">{{ config.notification_url or 'Not set' }}</code></div>
+        {% endcall %}
+    {% endcall %}
     </div>
     {% endif %}
 
-    <!-- How it works -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground">
-        <div class="px-6 py-4 border-b border-border">
-            <h2 class="text-base font-semibold">How it works</h2>
-        </div>
-        <div class="px-6 py-5">
-            <ol class="space-y-3 text-sm text-muted-foreground list-decimal list-inside">
-                <li>A Teams meeting ends — Microsoft Graph fires a <code class="text-xs bg-muted px-1 py-0.5 rounded">callRecord</code> change notification to the Notification URL above.</li>
-                <li>Entelim fetches the meeting transcript via Graph API (<code class="text-xs bg-muted px-1 py-0.5 rounded">OnlineMeetingTranscript.Read.All</code>).</li>
-                <li>The AI Architect analyses the transcript against the live portfolio (850+ apps) and extracts: architectural decisions, application names, risk mentions, and follow-up actions.</li>
-                <li>Findings are pushed as in-app notifications to enterprise architects and platform admins — no polling required.</li>
+    <div class="mt-6">
+    {% call ui.card() %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='How it works') }}
+        {% endcall %}
+        {% call ui.card_content(class='space-y-4') %}
+            <ol class="list-inside list-decimal space-y-3 text-sm text-muted-foreground">
+                <li>A Teams meeting ends and Microsoft Graph sends a <code class="font-mono text-xs">callRecord</code> change notification to the Notification URL above.</li>
+                <li>Entelim fetches the meeting transcript through the Graph API.</li>
+                <li>The AI Architect analyses the transcript against the live portfolio and extracts architectural decisions, application names, risk mentions and follow-up actions.</li>
+                <li>Findings are pushed as in-app notifications to enterprise architects and platform admins. No polling is needed.</li>
             </ol>
-            <p class="text-xs text-muted-foreground mt-4">
-                <strong>Note:</strong> Teams meeting transcription must be enabled for the tenant, and the meeting organiser must have transcription turned on during the call for a transcript to be available.
-            </p>
-        </div>
+            <p class="text-sm text-muted-foreground">Transcription must be enabled for the tenant, and the meeting organiser must turn it on during the call for a transcript to exist.</p>
+        {% endcall %}
+    {% endcall %}
     </div>
 </div>
 
 <script>
-document.getElementById('subscribe-btn').addEventListener('click', async function () {
-    const btn = this;
-    const urlInput = document.getElementById('notification_url');
-    const alertEl = document.getElementById('tm-alert');
-    btn.textContent = 'Subscribing…';
-    btn.disabled = true;
-
-    // CSRF token is automatically injected by Platform.fetch for mutating methods
-    try {
-        const data = await Platform.fetch.post('/admin/integrations/teams-meetings/subscribe', 
-            { notification_url: urlInput.value },
-            { silent: true }
-        );
-        alertEl.hidden = false;
-        if (data.status === 'ok') {
-            alertEl.className = 'mb-6 rounded-md border border-success/30 bg-success/10 text-success-emphasis p-4 text-sm';
-            alertEl.textContent = `Subscribed. ID: ${data.subscription_id} — expires ${data.expiry}. Reload to see status.`;
-            setTimeout(() => location.reload(), 3000);
-        } else {
-            alertEl.className = 'mb-6 rounded-md border border-destructive/30 bg-destructive/10 text-destructive p-4 text-sm';
-            alertEl.textContent = `Error: ${data.error}`;
-        }
-    } catch (e) {
-        alertEl.hidden = false;
-        alertEl.className = 'mb-6 rounded-md border border-destructive/30 bg-destructive/10 text-destructive p-4 text-sm';
-        alertEl.textContent = `Request failed: ${e.message}`;
-    } finally {
-        btn.textContent = 'Subscribe to call records';
-        btn.disabled = false;
+(function () {
+    const btn = document.getElementById('tm-subscribe-btn');
+    if (!btn) return;
+    const ok = document.getElementById('tm-result-ok');
+    const bad = document.getElementById('tm-result-error');
+    function show(good, text) {
+        ok.hidden = !good;
+        bad.hidden = good;
+        document.getElementById(good ? 'tm-result-ok-text' : 'tm-result-error-text').textContent = text;
     }
-});
+    btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        btn.textContent = 'Subscribing…';
+        try {
+            const data = await Platform.fetch.post('/admin/integrations/teams-meetings/subscribe',
+                { notification_url: document.getElementById('notification_url').value }, { silent: true });
+            show(true, 'Subscribed. Subscription ' + data.subscription_id + ' expires ' + data.expiry + '. Reloading to show the status.');
+            setTimeout(function () { location.reload(); }, 3000);
+        } catch (e) {
+            const why = (e.data && (e.data.error || e.data.message)) || e.message || 'no answer from the server';
+            show(false, 'Microsoft Graph did not accept the subscription: ' + why);
+        } finally {
+            btn.textContent = 'Subscribe to call records';
+            btn.disabled = false;
+        }
+    });
+})();
 </script>
 {% endblock %}
