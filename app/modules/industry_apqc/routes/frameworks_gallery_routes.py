@@ -8,6 +8,7 @@ opens the page that holds that framework's content.
 from flask import Blueprint, current_app, g, render_template
 from flask_login import current_user, login_required
 
+from app.seed_data.standard_control_totals import controls_loaded_text
 from app.services.industry_apqc_service import IndustryAPQCService
 
 frameworks_bp = Blueprint("frameworks", __name__, url_prefix="/frameworks")
@@ -18,21 +19,25 @@ def _compliance_cards(org_id):
     from app.models.compliance_models import RegulatoryFramework
     from app.models.regulatory_framework import FrameworkAdoption
 
-    adopted_ids = set()
+    sources = {}
     if org_id is not None:
-        adopted_ids = {
-            row.framework_id
+        sources = {
+            row.framework_id: row.source
             for row in FrameworkAdoption.query.filter_by(organization_id=org_id, status="active").all()
         }
+    adopted_ids = set(sources)
     adopted, available = [], []
     for framework in RegulatoryFramework.query.filter_by(status="active").order_by(RegulatoryFramework.name).all():
+        loaded = framework.controls.count()
         card = {
             "code": framework.code,
             "name": framework.name,
             "description": framework.description,
             "jurisdiction": framework.jurisdiction,
-            "controls": framework.controls.count(),
+            "controls": loaded,
+            "partly_loaded": controls_loaded_text(framework.code, loaded),
             "adopted": framework.id in adopted_ids,
+            "source": sources.get(framework.id),
         }
         (adopted if card["adopted"] else available).append(card)
     return adopted, available

@@ -128,7 +128,9 @@ _QUESTION_CUES = (
         KIND_IMPACT,
         re.compile(
             r"what\s+(breaks|stops|fails|is affected|would break|depends)|"
-            r"\bblast radius\b|\bimpact (of|if)\b|\bif\b.+\b(fails?|goes down|is retired|is decommissioned)\b|"
+            r"\bblast radius\b|\bimpact (of|if)\b|"
+            r"\bif\b.+\b(fails?|goes down|is retired|is decommissioned|is removed|is replaced|was retired|was decommissioned|was removed|was replaced)\b|"
+            r"\bwhat\s+(if|happens if)\b.*\b(retire|decommission|remove|replace)\b|"
             r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b|"
             r"\b(relies|rely|relied) on\b|\bconnected to\b|\b(everything|anything|which|what|list)\b.*\b(uses?|relies|connected)\b",
             re.I,
