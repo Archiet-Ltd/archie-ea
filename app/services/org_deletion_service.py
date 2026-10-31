@@ -61,6 +61,11 @@ _APPEND_ONLY_TABLES = frozenset({
     "outcome_measurements",
 })
 
+# Tables with no organisation column whose rows belong to the organisation that owns the row they
+# point at, though the pointer may be empty: (table, column) -> what it points at. Such a row is
+# the organisation's own data and is deleted with it, never kept with the pointer cleared.
+_OWNED_THROUGH_PARENT = frozenset({("sync_logs", "connector_id")})
+
 _FOREIGN_KEYS = text(
     """
     SELECT child.relname AS child_table, child_col.attname AS child_column,
@@ -147,6 +152,7 @@ class _Plan:
         self.referrers = defaultdict(list)
         self.org_columns = defaultdict(list)  # table -> columns that name an organisation
         for child, child_col, parent, parent_col, not_null, deferred in sess.execute(_FOREIGN_KEYS):
+            not_null = not_null or (child, child_col) in _OWNED_THROUGH_PARENT
             self.referrers[parent].append((child, child_col, parent_col, not_null, deferred))
         self.parents = defaultdict(list)  # child table -> [(child column, parent table, parent column)]
         for parent, rows in self.referrers.items():
@@ -159,6 +165,7 @@ class _Plan:
         self.parent_keys = defaultdict(list)
         self.all_keys = [tuple(row) for row in sess.execute(_ALL_FOREIGN_KEYS)]
         for child, parent, child_cols, parent_cols, not_null in self.all_keys:
+            not_null = not_null or (len(child_cols) == 1 and (child, child_cols[0]) in _OWNED_THROUGH_PARENT)
             self.parent_keys[child].append((parent, child_cols, parent_cols, bool(not_null)))
         # (table, column, column is NOT NULL, ON DELETE action, primary key column)
         self.organisation_pointers = [tuple(row) for row in sess.execute(_ORGANISATION_POINTERS)]

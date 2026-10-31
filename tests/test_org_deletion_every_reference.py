@@ -125,3 +125,46 @@ def test_another_organisations_relationship_targeting_an_element_of_the_deleted_
             db.session.commit()
             db.session.remove()
         _cleanup(app, ids["a"], ids["b"])
+
+
+def test_a_sync_log_of_the_deleted_organisations_connector_goes_with_it_and_another_organisations_stays(app):
+    from app import db
+    from app.models.organization import Organization
+    from app.services.org_deletion_service import OrganizationDeletionService
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        a, b, _, _ = _two_organisations(db, marker)
+        logs = {}
+        for key, org in (("a", a), ("b", b)):
+            connector_id = str(uuid.uuid4())
+            logs[key] = str(uuid.uuid4())
+            db.session.execute(text(
+                "INSERT INTO connector_configs (id, organization_id, connector_type, name, config) "
+                "VALUES (:c, :o, 'github', :n, '{}')"), {"c": connector_id, "o": org.id, "n": "GitHub %s" % key})
+            db.session.execute(text(
+                "INSERT INTO sync_logs (id, connector_id, sync_type, status) VALUES (:l, :c, 'manual', 'success')"),
+                {"l": logs[key], "c": connector_id})
+            logs[key + "_connector"] = connector_id
+        db.session.commit()
+        ids = {"a": a.id, "b": b.id}
+        db.session.remove()
+    try:
+        with app.app_context():
+            OrganizationDeletionService.delete_organization(ids["a"])
+            db.session.remove()
+        with app.app_context():
+            assert db.session.get(Organization, ids["a"]) is None
+            remaining = set(db.session.execute(text(
+                "SELECT id FROM sync_logs WHERE id IN (:a, :b)"), {"a": logs["a"], "b": logs["b"]}).scalars())
+            assert remaining == {logs["b"]}, remaining
+            kept = db.session.execute(text("SELECT connector_id FROM sync_logs WHERE id = :l"),
+                                      {"l": logs["b"]}).scalar()
+            assert kept == logs["b_connector"], "B's sync log lost its connector"
+            db.session.remove()
+    finally:
+        with app.app_context():
+            db.session.execute(text("DELETE FROM sync_logs WHERE id IN (:a, :b)"), {"a": logs["a"], "b": logs["b"]})
+            db.session.commit()
+            db.session.remove()
+        _cleanup(app, ids["a"], ids["b"])
