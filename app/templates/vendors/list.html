@@ -61,30 +61,37 @@
 {%- set status_options = register_status_options if register_status_options is defined else [] -%}
 {%- set filtered = (vendor_type_filter|default('all') != 'all') or (contract_status_filter|default('all') != 'all') -%}
 
+{% macro _filter_select(name, label, testid, all_label, options, current) %}
+{%- set cur = current if current else 'all' -%}
+{% call ui.select() %}
+  {% call ui.select_trigger(class='h-8 w-full sm:w-[180px]', attrs={'data-name': name, 'data-value': cur, 'aria-label': label, 'data-testid': testid}) %}
+    {{ ui.select_value(text=(cur|replace('_', ' ')|capitalize if cur != 'all' else all_label)) }}
+  {% endcall %}
+  {% call ui.select_content(attrs={'aria-label': label}) %}
+    {% call ui.select_item(attrs={'data-value': 'all', 'data-state': ('checked' if cur == 'all' else 'unchecked')}) %}{{ all_label }}{% endcall %}
+    {% for o in options %}
+    {% call ui.select_item(attrs={'data-value': o, 'data-state': ('checked' if cur == o else 'unchecked')}) %}{{ o|replace('_', ' ')|capitalize }}{% endcall %}
+    {% endfor %}
+  {% endcall %}
+{% endcall %}
+{% endmacro %}
+
 {% macro _filters() %}
 {% if type_options or status_options or filtered %}
-<form method="get" action="{{ url_for('unified_applications.vendors') }}" class="flex items-center gap-2" data-testid="vendor-filters">
-  {% call native_select_wrapper() %}
-    {% call native_select(class='h-8 w-[160px]', attrs={'name': 'vendor_type', 'aria-label': 'Vendor type', 'data-testid': 'vendor-type-filter'}) %}
-      {{ native_select_option('All types', value='all') }}
-      {% for t in type_options %}{{ native_select_option(t|replace('_', ' ')|capitalize, value=t, selected=(vendor_type_filter == t)) }}{% endfor %}
-    {% endcall %}
-  {% endcall %}
-  {% call native_select_wrapper() %}
-    {% call native_select(class='h-8 w-[170px]', attrs={'name': 'contract_status', 'aria-label': 'Contract status', 'data-testid': 'vendor-status-filter'}) %}
-      {{ native_select_option('All contract statuses', value='all') }}
-      {% for st in status_options %}{{ native_select_option(st|replace('_', ' ')|capitalize, value=st, selected=(contract_status_filter == st)) }}{% endfor %}
-    {% endcall %}
-  {% endcall %}
+<form method="get" action="{{ url_for('unified_applications.vendors') }}" class="flex flex-wrap items-center gap-2" data-testid="vendor-filters">
+  {{ _filter_select('vendor_type', 'Vendor type', 'vendor-type-filter', 'All types', type_options, vendor_type_filter|default('all')) }}
+  {{ _filter_select('contract_status', 'Contract status', 'vendor-status-filter', 'All contract statuses', status_options, contract_status_filter|default('all')) }}
   {{ ui.button(text='Apply', type='submit', variant='outline', size='sm', attrs={'data-testid': 'vendor-filter-apply'}) }}
   {% if filtered %}{{ ui.button(text='Clear', href=url_for('unified_applications.vendors'), variant='ghost', size='sm', attrs={'data-testid': 'vendor-filter-clear'}) }}{% endif %}
 </form>
 {% endif %}
 {% endmacro %}
 
-{% macro _toolbar() %}{{ _filters() }}{{ _set_vendors() }}{% endmacro %}
-
 {% macro _set_vendors() %}{% if unmapped_n %}{{ ui.button(text='Set system vendors (' ~ unmapped_n ~ ')', href=url_for('unified_applications.vendors', tab='mapping'), variant='outline', size='sm', attrs={'data-testid': 'vendors-mapping-link'}) }}{% endif %}{% endmacro %}
+
+{% macro _toolbar_row() %}
+<div class="flex flex-wrap items-center gap-2" data-testid="vendors-toolbar">{{ _filters() }}{{ _set_vendors() }}</div>
+{% endmacro %}
 
 <div class="p-6 space-y-6">
 {% if tab == 'mapping' %}
@@ -185,9 +192,10 @@
     </p>
     {% endcall %}
   {% endcall %}
+  {{ _toolbar_row() }}
   <div{% if not rows %} data-testid="vendors-true-empty-state"{% endif %}>
   {% call(row) list_table(rows=rows, columns=columns, caption='Vendors your systems and contracts name', testid='vendors-table', row_testid='vendor-row',
-                          search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_toolbar, notice=notice,
+                          search_placeholder='Filter vendors...', toolbar=true, notice=notice,
                           empty_message=('No vendor matches these filters. Clear them to see every vendor.') if filtered else ('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
                           empty_action=(none if filtered else _add_first)) %}
     {% call table_cell(class='max-w-[360px]') %}

@@ -53,6 +53,37 @@ def two_orgs(request, ai_protocol_stub, live_server):
     return {"tag": tag, "a": worlds["a"], "b": worlds["b"]}
 
 
+TOOLBAR_CONTROLS = (
+    "vendor-type-filter", "vendor-status-filter",
+    "vendor-filter-apply", "vendors-mapping-link",
+)
+
+
+def _assert_toolbar_fits_phone(page, viewport_width=390):
+    """At phone width every toolbar control sits inside the viewport and the page does not scroll sideways."""
+    boxes = {}
+    for tid in TOOLBAR_CONTROLS:
+        loc = page.get_by_test_id(tid)
+        if loc.count() == 0:
+            continue
+        boxes[tid] = loc.first.bounding_box()
+    boxes["search"] = page.locator("[data-table-filter]").first.bounding_box()
+    if page.get_by_test_id("vendor-filter-clear").count():
+        boxes["vendor-filter-clear"] = page.get_by_test_id("vendor-filter-clear").first.bounding_box()
+    assert {"search", "vendor-type-filter", "vendor-status-filter", "vendor-filter-apply"} <= set(boxes), boxes
+    for tid, box in boxes.items():
+        assert box is not None, tid
+        assert box["x"] >= 0 and box["x"] + box["width"] <= viewport_width + 0.5, (tid, box)
+    scroll_width = page.evaluate("document.documentElement.scrollWidth")
+    assert scroll_width == viewport_width, scroll_width
+
+
+def _pick(page, testid, value):
+    """Choose an option in the library's select: open the trigger, click the item carrying the value."""
+    page.get_by_test_id(testid).click()
+    page.locator('[data-slot="select-content"][data-state="open"] [data-slot="select-item"][data-value="%s"]' % value).click()
+
+
 def _count_on_page(page):
     return page.get_by_test_id("vendor-row").count()
 
@@ -89,12 +120,12 @@ def test_administrator_reads_one_vendors_page_with_only_their_vendors(browser, l
         expect(answer).to_contain_text("%d vendor" % len(mine))
 
         # Filter by type, then by contract status, through the toolbar.
-        page.get_by_test_id("vendor-type-filter").select_option(me["vendors"][1][2])
+        _pick(page, "vendor-type-filter", me["vendors"][1][2])
         page.get_by_test_id("vendor-filter-apply").click()
         expect(page.get_by_test_id("vendor-row")).to_have_count(1, timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("vendor-row").first).to_contain_text(me["vendors"][1][0])
-        page.get_by_test_id("vendor-type-filter").select_option("all")
-        page.get_by_test_id("vendor-status-filter").select_option(me["vendors"][0][3])
+        _pick(page, "vendor-type-filter", "all")
+        _pick(page, "vendor-status-filter", me["vendors"][0][3])
         page.get_by_test_id("vendor-filter-apply").click()
         expect(page.get_by_test_id("vendor-row")).to_have_count(1, timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("vendor-row").first).to_contain_text(me["vendors"][0][0])
@@ -127,6 +158,7 @@ def test_administrator_reads_one_vendors_page_with_only_their_vendors(browser, l
         page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
         page.evaluate("document.documentElement.classList.add('dark')")
         expect(page.get_by_test_id("vendor-row").first).to_be_visible()
+        _assert_toolbar_fits_phone(page)
         if shots:
             page.screenshot(path="%s/a-vendors-%s-390-dark.png" % (shots, key), full_page=True)
     finally:
