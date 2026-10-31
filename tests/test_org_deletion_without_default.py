@@ -170,7 +170,7 @@ def test_a_person_named_by_another_organisations_append_only_row_refuses_the_del
                 OrganizationDeletionService.delete_organization(ids["doomed"])
             message = str(refused.value)
             assert "Other append %s" % marker in message
-            assert "Reassign those records or move these people first" in message
+            assert "Remove or reassign those references first. Nothing was deleted." in message
             assert "foreign key" not in message and "append-only" not in message
             db.session.rollback()
             db.session.remove()

@@ -52,8 +52,8 @@ def test_a_person_a_surviving_organisation_must_name_refuses_the_deletion(app):
         with app.app_context():
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["doomed"])
-            assert "1 person in Doomed %s is named by records of %s" % (marker, ids["name"]) in str(refused.value)
-            assert "Reassign those records or move these people first" in str(refused.value)
+            assert "Doomed %s cannot be deleted: 1 record of %s refers to it" % (marker, ids["name"]) in str(refused.value)
+            assert "Remove or reassign those references first. Nothing was deleted." in str(refused.value)
             db.session.remove()
 
         with app.app_context():
@@ -115,12 +115,18 @@ def test_an_organisation_that_is_a_platform_administrators_home_is_not_deleted(a
         _cleanup(app, ids["home"])
 
 
-def test_a_nullable_pointer_to_a_deleted_element_is_cleared_and_its_row_kept(app):
+def test_a_platform_template_pointing_at_an_element_of_the_deleted_organisation_refuses_the_deletion(app):
+    """A row outside the organisation is never rewritten to let the deletion through.
+
+    This used to assert that the template row survived with its pointer cleared. That was a write to
+    a shared platform row the deletion has no right to make, so the deletion is now refused and the
+    template is left exactly as it was.
+    """
     from app import db
     from app.models.archimate_core import ArchiMateElement
     from app.models.organization import Organization
     from app.models.vendor.vendor_organization import VendorArchiMateTemplate
-    from app.services.org_deletion_service import OrganizationDeletionService
+    from app.services.org_deletion_service import OrganizationDeletionRefused, OrganizationDeletionService
 
     marker = uuid.uuid4().hex[:8]
     with app.app_context():
@@ -143,15 +149,18 @@ def test_a_nullable_pointer_to_a_deleted_element_is_cleared_and_its_row_kept(app
 
     try:
         with app.app_context():
-            OrganizationDeletionService.delete_organization(ids["doomed"])
+            with pytest.raises(OrganizationDeletionRefused) as refused:
+                OrganizationDeletionService.delete_organization(ids["doomed"])
+            assert "1 record of shared platform records refers to it" in str(refused.value)
             db.session.remove()
         with app.app_context():
+            assert db.session.get(Organization, ids["doomed"]) is not None
             row = db.session.execute(
                 text("SELECT element_id, element_name FROM vendor_archimate_templates WHERE id = :i"),
                 {"i": ids["template"]},
             ).first()
-            assert row is not None, "the template row was deleted with the element it pointed at"
-            assert row[0] is None and row[1] == "Kept template %s" % marker
+            assert row is not None, "the template row was deleted"
+            assert row[0] is not None and row[1] == "Kept template %s" % marker, "the template was rewritten"
             db.session.remove()
     finally:
         with app.app_context():

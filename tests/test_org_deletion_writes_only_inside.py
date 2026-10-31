@@ -109,7 +109,7 @@ def test_a_comment_on_another_organisations_element_naming_a_removed_person_refu
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["a"])
             message = str(refused.value)
-            assert "Org B %s" % marker in message and "1 person" in message, message
+            assert "Org B %s" % marker in message and "1 record" in message, message
             assert "Nothing was deleted" in message
             db.session.remove()
         with app.app_context():
@@ -118,6 +118,12 @@ def test_a_comment_on_another_organisations_element_naming_a_removed_person_refu
             assert db.session.get(User, ids["sole"]) is not None
             db.session.remove()
     finally:
+        with app.app_context():
+            # The comment hangs from both organisations, so neither can be deleted while it exists.
+            db.session.execute(text("DELETE FROM archimate_element_comments WHERE comment_text = :t"),
+                               {"t": "B's comment %s" % marker})
+            db.session.commit()
+            db.session.remove()
         _cleanup(app, ids["b"], ids["a"])
 
 
@@ -141,7 +147,7 @@ def test_a_platform_row_naming_a_removed_person_refuses_the_deletion(app):
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["a"])
             message = str(refused.value)
-            assert "shared platform records" in message and "1 person" in message, message
+            assert "shared platform records" in message and "1 record" in message, message
             db.session.remove()
         with app.app_context():
             assert _snapshot(db) == before
@@ -194,12 +200,16 @@ def test_a_detached_person_moves_home_to_the_organisation_where_they_hold_a_role
             for table, row in (("users", ids["sole"]),):
                 old = next(r for r in before[table].values() if r["id"] == row)
                 new = next(r for r in after[table].values() if r["id"] == row)
-                assert {k: v for k, v in old.items() if k not in ("organization_id",)} == \
-                    {k: v for k, v in new.items() if k not in ("organization_id",)}
+                # The home and the role move together: the role is the one held in the new home
+                # (viewer here), and the before and after are in the platform record below.
+                assert {k: v for k, v in old.items() if k not in ("organization_id", "role_id")} == \
+                    {k: v for k, v in new.items() if k not in ("organization_id", "role_id")}
             record = db.session.execute(text(
                 "SELECT new_value FROM soc2_audit_log WHERE organization_id IS NULL AND table_name = 'organizations' "
                 "AND record_id = :a"), {"a": ids["a"]}).scalar()
             assert record["people_detached_to"] == {str(ids["sole"]): ids["b"]}, record
+            rights = record["detached_rights"][str(ids["sole"])]
+            assert rights["before"]["role_id"] == old["role_id"] and rights["after"]["role_id"] == new["role_id"], record
             db.session.remove()
     finally:
         _cleanup(app, ids["a"], ids["b"])

@@ -76,6 +76,27 @@ _FOREIGN_KEYS = text(
     """
 )
 
+# Every foreign key in the schema, composite ones included, whatever its ON DELETE action.
+_ALL_FOREIGN_KEYS = text(
+    """
+    SELECT child.relname AS child_table, parent.relname AS parent_table,
+           (SELECT array_agg(a.attname ORDER BY k.ord)
+              FROM unnest(c.conkey) WITH ORDINALITY k(attnum, ord)
+              JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum) AS child_columns,
+           (SELECT array_agg(a.attname ORDER BY k.ord)
+              FROM unnest(c.confkey) WITH ORDINALITY k(attnum, ord)
+              JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = k.attnum) AS parent_columns,
+           (SELECT bool_and(a.attnotnull)
+              FROM unnest(c.conkey) k(attnum)
+              JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum) AS not_null
+    FROM pg_constraint c
+    JOIN pg_class child ON child.oid = c.conrelid
+    JOIN pg_namespace ns ON ns.oid = child.relnamespace
+    JOIN pg_class parent ON parent.oid = c.confrelid
+    WHERE c.contype = 'f' AND ns.nspname = current_schema() AND c.conparentid = 0
+    """
+)
+
 # Every foreign key to organizations other than on a column named organization_id (such as
 # vendor_organizations.named_by_organization_id), whatever its ON DELETE action: the database would
 # otherwise clear or cascade these silently, so each is handled and recorded by the service.
@@ -134,6 +155,11 @@ class _Plan:
         for (table,) in sess.execute(_ORGANIZATION_COLUMNS):
             if table != "organizations":
                 self.org_columns[table].append("organization_id")
+        # child table -> [(parent table, child columns, parent columns, every child column is NOT NULL)]
+        self.parent_keys = defaultdict(list)
+        self.all_keys = [tuple(row) for row in sess.execute(_ALL_FOREIGN_KEYS)]
+        for child, parent, child_cols, parent_cols, not_null in self.all_keys:
+            self.parent_keys[child].append((parent, child_cols, parent_cols, bool(not_null)))
         # (table, column, column is NOT NULL, ON DELETE action, primary key column)
         self.organisation_pointers = [tuple(row) for row in sess.execute(_ORGANISATION_POINTERS)]
         # Foreign keys the models declare that this database does not hold. They add no cycle-breaking
@@ -319,36 +345,85 @@ def _owners_outside(plan, table, alias, path):
     return " UNION ALL ".join(selects)
 
 
-def _people_named_elsewhere(sess, plan, people_ids, org_id):
-    """Map each person to the organisations (None: a platform record) whose rows still name them.
+def _in_set(plan, table, alias, path=frozenset()):
+    """SQL that is true for a row of ``table`` (as ``alias``) that the deletion removes, or None.
 
-    Reads only. A row is the deleted organisation's when it carries that organisation or hangs from
-    one of its rows; every other row that names the person counts, whatever the column, whether the
-    table has an organisation column or not, nullable or not, append-only or not.
+    The organisation's set is: its row; the people who leave with it; every row of a table with an
+    organisation column that names it; and a row of any other table that must point (NOT NULL) at a
+    row of the set, at any depth, such as a sync log of the organisation's connector.
     """
-    named = defaultdict(set)
-    if not people_ids:
-        return named
-    params = {"people": list(people_ids), "org_id": org_id}
-    for child, child_col, parent_col, _, _ in plan.referrers[PEOPLE]:
-        if parent_col != "id" or child == PEOPLE:
+    if table == "organizations":
+        return "%s.id = :org_id" % alias
+    if table == PEOPLE:
+        return "%s.id = ANY(CAST(:leaving AS integer[]))" % alias
+    if table in plan.org_columns:
+        return "%s.organization_id = :org_id" % alias
+    parts = []
+    for number, (parent, child_cols, parent_cols, not_null) in enumerate(plan.parent_keys[table]):
+        if not not_null or parent in path or parent == table or parent == "organizations":
+            continue
+        inner = "%s_%d" % (alias, number)
+        deeper = _in_set(plan, parent, inner, path | {table})
+        if deeper is None:
+            continue
+        link = " AND ".join("%s.%s = %s.%s" % (inner, _q(p), alias, _q(c)) for c, p in zip(child_cols, parent_cols))
+        parts.append("EXISTS (SELECT 1 FROM %s %s WHERE %s AND %s)" % (_q(parent), inner, link, deeper))
+    if not parts:
+        return None
+    inside = "(" + " OR ".join(parts) + ")"
+    # A row that also hangs from a row outside the set (another organisation's, or a platform row)
+    # is not the deletion's to remove.
+    outside = _owners_outside(plan, table, alias, frozenset({table}))
+    if outside:
+        inside += " AND NOT EXISTS (SELECT 1 FROM (%s) AS held_outside)" % outside
+    return "(" + inside + ")"
+
+
+def _references_into_set(sess, plan, org_id, leaving, homes):
+    """Count the rows outside the deletion's set that refer to a row in it, per owning organisation.
+
+    One reverse-reference query per foreign key in the database, whatever its ON DELETE action.
+    Reads only. Returns {organisation id (None: a platform row): number of rows}. The two ruled
+    kinds are not counted: a key to the organisation row itself, and a person who belongs elsewhere
+    (their home is moved by the service, not by the database).
+    """
+    params = {"org_id": org_id, "leaving": list(leaving)}
+    has_rows = {}
+    found = defaultdict(int)
+    for child, parent, child_cols, parent_cols, _ in plan.all_keys:
+        if parent == "organizations":
+            continue
+        inside_parent = _in_set(plan, parent, "p")
+        if inside_parent is None:
+            continue
+        if parent not in has_rows:
+            has_rows[parent] = sess.execute(
+                text("SELECT 1 FROM %s p WHERE %s LIMIT 1" % (_q(parent), inside_parent)), params
+            ).first() is not None
+        if not has_rows[parent]:
+            continue
+        inside_child = _in_set(plan, child, "c") or "FALSE"
+        link = " AND ".join("p.%s = c.%s" % (_q(p), _q(c)) for c, p in zip(child_cols, parent_cols))
+        outside = "NOT COALESCE(%s, FALSE)" % inside_child
+        if child == PEOPLE:
+            rows = sess.execute(text(
+                "SELECT c.id, COUNT(*) FROM users c JOIN %s p ON %s AND %s WHERE %s GROUP BY c.id"
+                % (_q(parent), link, inside_parent, outside)), params).all()
+            for person, number in rows:
+                found[homes.get(person)] += number
             continue
         if child in plan.org_columns:
-            query = (
-                "SELECT DISTINCT c.%s, c.organization_id FROM %s c WHERE c.%s = ANY(:people) "
-                "AND c.organization_id IS DISTINCT FROM :org_id" % (_q(child_col), _q(child), _q(child_col))
-            )
+            owner, lateral = "c.organization_id", ""
         else:
-            owners = _owners_outside(plan, child, "c", {child, PEOPLE})
-            if not owners:
-                continue
-            query = (
-                "SELECT DISTINCT c.%s, o.organization_id FROM %s c CROSS JOIN LATERAL (%s) AS o(organization_id) "
-                "WHERE c.%s = ANY(:people)" % (_q(child_col), _q(child), owners, _q(child_col))
-            )
-        for person, other in sess.execute(text(query), params).all():
-            named[person].add(other)
-    return named
+            owners = _owners_outside(plan, child, "c", {child})
+            owner, lateral = ("o.organization_id", "LEFT JOIN LATERAL (%s) AS o(organization_id) ON TRUE" % owners) \
+                if owners else ("NULL", "")
+        rows = sess.execute(text(
+            "SELECT %s, COUNT(DISTINCT c.ctid) FROM %s c JOIN %s p ON %s AND %s %s WHERE %s GROUP BY 1"
+            % (owner, _q(child), _q(parent), link, inside_parent, lateral, outside)), params).all()
+        for other, number in rows:
+            found[other] += number
+    return found
 
 
 def _remove_people(sess, plan, people_ids):
@@ -382,6 +457,25 @@ def _rights(sess, user_id):
         text("SELECT organization_id, role_id, is_org_admin FROM users WHERE id = :id"), {"id": user_id}
     ).one()
     return {"organization_id": row[0], "role_id": row[1], "is_org_admin": bool(row[2])}
+
+
+# The role a person holds in an organisation (OrgRole) and the account role it corresponds to.
+_ACCOUNT_ROLE = {"architect": "Architect", "viewer": "Viewer"}
+
+
+def _take_role_of(sess, user, org_role):
+    """Set ``user``'s account role and administrator flag from the role they hold in their new home."""
+    from app.models.user import Role
+
+    if org_role == "org_admin":
+        user.grant_org_admin()
+        return
+    role = Role.query.filter_by(name=_ACCOUNT_ROLE.get(org_role, "Viewer")).first()
+    if user.is_admin():
+        user.revoke_org_admin(fallback_role=role)
+    elif role is not None:
+        user.role = role
+        user._is_org_admin = False
 
 
 def _release_organisation_pointers(sess, plan, org_id, counts):
@@ -484,20 +578,20 @@ class OrganizationDeletionService:
             else:
                 leaving.append(user.id)
         plan = _Plan(sess)
-        named = _people_named_elsewhere(sess, plan, leaving, org_id)
-        if named:
-            other_ids = sorted({other for others in named.values() for other in others if other is not None})
+        homes = {user.id: home for user, home in detaching}
+        referring = _references_into_set(sess, plan, org_id, leaving, homes)
+        if referring:
+            other_ids = sorted(other for other in referring if other is not None)
             where = [name for (name,) in sess.query(Organization.name).filter(
                 Organization.id.in_(other_ids)).order_by(Organization.name)]
-            if where:
-                where = ["records of " + ", ".join(where)]
-            if any(None in others for others in named.values()):
+            if None in referring:
                 where.append("shared platform records")
+            total = sum(referring.values())
             raise OrganizationDeletionRefused(
-                "%d %s in %s %s named by %s. Reassign those records or move these people first. "
+                "%s cannot be deleted: %d %s of %s %s to it. Remove or reassign those references first. "
                 "Nothing was deleted." % (
-                    len(named), "person" if len(named) == 1 else "people", org.name,
-                    "is" if len(named) == 1 else "are", " and ".join(where))
+                    org.name, total, "record" if total == 1 else "records", ", ".join(where),
+                    "refers" if total == 1 else "refer")
             )
 
         org_name, org_slug = org.name, org.slug
@@ -517,24 +611,19 @@ class OrganizationDeletionService:
             detached, moved_to, rights_changed = 0, {}, {}
             for user, home in detaching:
                 moved_to[str(user.id)] = home
-                if user.is_admin():
-                    before = _rights(sess, user.id)
-                    # Administrator rights in this organisation do not travel: the person is what
-                    # their existing role in the new home says, and nothing more.
-                    if OrgRole.get_role(home, user.id) == "org_admin":
-                        user.grant_org_admin()
-                    else:
-                        user.revoke_org_admin()
-                    sess.flush()  # a demotion is recorded against this organisation, which is going
-                    rights_changed[str(user.id)] = {"before": before, "after_role_change": _rights(sess, user.id)}
+                before = _rights(sess, user.id)
+                # Rights in this organisation do not travel: the person is what their existing
+                # role in the new home says, and nothing more.
+                _take_role_of(sess, user, OrgRole.get_role(home, user.id))
+                sess.flush()  # a change of role is recorded against this organisation, which is going
+                rights_changed[str(user.id)] = {"before": before, "after_role_change": _rights(sess, user.id)}
                 # A statement, not an attribute change: the audit hook would file the move under the
                 # new home organisation. The platform record of this deletion carries it instead.
                 sess.execute(
                     text("UPDATE users SET organization_id = :home WHERE id = :id"), {"home": home, "id": user.id}
                 )
-                if str(user.id) in rights_changed:
-                    rights_changed[str(user.id)]["after"] = _rights(sess, user.id)
-                    del rights_changed[str(user.id)]["after_role_change"]
+                rights_changed[str(user.id)]["after"] = _rights(sess, user.id)
+                del rights_changed[str(user.id)]["after_role_change"]
                 sess.expire(user)
                 detached += 1
             sess.flush()
@@ -575,7 +664,7 @@ class OrganizationDeletionService:
                     "people_removed": len(leaving),
                     "people_detached": detached,
                     "people_detached_to": moved_to,
-                    "administrators_detached": rights_changed,
+                    "detached_rights": rights_changed,
                     "pointers_cleared": pointers_cleared,
                 },
             ))
@@ -596,7 +685,8 @@ class OrganizationDeletionService:
             homes = [name for (name,) in sess.query(Organization.name).filter(
                 Organization.id.in_(set(moved_to_ids))).order_by(Organization.name)]
             parts[-1] = parts[-1][:-1] + ", and now %s to %s." % ("belongs" if detached == 1 else "belong", ", ".join(homes))
-            demoted = sum(1 for rights in rights_changed.values() if not rights["after"]["is_org_admin"])
+            demoted = sum(1 for rights in rights_changed.values()
+                          if rights["before"]["is_org_admin"] and not rights["after"]["is_org_admin"])
             if demoted:
                 parts.append("%d of them administered it and %s no longer %s." % (
                     demoted, "is" if demoted == 1 else "are", "an administrator" if demoted == 1 else "administrators"))

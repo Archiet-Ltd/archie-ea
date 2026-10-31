@@ -379,11 +379,11 @@ def test_deleting_an_organisation_whose_person_another_organisation_names_is_ref
     page.get_by_role("button", name="Confirm", exact=True).click()
     page.wait_for_url("**/admin/organizations/%d" % made["doomed_id"], timeout=PAGE_TIMEOUT)
 
-    reason = page.get_by_text("is named by records of", exact=False).first
+    reason = page.get_by_text("cannot be deleted:", exact=False).first
     assert reason.is_visible(), "the page does not say why the organisation was not deleted"
     text = reason.inner_text()
-    assert "1 person in %s is named by records of %s" % (made["doomed_name"], made["other_name"]) in text, text
-    assert "Reassign those records or move these people first" in text
+    assert "%s cannot be deleted: 1 record of %s refers to it" % (made["doomed_name"], made["other_name"]) in text, text
+    assert "Remove or reassign those references first" in text
     assert "Nothing was deleted" in text
     assert page.get_by_text("reason is in the server log", exact=False).count() == 0
     assert made["person_name"] in page.locator("main").inner_text(), "the person is no longer shown in their organisation"
@@ -469,8 +469,8 @@ def test_deleting_an_organisation_whose_person_commented_on_another_organisation
     page.get_by_role("button", name="Confirm", exact=True).click()
     page.wait_for_url("**/admin/organizations/%d" % made["doomed_id"], timeout=PAGE_TIMEOUT)
 
-    text = page.get_by_text("is named by records of", exact=False).first.inner_text()
-    assert "1 person in %s is named by records of %s" % (made["doomed_name"], made["other_name"]) in text, text
+    text = page.get_by_text("cannot be deleted:", exact=False).first.inner_text()
+    assert "%s cannot be deleted: 1 record of %s refers to it" % (made["doomed_name"], made["other_name"]) in text, text
     assert "Nothing was deleted" in text
     if walk:
         for scheme in ("light", "dark"):
@@ -565,4 +565,146 @@ def test_deleting_an_organisation_moves_its_administrator_home_without_administr
         person = db.session.get(User, made["person_id"])
         assert person.organization_id == made["other_id"]
         assert person.is_admin() is False and person.is_org_admin is False
+        db.session.remove()
+
+
+@pytest.fixture
+def doomed_with_a_detached_member(app):
+    """An organisation whose ordinary member also holds a viewer role in a second organisation."""
+    from app import db
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed_org = Organization(name="Journey Member Doomed %s" % marker, slug="journey-member-doomed-%s" % marker)
+        other = Organization(name="Journey Member Elsewhere %s" % marker, slug="journey-member-elsewhere-%s" % marker)
+        db.session.add_all([doomed_org, other])
+        db.session.flush()
+        person = User(first_name="Shared", last_name="Member%s" % marker, email="shared-member-%s@example.test" % marker,
+                      password="test-password-123", confirmed=True, organization_id=doomed_org.id)
+        db.session.add(person)
+        db.session.flush()
+        db.session.add(OrgRole(organization_id=other.id, user_id=person.id, role="viewer"))
+        db.session.commit()
+        made = {"doomed_id": doomed_org.id, "doomed_name": doomed_org.name, "other_id": other.id,
+                "other_name": other.name, "person_id": person.id, "person_name": person.last_name}
+        db.session.remove()
+    yield made
+    with app.app_context():
+        from app.services.org_deletion_service import OrganizationDeletionService
+
+        for key in ("doomed_id", "other_id"):
+            if db.session.get(Organization, made[key]) is not None:
+                OrganizationDeletionService.delete_organization(made[key])
+        db.session.remove()
+
+
+def test_deleting_an_organisation_moves_an_ordinary_member_to_the_organisation_where_they_hold_a_role(
+    page, live_server, seeded, app, doomed_with_a_detached_member,
+):
+    """The page says the member now belongs to the other organisation, that organisation's members
+    list them, and they hold the role they had there."""
+    from app import db
+    from app.models.user import User
+
+    made = doomed_with_a_detached_member
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+    page.goto(live_server + "/admin/organizations/%d" % made["doomed_id"], wait_until="domcontentloaded")
+    page.locator("form[action$='/organizations/%d/delete']" % made["doomed_id"]).get_by_role(
+        "button", name="Delete organisation"
+    ).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_url("**/admin/organizations", timeout=PAGE_TIMEOUT)
+
+    text = page.get_by_text('Organisation "%s" deleted.' % made["doomed_name"], exact=False).first.inner_text()
+    assert "1 person who also belongs elsewhere was detached, and now belongs to %s." % made["other_name"] in text, text
+    assert "administered it" not in text, text
+
+    page.goto(live_server + "/admin/organizations/%d" % made["other_id"], wait_until="domcontentloaded")
+    assert made["person_name"] in page.locator("main").inner_text(), "the detached person is missing from their new home"
+    with app.app_context():
+        person = db.session.get(User, made["person_id"])
+        assert person.organization_id == made["other_id"]
+        assert person.role.name == "Viewer" and person.is_org_admin is False
+        db.session.remove()
+
+
+@pytest.fixture
+def doomed_element_used_by_another(app):
+    """An organisation whose ArchiMate element is the link target of a second organisation's application."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.organization import Organization
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed_org = Organization(name="Journey Ref A %s" % marker, slug="journey-ref-a-%s" % marker)
+        other = Organization(name="Journey Ref B %s" % marker, slug="journey-ref-b-%s" % marker)
+        db.session.add_all([doomed_org, other])
+        db.session.flush()
+        element = ArchiMateElement(name="Ref element %s" % marker, type="ApplicationComponent",
+                                   layer="Application", organization_id=doomed_org.id)
+        db.session.add(element)
+        db.session.flush()
+        application = ApplicationComponent(name="Ref app %s" % marker, organization_id=other.id,
+                                           archimate_element_id=element.id)
+        db.session.add(application)
+        db.session.commit()
+        made = {"doomed_id": doomed_org.id, "doomed_name": doomed_org.name, "other_id": other.id,
+                "other_name": other.name, "app_id": application.id, "element_id": element.id}
+        db.session.remove()
+    yield made
+    with app.app_context():
+        from app.services.org_deletion_service import OrganizationDeletionService
+
+        db.session.execute(db.text("DELETE FROM application_components WHERE id = :i"), {"i": made["app_id"]})
+        db.session.commit()
+        for key in ("doomed_id", "other_id"):
+            if db.session.get(Organization, made[key]) is not None:
+                OrganizationDeletionService.delete_organization(made[key])
+        db.session.remove()
+
+
+def test_deleting_an_organisation_whose_element_another_organisation_uses_is_refused_in_plain_words(
+    page, live_server, seeded, app, doomed_element_used_by_another,
+):
+    """The page names the organisation that still refers to it and says nothing was deleted; the
+    organisation is still listed and the other organisation's application still has its element."""
+    import os
+
+    from app import db
+    from app.models.organization import Organization
+
+    made = doomed_element_used_by_another
+    walk = os.environ.get("WALK_DIR")
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+    page.goto(live_server + "/admin/organizations/%d" % made["doomed_id"], wait_until="domcontentloaded")
+    page.locator("form[action$='/organizations/%d/delete']" % made["doomed_id"]).get_by_role(
+        "button", name="Delete organisation"
+    ).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_url("**/admin/organizations/%d" % made["doomed_id"], timeout=PAGE_TIMEOUT)
+
+    reason = page.get_by_text("cannot be deleted:", exact=False).first
+    assert reason.is_visible(), "the page does not say why the organisation was not deleted"
+    text = reason.inner_text()
+    assert "%s cannot be deleted: 1 record of %s refers to it." % (made["doomed_name"], made["other_name"]) in text, text
+    assert "Remove or reassign those references first. Nothing was deleted." in text, text
+    for database_text in ("foreign key", "violates", "constraint"):
+        assert database_text not in page.locator("body").inner_text()
+    assert made["doomed_name"] in page.locator("main").inner_text(), "the organisation's page no longer shows it"
+    if walk:
+        for width, height in ((1440, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.wait_for_timeout(800)
+            page.screenshot(path=os.path.join(walk, "refused-by-reference-%d.png" % width), full_page=True)
+        page.set_viewport_size({"width": 1440, "height": 900})
+    with app.app_context():
+        assert db.session.get(Organization, made["doomed_id"]) is not None
+        row = db.session.execute(db.text(
+            "SELECT archimate_element_id FROM application_components WHERE id = :i"), {"i": made["app_id"]}).scalar()
+        assert row == made["element_id"], "the other organisation's application lost its element"
         db.session.remove()

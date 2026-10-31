@@ -154,8 +154,8 @@ def test_another_organisations_row_that_names_the_deleted_one_keeps_its_row_with
         _cleanup(app, ids["a"], ids["b"])
 
 
-def _administrator_detached(app, role_in_b):
-    """Delete an organisation whose administrator also holds ``role_in_b`` in a second one."""
+def _administrator_detached(app, role_in_b, administrator=True):
+    """Delete an organisation whose member (an administrator, or not) also holds ``role_in_b`` in a second one."""
     from app import db
     from app.models.org_role import OrgRole
     from app.models.user import Role, User
@@ -170,11 +170,12 @@ def _administrator_detached(app, role_in_b):
             db.session.commit()
             made_roles = [r.id for r in Role.query.all() if r.name not in have]
         a, b, sole, _ = _two_organisations(db, marker)
-        sole.grant_org_admin()
+        if administrator:
+            sole.grant_org_admin()
         db.session.add(OrgRole(organization_id=b.id, user_id=sole.id, role=role_in_b))
         db.session.commit()
         ids = {"a": a.id, "b": b.id, "sole": sole.id}
-        assert sole.is_admin()
+        assert sole.is_admin() is administrator
         before = _snapshot(db)
         db.session.remove()
     try:
@@ -189,6 +190,7 @@ def _administrator_detached(app, role_in_b):
                 "person": person,
                 "is_admin": person.is_admin(),
                 "is_org_admin": person.is_org_admin,
+                "role": person.role.name if person.role else None,
                 "changes": _outside_changes(before, after, ids["a"], moved_people=(ids["sole"],)),
                 "record": _platform_record(db, ids["a"]),
                 "ids": ids,
@@ -211,8 +213,9 @@ def test_an_administrator_detached_to_a_viewer_role_is_not_an_administrator_ther
     ids = result["ids"]
     assert result["home"] == ids["b"]
     assert result["is_admin"] is False and result["is_org_admin"] is False
+    assert result["role"] == "Viewer", "a viewer in the new home must not be given a role that can write"
     assert result["changes"] == []
-    rights = result["record"]["administrators_detached"][str(ids["sole"])]
+    rights = result["record"]["detached_rights"][str(ids["sole"])]
     assert rights["before"]["organization_id"] == ids["a"] and rights["before"]["is_org_admin"] is True
     assert rights["after"]["organization_id"] == ids["b"] and rights["after"]["is_org_admin"] is False
     assert rights["before"]["role_id"] != rights["after"]["role_id"]
@@ -223,6 +226,19 @@ def test_an_administrator_detached_to_an_org_admin_role_keeps_exactly_that_role(
     ids = result["ids"]
     assert result["home"] == ids["b"]
     assert result["is_org_admin"] is True
-    rights = result["record"]["administrators_detached"][str(ids["sole"])]
+    rights = result["record"]["detached_rights"][str(ids["sole"])]
     assert rights["after"]["organization_id"] == ids["b"] and rights["after"]["is_org_admin"] is True
     assert rights["before"]["role_id"] == rights["after"]["role_id"]
+
+
+def test_a_detached_person_who_was_not_an_administrator_takes_the_role_they_hold_in_the_new_home(app):
+    result = _administrator_detached(app, "viewer", administrator=False)
+    ids = result["ids"]
+    assert result["home"] == ids["b"]
+    assert result["role"] == "Viewer" and result["is_org_admin"] is False
+    assert result["changes"] == []
+    rights = result["record"]["detached_rights"][str(ids["sole"])]
+    assert rights["before"]["organization_id"] == ids["a"] and rights["after"]["organization_id"] == ids["b"]
+    assert rights["before"]["role_id"] != rights["after"]["role_id"]
+    assert rights["after"]["is_org_admin"] is False
+    assert "administered it" not in result["message"], result["message"]
