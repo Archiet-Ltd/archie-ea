@@ -65,7 +65,7 @@ def sign_in(page, base, email):
     page.fill("#email", email)
     page.fill("#password", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+    page.wait_for_url(lambda url: "/account/login" not in url, wait_until="commit", timeout=PAGE_TIMEOUT)
     assert "/account/login" not in page.url, "could not sign in as %s" % email
 
 

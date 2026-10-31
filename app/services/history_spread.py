@@ -41,14 +41,15 @@ class HistoryDating:
         self.written = 0
 
     def date_new_record(self, connection, table_label, record):
-        """The date for ``record``'s first version, or None for a table the change history does not list.
+        """The date for ``record``'s first version, or None for a table this audit
+        listener does not control (so this is never asked about it in the first place).
 
         A model record that names no source yet is given one, on the record itself and so in the
         first version written for it.
         """
-        from app.modules.intelligence.services.history_service import AUDITED_TABLES
+        from app.middleware.audit_middleware import CONTROLLED_TABLE_LABELS
 
-        if table_label not in AUDITED_TABLES:
+        if table_label not in CONTROLLED_TABLE_LABELS:
             return None
         index = self.written
         self.written += 1

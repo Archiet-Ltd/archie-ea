@@ -572,6 +572,8 @@ def _source_line(element, first_recorded=None) -> str:
     when = element.source_recorded_at or element.recorded_at or first_recorded
     date = "%d %s" % (when.day, when.strftime("%b %Y")) if when else None
     label = (element.source_label or "").strip()
+    if getattr(element, "source_kind", None) == "sample":
+        return "Sample data, as of %s" % date if date else "Sample data"
     if label:
         return "from %s, as of %s" % (label, date) if date else "from %s" % label
     return "added by hand on %s" % date if date else "added by hand"
