@@ -98,6 +98,67 @@ def test_an_administrator_deletes_an_organisation_and_it_is_gone(page, live_serv
 
 
 @pytest.fixture
+def administrators_home(app):
+    """An organisation that is the home of a second platform administrator."""
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        org = Organization(name="Journey Admin Home %s" % marker, slug="journey-admin-home-%s" % marker)
+        db.session.add(org)
+        db.session.flush()
+        admin = User(first_name="Home", last_name="Admin", email="home-admin-%s@example.test" % marker,
+                     password="test-password-123", confirmed=True, organization_id=org.id)
+        admin.role = Role.query.filter_by(name="Administrator").one()
+        admin.is_platform_admin = True
+        db.session.add(admin)
+        db.session.commit()
+        made = {"org_id": org.id, "name": org.name, "admin_id": admin.id}
+        db.session.remove()
+    yield made
+    with app.app_context():
+        from app.services.org_deletion_service import OrganizationDeletionService
+
+        db.session.execute(db.text("UPDATE users SET is_platform_admin = false WHERE id = :i"), {"i": made["admin_id"]})
+        db.session.commit()
+        if db.session.get(Organization, made["org_id"]) is not None:
+            OrganizationDeletionService.delete_organization(made["org_id"])
+        db.session.remove()
+
+
+def test_deleting_the_home_of_a_platform_administrator_is_refused_with_the_reason(
+    page, live_server, seeded, app, administrators_home,
+):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    home = administrators_home
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+    page.goto(live_server + "/admin/organizations/%d" % home["org_id"], wait_until="domcontentloaded")
+    page.locator("form[action$='/organizations/%d/delete']" % home["org_id"]).get_by_role(
+        "button", name="Delete organisation"
+    ).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_url("**/admin/organizations/%d" % home["org_id"], timeout=PAGE_TIMEOUT)
+
+    reason = page.get_by_text("1 platform administrator must be moved to another organisation", exact=False).first
+    assert reason.is_visible(), "the page does not say why the organisation was not deleted"
+    assert home["name"] in reason.inner_text()
+    assert page.get_by_text("reason is in the server log", exact=False).count() == 0
+
+    page.goto(live_server + "/admin/organizations", wait_until="domcontentloaded")
+    assert page.get_by_role("link", name=home["name"]).count() >= 1, "the organisation vanished from the list"
+
+    with app.app_context():
+        assert db.session.get(Organization, home["org_id"]) is not None
+        assert db.session.get(User, home["admin_id"]) is not None, "the administrator was removed"
+        db.session.remove()
+
+
+@pytest.fixture
 def doomed_with_append_only_rows(app):
     """An organisation holding an outbox event, ARB evidence, and audit entries."""
     from app import db
@@ -194,10 +255,9 @@ def test_an_administrator_deletes_an_organisation_holding_append_only_rows(
         assert record.new_value["name"] == doomed["name"]
         row_counts = record.new_value.get("row_counts")
         assert isinstance(row_counts, dict) and row_counts
-        # entity_history.organization_id carries no foreign key to organizations (it predates
-        # that key's enforcement), so it is removed by its own explicit step rather than the
-        # foreign-key-driven plan every other table here goes through -- named here to prove
-        # that step actually ran and was counted, not merely that some table was.
+        # entity_history.organization_id carries no foreign key to organizations, so its rows are
+        # found by the column and counted like every other table's -- named here to prove that
+        # table's rows were removed and counted, not merely that some table was.
         assert row_counts.get("entity_history", 0) > 0, (
             "the application write this fixture seeds versions into entity_history; "
             "its removal must be named in the audit record's row_counts: %r" % row_counts
