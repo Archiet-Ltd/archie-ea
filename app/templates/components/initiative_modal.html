@@ -1,203 +1,233 @@
 {# Reusable Initiative Creation Modal Component
 
-   Creates new StrategicInitiative from dashboard context.
+   Creates a StrategicInitiative from a strategic page, and lists the plans created there.
    Uses shared modal.html component for consistent shell.
 
    Usage:
-   {% from 'components/initiative_modal.html' import initiative_modal %}
+   {% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+   {{ plans_created_here(id='health-remediation-modal', kind='remediation_plan', button_text='Create Plan') }}
 
    {{ initiative_modal(
        id='health-remediation-modal',
        title='Create Remediation Plan',
        endpoint='/strategic/api/initiatives/from-health',
        fields=[
-           {'name': 'title', 'type': 'text', 'label': 'Plan Title', 'required': True, 'value': 'Remediation: Finance Capability'},
-           {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe remediation approach...'},
-           {'name': 'priority', 'type': 'select', 'label': 'Priority', 'options': [('High', 'High'), ('Medium', 'Medium'), ('Low', 'Low')], 'value': 'High'},
-           {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'options': users, 'value_key': 'id', 'label_key': 'name'},
+           {'name': 'name', 'type': 'text', 'label': 'Plan Title', 'required': True},
+           {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True},
+           {'name': 'priority', 'type': 'select', 'label': 'Priority', 'options': [('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
+           {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
+           {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget'},
        ]
    ) }}
 
+   Field names are the ones StrategicService.create_initiative stores. The endpoint sets the
+   plan's kind (record_kind); plans_created_here lists the organisation's plans of that kind.
+
    Trigger from JavaScript:
    document.dispatchEvent(new CustomEvent('open-initiative-{{ id }}', {
-       detail: { prefill: { title: 'Remediation: Finance' } }
+       detail: { prefill: { name: 'Remediation: Finance' } }
    }));
 #}
 
 {% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro plans_created_here(id, kind, button_text) %}
+{% set plans = initiative_plans(kind) %}
+{# The library's component rules (css/basecoat_components.css, linked by the page) read the style-vega scope. #}
+<div class="style-vega" data-plans-card="{{ id }}">
+{% call ui.card(attrs={'data-testid': 'plans-created-here'}) %}
+    {% call ui.card_header() %}
+        {{ ui.card_title(text='Plans created here') }}
+        {{ ui.card_description(text='The plans your organisation has created from this page, newest first.') }}
+    {% endcall %}
+    {% call ui.card_content() %}
+        {% if plans %}
+        {% call ui.table_container() %}{% call ui.table() %}
+            {% call ui.table_header() %}{% call ui.table_row() %}
+                {{ ui.table_head(text='Plan') }}
+                {{ ui.table_head(text='Owner') }}
+                {{ ui.table_head(text='Risk level' if kind == 'risk_mitigation' else 'Priority') }}
+                {{ ui.table_head(text='Budget', class='text-right') }}
+                {{ ui.table_head(text='Created') }}
+            {% endcall %}{% endcall %}
+            {% call ui.table_body() %}
+                {% for plan in plans %}
+                {% call ui.table_row(attrs={'data-testid': 'plan-row'}) %}
+                    {{ ui.table_cell(text=plan.name, class='max-w-[320px] truncate font-medium') }}
+                    {{ ui.table_cell(text=(plan.owner.full_name() if plan.owner else '—')) }}
+                    {% call ui.table_cell() %}{{ ui.badge(text=((plan.risk_level if kind == 'risk_mitigation' else plan.priority) or 'medium')|capitalize, variant='outline') }}{% endcall %}
+                    {{ ui.table_cell(text=(plan.budget_allocated|currency if plan.budget_allocated else '—'), class='text-right tabular-nums') }}
+                    {{ ui.table_cell(text=(plan.created_at.strftime('%d %b %Y') if plan.created_at else '—'), class='tabular-nums') }}
+                {% endcall %}
+                {% endfor %}
+            {% endcall %}
+        {% endcall %}{% endcall %}
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="plans-created-here-empty">
+            No plans yet. Use “{{ button_text }}” above to create the first one; it will be listed here.
+        </p>
+        {% endif %}
+    {% endcall %}
+{% endcall %}
+</div>
+{% endmacro %}
+
 {% macro initiative_modal(
     id='initiative-modal',
     title='Create Initiative',
     endpoint='/strategic/api/initiatives',
     fields=[]
 ) %}
+{# Fields sent as numbers: the number inputs and the ids (owner_id). #}
+{% set numeric = [] %}
+{% for field in fields %}{% if field.type == 'number' or field.name.endswith('_id') %}{% set _ = numeric.append(field.name) %}{% endif %}{% endfor %}
 
 <div x-data="{
     loading: false,
     error: null,
     formData: {},
+    defaults: {},
+    numeric: {{ numeric | tojson | forceescape }},
     init() {
         {% for field in fields %}
-            this.formData['{{ field.name }}'] = '{{ field.value | default('') }}';
+            this.defaults['{{ field.name }}'] = '{{ field.value | default('') }}';
         {% endfor %}
+        this.formData = { ...this.defaults };
+    },
+    populateLazyOptions() {
+        // The owner picker's options carry every person's name and email; they are kept out of
+        // the page's DOM (and so out of any text match against the closed dialog) until the
+        // dialog is actually opened, instead of rendering server-side on every page load.
+        this.$el.querySelectorAll('select[data-lazy-options]').forEach(select => {
+            if (select.dataset.lazyPopulated) return;
+            const valueKey = select.dataset.valueKey, labelKey = select.dataset.labelKey;
+            JSON.parse(select.dataset.lazyOptions).forEach(option => {
+                const node = document.createElement('option');
+                node.value = String(option[valueKey]);
+                node.textContent = option[labelKey];
+                select.appendChild(node);
+            });
+            select.dataset.lazyPopulated = '1';
+        });
+    },
+    payload() {
+        // Empty fields are left out; number fields and ids are sent as numbers.
+        const out = {};
+        Object.keys(this.formData).forEach(key => {
+            const value = this.formData[key];
+            if (value === '' || value === null || value === undefined) return;
+            out[key] = this.numeric.includes(key) ? Number(value) : value;
+        });
+        return out;
+    },
+    refreshPlans() {
+        // The page lists the plans created from it; read the fresh list from the page itself.
+        const card = document.querySelector('[data-plans-card={{ id }}]');
+        if (!card) return;
+        fetch(window.location.href, { credentials: 'same-origin' }) // raw-fetch-ok: reads this page's HTML to replace the plans card; Platform.fetch parses JSON
+            .then(response => response.text())
+            .then(html => {
+                const fresh = new DOMParser().parseFromString(html, 'text/html')
+                    .querySelector('[data-plans-card={{ id }}]');
+                if (fresh) card.replaceWith(fresh);
+            });
     },
     submitInitiativeForm() {
         this.loading = true;
         this.error = null;
 
-        try {
-            // Platform.fetch will throw a PlatformError on non‑ok responses.
-            // It automatically injects CSRF token and serialises plain‑object bodies to JSON.
-            // We pass { silent: true } because we paint our own inline error state.
-            Platform.fetch.post('{{ endpoint }}', this.formData, { silent: true })
-                .then(result => {
-                    // Platform.fetch returns the parsed response body directly.
-                    // The endpoint returns { success: true, message: ... } on success.
-                    if (result.success) {
-                        Platform.toast.success(result.message || 'Initiative created successfully');
-                        Platform.modal.close('initiative-{{ id }}');
-                        this.formData = {};
-                        if (typeof refreshInitiatives === 'function') {
-                            refreshInitiatives();
-                        }
-                    } else {
-                        this.error = result.error || 'Failed to create initiative';
-                    }
-                })
-                .catch(err => {
-                    // Platform.fetch throws a structured PlatformError.
-                    // We surface the failure to the user via the inline error state.
-                    this.error = 'Error: ' + (err.message || 'Unknown error');
-                })
-                .finally(() => {
-                    this.loading = false;
-                });
-        } catch (syncErr) {
-            // This catch handles any synchronous error before the fetch starts.
-            this.error = 'Error: ' + (syncErr.message || 'Unknown error');
-            this.loading = false;
-        }
+        // Platform.fetch throws a PlatformError on non-ok responses, injects the CSRF token and
+        // serialises the body to JSON. { silent: true }: the dialog paints its own error.
+        Platform.fetch.post('{{ endpoint }}', this.payload(), { silent: true })
+            .then(result => {
+                if (result.success) {
+                    Platform.toast.success(result.message || 'Initiative created');
+                    Platform.modal.close('initiative-{{ id }}');
+                    this.formData = { ...this.defaults };
+                    this.refreshPlans();
+                } else {
+                    this.error = result.error || 'The plan could not be created.';
+                }
+            })
+            .catch(err => {
+                this.error = (err && err.message) || 'The plan could not be created.';
+            })
+            .finally(() => {
+                this.loading = false;
+            });
     }
 }"
      @open-initiative-{{ id }}.window="
          $event.detail?.prefill && (formData = { ...formData, ...$event.detail.prefill });
+         populateLazyOptions();
          Platform.modal.open('initiative-{{ id }}');
      "
      x-cloak>
 
 {% call modal(id='initiative-' ~ id, title=title, size='lg') %}
-    <!-- Error Alert -->
     <div x-show="error" x-cloak
          x-transition
+         role="alert"
          class="mb-4 px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis text-sm">
         <span x-text="error"></span>
     </div>
 
-    <!-- Form -->
-    <form @submit.prevent="submitInitiativeForm" class="space-y-4">
+    {# The create button is this form's submit button: Enter submits, and the browser checks
+       the required fields before the submit handler runs. #}
+    <form id="initiative-{{ id }}-form" @submit.prevent="submitInitiativeForm" class="style-vega space-y-4" data-testid="initiative-form">
 
         {% for field in fields %}
-            {% if field.type == 'text' %}
+            {% set field_id = id ~ '-' ~ field.name %}
             <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
+                <label for="{{ field_id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                     {{ field.label }}
-                    {% if field.required %}<span class="text-destructive-emphasis">*</span>{% endif %}
+                    {% if field.required %}<span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}
                 </label>
-                <input type="text"
-                       x-model="formData['{{ field.name }}']"
-                       placeholder="{{ field.placeholder | default('') }}"
-                       {% if field.required %}required{% endif %}
-                       class="h-9 w-full px-3 border border-input rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="{{ field.placeholder | default('') }}">
-            </div>
-
-            {% elif field.type == 'textarea' %}
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
-                    {{ field.label }}
-                    {% if field.required %}<span class="text-destructive-emphasis">*</span>{% endif %}
-                </label>
-                <textarea aria-label="{{ field.label }}" x-model="formData['{{ field.name }}']"
-                          placeholder="{{ field.placeholder | default('') }}"
-                          {% if field.required %}required{% endif %}
-                          rows="3"
-                          class="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
-            </div>
+            {% if field.type == 'textarea' %}
+                {{ ui.textarea(id=field_id, rows=3, attrs={'x-model': 'formData["' ~ field.name ~ '"]', 'placeholder': field.placeholder | default(''), 'required': field.required}) }}
 
             {% elif field.type == 'select' %}
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
-                    {{ field.label }}
-                    {% if field.required %}<span class="text-destructive-emphasis">*</span>{% endif %}
-                </label>
-                <select aria-label="{{ field.label }}" x-model="formData['{{ field.name }}']"
-                        {% if field.required %}required{% endif %}
-                        class="h-9 w-full px-3 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">-- Select {{ field.label }} --</option>
-                    {% if field.value_key %}
-                        {# Complex options: list of objects #}
-                        {% for option in field.options %}
-                        <option value="{{ option[field.value_key] }}">
-                            {{ option[field.label_key] }}
-                        </option>
-                        {% endfor %}
-                    {% else %}
-                        {# Simple options: tuples (value, label) #}
-                        {% for value, label in field.options %}
-                        <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
-                    {% endif %}
-                </select>
-            </div>
+                {% set select_attrs = {'x-model': "formData['" ~ field.name ~ "']"} %}
+                {% if field.required %}{% set select_attrs = dict(select_attrs, required='required') %}{% endif %}
+                {# The owner picker (value_key set) lists every person in the organisation by name
+                   and email; those options are loaded only once the dialog opens (see
+                   populateLazyOptions above), not rendered into every page's HTML, so a page that
+                   never opens this dialog never carries anyone's name in its markup. #}
+                {% if field.value_key %}{% set select_attrs = dict(select_attrs, **{'data-lazy-options': field.options | tojson | forceescape, 'data-value-key': field.value_key, 'data-label-key': field.label_key}) %}{% endif %}
+                {% call ui.native_select_wrapper(class='relative w-full') %}
+                    {% call ui.native_select(id=field_id, class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs=select_attrs) %}
+                        {{ ui.native_select_option(text='Select ' ~ field.label | lower, value='') }}
+                        {% if not field.value_key %}
+                            {% for value, label in field.options %}
+                            {{ ui.native_select_option(text=label, value=value) }}
+                            {% endfor %}
+                        {% endif %}
+                    {% endcall %}
+                    {{ ui.native_select_icon(class='pointer-events-none absolute') }}
+                {% endcall %}
 
-            {% elif field.type == 'date' %}
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
-                    {{ field.label }}
-                    {% if field.required %}<span class="text-destructive-emphasis">*</span>{% endif %}
-                </label>
-                <input type="date"
-                       x-model="formData['{{ field.name }}']"
-                       {% if field.required %}required{% endif %}
-                       class="h-9 w-full px-3 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Date field">
-            </div>
-
-            {% elif field.type == 'number' %}
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
-                    {{ field.label }}
-                    {% if field.required %}<span class="text-destructive-emphasis">*</span>{% endif %}
-                </label>
-                <input type="number"
-                       x-model="formData['{{ field.name }}']"
-                       placeholder="{{ field.placeholder | default('') }}"
-                       {% if field.required %}required{% endif %}
-                       class="h-9 w-full px-3 border border-input rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="{{ field.placeholder | default('') }}">
-            </div>
+            {% else %}
+                {{ ui.input(type=field.type if field.type in ('text', 'date', 'number') else 'text', id=field_id, attrs={'x-model': 'formData["' ~ field.name ~ '"]', 'placeholder': field.placeholder | default(''), 'min': 0 if field.type == 'number' else none, 'step': 'any' if field.type == 'number' else none, 'required': field.required}) }}
             {% endif %}
+            </div>
         {% endfor %}
 
+        <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-border">
+            {# The page's base button reset is unlayered and outranks the library's layered button rules on a button
+               element, so the variant's surface is restated with token utilities, as the Overview does. #}
+            {{ ui.button(text='Cancel', variant='outline', type='button', class='border border-input bg-background px-2.5 text-foreground hover:bg-accent', attrs={'@click': "Platform.modal.close('initiative-" ~ id ~ "')"}) }}
+            {% call ui.button(type='submit', class='bg-primary px-2.5 text-primary-foreground hover:bg-primary/90', attrs={':disabled': 'loading', 'data-testid': 'initiative-create'}) %}
+                <span x-show="!loading">Create</span>
+                <span x-show="loading" x-cloak class="inline-flex items-center gap-1">
+                    <i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                    Creating…
+                </span>
+            {% endcall %}
+        </div>
     </form>
-
-    <!-- Footer -->
-    <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-border">
-        <button @click="Platform.modal.close('initiative-{{ id }}')"
-                type="button"
-                class="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4" aria-label="Cancel">
-            Cancel
-        </button>
-        <button @click="submitInitiativeForm()"
-                :disabled="loading"
-                type="button"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <span x-show="!loading" x-cloak>Create Initiative</span>
-            <span x-show="loading" x-cloak class="inline-flex items-center gap-1">
-                <i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i>
-                Creating...
-            </span>
-        </button>
-    </div>
 {% endcall %}
 
 </div>
-
 {% endmacro %}

@@ -94,6 +94,21 @@ def _shot(page, name):
         page.screenshot(path=os.path.join(WALK, name + ".png"), full_page=True)
 
 
+def _greeting(email):
+    """"Welcome" on this user's first-ever session, "Welcome back" on every later one --
+    read from the user_sessions rows the login just created/extended, not assumed from
+    test order (round welcome01)."""
+    from app import create_app
+    from app.models.user import User
+    from app.models.user_session import UserSession
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        sessions = UserSession.query.filter_by(user_id=user.id).count()
+    return "Welcome" if sessions <= 1 else "Welcome back"
+
+
 @pytest.mark.parametrize("viewport,theme", [(FOLD, "light"), (PHONE, "dark")], ids=["1440-light", "390-dark"])
 def test_a_member_who_may_not_see_spend_reads_no_money_and_no_request_fails(browser, live_server, org, viewport, theme):
     context, page = _page(browser, viewport)
@@ -102,7 +117,7 @@ def test_a_member_who_may_not_see_spend_reads_no_money_and_no_request_fails(brow
         page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
         dash = page.locator('[data-testid="overview-dashboard"]')
         expect(dash).to_be_visible()
-        expect(dash.get_by_text("Welcome back, Sam")).to_be_visible()
+        expect(dash.get_by_text("%s, Sam" % _greeting(org["emails"]["solution_architect"]))).to_be_visible()
 
         # no money anywhere on the page, and no short form on the cost cards
         body = page.locator("body").inner_text()
@@ -134,7 +149,7 @@ def test_a_finance_lead_of_the_same_company_reads_the_run_cost_and_the_top_vendo
         failed = _open(page, live_server, org["emails"]["finance"])
         page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
         dash = page.locator('[data-testid="overview-dashboard"]')
-        expect(dash.get_by_text("Welcome back, Fay")).to_be_visible()
+        expect(dash.get_by_text("%s, Fay" % _greeting(org["emails"]["finance"]))).to_be_visible()
         run = dash.locator('[data-testid="card-run-cost-value"]')
         assert run.inner_text().strip() == "£250k"
         assert run.get_attribute("title") == "£250,000"

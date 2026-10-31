@@ -65,7 +65,7 @@ def launch(browser):
     errors = []
     unexpected = []
 
-    def start(models, failure=False):
+    def start(models, failure=False, stream_fault=False):
         context = browser.new_context(viewport={'width': 1440, 'height': 1000})
         contexts.append(context)
         page = context.new_page()
@@ -135,6 +135,11 @@ def launch(browser):
                     return self.respond({'success': True, 'found': False})
                 if self.path == '/ai-chat/message/stream':
                     payloads.append(json.loads(body))
+                    if stream_fault:
+                        # The no-provider gate's answer: a configuration fault, not a transient failure.
+                        return self.respond({'error': 'service_unavailable', 'feature': 'chat',
+                                             'message': "AI feature 'chat' is not available. LLM provider must be configured."},
+                                            status=503)
                     events = [{'type': 'token', 'text': 'Fixture response.'},
                               {'type': 'done', 'response': 'Fixture response.', 'domain': 'general'}]
                     return self.respond(''.join('data: ' + json.dumps(e) + '\n\n'

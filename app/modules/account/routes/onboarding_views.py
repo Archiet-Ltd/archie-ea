@@ -12,6 +12,7 @@ import logging
 
 from flask import g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models.organization import Organization
@@ -41,6 +42,8 @@ def add_routes(bp, access) -> None:
     @login_required
     @access
     def welcome():
+        from app.connectors import github_app
+
         org = _org()
         step = request.args.get("step", type=int)
         step = step if step in (3, 4) else 2
@@ -48,6 +51,7 @@ def add_routes(bp, access) -> None:
         return render_template(
             "account/register.html",
             form=None,
+            github_app_install_url=github_app.install_url(org.id, return_to="welcome"),
             step=step,
             org=org,
             kinds=onboarding.KINDS,
@@ -126,7 +130,21 @@ def add_routes(bp, access) -> None:
             saved = onboarding.save_choices(_org(), data.get("industry"), data.get("frameworks") or [], data.get("kind"))
         except ValueError as exc:
             return _problem(str(exc))
-        return jsonify({"ok": True, **saved})
+        return jsonify({"ok": True, **saved, "removable": onboarding.removable_starter_rows(_org())})
+
+    @bp.route("/welcome/starter/remove", methods=["POST"])
+    @login_required
+    @access
+    def welcome_starter_remove():
+        data = request.get_json(silent=True) or {}
+        try:
+            removed = onboarding.remove_unedited_starter_rows(_org(), data.get("model"))
+        except ValueError as exc:
+            return _problem(str(exc))
+        except IntegrityError:
+            db.session.rollback()
+            return _problem("Some of these capabilities are still used elsewhere, so none were removed.")
+        return jsonify({"ok": True, "removed": removed})
 
     @bp.route("/welcome/profile", methods=["POST"])
     @login_required

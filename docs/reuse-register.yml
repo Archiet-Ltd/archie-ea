@@ -396,20 +396,24 @@ entries:
     concept: Empty state shown when a list or page has no data
     status: active
     canonical:
-      path: app/templates/components/empty_state.html
-      symbols: [empty_state]
+      path: app/templates/basecoat/empty.html
+      symbols: [empty, empty_header, empty_icon, empty_title, empty_description, empty_content]
     reuse: >
-      {% from 'components/empty_state.html' import empty_state %} (see DESIGN.md). Do not define another
-      empty_state macro or inline an empty-state block; two macros with incompatible signatures 500 the page
-      that imports the wrong one.
+      {% import 'basecoat/index.html' as ui %} (see DESIGN.md). ui.empty holds ui.empty_header with an
+      icon, a title and a description, then ui.empty_content with the next-step button: every empty state
+      says why the area is empty and offers the next step. Do not define another empty-state macro or
+      inline an empty-state block; two macros with incompatible signatures 500 the page that imports the
+      wrong one.
     must_not_create:
       - id: empty-state-macro
         regex: '{%-?\s*macro\s+(empty_state\w*|render_empty\w*|no_data\w*)\s*\('
         scope: [app/templates]
         suffixes: [.html]
     known_exceptions:
+      - path: app/templates/components/empty_state.html
+        reason: legacy empty_state macro kept as a compatibility wrapper; new and touched empty states migrate to the ui.empty block (basecoat/empty.html) instead
       - path: app/templates/macros/page_shell.html
-        reason: second empty_state macro (icon, headline, body) predating the register; to be merged into the canonical one
+        reason: second empty_state macro (icon, headline, body) predating the register; migrate from it to the ui.empty block (basecoat/empty.html)
 
   - id: loading-state
     concept: Loading and skeleton states
