@@ -10,7 +10,7 @@ Supports regulatory audit requirements.
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app import db
@@ -168,86 +168,3 @@ class ADMAuditLog(db.Model):
             next_num = 1
 
         return f"ADM-AUDIT-{year}-{next_num:06d}"
-
-
-class ADMAuditSummary(db.Model):
-    """
-    Aggregated audit summary for quick reporting.
-
-    Pre-computed summaries for common audit queries.
-    """
-
-    __tablename__ = "adm_audit_summaries"
-    __table_args__ = {"extend_existing": True}
-
-    id = Column(Integer, primary_key=True)
-
-    # Summary scope
-    summary_type = Column(String(50), nullable=False)  # board, card, user, phase
-    scope_id = Column(Integer, nullable=False)  # ID of the entity being summarized
-    scope_name = Column(String(255))
-
-    # Time period
-    period_start = Column(DateTime, nullable=False)
-    period_end = Column(DateTime, nullable=False)
-
-    # Aggregated metrics
-    total_actions = Column(Integer, default=0)
-    cards_created = Column(Integer, default=0)
-    cards_moved = Column(Integer, default=0)
-    approvals_submitted = Column(Integer, default=0)
-    approvals_approved = Column(Integer, default=0)
-    approvals_rejected = Column(Integer, default=0)
-    phase_transitions = Column(JSON)  # Count by phase
-
-    # Actor summary
-    unique_actors = Column(Integer, default=0)
-    top_actors = Column(JSON)  # List of {user_id, action_count}
-
-    # Compliance
-    checkpoints_completed = Column(Integer, default=0)
-    stakeholder_concurrences = Column(Integer, default=0)
-
-    # Timestamps
-    computed_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<ADMAuditSummary {self.summary_type}: {self.period_start} to {self.period_end}>"
-
-
-class ADMDataRetentionPolicy(db.Model):
-    """
-    Data retention policy configuration for ADM audit logs.
-
-    Configurable retention periods for different audit event types.
-    """
-
-    __tablename__ = "adm_data_retention_policies"
-    __table_args__ = {"extend_existing": True}
-
-    id = Column(Integer, primary_key=True)
-
-    policy_name = Column(String(100), nullable=False, unique=True)
-    description = Column(Text)
-
-    # Retention rules (days)
-    card_operations_retention_days = Column(Integer, default=2555)  # 7 years
-    phase_transition_retention_days = Column(Integer, default=2555)
-    approval_workflow_retention_days = Column(Integer, default=3650)  # 10 years
-    compliance_audit_retention_days = Column(Integer, default=3650)
-    system_generated_retention_days = Column(Integer, default=365)  # 1 year
-
-    # Archival configuration
-    auto_archive_enabled = Column(Boolean, default=False)
-    archive_after_days = Column(Integer, default=1095)  # 3 years
-    archive_location = Column(String(500))
-
-    # Policy status
-    is_active = Column(Boolean, default=True)
-    created_by_id = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<ADMDataRetentionPolicy {self.policy_name}>"
