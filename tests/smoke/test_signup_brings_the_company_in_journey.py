@@ -543,7 +543,12 @@ def test_a_slow_model_does_not_keep_the_founder_from_seeing_their_company_name(b
         assert time.monotonic() - asked_at < 30, "the name took %.0f s" % (time.monotonic() - asked_at)
         expect(name.get_by_role("checkbox")).to_be_checked()
         expect(_fact(page, "Contact email").locator("[data-fact-value]")).to_have_value("info@acme-robotics.test")
-        expect(page.get_by_test_id("signup-facts-more")).to_contain_text("More facts are still being worked out")
+        # The page says more are coming, whether the first read is still under way (the notice in the facts list) or
+        # has finished while the model works (the notice beside it), and offers the way to see them when they arrive.
+        coming = page.locator("[data-testid=signup-facts-more], [data-testid=more-facts-coming]")
+        expect(coming).to_have_count(1)
+        expect(coming).to_contain_text(re.compile(r"More facts (are still being worked out|follow|will be added)"))
+        expect(coming.get_by_role("link", name="Show them when they are ready")).to_be_visible()
         assert _fact(page, "Category").count() == 0, "a model-only fact appeared before the model answered"
         shoot(page, "slow-model-first-facts")
 
