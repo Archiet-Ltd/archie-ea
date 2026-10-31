@@ -803,8 +803,11 @@ def _slug_from_filename(filename: str) -> str:
     return filename.replace(".md", "")
 
 
-def load_all_pages() -> list[PublicPage]:
-    """Load every Markdown page under content/pages/."""
+def load_all_pages(families: tuple[str, ...] | None = None) -> list[PublicPage]:
+    """Load every Markdown page under content/pages/, or only those of the given families.
+
+    A caller that needs one family (the "Other roles" strip needs the role pages) names it, so a request
+    reads, renders and sanitises that family and not all of the content directory."""
     pages: list[PublicPage] = []
     if not CONTENT_ROOT.is_dir():
         return pages
@@ -812,6 +815,8 @@ def load_all_pages() -> list[PublicPage]:
     from app.services.legal_pages import legal_pages_enabled
 
     for family, dir_name in FAMILY_DIR_MAP.items():
+        if families is not None and family not in families:
+            continue
         if family == "legal" and not legal_pages_enabled():
             continue
         family_dir = CONTENT_ROOT / dir_name
@@ -857,7 +862,7 @@ def _pages_by_url() -> dict[str, PublicPage]:
     return _pages_by_url_for_fingerprint(_content_fingerprint())
 
 
-def load_feed_pages() -> list[PublicPage]:
+def load_feed_pages(families: tuple[str, ...] | None = None) -> list[PublicPage]:
     """Every public page that belongs in a "lists every page" surface: the
     sitemap, /llms.txt, /llms-full.txt, the /vs hub, and any per-family
     "see every one of these" index (e.g. the /use-cases index).
@@ -877,7 +882,7 @@ def load_feed_pages() -> list[PublicPage]:
     than one surface at a time.
     """
     return [
-        page for page in load_all_pages()
+        page for page in load_all_pages(families)
         if not page.is_held and page.url not in MERGED_PAGES
     ]
 
@@ -1140,12 +1145,42 @@ def family_hub_groups(
     return groups
 
 
+def _feed_pages_at(urls) -> list[PublicPage]:
+    """The feed pages at exactly these URLs, reading only the files that can hold them.
+
+    Same rule as ``load_feed_pages`` (a held, withdrawn or merged page is left out), but a page is rendered and
+    sanitised only when its address is one asked for. A use-case page's address comes from its front matter, not its
+    filename, so that family's front matter is read (YAML only) to find the files; every other family maps a
+    filename to an address directly. Families with no URL prefix (site, legal) are not addressed this way."""
+    wanted = set(urls)
+    found: list[PublicPage] = []
+    for family, prefix in FAMILY_URL_PREFIX.items():
+        if not prefix or family in ("vision", "dogfood"):
+            continue
+        in_family = [u for u in wanted if u.startswith(prefix + "/")]
+        family_dir = CONTENT_ROOT / FAMILY_DIR_MAP[family]
+        if not in_family or not family_dir.is_dir():
+            continue
+        for md_file in sorted(family_dir.glob("*.md")):
+            slug = _slug_from_filename(md_file.name)
+            url = f"{prefix}/{slug}"
+            if family == "function-per-segment":
+                front_matter, _body = _parse_front_matter(md_file.read_text(encoding="utf-8"))
+                url = _use_case_slug_and_url(front_matter, slug)[1]
+            if url not in wanted:
+                continue
+            page = _load_page(md_file, family, slug, f"{prefix}/{slug}")
+            if not page.is_held and page.url not in MERGED_PAGES:
+                found.append(page)
+    return found
+
+
 def hub_extra_entries(
     entries: tuple[tuple[str, tuple[str, ...]], ...],
 ) -> list[dict[str, Any]]:
     """Resolve non-page entries against the feed: only targets that are live
     feed pages are linked, titled with their own page title."""
-    by_url = {p.url: p for p in load_feed_pages()}
+    by_url = {p.url: p for p in _feed_pages_at(url for _label, urls in entries for url in urls)}
     resolved = []
     for label, urls in entries:
         pages = [by_url[u] for u in urls if u in by_url]
@@ -1159,7 +1194,7 @@ def role_siblings(page: PublicPage) -> list[dict[str, Any]]:
     page (sorted by title) as one group, then the non-page role entries as
     further groups. Never the page itself."""
     others = sorted(
-        (p for p in load_feed_pages() if p.family == "role" and p.url != page.url),
+        (p for p in load_feed_pages(("role",)) if p.url != page.url),
         key=_title_key,
     )
     groups = hub_extra_entries(ROLE_HUB_EXTRA_ENTRIES)
