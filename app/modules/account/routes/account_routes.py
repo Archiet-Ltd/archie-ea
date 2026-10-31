@@ -260,8 +260,10 @@ def _company_card():
 # Sign-up after the account: bring the company in, then choose the AI provider.
 from app.modules.admin.connector_routes import connections_access as _connections_access  # noqa: E402
 from app.modules.account.routes import onboarding_views  # noqa: E402
+from app.modules.account.routes import region_views  # noqa: E402
 
 onboarding_views.add_routes(account_bp, _connections_access)
+region_views.add_routes(account_bp)
 
 
 @account_bp.route("/logout")
@@ -301,6 +303,7 @@ def manage():
         user=current_user,
         form=None,
         company=_company_card(),
+        region=region_views.region_card(),
         last_login_entry=last_login_entry,
         recent_auth_events=auth_audit.recent_auth_events(current_user.id),
     )

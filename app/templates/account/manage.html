@@ -333,6 +333,34 @@
     {% endcall %}
     {% endcall %}
     </div>
+
+    {# Region and currency: how every date, number and amount of money is written for this organisation. #}
+    {% if region %}
+    <div class="mt-6" data-testid="region-card">
+    {% call card() %}
+    {% call card_content() %}
+            <h3 class="text-sm font-semibold mb-1">Region and currency</h3>
+            <p class="text-xs text-muted-foreground mb-5">Sets how dates, numbers and amounts of money are written for everyone in your organisation. Today they read <span data-testid="region-example">{{ region.examples.money }} on {{ region.examples.date }}</span>.</p>
+            <form method="POST" action="{{ url_for('account.save_region') }}" class="space-y-4">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <label for="region-locale" class="text-sm font-medium">Language and region</label>
+                        {{ native_select(id='region-locale', name='locale', options=region.locales, selected=region.locale, class='w-full') }}
+                    </div>
+                    <div class="space-y-2">
+                        <label for="region-currency" class="text-sm font-medium">Currency</label>
+                        {{ native_select(id='region-currency', name='currency', options=region.currencies, selected=region.currency, class='w-full') }}
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    {{ button(type='submit', text='Save region and currency', testid='region-save') }}
+                </div>
+            </form>
+    {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
 {% endmacro %}
 
 {% block content %}

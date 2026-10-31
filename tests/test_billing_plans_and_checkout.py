@@ -643,7 +643,7 @@ def test_billing_details_and_invoices(app, db_session, client, login_as, billing
     assert modified["invoice_settings"] == {"custom_fields": [{"name": "PO number", "value": "PO-7781"}]}
     assert "Billing details saved." in html
     assert 'value="PO-7781"' in html
-    assert "GBP 588.00" in html and "GBP 98.00" in html
+    assert "\u00a3588.00" in html and "\u00a398.00" in html  # the locale filter writes the currency as its symbol
     assert "https://pay.stripe.com/invoice/ENT-0001/pdf" in html
     # An invoice whose tax the provider did not report shows a dash, not 0.00.
     assert "USD 0.00" not in html

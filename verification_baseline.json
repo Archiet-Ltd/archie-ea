@@ -63,6 +63,7 @@
     "hand_pagination": 8,
     "placeholder_content": 9,
     "lint_core": 0,
+    "locale_literals": 271,
     "llm_boundary": 0,
     "missing_value_placeholder": 563,
     "nav_coverage": 0,

@@ -129,6 +129,10 @@ def compute_nav_counts(org_id, ttl=_NAV_COUNTS_TTL):
 def init_context_processors(app):
     """Register all context processors for Jinja templates."""
 
+    from app.utils.locale_format import register_locale_filters
+
+    register_locale_filters(app)  # the one place a date, number, percentage or amount becomes text
+
     # Keyed by organisation id: the per-model counts below are tenant-filtered
     # entity queries, so one shared entry served one tenant's counts to all.
     _dashboard_categories_cache: dict = {}

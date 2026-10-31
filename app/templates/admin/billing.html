@@ -182,7 +182,7 @@
                     <dt class="text-muted-foreground">Price</dt>
                     <dd class="font-semibold" data-testid="checkout-price">
                         {% if price and price.amount is not none %}
-                            {{ price.currency }} {{ '%.2f' | format(price.amount) }}{% if selected_plan.per_seat %} per editor{% endif %} per {{ price.interval or selected_interval }}
+                            {{ price.amount | fmt_money(price.currency) }}{% if selected_plan.per_seat %} per editor{% endif %} per {{ price.interval or selected_interval }}
                         {% else %}Shown on the payment page{% endif %}
                     </dd>
                 </div>
@@ -274,10 +274,10 @@
             {% call table_body() %}
             {% for inv in invoices %}
                 {% call table_row() %}
-                    {% call table_cell(class='whitespace-nowrap') %}{{ inv.date.strftime('%d %b %Y') if inv.date else '—' }}{% endcall %}
+                    {% call table_cell(class='whitespace-nowrap') %}{{ inv.date | fmt_date }}{% endcall %}
                     {% call table_cell() %}{{ inv.number or '—' }}{% endcall %}
-                    {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.total is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.total) }}{% else %}—{% endif %}{% endcall %}
-                    {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.tax is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.tax) }}{% else %}—{% endif %}{% endcall %}
+                    {% call table_cell(class='text-right whitespace-nowrap') %}{{ inv.total | fmt_money(inv.currency) }}{% endcall %}
+                    {% call table_cell(class='text-right whitespace-nowrap') %}{{ inv.tax | fmt_money(inv.currency) }}{% endcall %}
                     {% call table_cell() %}{{ (inv.status or '—') | replace('_', ' ') | capitalize }}{% endcall %}
                     {% call table_cell() %}{% if inv.pdf_url %}<a href="{{ inv.pdf_url }}" class="text-primary underline" rel="noopener">PDF</a>{% elif inv.hosted_url %}<a href="{{ inv.hosted_url }}" class="text-primary underline" rel="noopener">View</a>{% else %}—{% endif %}{% endcall %}
                 {% endcall %}

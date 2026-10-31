@@ -1545,6 +1545,20 @@ def gate_js_syntax() -> Result:
     return Result("js-syntax", FAIL, output.strip()[-800:])
 
 
+def gate_locale_literals(baseline: int) -> Result:
+    """Templates that write a date, number or amount of money themselves instead of through the locale filters."""
+    proc = _run([sys.executable, "scripts/check_locale_literals.py", "--count"])
+    output = (proc.stdout or "").strip()
+    if proc.returncode != 0:
+        return Result("locale-literals", FAIL, output[-400:])
+    try:
+        count = int(output.splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("locale-literals", FAIL, f"unparseable count: {output[-200:]}")
+    detail = "" if count <= baseline else "run scripts/check_locale_literals.py to list them"
+    return Result("locale-literals", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_content_placeholders(baseline: int) -> Result:
     """Ratchet on the banned placeholder phrases ("Nothing here yet", "No data",
     "N/A") in shipped templates and scripts. Each one is an empty region that
@@ -2420,6 +2434,10 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("console-reporting", "console.* calls in shipped JS and templates", "ratchet",
              lambda: gate_console_reporting(baseline["console_reporting"]),
              remediation="surface the failure via Platform.toast or an inline error state, or delete the diagnostic",
+             tags=["static", "ui"]),
+        Gate("locale-literals", "a date, number or amount of money written by the template instead of fmt_date/fmt_number/fmt_percent/fmt_money", "ratchet",
+             lambda: gate_locale_literals(baseline["locale_literals"]),
+             remediation="use the locale filters in app/utils/locale_format.py (|fmt_date, |fmt_number, |fmt_percent, |fmt_money), or mark a justified line with locale-ok: <reason>",
              tags=["static", "ui"]),
         Gate("content-placeholders", "no 'Nothing here yet', 'No data' or 'N/A' placeholder text", "ratchet",
              lambda: gate_content_placeholders(baseline["content_placeholders"]),
