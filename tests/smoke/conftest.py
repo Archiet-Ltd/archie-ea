@@ -739,6 +739,55 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         ))
         db.session.commit()
 
+        # A fourth solution for the quality panel's rule coverage. It carries
+        # one must rule and one should rule recorded the way an architect
+        # records them (blueprint proposal business_rules). The must rule
+        # asks for something no generated project mentions, the should rule
+        # for something every project mentions, so the coverage figure a
+        # person reads is a partial one and not the empty-rule-set 100.
+        from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+
+        rules_component = ApplicationComponent(
+            name="Smoke Rules Service %s" % suffix, organization_id=org.id,
+            lifecycle_status="operational", description="Smoke fixture for rule coverage.",
+        )
+        db.session.add(rules_component)
+        db.session.commit()
+        assert rules_component.archimate_element_id is not None
+
+        codegen_rules_solution = Solution(
+            name="Smoke rules solution %s" % suffix,
+            description="Outcome-test fixture for business rule coverage.",
+            organization_id=org.id,
+            created_by_id=out["ids"]["solution_architect_user"],
+            governance_status="draft",
+            adm_phase="C",
+            has_acm_domains=True,
+        )
+        db.session.add(codegen_rules_solution)
+        db.session.commit()
+        out["ids"]["codegen_rules_solution"] = codegen_rules_solution.id
+
+        db.session.add(SolutionArchiMateElement(
+            solution_id=codegen_rules_solution.id,
+            layer_type="application",
+            element_id=rules_component.archimate_element_id,
+            element_table="archimate_elements",
+            element_name=rules_component.name,
+            element_role="primary",
+        ))
+        db.session.add(SolutionBlueprintProposal(
+            solution_id=codegen_rules_solution.id,
+            archimate_type="BusinessRule",
+            name="Smoke rules carrier",
+            status="rejected",
+            acm_properties={"business_rules": [
+                {"name": "Zorblax settlement", "condition": "zorblax settlement quorum", "severity": "must"},
+                {"name": "Health endpoint", "condition": "health", "severity": "should"},
+            ]},
+        ))
+        db.session.commit()
+
     return out
 
 
