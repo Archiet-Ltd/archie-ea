@@ -1,12 +1,15 @@
+{# design-block: dashboard #}
+{# smoke-coverage-ok: covered by tests/smoke/test_vendor_matrix_journey.py #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Vendor Capability Matrix{% endblock %}
 
 {% block extra_head_js %}
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.store('matrixModal', { open: false, title: '', data: null });
+    Alpine.store('matrixModal', { title: '', subtitle: '', step: 'weak', data: null });
 
     Alpine.data('vendorCapabilityMatrix', () => ({
         matrixData: [],
@@ -33,8 +36,7 @@ document.addEventListener('alpine:init', () => {
                 this.error = 'Failed to load categories. ' + e.message;
             } finally {
                 this.loadingCategories = false;
-                this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-            }
+                }
         },
 
         async loadData() {
@@ -51,8 +53,7 @@ document.addEventListener('alpine:init', () => {
                 this.error = 'Failed to load matrix data. ' + e.message;
             } finally {
                 this.loading = false;
-                this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-            }
+                }
         },
 
         applyFilters() {
@@ -111,37 +112,25 @@ document.addEventListener('alpine:init', () => {
 
         getCellText(cap, vendor, product) {
             const d = this.getCell(cap, vendor, product);
-            return d ? d.coverage_percentage + '%' : '—';
+            return d ? d.coverage_percentage + '%' : 'No data';
         },
 
-        // Sequential heatmap intensity scale (Strong/Moderate/Partial/Weak coverage) — see the
-        // inline legend below the filters card. Kept as raw hues per DESIGN.md's data-viz
-        // exception; a single semantic token can't represent four ordered steps without
-        // collapsing distinct legend entries onto the same colour.
-        getCellClass(cap, vendor, product) {
+        // Coverage steps: one theme-token fill per step, the same four the legend shows.
+        stepFor(pct) {
+            if (pct >= 80) return 'strong';
+            if (pct >= 60) return 'moderate';
+            if (pct >= 40) return 'partial';
+            return 'weak';
+        },
+
+        stepClass(pct) {
+            return { strong: 'bg-primary/40 text-foreground', moderate: 'bg-primary/20 text-foreground',
+                     partial: 'bg-primary/10 text-foreground', weak: 'bg-muted/50 text-muted-foreground' }[this.stepFor(pct)];
+        },
+
+        cellClass(cap, vendor, product) {
             const d = this.getCell(cap, vendor, product);
-            if (!d) return 'bg-muted/40 text-muted-foreground/40';
-            const p = d.coverage_percentage;
-            if (p >= 80) return 'bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30'; // design-tokens-ok: heatmap intensity scale
-            if (p >= 60) return 'bg-amber-400/25 text-amber-700 hover:bg-amber-400/40'; // design-tokens-ok: heatmap intensity scale
-            if (p >= 40) return 'bg-amber-200/40 text-amber-600 hover:bg-amber-200/60'; // design-tokens-ok: heatmap intensity scale
-            return 'bg-muted/50 text-muted-foreground hover:bg-muted';
-        },
-
-        getCoverageVariant(pct) {
-            if (pct == null) return 'bg-muted/50 text-muted-foreground border-border';
-            if (pct >= 80) return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'; // design-tokens-ok: heatmap intensity scale
-            if (pct >= 60) return 'bg-amber-400/10 text-amber-600 border-amber-400/30'; // design-tokens-ok: heatmap intensity scale
-            if (pct >= 40) return 'bg-amber-200/10 text-amber-500 border-amber-200/30'; // design-tokens-ok: heatmap intensity scale
-            return 'bg-muted/50 text-muted-foreground border-border';
-        },
-
-        getCoverageBarClass(pct) {
-            if (!pct && pct !== 0) return 'bg-muted';
-            if (pct >= 80) return 'bg-emerald-500'; // design-tokens-ok: heatmap intensity scale
-            if (pct >= 60) return 'bg-amber-400'; // design-tokens-ok: heatmap intensity scale
-            if (pct >= 40) return 'bg-amber-300'; // design-tokens-ok: heatmap intensity scale
-            return 'bg-muted-foreground/40';
+            return d ? this.stepClass(d.coverage_percentage) : '';
         },
 
         openDetail(cap, vendor, product) {
@@ -151,10 +140,7 @@ document.addEventListener('alpine:init', () => {
             store.title = vendor + ' › ' + product;
             store.subtitle = cap;
             store.data = d;
-            store.badgeClass = this.getCoverageVariant(d.coverage_percentage);
-            store.barClass = this.getCoverageBarClass(d.coverage_percentage);
-            store.open = true;
-            this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+            store.step = this.stepFor(d.coverage_percentage);
         },
 
         exportCSV() {
@@ -182,345 +168,197 @@ document.addEventListener('alpine:init', () => {
 {% endblock %}
 
 {% block content %}
-<div x-data="vendorCapabilityMatrix()" class="space-y-6">
+{% macro _actions() %}
+    {{ ui.button(text='Refresh', variant='outline', attrs={'@click': 'loadData()', 'data-testid': 'matrix-refresh'}) }}
+    {{ ui.button(text='Export CSV', attrs={'@click': 'exportCSV()', 'data-testid': 'matrix-export'}) }}
+{% endmacro %}
+{% macro _step(label, range, cls) %}
+    <span class="inline-flex items-center gap-2 text-sm text-muted-foreground"><span class="h-4 w-4 rounded-sm border border-border {{ cls }}"></span>{{ label }} <span class="tabular-nums">{{ range }}</span></span>
+{% endmacro %}
 
-    {{ page_header(
-        title='Vendor Capability Matrix', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Vendor Capability Matrix'}],
-        description='Heatmap of vendor product coverage across enterprise capabilities — click any cell to drill into gaps and strengths',
-        actions=[
-            {'text': 'Refresh', 'icon': 'refresh-cw', 'onclick': 'loadData()', 'variant': 'outline'},
-            {'text': 'Export CSV', 'icon': 'download', 'onclick': 'exportCSV()', 'variant': 'default'}
-        ]
-    ) }}
+<div x-data="vendorCapabilityMatrix()" class="p-6 space-y-6 mx-auto" data-testid="vendor-matrix">
 
-    <!-- KPI bar -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-card border border-border rounded-lg p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capabilities</p>
-            <p class="text-2xl font-bold text-foreground mt-1" x-text="stats.totalCaps || '—'"></p>
-        </div>
-        <div class="bg-card border border-border rounded-lg p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vendors</p>
-            <p class="text-2xl font-bold text-foreground mt-1" x-text="stats.totalVendors || '—'"></p>
-        </div>
-        <div class="bg-card border border-border rounded-lg p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Avg Coverage</p>
-            <p class="text-2xl font-bold text-foreground mt-1" x-text="stats.avgCoverage != null ? stats.avgCoverage + '%' : '—'"></p>
-        </div>
-        <div class="bg-card border border-border rounded-lg p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Strong Fits (80%+)</p>
-            <p class="text-2xl font-bold text-success mt-1" x-text="stats.strongCount"></p>
-        </div>
+    {{ page_shell(title='Vendor Capability Matrix', breadcrumb=[('Home', '/'), ('Vendor Capability Matrix', none)], subtitle='How well each vendor product covers each capability. Choose a category, then open any cell for its gaps and strengths.', actions_caller=_actions) }}
+
+    {# Stat card row: each figure is counted from the cells the matrix shows. #}
+    {% set stat_items = [
+        ('capabilities', 'Capabilities', 'stats.totalCaps', 'Capabilities with a vendor product mapped to them in this category'),
+        ('vendors', 'Vendors', 'stats.totalVendors', 'Vendors with a product in this category'),
+        ('coverage', 'Average coverage', "stats.avgCoverage != null ? stats.avgCoverage + '%' : '—'", 'The mean coverage across the cells shown'),
+        ('strong', 'Strong fits', 'stats.strongCount', 'Cells where a product covers 80% or more of the capability')] %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="vendor-matrix-stats">
+        {% for key, label, expr, sentence in stat_items %}
+        {% call ui.card(attrs={'data-testid': 'vendor-matrix-' ~ key}) %}
+            {% call ui.card_header() %}
+                {{ ui.card_description(text=label) }}
+                {{ ui.card_title(text='', class='text-2xl font-semibold tabular-nums', attrs={'x-text': "dataLoaded ? (" ~ expr ~ ") : '—'", 'data-testid': 'vendor-matrix-' ~ key ~ '-value'}) }}
+            {% endcall %}
+            {% call ui.card_content() %}<p class="text-sm text-muted-foreground" x-text="dataLoaded ? '{{ sentence }}' : 'Choose a product category to count this'"></p>{% endcall %}
+        {% endcall %}
+        {% endfor %}
     </div>
 
-    <!-- Filters card -->
-    <div class="bg-card border border-border rounded-lg p-5">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-sm font-semibold text-foreground">Filters</h2>
-            <button type="button" @click="resetFilters()"
-                    class="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                Reset all
-            </button>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="space-y-1.5">
-                <label for="f-vendor" class="text-xs font-medium text-muted-foreground">Vendor</label>
-                <input id="f-vendor" type="text" x-model="filters.vendor" @input="applyFilters()"
-                       placeholder="Search vendors…"
-                       class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+    {% call ui.card() %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='Filters') }}
+            {{ ui.card_description(text='A category loads its vendors; the other filters narrow what is shown.') }}
+            {% call ui.card_action() %}{{ ui.button(text='Reset all', variant='ghost', size='sm', attrs={'@click': 'resetFilters()', 'data-testid': 'matrix-reset'}) }}{% endcall %}
+        {% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-4') %}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Category', attrs={'for': 'f-category'}) }}
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='f-category', class='h-9 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'x-model': 'filters.category', '@change': 'loadData()'}) %}
+                        <option value="">Select a category</option>
+                        <template x-for="cat in allCategories" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                    {% endcall %}{% endcall %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Vendor', attrs={'for': 'f-vendor'}) }}
+                    {{ ui.input(id='f-vendor', attrs={'type': 'text', 'placeholder': 'Search vendors', 'x-model': 'filters.vendor', '@input': 'applyFilters()'}) }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Capability', attrs={'for': 'f-capability'}) }}
+                    {{ ui.input(id='f-capability', attrs={'type': 'text', 'placeholder': 'Search capabilities', 'x-model': 'filters.capability', '@input': 'applyFilters()'}) }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Minimum coverage', attrs={'for': 'f-coverage'}) }}
+                    {% call ui.native_select_wrapper() %}{% call ui.native_select(id='f-coverage', class='h-9 w-full rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'x-model': 'filters.minCoverage', '@change': 'applyFilters()'}) %}
+                        <option value="0">All</option>
+                        <option value="40">40% or more</option>
+                        <option value="60">60% or more</option>
+                        <option value="80">80% or more</option>
+                    {% endcall %}{% endcall %}
+                {% endcall %}
             </div>
-            <div class="space-y-1.5">
-                <label for="f-capability" class="text-xs font-medium text-muted-foreground">Capability</label>
-                <input id="f-capability" type="text" x-model="filters.capability" @input="applyFilters()"
-                       placeholder="Search capabilities…"
-                       class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4" data-testid="matrix-legend" aria-label="Coverage scale">
+                <span class="text-sm font-medium">Coverage</span>
+                {{ _step('Strong', '80–100%', 'bg-primary/40') }}
+                {{ _step('Moderate', '60–79%', 'bg-primary/20') }}
+                {{ _step('Partial', '40–59%', 'bg-primary/10') }}
+                {{ _step('Weak', '0–39%', 'bg-muted/50') }}
             </div>
-            <div class="space-y-1.5">
-                <label for="f-coverage" class="text-xs font-medium text-muted-foreground">Min Coverage</label>
-                <select id="f-coverage" x-model="filters.minCoverage" @change="applyFilters()"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="0">All</option>
-                    <option value="40">40%+</option>
-                    <option value="60">60%+</option>
-                    <option value="80">80%+</option>
-                </select>
-            </div>
-            <div class="space-y-1.5">
-                <label for="f-category" class="text-xs font-medium text-muted-foreground">Category <span class="text-destructive-emphasis">*</span></label>
-                <select id="f-category" x-model="filters.category" @change="loadData()"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">— Select a category —</option>
-                    <template x-for="cat in allCategories" :key="cat">
-                        <option :value="cat" x-text="cat"></option>
-                    </template>
-                </select>
-            </div>
-        </div>
-        <!-- Inline legend -->
-        <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-4 border-t border-border">
-            <span class="text-xs font-medium text-muted-foreground">Coverage:</span>
-            <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm bg-emerald-500/70"></span> <!-- design-tokens-ok: heatmap intensity scale, matches getCellClass -->
-                <span class="text-xs text-muted-foreground">80–100% Strong</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm bg-amber-400/70"></span> <!-- design-tokens-ok: heatmap intensity scale, matches getCellClass -->
-                <span class="text-xs text-muted-foreground">60–79% Moderate</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm bg-amber-200/70 border border-amber-300/50"></span> <!-- design-tokens-ok: heatmap intensity scale, matches getCellClass -->
-                <span class="text-xs text-muted-foreground">40–59% Partial</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm bg-muted border border-border"></span>
-                <span class="text-xs text-muted-foreground">0–39% Weak</span>
-            </div>
-        </div>
-    </div>
+        {% endcall %}
+    {% endcall %}
 
-    <!-- Matrix card -->
-    <div class="bg-card border border-border rounded-lg overflow-hidden">
+    {% call ui.card(class='overflow-hidden') %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='Coverage by capability and product') }}
+            {{ ui.card_description(text='Each cell is the share of a capability a product covers.') }}
+        {% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-4') %}
+            <p x-cloak x-show="loading" class="text-sm text-muted-foreground" role="status">Loading the matrix.</p>
 
-        <!-- Loading -->
-        <div x-cloak x-show="loading" class="flex flex-col items-center justify-center py-24 gap-3">
-            <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p class="text-sm text-muted-foreground">Loading matrix…</p>
-        </div>
+            {% call ui.alert(variant='destructive', attrs={'x-cloak': '', 'x-show': '!loading && error', 'data-testid': 'matrix-error'}) %}
+                {{ ui.alert_title(text='The matrix could not be loaded') }}
+                <div class="col-start-2 flex flex-col items-start gap-2">
+                    <p class="text-sm" x-text="error"></p>
+                    {{ ui.button(text='Try again', variant='outline', size='sm', attrs={'@click': 'loadData()'}) }}
+                </div>
+            {% endcall %}
 
-        <!-- Error -->
-        <div x-cloak x-show="!loading && error" class="flex flex-col items-center justify-center py-24 gap-3">
-            <i data-lucide="alert-triangle" class="h-10 w-10 text-destructive" aria-hidden="true"></i>
-            <p class="text-sm text-muted-foreground" x-text="error"></p>
-            <button type="button" @click="loadData()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-1 items-center">
-                <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i> Retry
-            </button>
-        </div>
+            <div x-cloak x-show="!loading && !error && !dataLoaded" data-testid="matrix-choose-category">
+                {% call ui.empty(class='p-6 md:p-10') %}
+                    {% call ui.empty_header() %}
+                        {{ ui.empty_title(text='Choose a product category') }}
+                        {% call ui.empty_description() %}<span x-show="loadingCategories">Loading the categories.</span><span x-show="!loadingCategories && allCategories.length > 0"><span x-text="allCategories.length"></span> categories are available in the Category filter above.</span><span x-show="!loadingCategories && allCategories.length === 0">No vendor products are recorded yet, so there is nothing to compare. Add a vendor product on the vendor page to start.</span>{% endcall %}
+                    {% endcall %}
+                {% endcall %}
+            </div>
 
-        <!-- Pick category prompt -->
-        <div x-cloak x-show="!loading && !error && !dataLoaded"
-             class="flex flex-col items-center justify-center py-24 gap-3">
-            <i data-lucide="table-2" class="h-10 w-10 text-muted-foreground" aria-hidden="true"></i>
-            <p class="text-sm font-medium text-foreground">Select a product category to load the matrix</p>
-            <p x-cloak class="text-xs text-muted-foreground" x-show="loadingCategories">Loading categories…</p>
-            <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length > 0">
-                <span x-text="allCategories.length"></span> categories available — use the Category filter above
-            </p>
-        </div>
+            <div x-cloak x-show="!loading && !error && dataLoaded && capabilities.length === 0" data-testid="matrix-empty">
+                {% call ui.empty(class='p-6 md:p-10') %}
+                    {% call ui.empty_header() %}
+                        {{ ui.empty_title(text='No coverage matches these filters') }}
+                        {{ ui.empty_description(text='Loosen the vendor, capability or minimum coverage filter to see cells again.') }}
+                    {% endcall %}
+                    {% call ui.empty_content() %}{{ ui.button(text='Clear filters', variant='outline', size='sm', attrs={'@click': "filters.vendor = ''; filters.capability = ''; filters.minCoverage = '0'; applyFilters()", 'data-testid': 'matrix-clear-filters'}) }}{% endcall %}
+                {% endcall %}
+            </div>
 
-        <!-- Empty -->
-        <div x-cloak x-show="!loading && !error && dataLoaded && capabilities.length === 0"
-             class="flex flex-col items-center justify-center py-24 gap-3">
-            <i data-lucide="table-2" class="h-10 w-10 text-muted-foreground" aria-hidden="true"></i>
-            <p class="text-sm font-medium text-foreground">No data matches your filters</p>
-            <button type="button" @click="resetFilters()" class="text-xs text-primary hover:underline">Clear filters</button>
-        </div>
-
-        <!-- Matrix table -->
-        <div x-cloak x-show="!loading && !error && dataLoaded && capabilities.length > 0"
-             class="overflow-auto max-h-[65vh]">
-            <table class="dense-table w-full text-xs border-collapse">
-                <thead class="sticky top-0 z-20">
-                    <!-- Vendor header row -->
-                    <tr>
-                        <th class="sticky left-0 z-30 bg-muted border-r border-b border-border px-4 py-2.5 text-left text-xs font-semibold text-foreground min-w-[200px]"
-                            rowspan="2">
-                            Capability
-                        </th>
-                        <template x-for="vendor in vendors" :key="vendor.name">
-                            <th class="bg-primary/5 border-b border-r border-border px-2 py-2 text-center text-xs font-semibold text-primary whitespace-nowrap"
-                                :colspan="vendor.products.length"
-                                x-text="vendor.name"></th>
-                        </template>
-                    </tr>
-                    <!-- Product sub-header row -->
-                    <tr>
-                        <template x-for="col in vendorProducts" :key="'sub-' + col.vendor + '::' + col.product">
-                            <th class="bg-muted/60 border-r border-b border-border px-2 py-1.5 text-center text-2xs font-medium text-muted-foreground whitespace-nowrap max-w-[96px] overflow-hidden text-ellipsis"
-                                :title="col.product"
-                                x-text="col.product"></th>
-                        </template>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="cap in capabilities" :key="cap">
-                        <tr class="group hover:bg-muted/20 transition-colors">
-                            <td class="sticky left-0 z-10 bg-card group-hover:bg-muted/20 border-r border-b border-border px-4 py-2 font-medium text-foreground whitespace-nowrap max-w-[220px] overflow-hidden text-ellipsis transition-colors"
-                                :title="cap"
-                                x-text="cap"></td>
-                            <template x-for="col in vendorProducts" :key="cap + '::' + col.vendor + '::' + col.product">
-                                    <td class="border-r border-b border-border text-center px-1.5 py-1.5 cursor-pointer transition-all hover:scale-105 hover:z-10 relative font-semibold"
-                                        :class="getCellClass(cap, col.vendor, col.product)"
-                                        :title="getCellText(cap, col.vendor, col.product) + ' — click for details'"
-                                        @click="openDetail(cap, col.vendor, col.product)">
-                                        <span x-text="getCellText(cap, col.vendor, col.product)"></span>
-                                    </td>
+            <div x-cloak x-show="!loading && !error && dataLoaded && capabilities.length > 0" class="max-h-[65vh] overflow-auto" data-testid="matrix-table">
+                {% call ui.table_container() %}{% call ui.table(attrs={'aria-label': 'Vendor capability coverage'}) %}
+                    {% call ui.table_header() %}
+                        {% call ui.table_row() %}
+                            {{ ui.table_head(text='Capability', class='sticky left-0 z-10 min-w-48 bg-card', attrs={'rowspan': '2'}) }}
+                            <template x-for="vendor in vendors" :key="vendor.name">
+                                {{ ui.table_head(class='text-center', attrs={':colspan': 'vendor.products.length', 'x-text': 'vendor.name'}) }}
+                            </template>
+                        {% endcall %}
+                        {% call ui.table_row() %}
+                            <template x-for="col in vendorProducts" :key="'sub-' + col.vendor + '::' + col.product">
+                                {{ ui.table_head(class='text-center font-normal text-muted-foreground', attrs={'x-text': 'col.product', ':title': 'col.product'}) }}
+                            </template>
+                        {% endcall %}
+                    {% endcall %}
+                    {% call ui.table_body() %}
+                        <template x-for="cap in capabilities" :key="cap">
+                            {% call ui.table_row() %}
+                                {{ ui.table_cell(class='sticky left-0 z-10 max-w-56 truncate bg-card font-medium', attrs={'x-text': 'cap', ':title': 'cap'}) }}
+                                <template x-for="col in vendorProducts" :key="cap + '::' + col.vendor + '::' + col.product">
+                                    {% call ui.table_cell(class='p-1 text-center') %}
+                                        <template x-if="getCell(cap, col.vendor, col.product)">
+                                            {{ ui.button(variant='ghost', size='sm', class='h-8 w-full justify-center tabular-nums', attrs={
+                                                'x-text': 'getCellText(cap, col.vendor, col.product)',
+                                                ':class': 'cellClass(cap, col.vendor, col.product)',
+                                                ':data-vendor': 'col.vendor', ':data-capability': 'cap', ':data-product': 'col.product',
+                                                ':data-coverage': 'getCell(cap, col.vendor, col.product).coverage_percentage',
+                                                ':aria-label': "cap + ', ' + col.vendor + ' ' + col.product + ': ' + getCellText(cap, col.vendor, col.product) + ' coverage. Open details'",
+                                                'data-fb-open': 'matrix-detail', 'data-testid': 'matrix-cell',
+                                                '@click': 'openDetail(cap, col.vendor, col.product)'}) }}
+                                        </template>
+                                        <template x-if="!getCell(cap, col.vendor, col.product)">
+                                            <span class="text-xs text-muted-foreground" data-testid="matrix-cell-empty" title="No coverage is recorded for this product against this capability">No data</span>
+                                        </template>
+                                    {% endcall %}
                                 </template>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Table footer -->
-        <div x-cloak x-show="!loading && dataLoaded && capabilities.length > 0"
-             class="flex items-center justify-between px-5 py-2.5 border-t border-border bg-muted/30">
-            <p class="text-xs text-muted-foreground">
-                <span x-text="capabilities.length"></span> capabilities ×
-                <span x-text="vendors.reduce((a, v) => a + v.products.length, 0)"></span> products
-            </p>
-            <button type="button" @click="exportCSV()"
-                    class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <i data-lucide="download" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                Export CSV
-            </button>
-        </div>
-    </div>
-
+                            {% endcall %}
+                        </template>
+                    {% endcall %}
+                {% endcall %}{% endcall %}
+            </div>
+            <p x-cloak x-show="!loading && dataLoaded && capabilities.length > 0" class="text-sm text-muted-foreground" data-testid="matrix-footer"><span x-text="capabilities.length"></span> capabilities by <span x-text="vendors.reduce((a, v) => a + v.products.length, 0)"></span> products.</p>
+        {% endcall %}
+    {% endcall %}
 </div>
 {% endblock %}
 
 {% block modals %}
-<!-- Capability detail modal -->
-<div x-data="{}"
-     x-cloak x-show="$store.matrixModal.open"
-     x-transition:enter="transition ease-out duration-200"
-     x-transition:enter-start="opacity-0"
-     x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-150"
-     x-transition:leave-start="opacity-100"
-     x-transition:leave-end="opacity-0"
-     @keydown.escape.window="$store.matrixModal.open = false"
-     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
-     role="dialog" aria-modal="true" aria-labelledby="matrix-modal-title"
-     style="display:none"> <!-- inline-style-ok -->
-    <div @click.outside="$store.matrixModal.open = false"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95"
-         x-transition:enter-end="opacity-100 scale-100"
-         class="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
-
-        <!-- Modal header -->
-        <div class="flex items-start justify-between px-6 py-4 border-b border-border shrink-0">
-            <div class="pr-4 min-w-0">
-                <p class="text-xs text-muted-foreground mb-0.5" x-text="$store.matrixModal.title"></p>
-                <h2 id="matrix-modal-title"
-                    class="text-base font-semibold text-foreground text-foreground text-foreground truncate"
-                    x-text="$store.matrixModal.subtitle || ''"></h2>
-                <div class="flex items-center gap-2 mt-2" x-cloak x-show="$store.matrixModal.data" role="dialog">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
-                          :class="$store.matrixModal.badgeClass"
-                          x-text="($store.matrixModal.data?.coverage_percentage ?? '—') + '% Coverage'"></span>
-                    <span x-cloak x-show="$store.matrixModal.data?.maturity_level"
-                          class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border bg-muted/50 text-muted-foreground border-border"
-                          x-text="'Maturity ' + $store.matrixModal.data?.maturity_level + '/5'"></span>
-                </div>
-            </div>
-            <button type="button" @click="$store.matrixModal.open = false" aria-label="Close"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0">
-                <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
-        </div>
-
-        <!-- Modal body -->
-        <div class="overflow-y-auto px-6 py-5 space-y-5 flex-1" x-cloak x-show="$store.matrixModal.data">
-
-            <!-- Coverage bar -->
-            <div>
-                <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-xs font-medium text-muted-foreground">Total Coverage</span>
-                    <span class="text-xs font-bold text-foreground"
-                          x-text="$store.matrixModal.data?.coverage_percentage + '%'"></span>
-                </div>
-                <div class="h-2 rounded-full bg-muted overflow-hidden">
-                    <div class="h-2 rounded-full transition-all duration-500"
-                         :class="$store.matrixModal.barClass"
-                         :style="'width:' + ($store.matrixModal.data?.coverage_percentage ?? 0) + '%'"></div><!-- inline-style-ok -->
-                </div>
-            </div>
-
-            <!-- Stats grid -->
-            <div class="grid grid-cols-3 gap-3">
-                <div class="bg-muted/40 rounded-lg p-3">
-                    <p class="text-xs text-muted-foreground">Out-of-Box</p>
-                    <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="($store.matrixModal.data?.out_of_box_percentage ?? 0) + '%'"></p>
-                </div>
-                <div class="bg-muted/40 rounded-lg p-3">
-                    <p class="text-xs text-muted-foreground">Via Customisation</p>
-                    <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="(($store.matrixModal.data?.coverage_percentage ?? 0) - ($store.matrixModal.data?.out_of_box_percentage ?? 0)) + '%'"></p>
-                </div>
-                <div class="bg-muted/40 rounded-lg p-3">
-                    <p class="text-xs text-muted-foreground">Impl. Complexity</p>
-                    <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="$store.matrixModal.data?.implementation_complexity != null ? $store.matrixModal.data.implementation_complexity + '/10' : '—'"></p>
-                </div>
-            </div>
-
-            <!-- Gaps -->
-            <div x-cloak x-show="$store.matrixModal.data?.gaps?.length">
-                <h3 class="text-sm font-semibold text-foreground mb-2.5">Identified Gaps</h3>
-                <div class="space-y-1.5">
-                    <template x-for="gap in ($store.matrixModal.data?.gaps ?? [])" :key="gap.name">
-                        <div class="flex items-start gap-2.5">
-                            <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border mt-0.5"
-                                  :class="gap.severity === 'high' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30' :
- gap.severity === 'medium' ? 'bg-warning/10 text-warning-emphasis border-warning/30' :
- 'bg-primary/10 text-primary border-primary/30'"
-                                  x-text="gap.severity"></span>
-                            <span class="text-sm text-foreground leading-snug" x-text="gap.name"></span>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Strengths -->
-            <div x-cloak x-show="$store.matrixModal.data?.strengths?.length">
-                <h3 class="text-sm font-semibold text-foreground mb-2.5">Key Strengths</h3>
-                <div class="space-y-1.5">
-                    <template x-for="s in ($store.matrixModal.data?.strengths ?? [])" :key="s">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="check-circle-2" class="h-4 w-4 text-success shrink-0" aria-hidden="true"></i>
-                            <span class="text-sm text-foreground" x-text="s"></span>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Evidence -->
-            <div x-show="$store.matrixModal.data && $store.matrixModal.data.evidence">
-                <h3 class="text-sm font-semibold text-foreground mb-2.5">Evidence & Verification</h3>
-                <div class="bg-muted/40 border border-border rounded-lg p-3.5 space-y-1.5">
-                    <p class="text-xs text-muted-foreground">
-                        <span class="font-medium text-foreground">Source: </span>
-                        <span x-text="$store.matrixModal.data.evidence && $store.matrixModal.data.evidence.source ? $store.matrixModal.data.evidence.source : 'N/A'"></span>
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                        <span class="font-medium text-foreground">Verified: </span>
-                        <span x-text="$store.matrixModal.data.evidence && $store.matrixModal.data.evidence.verified_at
-                            ? new Date($store.matrixModal.data.evidence.verified_at).toLocaleDateString()
-                            : 'Not verified'"></span>
-                    </p>
-                    <p class="text-xs text-muted-foreground" x-cloak x-show="$store.matrixModal.data.evidence && $store.matrixModal.data.evidence.verified_by">
-                        <span class="font-medium text-foreground">By: </span>
-                        <span x-text="$store.matrixModal.data.evidence && $store.matrixModal.data.evidence.verified_by ? $store.matrixModal.data.evidence.verified_by : ''"></span>
-                    </p>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Modal footer -->
-        <div class="px-6 py-3 border-t border-border flex justify-end shrink-0">
-            <button type="button" @click="$store.matrixModal.open = false"
-                    class="px-4 py-2 text-sm rounded-md bg-muted hover:bg-muted/80 text-foreground transition-colors">
-                Close
-            </button>
-        </div>
-
+{% call ui.dialog() %}
+  {% call ui.dialog_content(id='matrix-detail', attrs={'x-data': '{}', 'data-testid': 'matrix-detail'}) %}
+    {% call ui.dialog_header() %}
+      {{ ui.dialog_title(text='', attrs={'x-text': "$store.matrixModal.subtitle || ''"}) }}
+      {{ ui.dialog_description(text='', attrs={'x-text': '$store.matrixModal.title'}) }}
+    {% endcall %}
+    <div class="flex flex-col gap-4" x-show="$store.matrixModal.data">
+      <div class="flex flex-wrap items-center gap-2">
+        {{ ui.badge(variant='outline', attrs={'x-text': "(($store.matrixModal.data && $store.matrixModal.data.coverage_percentage) ?? 0) + '% coverage'"}) }}
+        {{ ui.badge(variant='secondary', attrs={'x-text': "$store.matrixModal.step[0].toUpperCase() + $store.matrixModal.step.slice(1) + ' fit'"}) }}
+        <template x-if="$store.matrixModal.data && $store.matrixModal.data.maturity_level">{{ ui.badge(variant='outline', attrs={'x-text': "'Maturity ' + $store.matrixModal.data.maturity_level + ' of 5'"}) }}</template>
+      </div>
+      <dl class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div><dt class="text-sm text-muted-foreground">Out of the box</dt><dd class="text-xl font-semibold tabular-nums" x-text="(($store.matrixModal.data && $store.matrixModal.data.out_of_box_percentage) ?? 0) + '%'"></dd></div>
+        <div><dt class="text-sm text-muted-foreground">With customisation</dt><dd class="text-xl font-semibold tabular-nums" x-text="((($store.matrixModal.data && $store.matrixModal.data.coverage_percentage) ?? 0) - (($store.matrixModal.data && $store.matrixModal.data.out_of_box_percentage) ?? 0)) + '%'"></dd></div>
+        <div><dt class="text-sm text-muted-foreground">Implementation complexity</dt><dd class="text-xl font-semibold tabular-nums" x-text="$store.matrixModal.data && $store.matrixModal.data.implementation_complexity != null ? $store.matrixModal.data.implementation_complexity + ' of 10' : 'Not rated'"></dd></div>
+      </dl>
+      <div x-show="$store.matrixModal.data && $store.matrixModal.data.gaps && $store.matrixModal.data.gaps.length">
+        <h3 class="text-sm font-semibold">Identified gaps</h3>
+        <ul class="mt-2 flex flex-col gap-1.5">
+          <template x-for="gap in (($store.matrixModal.data && $store.matrixModal.data.gaps) || [])" :key="gap.name"><li class="flex items-start gap-2 text-sm">{{ ui.badge(variant='outline', attrs={'x-text': 'gap.severity'}) }}<span x-text="gap.name"></span></li></template>
+        </ul>
+      </div>
+      <div x-show="$store.matrixModal.data && $store.matrixModal.data.strengths && $store.matrixModal.data.strengths.length">
+        <h3 class="text-sm font-semibold">Key strengths</h3>
+        <ul class="mt-2 flex flex-col gap-1.5 text-sm">
+          <template x-for="s in (($store.matrixModal.data && $store.matrixModal.data.strengths) || [])" :key="s"><li x-text="s"></li></template>
+        </ul>
+      </div>
+      <div x-show="$store.matrixModal.data && $store.matrixModal.data.evidence">
+        <h3 class="text-sm font-semibold">Evidence</h3>
+        <p class="mt-2 text-sm text-muted-foreground">Source: <span x-text="($store.matrixModal.data && $store.matrixModal.data.evidence && $store.matrixModal.data.evidence.source) || 'Not recorded'"></span>. Verified: <span x-text="($store.matrixModal.data && $store.matrixModal.data.evidence && $store.matrixModal.data.evidence.verified_at) ? new Date($store.matrixModal.data.evidence.verified_at).toLocaleDateString() : 'not yet'"></span>.</p>
+      </div>
     </div>
-</div>
+    {% call ui.dialog_footer() %}{{ ui.button(text='Close', variant='outline', attrs={'data-fb-close': ''}) }}{% endcall %}
+  {% endcall %}
+{% endcall %}
 {% endblock %}
-
-
