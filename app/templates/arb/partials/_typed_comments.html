@@ -1,3 +1,4 @@
+{% import 'basecoat/index.html' as ui %}
 {#
   Review discussion comments.
 
@@ -11,7 +12,6 @@
 #}
 {% from 'arb/partials/_typed_macros.html' import dash, ts %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% set _comments = review.comments or [] %}
 {% set _rid = (review.identity or {}).get('review_item_id') %}
@@ -42,11 +42,7 @@
     </ol>
     {% else %}
     {# empty-state-ok: derived comment list, filled by the form directly below it #}
-    {{ empty_state(
-        icon='message-square',
-        title='No comments yet.',
-        description='Add a comment below to start the discussion on this review.'
-    ) }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No comments yet.') }}{{ ui.empty_description(text='Add a comment below to start the discussion on this review.') }}{% endcall %}{% endcall %}
     {% endif %}
 
     {% if _rid %}

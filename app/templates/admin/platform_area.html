@@ -1,8 +1,8 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% import 'components/card.html' as card %}
-{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Platform admin{% endblock %}
 
 {% block content %}
@@ -29,6 +29,6 @@
     {% endfor %}
 </div>
 {% else %}
-{{ empty_state(icon='shield', title='No platform tools are available', description='None of the platform administration tools is running on this server. Check the service status page, or ask the person who runs the platform.') }}
+{% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No platform tools are available') }}{{ ui.empty_description(text='None of the platform administration tools is running on this server. Check the service status page, or ask the person who runs the platform.') }}{% endcall %}{% endcall %}
 {% endif %}
 {% endblock %}

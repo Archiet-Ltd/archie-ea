@@ -1,6 +1,7 @@
 {# shadcn-reference: impact_analysis@e55b60b #}
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/badge.html' import badge %}
@@ -8,7 +9,6 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Impact Analysis: {{ element.name }}{% endblock %}
 
@@ -147,11 +147,7 @@
 
         <!-- Empty state -->
         {% if analysis.total_impacted == 0 %}
-        {{ empty_state(
-            icon='zap-off',
-            title='No relationships found',
-            description='This element has no dependencies.'
-        ) }}
+        {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No relationships found') }}{{ ui.empty_description(text='This element has no dependencies.') }}{% endcall %}{% endcall %}
         {% else %}
 
         <!-- Tabs: Direct Impact / All Impact -->

@@ -1,3 +1,4 @@
+{% import 'basecoat/index.html' as ui %}
 {#
   Decision and provenance history (blueprint section 10).
 
@@ -10,7 +11,6 @@
 #}
 {% from 'arb/partials/_typed_macros.html' import dash, ts %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% set _history = review.history or [] %}
 {% set _rid = (review.identity or {}).get('review_item_id') %}
@@ -68,11 +68,7 @@
        submitted, decided and conditioned. Nothing here is created by hand — the
        actions that fill it are the review controls above this panel on the same page.
        empty-state-ok: derived event history, filled by the controls above it #}
-    {{ empty_state(
-        icon='history',
-        title='No recorded events yet.',
-        description='Submission, decision and condition events appear here as they are recorded.'
-    ) }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No recorded events yet.') }}{{ ui.empty_description(text='Submission, decision and condition events appear here as they are recorded.') }}{% endcall %}{% endcall %}
     {% endif %}
     {% endcall %}
 {% endcall %}

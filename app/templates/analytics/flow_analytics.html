@@ -1,8 +1,8 @@
 {# design-block: dashboard #}
 {# shadcn-reference: dashboard-01@e55b60b #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/alert.html' import alert %}
 {% from 'components/button.html' import button %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
@@ -69,11 +69,7 @@
 
     <!-- Empty State -->
     <template x-if="!loading && noData">
-        {{ empty_state(
-            icon='bar-chart-2',
-            title='No flow data yet',
-            description='Move cards through In Progress to Done to start tracking metrics.'
-        ) }}
+        {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No flow data yet') }}{{ ui.empty_description(text='Move cards through In Progress to Done to start tracking metrics.') }}{% endcall %}{% endcall %}
     </template>
 
     <!-- Error State -->

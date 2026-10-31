@@ -1,6 +1,7 @@
 {# design-block: data-table #}
 {# shadcn-reference: example:tasks@e55b60b #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from "components/input.html" import input %}
@@ -49,11 +50,7 @@
 
         <div class="px-4 lg:px-6">
             {% if not query_text and not element_id %}
-            {{ empty_state(
-                icon='search',
-                title='Search for precedent',
-                description='Enter a term to find decisions already made on a similar question.'
-            ) }}
+            {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='Search for precedent') }}{{ ui.empty_description(text='Enter a term to find decisions already made on a similar question.') }}{% endcall %}{% endcall %}
             {% elif results %}
             {% call table() %}
                 {% call table_header() %}
@@ -87,11 +84,7 @@
                 {% endcall %}
             {% endcall %}
             {% else %}
-            {{ empty_state(
-                icon='search-x',
-                title='No precedent found',
-                description='No existing decision matches "' ~ (query_text or '') ~ '".'
-            ) }}
+            {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No precedent found') }}{{ ui.empty_description(text='No existing decision matches "' ~ (query_text or '') ~ '".') }}{% endcall %}{% endcall %}
             {% endif %}
         </div>
     </div>

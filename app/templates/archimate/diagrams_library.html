@@ -1,7 +1,7 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
 {% from 'components/select.html' import native_select %}
@@ -69,11 +69,7 @@
         {% endcall %}
     </div>
     {% else %}
-    {{ empty_state(
-        title='No diagrams found',
-        description='Save a diagram from the Composer, or try a different search.',
-        icon='layout-panel-top'
-    ) }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No diagrams found') }}{{ ui.empty_description(text='Save a diagram from the Composer, or try a different search.') }}{% endcall %}{% endcall %}
     {% endif %}
 </div>
 {% endblock %}

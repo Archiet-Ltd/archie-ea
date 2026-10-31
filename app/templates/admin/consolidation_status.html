@@ -1,8 +1,8 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Blueprint Consolidation Status{% endblock %}
 
@@ -108,7 +108,7 @@
                         {% else %}
                         <tr>
                             <td colspan="7">
-                                {{ empty_state(icon='shield-check', title='No consolidation targets', description='No blueprint-consolidation targets are recorded.') }}
+                                {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No consolidation targets') }}{{ ui.empty_description(text='No blueprint-consolidation targets are recorded.') }}{% endcall %}{% endcall %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -166,7 +166,7 @@
                         {% else %}
                         <tr>
                             <td colspan="6">
-                                {{ empty_state(icon='layout-list', title='No blueprints found', description='No registered Flask blueprints were found in this process.') }}
+                                {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No blueprints found') }}{{ ui.empty_description(text='No registered Flask blueprints were found in this process.') }}{% endcall %}{% endcall %}
                             </td>
                         </tr>
                         {% endfor %}

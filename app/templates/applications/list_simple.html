@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/dense_table.html' import dense_table %}
@@ -365,8 +366,7 @@
     {# Populating the portfolio is a platform-admin action; the way forward for everyone
        else is to ask their admin, which the copy says.
        empty-state-ok: role-scoped, non-admins cannot add applications #}
-    {{ empty_state(icon='layout-grid', title='No applications yet.',
-                   description='The portfolio has not been populated. Ask your platform admin to import or add applications.') }}
+    {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No applications yet.') }}{{ ui.empty_description(text='The portfolio has not been populated. Ask your platform admin to import or add applications.') }}{% endcall %}{% endcall %}
     {% endif %}
     {% else %}
 
