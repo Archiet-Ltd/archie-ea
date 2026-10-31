@@ -284,7 +284,10 @@ def test_an_organisation_with_a_cut_off_read_is_not_left_reading_for_ever(app, d
     db_session.expire_all()
     with app.test_request_context("/"):
         state = onboarding_service.website_state(db_session.get(Organization, org.id))
-    assert state["state"] == "waiting" and "starts in a moment" in state["text"], state  # the read was queued again
+    # Sharpened (jobsweep01): the read queued again says why it is waiting, with the sentence about the restart,
+    # instead of the generic "starts in a moment".
+    assert state["state"] == "waiting", state
+    assert "cut off by a restart" in state["text"] and "queued to run again" in state["text"], state
     assert db_session.get(Job, stale.id).status == "failed"
 
 
