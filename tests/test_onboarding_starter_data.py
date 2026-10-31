@@ -444,3 +444,37 @@ def test_the_frameworks_gallery_reads_the_adoptions_once(client, login_as, two):
     finally:
         event.remove(db.engine, "before_cursor_execute", count)
     assert len(statements) == 1
+
+
+def test_a_starter_capability_an_application_is_mapped_to_is_never_offered_for_removal(client, login_as, two):
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.unified_capability import UnifiedCapability
+
+    for key in ("one", "two"):
+        _choose(client, login_as, two["%s_owner" % key], "banking", [])
+    login_as(client, two["one_owner"])
+    application = ApplicationComponent(name="Core ledger", organization_id=two["one"].id)
+    db.session.add(application)
+    db.session.flush()
+    mapped = BusinessCapability.query.filter_by(organization_id=two["one"].id, name="Current Account").one()
+    unified = UnifiedCapability.query.filter_by(
+        organization_id=two["one"].id, source_table="business_capability", source_id=str(mapped.id)
+    ).one()
+    db.session.add(UnifiedApplicationCapabilityMapping(
+        unified_capability_id=unified.id, application_component_id=application.id
+    ))
+    db.session.commit()
+    _choose(client, login_as, two["one_owner"], "software", [])
+
+    login_as(client, two["one_owner"])
+    reply = client.post("/account/welcome/starter/remove", json={"model": "BIAN"})
+    assert reply.status_code == 200, reply.get_data(as_text=True)
+    names = {r.name for r in _capabilities(two["one"]) if r.discovery_source == "starter:BIAN"}
+    assert "Current Account" in names, "a capability an application is mapped to stays"
+    assert db.session.get(UnifiedCapability, unified.id) is not None
+    assert UnifiedApplicationCapabilityMapping.query.filter_by(unified_capability_id=unified.id).count() == 1
+    assert "Payment Execution" not in names, "the unmapped rows are still removed"
+    other = {r.name for r in _capabilities(two["two"]) if r.discovery_source == "starter:BIAN"}
+    assert "Current Account" in other, "the other organisation's rows are untouched"

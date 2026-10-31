@@ -743,14 +743,30 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
 
 
 def _unedited(row, entry: Dict[str, Any]) -> bool:
-    """A starter row nobody has changed: still the catalogue's name, text and level, with nothing recorded on it."""
+    """A starter row nobody has changed: still the catalogue's name, text and level, with nothing recorded on it
+    and no application mapped to it in either mapping store (the capability map reads the unified one)."""
     from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.unified_capability import UnifiedCapability
 
     if (row.description or None) != entry["description"] or row.business_domain != entry["domain"]:
         return False
     if any(getattr(row, field) is not None for field in ("business_owner", "it_owner", "current_maturity_level", "target_maturity_level", "strategic_importance")):
         return False
-    return ApplicationCapabilityMapping.query.filter_by(business_capability_id=row.id).first() is None
+    if ApplicationCapabilityMapping.query.filter_by(business_capability_id=row.id).first() is not None:
+        return False
+    return (
+        UnifiedApplicationCapabilityMapping.query.join(
+            UnifiedCapability, UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id
+        )
+        .filter(
+            UnifiedCapability.organization_id == row.organization_id,
+            UnifiedCapability.source_table == "business_capability",
+            UnifiedCapability.source_id == str(row.id),
+        )
+        .first()
+        is None
+    )
 
 
 def _removable_rows(org_id: int, model: str):

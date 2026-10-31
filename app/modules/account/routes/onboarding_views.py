@@ -12,6 +12,7 @@ import logging
 
 from flask import g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models.organization import Organization
@@ -140,6 +141,9 @@ def add_routes(bp, access) -> None:
             removed = onboarding.remove_unedited_starter_rows(_org(), data.get("model"))
         except ValueError as exc:
             return _problem(str(exc))
+        except IntegrityError:
+            db.session.rollback()
+            return _problem("Some of these capabilities are still used elsewhere, so none were removed.")
         return jsonify({"ok": True, "removed": removed})
 
     @bp.route("/welcome/profile", methods=["POST"])
