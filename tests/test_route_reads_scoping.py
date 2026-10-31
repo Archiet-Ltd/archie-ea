@@ -59,7 +59,7 @@ def _record_decision_log(monkeypatch):
     return seen
 
 
-def test_the_decision_log_is_limited_to_the_callers_own_decisions(app, db_session, login_as, client, monkeypatch):
+def test_an_ordinary_user_cannot_reach_the_decision_log(app, db_session, login_as, client, monkeypatch):
     org = _org(db_session, "log")
     user = _user(db_session, org)
     db_session.commit()
@@ -68,8 +68,8 @@ def test_the_decision_log_is_limited_to_the_callers_own_decisions(app, db_sessio
     login_as(client, user)
     resp = client.get("/api/agentic-gaps/decision-logs")
 
-    assert resp.status_code == 200
-    assert seen == [user.id]
+    assert resp.status_code == 404
+    assert seen == []
 
 
 def test_a_platform_admin_still_sees_every_users_decisions(app, db_session, login_as, client, monkeypatch):
@@ -221,10 +221,10 @@ def test_an_ordinary_user_cannot_rewrite_the_platform_agent_configuration(app, d
 
     login_as(client, user)
     denied = client.post(f"/api/agentic-gaps/config/{name}", json={"require_review": False})
-    readable = client.get(f"/api/agentic-gaps/config/{name}")
+    unreadable = client.get(f"/api/agentic-gaps/config/{name}")
 
-    assert denied.status_code == 403
-    assert readable.status_code == 200
+    assert denied.status_code == 404
+    assert unreadable.status_code == 404
 
 
 def test_a_platform_admin_can_rewrite_the_agent_configuration(app, db_session, login_as, client):

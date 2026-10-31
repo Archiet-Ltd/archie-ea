@@ -9,11 +9,14 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import jsonify, render_template, request
+from functools import wraps
+
+from flask import abort, jsonify, redirect, request, url_for
 from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
 from app import db
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.agentic_gaps import AgentConfiguration, AgentSchedule
 from app.services.archimate.agentic_gap_implementation_service import (
     AgenticGapImplementationService,
@@ -27,14 +30,28 @@ logger = logging.getLogger(__name__)
 
 
 @main.route("/agentic-gaps")
-@login_required
-def agentic_gaps_ui():
-    """UI for Agentic Gap Implementation."""
-    return render_template("main/agentic_gaps.html")
+def agentic_gaps_retired():
+    """The page is retired; an old address lands on the dashboard."""
+    return redirect(url_for("dashboard.overview"))
+
+
+def _platform_admin_only(view):
+    """The agentic-gaps service is platform-wide and frozen: its schedules, configuration and
+    history are not owned by any organisation, so only a platform administrator may reach them.
+    Anyone else gets a 404 so the surface is not advertised."""
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not is_platform_admin(current_user):
+            abort(404)
+        return view(*args, **kwargs)
+
+    return wrapper
 
 
 @main.route("/api/agentic-gaps/implement-all", methods=["POST"])
 @login_required
+@_platform_admin_only
 def implement_all_gaps():
     """API endpoint to implement all gaps using all agents."""
     try:
@@ -59,6 +76,7 @@ def implement_all_gaps():
 
 @main.route("/api/agentic-gaps/implement/<agent_name>", methods=["POST"])
 @login_required
+@_platform_admin_only
 def implement_single_agent(agent_name):
     """API endpoint to implement gaps using a single agent."""
     try:
@@ -103,6 +121,7 @@ def implement_single_agent(agent_name):
 
 @main.route("/api/agentic-gaps/status", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_implementation_status():
     """Get status of implemented models and services."""
     try:
@@ -206,6 +225,7 @@ def get_implementation_status():
 
 @main.route("/api/agentic-gaps/auto-implement", methods=["POST"])
 @login_required
+@_platform_admin_only
 def auto_implement_from_gaps():
     """Automatically implement gaps based on gap discovery."""
     try:
@@ -225,6 +245,7 @@ def auto_implement_from_gaps():
 
 @main.route("/api/agentic-gaps/metrics", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_agent_metrics():
     """Get analytics and metrics on agent executions."""
     try:
@@ -244,6 +265,7 @@ def get_agent_metrics():
 
 @main.route("/api/agentic-gaps/history", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_execution_history():
     """Get execution history with filtering."""
     try:
@@ -264,6 +286,7 @@ def get_execution_history():
 
 @main.route("/api/agentic-gaps/review/<int:execution_id>", methods=["POST"])
 @login_required
+@_platform_admin_only
 def review_generated_code(execution_id):
     """Review and approve/reject generated code."""
     try:
@@ -284,6 +307,7 @@ def review_generated_code(execution_id):
 
 @main.route("/api/agentic-gaps/rollback/<int:execution_id>", methods=["POST"])
 @login_required
+@_platform_admin_only
 def rollback_execution(execution_id):
     """Rollback changes made by an agent execution."""
     try:
@@ -300,6 +324,7 @@ def rollback_execution(execution_id):
 
 @main.route("/api/agentic-gaps/config/<agent_name>", methods=["GET", "POST"])
 @login_required
+@_platform_admin_only
 def agent_configuration(agent_name):
     """Get or update agent configuration."""
     try:
@@ -324,11 +349,6 @@ def agent_configuration(agent_name):
         else:
             # POST - update configuration. One row per agent name serves every organisation, so
             # changing it is a platform-admin action.
-            from app.middleware.tenant_decorators import is_platform_admin
-
-            if not is_platform_admin(current_user):
-                return jsonify({"success": False, "error": "Platform admin access required"}), 403
-
             data = request.get_json() or {}
 
             config = AgentConfiguration.query.filter_by(agent_name=agent_name).first()
@@ -385,6 +405,7 @@ def agent_configuration(agent_name):
 
 @main.route("/api/agentic-gaps/schedule", methods=["GET", "POST"])
 @login_required
+@_platform_admin_only
 def manage_schedules():
     """Get or create agent schedules."""
     try:
@@ -474,6 +495,7 @@ def _calculate_next_run(schedule_type: str, schedule_config: dict):
 
 @main.route("/api/agentic-gaps/schedule/<int:schedule_id>", methods=["DELETE", "PUT"])
 @login_required
+@_platform_admin_only
 def manage_single_schedule(schedule_id):
     """Delete or update a specific schedule."""
     try:
@@ -521,6 +543,7 @@ def manage_single_schedule(schedule_id):
 
 @main.route("/api/agentic-gaps/recommendations", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_agent_recommendations():
     """Get recommendations on which agents to run based on architecture state."""
     try:
@@ -602,6 +625,7 @@ def get_agent_recommendations():
 
 @main.route("/api/agentic-gaps/execute-full-workflow", methods=["POST"])
 @login_required
+@_platform_admin_only
 def execute_full_workflow():
     """
     Execute the complete LLM-driven gap resolution workflow.
@@ -660,6 +684,7 @@ def execute_full_workflow():
 
 @main.route("/api/agentic-gaps/reuse-candidates/<int:gap_id>", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_reuse_candidates(gap_id):
     """
     Get reuse candidates for a specific gap.
@@ -744,6 +769,7 @@ def get_reuse_candidates(gap_id):
 
 @main.route("/api/agentic-gaps/reuse-recommendation", methods=["POST"])
 @login_required
+@_platform_admin_only
 def get_reuse_recommendation():
     """
     Generate a reuse vs build recommendation for a gap.
@@ -834,6 +860,7 @@ def get_reuse_recommendation():
 
 @main.route("/api/agentic-gaps/validate-roadmap", methods=["POST"])
 @login_required
+@_platform_admin_only
 def validate_roadmap():
     """
     Create validation request for stakeholder review.
@@ -873,6 +900,7 @@ def validate_roadmap():
 
 @main.route("/api/agentic-gaps/stakeholder-feedback", methods=["POST"])
 @login_required
+@_platform_admin_only
 def process_feedback():
     """
     Process stakeholder feedback on a validation request.
@@ -928,6 +956,7 @@ def process_feedback():
 
 @main.route("/api/agentic-gaps/trigger-tests/<int:work_package_id>", methods=["POST"])
 @login_required
+@_platform_admin_only
 def trigger_tests(work_package_id):
     """
     Trigger MCP test pipeline for a completed work package.
@@ -957,6 +986,7 @@ def trigger_tests(work_package_id):
 
 @main.route("/api/agentic-gaps/audit-trail/<int:execution_id>", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_audit_trail(execution_id):
     """
     Get complete audit trail for a workflow execution.
@@ -1002,6 +1032,7 @@ def get_audit_trail(execution_id):
 
 @main.route("/api/agentic-gaps/decision-logs", methods=["GET"])
 @login_required
+@_platform_admin_only
 def get_decision_logs():
     """
     Get LLM decision logs for audit purposes.
@@ -1028,13 +1059,10 @@ def get_decision_logs():
         if days:
             since = datetime.utcnow() - timedelta(days=days)
 
-        # Prompts and decisions are personal to the user who triggered them: everyone sees their
-        # own, and only a platform admin sees every user's.
-        from app.middleware.tenant_decorators import is_platform_admin
-
+        # Only a platform administrator reaches this route, and sees every user's decisions.
         logs = LLMService.get_decision_log(
             decision_type=decision_type,
-            user_id=None if is_platform_admin(current_user) else current_user.id,
+            user_id=None,
             limit=limit,
             since=since,
         )
