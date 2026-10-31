@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: BOC Group ADOIT
 url_slug: archiet.ai/vs/boc-adoit

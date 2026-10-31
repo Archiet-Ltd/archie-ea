@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: module
 module_label: "Diagrams & Composer"
 endpoint: archimate.diagrams_library

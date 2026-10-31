@@ -192,6 +192,17 @@ def _mcp_tools_list(client, token: str) -> list:
     return resp.get_json()["result"]["tools"]
 
 
+def _held_back_at_wave(client, token, tool_name, arguments) -> bool:
+    """True when the wave map holds the tool back: it answers a plain 'not available yet' and the test has nothing else to check."""
+    from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+    if tool_released(tool_name):
+        return False
+    reply = _mcp_call(client, token, tool_name, arguments)
+    assert "not available yet" in reply["error"]["message"], reply
+    return True
+
+
 class TestMCPInitialize:
     """MCP lifecycle: initialize and tools/list."""
 
@@ -246,7 +257,10 @@ class TestMCPInitialize:
             "list_canvases", "get_canvas", "answer", "get_genome_slice",
             "ask_data_flow",
         }
-        assert tool_names == expected
+        from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+        # the wave map decides which of the tools can answer at the released wave
+        assert tool_names == {n for n in expected if tool_released(n)}
 
     def test_every_tool_has_title_and_read_only_hint(self, client, db_session, make_org, login_as):
         """Every tool carries a human-readable title and readOnlyHint: true."""
@@ -309,7 +323,10 @@ class TestBearerOnlySessionLess:
         )
         assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
-        assert len(data["result"]["tools"]) == 13  # the eleven, get_genome_slice and ask_data_flow
+        from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+        # the eleven, get_genome_slice and ask_data_flow, less any the wave map holds back
+        assert len(data["result"]["tools"]) == 13 - sum(not tool_released(n) for n in ("list_canvases", "get_canvas"))
 
     def test_tools_call_with_no_session_cookie_succeeds(self, client, db_session, make_org, login_as):
         """A real tools/call (ask_impact) over a bearer token, on a client
@@ -551,6 +568,8 @@ class TestCanvasTools:
         user = _make_user(db_session, org, "mcp-canvas@example.com")
 
         token = _mint_oauth_token(client, db_session, org, user, login_as)
+        if _held_back_at_wave(client, token, "list_canvases", {}):
+            return
         mcp_resp = _mcp_call(client, token, "list_canvases", {})
         mcp_result = json.loads(mcp_resp["result"]["content"][0]["text"])
 
@@ -565,6 +584,8 @@ class TestCanvasTools:
         user = _make_user(db_session, org, "mcp-bmc@example.com")
 
         token = _mint_oauth_token(client, db_session, org, user, login_as)
+        if _held_back_at_wave(client, token, "get_canvas", {"canvas_type": "business_model", "canvas_id": 999999}):
+            return
         mcp_resp = _mcp_call(client, token, "get_canvas",
                              {"canvas_type": "business_model", "canvas_id": 999999})
         mcp_result = json.loads(mcp_resp["result"]["content"][0]["text"])
@@ -578,6 +599,8 @@ class TestCanvasTools:
         user = _make_user(db_session, org, "mcp-bc@example.com")
 
         token = _mint_oauth_token(client, db_session, org, user, login_as)
+        if _held_back_at_wave(client, token, "get_canvas", {"canvas_type": "business_case", "canvas_id": 999999}):
+            return
         mcp_resp = _mcp_call(client, token, "get_canvas",
                              {"canvas_type": "business_case", "canvas_id": 999999})
         mcp_result = json.loads(mcp_resp["result"]["content"][0]["text"])

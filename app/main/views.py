@@ -697,6 +697,22 @@ def public_vision():
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+def _wave_closed_response(page):
+    """While RELEASE_WAVE is set, a content page of a later wave answers its early-access page, not its body.
+
+    A page that is already a waiting-list page (``cta: waiting_list``) keeps its own page."""
+    if not page.wave_closed or page.cta == "waiting_list":
+        return None
+    from app.release_waves import code_slug, entry_for
+    from app.release_waves.routes import early_access_page
+
+    endpoint = page.front_matter.get("endpoint")
+    rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
+    entry = entry_for(rule.rule, rule.endpoint) if rule is not None else None
+    title = page.front_matter.get("module_label") or page.title
+    return early_access_page(code_slug(entry[1]) if entry else "pg-ea", title=title)
+
+
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page.
@@ -727,6 +743,9 @@ def public_module(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -852,6 +871,9 @@ def public_role(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
@@ -888,6 +910,9 @@ def public_connector(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -925,6 +950,9 @@ def public_use_case(slug):
             return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -977,6 +1005,12 @@ def public_comparison(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         landing=build_landing(page),
@@ -1008,6 +1042,9 @@ def public_dogfood():
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 

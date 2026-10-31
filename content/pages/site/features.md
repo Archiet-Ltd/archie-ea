@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Features"
 page_role: "The seventeen capabilities of Enterprise Intelligence Management, grouped by the question each one answers, each linked to the module pages and use cases that deliver it today."

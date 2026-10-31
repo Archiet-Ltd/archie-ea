@@ -1,4 +1,5 @@
 ---
+wave: EA
 page_family: module
 module_label: "Scenarios"
 state: briefed

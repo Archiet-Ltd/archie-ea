@@ -351,6 +351,53 @@ def _is_connector_tool(schema: dict) -> bool:
     )
 
 
+# The route-rule pattern(s) (the wave map's own key format -- a `<name>`
+# placeholder collapses to a bare "<x>" inside entry_for, so the exact
+# parameter name here does not matter) that the wave map gates each tool
+# through. A tool is released only when every one of its rules is OPEN.
+#
+# Most tools call their rule directly (see ROUTE_READ_HANDLERS). ask_impact is
+# the one exception: _impact_answer stores its result at the canonical answer
+# service's own permanent address rather than calling a route of its own, so
+# that address -- not a route ask_impact never calls -- is what the wave map
+# actually gates for it.
+TOOL_ROUTE_PATHS: dict[str, tuple[str, ...]] = {
+    "list_canvases": ("/business-model/api/list", "/business-case/api/list"),
+    "get_canvas": ("/business-model/api/<x>", "/business-case/api/<x>"),
+    "get_element": ("/archimate/api/elements/<x>/detail",),
+    "search_elements": ("/archimate/api/elements/search",),
+    "ask_strategy": ("/api/v1/intelligence/strategy/<x>",),
+    "ask_portfolio": ("/api/v1/intelligence/portfolio/<x>",),
+    "ask_programme": ("/api/v1/intelligence/programme/<x>",),
+    "ask_risk": ("/api/v1/intelligence/risk/<x>",),
+    "ask_accountability": ("/api/v1/intelligence/accountability/<x>",),
+    "ask_impact": ("/intelligence/answers/<x>",),
+}
+
+
+def tool_released(tool_name: str) -> bool:
+    """True when every route the tool reads is open in the released waves (always true with the switch off).
+
+    Reads the wave map directly (``entry_for``/``state_for``), not
+    ``is_released_path``: that needs a live app's ``url_map`` to resolve a
+    concrete URL to a rule, which is more than this needs when the rule
+    pattern is already known, and it requires a request-bound app context
+    this function's callers (including plain unit tests) do not always have.
+    """
+    from app.release_waves import OPEN, configured_wave, entry_for, state_for
+
+    wave = configured_wave()
+    if wave is None:
+        return True
+    rules = TOOL_ROUTE_PATHS.get(CONNECTOR_ALIASES.get(tool_name, tool_name))
+    if not rules:
+        # No rule is recorded for this tool (a generic primitive like `answer`,
+        # or one with no page/API equivalent of its own): nothing in the wave
+        # map holds it back.
+        return True
+    return all(state_for(entry_for(rule), wave) == OPEN for rule in rules)
+
+
 def connector_tools() -> list[dict]:
     """The tools the connector publishes, in its wire format, sorted by name.
 
@@ -360,7 +407,7 @@ def connector_tools() -> list[dict]:
     """
     tools = []
     for schema in TOOL_SCHEMAS:
-        if _is_connector_tool(schema):
+        if _is_connector_tool(schema) and tool_released(schema["name"]):
             tools.append({
                 "name": schema["name"],
                 "description": schema["description"],

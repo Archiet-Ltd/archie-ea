@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Solutions"
 endpoint: solution_design.list_solutions

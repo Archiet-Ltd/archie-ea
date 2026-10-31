@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: Avolution ABACUS
 url_slug: archiet.ai/vs/avolution-abacus

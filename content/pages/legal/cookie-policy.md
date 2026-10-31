@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: legal
 title: "Cookie policy"
 page_role: "Every cookie and browser storage item the service sets, under PECR."

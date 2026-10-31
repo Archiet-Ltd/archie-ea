@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Compliance Frameworks"
 endpoint: application_mgmt.compliance_frameworks_dashboard

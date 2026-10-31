@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Investment Analysis"
 endpoint: architecture.investment_priorities

@@ -63,6 +63,11 @@ def create_app(config=None):
 
     Config[config_name].init_app(app)
 
+    # 0. The wave switch (RELEASE_WAVE): installed first so a page of a later release answers its
+    # early-access page before the CSRF check or any sign-in redirect.
+    from app.release_waves import install_hook
+    install_hook(app)
+
     # 1. Extensions (db, csrf, mail, login_manager, compress, migrate, rq, cache)
     init_extensions(app)
 
@@ -146,6 +151,10 @@ def create_app(config=None):
 
     # 7. All blueprints and feature-flagged modules
     init_blueprints(app)
+
+    # 7-0. The early-access pages a closed address answers (wave switch).
+    from app.release_waves import register_routes as register_early_access_routes
+    register_early_access_routes(app)
 
     # 7a. Solution AI Prompt admin (separate from admin_routes.py to survive deploys)
     try:

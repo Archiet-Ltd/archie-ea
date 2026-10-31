@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: legal
 title: "Commercial licence"
 page_role: "Plain terms for the commercial licence that sits beside the AGPL-3.0."
