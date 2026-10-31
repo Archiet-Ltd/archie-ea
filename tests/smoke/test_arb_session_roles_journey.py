@@ -53,6 +53,44 @@ def quorum_session(seeded):
 
 
 @pytest.fixture
+def short_session(seeded):
+    """A scheduled session with three seats of which only two vote."""
+    from app import create_app, db
+    from app.models.architecture_review_board import (
+        ARBBoardMember,
+        ArchitectureReviewBoard,
+    )
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        owner = User.query.filter_by(email=seeded["emails"]["enterprise_architect"]).one()
+        board = ArchitectureReviewBoard(
+            organization_id=owner.organization_id,
+            board_number="SHT-%s" % uuid.uuid4().hex[:8],
+            name="Short journey board",
+            scheduled_date=datetime(2030, 1, 1),
+            status="scheduled",
+        )
+        db.session.add(board)
+        db.session.flush()
+        members = User.query.filter_by(organization_id=owner.organization_id).limit(3).all()
+        assert len(members) == 3
+        for index, user in enumerate(members):
+            db.session.add(
+                ARBBoardMember(
+                    organization_id=owner.organization_id,
+                    arb_session_id=board.id,
+                    user_id=user.id,
+                    role="enterprise_architect",
+                    voting_member=index < 2,
+                )
+            )
+        db.session.commit()
+        return board.id, board.board_number
+
+
+@pytest.fixture
 def own_session(seeded):
     from app import create_app, db
     from app.models.architecture_review_board import ArchitectureReviewBoard
@@ -176,3 +214,46 @@ def test_session_list_complete_is_reachable_at_phone_width(
     page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert number in page.inner_text("main")
     assert "Completed" in page.inner_text("main")
+
+
+def test_completing_a_full_board_says_so_on_the_list(
+    browser, live_server, seeded, quorum_session
+):
+    session_id, number = quorum_session
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    page.goto("%s/arb/sessions" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row = page.locator("main div").filter(has_text=number).filter(
+        has=page.get_by_role("button", name="Complete")
+    ).last
+    row.get_by_role("button", name="Complete").click()
+    page.wait_for_url("%s/arb/sessions" % live_server, timeout=PAGE_TIMEOUT)
+    page.wait_for_selector("text=completed successfully", timeout=PAGE_TIMEOUT)
+    assert number in page.inner_text("body")
+    _shot(page, "complete-success-1440")
+    page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "Completed" in page.inner_text("main")
+
+
+def test_completing_a_short_board_gives_the_reason_and_changes_nothing(
+    browser, live_server, seeded, short_session
+):
+    session_id, number = short_session
+    for width in (1440, 390):
+        page = browser.new_page(viewport={"width": width, "height": 900})
+        _login(page, live_server, seeded["emails"]["enterprise_architect"])
+        page.goto("%s/arb/sessions" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.locator("main div").filter(has_text=number).filter(
+            has=page.get_by_role("button", name="Complete")
+        ).last
+        row.get_by_role("button", name="Complete").click()
+        page.wait_for_selector("text=This board has 2 of the 3 voting members it needs", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1500)
+        box = page.get_by_text("This board has 2 of the 3 voting members it needs").first.bounding_box()
+        assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+        text = page.inner_text("body")
+        assert "add" in text.lower() and "member" in text.lower()
+        _shot(page, "complete-refused-%d" % width)
+        page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "Scheduled" in page.inner_text("main")
+        assert "Completed" not in page.inner_text("main")

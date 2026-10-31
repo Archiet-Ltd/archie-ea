@@ -1194,30 +1194,36 @@ def session_detail(id):
 def complete_session(id):
     """Complete an ARB session."""
     arb_session = _own_session_or_404(id)
+    back = (
+        url_for("arb.sessions")
+        if request.form.get("return_to") == "sessions"
+        else url_for("arb.session_detail", id=id)
+    )
     try:
-        # AUDIT-ARB-002: Quorum validation - require at least 3 board members
-        member_count = (
-            len(arb_session.board_members) if arb_session.board_members else 0
+        # AUDIT-ARB-002: quorum -- only seats that vote count toward it.
+        voting_count = sum(
+            1 for m in (arb_session.board_members or []) if m.voting_member is not False
         )
         minimum_quorum = 3
 
-        if member_count < minimum_quorum:
+        if voting_count < minimum_quorum:
             flash(
-                f"Cannot complete session: quorum not met. "
-                f"At least {minimum_quorum} board members are required, "
-                f"but only {member_count} member(s) are assigned.",
+                f"This board has {voting_count} of the {minimum_quorum} voting "
+                f"members it needs. Add voting members on the session page, "
+                f"then complete it.",
                 "error",
             )
-            return redirect(url_for("arb.session_detail", id=id))
+            return redirect(back)
 
         minutes = request.form.get("minutes")
         session = arb_service.complete_session(id, minutes)
         flash(f"ARB session {session.board_number} completed successfully", "success")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error completing ARB session: {e}")
         flash("Error completing session. Please try again.", "error")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
 
 
 @arb_bp.route("/sessions/<int:id>/cancel", methods=["POST"])

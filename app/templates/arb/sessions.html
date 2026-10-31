@@ -111,7 +111,11 @@
                     <div class="flex flex-wrap gap-2 sm:pl-4" x-data>
                         <a href="{{ url_for('arb.review_detail', id=session.id) if is_reviews_view else url_for('arb.session_detail', id=session.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"><i data-lucide="eye" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>View</a>
                         {% if may_run_board and not is_reviews_view and session.status == 'scheduled' %}
-                        {{ button(text='Complete', type='button', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'@click': "Platform.fetch.post('/arb/sessions/" ~ session.id ~ "/complete', {}, {silent: true}).then(function(){location.reload()})", 'aria_label': 'Complete Session'}) }}
+                        <form method="POST" action="{{ url_for('arb.complete_session', id=session.id) }}" class="inline"
+                              x-data x-init="$el.appendChild(function(){var i=document.createElement('input');i.type='hidden';i.name='csrf_token';i.value=document.querySelector('meta[name=csrf-token]').content;return i;}())">
+                            <input type="hidden" name="return_to" value="sessions">
+                            {{ button(text='Complete', type='submit', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'aria_label': 'Complete Session'}) }}
+                        </form>
                         {% endif %}
                     </div>
                 </div>
