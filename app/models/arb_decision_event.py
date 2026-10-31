@@ -308,7 +308,7 @@ SET legacy_lifecycle_provenance = jsonb_build_object(
       'classification','pre_c3_waiver')
 WHERE status='waived' AND legacy_lifecycle_provenance IS NULL
   AND waiver_prior_status IS NULL AND waiver_scope_json IS NULL;
-SET CONSTRAINTS ALL IMMEDIATE;
+SET CONSTRAINTS {schema}.trg_arb_condition_membership IMMEDIATE;
 ALTER TABLE {schema}.arb_canonical_conditions ALTER COLUMN revision SET DEFAULT 1;
 ALTER TABLE {schema}.arb_canonical_conditions ALTER COLUMN revision SET NOT NULL;
 ALTER TABLE {schema}.arb_canonical_conditions DROP CONSTRAINT IF EXISTS ck_arb_condition_status;
@@ -342,8 +342,18 @@ def ensure_arb_decision_guards(connection):
         "SELECT to_regclass(current_schema() || '.arb_condition_evidence_records')"
     ).scalar() is not None:
         connection.exec_driver_sql(_condition_reconcile_sql(q))
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
+
+    connection.exec_driver_sql(
+        _render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, q)
+    )
     connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_guard_arb_decision_immutable() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN
- IF TG_OP='DELETE' THEN RAISE EXCEPTION 'ARB decision history is append-only' USING ERRCODE='55000'; END IF;
+ IF TG_OP='DELETE' THEN
+   IF {q}.archie_org_deletion_admits((to_jsonb(OLD) ->> 'organization_id')::integer) THEN RETURN OLD; END IF;
+   RAISE EXCEPTION 'ARB decision history is append-only' USING ERRCODE='55000'; END IF;
  IF TG_TABLE_NAME='arb_decision_events' THEN RAISE EXCEPTION 'ARB decision events are append-only' USING ERRCODE='55000'; END IF;
  IF ROW(OLD.organization_id,OLD.decision_event_id,OLD.review_cycle_id,OLD.review_item_id,OLD.condition_number,OLD.description,OLD.category,OLD.due_date,OLD.blocks_execution,OLD.created_at) IS DISTINCT FROM ROW(NEW.organization_id,NEW.decision_event_id,NEW.review_cycle_id,NEW.review_item_id,NEW.condition_number,NEW.description,NEW.category,NEW.due_date,NEW.blocks_execution,NEW.created_at) THEN RAISE EXCEPTION 'ARB condition identity and terms are immutable' USING ERRCODE='55000'; END IF;
  IF OLD.legacy_lifecycle_provenance::jsonb IS DISTINCT FROM NEW.legacy_lifecycle_provenance::jsonb

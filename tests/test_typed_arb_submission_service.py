@@ -9,7 +9,6 @@ import uuid
 
 import pytest
 import psycopg2
-from psycopg2 import sql
 from sqlalchemy.orm import configure_mappers
 
 from tests._raw_psycopg2 import raw_psycopg2_connection
@@ -1483,40 +1482,54 @@ def test_successor_rejects_predecessor_without_complete_terminal_projection(app,
         raw.close()
 
 
-def _purge_concurrency_test_organizations(connection, organization_ids):
+def _purge_concurrency_test_organizations(connection, organization_ids, app):
     """Remove only committed fixtures created for a multi-transaction race."""
     connection.rollback()
-    cursor = connection.cursor()
-    try:
-        cursor.execute("SET session_replication_role = replica")
-        cursor.execute(
-            """
-            SELECT column_row.table_name
-            FROM information_schema.columns column_row
-            JOIN information_schema.tables table_row
-              ON table_row.table_schema = column_row.table_schema
-             AND table_row.table_name = column_row.table_name
-            WHERE column_row.table_schema = current_schema()
-              AND column_row.column_name = 'organization_id'
-              AND table_row.table_type = 'BASE TABLE'
-            """
-        )
-        for (table_name,) in cursor.fetchall():
-            cursor.execute(
-                sql.SQL("DELETE FROM {} WHERE organization_id = ANY(%s)").format(
-                    sql.Identifier(table_name)
-                ),
-                (list(organization_ids),),
-            )
-        cursor.execute(
-            "DELETE FROM organizations WHERE id = ANY(%s)",
-            (list(organization_ids),),
-        )
-        cursor.execute("SET session_replication_role = origin")
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
+    organization_ids = list(organization_ids)
+    from app.models.organization import Organization
+    from app.services.org_deletion_service import OrganizationDeletionService
+
+    with app.app_context():
+        from app import db
+
+        # The race this test deliberately provokes can leave a decision brief
+        # retenanted to one organisation while its own version/citation rows
+        # keep the organisation_id they were written under — a parent/child
+        # mismatch the deletion service's per-table organisation_id scoping
+        # cannot see (it looks for each table's OWN rows naming the
+        # organisation, not rows whose parent now belongs to it). Clear the
+        # versions by their real parent — the brief, whichever organisation
+        # either row claims — before the generic per-organisation delete.
+        raw = db.engine.raw_connection()
+        try:
+            with raw.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id FROM decision_briefs WHERE organization_id = ANY(%s)",
+                    (organization_ids,),
+                )
+                brief_ids = [row[0] for row in cursor.fetchall()]
+                if brief_ids:
+                    for org_id in organization_ids:
+                        cursor.execute(
+                            "SELECT set_config('archie.deleting_organisation', %s, true)",
+                            (str(org_id),),
+                        )
+                        cursor.execute(
+                            "DELETE FROM decision_brief_versions "
+                            "WHERE brief_id = ANY(%s) AND organization_id = %s",
+                            (brief_ids, org_id),
+                        )
+                    cursor.execute(
+                        "DELETE FROM decision_briefs WHERE id = ANY(%s)",
+                        (brief_ids,),
+                    )
+                raw.commit()
+        finally:
+            raw.close()
+        for org_id in organization_ids:
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
+        db.session.remove()
 
 
 @pytest.mark.parametrize("subject_type", sorted(SUBJECT_TYPES))
@@ -1605,7 +1618,7 @@ def test_parent_retenant_and_child_insert_share_subject_concurrency_fence(
             child.rollback()
             child.close()
         if organization_ids:
-            _purge_concurrency_test_organizations(setup, organization_ids)
+            _purge_concurrency_test_organizations(setup, organization_ids, app)
         else:
             setup.rollback()
         setup.close()

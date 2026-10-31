@@ -117,31 +117,6 @@ def people(app):
         from app.models.user import User
 
         org_ids = [User.query.filter_by(email=email).one().organization_id for email in made]
-    with app.app_context():
-        from sqlalchemy import text
-
-        from app import db
-
-        # Sign-up writes rows no organisation column points at (the audit trail is append-only, and
-        # sessions and tokens hang off the person). The switch that stops the triggers firing lasts
-        # for this one transaction; every row removed is one of the people this module made.
-        ids = {"ids": org_ids}
-        db.session.execute(text("SET LOCAL session_replication_role = replica"))
-        user_ids = [r[0] for r in db.session.execute(text("SELECT id FROM users WHERE organization_id = ANY(:ids)"), ids)]
-        referrers = db.session.execute(text(
-            "SELECT kcu.table_name, kcu.column_name FROM information_schema.referential_constraints rc "
-            "JOIN information_schema.key_column_usage kcu ON kcu.constraint_name = rc.constraint_name "
-            "JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = rc.unique_constraint_name "
-            "WHERE ccu.table_name = 'users' AND ccu.column_name = 'id' AND kcu.table_schema = 'public'"
-        )).all()
-        for table, column in referrers:
-            if "evidence" in table:  # append-only, and sign-up writes none
-                continue
-            db.session.execute(text('DELETE FROM "%s" WHERE "%s" = ANY(:u)' % (table, column)), {"u": user_ids})
-        db.session.execute(text("DELETE FROM soc2_audit_log WHERE organization_id = ANY(:ids)"), ids)
-        db.session.execute(text("DELETE FROM users WHERE organization_id = ANY(:ids)"), ids)
-        db.session.commit()
-        db.session.remove()
     remove_organisations(app, org_ids)
 
 

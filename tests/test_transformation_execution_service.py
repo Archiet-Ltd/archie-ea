@@ -1929,7 +1929,7 @@ def test_materialisation_rejects_corrupt_frozen_hashes(
     scope = make_execution_scope()
     _install_command_harness(monkeypatch, db_session)
     row_id = getattr(scope, scope_id_field)
-    db_session.execute(text("SET LOCAL session_replication_role = replica"))
+    db_session.execute(text("SET LOCAL session_replication_role = replica"))  # session-replication-role-ok: corrupts a frozen snapshot's content_hash directly to prove execution detects it; the append-only guard correctly refuses every UPDATE on this table
     db_session.execute(
         text(
             f'UPDATE "{table_name}" SET content_hash = :bad_hash '
@@ -1941,7 +1941,7 @@ def test_materialisation_rejects_corrupt_frozen_hashes(
             "organization_id": scope.actor.organization_id,
         },
     )
-    db_session.execute(text("SET LOCAL session_replication_role = origin"))
+    db_session.execute(text("SET LOCAL session_replication_role = origin"))  # session-replication-role-ok: restores the switch flipped above
     db_session.expire_all()
 
     with pytest.raises(CommandConflict, match="decision_snapshot_hash_invalid"):

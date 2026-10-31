@@ -206,51 +206,32 @@ def decision_scope(app, evidence_scope: EvidenceScope):
             yield created
         finally:
             db.session.remove()
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            own_id = scope.organization_id
+            foreign_id = scope.foreign_organization_id
             raw = db.engine.raw_connection()
             try:
                 with raw.cursor() as cursor:
-                    cursor.execute("SHOW session_replication_role")
-                    original_role = cursor.fetchone()[0]
-                    cursor.execute("SET session_replication_role = replica")
-                    try:
-                        for table_name in (
-                            "archie_command_claim_challenges",
-                            "arb_condition_events",
-                            "arb_canonical_conditions",
-                            "arb_condition_evidence_records",
-                            "arb_decision_events",
-                            "arb_submission_events",
-                            "arb_submission_evidence_snapshots",
-                            "arb_review_items",
-                            "arb_review_cycles",
-                            "arb_subject_evidence_snapshots",
-                            "transformation_outbox_events",
-                            "operation_results",
-                            "command_materialisations",
-                            "command_idempotency_records",
-                            "decision_events",
-                            "decision_brief_evidence_citations",
-                            "decision_brief_option_citations",
-                            "decision_brief_versions",
-                            "decision_briefs",
-                            "transformation_option_versions",
-                            "transformation_options",
-                            "measure_definitions",
-                            "programme_outcome_commitments",
-                            "value_streams",
-                        ):
-                            cursor.execute(
-                                f'DELETE FROM "{table_name}" '  # nosec B608 -- fixed table allowlist
-                                "WHERE organization_id IN (%s, %s)",
-                                (scope.organization_id, scope.foreign_organization_id),
-                            )
-                    finally:
-                        cursor.execute(
-                            f"SET session_replication_role = {original_role}"
-                        )
+                    # archie_command_claim_challenges carries organization_id with no
+                    # foreign key to organizations, so the deletion service never
+                    # reaches it; no guard sits on it, so a plain delete needs no marker.
+                    cursor.execute(
+                        "DELETE FROM archie_command_claim_challenges "
+                        "WHERE organization_id IN (%s, %s)",
+                        (own_id, foreign_id),
+                    )
                     raw.commit()
             finally:
                 raw.close()
+            # The foreign organisation first: it may deliberately cite the primary
+            # organisation's rows, so the citing side must be gone before the cited
+            # organisation is deleted.
+            for org_id in (foreign_id, own_id):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
 
 
 def _freeze(scope: DecisionScope, option_id: int, *, key: str, revision: int = 1):
@@ -428,7 +409,7 @@ def test_compare_rejects_a_database_corrupt_comparison_column(decision_scope):
     frozen = _freeze(scope, scope.option_ids[0], key="compare-integrity")
     version_id = frozen.object_ids["option_version_id"]
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: mutates a frozen transformation_option_versions row; the append-only guard correctly refuses every UPDATE on this table
         connection.execute(
             text(
                 "UPDATE transformation_option_versions "

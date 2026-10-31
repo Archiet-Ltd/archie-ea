@@ -147,26 +147,11 @@ def guard_fixture(app, _schema):
             yield fixture
         finally:
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "users",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id = :organization_id"
-                        ),
-                        {"organization_id": organization_id},
-                    )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id = :organization_id"),
-                    {"organization_id": organization_id},
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            if db.session.get(Organization, organization_id) is not None:
+                OrganizationDeletionService.delete_organization(organization_id)
+            db.session.remove()
 
 
 def _direct_driver_execute(statement, parameters):
@@ -391,7 +376,7 @@ def test_fencing_trigger_rejects_invalid_generation_and_old_worker(guard_fixture
         )
 
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: backdates a lease to simulate real expiry without a real wait; the guard correctly refuses an UPDATE to this append-only row from any real caller
         connection.execute(
             text(
                 "UPDATE command_idempotency_records "

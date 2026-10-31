@@ -227,14 +227,13 @@ def test_two_independent_sessions_cannot_claim_the_same_pending_approval(app):
             setup.close()
             cleanup = Session()
             try:
-                if approval_id is not None:
-                    cleanup.query(AIChatCRUDApproval).filter_by(id=approval_id).delete()
-                if requester_id is not None:
-                    cleanup.query(User).filter(
-                        User.id.in_([requester_id, first_reviewer_id, second_reviewer_id])
-                    ).delete(synchronize_session=False)
                 if org_id is not None:
-                    cleanup.query(Organization).filter_by(id=org_id).delete()
+                    from app.services.org_deletion_service import OrganizationDeletionService
+
+                    OrganizationDeletionService.delete_organization(org_id, session=cleanup)
+                people = [i for i in (requester_id, first_reviewer_id, second_reviewer_id) if i is not None]
+                if people:
+                    cleanup.query(User).filter(User.id.in_(people)).delete(synchronize_session=False)
                 cleanup.commit()
             finally:
                 cleanup.close()
@@ -342,14 +341,13 @@ def test_two_sessions_rejection_cannot_overwrite_a_durable_claim(app):
             setup.close()
             cleanup = Session()
             try:
-                if approval_id is not None:
-                    cleanup.query(AIChatCRUDApproval).filter_by(id=approval_id).delete()
-                if requester_id is not None:
-                    cleanup.query(User).filter(User.id.in_([requester_id, reviewer_id])).delete(
-                        synchronize_session=False
-                    )
                 if org_id is not None:
-                    cleanup.query(Organization).filter_by(id=org_id).delete()
+                    from app.services.org_deletion_service import OrganizationDeletionService
+
+                    OrganizationDeletionService.delete_organization(org_id, session=cleanup)
+                people = [i for i in (requester_id, reviewer_id) if i is not None]
+                if people:
+                    cleanup.query(User).filter(User.id.in_(people)).delete(synchronize_session=False)
                 cleanup.commit()
             finally:
                 cleanup.close()

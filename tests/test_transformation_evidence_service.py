@@ -138,57 +138,16 @@ def evidence_scope(app, _schema):
             if prior_steward is not None:
                 app.config["TRANSFORMATION_PORTFOLIO_STEWARD_ID"] = prior_steward
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "evidence_head_events",
-                    "evidence_claim_heads",
-                    "evidence_records",
-                    "candidate_signals",
-                    "candidate_overlap_dispositions",
-                    "evidence_requests",
-                    "transformation_candidates",
-                    "application_dependencies",
-                    "application_capability_mapping",
-                    "programme_role_assignments",
-                    "programme_workstreams",
-                    "strategic_initiatives",
-                    "application_owners",
-                    "application_components",
-                    "business_capability",
-                    "users",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id IN (:organization_id, :foreign_id)"
-                        ),
-                        {
-                            "organization_id": scope.organization_id,
-                            "foreign_id": scope.foreign_organization_id,
-                        },
-                    )
-                connection.execute(
-                    text(
-                        "DELETE FROM subscriptions "
-                        "WHERE organization_id IN (:organization_id, :foreign_id)"
-                    ),
-                    {
-                        "organization_id": scope.organization_id,
-                        "foreign_id": scope.foreign_organization_id,
-                    },
-                )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id IN (:organization_id, :foreign_id)"),
-                    {
-                        "organization_id": scope.organization_id,
-                        "foreign_id": scope.foreign_organization_id,
-                    },
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            # The foreign organisation first: some tests deliberately cite the
+            # primary organisation's row from the foreign one (a cross-tenant
+            # citation probe), so the citing row must be gone before the cited
+            # one's own organisation is deleted.
+            for org_id in (scope.foreign_organization_id, scope.organization_id):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
 
 
 def _record_inventory(scope: EvidenceScope, *, expected_revision=0, key="inventory-root"):

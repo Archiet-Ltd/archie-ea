@@ -338,14 +338,16 @@ def test_first_screen_of_a_new_user_has_no_overlay_over_the_page(browser, live_s
     finally:
         page.close()
         with app.app_context():
+            from app.services.org_deletion_service import OrganizationDeletionService
+
             db.session.remove()
+            OrganizationDeletionService.delete_organization(org_id)
             db.session.execute(
-                db.text("DELETE FROM soc2_audit_log WHERE user_id=:uid OR organization_id=:oid"),
-                {"uid": user_id, "oid": org_id})
+                db.text("DELETE FROM user_sessions WHERE user_id=:uid"), {"uid": user_id})
+            db.session.execute(
+                db.text("DELETE FROM soc2_audit_log WHERE user_id=:uid"), {"uid": user_id})
             db.session.execute(
                 db.text("DELETE FROM users WHERE id=:uid"), {"uid": user_id})
-            db.session.execute(
-                db.text("DELETE FROM organizations WHERE id=:oid"), {"oid": org_id})
             db.session.commit()
             db.session.remove()
 

@@ -43,24 +43,6 @@ from app.modules.transformation_room.domain import (
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
-_CLEANUP_TABLES = (
-    "arb_canonical_conditions",
-    "arb_condition_events",
-    "arb_condition_evidence_records",
-    "arb_decision_events",
-    "arb_submission_events",
-    "transformation_outbox_events",
-    "operation_results",
-    "command_materialisations",
-    "command_idempotency_records",
-    "arb_review_items",
-    "arb_review_cycles",
-    "arb_subject_evidence_snapshots",
-    "architecture_decisions",
-    "users",
-)
-
-
 @pytest.fixture
 def db_session(app, _schema):
     """Committed setup visible to CommandService's independent sessions."""
@@ -75,34 +57,13 @@ def db_session(app, _schema):
             db.session.remove()
             if not organization_ids:
                 return
-            raw = db.engine.raw_connection()
-            try:
-                with raw.cursor() as cursor:
-                    cursor.execute("SHOW session_replication_role")
-                    original_role = cursor.fetchone()[0]
-                    cursor.execute("SET session_replication_role = replica")
-                    try:
-                        for table in _CLEANUP_TABLES:
-                            cursor.execute(
-                                f'DELETE FROM "{table}" '
-                                "WHERE organization_id = ANY(%s)",
-                                (list(organization_ids),),
-                            )
-                        cursor.execute(
-                            "DELETE FROM organizations WHERE id = ANY(%s)",
-                            (list(organization_ids),),
-                        )
-                    except Exception:
-                        raw.rollback()
-                        cursor.execute(
-                            f"SET session_replication_role = {original_role}"
-                        )
-                        raw.commit()
-                        raise
-                    cursor.execute(f"SET session_replication_role = {original_role}")
-                    raw.commit()
-            finally:
-                raw.close()
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            for org_id in organization_ids:
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
 
 
 def _install_guards(db_session):

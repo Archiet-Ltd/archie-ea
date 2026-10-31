@@ -105,44 +105,18 @@ def route_scope(app, _schema):
             yield scope
         finally:
             db.session.remove()
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            # The foreign organisation first: it may deliberately cite the primary
+            # organisation's rows, so the citing side must be gone before the cited
+            # organisation is deleted. The deletion service resolves the
+            # arb_submission_evidence_snapshots/arb_review_items/arb_review_cycles
+            # append-only ring itself, via the one deferrable edge in that cycle.
+            for org_id in (scope.foreign_organization_id, scope.organization_id):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
             with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                connection.execute(
-                    text("DELETE FROM soc2_audit_log WHERE user_id = :user_id"),
-                    {"user_id": scope.actor_id},
-                )
-                for table_name in (
-                    "arb_submission_events",
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "arb_review_items",
-                    "arb_review_cycles",
-                    "arb_subject_evidence_snapshots",
-                    "archimate_relationships",
-                    "archimate_elements",
-                    "architecture_decisions",
-                    "architecture_models",
-                    "users",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id IN (:own, :foreign)"
-                        ),
-                        {
-                            "own": scope.organization_id,
-                            "foreign": scope.foreign_organization_id,
-                        },
-                    )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id IN (:own, :foreign)"),
-                    {
-                        "own": scope.organization_id,
-                        "foreign": scope.foreign_organization_id,
-                    },
-                )
                 connection.execute(
                     text("DELETE FROM roles WHERE id = :role_id"),
                     {"role_id": scope.role_id},

@@ -436,14 +436,17 @@ entries:
         reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
 
   - id: outbox-test-cleanup
-    concept: Purging outbox events between tests
+    concept: Removing a test organisation and the append-only rows it holds
     status: active
     canonical:
-      path: tests/_outbox_cleanup.py
-      symbols: [purge_outbox_events]
+      path: app/services/org_deletion_service.py
+      symbols: [OrganizationDeletionService]
     reuse: >
-      Import purge_outbox_events from tests/_outbox_cleanup.py in test fixtures and teardown. Do not write another
-      outbox-purging helper in a test module.
+      Delete a test organisation through OrganizationDeletionService.delete_organization in test fixtures and
+      teardown. It removes every row the organisation holds, append-only rows included, through the same
+      transaction-local marker a platform administrator's delete uses; no trigger is
+      disabled. Retired 29 Oct 2026: tests/_outbox_cleanup.py (SET LOCAL session_replication_role = replica) no
+      longer exists. Do not write another outbox-purging or organisation-cleanup helper in a test module.
     must_not_create:
       - id: outbox-purge
         regex: 'def\s+_?(purge|clean|clear|delete|reset|flush)_?(\w+_)?outbox\w*\s*\('

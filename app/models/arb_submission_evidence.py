@@ -146,11 +146,19 @@ def ensure_evidence_immutability_triggers(connection):
     connection.exec_driver_sql(
         "SELECT pg_advisory_xact_lock(hashtext('archie_evidence_immutability_triggers'))"
     )
+    from app.models.transformation_db_guards import _ORG_DELETION_ADMITS_SQL
+
+    connection.exec_driver_sql(_ORG_DELETION_ADMITS_SQL)
     connection.exec_driver_sql(
         """
         CREATE OR REPLACE FUNCTION reject_archie_evidence_mutation()
         RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN
+            IF TG_OP = 'DELETE' THEN
+                IF archie_org_deletion_admits(OLD.organization_id) THEN
+                    RETURN OLD;
+                END IF;
+            END IF;
             RAISE EXCEPTION 'ARB and workbench evidence records are append-only'
                 USING ERRCODE = '55000';
         END;
@@ -271,7 +279,20 @@ def _install_evidence_guards_after_metadata_create(_target, connection, **_kwarg
 event.listen(db.metadata, "after_create", _install_evidence_guards_after_metadata_create)
 
 
-def _reject_snapshot_mutation(_mapper, _connection, _target):
+def _org_deletion_in_progress(connection):
+    """True while an organisation delete's transaction-local marker is set.
+
+    The database trigger (``reject_archie_evidence_mutation``) still makes the precise,
+    per-row check that the row's own organisation matches the marker; this Python-level
+    guard only needs to know whether to let a DELETE reach the database at all.
+    """
+    marker = connection.scalar(db.text("SELECT current_setting('archie.deleting_organisation', TRUE)"))
+    return bool(marker)
+
+
+def _reject_snapshot_mutation(mapper, connection, target):
+    if _org_deletion_in_progress(connection):
+        return
     raise ValueError("ARB submission evidence snapshots are append-only")
 
 
@@ -281,14 +302,20 @@ event.listen(WorkbenchArtifactEvidence, "before_update", _reject_snapshot_mutati
 event.listen(WorkbenchArtifactEvidence, "before_delete", _reject_snapshot_mutation)
 
 
-_IMMUTABLE_TABLE_PATTERN = re.compile(
-    r"^\s*(?:UPDATE|DELETE\s+FROM)\s+[\"']?(?:arb_submission_evidence_snapshots|workbench_artifact_evidence)[\"']?\b",
+_IMMUTABLE_UPDATE_PATTERN = re.compile(
+    r"^\s*UPDATE\s+[\"']?(?:arb_submission_evidence_snapshots|workbench_artifact_evidence)[\"']?\b",
+    re.IGNORECASE,
+)
+_IMMUTABLE_DELETE_PATTERN = re.compile(
+    r"^\s*DELETE\s+FROM\s+[\"']?(?:arb_submission_evidence_snapshots|workbench_artifact_evidence)[\"']?\b",
     re.IGNORECASE,
 )
 
 
 @event.listens_for(Engine, "before_cursor_execute", retval=True)
-def _guard_append_only_sql(_conn, _cursor, statement, parameters, _context, _executemany):
-    if _IMMUTABLE_TABLE_PATTERN.match(statement):
+def _guard_append_only_sql(conn, _cursor, statement, parameters, _context, _executemany):
+    if _IMMUTABLE_UPDATE_PATTERN.match(statement):
+        raise ValueError("ARB and workbench evidence records are append-only")
+    if _IMMUTABLE_DELETE_PATTERN.match(statement) and not _org_deletion_in_progress(conn):
         raise ValueError("ARB and workbench evidence records are append-only")
     return statement, parameters

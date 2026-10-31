@@ -26,24 +26,6 @@ from flask_login import login_user
 os.environ.setdefault("TRANSFORMATION_COMMAND_CAPABILITY_SECRET", "74" * 32)
 
 
-_CLEANUP_TABLES = (
-    "archie_command_claim_challenges",
-    "arb_condition_events",
-    "arb_canonical_conditions",
-    "arb_condition_evidence_records",
-    "arb_decision_events",
-    "arb_submission_events",
-    "operation_results",
-    "command_materialisations",
-    "command_idempotency_records",
-    "arb_review_items",
-    "arb_review_cycles",
-    "arb_subject_evidence_snapshots",
-    "architecture_decisions",
-    "users",
-)
-
-
 @pytest.fixture
 def committed_session(app, _schema):
     """Committed setup visible to CommandService's independent sessions."""
@@ -61,30 +43,28 @@ def committed_session(app, _schema):
             organization_ids = tuple(cleanup_org_ids)
             db.session.remove()
             if organization_ids:
+                from app.models.organization import Organization
+                from app.services.org_deletion_service import OrganizationDeletionService
+
                 raw = db.engine.raw_connection()
                 try:
                     with raw.cursor() as cursor:
-                        cursor.execute("SHOW session_replication_role")
-                        original_role = cursor.fetchone()[0]
-                        cursor.execute("SET session_replication_role = replica")
-                        try:
-                            for table in _CLEANUP_TABLES:
-                                cursor.execute(
-                                    f'DELETE FROM "{table}" '
-                                    "WHERE organization_id = ANY(%s)",
-                                    (list(organization_ids),),
-                                )
-                            cursor.execute(
-                                "DELETE FROM organizations WHERE id = ANY(%s)",
-                                (list(organization_ids),),
-                            )
-                        finally:
-                            cursor.execute(
-                                f"SET session_replication_role = {original_role}"
-                            )
-                            raw.commit()
+                        # archie_command_claim_challenges carries organization_id with no
+                        # foreign key to organizations (a deliberate, trigger-free,
+                        # TTL-cleaned table), so the deletion service never reaches it.
+                        # No guard sits on this table, so a plain delete needs no marker.
+                        cursor.execute(
+                            "DELETE FROM archie_command_claim_challenges "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
+                        )
+                        raw.commit()
                 finally:
                     raw.close()
+                for org_id in organization_ids:
+                    if db.session.get(Organization, org_id) is not None:
+                        OrganizationDeletionService.delete_organization(org_id)
+                db.session.remove()
 
 
 def _make_org(session, label):

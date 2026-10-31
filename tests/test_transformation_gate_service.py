@@ -637,7 +637,13 @@ def test_real_task6_rows_allow_discovery_only_while_current_and_fresh(
     assert ready.allowed is True
 
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        # Flagged exception: mutates a committed evidence_records
+        # row to construct an already-expired freshness window. The append-only
+        # guard correctly refuses every UPDATE on this table; the deletion marker
+        # only ever admits a DELETE, by design. Needs a new, named admission path
+        # on a production append-only guard for a mutation outside any real write
+        # path — out of scope here. Left for the lead/founder to decide.
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: mutates a committed evidence_records row to an expired freshness window; the append-only guard correctly refuses every UPDATE on this table
         connection.execute(
             text(
                 "UPDATE evidence_records SET freshness_expires_at = :expired "
@@ -735,7 +741,6 @@ def test_real_task6_waiver_releases_discovery_only_with_exact_current_contract(
     assert gate.allowed is True
 
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(
                 "UPDATE evidence_requests SET waiver_id = id + 1 "
@@ -753,7 +758,6 @@ def test_real_task6_waiver_releases_discovery_only_with_exact_current_contract(
     }
 
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(
                 "UPDATE evidence_requests SET waiver_id = id, "
@@ -786,7 +790,6 @@ def test_real_task6_waiver_releases_discovery_only_with_exact_current_contract(
     ordinary_id = ordinary.id
     db.session.remove()
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(
                 "UPDATE evidence_requests SET waiver_expires_at = :current_expiry, "
@@ -867,7 +870,6 @@ def test_transition_replay_uses_immutable_original_edge_and_current_authority(
     option_version_ids = _freeze_options(scope)
     _freeze_brief(scope, option_version_ids, key="transition-replay-brief")
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             text(
                 "UPDATE programme_workstreams SET lifecycle_stage = 'decision_ready', "

@@ -126,23 +126,11 @@ def tenant(app):
     # The test database is shared and persistent, so every row made here is
     # removed here.
     with app.app_context():
-        from app.models.application_portfolio import ApplicationComponent
+        from app.services.org_deletion_service import OrganizationDeletionService
 
-        for app_id in created["apps"]:
-            row = db.session.get(ApplicationComponent, app_id)
-            if row is not None:
-                db.session.delete(row)
-        db.session.commit()
-        user = db.session.get(User, created["user_id"])
-        if user is not None:
-            db.session.delete(user)
-        db.session.commit()
-        from tests._outbox_cleanup import purge_outbox_events
-
-        purge_outbox_events(db.session, [created["org_id"]])
         org = db.session.get(Organization, created["org_id"])
         if org is not None:
-            db.session.delete(org)
+            OrganizationDeletionService.delete_organization(created["org_id"])
         db.session.commit()
 
 

@@ -5738,41 +5738,22 @@ def toggle_org_admin(org_id, user_id):
 @login_required
 @platform_admin_required
 def organization_delete(org_id):
-    """Delete an organization. Moves all users to the Default org first."""
-    org = Organization.query.get_or_404(org_id)
+    """Delete an organization and all its tenant data."""
+    from app.services.org_deletion_service import OrganizationDeletionService
 
-    if org.slug == "default":
-        flash("Cannot delete the Default organization.", "error")
+    from flask import current_app
+
+    from app.services.org_deletion_service import OrganizationDeletionRefused
+
+    try:
+        flash(OrganizationDeletionService.delete_organization(org_id, requester_id=current_user.id), "success")
+    except OrganizationDeletionRefused as refused:
+        flash(str(refused), "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
-
-    # Move all users to Default org before deleting
-    default_org = Organization.query.filter_by(slug="default").first()
-    if not default_org:
-        flash("Cannot delete — no Default organization to reassign users.", "error")
+    except Exception:  # noqa: BLE001 - rolled back by the service; the reason is logged, the person told
+        current_app.logger.exception("Organisation %s could not be deleted", org_id)
+        flash("The organisation could not be deleted. Nothing was changed. The reason is in the server log.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
-
-    # Move all users to Default org.  Preserve each user's existing role;
-    # only downgrade users who currently hold the Administrator role (the
-    # system of record for org-admin).  A Viewer stays a Viewer, an Architect
-    # stays an Architect — only an Administrator is reset to the default role
-    # (a no-op for a platform admin — see User.revoke_org_admin).
-    users = User.query.filter_by(organization_id=org.id).all()
-    moved = 0
-    for user in users:
-        user.organization_id = default_org.id
-        if user.is_admin():
-            user.revoke_org_admin()
-        moved += 1
-    # Remove OrgRole rows for the deleted organisation so no stale
-    # per-organisation role grants survive.
-    OrgRole.query.filter_by(organization_id=org.id).delete(
-        synchronize_session=False
-    )
-
-    org_name = org.name
-    db.session.delete(org)
-    db.session.commit()
-    flash(f'Organization "{org_name}" deleted. {moved} user(s) moved to Default.', "success")
     return redirect(url_for("admin.organizations_list"))
 
 
@@ -5790,7 +5771,7 @@ def remove_user_from_org(org_id, user_id):
         flash("User does not belong to this organization.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
-    default_org = Organization.query.filter_by(slug="default").first()
+    default_org = Organization.default_organization()
     if not default_org or default_org.id == org_id:
         flash("Cannot remove user — no other organization to move them to.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))

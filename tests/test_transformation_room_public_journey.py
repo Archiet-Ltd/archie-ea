@@ -186,62 +186,12 @@ def public_journey_scope(app, _schema):
             else:
                 app.config["TRANSFORMATION_PORTFOLIO_STEWARD_ID"] = previous_steward
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql(
-                    "SET LOCAL session_replication_role = replica"
-                )
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "decision_events",
-                    "decision_brief_evidence_citations",
-                    "decision_brief_option_citations",
-                    "decision_brief_versions",
-                    "decision_briefs",
-                    "transformation_option_versions",
-                    "transformation_options",
-                    "evidence_head_events",
-                    "evidence_claim_heads",
-                    "evidence_records",
-                    "evidence_requests",
-                    "candidate_overlap_dispositions",
-                    "candidate_signals",
-                    "transformation_candidates",
-                    "measure_definitions",
-                    "programme_outcome_commitments",
-                    "programme_role_assignments",
-                    "programme_workstreams",
-                    "strategic_initiatives",
-                    "application_dependencies",
-                    "application_capability_mapping",
-                    "application_owners",
-                    "application_components",
-                    "business_capability",
-                    "value_streams",
-                    "users",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id IN (:organization_id, :foreign_id)"
-                        ),
-                        {
-                            "organization_id": scope.organization_id,
-                            "foreign_id": scope.foreign_organization_id,
-                        },
-                    )
-                connection.execute(
-                    text(
-                        "DELETE FROM organizations "
-                        "WHERE id IN (:organization_id, :foreign_id)"
-                    ),
-                    {
-                        "organization_id": scope.organization_id,
-                        "foreign_id": scope.foreign_organization_id,
-                    },
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            for org_id in (scope.organization_id, scope.foreign_organization_id):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
 
 
 def _option_draft(scope, *, title, action_type, ordinal):
@@ -281,9 +231,18 @@ def _option_draft(scope, *, title, action_type, ordinal):
 
 
 def _expire_and_remove_result(scope, *, operation, command_key, result_id):
-    """Model a lost/damaged result envelope while retaining the domain effect."""
+    """Model a lost/damaged result envelope while retaining the domain effect.
+
+    This organisation is not being deleted, so the org-deletion marker does not apply here
+    and would not help regardless: the guard's unconditional first check on this table
+    refuses to null an already-set ``operation_result_id`` under any admission, by design
+    (the marker is never allowed to admit an UPDATE, only a DELETE).
+    No real caller writes this exact "lost envelope, result discarded" shape in one
+    transaction, so it is modelled directly here with the trigger switched off for this
+    transaction only.
+    """
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")  # session-replication-role-ok: see docstring above — constructs a test-only "lost result envelope" state no real caller produces, not an organisation deletion
         connection.execute(
             text(
                 "DELETE FROM transformation_outbox_events "
@@ -295,6 +254,7 @@ def _expire_and_remove_result(scope, *, operation, command_key, result_id):
             text(
                 "UPDATE command_idempotency_records "
                 "SET status = 'retryable_failure', operation_result_id = NULL, "
+                "last_error_class = 'envelope_lost', "
                 "lease_expires_at = clock_timestamp() - interval '1 second' "
                 "WHERE organization_id = :organization_id "
                 "AND actor_id = :actor_id AND operation = :operation "

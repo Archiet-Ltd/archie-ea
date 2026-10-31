@@ -93,7 +93,6 @@ def real_committed_org_and_user(app, _schema):
     from app import db
     from app.models.organization import Organization
     from app.models.user import User
-    from sqlalchemy import text
 
     suffix = uuid.uuid4().hex[:12]
     with app.app_context():
@@ -115,26 +114,12 @@ def real_committed_org_and_user(app, _schema):
             yield org_id, user_id
         finally:
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "measure_definitions",
-                    "programme_outcome_commitments",
-                    "programme_role_assignments",
-                    "programme_workstreams",
-                    "solutions",
-                    "strategic_initiatives",
-                    "users",
-                ):
-                    connection.execute(
-                        text(f'DELETE FROM "{table_name}" WHERE organization_id = :org'),
-                        {"org": org_id},
-                    )
-                connection.execute(text("DELETE FROM organizations WHERE id = :org"), {"org": org_id})
+            from app.models.organization import Organization
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
 
 
 def test_create_programme_creates_a_real_programme(app, tenant_ctx, real_committed_org_and_user):

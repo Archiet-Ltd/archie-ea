@@ -453,8 +453,39 @@ def _conn_row(url, sql):
 # ------------------------------------------------ expand / contract examples
 
 
-def _insert(conn, table, values):
-    """Insert one row, filling any other required column with a unique dummy."""
+def _fk_target(conn, table, column):
+    """The (table, column) a foreign key on ``table.column`` points at, or None."""
+    row = conn.execute(text(
+        """
+        SELECT target.relname, target_col.attname
+        FROM pg_constraint c
+        JOIN pg_class child ON child.oid = c.conrelid
+        JOIN pg_namespace ns ON ns.oid = child.relnamespace
+        JOIN pg_class target ON target.oid = c.confrelid
+        JOIN pg_attribute child_col
+          ON child_col.attrelid = c.conrelid AND child_col.attnum = c.conkey[1]
+        JOIN pg_attribute target_col
+          ON target_col.attrelid = c.confrelid AND target_col.attnum = c.confkey[1]
+        WHERE c.contype = 'f' AND ns.nspname = current_schema()
+          AND child.relname = :table AND child_col.attname = :column
+          AND array_length(c.conkey, 1) = 1
+        """
+    ), {"table": table, "column": column}).first()
+    return (row[0], row[1]) if row else None
+
+
+def _insert(conn, table, values, _building=frozenset()):
+    """Insert one row, filling any other required column with a unique dummy.
+
+    Any column naming a foreign key gets a real parent row first (a minimal
+    stub, inserted the same way), rather than a value nothing in the database
+    actually holds: this seeder never leans on a disabled trigger to paper
+    over a reference that is not real. ``_building`` guards the rare
+    parent/child cycle (an FK whose own required columns point back at a
+    table already being built) so that edge is simply left unfilled instead
+    of recursing forever -- the same thing the database itself would refuse
+    only if that edge turned out not to be nullable.
+    """
     required = conn.execute(text(
         "SELECT column_name, data_type, udt_name FROM information_schema.columns "
         "WHERE table_schema = current_schema() AND table_name = :t "
@@ -481,16 +512,31 @@ def _insert(conn, table, values):
             ), {"u": udt}).scalar()
         else:
             row[name] = uuid.uuid4().hex[:8]
+    building = _building | {table}
+    for column, value in row.items():
+        if value is None:
+            continue
+        target = _fk_target(conn, table, column)
+        if target is None:
+            continue
+        target_table, target_column = target
+        if target_table in building:
+            continue
+        exists = conn.execute(
+            text(f'SELECT 1 FROM "{target_table}" WHERE "{target_column}" = :v'),
+            {"v": value},
+        ).first()
+        if not exists:
+            _insert(conn, target_table, {target_column: value}, _building=building)
     cols = ", ".join(f'"{c}"' for c in row)
     params = ", ".join(f":{c}" for c in row)
     conn.execute(text(f'INSERT INTO "{table}" ({cols}) VALUES ({params})'), row)
 
 
 def _seed(url, rows):
-    """Insert fixture rows with foreign keys and triggers off (superuser session)."""
+    """Insert fixture rows across many tables, each with every foreign key real."""
     engine = create_engine(url)
     with engine.begin() as conn:
-        conn.execute(text("SET LOCAL session_replication_role = replica"))
         for table, values in rows:
             _insert(conn, table, values)
     engine.dispose()

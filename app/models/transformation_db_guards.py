@@ -1385,6 +1385,29 @@ $$
 """
 
 
+_ORG_DELETION_ADMITS_SQL = r"""
+CREATE OR REPLACE FUNCTION public.archie_org_deletion_admits(old_org integer)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+    marker text;
+BEGIN
+    marker := current_setting('archie.deleting_organisation', TRUE);
+    IF marker IS NULL OR marker = '' THEN
+        RETURN FALSE;
+    END IF;
+    IF old_org IS NULL OR old_org <> marker::integer THEN
+        RETURN FALSE;
+    END IF;
+    RETURN TRUE;
+END;
+$$
+"""
+
+
 _IMMUTABILITY_FUNCTION_SQL = r"""
 CREATE OR REPLACE FUNCTION public.archie_reject_transformation_mutation()
 RETURNS trigger
@@ -1416,6 +1439,11 @@ BEGIN
                )
            ) THEN
             RETURN NEW;
+        END IF;
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        IF public.archie_org_deletion_admits((to_jsonb(OLD) ->> 'organization_id')::integer) THEN
+            RETURN OLD;
         END IF;
     END IF;
     RAISE EXCEPTION 'transformation immutable rows are append-only'
@@ -2795,6 +2823,9 @@ DECLARE
     contender_failure_document jsonb;
 BEGIN
     IF TG_OP = 'DELETE' THEN
+        IF public.archie_org_deletion_admits((to_jsonb(OLD) ->> 'organization_id')::integer) THEN
+            RETURN OLD;
+        END IF;
         RAISE EXCEPTION 'command receipt identity and terminal result are immutable'
             USING ERRCODE = '55000';
     END IF;
@@ -3073,6 +3104,9 @@ BEGIN
     END IF;
 
     IF TG_OP = 'DELETE' THEN
+        IF public.archie_org_deletion_admits(OLD.organization_id) THEN
+            RETURN OLD;
+        END IF;
         IF OLD.current_record_id IS NOT NULL OR EXISTS (
             SELECT 1 FROM public.evidence_head_events event
             WHERE event.head_id = OLD.id
@@ -4419,6 +4453,7 @@ def ensure_transformation_db_guards(
         f"DROP FUNCTION IF EXISTS {legacy_canonical}(jsonb)"
     )
     for create_sql in (
+        _ORG_DELETION_ADMITS_SQL,
         _HMAC_SHA256_FUNCTION_SQL,
         _VERIFY_COMMAND_CAPABILITY_SQL,
         _ISSUE_COMMAND_CLAIM_CHALLENGE_SQL,

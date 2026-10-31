@@ -6,9 +6,10 @@ is always rolled back.
 
 The typed graph is built directly rather than through the command services:
 those commit through their own sessions, which the rolled-back fixture cannot
-see.  Database triggers are suspended for the *setup writes only*
-(``session_replication_role``), so the table CHECK constraints — the actual
-shape contract — still apply to every row these tests create.
+see.  Database triggers are suspended for the *setup writes only* (a replica
+replication-role switch; see ``_sql`` calls below, each carrying its own
+``# session-replication-role-ok:`` reason), so the table CHECK constraints —
+the actual shape contract — still apply to every row these tests create.
 """
 
 from __future__ import annotations
@@ -79,7 +80,7 @@ def _build_adr_cycle(
 
     suffix = uuid.uuid4().hex[:10]
     review_number_token = _letters_only_token()
-    _sql(db_session, "SET LOCAL session_replication_role = replica")
+    _sql(db_session, "SET LOCAL session_replication_role = replica")  # session-replication-role-ok: builds the typed graph directly (command services commit through their own sessions, invisible to this rolled-back fixture); CHECK constraints still apply to every row
     existing_adr = adr
     adr = existing_adr or ArchitectureDecision(
         organization_id=org.id,
@@ -164,7 +165,7 @@ def _build_adr_cycle(
     )
     db_session.add(review)
     db_session.flush()
-    _sql(db_session, "SET LOCAL session_replication_role = origin")
+    _sql(db_session, "SET LOCAL session_replication_role = origin")  # session-replication-role-ok: restores the switch flipped above
     return _Graph(adr=adr, snapshot=snapshot, cycle=cycle, review=review)
 
 
@@ -193,7 +194,7 @@ def _decide(db_session, org, graph, decider, *, outcome, projected_status):
     """Record a terminal decision event and project the cycle separately."""
     from app.models.arb_decision_event import ARBDecisionEvent
 
-    _sql(db_session, "SET LOCAL session_replication_role = replica")
+    _sql(db_session, "SET LOCAL session_replication_role = replica")  # session-replication-role-ok: builds the typed graph directly (command services commit through their own sessions, invisible to this rolled-back fixture); CHECK constraints still apply to every row
     receipt = _receipt(db_session, org, decider, "arb.decision.record")
     event = ARBDecisionEvent(
         organization_id=org.id,
@@ -230,7 +231,7 @@ def _decide(db_session, org, graph, decider, *, outcome, projected_status):
     graph.review.decision_date = datetime.now(timezone.utc)
     graph.review.review_completed_at = datetime.now(timezone.utc)
     db_session.flush()
-    _sql(db_session, "SET LOCAL session_replication_role = origin")
+    _sql(db_session, "SET LOCAL session_replication_role = origin")  # session-replication-role-ok: restores the switch flipped above
     graph.decision_event = event
     graph.conditions = []
     return event
@@ -244,7 +245,7 @@ def _condition(db_session, org, graph, *, status, evidence_submitted_by=None):
     from app.models.arb_condition_evidence import ARBConditionEvidenceRecord
     from app.models.arb_decision_event import ARBCondition
 
-    _sql(db_session, "SET LOCAL session_replication_role = replica")
+    _sql(db_session, "SET LOCAL session_replication_role = replica")  # session-replication-role-ok: builds the typed graph directly (command services commit through their own sessions, invisible to this rolled-back fixture); CHECK constraints still apply to every row
     condition = ARBCondition(
         organization_id=org.id,
         decision_event_id=graph.decision_event.id,
@@ -304,7 +305,7 @@ def _condition(db_session, org, graph, *, status, evidence_submitted_by=None):
         db_session.flush()
         graph.evidence_record = record
 
-    _sql(db_session, "SET LOCAL session_replication_role = origin")
+    _sql(db_session, "SET LOCAL session_replication_role = origin")  # session-replication-role-ok: restores the switch flipped above
     graph.conditions = [condition]
     return condition
 
@@ -757,7 +758,7 @@ def test_legacy_generic_review_is_labelled_not_typed(db_session, make_org, tenan
     submitter = _user(db_session, org, "submitter", admin=True)
     suffix = uuid.uuid4().hex[:10]
     with tenant_ctx(org.id):
-        _sql(db_session, "SET LOCAL session_replication_role = replica")
+        _sql(db_session, "SET LOCAL session_replication_role = replica")  # session-replication-role-ok: builds the typed graph directly (command services commit through their own sessions, invisible to this rolled-back fixture); CHECK constraints still apply to every row
         review = ARBReviewItem(
             organization_id=org.id,
             review_number=f"LEGACY-{suffix}",
@@ -768,7 +769,7 @@ def test_legacy_generic_review_is_labelled_not_typed(db_session, make_org, tenan
         )
         db_session.add(review)
         db_session.flush()
-        _sql(db_session, "SET LOCAL session_replication_role = origin")
+        _sql(db_session, "SET LOCAL session_replication_role = origin")  # session-replication-role-ok: restores the switch flipped above
         view = typed_arb_review_view(
             actor=_actor(submitter, org), review_item_id=review.id
         )

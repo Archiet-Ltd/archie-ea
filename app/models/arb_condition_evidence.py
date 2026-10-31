@@ -46,7 +46,18 @@ class ARBConditionEvidenceRecord(TenantMixin, db.Model):
     __tablename__ = "arb_condition_evidence_records"
 
     id = db.Column(db.Integer, primary_key=True)
-    condition_id = db.Column(db.Integer, db.ForeignKey("arb_canonical_conditions.id", ondelete="RESTRICT"), nullable=False, index=True)
+    condition_id = db.Column(
+        db.Integer,
+        db.ForeignKey(
+            "arb_canonical_conditions.id",
+            ondelete="RESTRICT",
+            name="fk_arb_condition_evidence_condition",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        nullable=False,
+        index=True,
+    )
     condition_revision = db.Column(db.Integer, nullable=False)
     decision_event_id = db.Column(db.Integer, db.ForeignKey("arb_decision_events.id", ondelete="RESTRICT"), nullable=False)
     review_cycle_id = db.Column(db.Integer, db.ForeignKey("arb_review_cycles.id", ondelete="RESTRICT"), nullable=False)
@@ -165,13 +176,82 @@ LANGUAGE plpgsql SET search_path=pg_catalog,{schema} AS $$ BEGIN
 """
 
 
+def _ensure_condition_evidence_condition_fk(connection):
+    """Repair the cyclic condition/evidence FK on upgraded PostgreSQL schemas.
+
+    arb_canonical_conditions and arb_condition_evidence_records are mutually append-only and
+    reference each other (a condition's submitted/fulfilment evidence id; an evidence row's own
+    condition id), so the deletion planner has no row order that satisfies both constraints at
+    once and neither guard admits the UPDATE a column-null cycle-break would need. Deferring this
+    one edge to commit removes its ordering requirement outright -- by commit every row on both
+    sides of the cycle is gone, so there is nothing left for it to check.
+    """
+    tables_ready = connection.exec_driver_sql(
+        "SELECT to_regclass(current_schema() || '.arb_condition_evidence_records') "
+        "IS NOT NULL AND to_regclass(current_schema() || '.arb_canonical_conditions') IS NOT NULL"
+    ).scalar()
+    if not tables_ready:
+        return
+    row = connection.exec_driver_sql(
+        """
+        SELECT c.conname, c.condeferrable, c.condeferred,
+               target.relname AS target_table
+        FROM pg_constraint AS c
+        JOIN pg_class AS source ON source.oid = c.conrelid
+        JOIN pg_namespace AS n ON n.oid = source.relnamespace
+        JOIN pg_class AS target ON target.oid = c.confrelid
+        WHERE n.nspname = current_schema()
+          AND source.relname = 'arb_condition_evidence_records'
+          AND c.contype = 'f'
+          AND c.conkey = ARRAY[
+              (SELECT attnum FROM pg_attribute
+               WHERE attrelid = source.oid AND attname = 'condition_id')
+          ]::smallint[]
+        """
+    ).mappings().one_or_none()
+    if (
+        row is not None
+        and row["conname"] == "fk_arb_condition_evidence_condition"
+        and row["target_table"] == "arb_canonical_conditions"
+        and row["condeferrable"]
+        and row["condeferred"]
+    ):
+        return
+    if row is not None:
+        preparer = connection.dialect.identifier_preparer
+        constraint_name = preparer.quote(row["conname"])
+        connection.exec_driver_sql(
+            "ALTER TABLE arb_condition_evidence_records "
+            f"DROP CONSTRAINT {constraint_name}"
+        )
+    connection.exec_driver_sql(
+        "ALTER TABLE arb_condition_evidence_records "
+        "ADD CONSTRAINT fk_arb_condition_evidence_condition "
+        "FOREIGN KEY (condition_id) REFERENCES arb_canonical_conditions(id) "
+        "DEFERRABLE INITIALLY DEFERRED"
+    )
+
+
 def ensure_arb_condition_evidence_guards(connection):
     if connection.dialect.name != "postgresql":
         return
     schema = connection.exec_driver_sql("SELECT current_schema()").scalar()
     q = connection.dialect.identifier_preparer.quote(schema)
+    _ensure_condition_evidence_condition_fk(connection)
     connection.exec_driver_sql(_membership_sql(q))
-    connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_reject_arb_condition_evidence_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN RAISE EXCEPTION 'ARB condition evidence is append-only' USING ERRCODE='55000'; END $$;
+    from app.models.transformation_db_guards import (
+        _ORG_DELETION_ADMITS_SQL,
+        _render_guard_sql,
+    )
+
+    connection.exec_driver_sql(
+        _render_guard_sql(connection, _ORG_DELETION_ADMITS_SQL, q)
+    )
+    connection.exec_driver_sql(f"""CREATE OR REPLACE FUNCTION {q}.archie_reject_arb_condition_evidence_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN
+ IF TG_OP='DELETE' THEN
+   IF {q}.archie_org_deletion_admits(OLD.organization_id) THEN RETURN OLD; END IF;
+ END IF;
+ RAISE EXCEPTION 'ARB condition evidence is append-only' USING ERRCODE='55000'; END $$;
 DROP TRIGGER IF EXISTS trg_arb_condition_evidence_membership ON {q}.arb_condition_evidence_records; CREATE CONSTRAINT TRIGGER trg_arb_condition_evidence_membership AFTER INSERT OR UPDATE ON {q}.arb_condition_evidence_records DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION {q}.archie_validate_arb_condition_evidence();
 DROP TRIGGER IF EXISTS trg_arb_condition_evidence_immutable ON {q}.arb_condition_evidence_records; CREATE TRIGGER trg_arb_condition_evidence_immutable BEFORE UPDATE OR DELETE ON {q}.arb_condition_evidence_records FOR EACH ROW EXECUTE FUNCTION {q}.archie_reject_arb_condition_evidence_mutation();""")
 

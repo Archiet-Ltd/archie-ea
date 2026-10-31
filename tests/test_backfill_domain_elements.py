@@ -191,39 +191,15 @@ def _seed_data_domain_and_maybe_entity(app, org_id, domain_name, entity_name=Non
 
 
 def _cleanup(app, org_ids):
-    """Delete everything the app-context tests created.
-
-    An organisation cannot be deleted while the append-only transformation
-    outbox holds element events for it, so the outbox rows go first through
-    the shared teardown helper (the app's repair flag does not delete them:
-    the trigger returns NULL for a DELETE and the row is skipped).
-    """
+    """Delete everything the app-context tests created, organisation by organisation."""
     from app import db
-    from sqlalchemy import text
-    from tests._outbox_cleanup import purge_outbox_events
+    from app.models.organization import Organization
+    from app.services.org_deletion_service import OrganizationDeletionService
 
     with app.app_context():
-        purge_outbox_events(db.session, org_ids)
-        for table, column in (
-            ("unified_capabilities", "organization_id"),
-            ("work_packages", "organization_id"),
-            ("vendor_contracts", "organization_id"),
-            ("application_components", "organization_id"),
-            ("application_interfaces", "organization_id"),
-            ("data_entities", "organization_id"),
-            ("data_domains", "organization_id"),
-            ("business_capability", "organization_id"),
-            ("archimate_elements", "organization_id"),
-        ):
-            db.session.execute(
-                text(f"DELETE FROM {table} WHERE {column} = ANY(:ids)"),
-                {"ids": list(org_ids)},
-            )
-        db.session.execute(
-            text("DELETE FROM organizations WHERE id = ANY(:ids)"),
-            {"ids": list(org_ids)},
-        )
-        db.session.commit()
+        for org_id in org_ids:
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
 
 
 def test_backfill_creates_missing_elements(db_session, make_org, tenant_ctx):

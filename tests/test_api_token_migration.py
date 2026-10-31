@@ -174,7 +174,7 @@ def migration_rows(app):
 
     with app.app_context():
         with db.engine.begin() as connection:
-            connection.execute(text("SET session_replication_role = replica"))
+            connection.execute(text("SET session_replication_role = replica"))  # session-replication-role-ok: constructs a dangling user_id on purpose, a shape the backfill cannot fix and no real caller can write (the token/user FK forbids it)
             try:
                 connection.execute(
                     text(
@@ -186,7 +186,7 @@ def migration_rows(app):
                     {"t": token_b},
                 )
             finally:
-                connection.execute(text("SET session_replication_role = origin"))
+                connection.execute(text("SET session_replication_role = origin"))  # session-replication-role-ok: restores the switch flipped above
 
     def cleanup():
         with app.app_context():

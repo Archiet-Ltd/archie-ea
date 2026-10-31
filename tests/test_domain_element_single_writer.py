@@ -269,24 +269,49 @@ def test_vendor_matching_api_routes_uses_shared_writer(
 
 
 def _delete_element_leaving_pointer(db_session, element):
-    """Delete an element row with raw SQL and foreign-key enforcement off, so the
-    owning row's archimate_element_id keeps pointing at the now-missing row.
+    """Delete an element row with whichever foreign key currently references it
+    dropped for this test's transaction only, so the owning row's
+    archimate_element_id keeps pointing at the now-missing row.
 
     This is the state the repair exists for. Clearing the pointer first (as an
     ORM delete would force) tests nothing: an unlinked row was always repaired.
+    Which table owns the pointer varies by test (ApplicationComponent, DataEntity,
+    ...), so the constraint to drop is found from the catalog rather than named,
+    and only one actually referencing this row is touched. ``db_session`` rolls
+    back its whole real transaction at teardown (see tests/conftest.py), so
+    dropping it here is undone with everything else the test did; no trigger is
+    disabled and no other table's integrity is touched.
     """
     from sqlalchemy import text
 
     element_id = element.id
     db_session.flush()
     db_session.expunge(element)
-    db_session.execute(text("SET LOCAL session_replication_role = replica"))
-    try:
-        db_session.execute(
-            text("DELETE FROM archimate_elements WHERE id = :i"), {"i": element_id}
+
+    referencing_fks = db_session.execute(
+        text(
+            "SELECT c.conname, c.conrelid::regclass::text AS table_name,"
+            "       a.attname AS column_name "
+            "FROM pg_constraint c "
+            "JOIN unnest(c.conkey) WITH ORDINALITY AS cols(attnum, ord) ON true "
+            "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = cols.attnum "
+            "WHERE c.contype = 'f' AND c.confrelid = 'archimate_elements'::regclass"
         )
-    finally:
-        db_session.execute(text("SET LOCAL session_replication_role = DEFAULT"))
+    ).fetchall()
+
+    for conname, table_name, column_name in referencing_fks:
+        holder = db_session.execute(
+            text(f'SELECT 1 FROM {table_name} WHERE "{column_name}" = :i LIMIT 1'),
+            {"i": element_id},
+        ).first()
+        if holder:
+            db_session.execute(
+                text(f'ALTER TABLE {table_name} DROP CONSTRAINT "{conname}"')
+            )
+
+    db_session.execute(
+        text("DELETE FROM archimate_elements WHERE id = :i"), {"i": element_id}
+    )
     assert db_session.get(ArchiMateElement, element_id) is None
     return element_id
 

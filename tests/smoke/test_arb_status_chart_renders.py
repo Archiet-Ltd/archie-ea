@@ -48,7 +48,7 @@ def one_governed_review(seeded):
         # `governed` fixture already uses for synthetic rows -- must be set
         # before the first insert, since SET LOCAL only affects statements
         # issued after it within the current transaction.
-        db.session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        db.session.execute(db.text("SET LOCAL session_replication_role = replica"))  # session-replication-role-ok: archie_validate_arb_cycle_membership() expects a review-projection row only the real submission service normally populates; a hand-built ORM fixture can't satisfy it without replaying that workflow
 
         adr = ArchitectureDecision(
             organization_id=org_id,

@@ -4482,7 +4482,7 @@ def test_role_bootstrap_is_idempotent_and_runtime_cannot_bypass_guards(
             raw.commit()
 
             forbidden = (
-                "SET session_replication_role = replica",
+                "SET session_replication_role = replica",  # session-replication-role-ok: asserts the runtime role is REFUSED this, not that it uses it
                 f"SET ROLE {role_database.deploy_role}",
                 f"SET ROLE {role_database.privileged_role}",
                 "ALTER TABLE public.operation_results DISABLE TRIGGER ALL",

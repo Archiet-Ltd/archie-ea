@@ -296,12 +296,10 @@ def test_two_concurrent_additions_of_the_last_place_admit_exactly_one(app):
         assert members == 3
     finally:
         with app.app_context():
-            from tests._outbox_cleanup import purge_audit_entries
+            from app.services.org_deletion_service import OrganizationDeletionService
 
-            purge_audit_entries(db.session, [org_id])
-            User.query.filter_by(organization_id=org_id).delete()
-            Organization.query.filter_by(id=org_id).delete()
-            db.session.commit()
+            if db.session.get(Organization, org_id) is not None:
+                OrganizationDeletionService.delete_organization(org_id)
 
 
 # --------------------------------------------------------------------------- #

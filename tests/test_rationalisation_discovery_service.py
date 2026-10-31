@@ -479,42 +479,11 @@ def committed_scope(app, _schema):
             else:
                 app.config["TRANSFORMATION_PORTFOLIO_STEWARD_ID"] = previous_steward
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "candidate_overlap_dispositions",
-                    "candidate_signals",
-                    "evidence_requests",
-                    "transformation_candidates",
-                    "application_dependencies",
-                    "application_capability_mapping",
-                    "programme_role_assignments",
-                    "programme_workstreams",
-                    "strategic_initiatives",
-                    "application_owners",
-                    "application_components",
-                    "business_capability",
-                    "users",
-                ):
-                    connection.execute(
-                        text(
-                            f'DELETE FROM "{table_name}" '
-                            "WHERE organization_id = :organization_id"
-                        ),
-                        {"organization_id": scope.organization_id},
-                    )
-                connection.execute(
-                    text("DELETE FROM subscriptions WHERE organization_id = :organization_id"),
-                    {"organization_id": scope.organization_id},
-                )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id = :organization_id"),
-                    {"organization_id": scope.organization_id},
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            if db.session.get(Organization, scope.organization_id) is not None:
+                OrganizationDeletionService.delete_organization(scope.organization_id)
+            db.session.remove()
 
 
 def test_acceptance_recomputes_citations_replays_and_does_not_copy_application(

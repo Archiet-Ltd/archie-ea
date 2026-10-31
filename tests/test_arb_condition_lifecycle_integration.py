@@ -46,41 +46,41 @@ def db_session(app, _schema):
             checkpoint_keys = tuple(cleanup_checkpoint_keys)
             db.session.remove()
             if organization_ids:
+                from app.models.organization import Organization
+                from app.services.org_deletion_service import OrganizationDeletionService
+
                 raw = db.engine.raw_connection()
                 try:
                     with raw.cursor() as cursor:
-                        cursor.execute("SHOW session_replication_role")
-                        original_role = cursor.fetchone()[0]
-                        cursor.execute("SET session_replication_role = replica")
-                        try:
-                            if checkpoint_keys:
-                                cursor.execute(
-                                    "DELETE FROM arb_waiver_expiry_checkpoints "
-                                    "WHERE scope_key = ANY(%s)",
-                                    (list(checkpoint_keys),),
-                                )
-                            for table in _C3_CLEANUP_TABLES:
-                                cursor.execute(
-                                    f'DELETE FROM "{table}" WHERE organization_id = ANY(%s)',
-                                    (list(organization_ids),),
-                                )
+                        if checkpoint_keys:
                             cursor.execute(
-                                "DELETE FROM organizations WHERE id = ANY(%s)",
-                                (list(organization_ids),),
+                                "DELETE FROM arb_waiver_expiry_checkpoints "
+                                "WHERE scope_key = ANY(%s)",
+                                (list(checkpoint_keys),),
                             )
-                        except Exception:
-                            raw.rollback()
-                            cursor.execute(
-                                f"SET session_replication_role = {original_role}"
-                            )
-                            raw.commit()
-                            raise
+                        # archie_command_claim_challenges carries organization_id with no
+                        # foreign key to organizations (a deliberate, trigger-free,
+                        # TTL-cleaned table — see transformation_db_guards.py), so the
+                        # deletion service's foreign-key-driven plan never reaches it and
+                        # an un-expired nonce for this organisation outlives it. No guard
+                        # sits on this table, so a plain delete needs no marker and no
+                        # escape hatch.
                         cursor.execute(
-                            f"SET session_replication_role = {original_role}"
+                            "DELETE FROM archie_command_claim_challenges "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(organization_ids),),
                         )
                         raw.commit()
-                        cursor.execute("SHOW session_replication_role")
-                        restored_role = cursor.fetchone()[0]
+                finally:
+                    raw.close()
+                for org_id in organization_ids:
+                    if db.session.get(Organization, org_id) is not None:
+                        OrganizationDeletionService.delete_organization(org_id)
+                db.session.remove()
+
+                raw = db.engine.raw_connection()
+                try:
+                    with raw.cursor() as cursor:
                         residual = {}
                         for table in _C3_CLEANUP_ASSERT_TABLES:
                             cursor.execute(
@@ -109,10 +109,9 @@ def db_session(app, _schema):
                                 residual["arb_waiver_expiry_checkpoints"] = (
                                     checkpoint_count
                                 )
-                        if restored_role != original_role or residual:
+                        if residual:
                             raise AssertionError(
-                                "C3 cleanup did not restore database state: "
-                                f"role={restored_role!r}, residual={residual!r}"
+                                f"C3 cleanup did not restore database state: residual={residual!r}"
                             )
                 finally:
                     raw.close()
@@ -245,13 +244,13 @@ def test_submit_verify_and_projection_commit_under_real_guards(
         db_session.commit()
     db_session.rollback()
 
-    db_session.execute(db.text("SET LOCAL session_replication_role = replica"))
+    db_session.execute(db.text("SET LOCAL session_replication_role = replica"))  # session-replication-role-ok: constructs a row shaped like data written before this validation existed, to prove reconciliation of genuinely pre-existing legacy rows; no real caller can write this shape today
     legacy_condition_id = db_session.execute(
         legacy_insert, legacy_parameters
     ).scalar_one()
     db_session.commit()
     assert db_session.execute(
-        db.text("SHOW session_replication_role")
+        db.text("SHOW session_replication_role")  # session-replication-role-ok: read-only check that the replica mode set above was scoped to its own transaction and already reverted
     ).scalar_one() == "origin"
     mutated_provenance = {
         "classification": "pre_c3_fulfilment",

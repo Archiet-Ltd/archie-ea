@@ -92,29 +92,11 @@ def programme_fixture(app, _schema):
             yield fixture
         finally:
             db.session.remove()
-            with db.engine.begin() as connection:
-                connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
-                for table_name in (
-                    "transformation_outbox_events",
-                    "operation_results",
-                    "command_materialisations",
-                    "command_idempotency_records",
-                    "measure_definitions",
-                    "programme_outcome_commitments",
-                    "programme_role_assignments",
-                    "programme_workstreams",
-                    "solutions",
-                    "strategic_initiatives",
-                    "users",
-                ):
-                    connection.execute(
-                        text(f'DELETE FROM "{table_name}" WHERE organization_id IN (:org, :foreign)'),
-                        {"org": fixture.organization_id, "foreign": fixture.foreign_organization_id},
-                    )
-                connection.execute(
-                    text("DELETE FROM organizations WHERE id IN (:org, :foreign)"),
-                    {"org": fixture.organization_id, "foreign": fixture.foreign_organization_id},
-                )
+            from app.services.org_deletion_service import OrganizationDeletionService
+
+            for org_id in (fixture.organization_id, fixture.foreign_organization_id):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
 
 
 def _intake(owner_id: int, **changes) -> ProgrammeIntake:

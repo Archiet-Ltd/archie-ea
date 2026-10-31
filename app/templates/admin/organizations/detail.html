@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 
@@ -73,15 +74,17 @@
                 &middot; Updated {{ org.updated_at.strftime('%Y-%m-%d %H:%M') }}
                 {% endif %}
             </span>
-            {% if org.slug != 'default' %}
+            {% if not org.is_default(org) %}
             <form method="POST" action="{{ url_for('admin.organization_delete', org_id=org.id) }}"
-                  data-confirm="Delete {{ org.name }}? All users will be moved to the Default organization.">
+                  data-confirm="Delete {{ org.name }}? Everything it holds is removed. People who belong only to it are removed with it; people who also belong to another organisation keep that one. This cannot be undone.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit"
                     class="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-7 px-2.5 bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i> Delete Organization
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i> Delete organisation
                 </button>
             </form>
+            {% else %}
+            <span class="text-xs text-muted-foreground" data-testid="organisation-delete-refused">The Default organisation cannot be deleted.</span>
             {% endif %}
         </div>
         {% endif %}
@@ -164,7 +167,7 @@
                                         {{ 'Revoke Admin' if user.is_org_admin else 'Make Admin' }}
                                     </button>
                                 </form>
-                                {% if org.slug != 'default' %}
+                                {% if not org.is_default(org) %}
                                 <form method="POST" action="{{ url_for('admin.remove_user_from_org', org_id=org.id, user_id=user.id) }}" class="inline"
                                       data-confirm="Remove {{ user.full_name() or user.email }} from this organization?">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

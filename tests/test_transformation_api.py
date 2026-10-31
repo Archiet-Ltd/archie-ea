@@ -177,21 +177,6 @@ MUTATION_PATHS = (
 )
 
 
-_CLEANUP_TABLES = (
-    "archie_command_claim_challenges",
-    "transformation_outbox_events",
-    "operation_results",
-    "command_materialisations",
-    "command_idempotency_records",
-    "measure_definitions",
-    "programme_outcome_commitments",
-    "programme_role_assignments",
-    "programme_workstreams",
-    "strategic_initiatives",
-    "users",
-)
-
-
 @pytest.fixture(scope="module", autouse=True)
 def transformation_api_schema(app, _schema):
     from app.commands.reconcile_schema import _reconcile
@@ -214,27 +199,27 @@ def committed_session(app, _schema):
         finally:
             db.session.remove()
             if cleanup_org_ids:
+                from app.models.organization import Organization
+                from app.services.org_deletion_service import OrganizationDeletionService
+
                 raw = db.engine.raw_connection()
                 try:
                     with raw.cursor() as cursor:
-                        cursor.execute("SHOW session_replication_role")
-                        original_role = cursor.fetchone()[0]
-                        cursor.execute("SET session_replication_role = replica")
-                        try:
-                            for table in _CLEANUP_TABLES:
-                                cursor.execute(
-                                    f'DELETE FROM "{table}" WHERE organization_id = ANY(%s)',
-                                    (list(cleanup_org_ids),),
-                                )
-                            cursor.execute(
-                                "DELETE FROM organizations WHERE id = ANY(%s)",
-                                (list(cleanup_org_ids),),
-                            )
-                        finally:
-                            cursor.execute(f"SET session_replication_role = {original_role}")
-                            raw.commit()
+                        # archie_command_claim_challenges carries organization_id with no
+                        # foreign key to organizations (a deliberate, trigger-free,
+                        # TTL-cleaned table), so the deletion service never reaches it.
+                        cursor.execute(
+                            "DELETE FROM archie_command_claim_challenges "
+                            "WHERE organization_id = ANY(%s)",
+                            (list(cleanup_org_ids),),
+                        )
+                        raw.commit()
                 finally:
                     raw.close()
+                for org_id in cleanup_org_ids:
+                    if db.session.get(Organization, org_id) is not None:
+                        OrganizationDeletionService.delete_organization(org_id)
+                db.session.remove()
 
 
 def _make_org(session, cleanup_org_ids, label):
@@ -764,7 +749,6 @@ def test_evidence_http_lifecycle_uses_real_observation_conflict_and_request_serv
     assert accepted_replay.get_json()["meta"]["idempotent"] is True
 
     with db.engine.begin() as connection:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
         connection.execute(
             EvidenceRequest.__table__.update()
             .where(
