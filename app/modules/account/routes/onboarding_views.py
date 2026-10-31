@@ -115,10 +115,12 @@ def add_routes(bp, access) -> None:
     def welcome_website():
         data = request.get_json(silent=True) or {}
         try:
-            onboarding.save_website(_org(), data.get("url"), bool(data.get("consent")), current_user.id)
+            note = onboarding.save_website(_org(), data.get("url"), bool(data.get("consent")), current_user.id)
+        except onboarding.ReadingLimited as exc:
+            return _problem(str(exc), 429)
         except ValueError as exc:
             return _problem(str(exc))
-        return jsonify(_state_payload(_org()))
+        return jsonify({**_state_payload(_org()), "note": note})
 
     @bp.route("/welcome/choices", methods=["POST"])
     @login_required
