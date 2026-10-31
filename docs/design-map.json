@@ -10625,23 +10625,14 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
-    "alert",
-    "badge",
     "breadcrumb",
-    "button",
-    "empty",
-    "field",
-    "input",
-    "page-header",
-    "page-shell",
-    "switch",
-    "tabs",
     "card",
-    "alert-dialog"
+    "page-shell",
+    "table"
    ],
    "confidence": "high",
    "controls": {
@@ -10667,13 +10658,10 @@
    "original": "preview-02",
    "page_type": "settings",
    "patterns": [
-    "P01-page-header",
-    "P16-settings-section",
-    "P08-confirm-destructive",
-    "P22-toast-feedback"
+    "P01-page-header"
    ],
    "persona": "security_architect",
-   "reason": "Security settings, one section per card.",
+   "reason": "Read which security headers this deployment sends and what the rate limiter has counted.",
    "reference": {
     "shadcn": {
      "name": "shadcn blocks: sidebar-08 (inset section navigation)",
@@ -10684,7 +10672,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/security-dashboard.md",
    "states": [
     "loading",
     "empty-no-permission",

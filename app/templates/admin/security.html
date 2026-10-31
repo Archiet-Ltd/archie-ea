@@ -1,53 +1,77 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Security Settings{% endblock %}
 {% block content %}
-<div class="max-w-3xl mx-auto py-8">
-  {{ page_shell(title='Security Dashboard', breadcrumb=[('Home', '/'), ('Security Dashboard', none)]) }}
-  <div class="bg-background rounded p-6 mb-6">
-    <h2 class="text-lg font-semibold mb-2">Response Headers</h2>
-    {% if headers %}
-    <p class="text-sm text-muted-foreground mb-3">
-      The headers this page's own response carries, read from the live
-      after-request handler.
-    </p>
-    <table class="dense-table min-w-full text-sm">
-      <thead><tr><th class="text-left">Header name</th><th class="text-left">Header name</th></tr></thead>
-      <tbody>
-        {% for k, v in headers.items() %}
-        <tr><td class="font-mono">{{ k }}</td><td class="font-mono break-all">{{ v }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="text-sm text-muted-foreground">
-      &mdash; Not determined: this app has no registered security-header handler,
-      so there is nothing to report.
-    </p>
-    {% endif %}
-  </div>
-  <div class="bg-background rounded p-6 mb-6">
-    <h2 class="text-lg font-semibold mb-2">Rate Limit Stats</h2>
-    {% if rate_limit_stats is none %}
-    <p class="text-sm text-muted-foreground">
-      &mdash; Not measured: the in-process rate limiter is not installed in the
-      request pipeline, so no counters exist. This is not the same as "nothing
-      was rate limited".
-    </p>
-    {% elif rate_limit_stats %}
-    <table class="dense-table min-w-full text-sm">
-      <thead><tr><th class="text-left">Key</th><th class="text-left">Count, Timestamp</th></tr></thead>
-      <tbody>
-        {% for key, val in rate_limit_stats %}
-        <tr><td class="font-mono">{{ key }}</td><td class="font-mono">{{ val }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="text-sm text-muted-foreground">
-      No requests have been counted by the rate limiter in this process yet.
-    </p>
-    {% endif %}
+<div class="p-6 space-y-6">
+  {{ page_shell(title='Security Dashboard',
+                subtitle='What this deployment sends and counts right now. Nothing on this page is a setting you can change.',
+                breadcrumb=[('Home', '/'), ('Admin', url_for('admin.index')), ('Security Dashboard', none)]) }}
+  <div class="max-w-2xl space-y-6">
+    {% call ui.card(attrs={'data-testid': 'security-headers'}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_title(text='Response headers') }}
+        {{ ui.card_description(text="The headers this page's own response carries, read from the live after-request handler.") }}
+      {% endcall %}
+      {% call ui.card_content() %}
+        {% if headers %}
+        {% call ui.table_container() %}
+          {% call ui.table() %}
+            {% call ui.table_header() %}
+              {% call ui.table_row() %}
+                {{ ui.table_head(text='Header') }}
+                {{ ui.table_head(text='Value') }}
+              {% endcall %}
+            {% endcall %}
+            {% call ui.table_body() %}
+              {% for k, v in headers.items() %}
+              {% call ui.table_row() %}
+                {{ ui.table_cell(text=k, class='font-mono') }}
+                {{ ui.table_cell(text=v, class='font-mono break-all whitespace-normal') }}
+              {% endcall %}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% else %}
+        <p class="text-sm text-muted-foreground">Not determined: this app has no registered security-header handler, so there is nothing to report.</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+
+    {% call ui.card(attrs={'data-testid': 'security-rate-limit'}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_title(text='Rate limit') }}
+        {{ ui.card_description(text='Requests counted by the in-process rate limiter since this process started.') }}
+      {% endcall %}
+      {% call ui.card_content() %}
+        {% if rate_limit_stats is none %}
+        <p class="text-sm text-muted-foreground">Not measured: the in-process rate limiter is not installed in the request pipeline, so no counters exist. This is not the same as "nothing was rate limited".</p>
+        {% elif rate_limit_stats %}
+        {% call ui.table_container() %}
+          {% call ui.table() %}
+            {% call ui.table_header() %}
+              {% call ui.table_row() %}
+                {{ ui.table_head(text='Key') }}
+                {{ ui.table_head(text='Count, timestamp') }}
+              {% endcall %}
+            {% endcall %}
+            {% call ui.table_body() %}
+              {% for key, val in rate_limit_stats %}
+              {% call ui.table_row() %}
+                {{ ui.table_cell(text=key, class='font-mono') }}
+                {{ ui.table_cell(text=val, class='font-mono') }}
+              {% endcall %}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% else %}
+        <p class="text-sm text-muted-foreground">No requests have been counted by the rate limiter in this process yet.</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
   </div>
 </div>
 {% endblock %}
