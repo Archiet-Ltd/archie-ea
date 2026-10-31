@@ -5,9 +5,17 @@
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import hidden_input %}
+{% import 'basecoat/index.html' as ui %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="style-vega max-w-6xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='Connectors',
         description='Every connector of your organisation: health, last synchronisation, and the change queue each edit goes through.',
@@ -47,74 +55,41 @@
         to read your repositories and get a first model of your company: its applications, their parts, their owners and the links between them.
     </p>
 
-    <div class="grid gap-6 lg:grid-cols-3">
-        <!-- Add / edit form -->
-        <div data-slot="card" class="rounded-lg border border-input bg-card h-fit lg:col-span-1">
-            <div class="p-4 sm:p-6 border-b">
-                <h3 class="text-lg font-semibold">Add connector</h3>
-                <p class="text-sm text-muted-foreground mt-1">
-                    Every change is queued for approval in this organisation unless
-                    the action type is delegated. Credentials are stored encrypted,
-                    per organisation, and shown masked.
-                </p>
-            </div>
-            <form method="POST" action="{{ url_for('m365_connector.connectors_save') }}" class="p-4 sm:p-6 space-y-4" data-connector-form>
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% call ui.card(class='max-w-2xl') %}
+        {% call ui.card_header() %}
+            {{ ui.card_title(text='Add connector') }}
+            {{ ui.card_description(text='Every change is queued for approval in this organisation unless the action type is delegated. Credentials are stored encrypted, per organisation, and are never shown again.') }}
+        {% endcall %}
+        {% call ui.card_content() %}
+        <form method="POST" action="{{ url_for('m365_connector.connectors_save') }}" class="space-y-6" data-connector-form>
+            {{ hidden_input('csrf_token', csrf_token()) }}
 
-                <div>
-                    <label for="connector_type" class="block text-sm font-medium text-muted-foreground mb-1">Connector type</label>
-                    <select id="connector_type" name="connector_type" required
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                        <option value="">Select a type…</option>
-                        {% for type_key, type_label in connector_type_labels.items() %}
-                            <option value="{{ type_key }}">{{ type_label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+            {% call form_group(id='connector_type', label='Connector type', required=true, class='space-y-2') %}
+                {% call native_select(id='connector_type', name='connector_type', class='w-full', attrs_dict={'required': 'required'}) %}
+                    <option value="">Choose a connector type</option>
+                    {% for type_key, type_label in connector_type_labels.items() %}
+                        <option value="{{ type_key }}">{{ type_label }}</option>
+                    {% endfor %}
+                {% endcall %}
+            {% endcall %}
 
-                <div>
-                    <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Display name</label>
-                    <input type="text" id="name" name="name"
-                        placeholder="Production ServiceNow"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                </div>
+            {{ form_field(id='name', label='Display name', placeholder='Jira Cloud, production', class='space-y-2') }}
 
-                <div>
-                    <label for="config_json" class="block text-sm font-medium text-muted-foreground mb-1">
-                        Configuration (JSON, non-secret)
-                    </label>
-                    <textarea id="config_json" name="config_json" rows="5"
-                        placeholder='{"instance_url": "https://your-instance.service-now.com"}'
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"></textarea>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                        Settings only. Secrets go in the credential field and are stored
-                        separately, encrypted.
-                    </p>
-                </div>
+            {{ form_field(id='config_json', label='Configuration (JSON, non-secret)', input_type='textarea', rows=5,
+                placeholder='{"instance_url": "https://example.com"}',
+                help_text='Settings only. Secrets go in the credential field and are stored separately, encrypted.',
+                class='space-y-2', attrs_dict={'class': 'font-mono'}) }}
 
-                <div>
-                    <label for="credential" class="block text-sm font-medium text-muted-foreground mb-1">Credential</label>
-                    <input type="password" id="credential" name="credential"
-                        autocomplete="new-password"
-                        placeholder="API token or client secret"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
-                </div>
+            {{ form_field(id='credential', label='Credential', type='password', placeholder='API token or client secret',
+                class='space-y-2', attrs_dict={'autocomplete': 'new-password'}) }}
 
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" id="enabled" name="enabled" value="1" checked
-                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
-                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable connector</label>
-                </div>
+            {{ checkbox(id='enabled', name='enabled', value='1', checked=true, label='Enable connector') }}
 
-                <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    Save connector
-                </button>
-            </form>
-        </div>
+            {{ ui.button(text='Save connector', attrs={'type': 'submit'}) }}
+        </form>
+        {% endcall %}
+    {% endcall %}
 
-        <!-- Connector list -->
-        <div class="lg:col-span-2">
             {% call(connector) list_table(rows=connectors, columns=[('Connector', ''), ('Health', ''), ('Credential', ''), ('Last synchronisation', ''), ('Schedule', ''), {'label': '', 'class': 'w-12'}],
                                   caption='Connectors', testid='connectors-table', row_testid='connector-row', search_placeholder='Filter connectors...', toolbar=true,
                                   empty_message='No connectors configured for this organisation yet. Add one with the form, then approve it in the approval inbox.') %}
@@ -132,8 +107,7 @@
                 {% else %}{% call badge(variant='neutral') %}{{ connector.health }}{% endcall %}{% endif %}
               {% endcall %}
               {% call table_cell() %}
-                {% if connector.credential_masked %}<span class="text-sm font-mono text-muted-foreground">{{ connector.credential_masked }}</span>
-                {% else %}<span class="text-xs text-muted-foreground">None</span>{% endif %}
+                {{ ui.badge(text=('Stored' if connector.credential_stored else 'Not set'), variant='outline') }}
               {% endcall %}
               {% call table_cell(class='text-sm text-foreground whitespace-nowrap') %}
                 {% if connector.is_proposal %}<span class="text-xs text-muted-foreground">Awaiting approval</span>
@@ -156,7 +130,5 @@
                 {% endif %}
               {% endcall %}
             {% endcall %}
-        </div>
-    </div>
 </div>
 {% endblock %}

@@ -2064,7 +2064,7 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("legacy-macro-calls", "no new call to an old macro (empty_state, page_header, modal, dense_table, shadcn_*)",
              "ratchet",
              lambda: gate_counted_rule("legacy-macro-calls", "scripts/check_ui_contract.py", "legacy-macro", baseline["legacy_macro_calls"]),
-             remediation="use the component from app/templates/components instead of the old macro",
+             remediation="for empty_state use the ui.empty block (basecoat/empty.html); otherwise use the component from app/templates/components instead of the old macro",
              tags=["static", "ui"]),
         Gate("second-component-library", "no macro outside components/ and basecoat/ under a name the library exports, and no import of one from elsewhere",
              "ratchet",
