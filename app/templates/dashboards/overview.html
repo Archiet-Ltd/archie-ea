@@ -63,7 +63,6 @@
       {% call ui.card_content(class='flex flex-col items-start gap-4') %}
         {% if o.empty %}
         {% if links.connect %}{{ ui.button(text='Connect GitHub', href=links.connect, variant='secondary', class='text-secondary-foreground', attrs={'data-testid': 'overview-connect'}) }}{% endif %}
-        <p class="text-sm text-primary-surface-foreground/90" data-testid="overview-connect-chat">Or ask from the AI chat you already use: <a class="underline underline-offset-4" href="{{ url_for('account.welcome', step=4) }}">connect Claude, ChatGPT or Cursor</a>.</p>
         {% else %}
         <div class="inline-flex divide-x divide-primary-surface-foreground/20 rounded-lg bg-primary-surface-foreground/10" data-testid="welcome-figures">
           <a href="{{ links.applications }}" class="flex flex-col items-center px-5 py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-primary-surface-foreground/50" data-testid="welcome-applications"><span class="text-lg font-semibold tabular-nums">{{ apps.total }}</span><span class="text-xs">Applications</span></a>
