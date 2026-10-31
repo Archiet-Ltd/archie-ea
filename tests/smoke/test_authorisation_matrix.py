@@ -120,6 +120,11 @@ POLICY = {
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # Rate limits: the refused-request log is for an organisation's own administrators (its
+    # people's refusals only) and the platform administrator; the allow and deny lists are the
+    # platform administrator's. No seeded archetype but platform_admin is an administrator, so
+    # every plain member is refused, signed in.
+    "/admin/rate-limits":      set(),
     # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
     # gated to platform_admin via @requires_role / _guard in
     # agent_registry_routes.py -- registering and activating an agent is
@@ -898,6 +903,24 @@ def test_oversight_post_routes_authorisation(
     assert actual == expected, (
         "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
     )
+
+
+# Writing an allow or deny entry is for the platform administrator alone. The delete route is
+# probed with an entry that does not exist, so nothing is changed: a refused person gets 403, the
+# platform administrator reaches the handler (which redirects back with a notice).
+RATE_LIMIT_POST_POLICY = {"/admin/rate-limits/rules/2147483646/delete": {"platform_admin"}}
+
+
+@pytest.mark.parametrize("path,allowed", RATE_LIMIT_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_rate_limit_writes_refuse_a_signed_in_plain_member(archetype, path, allowed, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(live_server + path, data={"csrf_token": csrf}, max_redirects=0)
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
 
 
 @pytest.fixture(scope="module")
