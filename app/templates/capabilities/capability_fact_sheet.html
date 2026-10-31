@@ -1,33 +1,61 @@
 {# shadcn-reference: preview@e55b60b #}
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/metrics_card.html" import metrics_card %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/badge.html" import badge %}
 {% from "components/button.html" import button %}
 {% from "components/form_field.html" import form_group %}
 {% from "components/select.html" import native_select %}
+{% from "components/fact_list.html" import fact_list %}
 
 {% block title %}{{ cap.name }} — Capability Fact Sheet{% endblock %}
 
-{% macro drow(label, value) %}
-<div class="flex items-start justify-between gap-4 py-2.5 border-t border-border first:border-t-0">
-  <dt class="text-sm text-muted-foreground">{{ label }}</dt>
-  <dd class="text-sm text-foreground font-medium text-right">
-    {%- if value is not none and (value | string) | trim != '' -%}{{ value }}{%- else -%}<span class="text-muted-foreground">&mdash;</span>{%- endif -%}
-  </dd>
-</div>
+{# One empty value: what it says, then the sentence that tells the reader where it is recorded. #}
+{% macro not_set(lead='Not set', place=none, href=none) %}
+<span class="text-muted-foreground">{{ lead }}</span>
+{%- if place %} <span class="block text-xs text-muted-foreground">
+  {%- if href %}<a href="{{ href }}" class="hover:underline">{{ place }}</a>{% else %}{{ place }}{% endif -%}
+</span>{% endif %}
+{% endmacro %}
+
+{% set import_place = 'Recorded through the capability import or API.' %}
+{% set score_place = 'Set it with Edit on the capability list.' %}
+{% set list_url = '/enterprise/capability-map/capabilities' %}
+
+{# One fact's value: the value when recorded, otherwise "Not set" with where to set it. #}
+{% macro fact_value(p) %}
+<span id="field-{{ p.key }}" class="scroll-mt-24">
+{%- if p.value is not none and (p.value | string) | trim != '' -%}
+  <span class="font-medium">{{ p.value }}</span>
+{%- else -%}{{ not_set(p.get('lead', 'Not set'), p.get('place'), p.get('href')) }}{%- endif -%}
+</span>
+{% endmacro %}
+
+{% macro facts(testid, items) %}
+{% call(p) fact_list(items=items, testid=testid) %}{{ fact_value(p) }}{% endcall %}
 {% endmacro %}
 
 {% macro panel(title, icon) %}
-<section data-slot="card" class="rounded-lg border border-border bg-card">
-  <header class="flex items-center gap-2 px-6 py-4 border-b border-border">
-    <i data-lucide="{{ icon }}" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-    <h2 class="text-sm font-semibold text-foreground tracking-tight">{{ title }}</h2>
-  </header>
-  <div class="px-6 py-4">{{ caller() }}</div>
-</section>
+{%- set body = caller -%}
+{% call ui.card() %}
+  {% call ui.card_header() %}{{ ui.card_title(text=title) }}{% endcall %}
+  {% call ui.card_content() %}{{ body() }}{% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{# One of the figures along the top: a label, the figure or its gap, and the sentence that explains it. #}
+{% macro stat(label, key, value, sentence, lead='Not set', place=none, href=none) %}
+{% call ui.card(attrs={'data-testid': 'stat-card'}) %}
+  {% call ui.card_header() %}{{ ui.card_description(text=label) }}{% endcall %}
+  {% call ui.card_content(class='flex flex-col gap-1') %}
+    <span id="field-{{ key }}" class="text-2xl font-semibold tabular-nums scroll-mt-24">
+      {%- if value is not none and (value | string) | trim != '' %}{{ value }}{% else %}<span class="text-base font-normal">{{ not_set(lead, place, href) }}</span>{% endif -%}
+    </span>
+    {% if sentence %}<span class="text-sm text-muted-foreground">{{ sentence }}</span>{% endif %}
+  {% endcall %}
+{% endcall %}
 {% endmacro %}
 
 {% block content %}
@@ -46,69 +74,40 @@
   ) }}
 
   {# ── Top band ────────────────────────────────────────────────────────── #}
-  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-
-    {# Completeness ring #}
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
-      {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
-      <div class="relative shrink-0" style="width:76px;height:76px">
-        <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="3"></circle>
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring }}" stroke-width="3"
-                  stroke-linecap="round" stroke-dasharray="{{ completeness.pct }} 100"></circle>
-        </svg>
-        <div class="absolute inset-0 flex items-center justify-center">
-          <span class="text-lg font-bold tabular-nums text-foreground">{{ completeness.pct }}<span class="text-xs">%</span></span>
-        </div>
-      </div>
-      <div>
-        <p class="text-sm font-medium text-foreground">Record completeness</p>
-        <p class="text-xs text-muted-foreground mt-0.5">{{ completeness.filled }} of {{ completeness.of }} key fields recorded</p>
-      </div>
-    </div>
-
-    {# Maturity current -> target #}
-    <div data-slot="card" class="rounded-xl border p-6
- {{ 'border-destructive/40 bg-destructive/5' if maturity.tone == 'crit' else 'border-warning/40 bg-warning/5' if maturity.tone == 'warn' else 'border-border bg-card' }}">
-      <p class="text-sm font-medium text-foreground">Maturity</p>
-      <p class="text-2xl font-bold text-foreground mt-2">
-        {{ maturity.current if maturity.current is not none else '—' }}<span class="text-base text-muted-foreground"> / {{ maturity.target if maturity.target is not none else '—' }}</span>
-      </p>
-      {% if maturity.current_pct is not none %}
-      <div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden relative">
-        <div class="h-full bg-primary rounded-full" style="width:{{ maturity.current_pct }}%"></div>
-        {% if maturity.target_pct is not none %}
-        <span class="absolute top-0 h-full w-0.5 bg-foreground/70" style="left:{{ maturity.target_pct }}%"></span>
-        {% endif %}
-      </div>
-      {% endif %}
-      <p class="text-xs mt-1 {{ 'text-destructive-emphasis' if maturity.tone == 'crit' else 'text-warning-emphasis' if maturity.tone == 'warn' else 'text-muted-foreground' }}">
-        {%- if maturity.gap is not none and maturity.gap > 0 -%}{{ maturity.gap }}-level gap to target
-        {%- elif maturity.gap is not none -%}At or above target
-        {%- else -%}Maturity not assessed{%- endif -%}
-      </p>
-    </div>
-
-    {{ metrics_card(title='Importance',
-        value=(cap.strategic_importance if cap.strategic_importance is not none else '—'),
-        icon='target',
-        footer_text='ROI score: ' ~ (cap.roi_score if cap.roi_score is not none else '—')) }}
-
-    {{ metrics_card(title='Business value',
-        value=(cap.business_value if cap.business_value is not none else '—'),
-        icon='trending-up',
-        footer_text='Performance: ' ~ (cap.performance_score if cap.performance_score is not none else '—')) }}
+  {% set maturity_place = 'Set it in the maturity assessment.' %}
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 mb-6" data-testid="fact-sheet-stats">
+    {{ stat('Record completeness', 'completeness', completeness.pct ~ '%', completeness.filled ~ ' of ' ~ completeness.of ~ ' key fields recorded') }}
+    {% call ui.card(attrs={'data-testid': 'stat-card'}) %}
+      {% call ui.card_header() %}{{ ui.card_description(text='Maturity') }}{% endcall %}
+      {% call ui.card_content(class='flex flex-col gap-1') %}
+        <span class="text-2xl font-semibold tabular-nums">
+          <span id="field-current-maturity" class="scroll-mt-24">{% if maturity.current is not none %}{{ maturity.current }}{% else %}<span class="text-base font-normal">{{ not_set('Not assessed', maturity_place, url_for('maturity_management.edit_capability_maturity', capability_id=cap.id)) }}</span>{% endif %}</span>
+          <span class="text-base font-normal text-muted-foreground">/ <span id="field-target-maturity" class="scroll-mt-24">{% if maturity.target is not none %}{{ maturity.target }}{% else %}Not set{% endif %}</span></span>
+        </span>
+        <span class="text-sm {{ 'text-destructive-emphasis' if maturity.tone == 'crit' else 'text-warning-emphasis' if maturity.tone == 'warn' else 'text-muted-foreground' }}">
+          {%- if maturity.gap is not none and maturity.gap > 0 -%}{{ maturity.gap }}-level gap to target
+          {%- elif maturity.gap is not none -%}At or above target
+          {%- else -%}Gap to target appears once both levels are set{%- endif -%}
+        </span>
+      {% endcall %}
+    {% endcall %}
+    {{ stat('Importance', 'strategic-importance', cap.strategic_importance | capitalize if cap.strategic_importance else none, none, 'Not scored yet', score_place, list_url) }}
+    {{ stat('Business value', 'business-value', cap.business_value | capitalize if cap.business_value else none, none, 'Not scored yet', score_place, list_url) }}
   </div>
 
-  {# ── Gaps ────────────────────────────────────────────────────────────── #}
+  {# ── Gaps: each chip links once to the field it names ────────────────── #}
+  {% set chip_targets = {
+      'Description': 'description', 'Business domain': 'business-domain', 'Business owner': 'business-owner',
+      'IT owner': 'it-owner', 'Current maturity': 'current-maturity', 'Target maturity': 'target-maturity',
+      'Strategic importance': 'strategic-importance', 'Business value': 'business-value'} %}
   {% if completeness.missing %}
-  <div class="rounded-md border border-warning/40 bg-warning/10 px-5 py-2 mb-6 flex items-start gap-3">
+  <div id="missing-record" class="scroll-mt-24 rounded-md border border-warning/40 bg-warning/10 px-5 py-2 mb-6 flex items-start gap-3" data-testid="missing-record">
     <i data-lucide="clipboard-list" class="h-4 w-4 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
     <div>
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
       <div class="flex flex-wrap gap-2 mt-2">
         {% for m in completeness.missing %}
-        {% call badge(variant='warning') %}{{ m }}{% endcall %}
+        <a href="#field-{{ chip_targets.get(m, 'description') }}" class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5 hover:underline">{{ m }}</a>
         {% endfor %}
       </div>
     </div>
@@ -145,14 +144,22 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
     {% call panel('Identity & ownership', 'id-card') %}
-    <dl>
-      {{ drow('Code', cap.code) }}
-      {{ drow('Level', cap.level) }}
-      {{ drow('Business domain', cap.business_domain) }}
-      {{ drow('Business owner', owners | map(attribute='user_name') | join(', ') if owners else cap.business_owner) }}
-      {{ drow('IT owner', cap.it_owner) }}
-      {{ drow('Maturity assessed', maturity.assessed) }}
-    </dl>
+    {{ facts('identity-facts', [
+      {'label': 'Code', 'key': 'code', 'value': cap.code, 'place': import_place},
+      {'label': 'Level', 'key': 'level', 'value': cap.level},
+      {'label': 'Description', 'key': 'description', 'value': cap.description, 'place': 'Set it with Edit on the capability list.', 'href': list_url},
+      {'label': 'Business domain', 'key': 'business-domain', 'value': cap.business_domain, 'place': import_place},
+      {'label': 'Business owner', 'key': 'business-owner', 'value': (owners | map(attribute='user_name') | join(', ')) if owners else cap.business_owner, 'place': 'Set it with Edit on the capability list.', 'href': list_url},
+      {'label': 'IT owner', 'key': 'it-owner', 'value': cap.it_owner, 'place': import_place},
+      {'label': 'Maturity assessed', 'key': 'maturity-assessed', 'value': ('Assessed on ' ~ (maturity.assessed | format_datetime('d MMM yyyy'))) if maturity.assessed else none, 'lead': 'Not assessed', 'place': maturity_place, 'href': url_for('maturity_management.edit_capability_maturity', capability_id=cap.id)},
+    ]) }}
+    {% endcall %}
+
+    {% call panel('Scores', 'gauge') %}
+    {{ facts('score-facts', [
+      {'label': 'ROI score', 'key': 'roi-score', 'value': cap.roi_score, 'lead': 'Not scored yet', 'place': 'No screen records this score yet.'},
+      {'label': 'Performance', 'key': 'performance-score', 'value': cap.performance_score, 'lead': 'Not scored yet', 'place': 'No screen records this score yet.'},
+    ]) }}
     {% endcall %}
 
     {% call panel('Sub-capabilities', 'network') %}
@@ -161,7 +168,7 @@
         {% for k in children %}
         <li class="flex items-center justify-between gap-3 py-2.5">
           <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=k.id) }}" class="text-sm text-foreground hover:text-primary hover:underline">{{ k.name }}</a>
-          <span class="text-xs text-muted-foreground">{% if k.maturity is not none %}maturity {{ k.maturity }}{% else %}&mdash;{% endif %}</span>
+          <span class="text-xs text-muted-foreground">{% if k.maturity is not none %}maturity {{ k.maturity }}{% else %}Not assessed{% endif %}</span>
         </li>
         {% endfor %}
       </ul>
