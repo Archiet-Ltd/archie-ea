@@ -1,6 +1,6 @@
 """Rate limits an administrator can see and set: allow and deny lists, shared counters, violations.
 
-T-limits01. Three tables: rate_limit_rules (platform-wide allow and deny entries),
+Three tables: rate_limit_rules (platform-wide allow and deny entries),
 rate_limit_counters (the limiter's shared counters, so every worker counts one limit) and
 rate_limit_violations (one row per refused request, kept thirty days). The violations table
 carries a nullable organization_id (the signed-in user's organisation; NULL for someone who is

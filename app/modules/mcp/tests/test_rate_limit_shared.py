@@ -1,4 +1,4 @@
-"""The assistant connector is held to the same limiter as every other route (T-limits01).
+"""The assistant connector is held to the same limiter as every other route.
 
 An address on the administrator's deny list is refused at /mcp in the API envelope, before the
 connector reads the request, and the refusal is logged on the Rate limits page's list.
