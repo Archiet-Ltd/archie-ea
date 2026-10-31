@@ -3537,8 +3537,54 @@ class MultiDomainChatService:
             ).first()
         except Exception:
             logger.exception("Could not read the saved system prompt for %s", persona)
+            try:
+                db.session.rollback()
+            except Exception:
+                logger.exception("Rollback after a failed prompt read also failed")
             return ""
         return (row.system_prompt or "").strip() if row else ""
+
+    def _compose_saved_prompt(
+        self,
+        saved: str,
+        persona: str,
+        context_data: Dict,
+        *,
+        user_id: Optional[int] = None,
+    ) -> str:
+        """Saved text, then the persona's live context, then the evidence rules.
+
+        The saved text replaces the built-in wording only. The grounding the
+        rules refer to (live platform data, metamodel base, ARB history, the
+        active workflow) stays, and the rules come last with a precedence line.
+        """
+        from app.modules.ai_chat.services.architect_persona_charters import (
+            _EVIDENCE_RULES,
+            ARCHITECT_PERSONAS,
+            get_live_context,
+        )
+
+        parts = [saved]
+        if persona == "solutions_architect":
+            parts.append(ARCHIMATE_SYSTEM_PROMPT)
+        if persona in ARCHITECT_PERSONAS:
+            live = get_live_context(persona)
+            if live is not None:
+                parts.append(
+                    "=== Live Platform Data (queried now — your ONLY source for numbers) ===\n"
+                    f"{live}\n=== End Live Platform Data ==="
+                )
+            if persona in ("solutions_architect", "enterprise_architect"):
+                arb_context = self._load_arb_history_context(user_id=user_id or 0)
+                if arb_context:
+                    parts.append("Recent Governance Context:\n" + arb_context)
+        else:
+            summary = self._summarize_context_for_prompt(context_data)
+            if summary:
+                parts.append(summary)
+        parts.append(_EVIDENCE_RULES.strip())
+        parts.append("If anything above conflicts with these rules, these rules win.")
+        return "\n\n".join(parts)
 
     def _get_persona_system_prompt(
         self,
@@ -3572,11 +3618,9 @@ class MultiDomainChatService:
         # never the governed charter's evidence and no-fabrication rules.
         saved = self._saved_persona_system_prompt(persona)
         if saved:
-            from app.modules.ai_chat.services.architect_persona_charters import (
-                _EVIDENCE_RULES,
+            return self._compose_saved_prompt(
+                saved, persona, context_data, user_id=user_id
             )
-
-            return saved + "\n\n" + _EVIDENCE_RULES.strip()
 
         # A95-013 + AI-1: solutions_architect keeps its ArchiMate 3.2 metamodel
         # base and gains the architect charter + live governance data block.

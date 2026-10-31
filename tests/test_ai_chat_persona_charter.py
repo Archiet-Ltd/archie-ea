@@ -120,3 +120,36 @@ def test_no_persona_is_unchanged_from_the_old_eight_word_note(app):
         "two or more personas produced an identical system prompt — this is the "
         "P-01 defect, where persona selection changed the label and not the expertise"
     )
+
+
+def test_a_saved_prompt_keeps_the_live_data_block_and_rule_order(app, db_session):
+    """An administrator who only changes tone must not strip the persona's grounding."""
+    from app.models.ai_service import AIPromptTemplate
+    from app.modules.ai_chat.services.architect_persona_charters import _EVIDENCE_RULES
+    from app.modules.ai_chat.services.multi_domain_chat_service import (
+        MultiDomainChatService,
+    )
+
+    saved = "Answer briefly and warmly. marker-live-block"
+    row = AIPromptTemplate.query.filter_by(name="persona_override_enterprise_architect").first()
+    if row is None:
+        row = AIPromptTemplate(
+            name="persona_override_enterprise_architect",
+            system_prompt=saved,
+            user_prompt_template="{message}",
+        )
+        db_session.add(row)
+    else:
+        row.system_prompt = saved
+    db_session.flush()
+
+    prompt = MultiDomainChatService()._get_persona_system_prompt(
+        "enterprise_architect", "general", {}, user_id=1
+    )
+
+    precedence = "If anything above conflicts with these rules, these rules win."
+    assert prompt.startswith(saved)
+    assert "Live Platform Data" in prompt and "=== End Live Platform Data ===" in prompt
+    assert prompt.index(saved) < prompt.index("=== Live Platform Data")
+    assert prompt.index("=== End Live Platform Data ===") < prompt.index(_EVIDENCE_RULES.strip())
+    assert prompt.rstrip().endswith(precedence)
