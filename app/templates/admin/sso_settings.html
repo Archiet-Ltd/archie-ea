@@ -4,6 +4,10 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/button.html' import button %}
+{% from 'components/input.html' import hidden_input %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu, dropdown_menu_trigger, dropdown_menu_content, dropdown_menu_item, dropdown_menu_separator %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" x-data="ssoMappingPage()">
@@ -42,54 +46,18 @@
                 </div>
                 <div class="p-4 sm:p-6">
                     <form method="POST" action="{{ url_for('admin.sso_settings') }}" class="space-y-4">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="action" value="add"/>
+                        {{ hidden_input('csrf_token', csrf_token()) }}
+                        {{ hidden_input('action', 'add') }}
 
-                        <div>
-                            <label for="sso_group_name" class="block text-sm font-medium text-muted-foreground mb-1">
-                                IdP Group Name <span class="text-destructive-emphasis">*</span>
-                            </label>
-                            <input type="text"
-                                   id="sso_group_name"
-                                   name="sso_group_name"
-                                   placeholder="e.g. EA-Architects"
-                                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                   required>
-                            <p class="text-xs text-muted-foreground mt-1">Exact display name from your identity provider</p>
-                        </div>
+                        {{ form_field(id='sso_group_name', label='IdP Group Name', required=true, placeholder='e.g. EA-Architects', help_text='Exact display name from your identity provider', class='space-y-2') }}
+                        {% set role_opts = [('', 'Select a role…')] %}{% for role in valid_roles %}{% set _ = role_opts.append((role, role | replace('_', ' ') | title)) %}{% endfor %}
+                        {% call form_group(id='role_name', label='Platform Role', required=true, class='space-y-2') %}
+                            {{ native_select(id='role_name', name='role_name', class='w-full', options=role_opts, attrs_dict={'required': 'required'}) }}
+                        {% endcall %}
+                        {{ form_field(id='description', label='Description (optional)', placeholder='e.g. Enterprise Architect team', class='space-y-2') }}
 
-                        <div>
-                            <label for="role_name" class="block text-sm font-medium text-muted-foreground mb-1">
-                                Platform Role <span class="text-destructive-emphasis">*</span>
-                            </label>
-                            <select id="role_name"
-                                    name="role_name"
-                                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    required>
-                                <option value="">Select a role…</option>
-                                {% for role in valid_roles %}
-                                    <option value="{{ role }}">{{ role | replace('_', ' ') | title }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">
-                                Description <span class="text-muted-foreground">(optional)</span>
-                            </label>
-                            <input type="text"
-                                   id="description"
-                                   name="description"
-                                   placeholder="e.g. Enterprise Architect team"
-                                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        </div>
-
-                        <button type="submit"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
-                                aria-label="Add SSO group mapping">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            Add Mapping
-                        </button>
+                        {% call button(type='submit', class='w-full', attrs={'aria-label': 'Add SSO group mapping'}) %}<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Add Mapping{% endcall %}
                     </form>
                 </div>
             </div>
@@ -104,14 +72,10 @@
                         Refresh the in-memory role map from database. New roles apply on the next SSO login for each user.
                     </p>
                     <form method="POST" action="{{ url_for('admin.sso_settings') }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="action" value="sync_all"/>
-                        <button type="submit"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
-                                aria-label="Sync all SSO user roles from database mappings">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-                            Refresh Role Map
-                        </button>
+                        {{ hidden_input('csrf_token', csrf_token()) }}
+                        {{ hidden_input('action', 'sync_all') }}
+                        {% call button(type='submit', variant='outline', class='w-full', attrs={'aria-label': 'Sync all SSO user roles from database mappings'}) %}<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                            Refresh Role Map{% endcall %}
                     </form>
                 </div>
             </div>
@@ -187,20 +151,24 @@
                     </span>
                   {% endcall %}
                   {% call table_cell(class='w-12 text-right') %}
-                    <div class="inline-flex items-center gap-2">
-                        <form method="POST" action="{{ url_for('admin.sso_settings') }}" class="inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <input type="hidden" name="action" value="toggle"/>
-                            <input type="hidden" name="mapping_id" value="{{ mapping.id }}"/>
-                            {% call button(type='submit', variant='outline', size='sm', attrs={'aria-label': ('Disable' if mapping.is_active else 'Enable') ~ ' mapping for ' ~ mapping.sso_group_name}) %}{{ 'Disable' if mapping.is_active else 'Enable' }}{% endcall %}
+                    {% call dropdown_menu() %}
+                      {% call dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') %}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ mapping.sso_group_name }}</span>{% endcall %}
+                      {% call dropdown_menu_content(align='end', class='w-[160px]') %}
+                        <form method="POST" action="{{ url_for('admin.sso_settings') }}">
+                            {{ hidden_input('csrf_token', csrf_token()) }}
+                            {{ hidden_input('action', 'toggle') }}
+                            {{ hidden_input('mapping_id', mapping.id) }}
+                            {{ dropdown_menu_item(text=('Disable' if mapping.is_active else 'Enable'), tag='button', type='submit', class='w-full') }}
                         </form>
-                        <form method="POST" action="{{ url_for('admin.sso_settings') }}" class="inline" data-confirm="Delete mapping for {{ mapping.sso_group_name }}? This cannot be undone.">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <input type="hidden" name="action" value="delete"/>
-                            <input type="hidden" name="mapping_id" value="{{ mapping.id }}"/>
-                            {% call button(type='submit', variant='destructive', size='sm', attrs={'aria-label': 'Delete mapping for ' ~ mapping.sso_group_name}) %}Delete{% endcall %}
+                        {{ dropdown_menu_separator() }}
+                        <form method="POST" action="{{ url_for('admin.sso_settings') }}" data-confirm="Delete mapping for {{ mapping.sso_group_name }}? This cannot be undone.">
+                            {{ hidden_input('csrf_token', csrf_token()) }}
+                            {{ hidden_input('action', 'delete') }}
+                            {{ hidden_input('mapping_id', mapping.id) }}
+                            {{ dropdown_menu_item(text='Delete', tag='button', type='submit', variant='destructive', class='w-full') }}
                         </form>
-                    </div>
+                      {% endcall %}
+                    {% endcall %}
                   {% endcall %}
                 {% endcall %}
                 {% else %}
