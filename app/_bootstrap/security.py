@@ -51,6 +51,20 @@ class CspNonceExtension(Extension):
 _FINGERPRINTED_RE = re.compile(r"\.[0-9a-f]{8,}\.[^./]+$")
 
 
+def ensure_csp_nonce():
+    """The request's CSP nonce, issued on first use.
+
+    The one place a nonce is made. The template context and the response header both ask for it
+    here, so the page and the header carry the same value whatever order the request hooks ran in
+    (a refusal returned by an early hook never reaches ``generate_csp_nonce``).
+    """
+    from flask import g
+
+    if not getattr(g, "csp_nonce", ""):
+        g.csp_nonce = secrets.token_urlsafe(32)
+    return g.csp_nonce
+
+
 def init_security(app):
     """Register security headers and guardrails."""
 
@@ -60,23 +74,19 @@ def init_security(app):
 
     @app.before_request
     def generate_csp_nonce():
-        """Generate a unique CSP nonce per request for script-src."""
-        from flask import g
-
-        g.csp_nonce = secrets.token_urlsafe(32)
+        """Issue the per-request CSP nonce for script-src."""
+        ensure_csp_nonce()
 
     @app.context_processor
     def inject_csp_nonce():
-        """Expose csp_nonce to all templates (for manual use if needed)."""
-        from flask import g
-
-        return {"csp_nonce": getattr(g, "csp_nonce", "")}
+        """Expose csp_nonce to all templates, issuing it if no hook has yet."""
+        return {"csp_nonce": ensure_csp_nonce()}
 
     @app.after_request
     def add_security_headers(response):
         from flask import g
 
-        nonce = getattr(g, "csp_nonce", "")
+        nonce = ensure_csp_nonce()
 
         # The nonce is applied by CspNonceExtension when a template is compiled,
         # not by rewriting the response body here. Rewriting the body nonce'd

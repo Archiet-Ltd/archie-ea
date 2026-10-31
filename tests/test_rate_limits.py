@@ -278,3 +278,102 @@ def test_the_pages_are_for_administrators_and_a_plain_member_is_refused(app, cle
     assert client.get("/admin/rate-limits").status_code in (302, 401, 403)
     assert client.post("/admin/rate-limits/rules", data={"action": "deny", "value": "192.0.2.1"}).status_code in (302, 401, 403)
     assert clean.list_rules() == []
+
+
+@pytest.fixture
+def clean_between_requests(app):
+    """Like ``clean`` but holds no application context open, so each request gets its own ``g``."""
+    from app import db
+    from app.services import rate_limiter
+
+    def wipe():
+        with app.app_context():
+            with db.engine.begin() as connection:
+                connection.execute(text("DELETE FROM rate_limit_rules"))
+                connection.execute(text("DELETE FROM rate_limit_counters"))
+                connection.execute(text("DELETE FROM rate_limit_violations"))
+            rate_limiter._rules_cache["version"] = None
+
+    wipe()
+    yield rate_limiter
+    wipe()
+
+
+def _nonces(response):
+    import re
+
+    header = set(re.findall(r"'nonce-([^']*)'", response.headers.get("Content-Security-Policy", "")))
+    body = set(re.findall(r'nonce="([^"]*)"', response.get_data(as_text=True)))
+    return header, body
+
+
+def test_the_default_limit_refusal_carries_the_nonce_the_header_names(app, clean_between_requests, limiting_on):
+    """The 121st read in a minute is refused by the limiter's own hook, before any page hook has run."""
+    client = app.test_client()
+    environ = {"REMOTE_ADDR": "192.0.2.77"}
+    refused = None
+    for _ in range(125):
+        refused = client.get("/account/login", environ_overrides=environ)
+        if refused.status_code == 429:
+            break
+    assert refused.status_code == 429
+    header, body = _nonces(refused)
+    assert len(header) == 1 and "" not in header, header
+    assert body == header, (header, body)
+
+
+def test_the_blocked_address_page_carries_the_nonce_and_offers_only_what_it_can_reach(app, clean_between_requests, limiting_on):
+    with app.app_context():
+        clean_between_requests.add_rule("deny", "address", "192.0.2.78")
+    refused = app.test_client().get("/account/login", environ_overrides={"REMOTE_ADDR": "192.0.2.78"})
+    assert refused.status_code == 403
+    header, body = _nonces(refused)
+    assert len(header) == 1 and "" not in header and body == header, (header, body)
+    html = refused.get_data(as_text=True)
+    assert "Go to Dashboard" not in html and 'href="/"' not in html
+
+
+def test_a_role_refusal_still_offers_the_dashboard(app):
+    with app.test_request_context("/"):
+        from flask import render_template
+
+        assert "Go to Dashboard" in render_template("errors/403.html")
+
+
+def test_one_function_issues_the_nonce_whatever_order_the_hooks_ran(app):
+    from app._bootstrap.security import ensure_csp_nonce
+
+    with app.test_request_context("/"):
+        first = ensure_csp_nonce()
+        assert first and ensure_csp_nonce() == first
+
+
+def test_an_unreadable_counter_store_lets_the_request_through_and_says_so(app, clean, limiting_on, caplog):
+    import logging
+
+    class Broken:
+        def incr(self, *args, **kwargs):
+            raise RuntimeError("counter store down")
+
+    with app.test_request_context("/account/register"):
+        original = clean.counter_storage
+        clean.counter_storage = lambda: Broken()
+        try:
+            with caplog.at_level(logging.WARNING):
+                verdict = clean.count_hit("signup", "192.0.2.79", 5, 3600)
+        finally:
+            clean.counter_storage = original
+    assert verdict.allowed is True
+    assert "rate limit store unavailable" in caplog.text and "counter store down" in caplog.text
+
+
+def test_unreadable_allow_and_deny_lists_do_not_take_the_page_down(app, clean, limiting_on, monkeypatch, caplog):
+    import logging
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("lists down")
+
+    monkeypatch.setattr(clean, "access_verdict", broken)
+    with caplog.at_level(logging.WARNING):
+        response = app.test_client().get("/account/login", environ_overrides={"REMOTE_ADDR": "192.0.2.80"})
+    assert response.status_code == 200 and "lists down" in caplog.text

@@ -33,6 +33,7 @@
             <h1 class="code">403</h1>
             <h2 class="title">{{ error_title|default('You do not have access to this page') }}</h2>
             <p class="copy">{{ error_message|default('Your role does not include this page. Ask an administrator of your organisation to give you access.') }}</p>
+            {% if not blocked %}
             <div class="actions">
                 <a href="/" class="button button-primary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>
@@ -43,8 +44,11 @@
                     Go Back
                 </button>
             </div>
+            {% endif %}
         </div>
     </main>
+    {% if not blocked %}
     <script nonce="{{ csp_nonce }}">document.getElementById('btn-go-back-403').addEventListener('click', function(){ history.back(); });</script>
+    {% endif %}
 </body>
 </html>
