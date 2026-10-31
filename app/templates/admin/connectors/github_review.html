@@ -5,6 +5,9 @@
 {% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
+{% from 'components/input.html' import hidden_input %}
+{% from 'components/select.html' import native_select %}
+{% import 'basecoat/index.html' as ui %}
 
 {% macro evidence(item) -%}
     {{ item.repository }}{% if item.path %}/{{ item.path }}{% endif %}{% if item.short_commit %} @ {{ item.short_commit }}{% endif %}{% if item.evidence_file %} ({{ item.evidence_file }}){% endif %}
@@ -13,20 +16,15 @@
 {% macro item_controls(item, classifications) %}
 <div class="flex flex-wrap items-center gap-2 sm:justify-end">
     <form method="POST" action="{{ url_for('m365_connector.github_review_classify', approval_id=item.id) }}" class="flex items-center gap-1">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ hidden_input('csrf_token', csrf_token()) }}
         <label for="class-{{ item.id }}" class="sr-only">What {{ item.name }} is</label>
-        <select id="class-{{ item.id }}" name="classification" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
-            {% for option in classifications %}
-            {% if option != 'component' or item.parent %}
-            <option value="{{ option }}" {% if option == item.classification %}selected{% endif %}>{{ option|capitalize }}</option>
-            {% endif %}
-            {% endfor %}
-        </select>
-        <button type="submit" class="inline-flex h-8 items-center rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-muted/50">Change</button>
+        {% set class_opts = [] %}{% for option in classifications %}{% if option != 'component' or item.parent %}{% set _ = class_opts.append((option, option|capitalize)) %}{% endif %}{% endfor %}
+        {{ native_select(id='class-' ~ item.id, name='classification', size='xs', options=class_opts, selected=item.classification) }}
+        {{ ui.button(text='Change', variant='outline', size='sm', attrs={'type': 'submit'}) }}
     </form>
     <form method="POST" action="{{ url_for('m365_connector.github_review_skip', approval_id=item.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted/50">Skip</button>
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        {{ ui.button(text='Skip', variant='ghost', size='sm', attrs={'type': 'submit'}) }}
     </form>
 </div>
 {% endmacro %}
@@ -62,11 +60,8 @@
             {{ review.applications_total }} applications, {{ review.parts|length }} parts, {{ review.links|length }} links and {{ review.others|length }} repositories that stay out of the model.
         </p>
         <form method="POST" action="{{ url_for('m365_connector.github_review_approve_all') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-4">
-                Approve all ({{ review.total }})
-            </button>
+            {{ hidden_input('csrf_token', csrf_token()) }}
+            {{ ui.button(text='Approve all (' ~ review.total ~ ')', attrs={'type': 'submit'}) }}
         </form>
     </div>
 
@@ -112,8 +107,8 @@
           {% call table_cell(class='text-xs font-mono text-muted-foreground break-words') %}{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }}){% endcall %}
           {% call table_cell(class='text-right') %}
             <form method="POST" action="{{ url_for('m365_connector.github_review_skip', approval_id=item.id) }}" class="flex justify-end">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted/50">Skip</button>
+                {{ hidden_input('csrf_token', csrf_token()) }}
+                {{ ui.button(text='Skip', variant='ghost', size='sm', attrs={'type': 'submit'}) }}
             </form>
           {% endcall %}
         {% endcall %}
