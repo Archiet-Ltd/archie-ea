@@ -120,5 +120,7 @@ def test_the_old_page_address_goes_to_the_dashboard_and_no_menu_lists_it(app, db
 
     shell = client.get(resp.headers["Location"], follow_redirects=True).get_data(as_text=True)
     assert 'href="/agentic-gaps"' not in shell
-    assert "Gap Discovery" not in shell
+    assert "/agentic-gaps" not in shell
+    assert "agentic_gaps.js" not in shell
+    assert "agentic_gaps_ui" not in shell
     assert "main.agentic_gaps_ui" not in app.view_functions
