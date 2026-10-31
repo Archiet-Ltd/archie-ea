@@ -113,6 +113,7 @@ def settings_card(org) -> Dict[str, Any]:
 
     return {
         "kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org),
+        "removable": removable_starter_rows(org),
         "profile": confirm.profile_entries(org),
         "company_name": public_signals.company_name(org),
         "signals": public_signals.signals_for_profile(org.id), "signals_state": public_signals.refresh_state(org),
@@ -551,6 +552,34 @@ def own_key_provider() -> Optional[str]:
 # --------------------------------------------------------------------------------------------- #
 
 
+def _refresh_capability_map(org_id: int) -> None:
+    """The capability map keeps an organisation's hierarchy for a few minutes; drop it so a change shows at once."""
+    from app.extensions.cache import invalidate_cache
+
+    try:
+        invalidate_cache("capability_map:*:%s" % org_id)
+    except Exception:
+        _log.warning("could not refresh the capability map for organisation %s", org_id, exc_info=True)
+
+
+def _mark_elements_as_starter(org_id: int) -> None:
+    """The model elements mirrored from starter capabilities and adopted controls say they are starter elements,
+    so the overview does not mistake them for what the person brought."""
+    db.session.execute(
+        db.text(
+            "UPDATE archimate_elements SET source_kind = 'starter' "
+            "WHERE organization_id = :org AND source_kind IS NULL AND id IN ("
+            " SELECT archimate_element_id FROM business_capability WHERE organization_id = :org"
+            "  AND discovery_source LIKE 'starter:%' AND archimate_element_id IS NOT NULL"
+            " UNION SELECT c.archimate_element_id FROM application_compliance_controls c"
+            "  JOIN framework_adoptions a ON a.id = c.adoption_id WHERE a.organization_id = :org"
+            "  AND c.organization_id = :org AND a.source LIKE 'starter:%' AND c.archimate_element_id IS NOT NULL)"
+        ),
+        {"org": org_id},
+    )
+    db.session.commit()
+
+
 def _starter_source(model: str) -> str:
     return "starter:%s" % model
 
@@ -653,7 +682,9 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
     model = _starter_model(chosen["industry"])
     capabilities = _load_capabilities(org_id, model) if model else 0
     db.session.commit()
+    _refresh_capability_map(org_id)
     adopted = _adopt_frameworks(org_id, chosen["frameworks"])
+    _mark_elements_as_starter(org_id)
     return {"success": True, "model": model, "capabilities_added": capabilities, "frameworks_adopted": adopted}
 
 
@@ -713,4 +744,5 @@ def remove_unedited_starter_rows(org, model: str) -> int:
         db.session.flush()
         removed += 1
     db.session.commit()
+    _refresh_capability_map(org.id)
     return removed

@@ -134,6 +134,8 @@ def remove_organisations(app, org_ids):
         # Rows that point at an organisation's rows through no organisation column of their own.
         for statement in (
             "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
+            "DELETE FROM unified_application_capability_mapping WHERE application_component_id IN "
+            "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
             "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
             "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
         ):

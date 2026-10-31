@@ -134,8 +134,8 @@ def test_saving_queues_the_load_and_never_waits_for_it(client, login_as, two):
 
     login_as(client, two["one_owner"])
     client.post("/account/welcome/choices", json={"industry": "banking", "frameworks": ["soc2"]})
-    jobs = Job.query.filter_by(task=onboarding.STARTER_TASK).all()
-    assert [j.payload["organization_id"] for j in jobs] == [two["one"].id]
+    jobs = [j for j in Job.query.filter_by(task=onboarding.STARTER_TASK).all() if j.payload["organization_id"] == two["one"].id]
+    assert len(jobs) == 1
     assert _capabilities(two["one"]) == [], "nothing is loaded inside the request"
 
 
@@ -165,3 +165,70 @@ def test_another_organisation_cannot_remove_my_starter_rows(client, login_as, tw
     login_as(client, two["two_owner"])
     client.post("/account/welcome/starter/remove", json={"model": "BIAN"})
     assert len(_capabilities(two["one"])) > 0
+
+
+def test_the_compliance_page_marks_only_the_frameworks_this_organisation_chose(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    _choose(client, login_as, two["two_owner"], "", ["gdpr"])
+    page = client.get("/dashboard/compliance").get_data(as_text=True)
+    assert page.count('data-testid="framework-adopted"') == 1
+    assert 'data-source="starter:GDPR"' in page and "starter:ISO 27001" not in page
+
+
+def test_the_controls_of_an_adopted_framework_load_from_the_address_the_page_asks(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    page = client.get("/dashboard/compliance").get_data(as_text=True)
+    assert "/dashboard/api/compliance/frameworks/' + frameworkId" in page
+    framework_id = _adoptions(two["one"])[0]
+    from app import db
+
+    listed = client.get("/dashboard/api/compliance/frameworks/%d/controls" % db.session.execute(
+        db.text("SELECT id FROM regulatory_frameworks WHERE code = 'ISO - 27001'")).scalar_one())
+    assert listed.status_code == 200 and {c["control_code"] for c in listed.get_json()} >= {"A.8.2", "A.8.24"}
+    assert framework_id.source == "starter:ISO 27001"
+    assert "Application control mappings" in page and "planned: 3" not in page
+
+
+def test_removed_starter_rows_leave_the_capability_map_too(client, login_as, two):
+    from app import db
+
+    _choose(client, login_as, two["one_owner"], "banking", [])
+    _choose(client, login_as, two["one_owner"], "software", [])
+    names = lambda: {r[0] for r in db.session.execute(
+        db.text("SELECT name FROM unified_capabilities WHERE organization_id = :o"), {"o": two["one"].id})}
+    assert {"Sales and Service", "Develop Vision and Strategy"} <= names()
+    login_as(client, two["one_owner"])
+    assert client.post("/account/welcome/starter/remove", json={"model": "BIAN"}).status_code == 200
+    assert "Sales and Service" not in names() and "Payment Order" not in names()
+    assert "Develop Vision and Strategy" in names()
+
+
+def test_a_load_and_a_removal_show_on_the_capability_map_at_once(client, login_as, two):
+    """The map keeps an organisation's hierarchy for five minutes; the load and the removal must not wait on it."""
+    def on_map():
+        login_as(client, two["one_owner"])
+        return {c["name"] for d in client.get("/capability-map/api/capabilities/hierarchy").get_json()["domains"] for c in d["capabilities"]}
+
+    _choose(client, login_as, two["one_owner"], "banking", [])
+    assert "Sales and Service" in on_map()
+    _choose(client, login_as, two["one_owner"], "software", [])
+    assert "Develop Vision and Strategy" in on_map()
+    assert client.post("/account/welcome/starter/remove", json={"model": "BIAN"}).status_code == 200
+    assert "Sales and Service" not in on_map()
+
+
+def test_starter_rows_are_not_the_persons_own_model_so_the_overview_still_asks_for_a_source(client, login_as, two):
+    """Choosing a framework or an industry gives a starting point; the overview still offers to connect a
+    source until something the person brought is in the model, and its figure counts only their own."""
+    from app.modules.dashboard.services.overview_figures import build_overview
+
+    _choose(client, login_as, two["one_owner"], "banking", ["iso27001"])
+    with client.application.test_request_context("/"):
+        figures = build_overview(two["one"].id, two["one_owner"])
+    assert figures["empty"] is True and figures["sourced"] is None
+    from app import db
+
+    kinds = db.session.execute(db.text(
+        "SELECT DISTINCT source_kind FROM archimate_elements WHERE organization_id = :o AND deleted_at IS NULL"),
+        {"o": two["one"].id}).scalars().all()
+    assert kinds == ["starter"], kinds

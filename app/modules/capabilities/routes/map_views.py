@@ -562,6 +562,19 @@ def _api_hierarchy_context():
             if c.parent_capability_id:
                 children_by_parent.setdefault(c.parent_capability_id, []).append(c)
 
+        # Capabilities that came from the starter model chosen at sign-up, by the id of the row they are projected from.
+        from app.models.business_capabilities import BusinessCapability
+
+        starter_sources = {
+            str(row_id): source
+            for row_id, source in db.session.query(
+                BusinessCapability.id, BusinessCapability.discovery_source
+            ).filter(
+                BusinessCapability.organization_id == org_id,
+                BusinessCapability.discovery_source.like("starter:%"),
+            ).all()
+        } if org_id is not None else {}
+
         # Get application mapping counts
         mapping_counts = {}
         if org_id is not None:
@@ -726,6 +739,10 @@ def _api_hierarchy_context():
                 "domainCode": cap.domain.code if cap.domain else "UNCAT",
                 "type": cap.capability_type or cap.category or "business",
                 "code": cap.code,
+                "starterModel": (
+                    starter_sources.get(str(cap.source_id), "")[len("starter:"):] or None
+                    if cap.source_table == "business_capability" else None
+                ),
                 "businessOwner": cap.business_owner,
                 "itOwner": cap.it_owner,
                 "capabilityOwner": cap.capability_owner,

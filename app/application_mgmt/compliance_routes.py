@@ -34,8 +34,20 @@ def compliance_frameworks_dashboard():
         .all()
     )
 
+    from flask import g
+
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    adopted = {
+        a.framework_id: a.source
+        for a in FrameworkAdoption.query.filter_by(
+            organization_id=getattr(g, "current_org_id", None), status="active"
+        ).all()
+    }
     framework_rows = [
         {
+            "adopted": f.id in adopted,
+            "source": adopted.get(f.id),
             "id": f.id,
             "code": f.code,
             "name": f.name,
@@ -51,7 +63,8 @@ def compliance_frameworks_dashboard():
     total_controls = ComplianceControl.query.filter_by(is_active=True).count()
 
     # Org-scoped mapping coverage (TenantMixin auto-filters inside the request).
-    mappings = ApplicationComplianceControl.query.all()
+    # A control adopted with its framework is not yet mapped to an application, so it is not counted here.
+    mappings = ApplicationComplianceControl.query.filter(ApplicationComplianceControl.application_id.isnot(None)).all()
     mapped_by_status = {}
     for m in mappings:
         status = m.implementation_status or "planned"

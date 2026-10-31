@@ -18,8 +18,12 @@ def _compliance_cards(org_id):
     from app.models.compliance_models import RegulatoryFramework
     from app.models.regulatory_framework import FrameworkAdoption
 
-    adopted_ids = set()
+    adopted_ids, sources = set(), {}
     if org_id is not None:
+        sources = {
+            row.framework_id: row.source
+            for row in FrameworkAdoption.query.filter_by(organization_id=org_id, status="active").all()
+        }
         adopted_ids = {
             row.framework_id
             for row in FrameworkAdoption.query.filter_by(organization_id=org_id, status="active").all()
@@ -33,6 +37,7 @@ def _compliance_cards(org_id):
             "jurisdiction": framework.jurisdiction,
             "controls": framework.controls.count(),
             "adopted": framework.id in adopted_ids,
+            "source": sources.get(framework.id),
         }
         (adopted if card["adopted"] else available).append(card)
     return adopted, available

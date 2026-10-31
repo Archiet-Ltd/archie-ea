@@ -206,6 +206,9 @@
                             <template x-if="cap.description">
                                 <p class="text-sm text-muted-foreground mb-3 line-clamp-2" x-text="cap.description"></p>
                             </template>
+                            <template x-if="cap.starterModel">
+                                <p class="text-xs text-muted-foreground mb-2" data-testid="capability-source" x-text="'Starter capability from ' + cap.starterModel + ', chosen at sign-up'"></p>
+                            </template>
 
                             <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                                 <span x-text="cap.domainName"></span>
@@ -354,7 +357,12 @@
                 <tbody class="divide-y divide-border">
                     <template x-for="cap in allFilteredCapabilities" :key="cap.id">
                         <tr class="hover:bg-muted/50 transition-colors cursor-pointer" @click="openCapabilityDetail(cap)" tabindex="0" @keydown.enter="openCapabilityDetail(cap)">
-                            <td class="px-4 py-3 font-medium text-foreground" x-text="cap.name"></td>
+                            <td class="px-4 py-3 font-medium text-foreground">
+                                <span x-text="cap.name"></span>
+                                <template x-if="cap.starterModel">
+                                    <span class="block text-xs font-normal text-muted-foreground" data-testid="capability-source" x-text="'Starter capability from ' + cap.starterModel + ', chosen at sign-up'"></span>
+                                </template>
+                            </td>
                             <td class="px-4 py-3 text-muted-foreground" x-text="cap.domainName"></td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + cap.level"></span>
@@ -480,6 +488,9 @@
             <div class="flex items-start justify-between">
                 <div>
                     <h3 class="text-xl font-semibold text-foreground" x-text="capability.name"></h3>
+                    <template x-if="capability.starterModel">
+                        <p class="text-sm text-muted-foreground" data-testid="capability-source" x-text="'Starter capability from ' + capability.starterModel + ', chosen at sign-up. Keep it, change it or remove it.'"></p>
+                    </template>
                     <div class="flex items-center gap-2 mt-1">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + capability.level"></span>
                         <span class="text-sm text-muted-foreground" x-text="capability.domainName"></span>
