@@ -69,6 +69,17 @@ def organization_from_parent(session, obj, include_actors=True, refuse_unseen=Fa
 
 
 
+def _refuse_foreign_parent(obj, derived, owner):
+    """Never let a signed-in or a named organisation win over a parent that belongs to another
+    company: the child would link to a record that is not theirs. A parent with no organisation
+    (shared, platform) is no evidence either way."""
+    if derived is not None and owner is not None and derived != owner:
+        raise TenantParentMismatch(
+            f"{type(obj).__name__} hangs from a record of organisation {derived}, "
+            f"but the row is for organisation {owner}"
+        )
+
+
 def set_database_tenant_context(connection, organization_id):
     """Set the trigger-visible tenant for this transaction only.
 
@@ -244,7 +255,10 @@ def install_tenant_filter(app):
             if isinstance(obj, HybridTenantMixin) and getattr(obj, "organization_id", None) is None:
                 # A shared-plus-override row never takes the signed-in organisation by default (NULL
                 # means shared), but a child of a company's row belongs to that company.
-                derived = organization_from_parent(session, obj)
+                derived = organization_from_parent(
+                    session, obj, include_actors=org_id is None, refuse_unseen=org_id is not None
+                )
+                _refuse_foreign_parent(obj, derived, org_id)
                 if derived is not None:
                     obj.organization_id = derived
                 continue
@@ -259,13 +273,7 @@ def install_tenant_filter(app):
                 include_actors=(named or org_id) is None,
                 refuse_unseen=owner is not None,
             )
-            if derived is not None and owner is not None and derived != owner:
-                # Never let a signed-in or a named organisation win over a parent that belongs to
-                # another company: the child would link to a record that is not theirs.
-                raise TenantParentMismatch(
-                    f"{type(obj).__name__} hangs from a record of organisation {derived}, "
-                    f"but the row is for organisation {owner}"
-                )
+            _refuse_foreign_parent(obj, derived, owner)
             if named is None:
                 if org_id is not None:
                     obj.organization_id = org_id

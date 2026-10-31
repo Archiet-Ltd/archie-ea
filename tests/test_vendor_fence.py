@@ -291,3 +291,69 @@ def test_product_organisation_is_derived_in_the_ruled_order_and_the_rest_stay_sh
     _upgrade(legacy_db)  # a second run changes nothing
     with legacy_db.connect() as c:
         assert dict(c.execute(text("SELECT name, organization_id FROM vendor_products")).all()) == got
+
+
+# ---------------------------------------------------------------- a child of a product, written by a signed-in organisation
+
+
+def _forget_embeddings(owner, ids):
+    with owner.begin() as c:
+        c.execute(text("DELETE FROM vendor_product_embeddings WHERE vendor_product_id = ANY(:p)"),
+                  {"p": [ids["shared"], ids["a"], ids["b"]]})
+
+
+def _write_child_as_signed_in_a(app, ids, owner):
+    """Organisation A is signed in. A child hung from B's product is refused and stores nothing;
+    the same child hung from A's own product is stored under A."""
+    from flask import g
+
+    from app import db
+    from app.middleware.tenant_isolation import TenantParentMismatch
+    from app.models.vector_embeddings import VendorProductEmbedding
+
+    try:
+        with app.test_request_context():
+            try:
+                db.session.remove()
+                g.current_org_id = ids["org_a"]
+                db.session.add(VendorProductEmbedding(vendor_product_id=ids["b"]))
+                with pytest.raises(TenantParentMismatch):
+                    db.session.flush()
+                db.session.rollback()
+
+                g.current_org_id = ids["org_a"]
+                db.session.add(VendorProductEmbedding(vendor_product_id=ids["a"]))
+                db.session.commit()
+            finally:
+                db.session.rollback()
+                db.session.remove()
+        with owner.connect() as c:
+            assert c.execute(text("SELECT count(*) FROM vendor_product_embeddings WHERE vendor_product_id = :p"),
+                             {"p": ids["b"]}).scalar() == 0
+            assert c.execute(text("SELECT organization_id FROM vendor_product_embeddings WHERE vendor_product_id = :p"),
+                             {"p": ids["a"]}).scalar() == ids["org_a"]
+    finally:
+        _forget_embeddings(owner, ids)
+
+
+def test_a_signed_in_organisation_cannot_hang_a_hybrid_child_from_another_organisations_product(app, world):
+    """The product is readable here (the application owner role), so the parent's organisation is
+    seen and differs from the signed-in one."""
+    ids, _, owner = world
+    _write_child_as_signed_in_a(app, ids, owner)
+
+
+def test_runtime_role_cannot_hang_a_hybrid_child_from_another_organisations_product(app, world):
+    """As the runtime role B's product is invisible to A, so the lookup finds no row. That is a
+    refusal, not a child stored as a shared row."""
+    ids, runtime, owner = world
+    from app import db
+
+    original = db._app_engines[app][None]
+    db._app_engines[app][None] = runtime
+    try:
+        _write_child_as_signed_in_a(app, ids, owner)
+    finally:
+        db._app_engines[app][None] = original
+        with app.app_context():
+            db.session.remove()
