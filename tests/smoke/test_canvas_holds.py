@@ -17,7 +17,7 @@ def _context(browser, width, height, theme="light"):
     context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": height})
     script = "localStorage.setItem('archie_onboarding_ts', Date.now().toString());"
     if theme == "dark":
-        script += " document.documentElement.classList.add('dark');"
+        script += " document.addEventListener('DOMContentLoaded', () => document.documentElement.classList.add('dark'));"
     context.add_init_script(script)
     return context
 
