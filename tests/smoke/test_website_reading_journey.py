@@ -105,7 +105,9 @@ def test_a_founder_watches_the_reading_confirms_what_it_found_and_asks_the_chat_
         # The person carries on; the next step still says where the reading is.
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=3")
-        expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile(r"of up to 30 pages|Opening 127"), timeout=PAGE_TIMEOUT)
+        # Step 3 says it once: the reading line once a page is read, "Opening <site>" before the first.
+        said = page.locator("[data-testid='signup-reading-line'], [data-testid='signup-status-website']")
+        expect(said.filter(has_text=re.compile(r"page \d+ of up to 30|Opening 127")).first).to_be_visible(timeout=PAGE_TIMEOUT)
         shoot(page, "company-reading", width)
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=4")
