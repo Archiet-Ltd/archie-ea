@@ -833,7 +833,7 @@
                 if (role !== 'dialog' && role !== 'alertdialog') continue;
                 if (!target.id) continue;
                 // A library dialog (data-slot="dialog-content") runs its own focus trap, Escape and scroll lock.
-                if (target.hasAttribute('data-slot')) continue;
+                if (target.getAttribute('data-slot') === 'dialog-content') continue;
 
                 // Check if element is now visible
                 let isHidden = target.hasAttribute('hidden') ||

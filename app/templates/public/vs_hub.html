@@ -1,5 +1,4 @@
 {# smoke-coverage-ok: covered by tests/test_public_content_pages.py (hub lists every vs page).
-{# design-block: public #}
    Template: public/vs_hub.html — Renders the /vs comparison hub: one list of links out to every
    comparison page at its real URL (most are the dedicated archiet.ai address recorded in that
    page's own front matter; any page without one stays on entelim.org directly). Where the real
@@ -10,6 +9,7 @@
    components/public_footer.html — same page data app/services/public_pages.py already provides
    to every other public page; no second loader or renderer.
 #}
+{# design-block: public #}
 {% extends 'layouts/public_base.html' %}
 {% from 'components/card.html' import card, card_header, card_title, card_description %}
 {% block body_theme %}theme-marketing{% endblock %}
