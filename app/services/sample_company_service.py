@@ -416,6 +416,7 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk
     from app.models.solution_models import Solution
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
     from app.services import import_restore_service
     from app.services.application_cost_accessor import sync_cost_fact
 
@@ -432,6 +433,15 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
             return []
         return model.query.filter(model.id.in_(ids), model.organization_id == org_id).all()
 
+    # Each contract also stands as an element of the model; the restore removes it with the rest.
+    contract_elements = [int(c.archimate_element_id) for c in rows(VendorContract, "vendor_contracts")
+                         if c.archimate_element_id]
+    if contract_elements:
+        data = dict(log.snapshot_data or {})
+        known = list(data.get("created_element_ids") or [])
+        data["created_element_ids"] = known + [i for i in contract_elements if i not in known]
+        log.snapshot_data = data
+        flag_modified(log, "snapshot_data")
     for model, table in (
         (VendorContract, "vendor_contracts"),
         (ApplicationCapabilityMapping, "application_capability_mapping"),
@@ -439,6 +449,13 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     ):
         for row in rows(model, table):
             db.session.delete(row)
+    # The one store of "which application supports which capability" also holds a row for each
+    # sample mapping, and one for every suggestion the person accepted on a sample application.
+    sample_app_ids = [app.id for app in rows(ApplicationComponent, "application_components")]
+    if sample_app_ids:
+        UnifiedApplicationCapabilityMapping.query.filter(
+            UnifiedApplicationCapabilityMapping.application_component_id.in_(sample_app_ids)
+        ).delete(synchronize_session=False)
     for app in rows(ApplicationComponent, "application_components"):
         app.total_cost_of_ownership = None
         app.license_cost_annual = None
