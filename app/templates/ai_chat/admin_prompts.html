@@ -1,420 +1,188 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/modal.html' import modal %}
 
 {% block title %}AI Chat Persona Management{% endblock %}
 
 {% block content %}
-<div x-data="personaAdmin()" x-init="loadPersonas()">
-    <!-- Page Header -->
-    {% macro _ps_actions() %}
-<div class="flex items-center gap-2">
-            <span x-show="loading" x-cloak class="text-sm text-muted-foreground">Loading...</span>
-            <button type="button" @click="loadPersonas()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    aria-label="Refresh persona list">
-                <i data-lucide="refresh-cw" class="h-4 w-4 mr-2" aria-hidden="true"></i>
-                Refresh
-            </button>
-        </div>
-    {% endmacro %}
-    {{ page_shell(title='AI Chat Persona Management', breadcrumb=[('Home', '/'), ('AI Chat Persona Management', none)], subtitle='View and override AI chat persona configurations. Overrides are stored in the database and take precedence over defaults.', actions_caller=_ps_actions) }}
+<div class="p-6 space-y-6" x-data="personaAdmin" x-init="loadPersonas">
+  {{ page_shell(title='AI Chat Persona Management',
+                subtitle='Edit the system prompt, description and sample prompts each chat persona uses. A saved prompt replaces the built-in one in every new chat.',
+                breadcrumb=[('Home', '/'), ('Admin', url_for('admin.index')), ('AI Chat Persona Management', none)]) }}
 
-    <!-- Error banner -->
-    <div x-show="errorMsg" x-cloak
-         class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"
-         role="alert">
-        <span x-text="errorMsg"></span>
+  <div x-show="errorMsg" x-cloak role="alert" data-testid="prompts-error">
+    {% call ui.alert(variant='destructive') %}
+      <span x-text="errorMsg"></span>
+    {% endcall %}
+  </div>
+  <div x-show="successMsg" x-cloak role="status" data-testid="prompts-saved">
+    {% call ui.alert() %}
+      <span x-text="successMsg"></span>
+    {% endcall %}
+  </div>
+
+  <form class="grid gap-6 lg:grid-cols-3" @submit.prevent="save" data-testid="prompts-form">
+    <div class="lg:col-span-2">
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+          {{ ui.card_title(text='System prompt') }}
+          {{ ui.card_description(text='Instructions the model receives before every conversation with this persona. Leave empty to use the built-in prompt.') }}
+        {% endcall %}
+        {% call ui.card_content() %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='System prompt', attrs={'for': 'system_prompt'}) }}
+            {{ ui.textarea(id='system_prompt', name='system_prompt', class='min-h-[320px] w-full font-mono lg:min-h-[420px]',
+                           placeholder='You are an enterprise architect specializing in…',
+                           attrs={'x-model': 'form.system_prompt'}) }}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card_footer(class='justify-between gap-2') %}
+          {{ ui.button(text='Reset to defaults', type='button', variant='outline', attrs={'x-show': 'hasOverride', 'x-cloak': '', '@click': 'askReset'}) }}
+          {{ ui.button(text='Save changes', type='submit', attrs={'x-bind:disabled': 'saving'}) }}
+        {% endcall %}
+      {% endcall %}
     </div>
 
-    <!-- Success banner -->
-    <div x-show="successMsg" x-cloak
-         class="mb-4 rounded-md border border-success/50 bg-success/10 px-3 py-2 text-sm text-success-emphasis"
-         role="status">
-        <span x-text="successMsg"></span>
-    </div>
+    <div class="space-y-6">
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+          {{ ui.card_title(text='Persona') }}
+          {{ ui.card_description(text='Choose which persona you are editing.') }}
+        {% endcall %}
+        {% call ui.card_content(class='space-y-6') %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Persona', attrs={'for': 'persona'}) }}
+            {% call ui.native_select_wrapper(class='relative w-full') %}
+              {% call ui.native_select(id='persona', name='persona', class='w-full', attrs={'x-model': 'selectedKey', '@change': 'pick'}) %}
+                <template x-for="p in personas" :key="p.key"><option :value="p.key" x-text="p.name"></option></template>
+              {% endcall %}
+              {{ ui.native_select_icon(class='pointer-events-none absolute') }}
+            {% endcall %}
+          {% endcall %}
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-muted-foreground">Status</span>
+            <span x-show="hasOverride" x-cloak>{{ ui.badge(text='Overridden', variant='outline') }}</span>
+            <span x-show="!hasOverride" x-cloak>{{ ui.badge(text='Default', variant='secondary') }}</span>
+          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='Description', attrs={'for': 'description'}) }}
+            {{ ui.textarea(id='description', name='description', class='w-full', attrs={'rows': '3', 'x-model': 'form.description'}) }}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
 
-    <!-- Personas Table -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b border-border bg-muted/50">
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Icon</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Domain</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                        <th class="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="persona in personas" :key="persona.key">
-                        <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                            <td class="px-4 py-3 font-medium text-foreground" x-text="persona.name"></td>
-                            <td class="px-4 py-3 text-muted-foreground">
-                                <i :data-lucide="persona.icon" class="h-4 w-4 inline-block" aria-hidden="true"></i>
-                                <span class="ml-1 text-xs" x-text="persona.icon"></span>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-primary/10 text-info-emphasis border border-primary/30"
-                                      x-text="persona.default_domain">
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-muted-foreground max-w-xs truncate" x-text="persona.description"></td>
-                            <td class="px-4 py-3">
-                                <span x-show="persona.has_override" x-cloak
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-warning/10 text-warning-emphasis border border-warning/30">
-                                    Overridden
-                                </span>
-                                <span x-show="!persona.has_override" x-cloak
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-success/10 text-success-emphasis border border-success/30">
-                                    Default
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <button type="button" @click="openEdit(persona)"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                                            :aria-label="'Edit ' + persona.name">
-                                        <i data-lucide="pencil" class="h-3.5 w-3.5 mr-1.5" aria-hidden="true"></i>
-                                        Edit
-                                    </button>
-                                    <button type="button" x-show="persona.has_override" x-cloak
-                                            @click="openReset(persona)"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-destructive/50 text-destructive-emphasis hover:bg-destructive/10
- h-8 px-3"
-                                            :aria-label="'Reset ' + persona.name + ' to defaults'">
-                                        <i data-lucide="rotate-ccw" class="h-3.5 w-3.5 mr-1.5" aria-hidden="true"></i>
-                                        Reset
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
-                    <tr x-show="!loading && personas.length === 0" x-cloak>
-                        <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
-                            No persona configurations found.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block modals %}
-<!-- Edit Persona Modal -->
-{% call modal(id='edit-persona-modal', title='Edit Persona Configuration', size='lg') %}
-<div x-data x-init="
-    document.getElementById('edit-persona-modal').addEventListener('modal:opened', function() {
-        /* Lucide icons inside modal need refresh */
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    });
-">
-    <form @submit.prevent="$dispatch('persona-save')">
-        <!-- Persona Name (read-only) -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Persona Name</label>
-            <input type="text" readonly
-                   class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed"
-                   :value="document.querySelector('[x-data*=personaAdmin]')?._x_dataStack?.[0]?.editForm?.name || ''"
-                   aria-label="Persona name (read-only)">
-        </div>
-
-        <!-- Description -->
-        <div class="mb-4">
-            <label for="edit-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea id="edit-description"
-                      rows="2"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground
- placeholder:text-muted-foreground
- focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                      placeholder="Persona description..."
-                      x-model="$root.closest('[x-data]')._x_dataStack ? '' : ''"
-                      aria-label="Persona description"></textarea>
-        </div>
-
-        <!-- System Prompt Override -->
-        <div class="mb-4">
-            <label for="edit-system-prompt" class="block text-sm font-medium text-muted-foreground mb-1">System Prompt Override</label>
-            <p class="text-xs text-muted-foreground mb-2">
-                Custom system prompt that overrides the default. Leave empty to use the built-in prompt.
-            </p>
-            <textarea id="edit-system-prompt"
-                      rows="6"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground font-mono
- placeholder:text-muted-foreground
- focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                      placeholder="You are an enterprise architect specializing in..."
-                      aria-label="System prompt override"></textarea>
-        </div>
-
-        <!-- Sample Prompts -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Sample Prompts</label>
-            <p class="text-xs text-muted-foreground mb-2">
-                Suggested prompts displayed to users for this persona.
-            </p>
-            <div id="edit-sample-prompts-list" class="space-y-2">
-                <!-- Populated by JS -->
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+          {{ ui.card_title(text='Sample prompts') }}
+          {{ ui.card_description(text='Suggestions shown to people who open this persona.') }}
+        {% endcall %}
+        {% call ui.card_content(class='space-y-3') %}
+          <p class="text-sm text-muted-foreground" x-show="form.sample_prompts.length === 0" x-cloak>No sample prompts yet. Add one below.</p>
+          <template x-for="sp in form.sample_prompts" :key="sp.id">
+            <div class="flex items-center gap-2" data-prompt-row>
+              {{ ui.input(type='text', class='w-full', attrs={'x-model': 'sp.text', 'aria-label': 'Sample prompt'}) }}
+              {{ ui.button(text='Remove', type='button', variant='outline', size='sm', attrs={'@click': 'removePrompt(sp)', 'aria-label': 'Remove sample prompt'}) }}
             </div>
-            <button type="button" id="btn-add-sample-prompt"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center"
-                    aria-label="Add sample prompt">
-                <i data-lucide="plus" class="h-3.5 w-3.5 mr-1.5" aria-hidden="true"></i>
-                Add Prompt
-            </button>
-        </div>
-
-        <!-- Footer -->
-        <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-            <button type="button"
-                    data-modal-close="edit-persona-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    id="btn-save-persona"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Save Changes
-            </button>
-        </div>
-    </form>
-</div>
-{% endcall %}
-
-<!-- Reset Confirmation Modal -->
-{% call modal(id='reset-persona-modal', title='Reset Persona to Defaults', size='sm') %}
-<div>
-    <p class="text-sm text-muted-foreground mb-4">
-        Are you sure you want to reset <strong id="reset-persona-name"></strong> to its default configuration?
-        This will remove all custom overrides.
-    </p>
-    <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-        <button type="button"
-                data-modal-close="reset-persona-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Cancel
-        </button>
-        <button type="button"
-                id="btn-confirm-reset"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Reset to Defaults
-        </button>
+          </template>
+          {{ ui.button(text='Add prompt', type='button', variant='outline', size='sm', attrs={'@click': 'addPrompt'}) }}
+        {% endcall %}
+      {% endcall %}
     </div>
+  </form>
 </div>
-{% endcall %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('alpine:init', function() {
-    Alpine.data('personaAdmin', function() {
-        return {
-            personas: [],
-            loading: false,
-            errorMsg: '',
-            successMsg: '',
-            editForm: {
-                key: '',
-                name: '',
-                description: '',
-                system_prompt: '',
-                sample_prompts: []
-            },
-            resetKey: '',
-            resetName: '',
+document.addEventListener('alpine:init', function () {
+  Alpine.data('personaAdmin', function () {
+    return {
+      personas: [],
+      selectedKey: '',
+      form: { description: '', system_prompt: '', sample_prompts: [] },
+      hasOverride: false,
+      saving: false,
+      errorMsg: '',
+      successMsg: '',
+      nextId: 1,
 
-            async loadPersonas() {
-                this.loading = true;
-                this.errorMsg = '';
-                try {
-                    const data = await Platform.fetch.get('/ai-chat/admin/prompts/data', null, { silent: true });
-                    this.personas = data.personas || [];
-                    this.$nextTick(function() {
-                        if (typeof lucide !== 'undefined') lucide.createIcons();
-                    });
-                } catch (err) {
-                    // Platform.fetch throws on non-ok responses; err.status is available
-                    if (err.status === 403) {
-                        this.errorMsg = 'Access denied. Admin privileges required.';
-                    } else {
-                        this.errorMsg = err.message || 'Failed to load persona data';
-                    }
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            openEdit(persona) {
-                this.errorMsg = '';
-                this.successMsg = '';
-                this.editForm = {
-                    key: persona.key,
-                    name: persona.name,
-                    description: persona.description || '',
-                    system_prompt: persona.system_prompt_override || '',
-                    sample_prompts: (persona.sample_prompts || []).slice()
-                };
-                /* Populate form fields in the modal */
-                let descEl = document.getElementById('edit-description');
-                let sysEl = document.getElementById('edit-system-prompt');
-                let nameEl = document.querySelector('#edit-persona-modal input[readonly]');
-                if (descEl) descEl.value = this.editForm.description;
-                if (sysEl) sysEl.value = this.editForm.system_prompt;
-                if (nameEl) nameEl.value = this.editForm.name;
-                this._renderSamplePrompts();
-                Platform.modal.open('edit-persona-modal');
-            },
-
-            _renderSamplePrompts() {
-                let container = document.getElementById('edit-sample-prompts-list');
-                if (!container) return;
-                container.innerHTML = '';
-                let self = this;
-                this.editForm.sample_prompts.forEach(function(prompt, idx) {
-                    self._addPromptRow(container, prompt, idx);
-                });
-            },
-
-            _addPromptRow(container, value, idx) {
-                let row = document.createElement('div');
-                row.className = 'flex items-center gap-2';
-                row.setAttribute('data-prompt-idx', idx);
-
-                let input = document.createElement('input');
-                input.type = 'text';
-                input.value = value;
-                input.className = 'flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ' +
-                    'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
-                input.setAttribute('aria-label', 'Sample prompt ' + (idx + 1));
-                input.setAttribute('data-prompt-input', '');
-
-                let removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'inline-flex items-center justify-center rounded-md h-8 w-8 ' +
-                    'border border-input bg-background hover:bg-destructive/10 hover:text-destructive transition-colors';
-                removeBtn.setAttribute('aria-label', 'Remove prompt ' + (idx + 1));
-                removeBtn.innerHTML = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M18 6L6 18M6 6l12 12"/></svg>';
-                removeBtn.addEventListener('click', function() {
-                    row.remove();
-                });
-
-                row.appendChild(input);
-                row.appendChild(removeBtn);
-                container.appendChild(row);
-            },
-
-            _collectSamplePrompts() {
-                let inputs = document.querySelectorAll('#edit-sample-prompts-list [data-prompt-input]');
-                let prompts = [];
-                inputs.forEach(function(input) {
-                    let val = input.value.trim();
-                    if (val) prompts.push(val);
-                });
-                return prompts;
-            },
-
-            async savePersona() {
-                let descEl = document.getElementById('edit-description');
-                let sysEl = document.getElementById('edit-system-prompt');
-                let payload = {
-                    description: descEl ? descEl.value.trim() : '',
-                    system_prompt: sysEl ? sysEl.value.trim() : '',
-                    sample_prompts: this._collectSamplePrompts()
-                };
-
-                try {
-                    const data = await Platform.fetch.post('/ai-chat/admin/prompts/' + this.editForm.key + '/update', payload, { silent: true });
-                    /* Update local state */
-                    let idx = this.personas.findIndex(function(p) { return p.key === data.persona.key; });
-                    if (idx >= 0) this.personas[idx] = data.persona;
-                    Platform.modal.close('edit-persona-modal');
-                    this.successMsg = 'Persona "' + this.editForm.name + '" updated successfully.';
-                    setTimeout(function() { this.successMsg = ''; }.bind(this), 4000);
-                } catch (err) {
-                    // Platform.fetch throws on non-ok responses; err.data may contain error details
-                    this.errorMsg = (err.data && err.data.error) || err.message || 'Network error saving persona';
-                }
-            },
-
-            openReset(persona) {
-                this.errorMsg = '';
-                this.successMsg = '';
-                this.resetKey = persona.key;
-                this.resetName = persona.name;
-                let nameEl = document.getElementById('reset-persona-name');
-                if (nameEl) nameEl.textContent = persona.name;
-                Platform.modal.open('reset-persona-modal');
-            },
-
-            async confirmReset() {
-                try {
-                    const data = await Platform.fetch.post('/ai-chat/admin/prompts/' + this.resetKey + '/reset', null, { silent: true });
-                    let idx = this.personas.findIndex(function(p) { return p.key === data.persona.key; });
-                    if (idx >= 0) this.personas[idx] = data.persona;
-                    Platform.modal.close('reset-persona-modal');
-                    this.successMsg = 'Persona "' + this.resetName + '" reset to defaults.';
-                    setTimeout(function() { this.successMsg = ''; }.bind(this), 4000);
-                } catch (err) {
-                    // Platform.fetch throws on non-ok responses; err.data may contain error details
-                    this.errorMsg = (err.data && err.data.error) || err.message || 'Network error resetting persona';
-                }
-            }
-        };
-    });
-});
-
-/* Wire modal form events after DOM ready */
-document.addEventListener('DOMContentLoaded', function() {
-    /* Save button and form submit */
-    document.addEventListener('persona-save', function() {
-        let adminEl = document.querySelector('[x-data*="personaAdmin"]');
-        if (adminEl && adminEl._x_dataStack) {
-            adminEl._x_dataStack[0].savePersona();
+      async loadPersonas() {
+        this.errorMsg = '';
+        try {
+          const data = await Platform.fetch.get('/ai-chat/admin/prompts/data', null, { silent: true });
+          this.personas = data.personas || [];
+          if (this.personas.length && !this.selectedKey) {
+            this.selectedKey = this.personas[0].key;
+          }
+          this.$nextTick(this.pick);
+        } catch (err) {
+          this.errorMsg = err.status === 403 ? 'Access denied. Administrator privileges are required.' : (err.message || 'The personas could not be loaded.');
         }
-    });
-
-    let saveBtn = document.getElementById('btn-save-persona');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.dispatchEvent(new CustomEvent('persona-save'));
-        });
-    }
-
-    /* Reset confirm button */
-    let resetBtn = document.getElementById('btn-confirm-reset');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', function() {
-            let adminEl = document.querySelector('[x-data*="personaAdmin"]');
-            if (adminEl && adminEl._x_dataStack) {
-                adminEl._x_dataStack[0].confirmReset();
-            }
-        });
-    }
-
-    /* Add sample prompt button */
-    let addBtn = document.getElementById('btn-add-sample-prompt');
-    if (addBtn) {
-        addBtn.addEventListener('click', function() {
-            let container = document.getElementById('edit-sample-prompts-list');
-            if (!container) return;
-            let idx = container.children.length;
-            let adminEl = document.querySelector('[x-data*="personaAdmin"]');
-            if (adminEl && adminEl._x_dataStack) {
-                adminEl._x_dataStack[0]._addPromptRow(container, '', idx);
-            }
-        });
-    }
+      },
+      current() {
+        const key = this.selectedKey;
+        return this.personas.find(function (p) { return p.key === key; });
+      },
+      pick() {
+        const p = this.current();
+        if (!p) { return; }
+        const self = this;
+        this.errorMsg = '';
+        this.successMsg = '';
+        this.hasOverride = !!p.has_override;
+        this.form = {
+          description: p.description || '',
+          system_prompt: p.system_prompt_override || '',
+          sample_prompts: (p.sample_prompts || []).map(function (t) { return { id: self.nextId++, text: t }; })
+        };
+      },
+      addPrompt() {
+        this.form.sample_prompts.push({ id: this.nextId++, text: '' });
+      },
+      removePrompt(sp) {
+        this.form.sample_prompts = this.form.sample_prompts.filter(function (x) { return x.id !== sp.id; });
+      },
+      replace(persona) {
+        const i = this.personas.findIndex(function (p) { return p.key === persona.key; });
+        if (i >= 0) { this.personas[i] = persona; }
+        this.hasOverride = !!persona.has_override;
+      },
+      async save() {
+        this.errorMsg = '';
+        this.successMsg = '';
+        this.saving = true;
+        const payload = {
+          description: this.form.description.trim(),
+          system_prompt: this.form.system_prompt.trim(),
+          sample_prompts: this.form.sample_prompts.map(function (s) { return s.text.trim(); }).filter(Boolean)
+        };
+        try {
+          const data = await Platform.fetch.post('/ai-chat/admin/prompts/' + this.selectedKey + '/update', payload, { silent: true });
+          this.replace(data.persona);
+          this.successMsg = 'Persona "' + data.persona.name + '" updated. New chats use it now.';
+        } catch (err) {
+          this.errorMsg = (err.data && err.data.error) ? err.data.error + '. Nothing was saved; what you typed is still here.' : (err.message || 'The persona could not be saved.');
+        } finally {
+          this.saving = false;
+        }
+      },
+      async askReset() {
+        const p = this.current();
+        if (!p) { return; }
+        if (!(await Platform.confirm({ title: 'Reset persona?', message: 'Reset ' + p.name + ' to its built-in prompt? This removes the saved prompt, description and sample prompts.', confirmText: 'Reset persona', variant: 'destructive' }))) { return; }
+        this.errorMsg = '';
+        try {
+          const data = await Platform.fetch.post('/ai-chat/admin/prompts/' + this.selectedKey + '/reset', null, { silent: true });
+          this.replace(data.persona);
+          this.pick();
+          this.successMsg = 'Persona "' + data.persona.name + '" reset to defaults.';
+        } catch (err) {
+          this.errorMsg = (err.data && err.data.error) || err.message || 'The persona could not be reset.';
+        }
+      }
+    };
+  });
 });
 </script>
 {% endblock %}

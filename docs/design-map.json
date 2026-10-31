@@ -11718,7 +11718,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -11726,24 +11726,17 @@
     "badge",
     "breadcrumb",
     "button",
-    "dialog",
-    "empty",
+    "card",
     "field",
     "input",
-    "page-header",
+    "native-select",
     "page-shell",
-    "switch",
-    "tabs",
-    "card",
-    "textarea",
-    "item"
+    "textarea"
    ],
    "confidence": "high",
    "controls": {
-    "button": 8,
-    "form": 1,
-    "modal": 2,
-    "table": 1
+    "button": 4,
+    "form": 1
    },
    "departures": [
     {
@@ -11761,19 +11754,17 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/modal.html",
     "macros/page_shell.html"
    ],
    "original": "example:playground",
    "page_type": "chat",
    "patterns": [
     "P01-page-header",
-    "P28-cited-answer-chat",
-    "P09-form-in-dialog",
+    "P16-settings-section",
     "P22-toast-feedback"
    ],
    "persona": "platform_admin",
-   "reason": "Edit chat prompts; a prompt page, so the playground example is the nearest original (held at B, no render yet).",
+   "reason": "Edit each chat persona's system prompt, description and sample prompts; the saved prompt is the one the chat uses.",
    "reference": {
     "shadcn": {
      "name": "shadcn blocks: sidebar-08 (inset section navigation)",
@@ -11784,7 +11775,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/ai-chat-persona-prompts.md",
    "states": [
     "loading",
     "empty-first-use",

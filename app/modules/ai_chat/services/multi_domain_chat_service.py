@@ -3569,6 +3569,20 @@ class MultiDomainChatService:
             "description": result["description"],
         }
 
+    @staticmethod
+    def _saved_persona_system_prompt(persona: str) -> str:
+        """The system prompt an administrator saved for ``persona``, or ""."""
+        try:
+            from app.models.ai_service import AIPromptTemplate
+
+            row = AIPromptTemplate.query.filter_by(
+                name=f"persona_override_{persona}"
+            ).first()
+        except Exception:
+            logger.exception("Could not read the saved system prompt for %s", persona)
+            return ""
+        return (row.system_prompt or "").strip() if row else ""
+
     def _get_persona_system_prompt(
         self,
         persona: str,
@@ -3595,6 +3609,12 @@ class MultiDomainChatService:
         config = PERSONA_CONFIGS.get(persona)
         if not config:
             return ""
+
+        # A platform administrator's saved system prompt (AI chat persona
+        # management page) replaces the built-in one for this persona.
+        saved = self._saved_persona_system_prompt(persona)
+        if saved:
+            return saved
 
         # A95-013 + AI-1: solutions_architect keeps its ArchiMate 3.2 metamodel
         # base and gains the architect charter + live governance data block.
