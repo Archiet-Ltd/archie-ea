@@ -312,3 +312,97 @@ def test_the_default_organisation_says_it_cannot_be_deleted_and_refuses(page, li
     with app.app_context():
         assert db.session.get(Organization, default_id) is not None
         db.session.remove()
+
+
+@pytest.fixture
+def doomed_named_by_another(app):
+    """An organisation whose only member is named by a record of a second organisation."""
+    from app import db
+    from app.models.models import Notification
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed_org = Organization(name="Journey Named A %s" % marker, slug="journey-named-a-%s" % marker)
+        other = Organization(name="Journey Named B %s" % marker, slug="journey-named-b-%s" % marker)
+        db.session.add_all([doomed_org, other])
+        db.session.flush()
+        person = User(first_name="Quinn", last_name="Architect%s" % marker, email="quinn-%s@example.test" % marker,
+                      password="test-password-123", confirmed=True, organization_id=doomed_org.id)
+        bystander = User(first_name="Bea", last_name="Stander%s" % marker, email="bea-%s@example.test" % marker,
+                         password="test-password-123", confirmed=True, organization_id=other.id)
+        db.session.add_all([person, bystander])
+        db.session.flush()
+        note = Notification(user_id=person.id, message="Review request %s" % marker, organization_id=other.id)
+        db.session.add(note)
+        db.session.commit()
+        made = {"doomed_id": doomed_org.id, "doomed_name": doomed_org.name, "other_id": other.id,
+                "other_name": other.name, "person_id": person.id, "person_name": person.last_name,
+                "bystander_name": bystander.last_name, "note_id": note.id}
+        db.session.remove()
+    yield made
+    with app.app_context():
+        from app.services.org_deletion_service import OrganizationDeletionService
+
+        for key in ("other_id", "doomed_id"):
+            if db.session.get(Organization, made[key]) is not None:
+                OrganizationDeletionService.delete_organization(made[key])
+        db.session.remove()
+
+
+def test_deleting_an_organisation_whose_person_another_organisation_names_is_refused(
+    page, live_server, seeded, app, doomed_named_by_another,
+):
+    """The page says how many people are named, by which organisation, and what to do; the other
+    organisation's member list gains nobody and the person stays where they were."""
+    import os
+
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    made = doomed_named_by_another
+    walk = os.environ.get("WALK_DIR")
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+
+    other_url = live_server + "/admin/organizations/%d" % made["other_id"]
+    page.goto(other_url, wait_until="domcontentloaded")
+    members_before = page.locator("main").inner_text()
+    assert made["bystander_name"] in members_before
+    assert made["person_name"] not in members_before
+
+    page.goto(live_server + "/admin/organizations/%d" % made["doomed_id"], wait_until="domcontentloaded")
+    page.locator("form[action$='/organizations/%d/delete']" % made["doomed_id"]).get_by_role(
+        "button", name="Delete organisation"
+    ).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_url("**/admin/organizations/%d" % made["doomed_id"], timeout=PAGE_TIMEOUT)
+
+    reason = page.get_by_text("is named by records of", exact=False).first
+    assert reason.is_visible(), "the page does not say why the organisation was not deleted"
+    text = reason.inner_text()
+    assert "1 person in %s is named by records of %s" % (made["doomed_name"], made["other_name"]) in text, text
+    assert "Reassign those records or move these people first" in text
+    assert "Nothing was deleted" in text
+    assert page.get_by_text("reason is in the server log", exact=False).count() == 0
+    assert made["person_name"] in page.locator("main").inner_text(), "the person is no longer shown in their organisation"
+    if walk:
+        page.wait_for_timeout(1200)
+        page.screenshot(path=os.path.join(walk, "refusal-1440.png"), full_page=True)
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.wait_for_timeout(1200)
+        page.screenshot(path=os.path.join(walk, "refusal-390.png"), full_page=True)
+        page.set_viewport_size({"width": 1440, "height": 900})
+
+    page.goto(other_url, wait_until="domcontentloaded")
+    assert page.locator("main").inner_text() == members_before, "the other organisation's page changed"
+    assert page.get_by_text(made["person_name"], exact=False).count() == 0
+    if walk:
+        page.screenshot(path=os.path.join(walk, "other-organisation-1440.png"), full_page=True)
+
+    with app.app_context():
+        assert db.session.get(Organization, made["doomed_id"]) is not None
+        person = db.session.get(User, made["person_id"])
+        assert person is not None and person.organization_id == made["doomed_id"]
+        db.session.remove()

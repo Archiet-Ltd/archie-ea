@@ -4,7 +4,7 @@ On a database with no Default organisation, deleting an organisation:
   - removes a person who belonged only to it, and their sessions;
   - detaches a person whose home it was but who also holds a role elsewhere; their home moves there;
   - removes another organisation's person's role in it, and keeps that person;
-  - keeps another organisation's row that named the removed person, without the name.
+  - is refused, with nothing changed, when another organisation's row names a person who would be removed.
 """
 
 import uuid
@@ -35,7 +35,6 @@ def test_deleting_an_organisation_needs_no_default_organisation(app, no_default_
     from app import db
     from app.models.org_role import OrgRole
     from app.models.organization import Organization
-    from app.models.strategic import StrategicInitiative
     from app.models.user import User
     from app.services.org_deletion_service import OrganizationDeletionService
 
@@ -53,7 +52,6 @@ def test_deleting_an_organisation_needs_no_default_organisation(app, no_default_
         db.session.add_all([
             OrgRole(organization_id=kept.id, user_id=also_elsewhere.id, role="viewer"),
             OrgRole(organization_id=doomed.id, user_id=visitor.id, role="viewer"),
-            StrategicInitiative(name="Kept plan %s" % marker, organization_id=kept.id, owner_id=only_here.id),
         ])
         db.session.commit()
         ids = {
@@ -78,8 +76,6 @@ def test_deleting_an_organisation_needs_no_default_organisation(app, no_default_
             assert visitor is not None and visitor.organization_id == ids["kept"]
             assert OrgRole.query.filter_by(organization_id=ids["doomed"]).count() == 0
             assert OrgRole.query.filter_by(user_id=ids["also_elsewhere"], organization_id=ids["kept"]).count() == 1
-            plan = StrategicInitiative.query.filter_by(name="Kept plan %s" % marker).one()
-            assert plan.organization_id == ids["kept"] and plan.owner_id is None
             db.session.remove()
     finally:
         with app.app_context():
@@ -91,30 +87,67 @@ def test_deleting_an_organisation_needs_no_default_organisation(app, no_default_
             db.session.remove()
 
 
-def test_a_departing_person_named_by_another_organisations_append_only_row_is_never_updated(app):
-    """``_remove_people`` never issues an UPDATE against an append-only table.
+def test_a_person_named_in_a_nullable_column_of_another_organisation_refuses_the_deletion(app):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.strategic import StrategicInitiative
+    from app.models.user import User
+    from app.services.org_deletion_service import OrganizationDeletionRefused, OrganizationDeletionService
 
-    arb_submission_evidence_snapshots is append-only (``reject_archie_evidence_mutation``
-    admits a DELETE under the deletion marker, never an UPDATE) and its ``actor_id`` is a
-    nullable foreign key to ``users`` with no tenant check of its own, so a person leaving
-    one organisation can still be named by another, surviving organisation's snapshot row.
-    Before this fix, deleting the person's own organisation tried to NULL that column and the
-    append-only guard refused the UPDATE outright -- a defect, since nulling an append-only
-    row's column is never admitted no matter which organisation's delete is in progress.
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed = Organization(name="Doomed %s" % marker, slug="doomed-%s" % marker)
+        kept = Organization(name="Kept %s" % marker, slug="kept-%s" % marker)
+        db.session.add_all([doomed, kept])
+        db.session.flush()
+        only_here = User(email="only-here-%s@example.com" % marker, organization_id=doomed.id)
+        db.session.add(only_here)
+        db.session.flush()
+        plan = StrategicInitiative(name="Kept plan %s" % marker, organization_id=kept.id, owner_id=only_here.id)
+        db.session.add(plan)
+        db.session.commit()
+        ids = {"doomed": doomed.id, "kept": kept.id, "person": only_here.id, "plan": plan.id}
+        db.session.remove()
 
-    The column is still a real foreign key with no cascade of its own, so a person a surviving
-    organisation's append-only row insists on still naming cannot be deleted either (deleting
-    them would leave that row's own reference dangling) -- that half is a genuine, pre-existing
-    referential-integrity conflict between the two organisations' data, not something a trigger
-    or a retry can paper over, and it now surfaces as the database's own plain foreign-key
-    refusal naming the row that is holding on, never as the append-only guard's misleading
-    "is append-only" exception.
+    try:
+        with app.app_context():
+            with pytest.raises(OrganizationDeletionRefused) as refused:
+                OrganizationDeletionService.delete_organization(ids["doomed"])
+            assert "Kept %s" % marker in str(refused.value)
+            assert "Nothing was deleted" in str(refused.value)
+            db.session.remove()
+        with app.app_context():
+            assert db.session.get(Organization, ids["doomed"]) is not None
+            person = db.session.get(User, ids["person"])
+            assert person is not None and person.organization_id == ids["doomed"]
+            owner = db.session.execute(
+                text("SELECT owner_id FROM strategic_initiatives WHERE id = :i"), {"i": ids["plan"]}
+            ).scalar()
+            assert owner == ids["person"], "the other organisation's row was written"
+            db.session.remove()
+    finally:
+        with app.app_context():
+            db.session.execute(text("DELETE FROM strategic_initiatives WHERE id = :i"), {"i": ids["plan"]})
+            db.session.commit()
+            db.session.remove()
+            for org_id in (ids["kept"], ids["doomed"]):
+                if db.session.get(Organization, org_id) is not None:
+                    OrganizationDeletionService.delete_organization(org_id)
+            db.session.remove()
+
+
+def test_a_person_named_by_another_organisations_append_only_row_refuses_the_deletion(app):
+    """The refusal is plain and comes before any write, so no foreign-key error ever shows.
+
+    arb_submission_evidence_snapshots is append-only and its ``actor_id`` is a nullable foreign
+    key to ``users``: a surviving organisation's snapshot can name a person who would otherwise
+    be removed with their own organisation.
     """
     from app import db
     from app.models.arb_submission_evidence import ARBSubmissionEvidenceSnapshot
     from app.models.organization import Organization
     from app.models.user import User
-    from app.services.org_deletion_service import OrganizationDeletionService
+    from app.services.org_deletion_service import OrganizationDeletionRefused, OrganizationDeletionService
 
     marker = uuid.uuid4().hex[:8]
     with app.app_context():
@@ -133,19 +166,16 @@ def test_a_departing_person_named_by_another_organisations_append_only_row_is_ne
 
     try:
         with app.app_context():
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["doomed"])
-            message = str(excinfo.value)
-            assert "append-only" not in message, (
-                "the guard rejected an UPDATE this code must no longer attempt: " + message
-            )
-            assert "arb_submission_evidence_snapshots" in message, (
-                "expected the database's own foreign-key refusal naming the citing row: " + message
-            )
+            message = str(refused.value)
+            assert "Other append %s" % marker in message
+            assert "Reassign those records or move these people first" in message
+            assert "foreign key" not in message and "append-only" not in message
             db.session.rollback()
             db.session.remove()
 
-        # Rolled back whole: the organisation, the person and the citing row all still stand.
+        # Nothing was written: the organisation, the person and the citing row all still stand.
         with app.app_context():
             assert db.session.get(Organization, ids["doomed"]) is not None
             row = db.session.execute(

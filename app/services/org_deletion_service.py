@@ -5,8 +5,9 @@ Deleting an organisation never depends on another organisation existing:
     organisation role) is detached from this one and keeps the others; their home organisation
     moves to one of them, and an Administrator of this organisation is no longer one;
   - a person who belongs only to this organisation is removed with it, with the rows that are theirs
-    alone (sessions, tokens). A person that a row of another organisation names is kept, like one who
-    belongs elsewhere: no row of another organisation is deleted for it;
+    alone (sessions, tokens). If a row of another organisation names such a person, in any column,
+    the whole deletion is refused before anything is written: no row of another organisation is
+    written, and no person is moved into one;
   - an organisation that is the home of a platform administrator is not deleted at all; the
     administrator is moved first.
 
@@ -251,43 +252,35 @@ def _remove_pointing_rows(sess, plan, table, where, params, path, counts=None):
         _delete(sess, child, child_where, params, counts)
 
 
-def _people_kept_by_other_rows(sess, plan, people_ids, org_id):
-    """Map each person a tenant table's row must name to the organisation that row belongs to.
+def _people_named_elsewhere(sess, plan, people_ids, org_id):
+    """Map each person to the names of the other organisations whose rows still name them.
 
-    The deleted organisation's own rows are gone by now, so any such row belongs to another
-    organisation (or to none). The row cannot lose the name (the column is NOT NULL) and is not
-    ours to delete, so the person is kept instead.
+    Reads only; any column of any tenant table counts, nullable or not, append-only or not.
     """
-    kept = {}
+    named = defaultdict(set)
     if not people_ids:
-        return kept
-    params = {"people": list(people_ids)}
-    for child, child_col, parent_col, not_null, _ in plan.referrers[PEOPLE]:
-        if parent_col != "id" or child == PEOPLE or child not in plan.org_columns or not not_null:
+        return named
+    params = {"people": list(people_ids), "org_id": org_id}
+    for child, child_col, parent_col, _, _ in plan.referrers[PEOPLE]:
+        if parent_col != "id" or child == PEOPLE or child not in plan.org_columns:
             continue
         rows = sess.execute(text(
-            "SELECT %s, min(organization_id) FROM %s WHERE %s = ANY(:people) GROUP BY %s"
-            % (_q(child_col), _q(child), _q(child_col), _q(child_col))
+            "SELECT DISTINCT %s, organization_id FROM %s WHERE %s = ANY(:people) "
+            "AND organization_id IS NOT NULL AND organization_id <> :org_id"
+            % (_q(child_col), _q(child), _q(child_col))
         ), params).all()
-        for person, home in rows:
-            if person not in kept or (home is not None and (kept[person] is None or home < kept[person])):
-                kept[person] = home
-    return kept
+        for person, other in rows:
+            named[person].add(other)
+    return named
 
 
 def _remove_people(sess, plan, people_ids):
     """Remove people who belonged only to the deleted organisation, and the rows that are theirs alone.
 
-    The organisation's own rows are gone by now, and no row of another organisation must name one of
-    these people (those people are kept, see ``_people_kept_by_other_rows``). A row still naming one
-    keeps its place and loses the name where the column allows it; a row that must name a person
-    belongs to no organisation (a session, a token) and is removed with them.
-
-    A nullable column on an append-only table (``arb_canonical_conditions.responsible_id`` and the
-    like) is neither: any row still naming this person belongs to a different organisation, and that
-    organisation's own append-only guard admits neither this UPDATE nor a DELETE -- only a delete of
-    its own organisation, under its own marker, which this is not. The row keeps the name; nothing
-    here is allowed to touch it.
+    The organisation's own rows are gone by now, and the deletion has already been refused if a row
+    of another organisation names one of these people. A row still naming one belongs to no
+    organisation: a nullable pointer is cleared, and a row that must point (a session, a token) is
+    removed with the person.
     """
     if not people_ids:
         return
@@ -344,35 +337,50 @@ class OrganizationDeletionService:
                 % (administrators, "administrator" if administrators == 1 else "administrators", org.name)
             )
 
+        # Read-only: who is detached (belongs elsewhere) and who leaves with the organisation.
+        detaching, leaving = [], []
+        for user in sess.query(User).filter_by(organization_id=org_id).order_by(User.id).all():
+            elsewhere = sorted(
+                role.organization_id
+                for role in sess.query(OrgRole).filter(
+                    OrgRole.user_id == user.id, OrgRole.organization_id != org_id
+                )
+            )
+            if elsewhere:
+                detaching.append((user, elsewhere[0]))
+            else:
+                leaving.append(user.id)
+        plan = _Plan(sess)
+        named = _people_named_elsewhere(sess, plan, leaving, org_id)
+        if named:
+            other_ids = sorted({other for others in named.values() for other in others})
+            names = [name for (name,) in sess.query(Organization.name).filter(
+                Organization.id.in_(other_ids)).order_by(Organization.name)]
+            raise OrganizationDeletionRefused(
+                "%d %s in %s %s named by records of %s. Reassign those records or move these people first. "
+                "Nothing was deleted." % (
+                    len(named), "person" if len(named) == 1 else "people", org.name,
+                    "is" if len(named) == 1 else "are", ", ".join(names))
+            )
+
         org_name, org_slug = org.name, org.slug
         try:
             sess.execute(
                 text("SELECT set_config('archie.deleting_organisation', :org_id, true)"),
                 {"org_id": str(org_id)},
             )
-            # People whose home is this organisation: detached when they belong elsewhere too,
-            # removed with it when they do not.
-            detached, leaving = 0, []
-            for user in sess.query(User).filter_by(organization_id=org_id).order_by(User.id).all():
-                elsewhere = sorted(
-                    role.organization_id
-                    for role in sess.query(OrgRole).filter(
-                        OrgRole.user_id == user.id, OrgRole.organization_id != org_id
-                    )
-                )
-                if elsewhere:
-                    if user.is_admin():
-                        user.revoke_org_admin()
-                    user.organization_id = elsewhere[0]
-                    detached += 1
-                else:
-                    leaving.append(user.id)
+            # People whose home is this organisation and who belong elsewhere are detached.
+            detached = 0
+            for user, home in detaching:
+                if user.is_admin():
+                    user.revoke_org_admin()
+                user.organization_id = home
+                detached += 1
             sess.flush()
             for user in sess.query(User).filter(User.id.in_(leaving)).all() if leaving else []:
                 sess.expunge(user)
 
             counts = {}
-            plan = _Plan(sess)
             params = {"org_id": org_id}
             table_order = plan.order()
             for table, column in plan.cycle_breaks():
@@ -383,23 +391,6 @@ class OrganizationDeletionService:
                 _remove_pointing_rows(sess, plan, table, where, params, {table}, counts)
                 _delete(sess, table, where, params, counts)
 
-            kept = _people_kept_by_other_rows(sess, plan, leaving, org_id)
-            if kept:
-                fallback, rehomed = Organization.default_organization(), []
-                for person_id, home in sorted(kept.items()):
-                    home = home or (fallback.id if fallback is not None else None)
-                    if home is None:
-                        continue
-                    person = sess.get(User, person_id)
-                    if person.is_admin():
-                        person.revoke_org_admin()
-                    person.organization_id = home
-                    detached += 1
-                    leaving.remove(person_id)
-                    rehomed.append(person)
-                sess.flush()
-                for person in rehomed:
-                    sess.expunge(person)
             _remove_people(sess, plan, leaving)
 
             sess.expunge(org)

@@ -1,7 +1,7 @@
 """Deleting an organisation never writes another organisation's rows or removes a platform administrator.
 
-  - a person whose home is the deleted organisation, but whose name a surviving organisation's row
-    must carry (a NOT NULL column), is kept and moved to that organisation;
+  - a person who would be removed, but whom a surviving organisation's row names, refuses the whole
+    deletion before anything is written;
   - an organisation that is the home of a platform administrator is refused before anything changes;
   - a nullable pointer to a deleted row, in a table with no organisation column, is cleared and
     the row is kept.
@@ -26,12 +26,12 @@ def _cleanup(app, *org_ids):
         db.session.remove()
 
 
-def test_a_person_a_surviving_organisation_must_name_is_kept_and_its_row_untouched(app):
+def test_a_person_a_surviving_organisation_must_name_refuses_the_deletion(app):
     from app import db
     from app.models.models import Notification
     from app.models.organization import Organization
     from app.models.user import User
-    from app.services.org_deletion_service import OrganizationDeletionService
+    from app.services.org_deletion_service import OrganizationDeletionRefused, OrganizationDeletionService
 
     marker = uuid.uuid4().hex[:8]
     with app.app_context():
@@ -40,35 +40,33 @@ def test_a_person_a_surviving_organisation_must_name_is_kept_and_its_row_untouch
         db.session.add_all([doomed, other])
         db.session.flush()
         author = User(email="author-%s@example.com" % marker, organization_id=doomed.id)
-        alone = User(email="alone-%s@example.com" % marker, organization_id=doomed.id)
-        db.session.add_all([author, alone])
+        db.session.add(author)
         db.session.flush()
         note = Notification(user_id=author.id, message="Written in the other organisation", organization_id=other.id)
         db.session.add(note)
         db.session.commit()
-        ids = {"doomed": doomed.id, "other": other.id, "author": author.id, "alone": alone.id, "note": note.id}
+        ids = {"doomed": doomed.id, "other": other.id, "author": author.id, "note": note.id, "name": other.name}
         db.session.remove()
 
     try:
         with app.app_context():
-            message = OrganizationDeletionService.delete_organization(ids["doomed"])
+            with pytest.raises(OrganizationDeletionRefused) as refused:
+                OrganizationDeletionService.delete_organization(ids["doomed"])
+            assert "1 person in Doomed %s is named by records of %s" % (marker, ids["name"]) in str(refused.value)
+            assert "Reassign those records or move these people first" in str(refused.value)
             db.session.remove()
-        assert "1 person who belonged only to it was removed" in message, message
-        assert "1 person who also belongs elsewhere was detached" in message, message
 
         with app.app_context():
-            assert db.session.get(Organization, ids["doomed"]) is None
-            kept = db.session.get(User, ids["author"])
-            assert kept is not None, "a person the other organisation's row names was removed"
-            assert kept.organization_id == ids["other"]
-            assert db.session.get(User, ids["alone"]) is None
+            assert db.session.get(Organization, ids["doomed"]) is not None
+            person = db.session.get(User, ids["author"])
+            assert person is not None and person.organization_id == ids["doomed"]
             row = db.session.execute(
                 text("SELECT user_id, organization_id FROM notifications WHERE id = :i"), {"i": ids["note"]}
             ).one()
             assert tuple(row) == (ids["author"], ids["other"]), "the other organisation's row was changed or removed"
             db.session.remove()
     finally:
-        _cleanup(app, ids["doomed"], ids["other"])
+        _cleanup(app, ids["other"], ids["doomed"])
 
 
 def test_an_organisation_that_is_a_platform_administrators_home_is_not_deleted(app):
