@@ -24,6 +24,8 @@ import os
 import uuid
 
 import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 
 # Tests must never inherit a developer's or deployment agent's LLM credentials.
@@ -58,8 +60,81 @@ for _llm_api_key_env_var in _LLM_API_KEY_ENV_VARS:
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 
 
+def _quote(connection, name):
+    return connection.dialect.identifier_preparer.quote(name)
+
+
 @pytest.fixture(scope="session")
-def app():
+def run_id():
+    """A short id unique to this pytest process.
+
+    Roles are cluster-wide and database names are shared by every run on the
+    cluster, so two runs (or two seats) with the same xdist worker id must not
+    share either.
+    """
+    return uuid.uuid4().hex[:8]
+
+
+@pytest.fixture(scope="session")
+def worker_database(request, run_id):
+    """Create a per-worker database if running in parallel, otherwise use the default.
+
+    The database is created from the seat template (archie_tmpl_main) at session start
+    and dropped at session end. Its name is TEST_DATABASE_URL's database with the worker
+    id and a run id appended (e.g. archie_test_xdist01_gw0_1a2b3c4d).
+    """
+    worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
+
+    # The master worker in a parallel run can reuse the main database.
+    if worker_id == "master":
+        yield
+        return
+
+    db_url = os.environ.get("TEST_DATABASE_URL")
+    if not db_url:
+        pytest.skip("TEST_DATABASE_URL not set, skipping parallel database setup.")
+
+    base_url = make_url(db_url)
+    worker_db_name = f"{base_url.database}_{worker_id}_{run_id}"
+    worker_db_url = base_url.set(database=worker_db_name).render_as_string(hide_password=False)
+
+    # The seat template database (created by mkseat.sh)
+    template_db_name = os.environ.get("TEST_TEMPLATE_DATABASE", "archie_tmpl_main")
+
+    # Connect to the postgres database (not the template) to create the worker database.
+    # This avoids "source database is being accessed by other users" when multiple
+    # workers try to create from the same template simultaneously.
+    admin = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            worker_q = _quote(connection, worker_db_name)
+            template_q = _quote(connection, template_db_name)
+            connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
+            connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+    finally:
+        admin.dispose()
+
+    original_url = db_url
+    os.environ["TEST_DATABASE_URL"] = worker_db_url
+
+    def finalizer():
+        os.environ["TEST_DATABASE_URL"] = original_url
+        cleanup = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+        try:
+            with cleanup.connect() as connection:
+                connection.execute(
+                    text(f"DROP DATABASE IF EXISTS {_quote(connection, worker_db_name)} WITH (FORCE)")  # nosec B608 - quoted identifier
+                )
+        finally:
+            cleanup.dispose()
+
+    request.addfinalizer(finalizer)
+
+    yield
+
+
+@pytest.fixture(scope="session")
+def app(request, worker_database):
     """Boot the application once per test session."""
     os.environ.setdefault("FLASK_CONFIG", "testing")
     from app import create_app
@@ -103,7 +178,7 @@ def _schema(app):
 
     It also seeds the standard roles, as a deployed database has them. A user
     created without an explicit role takes the default one, so without this a
-    test's permissions depended on whether some earlier test in the same run
+    test\'s permissions depended on whether some earlier test in the same run
     had happened to seed them, and a test run on its own, or in a CI shard
     without that earlier test, was refused with 403.
     """
