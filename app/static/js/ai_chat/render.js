@@ -625,8 +625,11 @@
         div.setAttribute('data-testid', 'estate-answer');
         div.innerHTML = avatarHtml() +
             '<div class="min-w-0 max-w-3xl flex-1">' +
-              (window.DOMPurify ? DOMPurify.sanitize(html) : '') +
+              (window.DOMPurify ? DOMPurify.sanitize(html, { ADD_ATTR: ['target'] }) : '') +
             '</div>';
+        /* A link out to the source (the file on GitHub) opens in a new tab so the
+           conversation stays where it is; sanitising drops target unless it is kept. */
+        div.querySelectorAll('a[target="_blank"]').forEach(function (a) { a.setAttribute('rel', 'noopener noreferrer'); });
         var container = messages();
         if (container) container.appendChild(div);
         scrollToBottom();
