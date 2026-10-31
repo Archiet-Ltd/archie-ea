@@ -210,8 +210,8 @@
              if (n && !this.open && this.extra && e.target.matches(':focus-visible') && (box.scrollTop > 0 || n.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1)) this.toggle();
            } }"
          x-init="fit(); const watch = new ResizeObserver(() => { if (measure() !== sig) fit(); }); watch.observe($refs.box); $refs.box.querySelectorAll('[data-canvas-note]').forEach(n => watch.observe(n)); document.fonts.ready.then(() => { if (measure() !== sig) fit(); })">
-    {%- set held = (boxes.get(b.key) or [])|length + (b.subs or [])|map(attribute='key')|map('extract', boxes)|map('length')|sum -%}
-    <div x-ref="box" class="flex min-h-0 flex-col gap-3{{ ' max-h-28 overflow-y-auto' if held }}"{% if held %} tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long"{% endif %} data-canvas-scroll @focusin="reach($event)">
+    {%- set held = namespace(n=(boxes.get(b.key) or [])|length) -%}{%- for s in (b.subs or []) %}{% set held.n = held.n + (boxes.get(s.key) or [])|length %}{% endfor -%}
+    <div x-ref="box" class="flex min-h-0 flex-col gap-3{{ ' max-h-28 overflow-y-auto' if held.n }}"{% if held.n %} tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long"{% endif %} data-canvas-scroll @focusin="reach($event)">
     {%- else %}
     <div class="flex min-h-0 flex-col gap-3">
     {%- endif %}
