@@ -2,8 +2,11 @@
 {# app/templates/adm_kanban/gap_analysis.html #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/button.html' import button %}
 
-{% block title %}Gap Analysis — ADM Kanban{% endblock %}
+{% block title %}Gap analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,11 +14,11 @@
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
             <div class="text-center">
-                <div class="text-2xl font-bold {% if (gaps|length + computed_gap_count) > 0 %}text-destructive{% else %}text-success{% endif %}">{{ gaps|length + computed_gap_count }}</div>
-                <div class="text-xs text-muted-foreground">Total Gaps</div>
+                <div class="text-2xl font-bold text-foreground" data-testid="gap-total">{{ gaps|length + computed_gap_count }}</div>
+                <div class="text-xs text-muted-foreground">Total gaps</div>
             </div>
             <div class="text-center">
-                <div class="text-2xl font-bold {% if unclosed_count > 0 %}text-destructive{% else %}text-success{% endif %}">
+                <div class="text-2xl font-bold {% if (unclosed_count + computed_gap_count) > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">
                     {# Includes computed_gap_count so the three tiles agree:
                        Total Gaps = gaps + computed, Covered = gaps - unclosed,
                        so Unclosed must be unclosed + computed for
@@ -25,7 +28,7 @@
                 <div class="text-xs text-muted-foreground">Unclosed</div>
             </div>
             <div class="text-center">
-                <div class="text-2xl font-bold text-foreground">{{ gaps|length - unclosed_count }}</div>
+                <div class="text-2xl font-bold {% if (gaps|length - unclosed_count) > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ gaps|length - unclosed_count }}</div>
                 <div class="text-xs text-muted-foreground">Covered</div>
             </div>
             <a href="{{ url_for('genome_roadmap.index') }}"
@@ -34,9 +37,9 @@
             </a>
     {% endmacro %}
     {{ page_shell(
-        title='Gap Analysis',
-        subtitle='ArchiMate 3.2 Gap elements and the WorkPackages that close them (TOGAF Phase E/F)',
-        breadcrumb=[('ADM Kanban', url_for('adm_kanban_view.index')), ('Gap Analysis', None)],
+        title='Gap analysis',
+        subtitle='Gaps between what the business needs and what the systems provide, and the work that closes them',
+        breadcrumb=[('Changes', url_for('adm_kanban_view.index')), ('Gaps', None)],
         actions_caller=_ps_actions
     ) }}
 
@@ -57,9 +60,8 @@
                 <h2 class="text-sm font-semibold text-foreground">{{ label }}</h2>
                 <p class="text-xs text-muted-foreground">{{ description }}</p>
             </div>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ color_class }} bg-current/10 border border-current/20"
-                  style="--tw-bg-opacity: 0.1; --tw-border-opacity: 0.2;">
-                {{ items|length }} gaps
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ color_class }} bg-current/10 border border-current/20">
+                {{ items|length }} {{ 'gap' if items|length == 1 else 'gaps' }}
             </span>
         </div>
         <div class="divide-y divide-border">
@@ -100,104 +102,96 @@
            class="mt-4 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors">
             Go to Board
         </a>
+        {% if can_change_model() %}
+        <div class="mt-2">{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('adm_kanban_view.index', new='Gap', next=url_for('adm_kanban_view.gap_analysis'))) }}</div>
+        {% endif %}
     </div>
     {% else %}
 
     {# -- Gap table ------------------------------------------------------ #}
-    <div class="border border-border rounded-lg overflow-hidden">
-        <table class="dense-table w-full text-sm">
-            <thead class="bg-muted/50">
-                <tr>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Gap</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Domain</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-muted-foreerable uppercase tracking-wide">Phase</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Closing WorkPackages</th>
-                    <th class="px-4 py-2.5 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide">Covered</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for gap in gaps %}
-                {% set closers = gap_closers.get(gap.id, []) %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                        {# A Gap is a KanbanCard. There is no per-card page; the board is
-                           where a card is opened, assigned and moved between phases. #}
-                        {% if 'adm_kanban_view.index' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('adm_kanban_view.index') }}"
-                           class="font-medium text-primary hover:underline">{{ gap.title }}</a>
-                        {% else %}
-                        <div class="font-medium text-foreground">{{ gap.title }}</div>
-                        {% endif %}
-                        {% if gap.description %}
-                        <div class="text-xs text-muted-foreground mt-0.5 line-clamp-1">{{ gap.description }}</div>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if gap.arch_domain %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                            {{ gap.arch_domain }}
-                        </span>
-                        {% else %}
-                        <span class="text-muted-foreground text-xs">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-xs text-muted-foreground">{{ gap.phase or '—' }}</td>
-                    <td class="px-4 py-3">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                            {% if gap.column == 'done' %}bg-success/10 text-success-emphasis
-                            {% elif gap.column == 'review' or gap.column == 'approved' %}bg-primary/10 text-primary
-                            {% elif gap.column == 'under_development' or gap.column == 'implementing' %}bg-warning/10 text-warning-emphasis
-                            {% else %}bg-muted text-muted-foreground{% endif %}">
-                            {{ (gap.column or 'proposed')|replace('_', ' ')|title }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">
-                        {% if closers %}
-                        <div class="flex flex-wrap gap-1">
-                            {% for c in closers %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-primary/10 text-info-emphasis border border-primary/20"
-                                  title="{{ c.phase or '' }} · {{ c.arch_domain or '' }}">
-                                {{ c.title|truncate(35) }}
-                                {% if c.jira_issue_key %}
-                                <span class="ml-1 text-xs opacity-60">{{ c.jira_issue_key }}</span>
-                                {% endif %}
-                            </span>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <span class="text-xs text-destructive-emphasis/70 italic">No WorkPackage assigned</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        {% if closers %}
-                        <svg class="w-4 h-4 text-success mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                        </svg>
-                        {% else %}
-                        <svg class="w-4 h-4 text-destructive/60 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% macro _gap_record_empty_action() %}{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('adm_kanban_view.index', new='Gap', next=url_for('adm_kanban_view.gap_analysis'))) }}{% endmacro %}
+    {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Work packages that close it', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
+                           caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
+                           search_placeholder='Filter gaps...',
+                           empty_message='No gap record has been made yet. The gaps shown above are computed from the capability map.',
+                           empty_action=(_gap_record_empty_action if can_change_model() else none)) %}
+    {% set closers = gap_closers.get(gap.id, []) %}
+    {% call table_cell(attrs={'data-sort': gap.title}) %}
+        {# A Gap is a KanbanCard. There is no per-card page; the board is
+           where a card is opened, assigned and moved between phases. #}
+        {% if 'adm_kanban_view.index' in flask.current_app.view_functions %}
+        <a href="{{ url_for('adm_kanban_view.index') }}"
+           class="font-medium text-primary hover:underline">{{ gap.title }}</a>
+        {% else %}
+        <div class="font-medium text-foreground">{{ gap.title }}</div>
+        {% endif %}
+        {% if gap.description %}
+        <div class="text-xs text-muted-foreground mt-0.5 line-clamp-1">{{ gap.description }}</div>
+        {% endif %}
+    {% endcall %}
+    {% call table_cell(attrs={'data-sort': gap.arch_domain or ''}) %}
+        {% if gap.arch_domain %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+            {{ gap.arch_domain }}
+        </span>
+        {% else %}
+        <span class="text-muted-foreground text-xs">No domain recorded</span>
+        {% endif %}
+    {% endcall %}
+    {% call table_cell(class='text-xs text-muted-foreground', attrs={'data-sort': gap.phase or ''}) %}{{ gap.phase or 'No phase recorded' }}{% endcall %}
+    {% call table_cell(attrs={'data-sort': gap.column or 'proposed'}) %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+            {% if gap.column == 'done' %}bg-success/10 text-success-emphasis
+            {% elif gap.column == 'review' or gap.column == 'approved' %}bg-primary/10 text-primary
+            {% elif gap.column == 'under_development' or gap.column == 'implementing' %}bg-warning/10 text-warning-emphasis
+            {% else %}bg-muted text-muted-foreground{% endif %}">
+            {{ (gap.column or 'proposed')|replace('_', ' ')|title }}
+        </span>
+    {% endcall %}
+    {% call table_cell() %}
+        {% if closers %}
+        <div class="flex flex-wrap gap-1">
+            {% for c in closers %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-primary/10 text-info-emphasis border border-primary/20"
+                  title="{{ c.phase or '' }} · {{ c.arch_domain or '' }}">
+                {{ c.title|truncate(35) }}
+                {% if c.jira_issue_key %}
+                <span class="ml-1 text-xs opacity-60">{{ c.jira_issue_key }}</span>
+                {% endif %}
+            </span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <span class="text-xs text-destructive-emphasis/70 italic">No work package yet</span>
+        {% endif %}
+    {% endcall %}
+    {% call table_cell(class='text-right', attrs={'data-sort': 1 if closers else 0}) %}
+        {% if closers %}
+        <span class="inline-flex items-center gap-1 text-xs font-medium text-success-emphasis"><svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+        </svg>Covered</span>
+        {% else %}
+        <span class="inline-flex items-center gap-1 text-xs font-medium text-destructive-emphasis"><svg class="w-4 h-4 text-destructive/60" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>Not covered</span>
+        {% endif %}
+    {% endcall %}
+    {% endcall %}
+
+    {% from 'basecoat/progress.html' import progress, progress_indicator %}
 
     {# -- Coverage summary bar ------------------------------------------- #}
     {% if gaps %}
     {% set covered = gaps|length - unclosed_count %}
     {% set pct = ((covered / gaps|length) * 100)|round|int %}
-    <div class="p-4 bg-muted/30 rounded-lg border border-border">
+    <div class="p-4 bg-muted/30 rounded-lg border border-border" data-testid="gap-coverage-summary">
         <div class="flex items-center justify-between text-sm mb-2">
             <span class="font-medium text-foreground">Gap Coverage</span>
-            <span class="text-muted-foreground">{{ covered }} / {{ gaps|length }} gaps have a closing WorkPackage ({{ pct }}%)</span>
+            <span class="text-muted-foreground" data-testid="gap-coverage-pct">{{ covered }} / {{ gaps|length }} {{ 'gap has' if gaps|length == 1 else 'gaps have' }} a work package that closes it ({{ pct }}%)</span>
         </div>
-        <div class="w-full bg-muted rounded-full h-2">
-            <div class="bg-primary h-2 rounded-full transition-all" style="width: {{ pct }}%"></div>
-        </div>
+        {% call progress(value=pct, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': 'Gap coverage'}) %}
+            {{ progress_indicator(value=pct) }}
+        {% endcall %}
     </div>
     {% endif %}
 

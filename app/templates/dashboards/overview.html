@@ -53,7 +53,7 @@
   <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-3 xl:grid-cols-5">
     {% call ui.card(class='relative overflow-hidden bg-primary-surface text-primary-surface-foreground sm:col-span-3 xl:col-span-2', attrs={'data-testid': 'overview-welcome'}) %}
       {% call ui.card_header() %}
-        {{ ui.card_title(text='Welcome back' ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
+        {{ ui.card_title(text=('Welcome' if o.first_visit else 'Welcome back') ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
         {% if o.empty %}
         {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-surface-foreground/90') }}
         {% else %}

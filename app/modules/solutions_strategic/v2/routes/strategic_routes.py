@@ -65,6 +65,71 @@ from app.utils.pagination import safe_int_arg
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
 
+# The kind of plan each strategic page's initiative dialog creates (StrategicInitiative.record_kind).
+PLAN_KINDS = {
+    "health": "remediation_plan",
+    "investment": "investment_proposal",
+    "risk": "risk_mitigation",
+    "impact": "change_request",
+}
+
+
+def _plan_request(source):
+    """The dialog's body with the plan's kind set, or None when the owner is not one of the
+    caller's organisation's people (the owner's name is shown with the plan)."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models.user import User
+
+    data = dict(request.get_json(silent=True) or {})
+    data["record_kind"] = PLAN_KINDS[source]
+    owner_id = data.get("owner_id")
+    if owner_id not in (None, ""):
+        try:
+            owner_id = int(owner_id)
+        except (TypeError, ValueError):
+            return None
+        owner = db.session.get(User, owner_id)
+        if owner is None or owner.organization_id != current_org_id():
+            return None
+        data["owner_id"] = owner_id
+    return data
+
+
+@strategic_bp.app_template_global("initiative_plans")
+def initiative_plans(kind):
+    """The organisation's plans of one kind, newest first, for a page's "Plans created here" card."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models.strategic import StrategicInitiative
+
+    org_id = current_org_id()
+    if org_id is None or kind not in PLAN_KINDS.values():
+        return []
+    return (
+        StrategicInitiative.query.filter(
+            StrategicInitiative.organization_id == org_id,
+            StrategicInitiative.record_kind == kind,
+        )
+        .order_by(StrategicInitiative.created_at.desc(), StrategicInitiative.id.desc())
+        .limit(20)
+        .all()
+    )
+
+
+@strategic_bp.app_template_global("initiative_owner_options")
+def initiative_owner_options():
+    """The people of the organisation a plan can be owned by, for the dialog's Owner select."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models.user import User
+
+    org_id = current_org_id()
+    if org_id is None:
+        return []
+    people = User.query.filter(User.organization_id == org_id).order_by(User.email.asc(), User.id.asc()).all()
+    return [
+        {"id": person.id, "name": "%s — %s" % (person.full_name(), person.email) if person.full_name() else person.email}
+        for person in people
+    ]
+
 
 @strategic_bp.route("/capability-health")
 @login_required
@@ -506,7 +571,9 @@ def api_check_compliance():
 def api_create_initiative_from_health():
     """Create strategic initiative from capability health dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("health")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
@@ -533,7 +600,9 @@ def api_create_initiative_from_health():
 def api_create_initiative_from_investment():
     """Create strategic initiative from investment matrix dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("investment")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
@@ -560,7 +629,9 @@ def api_create_initiative_from_investment():
 def api_create_initiative_from_risk():
     """Create strategic initiative from risk assessment dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("risk")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)
@@ -587,7 +658,9 @@ def api_create_initiative_from_risk():
 def api_create_initiative_from_impact():
     """Create strategic initiative from impact analysis dashboard."""
     try:
-        data = request.get_json()
+        data = _plan_request("impact")
+        if data is None:
+            return jsonify({"success": False, "error": "Choose an owner from your organisation."}), 400
         
         # Delegate to StrategicService
         result = StrategicService.create_initiative(data)

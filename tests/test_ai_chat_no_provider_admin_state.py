@@ -43,6 +43,7 @@ from pathlib import Path
 
 import pytest
 
+from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -161,10 +162,23 @@ def test_client_only_classifies_an_explicit_chat_provider_configuration_fault():
 
 
 def test_model_catalogue_includes_the_environment_provider_for_a_tenant_without_rows(
-    client, login_as, chat_user, monkeypatch
+    app, client, login_as, chat_user, monkeypatch
 ):
-    """The picker and the runtime must resolve the same usable provider."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    """The picker, the endpoint and the resolver must name the same provider.
+
+    Commit 1d2bd1e81 (``app/modules/ai_chat/services/llm_service_impl.py``) made the platform's
+    own keys (keys in the environment) usable only for a provider named in ``LLM_PROVIDER_ORDER``
+    and within a spend ceiling (``LLM_SPEND_CEILING_USD_<PROVIDER>``); a bare key with no order
+    and no ceiling now resolves to nothing, which a previous draft of this test did not assert
+    under. OpenAI stands in as the environment-configured provider, placed in the order with a
+    ceiling, as the rule requires: DeepSeek left the provider set on 24 Oct 2026, so a DeepSeek
+    key configures nothing and an even earlier draft asserted a provider that no longer exists.
+    """
+    monkeypatch.delenv("LLM_PROVIDER_ORDER", raising=False)
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_OPENAI", "5.00")
     login_as(client, chat_user)
 
     response = client.get("/ai-chat/models")
@@ -172,19 +186,47 @@ def test_model_catalogue_includes_the_environment_provider_for_a_tenant_without_
     assert response.status_code == 200
     body = response.get_json()
     assert body["success"] is True
-    assert body["current_provider"] == "deepseek"
-    assert body["current_model"] == "deepseek-chat"
-    assert any(
-        model["provider"] == "deepseek" and model["model"] == "deepseek-chat"
-        for model in body["models"]
-    )
+    assert body["current_provider"] == "openai"
+    assert body["current_model"] == "gpt-4o"
+    assert [(m["provider"], m["model"]) for m in body["models"]] == [("openai", "gpt-4o")]
+
+    with app.app_context():
+        resolved_provider, resolved_model = LLMService._get_configured_provider()
+    assert (resolved_provider, resolved_model) == (body["current_provider"], body["current_model"])
+
+
+def test_model_catalogue_names_no_provider_for_a_platform_key_outside_the_order(
+    app, client, login_as, chat_user, monkeypatch
+):
+    """Under the same rule, a platform key for a provider the order never calls configures
+    nothing on the picker, the endpoint and the resolver alike -- never a stale "configured"
+    state on one surface while another has moved on. See the docstring above for the commit
+    and the environment names the rule reads.
+    """
+    monkeypatch.delenv("LLM_PROVIDER_ORDER", raising=False)
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    login_as(client, chat_user)
+
+    response = client.get("/ai-chat/models")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["current_provider"] is None
+    assert body["current_model"] is None
+    assert body["models"] == []
+
+    with app.app_context():
+        with pytest.raises(ValueError):
+            LLMService._get_configured_provider()
 
 
 def test_chat_page_does_not_claim_an_environment_provider_is_unavailable(
     client, login_as, chat_user, monkeypatch
 ):
     """The first painted health state must use the runtime provider resolver."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     login_as(client, chat_user)
 
     response = client.get("/ai-chat/")

@@ -94,6 +94,30 @@ def _first_name(user):
     return name or None
 
 
+def _is_first_visit(user):
+    """True when the signed-in user has no ``UserSession`` row created before the
+    current one -- the current session is the first one this user has ever had."""
+    from flask import session
+
+    from app.models.user_session import UserSession
+
+    sid = session.get("_sid")
+    if not sid:
+        return False
+    # tenant-scoping-ok: UserSession is deliberately NOT TenantMixin (see its module
+    # docstring); scoped here by user_id, which is the one scope that applies to it.
+    current = UserSession.query.filter_by(sid=sid).first()
+    if current is None or current.user_id != user.id:
+        return False
+    # tenant-scoping-ok: UserSession is deliberately NOT TenantMixin (see its module
+    # docstring); scoped here by user_id, which is the one scope that applies to it.
+    earlier = UserSession.query.filter(
+        UserSession.user_id == user.id,
+        UserSession.created_at < current.created_at,
+    ).first()
+    return earlier is None
+
+
 def _active_applications():
     """The applications the Systems list shows by default."""
     from app.models.application_portfolio import ApplicationComponent as A
@@ -576,6 +600,7 @@ def build_overview(org_id, user, now=None, with_cost=True):
     return {
         "empty": empty,
         "first_name": _first_name(user),
+        "first_visit": _is_first_visit(user),
         "applications": apps,
         "sourced": sourced,
         "relationships": relationships,

@@ -23,6 +23,7 @@
 {% set type_label = element_type | plain_name(current_user) %}
 {% set layer_label = layer | plain_layer(current_user) %}
 {% set conn = page.connections %}
+{% set connection_count = (conn.depends_on | length + conn.used_by | length + conn.other | length) if conn.available else none %}
 {% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) %}
 {% set flag_help = {
     'Critical path member': 'Part of a chain that has to keep running for the business to run.',
@@ -71,9 +72,17 @@
             {% else %}
             {{ disabled_action('Edit', 'Only an architect can edit elements. Ask an administrator in Team settings.', 'edit-element-reason', icon='pencil') }}
             {% endif %}
-            {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 col-span-2 sm:col-span-1') %}
-                <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
-            {% endcall %}
+            <div class="col-span-2 inline-flex flex-col items-start gap-1 sm:col-span-1">
+                {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 w-full', testid='export-diagram') %}
+                    <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
+                {% endcall %}
+                {% if connection_count == 0 %}
+                <p class="text-xs text-muted-foreground" data-testid="export-diagram-no-relationships">
+                    This element has no relationships yet.
+                    {% if source_ae_id %}<a href="#connections" class="text-primary underline hover:underline">Add one</a>.{% endif %}
+                </p>
+                {% endif %}
+            </div>
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
             {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
@@ -408,7 +417,7 @@ function archimateDetail() {
 
         downloadDiagram() {
             const elId = {{ (source_ae_id or element.id) | tojson }};
-            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint=application';
+            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint={{ element.layer | default('application') | lower }}';
             const a = document.createElement('a');
             a.href = url;
             a.download = 'archimate-diagram-' + elId + '.svg';
