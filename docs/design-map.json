@@ -10584,6 +10584,10 @@
     }
    },
    "spec": "docs/design/specs/admin-rowforms.md",
+   "extra_macros": [
+    "components/form_field.html",
+    "components/select.html"
+   ],
    "states": [
     "loading",
     "empty-first-use",
