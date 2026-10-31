@@ -6,7 +6,7 @@
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/button.html' import button %}
 
-{% block title %}Gap Analysis — ADM Kanban{% endblock %}
+{% block title %}Gap analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -14,11 +14,11 @@
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
             <div class="text-center">
-                <div class="text-2xl font-bold {% if (gaps|length + computed_gap_count) > 0 %}text-destructive{% else %}text-success{% endif %}">{{ gaps|length + computed_gap_count }}</div>
-                <div class="text-xs text-muted-foreground">Total Gaps</div>
+                <div class="text-2xl font-bold text-foreground" data-testid="gap-total">{{ gaps|length + computed_gap_count }}</div>
+                <div class="text-xs text-muted-foreground">Total gaps</div>
             </div>
             <div class="text-center">
-                <div class="text-2xl font-bold {% if unclosed_count > 0 %}text-destructive{% else %}text-success{% endif %}">
+                <div class="text-2xl font-bold {% if (unclosed_count + computed_gap_count) > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">
                     {# Includes computed_gap_count so the three tiles agree:
                        Total Gaps = gaps + computed, Covered = gaps - unclosed,
                        so Unclosed must be unclosed + computed for
@@ -28,7 +28,7 @@
                 <div class="text-xs text-muted-foreground">Unclosed</div>
             </div>
             <div class="text-center">
-                <div class="text-2xl font-bold text-foreground">{{ gaps|length - unclosed_count }}</div>
+                <div class="text-2xl font-bold {% if (gaps|length - unclosed_count) > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ gaps|length - unclosed_count }}</div>
                 <div class="text-xs text-muted-foreground">Covered</div>
             </div>
             <a href="{{ url_for('genome_roadmap.index') }}"
@@ -37,9 +37,9 @@
             </a>
     {% endmacro %}
     {{ page_shell(
-        title='Gap Analysis',
-        subtitle='ArchiMate 3.2 Gap elements and the WorkPackages that close them (TOGAF Phase E/F)',
-        breadcrumb=[('ADM Kanban', url_for('adm_kanban_view.index')), ('Gap Analysis', None)],
+        title='Gap analysis',
+        subtitle='Gaps between what the business needs and what the systems provide, and the work that closes them',
+        breadcrumb=[('Changes', url_for('adm_kanban_view.index')), ('Gaps', None)],
         actions_caller=_ps_actions
     ) }}
 
@@ -61,7 +61,7 @@
                 <p class="text-xs text-muted-foreground">{{ description }}</p>
             </div>
             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ color_class }} bg-current/10 border border-current/20">
-                {{ items|length }} gaps
+                {{ items|length }} {{ 'gap' if items|length == 1 else 'gaps' }}
             </span>
         </div>
         <div class="divide-y divide-border">
@@ -102,12 +102,15 @@
            class="mt-4 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors">
             Go to Board
         </a>
+        {% if can_change_model() %}
+        <div class="mt-2">{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('adm_kanban_view.index', new='Gap', next=url_for('adm_kanban_view.gap_analysis'))) }}</div>
+        {% endif %}
     </div>
     {% else %}
 
     {# -- Gap table ------------------------------------------------------ #}
-    {% macro _gap_record_empty_action() %}{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('archimate_crud.create_element', layer='implementation', element_type='Gap')) }}{% endmacro %}
-    {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Closing WorkPackages', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
+    {% macro _gap_record_empty_action() %}{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('adm_kanban_view.index', new='Gap', next=url_for('adm_kanban_view.gap_analysis'))) }}{% endmacro %}
+    {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Work packages that close it', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
                            caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
                            search_placeholder='Filter gaps...',
                            empty_message='No gap record has been made yet. The gaps shown above are computed from the capability map.',
@@ -159,7 +162,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <span class="text-xs text-destructive-emphasis/70 italic">No WorkPackage assigned</span>
+        <span class="text-xs text-destructive-emphasis/70 italic">No work package yet</span>
         {% endif %}
     {% endcall %}
     {% call table_cell(class='text-right', attrs={'data-sort': 1 if closers else 0}) %}
@@ -184,7 +187,7 @@
     <div class="p-4 bg-muted/30 rounded-lg border border-border" data-testid="gap-coverage-summary">
         <div class="flex items-center justify-between text-sm mb-2">
             <span class="font-medium text-foreground">Gap Coverage</span>
-            <span class="text-muted-foreground" data-testid="gap-coverage-pct">{{ covered }} / {{ gaps|length }} gaps have a closing WorkPackage ({{ pct }}%)</span>
+            <span class="text-muted-foreground" data-testid="gap-coverage-pct">{{ covered }} / {{ gaps|length }} {{ 'gap has' if gaps|length == 1 else 'gaps have' }} a work package that closes it ({{ pct }}%)</span>
         </div>
         {% call progress(value=pct, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': 'Gap coverage'}) %}
             {{ progress_indicator(value=pct) }}
