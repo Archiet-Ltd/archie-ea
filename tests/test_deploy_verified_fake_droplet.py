@@ -61,6 +61,12 @@ echo "docker $*" >> "$S/docker.log"
 # serves from) held at that moment.
 echo "$1 $2 cwd=$(pwd) live=$(git -C "$APP_DIR" rev-parse HEAD)" >> "$S/docker.where"
 if [ "$1" = compose ]; then
+    # What compose would resolve here: the shell environment beats the .env file in
+    # the project directory, which beats the directory-derived default.
+    envval() { [ -f .env ] && sed -n "s/^$1=//p" .env | tail -1; }
+    eff_project="${COMPOSE_PROJECT_NAME:-$(envval COMPOSE_PROJECT_NAME)}"
+    eff_backup="${ARCHIE_BACKUP_HOST_DIR:-$(envval ARCHIE_BACKUP_HOST_DIR)}"
+    echo "$2 cwd=$(pwd) env_file=$([ -f .env ] && echo yes || echo no) project=${eff_project:-$(basename "$(pwd)")} backup=${eff_backup:-none}" >> "$S/docker.effective"
     case "$2" in
         build) exit "${FAKE_BUILD_EXIT:-0}" ;;
         run)
@@ -244,6 +250,12 @@ class FakeDroplet:
         path = self.state / "docker.where"
         lines = path.read_text().splitlines() if path.exists() else []
         return [entry for entry in lines if entry.startswith("compose")]
+
+    def effective(self) -> list[dict[str, str]]:
+        """What compose resolved for each call: directory, .env present, project, backup mount."""
+        path = self.state / "docker.effective"
+        lines = path.read_text().splitlines() if path.exists() else []
+        return [dict(item.split("=", 1) for item in line.split(" ")[1:]) | {"step": line.split(" ")[0]} for line in lines]
 
     def docker_calls(self) -> list[str]:
         path = self.state / "docker.log"
@@ -524,3 +536,59 @@ def test_the_backup_command_cannot_read_the_rest_of_the_deploy_script(droplet):
 
     assert rc == 0, out
     assert droplet.running() == sha(droplet, "B")
+
+
+def _production_env(droplet, text):
+    (droplet.app / ".env").write_text(text, encoding="utf-8")
+
+
+def test_the_copy_gets_the_live_env_file_and_the_live_project_name(droplet):
+    _production_env(droplet, "SECRET_KEY=x\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    before_swap = [e for e in droplet.effective() if e["step"] != "up"]
+    assert before_swap
+    for entry in before_swap:
+        assert entry["env_file"] == "yes", entry
+        assert entry["project"] == droplet.app.name, entry
+    assert droplet.effective()[-1]["project"] == droplet.app.name
+
+
+def test_the_backup_mount_in_the_copy_is_the_one_the_env_file_sets(droplet):
+    _production_env(droplet, "ARCHIE_BACKUP_HOST_DIR=/opt/archie/backups\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert [e["backup"] for e in droplet.effective()] == ["/opt/archie/backups"] * len(droplet.effective())
+
+
+def test_a_project_name_set_in_the_env_file_is_not_overridden(droplet):
+    _production_env(droplet, "COMPOSE_PROJECT_NAME=archie\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["project"] for e in droplet.effective()} == {"archie"}
+
+
+def test_a_silent_env_file_falls_back_to_the_live_defaults(droplet):
+    _production_env(droplet, "SECRET_KEY=x\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["backup"] for e in droplet.effective()} == {droplet.app.as_posix() + "/deploy/backups"}
+
+
+def test_a_checkout_that_fails_after_the_swap_point_fails_the_deploy(droplet):
+    """A hook that refuses the checkout: the deploy must stop, say so, and not go on
+    to replace the server."""
+    hook = droplet.app / ".git" / "hooks" / "post-checkout"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0")
+
+    assert rc != 0, out
+    assert "checking %s out in the live tree failed" % sha(droplet, "B") in out
+    assert "the live tree is at" in out
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+    assert droplet.running() == sha(droplet, "A")

@@ -224,9 +224,18 @@ echo "RESOLVED_COMMIT=$TARGET"
 LIVE_DIR=$(pwd)
 # The copy is a different directory, so pin what compose derives from the
 # directory: the project name (containers, networks, volumes, image names) and
-# the default backup folder, which is not tracked.
-export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-$(basename "$LIVE_DIR" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')}
-export ARCHIE_BACKUP_HOST_DIR=${ARCHIE_BACKUP_HOST_DIR:-$LIVE_DIR/deploy/backups}
+# the default backup folder, which is not tracked. The shell environment beats
+# .env in compose, so a default is exported only when neither the environment
+# nor the live .env defines the value; otherwise the copied .env decides.
+env_defines() {
+    [ -f "$LIVE_DIR/.env" ] && grep -Eq "^[[:space:]]*(export[[:space:]]+)?$1=" "$LIVE_DIR/.env"
+}
+if [ -z "${COMPOSE_PROJECT_NAME:-}" ] && ! env_defines COMPOSE_PROJECT_NAME; then
+    export COMPOSE_PROJECT_NAME=$(basename "$LIVE_DIR" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')
+fi
+if [ -z "${ARCHIE_BACKUP_HOST_DIR:-}" ] && ! env_defines ARCHIE_BACKUP_HOST_DIR; then
+    export ARCHIE_BACKUP_HOST_DIR=$LIVE_DIR/deploy/backups
+fi
 BUILD_TREE=$(mktemp -d)
 SWAPPED=0
 leave() {
@@ -257,13 +266,15 @@ docker compose run --rm --no-deps -T database-bootstrap </dev/null
 docker compose run --rm --no-deps -T -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy </dev/null
 docker compose run --rm --no-deps -T database-acl </dev/null
 cd "$LIVE_DIR"
-SWAPPED=1
 if [ "$CURRENT" != "$TARGET" ]; then
-    git checkout --detach "$TARGET"
-    git reset --hard "$TARGET"
+    if ! { git checkout --detach "$TARGET" && git reset --hard "$TARGET"; }; then
+        echo "DEPLOY-VERIFY FAIL: checking $TARGET out in the live tree failed; the server was not replaced" >&2
+        exit 1
+    fi
 else
     echo "already at $TARGET; checkout skipped (verification still runs)"
 fi
+SWAPPED=1
 docker compose up -d --no-deps --force-recreate server </dev/null
 REMOTE
 }
