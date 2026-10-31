@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
@@ -28,13 +29,13 @@
     <div class="flex items-center justify-end gap-2">
         {% set status_variant_map = {'completed': 'success', 'scheduled': 'primary', 'cancelled': 'error', 'draft': 'warning'} %}
         {{ status_badge(session.status|title, status_variant_map[session.status]|default('neutral')) }}
-        {% if session.status in ['scheduled', 'draft'] %}
+        {% if may_run_board and session.status in ['scheduled', 'draft'] %}
         <form method="POST" action="{{ url_for('arb.cancel_session', id=session.id) }}" class="inline"
               x-data x-init="$el.appendChild(function(){var i=document.createElement('input');i.type='hidden';i.name='csrf_token';i.value=document.querySelector('meta[name=csrf-token]').content;return i;}())">
             {{ button(text='Cancel Session', type='submit', variant='outline', size='sm', class='text-warning-emphasis border-warning/40 hover:bg-warning/10') }}
         </form>
         {% endif %}
-        {% if session.status in ['draft', 'cancelled'] %}
+        {% if may_run_board and session.status in ['draft', 'cancelled'] %}
         <div x-data>
             {{ button(text='Delete', type='button', variant='outline', size='sm', class='text-destructive-emphasis border-destructive/30 hover:bg-destructive/5', attrs_dict={'@click': "window.dispatchEvent(new CustomEvent('open-confirm-delete-arb-session', {detail: {callback: function(){var f=document.getElementById('arb-delete-form-" ~ session.id ~ "');var i=document.createElement('input');i.type='hidden';i.name='csrf_token';i.value=document.querySelector('meta[name=csrf-token]').content;f.appendChild(i);f.submit();}}}))"}) }}
             {{ confirmation_dialog(
