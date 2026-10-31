@@ -1,4 +1,8 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Architecture Impact Analysis{% endblock %}
@@ -868,19 +872,23 @@
 ) }}
 </div>
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='change-request-modal', kind='change_request', button_text='Create Change Request') }}
+</div>
 
 {{ initiative_modal(
     id='change-request-modal',
     title='Create Change Request',
     endpoint='/strategic/api/initiatives/from-impact',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Change Title', 'required': True, 'placeholder': 'e.g., Modernize Payment Processing'},
+        {'name': 'name', 'type': 'text', 'label': 'Change Title', 'required': True, 'placeholder': 'e.g., Modernize Payment Processing'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the proposed change...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('critical', 'Critical'), ('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'medium'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Change sponsor'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
-        {'name': 'cost_estimate', 'type': 'number', 'label': 'Cost Estimate ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 

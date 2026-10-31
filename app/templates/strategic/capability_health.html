@@ -1,4 +1,8 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -253,20 +257,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 ) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='health-remediation-modal', kind='remediation_plan', button_text='Create Plan') }}
+</div>
 
 {{ initiative_modal(
     id='health-remediation-modal',
     title='Create Remediation Plan',
     endpoint='/strategic/api/initiatives/from-health',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Remediation: Finance Capability'},
+        {'name': 'name', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Remediation: Finance Capability'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the remediation approach...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Team or individual responsible'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
         {'name': 'target_completion_date', 'type': 'date', 'label': 'Target Completion', 'required': False},
-        {'name': 'budget', 'type': 'number', 'label': 'Budget ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 

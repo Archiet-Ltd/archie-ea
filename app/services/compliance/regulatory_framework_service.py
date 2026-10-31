@@ -802,10 +802,18 @@ class RegulatoryFrameworkService:
         return frameworks
 
     @staticmethod
-    def seed_manufacturing_frameworks():
+    def _control_columns(control_data: Dict) -> Dict:
+        """The control as ComplianceControl columns: most catalogue entries name the code, the type and the
+        criticality ``control_id``, ``control_type`` and ``criticality``; the columns are ``control_code``,
+        ``category`` and ``priority``."""
+        renamed = {"control_id": "control_code", "control_type": "category", "criticality": "priority"}
+        return {renamed.get(key, key): value for key, value in control_data.items()}
+
+    @staticmethod
+    def seed_manufacturing_frameworks(codes=None):
         """
         Seed database with manufacturing-specific regulatory frameworks.
-        Now loads from JSON by default.
+        Now loads from JSON by default. ``codes`` limits the seeding to those framework codes.
 
         Returns:
             Number of frameworks seeded
@@ -818,6 +826,8 @@ class RegulatoryFrameworkService:
         frameworks = RegulatoryFrameworkService.load_frameworks_from_json()
 
         for framework_data in frameworks:
+            if codes is not None and framework_data["code"] not in codes:
+                continue
             # Check if framework already exists
             existing = RegulatoryFramework.query.filter_by(code=framework_data["code"]).first()
 
@@ -826,10 +836,11 @@ class RegulatoryFrameworkService:
                 continue
 
             # Extract controls separately
-            controls_data = framework_data.pop("controls", [])
+            # (read, not popped: the fallback list is shared by every call in the process)
+            controls_data = framework_data.get("controls", [])
 
             # Create framework
-            framework = RegulatoryFramework(**framework_data)
+            framework = RegulatoryFramework(**{k: v for k, v in framework_data.items() if k != "controls"})
             framework.last_updated = datetime.utcnow()
             framework.next_review_date = datetime.utcnow() + timedelta(days=365)
 
@@ -838,7 +849,9 @@ class RegulatoryFrameworkService:
 
             # Create controls
             for control_data in controls_data:
-                control = ComplianceControl(framework_id=framework.id, **control_data)
+                control = ComplianceControl(
+                    framework_id=framework.id, **RegulatoryFrameworkService._control_columns(control_data)
+                )
                 db.session.add(control)
 
             seeded_count += 1

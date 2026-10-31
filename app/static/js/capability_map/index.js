@@ -725,6 +725,7 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                     <div class="font-medium text-foreground">${escapeHtml(item.name || item.capability_name || 'Unknown')}</div>
+                    ${item.source && item.source.indexOf('starter:') === 0 ? `<div class="text-xs font-normal text-muted-foreground" data-testid="capability-source">Starter capability from ${escapeHtml(item.source.slice(8))}, chosen at sign-up</div>` : ''}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <span class="px-2 py-1 text-xs rounded-full ${domainColor}">

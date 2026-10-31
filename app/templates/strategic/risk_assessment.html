@@ -1,5 +1,8 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -181,20 +184,24 @@
     }
 ) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='risk-mitigation-modal', kind='risk_mitigation', button_text='Mitigate Risk') }}
+</div>
 
 {{ initiative_modal(
     id='risk-mitigation-modal',
     title='Create Risk Mitigation Plan',
     endpoint='/strategic/api/initiatives/from-risk',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Mitigate Legacy System Risk'},
+        {'name': 'name', 'type': 'text', 'label': 'Plan Title', 'required': True, 'placeholder': 'e.g., Mitigate Legacy System Risk'},
         {'name': 'description', 'type': 'textarea', 'label': 'Description', 'required': True, 'placeholder': 'Describe the mitigation strategy...'},
         {'name': 'risk_level', 'type': 'select', 'label': 'Risk Level', 'required': True, 'options': [('critical', 'Critical'), ('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Risk owner'},
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
         {'name': 'start_date', 'type': 'date', 'label': 'Start Date', 'required': False},
         {'name': 'target_completion_date', 'type': 'date', 'label': 'Target Completion', 'required': False},
-        {'name': 'cost_estimate', 'type': 'number', 'label': 'Cost Estimate ($)', 'required': False, 'placeholder': '0'}
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Budget', 'required': False, 'placeholder': '0'}
     ]
 ) }}
 
