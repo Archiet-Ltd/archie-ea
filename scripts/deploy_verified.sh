@@ -227,8 +227,10 @@ LIVE_DIR=$(pwd)
 # the default backup folder, which is not tracked. The shell environment beats
 # .env in compose, so a default is exported only when neither the environment
 # nor the live .env defines the value; otherwise the copied .env decides.
+# Read the way compose reads it: blanks are allowed around "=", and an empty
+# value is not a definition (compose then falls back to its own default).
 env_defines() {
-    [ -f "$LIVE_DIR/.env" ] && grep -Eq "^[[:space:]]*(export[[:space:]]+)?$1=" "$LIVE_DIR/.env"
+    [ -f "$LIVE_DIR/.env" ] && grep -Eq "^[[:space:]]*(export[[:space:]]+)?$1[[:space:]]*=[[:space:]]*[^[:space:]]" "$LIVE_DIR/.env"
 }
 if [ -z "${COMPOSE_PROJECT_NAME:-}" ] && ! env_defines COMPOSE_PROJECT_NAME; then
     export COMPOSE_PROJECT_NAME=$(basename "$LIVE_DIR" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')
@@ -269,6 +271,16 @@ cd "$LIVE_DIR"
 if [ "$CURRENT" != "$TARGET" ]; then
     if ! { git checkout --detach "$TARGET" && git reset --hard "$TARGET"; }; then
         echo "DEPLOY-VERIFY FAIL: checking $TARGET out in the live tree failed; the server was not replaced" >&2
+        # HEAD may already have moved (a hook can fail after the checkout): put
+        # the live tree back where the running server expects it. A failing hook
+        # also fails this checkout, so judge the result by where HEAD ended up.
+        git checkout --detach "$CURRENT" >/dev/null 2>&1 || true
+        git reset --hard "$CURRENT" >/dev/null 2>&1 || true
+        if [ "$(git rev-parse HEAD 2>/dev/null)" = "$CURRENT" ]; then
+            echo "the live tree was restored to $CURRENT" >&2
+        else
+            echo "DEPLOY-VERIFY FAIL: restoring the live tree to $CURRENT also failed" >&2
+        fi
         exit 1
     fi
 else

@@ -63,7 +63,7 @@ echo "$1 $2 cwd=$(pwd) live=$(git -C "$APP_DIR" rev-parse HEAD)" >> "$S/docker.w
 if [ "$1" = compose ]; then
     # What compose would resolve here: the shell environment beats the .env file in
     # the project directory, which beats the directory-derived default.
-    envval() { [ -f .env ] && sed -n "s/^$1=//p" .env | tail -1; }
+    envval() { [ -f .env ] && sed -n "s/^[[:space:]]*\\(export[[:space:]]\\{1,\\}\\)\\{0,1\\}$1[[:space:]]*=[[:space:]]*//p" .env | tail -1; }
     eff_project="${COMPOSE_PROJECT_NAME:-$(envval COMPOSE_PROJECT_NAME)}"
     eff_backup="${ARCHIE_BACKUP_HOST_DIR:-$(envval ARCHIE_BACKUP_HOST_DIR)}"
     echo "$2 cwd=$(pwd) env_file=$([ -f .env ] && echo yes || echo no) project=${eff_project:-$(basename "$(pwd)")} backup=${eff_backup:-none}" >> "$S/docker.effective"
@@ -589,6 +589,41 @@ def test_a_checkout_that_fails_after_the_swap_point_fails_the_deploy(droplet):
 
     assert rc != 0, out
     assert "checking %s out in the live tree failed" % sha(droplet, "B") in out
-    assert "the live tree is at" in out
     assert not any("--force-recreate" in c for c in _compose_steps(droplet))
     assert droplet.running() == sha(droplet, "A")
+
+
+def test_a_checkout_that_fails_after_head_moved_puts_the_live_tree_back(droplet):
+    """The hook runs after the checkout has moved HEAD, so the failed command leaves
+    the live tree at the target under the old server: it must go back to current."""
+    hook = droplet.app / ".git" / "hooks" / "post-checkout"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0")
+
+    assert rc != 0, out
+    assert head(droplet) == sha(droplet, "A")
+    assert (droplet.app / "f.txt").read_text() == "A"
+    assert "the live tree is at" not in out
+    assert droplet.running() == sha(droplet, "A")
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+
+
+def test_an_empty_env_value_is_not_a_definition(droplet):
+    """Compose reads `NAME=` as empty and its `:-` defaults then apply, so the live
+    defaults must still be pinned for the copy."""
+    _production_env(droplet, "COMPOSE_PROJECT_NAME=\nARCHIE_BACKUP_HOST_DIR=\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["project"] for e in droplet.effective()} == {droplet.app.name}
+    assert {e["backup"] for e in droplet.effective()} == {droplet.app.as_posix() + "/deploy/backups"}
+
+
+def test_a_space_before_the_equals_sign_still_counts_as_a_definition(droplet):
+    _production_env(droplet, "COMPOSE_PROJECT_NAME = archie\nARCHIE_BACKUP_HOST_DIR =/opt/archie/backups\n")
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    assert {e["project"] for e in droplet.effective()} == {"archie"}
+    assert {e["backup"] for e in droplet.effective()} == {"/opt/archie/backups"}
