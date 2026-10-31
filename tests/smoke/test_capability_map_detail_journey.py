@@ -167,3 +167,34 @@ def test_another_organisations_capability_cannot_be_opened(browser, live_server,
     finally:
         context.close()
 
+
+
+@pytest.mark.parametrize("viewport,scheme,tag", [
+    ({"width": 1440, "height": 900}, "light", "1440-light"), (NARROW, "dark", "390-dark"),
+])
+def test_map_and_opened_record_have_no_serious_accessibility_issue(browser, live_server, detail_tenants, viewport, scheme, tag):
+    import os
+    from axe_playwright_python.sync_playwright import Axe
+
+    shots = os.environ.get("CAPMAP03D_SHOTS")
+
+    def serious(p):
+        report = Axe().run(p, options={"runOnly": {"type": "tag", "values": ["wcag2a", "wcag2aa", "wcag22aa"]}})
+        data = report.response if hasattr(report, "response") else report
+        return [(v["id"], v["impact"], len(v["nodes"])) for v in data.get("violations", [])
+                if v.get("impact") in ("serious", "critical")]
+
+    context, page = _open_map(browser, live_server, detail_tenants["email_main"], viewport, scheme)
+    try:
+        expect(_box_button(page, detail_tenants["names"]["l2"])).to_be_visible(timeout=PAGE_TIMEOUT)
+        if shots:
+            page.screenshot(path=os.path.join(shots, "map-%s.png" % tag))
+        assert serious(page) == [], "map"
+        _box_button(page, detail_tenants["names"]["l2"]).click()
+        _assert_record(page, detail_tenants, "l2")
+        page.wait_for_load_state("networkidle")
+        if shots:
+            page.screenshot(path=os.path.join(shots, "detail-%s.png" % tag))
+        assert serious(page) == [], "opened record"
+    finally:
+        context.close()
