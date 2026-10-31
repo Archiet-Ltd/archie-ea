@@ -79,7 +79,6 @@ INTENTIONALLY_GLOBAL = {
     # but an assessment of how a product covers a business_capability is not:
     # that capability is tenant-owned, so the row describes one customer's
     # model. It now carries TenantMixin. See tests/test_vendor_tenancy_policy.py.
-    "VendorProductPricing": "vendor catalogue is shared reference data",
     "SolutionScoringConfig": "scoring defaults are platform-level",
     "OrgConnectorConfig": "queried by explicit organization_id in every caller",
     "DevOpsConnectorConfig": "queried by explicit organization_id in every caller",
