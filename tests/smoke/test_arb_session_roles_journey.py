@@ -151,3 +151,28 @@ def test_session_list_offers_complete_only_to_an_approver(
     assert number in page.inner_text("main")
     assert "Completed" in page.inner_text("main")
     _shot(page, "sessions-list-completed-1440")
+
+
+def test_session_list_complete_is_reachable_at_phone_width(
+    browser, live_server, seeded, quorum_session
+):
+    session_id, number = quorum_session
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    page.goto("%s/arb/sessions" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row = page.locator("main div").filter(has_text=number).filter(
+        has=page.get_by_role("button", name="Complete")
+    ).last
+    for control in (row.get_by_role("link", name="View"), row.get_by_role("button", name="Complete")):
+        box = control.bounding_box()
+        assert box is not None
+        assert box["x"] >= 0 and box["x"] + box["width"] <= 390, box
+    _shot(page, "sessions-list-approver-390")
+    with page.expect_response(lambda r: r.url.endswith("/complete")) as sent:
+        row.get_by_role("button", name="Complete").click()
+    assert sent.value.status in (200, 302), (sent.value.status, sent.value.url)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(2000)
+    page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert number in page.inner_text("main")
+    assert "Completed" in page.inner_text("main")

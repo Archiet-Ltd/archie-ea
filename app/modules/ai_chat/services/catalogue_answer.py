@@ -111,6 +111,8 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.
         "complete": complete,
+        # A name that matched nothing recorded: the records are not at fault.
+        "unmatched": result.get("matched") is False,
         "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete else None,
         "next_url": result.get("next_url") if not records else None,
         "next_label": result.get("next_label") if not records else None,

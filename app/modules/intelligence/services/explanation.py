@@ -101,6 +101,7 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
     from app.modules.intelligence.services.plain_terms import link_sentence
     from app.services.archimate_derivation_service import describe_rule
     from app.utils.tenant_users import user_in_org
+    from app.services.relationship_origin import manual_origin_text
 
     chain_ids: List[int] = list(fact.get("chain") or [])
     relationships = {}
@@ -175,7 +176,7 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
         if kind == "import" and label:
             who = f"Imported from {label}"
         elif kind == "manual" and label:
-            who = f"Drawn by {label}"
+            who = manual_origin_text(label)
         elif kind in ("connector", "derived") and label:
             who = label
         elif kind == "sample":
