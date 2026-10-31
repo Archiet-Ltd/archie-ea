@@ -386,36 +386,16 @@ class BatchImportService:
         Returns:
             Dictionary with cost breakdown
         """
-        total_apps = job.total_applications
-        mode = job.archimate_mode
+        base = self._estimate_cost_for_count(
+            app_count=job.total_applications,
+            mode=job.archimate_mode,
+            enable_ai=bool(job.enable_ai_generation),
+        )
+        total_cost = Decimal(str(base["estimated_total_usd"]))
 
-        mode_multiplier = self.ARCHIMATE_MODE_MULTIPLIERS.get(mode, Decimal("2.5"))
-
-        if job.enable_ai_generation:
-            archimate_cost = self.cost_per_app_base * mode_multiplier * total_apps
-            capability_cost = self.cost_capability_mapping * total_apps
-            process_cost = self.cost_process_classification * total_apps
-        else:
-            archimate_cost = Decimal("0")
-            capability_cost = Decimal("0")
-            process_cost = Decimal("0")
-
-        total_cost = archimate_cost + capability_cost + process_cost
-
-        result = {
-            "total_applications": total_apps,
-            "archimate_mode": mode,
-            "enable_ai_generation": job.enable_ai_generation,
-            "estimated_total_usd": float(total_cost),
-            "cost_per_application": float(total_cost / total_apps) if total_apps > 0 else 0,
-            "breakdown": {
-                "archimate_generation": float(archimate_cost),
-                "capability_mapping": float(capability_cost),
-                "process_classification": float(process_cost),
-            },
-            "budget_limit_usd": float(job.budget_limit_usd) if job.budget_limit_usd else None,
-            "within_budget": (job.budget_limit_usd is None or total_cost <= job.budget_limit_usd),
-        }
+        result = dict(base)
+        result["budget_limit_usd"] = float(job.budget_limit_usd) if job.budget_limit_usd else None
+        result["within_budget"] = job.budget_limit_usd is None or total_cost <= job.budget_limit_usd
 
         # Include actual vs estimated comparison when actual data exists
         actual = float(job.actual_cost_usd) if job.actual_cost_usd else 0
@@ -817,7 +797,7 @@ class BatchImportService:
     def _estimate_cost_for_count(
         self, app_count: int, mode: str = "standard", enable_ai: bool = True
     ) -> Dict[str, Any]:
-        """Estimate cost for a specific application count."""
+        """The one estimator: used by job creation, the analyse step and the new-import page."""
         mode_multiplier = self.ARCHIMATE_MODE_MULTIPLIERS.get(mode, Decimal("2.5"))
 
         if enable_ai:
@@ -843,3 +823,17 @@ class BatchImportService:
                 "process_classification": float(process_cost),
             },
         }
+
+
+def format_estimate_money(amount) -> str:
+    """Format an estimate in the signed-in organisation's currency, the way every
+    server-rendered money figure is formatted."""
+    from app.middleware.tenant_context import current_org
+    from app.services.currency_service import CurrencyService
+    from config import CurrencyConfig
+
+    try:
+        code = CurrencyConfig.get_org_currency_code(current_org())
+    except Exception:  # noqa: BLE001 - a figure must still render
+        code = None
+    return CurrencyService().format_currency(float(amount or 0), code)

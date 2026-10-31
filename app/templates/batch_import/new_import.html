@@ -366,32 +366,17 @@
                                     <span class="font-medium" x-text="totalApplications"></span>
                                 </div>
 
-                                <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                                    <span class="text-sm">Batches</span>
-                                    <span class="font-medium" x-text="estimatedBatches"></span>
-                                </div>
-
-                                <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                                    <span class="text-sm">Est. LLM Calls</span>
-                                    <span class="font-medium" x-text="estimatedLLMCalls"></span>
-                                </div>
-
-                                <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                                    <span class="text-sm">Est. Tokens</span>
-                                    <span class="font-medium" x-text="estimatedTokens.toLocaleString()"></span>
-                                </div>
-
                                 <div class="border-t pt-4">
                                     <div class="flex items-center justify-between">
                                         <span class="font-medium">Estimated Cost</span>
-                                        <span class="text-xl font-bold text-primary" x-text="'$' + estimatedCost.toFixed(2)"></span>
+                                        <span class="text-xl font-bold text-primary" data-testid="import-estimated-cost" x-text="estimateDisplay || 'Estimate after upload'"></span>
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
                                         Based on current token prices. Actual cost may vary.
                                     </p>
                                 </div>
 
-                                <template x-if="form.budget_limit && estimatedCost > form.budget_limit">
+                                <template x-if="form.budget_limit && estimateUsd !== null && estimateUsd > form.budget_limit">
                                     <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2">
                                         <div class="flex items-start gap-2">
                                             <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5" aria-hidden="true"></i>
@@ -505,6 +490,9 @@ function newImportForm() {
         init() {
             this.loadAvailableApplications();
             this.loadProgrammes();
+            this.$watch('totalApplications', () => this.refreshEstimate());
+            this.$watch('form.archimate_mode', () => this.refreshEstimate());
+            this.$watch('form.ai_generation', () => this.refreshEstimate());
         },
 
         get totalApplications() {
@@ -514,31 +502,35 @@ function newImportForm() {
             return this.previewData.length;
         },
 
-        get estimatedBatches() {
-            return Math.ceil(this.totalApplications / this.form.batch_size);
-        },
+        estimateDisplay: '',
+        estimateUsd: null,
+        estimateKey: '',
 
-        get estimatedLLMCalls() {
-            const callsPerApp = {
-                'quick': 1,
-                'standard': 2,
-                'comprehensive': 4
-            };
-            return this.totalApplications * (callsPerApp[this.form.archimate_mode] || 2);
-        },
-
-        get estimatedTokens() {
-            const tokensPerCall = {
-                'quick': 500,
-                'standard': 1000,
-                'comprehensive': 2000
-            };
-            return this.estimatedLLMCalls * (tokensPerCall[this.form.archimate_mode] || 1000);
-        },
-
-        get estimatedCost() {
-            // Approximate cost: $0.002 per 1000 tokens
-            return (this.estimatedTokens / 1000) * 0.002;
+        // The server's estimator is the only one; this asks it for the figure.
+        async refreshEstimate() {
+            const rows = this.totalApplications;
+            if (!this.form.ai_generation || rows === 0) {
+                this.estimateDisplay = '';
+                this.estimateUsd = null;
+                return;
+            }
+            const key = rows + '|' + this.form.archimate_mode;
+            this.estimateKey = key;
+            try {
+                const q = new URLSearchParams({
+                    rows: rows,
+                    archimate_mode: this.form.archimate_mode,
+                    ai_generation: this.form.ai_generation,
+                });
+                const data = await Platform.fetch('/api/batch-import/cost-estimate?' + q.toString());
+                if (this.estimateKey !== key) return;
+                const est = (data && data.data) || data || {};
+                this.estimateUsd = est.estimated_total_usd;
+                this.estimateDisplay = est.estimated_total_display || '';
+            } catch (error) {
+                this.estimateDisplay = '';
+                this.estimateUsd = null;
+            }
         },
 
         get canSubmit() {

@@ -22,7 +22,11 @@ from app import db
 from app.models.audit_log import AuditLog
 from app.models.batch_import import BatchImportJob, BatchJobStatus
 from app.services.batch_approval_service import BatchApprovalService
-from app.modules.import_batch.services.batch_import_service import ActiveJobExists, ImportRefused
+from app.modules.import_batch.services.batch_import_service import (
+    ActiveJobExists,
+    ImportRefused,
+    format_estimate_money,
+)
 from app.services.batch_import_service import BatchImportService
 from app.services.import_audit_service import log_batch_approval  # dead-code-ok
 from app.services.batch_processor_service import BatchProcessorService
@@ -248,6 +252,22 @@ def create_job():
                 "error_code": sanitized_error['error_code']
             }
         ), 500
+
+
+@batch_import_bp.route("/cost-estimate", methods=["GET"])
+@login_required
+def cost_estimate():
+    """The one cost estimate: same estimator the job is created with.
+
+    Query: rows (application count), archimate_mode, ai_generation.
+    Answers the figure in the organisation's currency format.
+    """
+    rows = safe_int_arg("rows", 0, minimum=0, maximum=1000000)
+    mode = request.args.get("archimate_mode", "standard")
+    ai = request.args.get("ai_generation", "true").lower() not in ("false", "0", "no", "off")
+    estimate = import_service._estimate_cost_for_count(app_count=rows, mode=mode, enable_ai=ai)
+    estimate["estimated_total_display"] = format_estimate_money(estimate["estimated_total_usd"])
+    return jsonify({"success": True, "data": estimate, **estimate})
 
 
 @batch_import_bp.route("/jobs/analyze", methods=["POST"])

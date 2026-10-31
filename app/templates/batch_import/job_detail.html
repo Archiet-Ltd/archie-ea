@@ -256,7 +256,7 @@
                             <i data-lucide="calculator" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                             <span class="text-sm">Estimated Cost</span>
                         </div>
-                        <span class="font-semibold" x-text="'$' + (job?.estimated_cost || 0).toFixed(2)"></span>
+                        <span class="font-semibold" data-testid="job-estimated-cost">{{ estimated_cost_display }}</span>
                     </div>
 
                     <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
