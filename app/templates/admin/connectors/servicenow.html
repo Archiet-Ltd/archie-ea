@@ -1,206 +1,165 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'components/switch.html' import switch %}
+{% from 'components/input.html' import hidden_input %}
 {% block title %}ServiceNow CMDB Connector{% endblock %}
-{% from 'components/page_header.html' import page_header %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+{% set errors = errors or {} %}
+{% set is_on = cfg.get('enabled') %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_shell(
         title='ServiceNow CMDB Connector',
-        description='Configure bidirectional sync: CMDB CIs → ApplicationComponent inventory, ARB decisions → ServiceNow Change Requests.',
-        breadcrumbs=[
-            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
-            {'label': 'ServiceNow Connector'}
+        subtitle='Configure bidirectional sync: CMDB CIs → ApplicationComponent inventory, ARB decisions → ServiceNow Change Requests.',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')) if current_user.is_admin() else ('Workspace', None),
+            ('Connectors', url_for('m365_connector.connectors_index')),
+            ('ServiceNow', None)
         ]
     ) }}
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="mb-6 space-y-2">
+            <div class="mb-6 space-y-2" data-testid="sn-saved">
                 {% for category, message in messages %}
-                    <div class="rounded-md border p-4
-                        {% if category == 'success' %}bg-primary/10 border-primary/20 text-foreground
-                        {% elif category == 'error' %}bg-destructive/10 border-destructive/20 text-destructive-emphasis
-                        {% else %}bg-accent border-border text-foreground{% endif %}">
-                        {{ message }}
-                    </div>
+                    {% call ui.alert(variant='destructive' if category == 'error' else 'default', attrs={'role': 'status'}) %}{{ ui.alert_description(text=message) }}{% endcall %}
                 {% endfor %}
             </div>
         {% endif %}
     {% endwith %}
 
-    <!-- Status card -->
-    <div data-slot="card" class="rounded-lg border border-input bg-card mb-6">
-        <div class="p-4 sm:p-6 border-b flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold">Connector Status</h3>
-                <p class="text-sm text-muted-foreground mt-1">
-                    Last sync:
-                    {% if sn_config and sn_config.last_sync %}
-                        {{ sn_config.last_sync.strftime('%Y-%m-%d %H:%M UTC') }}
-                    {% else %}
-                        <em>Never</em>
-                    {% endif %}
-                </p>
+    <div class="mb-6">
+    {% call ui.card() %}
+        {% call ui.card_header() %}
+            <div class="flex items-start justify-between gap-4">
+                <div class="space-y-1.5">
+                    {{ ui.card_title(text='Connector status') }}
+                    {{ ui.card_description(text=('Last sync: ' ~ sn_config.last_sync.strftime('%Y-%m-%d %H:%M UTC')) if sn_config and sn_config.last_sync else 'Never synced.') }}
+                </div>
+                {{ state_badge('Connected' if is_on else ('Disabled' if sn_config else 'Not set'), tone=('positive' if is_on else 'neutral'), testid='sn-state') }}
             </div>
-            <span id="status-badge"
-                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                {% if cfg.get('enabled') %}bg-success/10 text-success-emphasis{% else %}bg-muted text-muted-foreground{% endif %}">
-                {% if cfg.get('enabled') %}Enabled{% else %}Disabled{% endif %}
-            </span>
-        </div>
-        <div class="p-4 sm:p-6 flex gap-3 flex-wrap">
-            <button type="button" id="btn-test"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Test Connection
-            </button>
-            <button type="button" id="btn-sync"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Sync Now
-            </button>
-            <span id="sync-msg" class="hidden text-sm text-muted-foreground self-center"></span>
-        </div>
+        {% endcall %}
+        {% call ui.card_content() %}
+            <div id="sn-result" data-testid="sn-result" aria-live="polite">
+                <div id="sn-result-ok" hidden>{% call ui.alert() %}{{ ui.alert_description(text='', attrs={'id': 'sn-result-ok-text'}) }}{% endcall %}</div>
+                <div id="sn-result-error" hidden>{% call ui.alert(variant='destructive') %}{{ ui.alert_description(text='', attrs={'id': 'sn-result-error-text'}) }}{% endcall %}</div>
+            </div>
+        {% endcall %}
+        {% call ui.card_footer(class='justify-end gap-3') %}
+            {{ ui.button(text='Check status', type='button', variant='outline', attrs={'id': 'sn-status-btn'}) }}
+            {{ ui.button(text='Sync now', type='button', variant='outline', attrs={'id': 'sn-sync-btn'}) }}
+        {% endcall %}
+    {% endcall %}
     </div>
 
-    <!-- sn_config form -->
-    <form method="POST" action="{{ url_for('m365_connector.servicenow_config_save') }}" class="space-y-6">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form method="POST" action="{{ url_for('m365_connector.servicenow_config_save') }}" class="space-y-6" data-testid="sn-form" novalidate>
+        {{ hidden_input('csrf_token', csrf_token()) }}
 
-        <!-- OAuth2 / Instance -->
-        <div data-slot="card" class="rounded-lg border border-input bg-card">
-            <div class="p-4 sm:p-6 border-b">
-                <h3 class="text-lg font-semibold">ServiceNow Instance &amp; OAuth2</h3>
-                <p class="text-sm text-muted-foreground mt-1">
-                    Create an OAuth2 application in ServiceNow:
-                    <em>System OAuth → Application Registry</em>.
-                    Grant access to <code class="text-xs font-mono bg-muted px-1 rounded">cmdb_read</code>
-                    and <code class="text-xs font-mono bg-muted px-1 rounded">change_write</code> scopes.
-                </p>
-            </div>
-            <div class="p-4 sm:p-6 space-y-4">
-                <div>
-                    <label for="instance_url" class="block text-sm font-medium text-muted-foreground mb-1">Instance URL</label>
-                    <input type="url" id="instance_url" name="instance_url"
-                        value="{{ cfg.get('instance_url', '') }}"
-                        placeholder="https://your-instance.service-now.com"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
-                </div>
-                <div>
-                    <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">Client ID</label>
-                    <input type="text" id="client_id" name="client_id"
-                        value="{{ cfg.get('client_id', '') }}"
-                        placeholder="OAuth2 client_id from ServiceNow Application Registry"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
-                </div>
-                <div>
-                    <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">
-                        Client Secret
-                        <span class="ml-2 text-xs text-muted-foreground font-normal">(leave blank to keep existing)</span>
-                    </label>
-                    <input type="password" id="client_secret" name="client_secret"
-                        placeholder="{{ '••••••••' if has_secret else 'Enter client secret' }}"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono" autocomplete="new-password">
-                    <p class="mt-1 text-xs text-muted-foreground">
-                        Stored encrypted with the organisation's own key in the credential store. Never logged or returned in API responses.
-                    </p>
-                </div>
-            </div>
-        </div>
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='ServiceNow instance and OAuth2') }}
+                {% call ui.card_description() %}Create an OAuth2 application in ServiceNow under System OAuth, Application Registry, and grant it the <code class="font-mono text-xs">cmdb_read</code> and <code class="font-mono text-xs">change_write</code> scopes.{% endcall %}
+            {% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Instance URL', attrs={'for': 'instance_url'}) }}
+                    {{ ui.input(id='instance_url', name='instance_url', type='url', autocomplete='off', class='font-mono',
+                        value=cfg.get('instance_url', ''), placeholder='https://your-instance.service-now.com',
+                        attrs=({'aria-invalid': 'true'} if errors.instance_url else {})) }}
+                    {% if errors.instance_url %}{{ ui.field_error(text=errors.instance_url, attrs={'data-testid': 'sn-error-instance_url'}) }}{% endif %}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Client ID', attrs={'for': 'client_id'}) }}
+                    {{ ui.input(id='client_id', name='client_id', type='text', autocomplete='off', class='font-mono',
+                        value=cfg.get('client_id', ''), placeholder='The client ID from the ServiceNow Application Registry') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Client secret', attrs={'for': 'client_secret'}) }}
+                    {{ ui.input(id='client_secret', name='client_secret', type='password', autocomplete='new-password', class='font-mono',
+                        placeholder=('Leave blank to keep the existing value' if has_secret else 'Paste the client secret')) }}
+                    {{ ui.field_description(text='Stored encrypted with the organisation\'s own key and never shown again.') }}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
 
-        <!-- CMDB Pull Settings -->
-        <div data-slot="card" class="rounded-lg border border-input bg-card">
-            <div class="p-4 sm:p-6 border-b">
-                <h3 class="text-lg font-semibold">CMDB Pull Settings</h3>
-                <p class="text-sm text-muted-foreground mt-1">
-                    Controls which ServiceNow CIs are pulled into the ApplicationComponent inventory.
-                </p>
-            </div>
-            <div class="p-4 sm:p-6 space-y-4">
-                <div>
-                    <label for="ci_query_filter" class="block text-sm font-medium text-muted-foreground mb-1">CI Query Filter</label>
-                    <input type="text" id="ci_query_filter" name="ci_query_filter"
-                        value="{{ (cfg.get('field_mapping') or {}).get('ci_query_filter', '') }}"
-                        placeholder="operational_status=1^install_status=1"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
-                    <p class="mt-1 text-xs text-muted-foreground">ServiceNow encoded query for <code class="font-mono">cmdb_ci_appl</code> table.</p>
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text='CMDB pull settings') }}
+                {{ ui.card_description(text='Controls which ServiceNow CIs are pulled into the ApplicationComponent inventory.') }}
+            {% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='CI query filter', attrs={'for': 'ci_query_filter'}) }}
+                    {{ ui.input(id='ci_query_filter', name='ci_query_filter', type='text', autocomplete='off', class='font-mono',
+                        value=(cfg.get('field_mapping') or {}).get('ci_query_filter', ''), placeholder='operational_status=1^install_status=1') }}
+                    {{ ui.field_description(text='A ServiceNow encoded query for the cmdb_ci_appl table.') }}
+                {% endcall %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Field mapping overrides (JSON)', attrs={'for': 'field_mapping'}) }}
+                    {{ ui.textarea(id='field_mapping', name='field_mapping', text=mapping_text or '', class='font-mono',
+                        placeholder='{"name": "name", "sys_class_name": "component_type", "u_business_owner": "business_owner"}',
+                        attrs=({'rows': '6', 'aria-invalid': 'true'} if errors.field_mapping else {'rows': '6'})) }}
+                    {% if errors.field_mapping %}{{ ui.field_error(text=errors.field_mapping, attrs={'data-testid': 'sn-error-field_mapping'}) }}{% else %}
+                    {{ ui.field_description(text='A JSON object mapping ServiceNow field names to ApplicationComponent columns. Defaults: name to name, sys_class_name to component_type, u_business_owner to business_owner.') }}{% endif %}
+                {% endcall %}
+                <div class="flex items-start justify-between gap-4">
+                    <div class="space-y-1">
+                        <label for="enabled" class="text-sm font-medium">Enable connector</label>
+                        <p class="text-sm text-muted-foreground">When enabled, CMDB pulls and ARB decision pushes are active.</p>
+                    </div>
+                    {{ switch(name='enabled', id='enabled', checked=is_on, aria_label='Enable connector') }}
                 </div>
-                <div>
-                    <label for="field_mapping" class="block text-sm font-medium text-muted-foreground mb-1">Field Mapping Overrides (JSON)</label>
-                    <textarea id="field_mapping" name="field_mapping" rows="6"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                        placeholder='{"name": "name", "sys_class_name": "component_type", "u_business_owner": "business_owner"}'
-                    >{{ cfg.get('field_mapping', {}) | tojson(indent=2) }}</textarea>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                        JSON object mapping ServiceNow field names → ApplicationComponent column names.
-                        Defaults are: <code class="font-mono">name→name</code>, <code class="font-mono">sys_class_name→component_type</code>, <code class="font-mono">u_business_owner→business_owner</code>.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Enable toggle & submit -->
-        <div data-slot="card" class="rounded-lg border border-input bg-card">
-            <div class="p-4 sm:p-6 flex items-center justify-between">
-                <div>
-                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Connector</label>
-                    <p class="text-xs text-muted-foreground mt-0.5">
-                        When enabled, CMDB pulls and ARB decision pushes are active.
-                    </p>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="enabled" name="enabled" class="sr-only peer"
-                        {% if cfg.get('enabled') %}checked{% endif %}>
-                    <div class="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer
-                        peer-checked:after:translate-x-full peer-checked:after:border-background
-                        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                        after:bg-background after:border-border after:border after:rounded-full
-                        after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-            </div>
-        </div>
-
-        <div class="flex gap-3">
-            <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Save Configuration
-            </button>
-            <a href="{{ url_for('m365_connector.connectors_index') }}"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Cancel
-            </a>
-        </div>
+            {% endcall %}
+            {% call ui.card_footer(class='justify-end gap-3') %}
+                {{ ui.button(text='Cancel', href=url_for('m365_connector.connectors_index'), variant='outline') }}
+                {{ ui.button(text='Save configuration', type='submit') }}
+            {% endcall %}
+        {% endcall %}
     </form>
 </div>
 
 <script>
-document.getElementById('btn-test').addEventListener('click', function () {
-    const btn = this;
-    const msg = document.getElementById('sync-msg');
-    btn.disabled = true;
-    btn.textContent = 'Testing…';
-    Platform.fetch.get('{{ url_for("m365_connector.servicenow_status") }}', null, { silent: true })
-        .then(data => {
-            msg.textContent = data.status === 'not_configured'
-                ? 'Not configured — save credentials first.'
-                : 'Status: ' + data.status + (data.last_sync_at ? ' · Last sync: ' + data.last_sync_at : '');
-            msg.classList.remove('hidden');
-        })
-        .catch(() => { msg.textContent = 'Connection check failed.'; msg.classList.remove('hidden'); })
-        .finally(() => { btn.disabled = false; btn.textContent = 'Test Connection'; });
-});
-
-document.getElementById('btn-sync').addEventListener('click', function () {
-    const btn = this;
-    const msg = document.getElementById('sync-msg');
-    btn.disabled = true;
-    btn.textContent = 'Starting…';
-    Platform.fetch.post('{{ url_for("m365_connector.servicenow_sync") }}', undefined, { silent: true })
-        .then(data => {
-            msg.textContent = data.message || 'Sync started.';
-            msg.classList.remove('hidden');
-        })
-        .catch(() => { msg.textContent = 'Failed to start sync.'; msg.classList.remove('hidden'); })
-        .finally(() => { btn.disabled = false; btn.textContent = 'Sync Now'; });
-});
+(function () {
+    const ok = document.getElementById('sn-result-ok');
+    const bad = document.getElementById('sn-result-error');
+    function show(good, text) {
+        ok.hidden = !good;
+        bad.hidden = good;
+        document.getElementById(good ? 'sn-result-ok-text' : 'sn-result-error-text').textContent = text;
+    }
+    function whenDone(btn, label, work) {
+        btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            btn.textContent = label[0];
+            try { await work(); } finally { btn.textContent = label[1]; btn.disabled = false; }
+        });
+    }
+    whenDone(document.getElementById('sn-status-btn'), ['Checking…', 'Check status'], async function () {
+        try {
+            const data = await Platform.fetch.get('{{ url_for("m365_connector.servicenow_status") }}', null, { silent: true });
+            if (data.status === 'not_configured') {
+                show(false, 'Not set up yet. Save the connector first.');
+            } else {
+                show(true, (data.status === 'active' ? 'Enabled. ' : 'Disabled. ') +
+                    (data.last_sync_at ? 'Last sync: ' + data.last_sync_at + '.' : 'This connector has never synced.'));
+            }
+        } catch (e) {
+            show(false, 'The status could not be read: ' + (e.message || 'no answer from the server') + '.');
+        }
+    });
+    whenDone(document.getElementById('sn-sync-btn'), ['Starting…', 'Sync now'], async function () {
+        try {
+            const data = await Platform.fetch.post('{{ url_for("m365_connector.servicenow_sync") }}', undefined, { silent: true });
+            show(true, data.message || 'Sync started.');
+        } catch (e) {
+            show(false, e.status === 404
+                ? 'Save the connector before syncing.'
+                : 'The sync could not start: ' + ((e.data && e.data.error) || e.message || 'no answer from the server') + '.');
+        }
+    });
+})();
 </script>
 {% endblock %}

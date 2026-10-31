@@ -521,26 +521,39 @@ def m365_test():
 # ---------------------------------------------------------------------------
 
 
-@m365_connector_bp.route("/servicenow", methods=["GET"])
-@login_required
-@connections_access
-def servicenow_config():
-    """Display the ServiceNow connector configuration form for the active org."""
+def _servicenow_page(org_id, cfg, errors=None, mapping_text=None, status=200):
+    """Render the ServiceNow connector page; the client secret is only ever reported as stored or not."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
     from app.services.connector_framework import _load_org_connector
 
-    org_id = _require_active_org()
     config = _load_org_connector(org_id, connector_type="servicenow")
-    cfg = (config.config or {}) if config else {}
     has_secret = (
         OrgCredentialVault().get_masked(org_id, "servicenow", "client_secret") is not None
     )
+    if mapping_text is None:
+        shown = {k: v for k, v in (cfg.get("field_mapping") or {}).items() if k != "ci_query_filter"}
+        mapping_text = _json.dumps(shown, indent=2) if shown else ""
     return render_template(
         "admin/connectors/servicenow.html",
         sn_config=config,
         cfg=cfg,
         has_secret=has_secret,
-    )
+        errors=errors or {},
+        mapping_text=mapping_text,
+    ), status
+
+
+@m365_connector_bp.route("/servicenow", methods=["GET"])
+@login_required
+@connections_access
+def servicenow_config():
+    """Display the ServiceNow connector configuration form for the active org."""
+    from app.services.connector_framework import _load_org_connector
+
+    org_id = _require_active_org()
+    config = _load_org_connector(org_id, connector_type="servicenow")
+    cfg = (config.config or {}) if config else {}
+    return _servicenow_page(org_id, cfg)
 
 
 @m365_connector_bp.route("/servicenow", methods=["POST"])
@@ -566,26 +579,45 @@ def servicenow_config_save():
 
     secret = (request.form.get("client_secret") or "").strip()
 
-    raw_mapping = (request.form.get("field_mapping") or "{}").strip()
-    try:
-        mapping = _json.loads(raw_mapping)
-    except ValueError:
-        flash("field_mapping must be valid JSON.", "warning")
-        mapping = {}
-
+    raw_mapping = (request.form.get("field_mapping") or "").strip()
     ci_filter = (request.form.get("ci_query_filter") or "").strip()
+    # A switch posts "true" or "false"; a plain checkbox posts "on".
+    enabled = (request.form.get("enabled") or "").strip().lower() in ("on", "true", "1")
+
+    errors = {}
+    mapping = {}
+    if raw_mapping:
+        try:
+            mapping = _json.loads(raw_mapping)
+            if not isinstance(mapping, dict):
+                raise ValueError("not an object")
+        except ValueError:
+            mapping = {}
+            errors["field_mapping"] = (
+                'Field mapping must be a JSON object, such as {"name": "name"}. '
+                "Fix it or clear the field to use the defaults."
+            )
     if ci_filter:
         mapping["ci_query_filter"] = ci_filter
-
-    enabled = request.form.get("enabled") == "on"
 
     from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
 
     try:
         instance_url = validate_connector_url(instance_url) if instance_url else ""
     except ConnectorURLRefused as exc:
-        flash(str(exc), "error")
-        return redirect(url_for("m365_connector.servicenow_config"))
+        errors["instance_url"] = (
+            "%s. Use your instance's own https address, such as https://your-instance.service-now.com." % exc
+        )
+    if errors:
+        shown = {
+            "instance_url": (request.form.get("instance_url") or "").strip(),
+            "client_id": client_id,
+            "field_mapping": {"ci_query_filter": ci_filter} if ci_filter else {},
+            "enabled": enabled,
+        }
+        # 200, not 4xx: the page is shown again with the refusal beside the field, and the existing
+        # save-refusal tests read this page after following the redirect-less answer.
+        return _servicenow_page(org_id, shown, errors=errors, mapping_text=raw_mapping)
     existing = _load_org_connector(org_id, connector_type="servicenow")
     action = CONNECTOR_ACTION_UPDATE if existing else "create"
     payload = {

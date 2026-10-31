@@ -8087,7 +8087,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -8125,7 +8125,10 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/figures.html",
+    "components/input.html",
+    "components/switch.html",
+    "macros/page_shell.html"
    ],
    "original": "preview-02",
    "page_type": "settings",
@@ -8147,7 +8150,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/servicenow-connector-settings.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -8157,7 +8160,7 @@
     "long-job-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
