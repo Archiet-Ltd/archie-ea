@@ -67,6 +67,22 @@ def connections_access(f):
     return decorated
 
 
+def _saved_connector_can_write(connector_id=None, **_ignored):
+    """Whether the connector in the request can write to its source: the type
+    in the form for a save, or the saved connector's type for a sync or delete.
+    A connector that cannot be found counts as write-capable."""
+    from app.services import mfa_service
+
+    kind = (request.form.get("connector_type") or "") if connector_id is None else ""
+    if connector_id is not None:
+        from app.services.connector_framework import _load_org_connector
+
+        org_id = _active_org_id()
+        row = _load_org_connector(org_id, connector_id=connector_id) if org_id else None
+        kind = row.connector_type if row is not None else ""
+    return mfa_service.connector_can_write(kind)
+
+
 def _active_org_id():
     """The organisation the request is acting as (``g.current_org_id``),
     never the user's home organisation. Admin authority and every connector
@@ -136,7 +152,7 @@ def connectors_index():
 
 @m365_connector_bp.route("", methods=["POST"])
 @login_required
-@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index", only_if=_saved_connector_can_write)
 @connections_access
 def connectors_save():
     """Add or update a connector of the signed-in organisation.
@@ -258,7 +274,7 @@ def connectors_save():
 
 @m365_connector_bp.route("/<string:connector_id>/sync", methods=["POST"])
 @login_required
-@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index", only_if=_saved_connector_can_write)
 @connections_access
 def connectors_sync(connector_id):
     """Propose a sync for one connector of the signed-in organisation, or run
@@ -315,7 +331,7 @@ def connectors_sync(connector_id):
 
 @m365_connector_bp.route("/<string:connector_id>/delete", methods=["POST"])
 @login_required
-@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index", only_if=_saved_connector_can_write)
 @connections_access
 def connectors_delete(connector_id):
     """Propose removal of one connector, or remove it directly when the
@@ -389,6 +405,7 @@ def m365_config():
 
 @m365_connector_bp.route("/m365", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.m365_config")
 @connections_access
 def m365_config_save():
     """Persist M365 connector configuration through the change path.
@@ -738,6 +755,7 @@ def jira_config():
 
 @m365_connector_bp.route("/jira", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.jira_config")
 @connections_access
 def jira_config_save():
     """Persist Jira connector configuration through the change path.

@@ -55,7 +55,7 @@ def _owner(db_session, make_org, **kwargs):
 
 def _other_workspace(db_session, make_org):
     """A second, busy workspace: members, an invitation, a token, a write connection."""
-    from app.models.connector_config import DevOpsConnectorConfig
+    from app.models.connector_config import ConnectorConfig
     from app.models.pending_invitation import PendingInvitation
     from app.models.sso_config import SSOConfig
     from app.modules.oauth_provider.models import OAuthToken
@@ -68,7 +68,7 @@ def _other_workspace(db_session, make_org):
         client_id="cl-other", user_id=first.id, access_token=uuid.uuid4().hex,
         expires_at=datetime.utcnow() + timedelta(days=1), organization_id=org.id,
     ))
-    db_session.add(DevOpsConnectorConfig(organization_id=org.id, provider="github", enabled=True))
+    db_session.add(ConnectorConfig(organization_id=org.id, connector_type="jira", name="Jira", config={}))
     db_session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=True))
     org.settings = {mfa_service.REQUIRE_SETTING: True, "connector_action_delegation": {"create": True}}
     db_session.commit()
@@ -90,6 +90,29 @@ def test_window_closed_on_day_eight(db_session, make_org):
     assert not mfa_service.may_defer_enrolment(owner)
     assert mfa_service.must_enrol_now(owner)
     assert mfa_service.window_closed_reason(owner) == "Your first week is over."
+
+
+def test_window_is_open_at_six_days_twenty_three_hours_and_shut_at_seven_days(db_session, make_org, monkeypatch):
+    _org, owner = _owner(db_session, make_org)
+    signed_up = owner.signup_at
+    monkeypatch.setattr(mfa_service, "_utcnow", lambda: signed_up + timedelta(days=6, hours=23))
+    assert mfa_service.may_defer_enrolment(owner)
+    monkeypatch.setattr(mfa_service, "_utcnow", lambda: signed_up + timedelta(days=7) - timedelta(microseconds=1))
+    assert mfa_service.may_defer_enrolment(owner)
+    monkeypatch.setattr(mfa_service, "_utcnow", lambda: signed_up + timedelta(days=7))
+    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.window_closed_reason(owner) == "Your first week is over."
+
+
+def test_window_does_not_reopen_if_two_factor_is_switched_off_after_enrolment(db_session, make_org):
+    _org, owner = _owner(db_session, make_org)
+    secret = pyotp.random_base32()
+    mfa_service.enroll(owner, secret, pyotp.TOTP(secret).now())
+    assert owner.mfa_enrolled_at is not None
+    owner.mfa_enabled = False
+    db_session.commit()
+    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.must_enrol_now(owner)
 
 
 def test_enrolled_owner_is_never_in_the_window(db_session, make_org):
@@ -169,12 +192,31 @@ def test_window_closed_by_connector_delegation(db_session, make_org):
 
 
 def test_window_closed_by_a_write_scope_connection(db_session, make_org):
-    from app.models.connector_config import DevOpsConnectorConfig
+    from app.models.connector_config import ConnectorConfig
 
     org, owner = _owner(db_session, make_org)
-    db_session.add(DevOpsConnectorConfig(organization_id=org.id, provider="github", enabled=True))
+    db_session.add(ConnectorConfig(organization_id=org.id, connector_type="jira", name="Jira", config={}))
     db_session.commit()
     assert not mfa_service.may_defer_enrolment(owner)
+
+
+def test_a_read_only_connection_does_not_close_the_window(db_session, make_org):
+    from app.models.connector_config import ConnectorConfig
+
+    org, owner = _owner(db_session, make_org)
+    db_session.add(ConnectorConfig(organization_id=org.id, connector_type="github", name="GitHub", config={}))
+    db_session.commit()
+    assert mfa_service.may_defer_enrolment(owner)
+
+
+def test_a_write_connection_of_another_organisation_does_not_close_this_window(db_session, make_org):
+    from app.models.connector_config import ConnectorConfig
+
+    _org, owner = _owner(db_session, make_org)
+    other = make_org("other-connector")
+    db_session.add(ConnectorConfig(organization_id=other.id, connector_type="m365", name="M365", config={}))
+    db_session.commit()
+    assert mfa_service.may_defer_enrolment(owner)
 
 
 def test_window_closed_by_single_sign_on(db_session, make_org):
@@ -316,6 +358,9 @@ def test_api_requests_from_a_closed_window_get_a_plain_refusal(app, db_session, 
 TRIGGERS = [
     ("POST", "/admin/team/invite", {"email": "someone@example.com", "role": "viewer"}, "invite"),
     ("GET", "/admin/invite-user", None, "invite"),
+    ("GET", "/admin/new-user", None, "invite"),
+    ("POST", "/admin/new-user", {"first_name": "A", "last_name": "B", "email": "new@example.com"}, "invite"),
+    ("POST", "/admin/team/invitations/1/resend", {}, "invite"),
     ("POST", "/admin/billing/change-plan", {"plan": "team", "interval": "year"}, "billing"),
     ("POST", "/admin/billing/cancel", {}, "billing"),
     ("POST", "/admin/billing/details", {"billing_email": "a@example.com"}, "billing"),
@@ -323,6 +368,8 @@ TRIGGERS = [
     ("POST", "/admin/connectors", {"connector_type": "jira", "name": "Jira"}, "connector"),
     ("POST", "/admin/connectors/not-a-connector/sync", {}, "connector"),
     ("POST", "/admin/connectors/not-a-connector/delete", {}, "connector"),
+    ("POST", "/admin/connectors/m365", {"tenant_id": "t", "client_id": "c"}, "connector"),
+    ("POST", "/admin/connectors/jira", {"instance_url": "https://example.atlassian.net"}, "connector"),
     ("GET", "/admin/sso", None, "sso"),
     ("POST", "/admin/team/require-two-factor", {"require": "0"}, "require"),
 ]
@@ -343,6 +390,77 @@ def test_each_trigger_route_sends_an_unenrolled_owner_to_enrol_and_back(
     assert mfa_flow_line(trigger) in page.get_data(as_text=True)
     with client.session_transaction() as sess:
         assert sess["_mfa_return_to"].startswith("/")
+
+
+def test_an_unenrolled_owner_adds_no_member_through_new_user(app, db_session, make_org, login_as):
+    from app.models.user import User
+
+    org, owner = _owner(db_session, make_org)
+    client = app.test_client()
+    login_as(client, owner)
+    resp = client.post("/admin/new-user", data={
+        "first_name": "Sam", "last_name": "Member", "email": "sam-member@example.com",
+        "password": PASSWORD, "password2": PASSWORD,
+    })
+    assert resp.status_code == 302 and resp.headers["Location"].endswith("/account/mfa-enrol")
+    assert User.query.filter_by(email="sam-member@example.com").first() is None
+
+
+def test_resending_an_expired_invitation_asks_an_unenrolled_owner_to_enrol(app, db_session, make_org, login_as):
+    from app.models.pending_invitation import PendingInvitation
+
+    org, owner = _owner(db_session, make_org)
+    invitee = _user(db_session, make_org("invitee-home"), admin=False, signed_up=False)
+    invitation = PendingInvitation(organization_id=org.id, user_id=invitee.id, role="viewer", invited_by=owner.id)
+    db_session.add(invitation)
+    db_session.flush()
+    invitation.expires_at = datetime.utcnow() - timedelta(days=1)
+    db_session.commit()
+    before = invitation.token_hash
+    client = app.test_client()
+    login_as(client, owner)
+    resp = client.post(f"/admin/team/invitations/{invitation.id}/resend")
+    assert resp.status_code == 302 and resp.headers["Location"].endswith("/account/mfa-enrol")
+    db_session.refresh(invitation)
+    assert invitation.token_hash == before
+
+
+READ_ONLY_ROUTES = [
+    ("POST", "/admin/connectors", {"connector_type": "github"}),
+    ("POST", "/admin/connectors", {"connector_type": "servicenow"}),
+    ("POST", "/admin/connectors/servicenow", {"instance_url": ""}),
+    ("POST", "/admin/connectors/servicenow/sync", {}),
+    ("POST", "/admin/connectors/github", {"organization": "x", "api_token": ""}),
+]
+
+
+@pytest.mark.parametrize("method,path,data", READ_ONLY_ROUTES, ids=[f"{m} {p} {d}" for m, p, d in READ_ONLY_ROUTES])
+def test_read_only_connections_do_not_ask_the_owner_to_enrol(app, db_session, make_org, login_as, method, path, data):
+    _org, owner = _owner(db_session, make_org)
+    client = app.test_client()
+    login_as(client, owner)
+    resp = client.open(path, method=method, data=data)
+    assert "/account/mfa-enrol" not in (resp.headers.get("Location") or ""), path
+
+
+def test_syncing_a_saved_read_only_connector_does_not_ask_to_enrol_but_a_writing_one_does(
+    app, db_session, make_org, login_as
+):
+    from app.models.connector_config import ConnectorConfig
+
+    org, owner = _owner(db_session, make_org)
+    reader = ConnectorConfig(organization_id=org.id, connector_type="github", name="GitHub", config={})
+    db_session.add(reader)
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, owner)
+    read = client.post(f"/admin/connectors/{reader.id}/sync")
+    assert "/account/mfa-enrol" not in (read.headers.get("Location") or "")
+    writer = ConnectorConfig(organization_id=org.id, connector_type="jira", name="Jira", config={})
+    db_session.add(writer)
+    db_session.commit()
+    write = client.post(f"/admin/connectors/{writer.id}/sync")
+    assert write.status_code == 302 and write.headers["Location"].endswith("/account/mfa-enrol")
 
 
 def test_an_enrolled_owner_reaches_the_trigger_routes(app, db_session, make_org, login_as):

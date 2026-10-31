@@ -237,6 +237,7 @@ def team_invite():
 
 @team_bp.route("/team/invitations/<int:invitation_id>/resend", methods=["POST"])
 @login_required
+@enrol_first("invite", back_endpoint="team.team")
 @rate_limit(20, "1m", methods=("POST",))  # SECURITY: each POST sends mail
 def team_invitation_resend(invitation_id):
     """Send a fresh link for an open invitation; the previous link stops working."""

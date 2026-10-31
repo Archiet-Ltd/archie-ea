@@ -219,6 +219,9 @@ class User(UserMixin, db.Model):
     mfa_enabled = db.Column(
         db.Boolean, default=False, nullable=False, server_default=db.text("false")
     )
+    # When two-factor sign-in was first turned on; never cleared, so the first-week
+    # window cannot reopen if the flag above is ever switched off.
+    mfa_enrolled_at = db.Column(db.DateTime, nullable=True)
     mfa_recovery_codes = db.Column(db.Text)  # JSON array of salted hashes of unused recovery codes
 
     # Onboarding fields

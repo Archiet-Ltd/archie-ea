@@ -120,10 +120,12 @@ def send_to_enrolment(trigger, back):
     return redirect(url_for("account.mfa_enrol"))
 
 
-def enrol_first(trigger, back_endpoint=None):
+def enrol_first(trigger, back_endpoint=None, only_if=None):
     """Send an administrator who has not enrolled to enrol before this action,
     and back to ``back_endpoint`` (or this same page) afterwards. One decorator
-    on every route that reaches beyond a new workspace's sole owner."""
+    on every route that reaches beyond a new workspace's sole owner. ``only_if``,
+    when given, is called with the view's arguments and the action asks for
+    enrolment only when it returns true."""
     from functools import wraps
 
     def decorator(view):
@@ -133,7 +135,11 @@ def enrol_first(trigger, back_endpoint=None):
 
             from app.services import mfa_service
 
-            if current_user.is_authenticated and mfa_service.step_up_needed(current_user):
+            if (
+                current_user.is_authenticated
+                and mfa_service.step_up_needed(current_user)
+                and (only_if is None or only_if(*args, **kwargs))
+            ):
                 back = url_for(back_endpoint) if back_endpoint else request.full_path.rstrip("?")
                 return send_to_enrolment(trigger, back)
             return view(*args, **kwargs)

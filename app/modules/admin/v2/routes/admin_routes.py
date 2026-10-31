@@ -424,6 +424,7 @@ def _plan_limit():
 @admin_bp_v2.route("/new-user", methods=["GET", "POST"])
 @timed_route
 @login_required
+@enrol_first("invite")
 @admin_required
 @audit_log("create_user")
 def new_user():

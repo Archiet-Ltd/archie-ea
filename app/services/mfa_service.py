@@ -114,6 +114,13 @@ _WINDOW_CLOSED_REASONS = {
 }
 
 
+def _utcnow():
+    """The moment the first-week window is judged against; one place so a test can fix it."""
+    from datetime import datetime
+
+    return datetime.utcnow()
+
+
 def _first_week_end(user):
     from datetime import timedelta
 
@@ -126,8 +133,6 @@ def _window_closed_by(user):
     ``user``, or ``None`` when every condition holds. Read from the database on
     every call; nothing stored, configured, requested or held in a session can
     open it."""
-    from datetime import datetime
-
     from app import db
     from app.models.org_role import OrgRole
     from app.models.organization import Organization
@@ -136,7 +141,8 @@ def _window_closed_by(user):
     from app.models.user import User
     from app.services.rbac_service import rbac_service
 
-    if getattr(user, "mfa_enabled", False):
+    # A recorded enrolment keeps the window shut even if the flag is ever cleared.
+    if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
         return "enrolled"
     org_id = getattr(user, "organization_id", None)
     ends = _first_week_end(user)
@@ -147,7 +153,8 @@ def _window_closed_by(user):
     # Administrator anywhere else, however it was granted, ends the exemption.
     if any(rbac_service.is_org_admin(user, other) for other in rbac_service.org_ids_for(user) - {org_id}):
         return "not_owner"
-    if datetime.utcnow() >= ends:
+    now = _utcnow()
+    if now >= ends:
         return "week_over"
 
     # tenant-scoping-ok: every read below names this person's own organisation
@@ -155,7 +162,6 @@ def _window_closed_by(user):
     members |= {row[0] for row in db.session.query(OrgRole.user_id).filter(OrgRole.organization_id == org_id)}
     if members != {user.id}:
         return "second_member"
-    now = datetime.utcnow()
     invitations = db.session.query(PendingInvitation).filter(PendingInvitation.organization_id == org_id).all()
     if any(not invitation.is_expired(now) for invitation in invitations):
         return "open_invitation"
@@ -191,22 +197,29 @@ def _holds_credential(org_id, user) -> bool:
     ).first() is not None
 
 
-def _holds_write_connection(org_id) -> bool:
-    """A stored connection that can write to the source: code push, or a
-    Lucidchart grant whose scope names a write."""
-    from app import db
-    from app.models.connector_config import DevOpsConnectorConfig, LucidchartConnectorConfig
+# Connection types that only read from the source. Everything else, including a
+# type this list does not know, can write to it and asks for enrolment first.
+READ_ONLY_CONNECTOR_TYPES = frozenset({"github", "servicenow", "ea_tool", "abacus"})
 
-    if db.session.query(DevOpsConnectorConfig.id).filter(
-        DevOpsConnectorConfig.organization_id == org_id
-    ).first() is not None:
-        return True
-    for (scope,) in db.session.query(LucidchartConnectorConfig.scope).filter(
-        LucidchartConnectorConfig.organization_id == org_id
-    ):
-        if "write" in (scope or "").lower() or "edit" in (scope or "").lower():
-            return True
-    return False
+
+def connector_can_write(connector_type) -> bool:
+    """True unless ``connector_type`` is known to only read from its source."""
+    return (connector_type or "").strip().lower() not in READ_ONLY_CONNECTOR_TYPES
+
+
+def _holds_write_connection(org_id) -> bool:
+    """A saved connection of this organisation whose type can write to its source."""
+    from app import db
+    from app.models.connector_config import ConnectorConfig
+
+    # tenant-scoping-ok: filtered to this organisation by name
+    types = {
+        row[0]
+        for row in db.session.query(ConnectorConfig.connector_type).filter(
+            ConnectorConfig.organization_id == org_id
+        )
+    }
+    return any(connector_can_write(kind) for kind in types)
 
 
 def may_defer_enrolment(user) -> bool:
@@ -251,12 +264,10 @@ def window_ends_at(user):
 
 def window_days_left(user):
     """Whole days left in the first week (at least 1), or ``None`` when closed."""
-    from datetime import datetime
-
     ends = window_ends_at(user)
     if ends is None:
         return None
-    seconds = (ends - datetime.utcnow()).total_seconds()
+    seconds = (ends - _utcnow()).total_seconds()
     return max(1, -(-int(seconds) // 86400))
 
 
@@ -318,6 +329,8 @@ def enroll(user, secret: str, code: str) -> list[str]:
 
     user.mfa_secret = secret
     user.mfa_enabled = True
+    if getattr(user, "mfa_enrolled_at", None) is None:
+        user.mfa_enrolled_at = _utcnow()
     recovery_codes = generate_recovery_codes()
     import json
 

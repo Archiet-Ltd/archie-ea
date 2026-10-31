@@ -160,6 +160,7 @@ def _plan_limit():
 
 @admin_bp.route("/new-user", methods=["GET", "POST"])
 @login_required
+@enrol_first("invite")
 @rbac_service.require_role("org_admin")
 @admin_required
 @audit_log("admin_user_create")
