@@ -202,7 +202,10 @@ function erdApp() {
         storageKey: function() { return 'archie.erd.positions.' + this.domainId; },
 
         savedPositions: function() {
-            try { return JSON.parse(window.localStorage.getItem(this.storageKey()) || '{}'); } catch (e) { return {}; }
+            try { return JSON.parse(window.localStorage.getItem(this.storageKey()) || '{}'); } catch (e) { // swallow-ok: a blocked localStorage read is logged and the layout is recomputed; no request is involved
+                if (window.Platform && Platform.log) Platform.log.warn('[erd] saved layout could not be read; computing a fresh layout', e);
+                return {};
+            }
         },
 
         rememberPosition: function(cell) {

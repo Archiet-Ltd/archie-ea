@@ -22,7 +22,7 @@
 
     {% call card() %}
         {% call card_content() %}
-        <form x-data="{
+        <form @submit.prevent="submit()" class="space-y-5" x-data="{
             submitting: false,
             title: '', description: '', trigger_type: '', capability_id: '', solution_id: '',
             pendingFiles: [],
@@ -66,7 +66,7 @@
                         Platform.toast.error('Submission failed');
                     });
             }
-        }" @submit.prevent="submit()" class="space-y-5">
+        }">
 
             {{ form_field(id='cr-title', label='Title', name='title', required=true, placeholder='Brief title for this change request') }}
 

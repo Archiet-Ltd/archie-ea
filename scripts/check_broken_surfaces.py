@@ -244,7 +244,7 @@ def scan() -> dict[str, list[str]]:
     # `confirm() { ... }`, the modal method Platform hands callers instead of
     # window.confirm. A definition is followed by `) {`; a call is not.
     definition_re = re.compile(r"(?:\bmacro\s+|\bfunction\s+)?(?:alert|confirm)"
-                               r"\s*\([^()]*\)\s*(?:\{|%\})")
+                               r"\s*\([^()]*\)\s*(?:\{|-?%\})")
 
     def rel(p): return p.relative_to(ROOT).as_posix()
     def line_of(text, idx): return text[:idx].count("\n") + 1
@@ -363,6 +363,12 @@ def scan() -> dict[str, list[str]]:
         for m in forbidden_re.finditer(text):
             if definition_re.match(text, m.start()):
                 continue
+            # `{{ alert('danger', text=...) }}` calls the alert macro that
+            # replaces the native dialog; it sits inside a Jinja expression.
+            if path.suffix == ".html":
+                before = text[:m.start()]
+                if before.rfind("{{") > before.rfind("}}"):
+                    continue
             out["forbidden-ui"].append(
                 "%s:%d: forbidden-ui: %s() — DESIGN.md requires Platform.toast/modal"
                 % (rel(path), line_of(text, m.start()), m.group(1)))

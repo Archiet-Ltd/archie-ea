@@ -467,7 +467,9 @@
           Platform.toast.error(data.error || 'Failed to create solution');
         }
       })
-      .catch(function() {});
+      .catch(function() {
+        Platform.toast.error('Could not create the solution. Check your connection and try again.');
+      });
   }
 
   function openSolutionCompare() {

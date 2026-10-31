@@ -55,7 +55,7 @@
     // A save reloads the page so every figure on it follows; the confirmation
     // is kept across the reload and shown once the page is back.
     function reloadWithConfirmation(message) {
-        try { window.sessionStorage.setItem(SAVED_KEY, message); } catch (e) { /* storage blocked: the page still reloads */ }
+        try { window.sessionStorage.setItem(SAVED_KEY, message); } catch (e) { /* swallow-ok: session storage is blocked in private mode; the page still reloads and the saved figures show */ }
         window.location.reload();
     }
 
