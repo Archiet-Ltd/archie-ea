@@ -16,12 +16,7 @@
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto" data-testid="my-apps-dashboard">
-    <nav class="flex items-center gap-1 mb-4 border-b border-border" aria-label="My Applications">
-        <a href="{{ url_for('my_applications.dashboard') }}" {% if request.endpoint == 'my_applications.dashboard' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.dashboard' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Dashboard</a>
-        <a href="{{ url_for('my_applications.app_list') }}" {% if request.endpoint == 'my_applications.app_list' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.app_list' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Applications</a>
-        <a href="{{ url_for('my_applications.health_overview') }}" {% if request.endpoint == 'my_applications.health_overview' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.health_overview' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Health</a>
-        <a href="{{ url_for('my_applications.roadmap_impact') }}" {% if request.endpoint == 'my_applications.roadmap_impact' %}aria-current="page"{% endif %} class="px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == 'my_applications.roadmap_impact' else 'border-transparent text-muted-foreground hover:text-foreground' }}">Roadmap</a>
-    </nav>
+    {% include 'my_applications/_family_tabs.html' %}
     {% macro _ps_actions() %}
         {{ ui.button(text='My portfolio', href=url_for('my_applications.app_list')) }}
         {{ ui.button(text='All applications', href=url_for('unified_applications.application_list'), variant='outline') }}

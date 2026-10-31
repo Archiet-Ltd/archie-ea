@@ -1,0 +1,14 @@
+{#- The Dashboard / Applications / Health / Roadmap strip every My Applications page carries.
+    Scrolls sideways under the finger when the screen is narrower than the strip, keeps the tab of the
+    current page in view, and moves focus between tabs with the arrow keys. -#}
+{% set _family_tabs = [('my_applications.dashboard', 'Dashboard'), ('my_applications.app_list', 'Applications'),
+                       ('my_applications.health_overview', 'Health'), ('my_applications.roadmap_impact', 'Roadmap')] %}
+<nav class="flex items-center gap-1 mb-4 border-b border-border overflow-x-auto" aria-label="My Applications" data-testid="family-tabs"
+     x-data
+     x-init="$nextTick(() => { const t = $el.querySelector('[aria-current=page]'); if (t) { $el.scrollLeft = Math.max(0, t.offsetLeft - ($el.clientWidth - t.offsetWidth) / 2); } })"
+     @keydown.arrow-right.prevent="(document.activeElement.nextElementSibling || $el.firstElementChild).focus()"
+     @keydown.arrow-left.prevent="(document.activeElement.previousElementSibling || $el.lastElementChild).focus()">
+    {%- for endpoint, label in _family_tabs %}
+    <a href="{{ url_for(endpoint) }}" {% if request.endpoint == endpoint %}aria-current="page"{% endif %} class="shrink-0 whitespace-nowrap px-3 py-2 text-sm border-b-2 {{ 'border-primary text-foreground font-medium' if request.endpoint == endpoint else 'border-transparent text-muted-foreground hover:text-foreground' }}">{{ label }}</a>
+    {%- endfor %}
+</nav>
