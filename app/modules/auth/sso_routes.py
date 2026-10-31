@@ -307,6 +307,10 @@ def admin_sso():
     org_id = getattr(current_user, "organization_id", None)
     config = SSOConfig.query.filter_by(organization_id=org_id).first() if org_id else None
 
+    def _refused():
+        # Show the form again with what was typed, so it can be corrected, not retyped.
+        return render_template("admin/sso.html", config=config, form=request.form)
+
     if request.method == "POST":
         protocol = request.form.get("protocol", "oidc")
         email_domain = request.form.get("email_domain", "").strip()
@@ -322,18 +326,18 @@ def admin_sso():
         # leave the organisation's existing login configuration intact.
         if protocol not in {"oidc", "saml"}:
             flash("This SSO protocol is not supported. Choose OIDC or SAML.", "error")
-            return redirect(url_for("sso.admin_sso"))
+            return _refused()
         if protocol == "saml" and enabled and not (idp_sso_url and idp_x509_cert):
             flash(
                 "SAML SSO needs an IdP SSO URL and signing certificate "
                 "before it can be enabled.",
                 "error",
             )
-            return redirect(url_for("sso.admin_sso"))
+            return _refused()
         domain_problem = _svc.domain_claim_problem(org_id, email_domain)
         if domain_problem:
             flash(domain_problem, "error")
-            return redirect(url_for("sso.admin_sso"))
+            return _refused()
 
         # SAML keeps this field for reference only (an issuer URI, an ADFS
         # trust URL or a URN) and the server never fetches it.
@@ -345,7 +349,7 @@ def admin_sso():
                 check_idp_url(idp_metadata_url)
             except BlockedOutboundURL:
                 flash("That address is not allowed or could not be reached.", "error")
-                return redirect(url_for("sso.admin_sso"))
+                return _refused()
 
         if config is None:
             if not org_id:

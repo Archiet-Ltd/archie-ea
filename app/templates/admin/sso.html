@@ -1,269 +1,142 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/input.html' import hidden_input %}
 {% block title %}SSO / Identity Federation{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+
+{# What each field shows: what was just typed when a save was refused, otherwise what is stored. #}
+{% macro current(name, default='') -%}
+{%- if form -%}{{ form.get(name, default) }}{%- elif config and config[name] is not none -%}{{ config[name] }}{%- else -%}{{ default }}{%- endif -%}
+{%- endmacro %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+{% set protocol = (form.get('protocol') if form else (config.protocol if config else 'oidc')) or 'oidc' %}
+{% set sso_on = (form.get('enabled') == 'on') if form else (config.enabled if config else false) %}
+<div class="p-6 space-y-6">
+{{ page_shell(title='SSO / Identity Federation',
+              subtitle='Single sign-on with SAML 2.0 or OIDC. Once enabled, people with a matching email domain are sent to your identity provider at sign-in.',
+              breadcrumb=[('Home', url_for('main.index')), ('Admin', url_for('admin.index')), ('SSO Configuration', none)]) }}
 
-    {{ page_header(
-        title='SSO / Identity Federation',
-        description='Configure SAML 2.0 or OIDC single-sign-on for your organisation. Once enabled, users with a matching email domain are redirected to your Identity Provider at login.',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'SSO Configuration'}
-        ]
-    ) }}
+<div class="max-w-2xl space-y-6">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      {% call ui.alert(variant=('destructive' if category == 'error' else 'default'), attrs={'data-testid': 'sso-message', 'role': 'status'}) %}
+        {{ ui.alert_description(text=message) }}
+      {% endcall %}
+    {% endfor %}
+  {% endwith %}
 
-    {# Flash messages #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="mb-6 space-y-2">
-                {% for category, message in messages %}
-                    <div class="rounded-md border p-4
-                        {% if category == 'success' %}bg-primary/10 border-primary/20 text-foreground
-                        {% elif category == 'error' %}bg-destructive/10 border-destructive/20 text-destructive-emphasis
-                        {% else %}bg-muted border-border text-foreground{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+  {% call ui.card(attrs={'data-testid': 'sso-form-card'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Identity provider') }}
+      {{ ui.card_description(text='OIDC works with Entra ID, Okta, Google Workspace and any standards-compliant provider. SAML 2.0 verifies signed assertions.') }}
+    {% endcall %}
+    <form method="POST" action="{{ url_for('sso.admin_sso') }}" class="space-y-6" x-data="{ protocol: '{{ 'saml' if protocol == 'saml' else 'oidc' }}', on: {{ 'true' if sso_on else 'false' }} }">
+      {% call ui.card_content() %}
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        <div class="space-y-6">
+          {% call ui.field() %}
+            {{ ui.field_label(text='Protocol', attrs={'for': 'protocol'}) }}
+            {% call ui.native_select_wrapper(class='relative w-full') %}
+              {% call ui.native_select(id='protocol', name='protocol', class='w-full', attrs={'x-model': 'protocol'}) %}
+                {{ ui.native_select_option(text='OIDC / OpenID Connect (recommended)', value='oidc', selected=(protocol == 'oidc')) }}
+                {{ ui.native_select_option(text='SAML 2.0', value='saml', selected=(protocol == 'saml')) }}
+              {% endcall %}
+              {{ ui.native_select_icon(class='pointer-events-none absolute') }}
+            {% endcall %}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Email Domain(s)', attrs={'for': 'email_domain'}) }}
+            {{ ui.input(id='email_domain', name='email_domain', type='text', value=current('email_domain'), placeholder='acme.com or acme.com,acme.co.uk', class='w-full') }}
+            {{ ui.field_description(text='People with these email domains are sent to your identity provider at sign-in. Separate several with commas.') }}
+          {% endcall %}
 
-    <div class="bg-card border border-border rounded-lg p-6">
+          <div class="space-y-6" x-show="protocol !== 'saml'" data-testid="sso-oidc-fields">
+            {% call ui.field() %}
+              {{ ui.field_label(text='IdP Discovery URL', attrs={'for': 'idp_metadata_url'}) }}
+              {{ ui.input(id='idp_metadata_url', name='idp_metadata_url', type='url', value=current('idp_metadata_url'), placeholder='https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration', class='w-full font-mono') }}
+              {{ ui.field_description(text='The OpenID Connect discovery document of your identity provider.') }}
+            {% endcall %}
+            {% call ui.field() %}
+              {{ ui.field_label(text='Client ID', attrs={'for': 'client_id'}) }}
+              {# entity-picker-ok: IdP OAuth client ID (external credential), not a platform application reference #}
+              {{ ui.input(id='client_id', name='client_id', type='text', value=current('client_id'), placeholder='Application (client) ID from your identity provider', autocomplete='off', class='w-full font-mono') }}
+            {% endcall %}
+            {% call ui.field() %}
+              {{ ui.field_label(text='Client Secret', attrs={'for': 'client_secret'}) }}
+              {{ ui.input(id='client_secret', name='client_secret', type='password', autocomplete='new-password', class='w-full font-mono',
+                          placeholder=('Leave blank to keep the existing value' if config and config._client_secret_encrypted else 'Paste the client secret')) }}
+              {{ ui.field_description(text=('Secret stored. It is encrypted and never shown again.' if config and config._client_secret_encrypted else 'It is encrypted when saved and never shown again.')) }}
+            {% endcall %}
+          </div>
 
-        <form method="POST" action="{{ url_for('sso.admin_sso') }}" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="space-y-6" x-show="protocol === 'saml'" x-cloak data-testid="sso-saml-fields">
+            <p class="text-sm text-muted-foreground">Your identity provider must send a persistent NameID, or a subject-id or pairwise-id attribute. A temporary NameID is refused.</p>
+            {% call ui.field() %}
+              {{ ui.field_label(text='IdP SSO URL', attrs={'for': 'idp_sso_url'}) }}
+              {{ ui.input(id='idp_sso_url', name='idp_sso_url', type='url', value=current('idp_sso_url'), placeholder='https://idp.example.com/saml/sso', class='w-full font-mono') }}
+              {{ ui.field_description(text='The redirect-binding sign-in endpoint.') }}
+            {% endcall %}
+            {% call ui.field() %}
+              {{ ui.field_label(text='IdP Signing Certificate', attrs={'for': 'idp_x509_cert'}) }}
+              {{ ui.textarea(id='idp_x509_cert', name='idp_x509_cert', rows=6, class='w-full font-mono text-xs', placeholder='-----BEGIN CERTIFICATE-----', text=current('idp_x509_cert')) }}
+              {{ ui.field_description(text='PEM, used to verify every assertion. Entered here, apart from any sign-in, so a forged assertion carrying its own certificate is never trusted.') }}
+            {% endcall %}
+            {% call ui.field() %}
+              {{ ui.field_label(text='Service Provider Entity ID (optional)', attrs={'for': 'sp_entity_id'}) }}
+              {{ ui.input(id='sp_entity_id', name='sp_entity_id', type='text', value=current('sp_entity_id'), placeholder='Leave blank unless your provider needs a specific entity id', class='w-full') }}
+            {% endcall %}
+          </div>
 
-            {# Protocol selector #}
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="protocol">
-                    Protocol
-                </label>
-                <select id="protocol" name="protocol"
-                        class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50"
-                        data-protocol-toggle>
-                    <option value="oidc" {% if not config or config.protocol == 'oidc' %}selected{% endif %}>
-                        OIDC / OpenID Connect (recommended)
-                    </option>
-                    <option value="saml" {% if config and config.protocol == 'saml' %}selected{% endif %}>
-                        SAML 2.0
-                    </option>
-                </select>
-                <p class="mt-1 text-xs text-muted-foreground">
-                    OIDC works with Entra ID, Okta, Google Workspace, and any standards-compliant IdP.
-                    SAML 2.0 is also supported, with signed-assertion verification.
-                </p>
-            </div>
-
-            {# Email domain #}
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="email_domain">
-                    Email Domain(s)
-                </label>
-                <input type="text" id="email_domain" name="email_domain"
-                       value="{{ config.email_domain if config else '' }}"
-                       placeholder="acme.com  or  acme.com,acme.co.uk"
-                       class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
-                <p class="mt-1 text-xs text-muted-foreground">
-                    Users with these email domains are redirected to your IdP at login.
-                    Separate multiple domains with commas.
-                </p>
-            </div>
-
-            {# OIDC fields #}
-            <div id="oidc-fields" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_metadata_url">
-                        IdP Discovery URL
-                        <span class="text-muted-foreground font-normal">(OpenID Connect discovery document)</span>
-                    </label>
-                    <input type="url" id="idp_metadata_url" name="idp_metadata_url"
-                           value="{{ config.idp_metadata_url if config else '' }}"
-                           placeholder="https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
-                    <p class="mt-1 text-xs text-muted-foreground">
-                        Entra ID example:
-                        <code class="bg-muted px-1 rounded text-xs">https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0/.well-known/openid-configuration</code>
-                    </p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="client_id">
-                        Client ID
-                    </label>
-                    {# entity-picker-ok: IdP OAuth client ID (external credential), not a platform application reference #}
-                    <input type="text" id="client_id" name="client_id"
-                           value="{{ config.client_id if config else '' }}"
-                           placeholder="Application (client) ID from your IdP"<!-- entity-picker-ok -->
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="client_secret">
-                        Client Secret
-                        {% if config and config._client_secret_encrypted %}
-                            <span class="ml-2 text-xs text-primary font-normal">&#x2713; Secret stored</span>
-                        {% endif %}
-                    </label>
-                    <input type="password" id="client_secret" name="client_secret"
-                           placeholder="{{ 'Leave blank to keep existing secret' if config and config._client_secret_encrypted else 'Paste client secret' }}"
-                           autocomplete="new-password"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
-                    <p class="mt-1 text-xs text-muted-foreground">
-                        Stored encrypted with Fernet (FERNET_KEY env var). Never logged.
-                    </p>
-                </div>
-            </div>
-
-            {# SAML fields (hidden by default) #}
-            <div id="saml-fields" class="hidden space-y-4">
-                <p class="text-xs text-muted-foreground">
-                    Your identity provider must send a persistent NameID, or a subject-id or pairwise-id attribute. A temporary (transient) NameID is refused.
-                </p>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_sso_url">
-                        IdP SSO URL
-                        <span class="text-muted-foreground font-normal">(redirect-binding sign-in endpoint)</span>
-                    </label>
-                    <input type="url" id="idp_sso_url" name="idp_sso_url"
-                           value="{{ config.idp_sso_url if config else '' }}"
-                           placeholder="https://idp.example.com/saml/sso"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_x509_cert">
-                        IdP Signing Certificate
-                        <span class="text-muted-foreground font-normal">(PEM, used to verify every assertion)</span>
-                    </label>
-                    <textarea id="idp_x509_cert" name="idp_x509_cert" rows="6"
-                              placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                              class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/50">{{ config.idp_x509_cert if config else '' }}</textarea>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                        Entered here, out of band from any sign-in attempt, so a forged assertion
-                        carrying its own certificate can never be trusted.
-                    </p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="sp_entity_id">
-                        Service Provider Entity ID
-                        <span class="text-muted-foreground font-normal">(optional; defaults to this platform's own URL)</span>
-                    </label>
-                    <input type="text" id="sp_entity_id" name="sp_entity_id"
-                           value="{{ config.sp_entity_id if config else '' }}"
-                           placeholder="Leave blank unless your IdP requires a specific entity id"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_metadata_url_saml">
-                        IdP Metadata URL
-                        <span class="text-muted-foreground font-normal">(optional, for reference only)</span>
-                    </label>
-                    <input type="url" id="idp_metadata_url_saml" name="idp_metadata_url"
-                           value="{{ config.idp_metadata_url if config else '' }}"
-                           placeholder="https://idp.example.com/saml/metadata"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
-                </div>
-            </div>
-
-            {# Enabled toggle #}
-            <div class="flex items-center gap-3">
-                <input type="checkbox" id="enabled" name="enabled"
-                       {% if config and config.enabled %}checked{% endif %}
-                       class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50">
-                <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">
-                    Enable SSO for this organisation
-                </label>
-            </div>
-
-            {# Action buttons #}
-            <div class="flex items-center gap-3 pt-2">
-                <button type="submit"
-                        class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:ring-2 focus:ring-primary/50">
-                    Save Configuration
-                </button>
-            </div>
-        </form>
-    </div>
-
-    {# Info card: callback URLs for IdP registration #}
-    {% if config %}
-    <div class="mt-6 bg-card border border-border rounded-lg p-5">
-        <h3 class="text-sm font-semibold text-foreground mb-3">Register these URLs in your IdP</h3>
-        <dl class="space-y-2 text-sm">
-            <div class="flex gap-2">
-                <dt class="text-muted-foreground w-40 shrink-0">OIDC Callback URL</dt>
-                <dd class="text-foreground font-mono text-xs break-all">
-                    {{ request.host_url.rstrip('/') }}/auth/sso/callback/oidc
-                </dd>
-            </div>
-            <div class="flex gap-2">
-                <dt class="text-muted-foreground w-40 shrink-0">SAML ACS URL</dt>
-                <dd class="text-foreground font-mono text-xs break-all">
-                    {{ request.host_url.rstrip('/') }}/auth/sso/callback/saml
-                </dd>
-            </div>
-        </dl>
-    </div>
-
-    {# Test sign-in: runs the real IdP round-trip without enforcing the
-       config or signing anyone in (R1-B12 PR 2, TB-0142/PB-0129). Works
-       even while "Enable SSO" above is unchecked -- that is the point. #}
-    <div class="mt-6 bg-card border border-border rounded-lg p-5">
-        <h3 class="text-sm font-semibold text-foreground mb-2">Test sign-in</h3>
-        <p class="text-sm text-muted-foreground mb-3">
-            Try this configuration against your identity provider without enforcing it for
-            every user yet. This completes a real sign-in round-trip and verifies the
-            response, but never creates or signs in an account.
-        </p>
-        <a href="{{ url_for('sso.admin_sso_test_initiate') }}"
-           class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
-            Run test sign-in →
-        </a>
-
-        {% if config.last_test_result %}
-        <div class="mt-4 rounded-md border p-3 text-sm
-            {% if config.last_test_result.status == 'success' %}bg-primary/10 border-primary/20 text-foreground
-            {% else %}bg-destructive/10 border-destructive/20 text-destructive-emphasis{% endif %}"
-            data-testid="sso-test-result">
-            <p class="font-medium">
-                {{ 'Success' if config.last_test_result.status == 'success' else 'Failed' }}
-                — {{ config.last_test_result.message }}
-            </p>
-            <p class="mt-1 text-xs text-muted-foreground">Tested {{ config.last_test_result.tested_at }}</p>
-            {% if config.last_test_result.claims_preview %}
-            <p class="mt-1 text-xs font-mono">{{ config.last_test_result.claims_preview }}</p>
-            {% endif %}
+          <div class="flex items-center gap-3">
+            {% call ui.switch(id='enabled', attrs={'@click': 'on = !on', ':aria-checked': 'on', ':data-state': "on ? 'checked' : 'unchecked'", 'aria-label': 'Enable SSO for this organisation'}) %}{{ ui.switch_thumb() }}{% endcall %}
+            {{ ui.field_label(text='Enable SSO for this organisation', attrs={'for': 'enabled'}) }}
+            {{ ui.input(type='hidden', name='enabled', attrs={':value': "on ? 'on' : 'off'"}) }}
+          </div>
         </div>
-        {% endif %}
-    </div>
-    {% endif %}
+      {% endcall %}
+      {% call ui.card_footer(class='justify-end') %}
+        {{ ui.button(text='Save configuration', type='submit') }}
+      {% endcall %}
+    </form>
+  {% endcall %}
 
+  {% if config %}
+  {% call ui.card() %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Register these URLs with your identity provider') }}
+    {% endcall %}
+    {% call ui.card_content() %}
+      <dl class="space-y-3 text-sm">
+        <div><dt class="text-muted-foreground">OIDC callback URL</dt><dd class="break-all font-mono text-xs">{{ request.host_url.rstrip('/') }}/auth/sso/callback/oidc</dd></div>
+        <div><dt class="text-muted-foreground">SAML ACS URL</dt><dd class="break-all font-mono text-xs">{{ request.host_url.rstrip('/') }}/auth/sso/callback/saml</dd></div>
+      </dl>
+    {% endcall %}
+  {% endcall %}
+
+  {# Test sign-in runs the real round trip without enforcing the configuration or signing anyone in,
+     so it works while SSO is still off. #}
+  {% call ui.card(attrs={'data-testid': 'sso-test-card'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Test sign-in') }}
+      {{ ui.card_description(text='Try this configuration against your identity provider before enforcing it. It completes a real sign-in and checks the response, but never creates or signs in an account.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4') %}
+      {% if config.last_test_result %}
+        {% call ui.alert(variant=('default' if config.last_test_result.status == 'success' else 'destructive'), attrs={'data-testid': 'sso-test-result'}) %}
+          {{ ui.alert_title(text=('Success' if config.last_test_result.status == 'success' else 'Failed')) }}
+          {{ ui.alert_description(text=config.last_test_result.message ~ ' Tested ' ~ config.last_test_result.tested_at ~ '.') }}
+        {% endcall %}
+      {% else %}
+        <p class="text-sm text-muted-foreground">No test sign-in has been run yet.</p>
+      {% endif %}
+    {% endcall %}
+    {% call ui.card_footer(class='justify-end') %}
+      {{ ui.button(text='Run test sign-in', href=url_for('sso.admin_sso_test_initiate'), variant='outline') }}
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
 </div>
-
-<script>
-function toggleProtocolFields(protocol) {
-    let oidc = document.getElementById('oidc-fields');
-    let saml = document.getElementById('saml-fields');
-    if (protocol === 'saml') {
-        oidc.classList.add('hidden');
-        saml.classList.remove('hidden');
-    } else {
-        oidc.classList.remove('hidden');
-        saml.classList.add('hidden');
-    }
-}
-// The change handler is bound here, not with an inline onchange= attribute.
-// This app ships an enforcing CSP whose script-src has no 'unsafe-inline', and a
-// nonce does not cover event handler attributes -- so onchange= was refused by
-// the browser and switching between OIDC and SAML never revealed the right
-// fields. The <script> block itself is fine: template-authored script tags are
-// nonce'd at compile time (app/_bootstrap/security.py).
-var protocolSelect = document.getElementById('protocol');
-if (protocolSelect) {
-    protocolSelect.addEventListener('change', function () {
-        toggleProtocolFields(this.value);
-    });
-    // Apply on page load
-    toggleProtocolFields(protocolSelect.value);
-}
-</script>
+</div>
 {% endblock %}
