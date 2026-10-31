@@ -40,5 +40,5 @@ def downgrade() -> None:
     if not _has_column("deliverables", "adm_template_id"):
         return
     op.drop_index("ix_deliverables_adm_template_id", table_name="deliverables")
-    op.drop_constraint("fk_deliverables_adm_template_id", "deliverables", type_="foreignkey")
+    op.execute("ALTER TABLE deliverables DROP CONSTRAINT IF EXISTS fk_deliverables_adm_template_id")
     op.drop_column("deliverables", "adm_template_id")
