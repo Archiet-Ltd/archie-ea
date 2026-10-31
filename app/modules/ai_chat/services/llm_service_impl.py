@@ -117,13 +117,11 @@ DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (to
 
 from app.modules.ai_chat.services.model_defaults import (
     DEFAULT_MODELS,
-    FREE_ONLY_PROVIDERS,
     MISTRAL_CHAT_URL,
     OPENAI_COMPATIBLE_BASE_URLS,
     PUBLIC_INPUT_CHAIN,
     PUBLIC_INPUT_MODELS,
     fallback_models_for,
-    is_free_model,
 )
 
 # Fallback in-memory cache if Redis is not available
@@ -597,6 +595,14 @@ class LLMService:
         )
         allow_list_only = LLMService._resolve_allow_list_only(resolved_organization_id)
 
+        from app.modules.ai_chat.services.ai_route import route_for
+
+        route = route_for(resolved_organization_id)
+        if not route.allows(normalized_provider, cleaned_model):
+            raise ProviderNotAllowed(
+                f"Provider '{normalized_provider}' is not on this organisation's {route.kind} route."
+            )
+
         from app.models.model_provider import ModelProvider
 
         def _blocked(check_provider: str, check_model: str | None) -> bool:
@@ -664,6 +670,15 @@ class LLMService:
 
         # Provider fallback priority order (used when no preference is set)
         provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
+
+        # Only the providers on the organisation's route are ever chosen.
+        from app.modules.ai_chat.services.ai_route import current_route
+
+        route = current_route()
+        exclude_providers = list(exclude_providers) + [
+            p for p in provider_priority
+            if p not in exclude_providers and not route.allows(p, DEFAULT_MODELS.get(p, ""))
+        ]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
@@ -1986,7 +2001,16 @@ Output clean, executable test code."""
         deadline = time.monotonic() + (float(timeout) if timeout else 120.0)
         everything = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"] + list(PUBLIC_INPUT_CHAIN)
         last_error: Optional[BaseException] = None
-        for provider in PUBLIC_INPUT_CHAIN:
+        from app.modules.ai_chat.services.ai_route import current_route
+
+        route = current_route()
+        # The chain is the organisation's own route: a public page read does not leave it.
+        chain = [(p, PUBLIC_INPUT_MODELS[p]) for p in PUBLIC_INPUT_CHAIN if route.allows(p, PUBLIC_INPUT_MODELS[p])]
+        chain += [
+            (p, DEFAULT_MODELS[p]) for p in sorted(route.own_providers)
+            if p not in PUBLIC_INPUT_CHAIN and p in DEFAULT_MODELS
+        ]
+        for provider, chain_model in chain:
             if not LLMService._get_all_api_keys(provider):
                 continue
             for attempt in (0, 1):
@@ -1997,7 +2021,7 @@ Output clean, executable test code."""
                     provider_deadline = min(deadline, time.monotonic() + LLMService.PUBLIC_PROVIDER_SECONDS)
                     text, _interaction = LLMService._call_llm_with_failover(
                         prompt=prompt,
-                        model=PUBLIC_INPUT_MODELS[provider],
+                        model=chain_model,
                         provider=provider,
                         max_tokens=max_tokens,
                         timeout=min(LLMService.PUBLIC_ATTEMPT_SECONDS, remaining),
@@ -2020,6 +2044,8 @@ Output clean, executable test code."""
                             LLMService._sleep(wait)
                             continue
                     break
+        if route.pauses:
+            raise AnswersPaused("the %s route failed" % route.kind)
         raise RuntimeError(
             "Every provider in the public-input chain failed: %s" % (str(last_error)[:200] if last_error else "no provider has a key"))
 
@@ -2258,10 +2284,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             prompt_version=prompt_version,
             retention_setting=retention_setting,
         )
-        if not public_input and provider in FREE_ONLY_PROVIDERS:
-            raise ProviderNotAllowed(
-                f"Provider '{provider}' reads public input only and is refused for a call carrying organisation data."
-            )
+        from app.modules.ai_chat.services.ai_route import route_for
+
+        route = route_for(organization_id)
 
         # Track providers already tried across recursive fallback calls to prevent looping
         if _already_tried is None:
@@ -2489,8 +2514,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             if not fb_model:
                 continue
-            if not public_input and is_free_model(fallback_provider, fb_model):
-                continue  # an organisation's data never falls over to a free model
+            if not route.allows(fallback_provider, fb_model):
+                continue  # a request never falls over to a provider off the organisation's route
 
             logger.info(f"🔄 Cross-provider fallback: trying {fallback_provider} ({fb_model})")
             try:
@@ -2517,6 +2542,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 logger.warning(f"Cross-provider fallback to {fallback_provider} also failed: {str(fb_err)[:80]}")
                 continue
 
+        if route.pauses:
+            # a paid plan or an own key never reaches a free model: when its route fails, it is told so plainly
+            raise AnswersPaused("the %s route failed: %s" % (route.kind, str(last_error)[:120] if last_error else "no answer"))
         raise RuntimeError(
             f"All API keys failed for {provider} and all fallback providers. "
             f"Failed keys: {failed_keys}. "

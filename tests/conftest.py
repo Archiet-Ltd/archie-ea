@@ -213,6 +213,26 @@ def tenant_ctx(app):
 
 
 @pytest.fixture
+def free_plan_org(make_org, tenant_ctx):
+    """A free-plan organisation with no key of its own, inside its request context."""
+    org = make_org("freeplan")
+    with tenant_ctx(org.id):
+        yield org
+
+
+@pytest.fixture
+def paid_plan_org(make_org, tenant_ctx, db_session):
+    """A paid-plan organisation with no key of its own, inside its request context."""
+    from app.services import billing_plans
+
+    org = make_org("paidplan")
+    assert billing_plans.set_contract_plan(org, "team", 5)
+    db_session.flush()
+    with tenant_ctx(org.id):
+        yield org
+
+
+@pytest.fixture
 def client(app):
     """Repository-owned Flask client; do not depend on pytest-flask being installed."""
     return app.test_client()

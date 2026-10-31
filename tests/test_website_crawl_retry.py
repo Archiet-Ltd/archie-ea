@@ -110,7 +110,7 @@ class _Busy(Exception):
 
 
 @pytest.fixture
-def chain(monkeypatch, catalogue):
+def chain(monkeypatch, catalogue, free_plan_org):
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     calls, sleeps, script = [], [], {}

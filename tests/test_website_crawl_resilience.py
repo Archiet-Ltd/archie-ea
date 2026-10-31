@@ -113,7 +113,7 @@ def _public(providers_):
     return providers_.service.generate_from_prompt("Read this public page.", use_cache=False, timeout=5, public_input=True)
 
 
-def test_a_rate_limited_model_then_an_error_then_an_answer_takes_the_third_models_facts(providers):
+def test_a_rate_limited_model_then_an_error_then_an_answer_takes_the_third_models_facts(providers, free_plan_org):
     providers.script["nvidia"] = [RuntimeError("down")]
     providers.script["openrouter"] = [RuntimeError("429 rate limit"), RuntimeError("upstream error"), "third model's facts"]
     assert _public(providers) == "third model's facts"
@@ -122,7 +122,7 @@ def test_a_rate_limited_model_then_an_error_then_an_answer_takes_the_third_model
     assert providers.extras and all(extra == {"public_input": True} for extra in providers.extras), providers.extras
 
 
-def test_the_public_input_chain_is_openrouter_then_nvidia_then_mistral_cerebras_groq_then_gemini(providers):
+def test_the_public_input_chain_is_openrouter_then_nvidia_then_mistral_cerebras_groq_then_gemini(providers, free_plan_org):
     from app.modules.ai_chat.services.model_defaults import fallback_models_for
 
     boom = RuntimeError("unavailable")
@@ -141,19 +141,36 @@ def test_the_public_input_chain_is_openrouter_then_nvidia_then_mistral_cerebras_
     assert ("gemini", "gemini-2.0-flash") not in providers.calls, "stopped at the first answer"
 
 
-def test_gemini_flash_is_the_last_resort(providers):
+def test_a_free_plan_never_reaches_the_paid_provider_even_when_every_free_one_is_down(providers, free_plan_org):
     for name in ("openrouter", "nvidia", "mistral", "cerebras", "groq"):
         providers.script[name] = [RuntimeError("down")]
+    with pytest.raises(RuntimeError):
+        _public(providers)
+    assert "gemini" not in {p for p, _ in providers.calls}
+
+
+def test_a_paid_plan_reads_a_public_page_on_the_paid_route_only(providers, paid_plan_org):
     assert _public(providers) == "answer from gemini"
-    assert providers.calls[-1] == ("gemini", "gemini-2.0-flash")
+    assert {p for p, _ in providers.calls} == {"gemini"}, "no free provider was asked"
 
 
-def test_a_provider_with_no_key_is_skipped_silently(providers, caplog):
+def test_a_paid_plan_with_the_paid_route_down_gets_the_plain_pause_and_no_free_call(providers, paid_plan_org):
+    from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE, AnswersPaused
+
+    providers.script["gemini"] = [RuntimeError("down")]
+    with pytest.raises(AnswersPaused) as paused:
+        _public(providers)
+    assert str(paused.value).startswith(PAUSED_MESSAGE)
+    assert {p for p, _ in providers.calls} == {"gemini"}
+
+
+def test_a_provider_with_no_key_is_skipped_silently(providers, free_plan_org, caplog):
     providers.keyed -= {"mistral", "cerebras", "groq"}
     providers.script["openrouter"] = [RuntimeError("down")]
     providers.script["nvidia"] = [RuntimeError("down")]
-    assert _public(providers) == "answer from gemini"
-    assert {p for p, _ in providers.calls}.isdisjoint({"mistral", "cerebras", "groq"})
+    with pytest.raises(RuntimeError):
+        _public(providers)
+    assert {p for p, _ in providers.calls} == {"openrouter", "nvidia"}
     assert "mistral" not in caplog.text.lower() or "No API keys" not in caplog.text
 
 
@@ -170,19 +187,26 @@ def test_when_every_model_fails_the_pass_one_facts_stay_and_nothing_raises(make_
 
 # ----------------------------------------------------------------------------- organisation data
 
-def test_a_call_carrying_organisation_data_never_reaches_a_free_model(providers):
+def test_a_paid_plan_call_carrying_organisation_data_never_reaches_a_free_model(providers, paid_plan_org):
     from app.modules.ai_chat.services.llm_service_impl import ProviderNotAllowed
 
     service = providers.service
-    for provider in ("mistral", "cerebras", "groq"):
+    for provider, model in (("mistral", "any"), ("cerebras", "any"), ("groq", "any"), ("openrouter", OPENROUTER[0]), ("nvidia", "any")):
         with pytest.raises(ProviderNotAllowed):
-            service._call_llm_with_failover("Our confidential risk register", "any", provider=provider)
-    # the primary fails: the organisation's call falls over to its other paid providers only, never to
-    # the curated free backups or the free-only providers
+            service._call_llm_with_failover("Our confidential risk register", model, provider=provider)
+    assert providers.calls == [], "no free provider was called"
+    answer, _ = service._call_llm_with_failover("Our confidential risk register", "gemini-2.0-flash", provider="gemini")
+    assert answer == "answer from gemini"
+    assert providers.extras == [], "a call with organisation data keeps the original signature, no public-input flag"
+
+
+def test_a_free_plan_call_carrying_organisation_data_goes_to_the_free_models_and_never_the_paid_one(providers, free_plan_org):
+    service = providers.service
     providers.script["openrouter"] = [RuntimeError("429 rate limit")]
     answer, _ = service._call_llm_with_failover("Our confidential risk register", OPENROUTER[0], provider="openrouter")
-    assert answer == "answer from gemini", "it fell over to a paid provider, not a free one"
-    assert [m for p, m in providers.calls if p == "openrouter"] == [OPENROUTER[0]], "no free backup model tried"
-    assert not {p for p, _ in providers.calls} & {"nvidia", "mistral", "cerebras", "groq"}
-    assert providers.extras == [{}], "a call with organisation data keeps the original signature, no public-input flag"
+    assert answer == "answer from nvidia", "it fell over to another free provider"
+    assert "gemini" not in {p for p, _ in providers.calls}
+    from app.modules.ai_chat.services.llm_service_impl import ProviderNotAllowed
 
+    with pytest.raises(ProviderNotAllowed):
+        service._call_llm_with_failover("Our confidential risk register", "gemini-2.0-flash", provider="gemini")

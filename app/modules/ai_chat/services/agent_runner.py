@@ -206,7 +206,9 @@ def _models_of(setting_model: Optional[str]) -> list:
 def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False) -> list:
     """Ordered (provider, model, key, base_url) entries to try for one turn.
 
-    Built from the enabled providers only, never adds a paid one. The order is
+    Built from the providers on the organisation's route only (see ai_route): a free plan
+    gets the free models, a paid plan the paid ones, an own key that key alone; nothing
+    crosses over. The order is
     the ``AI_PROVIDER_ORDER`` setting (comma-separated provider names) when set;
     otherwise the providers the organisation has its own key for come first
     (paid ones in priority order), then the free ones, NVIDIA before OpenRouter
@@ -220,9 +222,11 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     import os
 
     from app.models.models import APISettings
+    from app.modules.ai_chat.services.ai_route import current_route
     from app.modules.ai_chat.services.llm_service_impl import LLMService
     from app.modules.ai_chat.services.model_defaults import default_model_for
 
+    route = current_route()
     rows = {}
     try:
         for row in APISettings.query.filter_by(enabled=True).all():
@@ -272,6 +276,8 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
         except Exception:
             keys = []
         for model in models:
+            if not route.allows(provider, model):
+                continue  # a request never leaves the organisation's route
             for key in keys:
                 chain.append((provider, model, key, os.getenv("AI_PROVIDER_BASE_URL_" + provider.upper()) or _base_url_of(provider)))
     return chain
@@ -842,6 +848,15 @@ class AgentRunner:
                             tool_schemas = self._build_tool_schemas(provider, TOOL_SCHEMAS)
                             self._held_tokens = []
                             continue
+                        from app.modules.ai_chat.services.ai_route import current_route
+
+                        if current_route().pauses:
+                            # a paid plan or an own key never reaches a free model: it is told plainly
+                            return self._finalize(
+                                self._fallback("answers are paused"),
+                                user_message=user_message, domain=domain, context=context,
+                                persona=persona, model_used=model,
+                            )
                         return self._finalize(
                             self._fallback(f"LLM call failed: {e}", busy=True),
                             user_message=user_message, domain=domain, context=context,
@@ -1193,6 +1208,12 @@ class AgentRunner:
 
         system_prompt = scrub_for_transmission(system_prompt)
         messages = scrub_chat_messages(messages)
+        from app.modules.ai_chat.services.ai_route import current_route
+
+        if not current_route().allows(provider, model):
+            from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+            raise AnswersPaused("%s is not on this organisation's route" % provider)
         platform_funded = self._platform_funded(provider)
         if platform_funded:
             from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService

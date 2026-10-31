@@ -24,7 +24,7 @@ pytestmark = pytest.mark.usefixtures("db_session")
 # ----------------------------------------------------------------------------- QA-032: real caps, a chain that moves on
 
 @pytest.fixture
-def providers(monkeypatch, catalogue):  # noqa: F811
+def providers(monkeypatch, catalogue, free_plan_org):  # noqa: F811
     """NVIDIA through the real client call with a stand-in OpenAI class, OpenRouter through a stand-in post."""
     import openai
     import requests

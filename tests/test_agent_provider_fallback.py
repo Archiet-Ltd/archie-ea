@@ -186,7 +186,7 @@ def test_a_provider_can_be_pointed_at_a_gateway_address(db_session, make_org, te
     assert urls["openrouter"] == ar._PROVIDER_BASE_URLS["openrouter"]
 
 
-def test_an_organisation_with_its_own_paid_key_is_asked_before_any_free_model(
+def test_an_organisation_with_its_own_key_is_asked_that_key_alone(
     db_session, make_org, tenant_ctx, monkeypatch
 ):
     _no_env_keys(monkeypatch)
@@ -198,8 +198,8 @@ def test_an_organisation_with_its_own_paid_key_is_asked_before_any_free_model(
         # the caller's default is a free route, as when nothing was chosen
         chain = ar.build_provider_chain("openrouter", "model-a:free")
     assert chain[0][:3] == ("anthropic", "claude-own", "own-anthropic-key")
-    # when that key fails the chain moves to the free models, NVIDIA first
-    assert [e[0] for e in chain] == ["anthropic", "nvidia", "openrouter"]
+    # the platform's free models are not on this organisation's route
+    assert [e[0] for e in chain] == ["anthropic"]
 
 
 def test_a_working_own_key_never_reaches_the_free_models(
@@ -219,7 +219,7 @@ def test_a_working_own_key_never_reaches_the_free_models(
     assert [c[0] for c in calls] == ["anthropic"]
 
 
-def test_when_the_own_key_fails_the_free_models_answer_nvidia_first(
+def test_when_the_own_key_fails_the_answer_is_the_plain_pause_and_no_free_model_is_asked(
     runner, db_session, make_org, tenant_ctx, monkeypatch
 ):
     _no_env_keys(monkeypatch)
@@ -232,8 +232,10 @@ def test_when_the_own_key_fails_the_free_models_answer_nvidia_first(
     calls = _script(monkeypatch, runner, [_rate_limit(), "Answered by NVIDIA."])
     with tenant_ctx(org.id):
         result = runner.run("How many applications do we run?")
-    assert result["response"] == "Answered by NVIDIA."
-    assert [c[0] for c in calls] == ["anthropic", "nvidia"]
+    from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
+
+    assert result["response"] == PAUSED_MESSAGE
+    assert [c[0] for c in calls] == ["anthropic"]
 
 
 def test_one_organisations_key_is_never_used_for_another(db_session, make_org, tenant_ctx, monkeypatch):
