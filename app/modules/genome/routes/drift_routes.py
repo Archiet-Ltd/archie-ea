@@ -169,10 +169,9 @@ def _enqueue_model_health_scan_if_not_pending(org_id: int) -> bool:
     return True
 
 
-@genome_drift_bp.route("/", methods=["GET"])
-@login_required
-def index():
-    """Read the stored drift report for the current tenant and render it."""
+def drift_panel_context() -> dict:
+    """Read the stored drift report for the current tenant, for the Model health
+    view of the Architecture Health Scorecard (/dashboard/health?view=drift)."""
     org_id = _active_org_id()
     report_html = None
     error = None
@@ -196,24 +195,34 @@ def index():
                 else:
                     computed_at = stored.computed_at
             else:
-                # No stored report — show a pending state and enqueue a
-                # background scan through the existing job queue so the
-                # page load stays sub-quadratic.  Enqueue at most once
-                # per organisation while a scan is already pending.
+                # No stored report: show a pending state and enqueue a
+                # background scan through the existing job queue. Enqueue at
+                # most once per organisation while a scan is already pending.
                 pending = True
                 _enqueue_model_health_scan_if_not_pending(org_id)
         except Exception as exc:
             logger.warning("Drift report read failed for org %s: %s", org_id, exc)
             error = f"Model-health report could not be read: {exc}"
-    return render_template(
-        "genome/model_health.html",
-        report_html=report_html,
-        summary=summary,
-        error=error,
-        org_id=org_id,
-        computed_at=computed_at,
-        pending=pending,
-    )
+    return {
+        "report_html": report_html,
+        "summary": summary,
+        "error": error,
+        "org_id": org_id,
+        "computed_at": computed_at,
+        "pending": pending,
+    }
+
+
+def _health_page_url(view: str = "drift") -> str:
+    return url_for("dashboard.health_scorecard", view=view)
+
+
+@genome_drift_bp.route("/", methods=["GET"])
+@login_required
+def index():
+    """Model health is a view of the Architecture Health Scorecard (T-merge-08);
+    the old address keeps answering."""
+    return redirect(_health_page_url("drift"), code=302)
 
 
 @genome_drift_bp.route("/rescan", methods=["POST"])
@@ -223,7 +232,7 @@ def rescan():
     org_id = _active_org_id()
     if org_id is None:
         flash("No active organization for the current user.", "error")
-        return redirect(url_for("genome_drift.index"))
+        return redirect(_health_page_url("drift"))
     try:
         from app.extensions import db
         from app.models.drift_report import DriftReport
@@ -242,7 +251,7 @@ def rescan():
     except Exception as exc:
         logger.warning("Drift rescan failed for org %s: %s", org_id, exc)
         flash(f"Model-health scan failed: {exc}", "error")
-    return redirect(url_for("genome_drift.index"))
+    return redirect(_health_page_url("drift"))
 
 
 @genome_drift_bp.route("/remediate", methods=["POST"])
@@ -255,7 +264,7 @@ def remediate():
 
     if org_id is None:
         flash("No active organization for the current user.", "error")
-        return redirect(url_for("genome_drift.index"))
+        return redirect(_health_page_url("drift"))
 
     if finding_type not in _FIXABLE:
         flash(
@@ -263,13 +272,13 @@ def remediate():
             "a single governed patch.",
             "error",
         )
-        return redirect(url_for("genome_drift.index"))
+        return redirect(_health_page_url("drift"))
 
     try:
         element_id = int(element_id_raw)
     except (TypeError, ValueError):
         flash("Invalid element reference for remediation.", "error")
-        return redirect(url_for("genome_drift.index"))
+        return redirect(_health_page_url("drift"))
 
     patch = _build_remediation_patch(org_id, finding_type, element_id)
     if patch is None:
@@ -278,7 +287,7 @@ def remediate():
             "(unknown ArchiMate type); no proposal was queued.",
             "error",
         )
-        return redirect(url_for("genome_drift.index"))
+        return redirect(_health_page_url("drift"))
 
     # Route through the EXISTING governed gate: validate -> ground -> QUEUE.
     from app.modules.genome.patch.proposer import propose_genome_patch
@@ -307,7 +316,7 @@ def remediate():
             "Could not queue the remediation: " + str(result.get("error", "unknown error")),
             "error",
         )
-    return redirect(url_for("genome_drift.index"))
+    return redirect(_health_page_url("drift"))
 
 
 def _build_remediation_patch(org_id: int, finding_type: str, element_id: int):

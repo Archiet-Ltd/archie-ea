@@ -55,7 +55,7 @@ class AIChatLinkService:
                     r"application.*inventory",
                     r"list.*applications?",
                 ],
-                "url": "/auto-dashboard/",
+                "url": "/applications/",
                 "title": "Application Registry",
                 "description": "Complete application portfolio and registry",
             },
@@ -304,7 +304,7 @@ class AIChatLinkService:
                     "icon": "💻",
                 },
                 {
-                    "url": urljoin(self.base_url, "/auto-dashboard/"),
+                    "url": urljoin(self.base_url, "/applications/"),
                     "title": "Application Registry",
                     "description": "Complete application inventory",
                     "icon": "📋",

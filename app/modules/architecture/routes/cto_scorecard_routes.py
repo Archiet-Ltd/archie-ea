@@ -20,22 +20,32 @@ def _guard():
     return None
 
 
+def cto_panel_context(org_id):
+    """The CTO view of the Architecture Health Scorecard
+    (/dashboard/health?view=cto): supported estate, open exceptions,
+    end-of-support exposure and the surfaces that disagree."""
+    return {
+        "versions": svc.supported_version_share(org_id),
+        "exceptions": svc.open_exceptions(org_id),
+        "agreement": svc.store_agreement_findings(org_id),
+        "exposure": svc.end_of_support_exposure(org_id),
+        "exposure_window_months": svc.lead_months_for(org_id),
+    }
+
+
+def can_view_cto_panel():
+    return can_access_section(current_user, "governance")
+
+
 @cto_scorecard_bp.route("/")
 @login_required
 def index():
+    """The CTO scorecard is the CTO view of the Architecture Health Scorecard
+    (T-merge-08); the old address keeps answering."""
     guard = _guard()
     if guard:
         return guard
-    org_id = g.current_org_id
-    exposure_rows = svc.end_of_support_exposure(org_id)
-    return render_template(
-        "architecture/cto_scorecard.html",
-        versions=svc.supported_version_share(org_id),
-        exceptions=svc.open_exceptions(org_id),
-        agreement=svc.store_agreement_findings(org_id),
-        exposure=exposure_rows,
-        exposure_window_months=svc.lead_months_for(org_id),
-    )
+    return redirect(url_for("dashboard.health_scorecard", view="cto"), code=302)
 
 
 @cto_scorecard_bp.route("/exceptions/<int:change_request_id>/escalate", methods=["POST"])
@@ -49,4 +59,4 @@ def escalate_exception(change_request_id):
         flash("Exception escalated.", "success")
     else:
         flash("That exception could not be escalated.", "error")
-    return redirect(url_for("cto_scorecard.index"))
+    return redirect(url_for("dashboard.health_scorecard", view="cto"))

@@ -3,6 +3,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/table.html' import table %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/tabs.html' import section_tabs %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% import 'components/card.html' as card %}
 
@@ -12,8 +13,14 @@
 <div class="space-y-6">
     {{ page_header(
         title='Architecture Health Scorecard', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Architecture Health Scorecard'}],
-        description='Real-time portfolio risk, ARB pipeline, ArchiMate coverage, and ADM progression'
+        description='Real-time portfolio risk, ARB pipeline, ArchiMate coverage, ADM progression, the CTO view and model drift'
     ) }}
+
+    {{ section_tabs([
+        ('Overview', url_for('dashboard.health_scorecard'), view == 'overview', 'health-tab-overview'),
+        ('CTO view', url_for('dashboard.health_scorecard', view='cto'), view == 'cto', 'health-tab-cto'),
+        ('Model drift', url_for('dashboard.health_scorecard', view='drift'), view == 'drift', 'health-tab-drift'),
+    ], label='Health scorecard views', testid='health-tabs') }}
 
     {# ── Health Score — the composite this page is named for. One line, not a
        card: the value and format are the ones the dashboard shows, and the
@@ -26,6 +33,34 @@
         {% if basis.not_measured %}<span class="ml-1" data-testid="health-score-not-measured">Not measured: {{ basis.not_measured }}.</span>{% endif %}
     </p>
 
+    {# The portfolio figures, read through the Overview's own service so the two pages cannot disagree. #}
+    {% if portfolio %}
+    <p class="-mt-3 text-sm text-muted-foreground" data-testid="health-portfolio-line">
+        <a href="{{ url_for('unified_applications.application_list') }}" class="underline underline-offset-2" data-testid="health-applications-link">Applications <strong class="tabular-nums text-foreground" data-testid="health-applications">{{ portfolio.total }}</strong></a>
+        ·
+        <a href="{{ url_for('unified_applications.application_list') }}" class="underline underline-offset-2">With a named owner <strong class="tabular-nums text-foreground" data-testid="health-applications-owned">{{ portfolio.total - portfolio.unowned|length }}</strong></a>
+        {% if portfolio.total == 0 %}<span class="ml-1" data-testid="health-portfolio-empty">No applications are in the model yet. They appear once a source is connected or you add one.</span>{% endif %}
+    </p>
+    {% endif %}
+
+    {% if view == 'cto' %}
+        {% include 'dashboards/_health_cto.html' %}
+    {% elif view == 'drift' %}
+        {% include 'dashboards/_health_drift.html' %}
+    {% endif %}
+
+    {% macro evidence_footer(evidence, source, confidence, as_of) %}
+    <p class="text-xs text-muted-foreground" data-testid="health-evidence-footer">
+        Evidence: {{ evidence }} · Source: {{ source }} · Confidence: {{ confidence }} · As of {{ as_of }}
+    </p>
+    {% endmacro %}
+    {% if view == 'cto' %}
+        {{ evidence_footer('applications, vendor products and open change requests recorded for this organisation', 'the organisation\'s model and decision register', 'measured from recorded fields; applications without a vendor product are left out', as_of) }}
+    {% elif view == 'drift' %}
+        {{ evidence_footer('findings of the last model scan, each naming its ArchiMate element', 'the stored scan of this organisation\'s model', 'rule-based detection; no AI involved', computed_at.strftime('%d %b %Y %H:%M UTC') if computed_at else as_of) }}
+    {% endif %}
+
+    {% if view == 'overview' %}
     {# ── AI Executive Briefing (advisory) ─────────────────────────────────── #}
     <div x-data="execBriefingPanel()" class="bg-card border border-border rounded-lg p-4">
         <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -283,6 +318,8 @@
             {% endcall %}
         {% endcall %}
     </div>
+    {{ evidence_footer('solution risks, ARB items, ArchiMate elements and solution phases recorded for this organisation', 'the organisation\'s model', 'measured from recorded fields; the health score is weighted from the parts named above', as_of) }}
+    {% endif %}
 </div>
 
 <script>

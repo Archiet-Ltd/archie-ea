@@ -80,12 +80,12 @@ def dashboard():
         from flask import url_for
 
         try:
-            dashboard_registry_url = url_for("dynamic_dashboards.model_registry_index")
+            dashboard_registry_url = url_for("dashboard.health_scorecard")
         except HTTPException:
             raise
         except Exception as e:
             logger.debug("Could not resolve dashboard registry URL: %s", e)
-            dashboard_registry_url = "/auto-dashboard/registry"
+            dashboard_registry_url = "/dashboard/health"
         return render_template(
             "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url
         )

@@ -385,12 +385,6 @@ NAVIGATION_REGISTRY = {
         "storage_key": "tools",
         "items": [
             {
-                "label": "Model Registry",
-                "icon": "layout-grid",
-                "endpoint": "dynamic_dashboards.model_registry_index",
-                "url_fallback": "/auto-dashboard/",
-            },
-            {
                 "label": "Users",
                 "icon": "users",
                 "endpoint": "admin.registered_users",

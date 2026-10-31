@@ -118,14 +118,22 @@ def _is_first_visit(user):
     return earlier is None
 
 
+def active_application_criteria():
+    """The conditions that make an application part of the portfolio the Systems list shows by default:
+    duplicates and decommissioned applications are left out. Every screen that counts applications uses these."""
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    return (
+        ~A.name.ilike("(Duplicate)%", escape="\\"),
+        or_(A.lifecycle_status.is_(None), func.lower(A.lifecycle_status) != "5. decommissioned"),
+    )
+
+
 def _active_applications():
     """The applications the Systems list shows by default."""
     from app.models.application_portfolio import ApplicationComponent as A
 
-    return db.select(A).where(
-        ~A.name.ilike("(Duplicate)%", escape="\\"),
-        or_(A.lifecycle_status.is_(None), func.lower(A.lifecycle_status) != "5. decommissioned"),
-    )
+    return db.select(A).where(*active_application_criteria())
 
 
 def _applications(org_id, now):

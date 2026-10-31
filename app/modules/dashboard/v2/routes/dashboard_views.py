@@ -445,6 +445,33 @@ def health_scorecard():
         health_score_basis,
     )
 
+    from datetime import datetime, timezone
+
+    view = request.args.get("view", "overview")
+    if view not in ("overview", "cto", "drift"):
+        view = "overview"
+    extra = {}
+    if view == "cto":
+        from app.modules.architecture.routes.cto_scorecard_routes import (
+            can_view_cto_panel,
+            cto_panel_context,
+        )
+
+        if not can_view_cto_panel():
+            return render_template("errors/403.html"), 403
+        extra = cto_panel_context(g.current_org_id)
+    elif view == "drift":
+        from app.modules.genome.routes.drift_routes import drift_panel_context
+
+        extra = drift_panel_context()
+    portfolio = None
+    try:
+        from app.modules.dashboard.services.overview_figures import _applications
+
+        portfolio = _applications(g.current_org_id, datetime.now(timezone.utc).replace(tzinfo=None))
+    except Exception as exc:
+        logger.warning("health_scorecard: portfolio figures unavailable: %s", exc)
+        db.session.rollback()
     metrics = _assemble_health_scorecard_metrics()
     health_score = None
     unavailable = None
@@ -459,6 +486,10 @@ def health_scorecard():
         "dashboards/health.html",
         health_score_text=format_health_score(health_score),
         health_basis=health_score_basis(health_score, unavailable),
+        view=view,
+        portfolio=portfolio,
+        as_of=datetime.now(timezone.utc).strftime("%d %b %Y"),
+        **extra,
         **metrics,
     )
 

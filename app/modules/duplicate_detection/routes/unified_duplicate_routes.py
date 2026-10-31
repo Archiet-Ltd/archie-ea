@@ -889,12 +889,12 @@ def simple_group_detail(group_id):
         try:
             from flask import url_for
 
-            dashboard_registry_url = url_for("dynamic_dashboards.model_registry_index")
+            dashboard_registry_url = url_for("dashboard.health_scorecard")
         except HTTPException:
             raise
         except Exception as e:
             current_app.logger.debug("Could not resolve dashboard registry URL: %s", e)
-            dashboard_registry_url = "/auto-dashboard/registry"
+            dashboard_registry_url = "/dashboard/health"
 
         # Load recommendation and pairwise analyses from the legacy DuplicateGroup model
         recommendation = None

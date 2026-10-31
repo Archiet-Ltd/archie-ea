@@ -1,23 +1,15 @@
-{% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell %}
-{% block title %}Model Health{% endblock %}
-
-{% block content %}
-<div class="p-6 space-y-6 mx-auto">
-    {% macro _ps_actions() %}
-    <form method="post" action="{{ url_for('genome_drift.rescan') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-            Re-scan for drift
-        </button>
-    </form>
-    {% endmacro %}
-    {{ page_shell(
-        title='Model Health', breadcrumb=[('Home', '/'), ('Model Health', none)],
-        subtitle='Deterministic drift and staleness detection across the enterprise genome — every finding links to the ArchiMate element it is about (zero LLM). Fixes are queued for human approval, never applied silently.',
-        actions_caller=_ps_actions) }}
+<div class="space-y-6" data-testid="health-view-drift">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="max-w-prose text-sm text-muted-foreground">Deterministic drift and staleness detection across the model. Every finding links to the ArchiMate element it is about. Fixes are queued for human approval, never applied silently.</p>
+        <form method="post" action="{{ url_for('genome_drift.rescan') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Re-scan for drift
+            </button>
+        </form>
+    </div>
 
     {% if error %}
     <div role="alert" class="px-3 py-2 border border-destructive/50 bg-destructive/10 rounded-md text-sm text-destructive-emphasis">
@@ -54,4 +46,3 @@
     {% endif %}
     {% endif %}
 </div>
-{% endblock %}

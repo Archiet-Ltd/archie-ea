@@ -43,6 +43,10 @@ def ownership_coverage():
     org_id = g.current_org_id
 
     from app.models.enterprise_intelligence import OrganizationUnit
+    from app.modules.dashboard.services.overview_figures import active_application_criteria
+
+    # the same portfolio the Overview, the applications list and the health scorecard count
+    in_portfolio = active_application_criteria()
 
     units = (
         OrganizationUnit.query
@@ -59,7 +63,7 @@ def ownership_coverage():
     for unit in units:
         unit_apps = (
             ApplicationComponent.query
-            .filter(ApplicationComponent.organization_id == org_id)
+            .filter(ApplicationComponent.organization_id == org_id, *in_portfolio)
             .filter(_domain_matches_unit(unit.name))
             .count()
         )
@@ -67,7 +71,7 @@ def ownership_coverage():
         if unit_apps > 0:
             unit_owned = (
                 ApplicationComponent.query
-                .filter(ApplicationComponent.organization_id == org_id)
+                .filter(ApplicationComponent.organization_id == org_id, *in_portfolio)
                 .filter(_domain_matches_unit(unit.name))
                 .filter(owner_predicate)
                 .count()
@@ -85,6 +89,7 @@ def ownership_coverage():
     orphan_count = ApplicationComponent.query.filter(
         ApplicationComponent.organization_id == org_id,
         ApplicationComponent.business_domain.is_(None),
+        *in_portfolio,
     ).count()
     orphan_owned = 0
     if orphan_count > 0:
@@ -92,6 +97,7 @@ def ownership_coverage():
             ApplicationComponent.organization_id == org_id,
             ApplicationComponent.business_domain.is_(None),
             owner_predicate,
+            *in_portfolio,
         ).count()
         total_apps += orphan_count
         total_owned += orphan_owned

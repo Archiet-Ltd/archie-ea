@@ -630,9 +630,9 @@ def simple_group_detail(group_id):
             })
 
         try:
-            dashboard_registry_url = url_for("dynamic_dashboards.model_registry_index")
+            dashboard_registry_url = url_for("dashboard.health_scorecard")
         except Exception:
-            dashboard_registry_url = "/auto-dashboard/registry"
+            dashboard_registry_url = "/dashboard/health"
         return render_template(
             "duplicate_detection/group_detail.html",
             group=group_payload, recommendation=None, pairwise_analyses=[],

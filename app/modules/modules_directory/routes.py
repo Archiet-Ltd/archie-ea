@@ -188,7 +188,6 @@ _MORE_TOOLS = [
     ("Agentic Gaps", "main.agentic_gaps_ui", "search"),
     ("Application Management", "application_management", "layout-dashboard"),
     ("Architecture Assistant", "architect_ui.architecture_assistant", "bot"),
-    ("Model Registry", "dynamic_dashboards.model_registry_index", "database"),
     ("Business Case", "business_case.index", "briefcase"),
     ("Business Model", "business_model.index", "layout-dashboard"),
     ("EA Workflows", "main.ea_workflows_dashboard", "git-merge"),

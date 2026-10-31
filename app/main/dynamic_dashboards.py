@@ -119,32 +119,11 @@ MODEL_REGISTRY = {
 @dynamic_dashboards.route("/registry")
 @login_required
 def model_registry_index():
-    """Model registry index page."""
-    from flask import url_for
+    """The model dashboard is the Architecture Health Scorecard (T-merge-08);
+    the old addresses keep answering."""
+    from flask import redirect, url_for
 
-    # Get all models from registry
-    models = []
-    for slug, info in MODEL_REGISTRY.items():
-        models.append(
-            {
-                "slug": slug,
-                "name": info["name"],
-                "plural": info["plural"],
-                "icon": info.get("icon", "📊"),
-                "category": info.get("category", "Other"),
-                "url": url_for("dynamic_dashboards.universal_dashboard", model_slug=slug),
-            }
-        )
-
-    # Group by category
-    categories = {}
-    for model in models:
-        category = model["category"]
-        if category not in categories:
-            categories[category] = []
-        categories[category].append(model)
-
-    return render_template("dashboards/model_dashboard.html", categories=categories, models=models)
+    return redirect(url_for("dashboard.health_scorecard"), code=302)
 
 
 @dynamic_dashboards.route("/<model_slug>")

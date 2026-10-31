@@ -167,9 +167,7 @@ def init_context_processors(app):
         if _hit is not None and current_time - _hit["timestamp"] < _cache_ttl:
             result = _hit["data"].copy()
             try:
-                result["dashboard_registry_url"] = url_for(
-                    "dynamic_dashboards.model_registry_index"
-                )
+                result["dashboard_registry_url"] = url_for("dashboard.health_scorecard")
             except Exception:
                 result["dashboard_registry_url"] = "#"
             return result
@@ -240,7 +238,7 @@ def init_context_processors(app):
             }
 
             try:
-                registry_url = url_for("dynamic_dashboards.model_registry_index")
+                registry_url = url_for("dashboard.health_scorecard")
             except Exception:
                 registry_url = "#"  # blueprint not registered
 
