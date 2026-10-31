@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from .conftest import PAGE_TIMEOUT, PASSWORD, _seed_standard_org
+from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -35,6 +35,32 @@ def own_review(seeded):
         return review.id
 
 
+@pytest.fixture
+def other_org_architect(seeded):
+    """A solution architect of a second organisation, made without touching the
+    shared organisation's seeded rows (a second full seeding deletes the AI
+    provider settings later smoke tests use)."""
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    tag = uuid.uuid4().hex[:6]
+    email = "smoke.arb.second.%s@example.com" % tag
+    app = create_app("testing")
+    with app.app_context():
+        second = Organization(name="Second %s" % tag, slug="second-%s" % tag)
+        db.session.add(second)
+        db.session.flush()
+        user = User(email=email, first_name="Smoke", last_name="Second",
+                    organization_id=second.id, enterprise_role="solution_architect",
+                    confirmed=True)
+        user.role = Role.query.filter_by(name="Architect").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+    return email
+
+
 def _login(page, base, email):
     page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.fill("#email", email)
@@ -50,9 +76,8 @@ def _shot(page, name):
 
 
 def test_architect_comments_on_own_review_and_other_organisation_cannot(
-    browser, live_server, seeded, own_review, request, ai_protocol_stub
+    browser, live_server, seeded, own_review, other_org_architect
 ):
-    other = _seed_standard_org(request, ai_protocol_stub)
     note = "Own note %s" % uuid.uuid4().hex[:6]
     intruder = "Intruder note %s" % uuid.uuid4().hex[:6]
 
@@ -76,7 +101,7 @@ def test_architect_comments_on_own_review_and_other_organisation_cannot(
 
     # The other organisation's architect is refused and nothing is stored.
     foreign = browser.new_page()
-    _login(foreign, live_server, other["emails"]["solution_architect"])
+    _login(foreign, live_server, other_org_architect)
     foreign.goto(live_server + "/arb/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     token = foreign.locator('meta[name="csrf-token"]').get_attribute("content")
     resp = foreign.request.post(

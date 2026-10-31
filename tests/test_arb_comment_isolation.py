@@ -10,7 +10,7 @@ from sqlalchemy import text
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
-def _user(db_session, org, label):
+def _user(db_session, org, label, role="solution_architect"):
     from app.models.user import User
 
     user = User(
@@ -18,7 +18,7 @@ def _user(db_session, org, label):
         first_name="Test",
         last_name=label,
         organization_id=org.id,
-        enterprise_role="solution_architect",
+        enterprise_role=role,
         confirmed=True,
     )
     db_session.add(user)
@@ -144,7 +144,10 @@ def test_foreign_organisation_gets_not_found_on_review_routes(
     from app.models.architecture_review_board import ARBReviewItem
 
     org_a, org_b = make_org("arb-a"), make_org("arb-b")
-    user_a, user_b = _user(db_session, org_a, "a"), _user(db_session, org_b, "b")
+    # The other organisation's caller holds the approver role, so only the
+    # organisation fence can turn them away.
+    user_a = _user(db_session, org_a, "a")
+    user_b = _user(db_session, org_b, "b", role="enterprise_architect")
     item_id = _review(db_session, org_a, user_a).id
 
     login_as(client, user_b)
@@ -220,7 +223,7 @@ def test_review_cannot_be_assigned_to_another_organisations_session(
     from app.models.architecture_review_board import ArchitectureReviewBoard
 
     org_a, org_b = make_org("arb-a"), make_org("arb-b")
-    user_a = _user(db_session, org_a, "a")
+    user_a = _user(db_session, org_a, "a", role="enterprise_architect")
     item_id = _review(db_session, org_a, user_a).id
     board = ArchitectureReviewBoard(
         board_number=f"ARB-TEST-{uuid.uuid4().hex[:10]}",
