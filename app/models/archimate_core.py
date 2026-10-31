@@ -101,7 +101,7 @@ if _FAST_INIT:
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
         # Provenance origin: where this element came from.
-        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_kind: 'manual', 'import', 'connector', 'derived', 'sample'
         # source_ref: import batch id, connector run id, or user id as text
         # source_label: file name, connector name, or person's display name
         # source_recorded_at: when the origin was recorded
@@ -189,7 +189,7 @@ if _FAST_INIT:
         sequence_order = db.Column(db.Integer, nullable=True)
 
         # Provenance origin: where this relationship came from.
-        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_kind: 'manual', 'import', 'connector', 'derived', 'sample'
         # source_ref: import batch id, connector run id, or user id as text
         # source_label: file name, connector name, or person's display name
         # source_recorded_at: when the origin was recorded

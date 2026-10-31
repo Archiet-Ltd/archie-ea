@@ -787,6 +787,12 @@ def init_context_processors(app):
     from app.utils.template_utils import humanize_error
     app.jinja_env.filters["humanize_error"] = humanize_error
 
+    # Plain words for an ArchiMate element type ("ApplicationComponent" ->
+    # "Application component"), the same split the Model sidebar uses for its
+    # own type links, so a badge and a sidebar entry never name a type two ways.
+    from app.navigation.registry import element_type_label
+    app.jinja_env.filters["type_label"] = element_type_label
+
     # Register date/datetime formatting filters
     def _filter_format_date(value, fmt='%d %b %Y'):
         if value is None:

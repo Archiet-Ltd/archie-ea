@@ -26,6 +26,9 @@ from app import db
 SAMPLE_MODEL_NAME = "Sample company"
 # Written on every relationship and element the file brings in, so the first answer cites it.
 SOURCE_LABEL = "Sample company"
+# The origin kind of everything the sample brings in: never 'connector', so a sample record cannot be
+# presented as evidence a connector read (the answers read the kind and say "Sample data").
+SOURCE_KIND = "sample"
 _ROWS_KEY = "sample_rows"
 _LOCK_KEY = 74510  # first half of the advisory-lock pair; the organisation id is the second
 
@@ -86,6 +89,20 @@ _CAPABILITY_TYPES = {
     "Run customer support": "supporting",
 }
 
+# The named owners of the sample applications: plain text labelled "(sample owner)", never a user
+# account, never the person who loaded the sample. A name that matches no user stays text on the
+# application, so nobody can sign in as them, they are in no member list and they take no seat.
+_OWNERS = [
+    ("Alex", ("Payments service", "Finance system", "Identity provider")),
+    ("Sam", ("Customer web app", "Notification service", "Monitoring dashboard")),
+    ("Jo", ("Order management system", "Inventory system", "Data warehouse", "Document management")),
+]
+_OWNER_LABEL = "%s (sample owner)"
+_OWNER_BY_APPLICATION = {
+    application: _OWNER_LABEL % first for first, applications in _OWNERS for application in applications
+}
+
+
 # (title, likelihood, impact, owner role, mitigation, element name)
 _RISKS = [
     ("Payments provider outage stops checkout", 3, 5,
@@ -110,11 +127,6 @@ _SOLUTIONS = [
     ("Real-time stock across channels", "Keep web and warehouse stock counts in step as orders arrive.",
      "B", "Inventory system"),
 ]
-
-
-def _display_name(user) -> str:
-    name = " ".join(p for p in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if p)
-    return name or getattr(user, "email", "") or "Workspace owner"
 
 
 def find_restore_point(org_id: int):
@@ -142,6 +154,13 @@ def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, 
     The mirrored elements and the links drawn from the capability mappings are
     written by the model's own sync, which records no origin; without this the
     first answer reads "Source not recorded" beside them.
+
+    Unconditional, not only where ``source_kind IS NULL``: a relationship written
+    inside this request is stamped "manual" by the generic origin listener
+    (``app/services/relationship_origin.py``) before this runs, naming the person
+    who clicked Load the sample company as its drawer. These rows are the sample
+    file's, not that person's, so this overwrites whatever that listener set for
+    exactly the rows this load just added — never anything it did not add.
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
@@ -150,14 +169,13 @@ def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, 
     if mirrored_elements:
         for element in ArchiMateElement.query.filter(
             ArchiMateElement.id.in_(mirrored_elements), ArchiMateElement.organization_id == org_id,
-            ArchiMateElement.source_kind.is_(None),
         ):
-            element.source_kind, element.source_label, element.source_recorded_at = "import", SOURCE_LABEL, when
+            element.source_kind, element.source_label, element.source_recorded_at = SOURCE_KIND, SOURCE_LABEL, when
     for rel in ArchiMateRelationship.query.filter(
-        ArchiMateRelationship.organization_id == org_id, ArchiMateRelationship.source_kind.is_(None),
+        ArchiMateRelationship.organization_id == org_id,
     ):
         if rel.id not in relationships_before:
-            rel.source_kind, rel.source_label, rel.source_recorded_at = "import", SOURCE_LABEL, when
+            rel.source_kind, rel.source_label, rel.source_recorded_at = SOURCE_KIND, SOURCE_LABEL, when
 
 
 class LoadBusy(Exception):
@@ -215,7 +233,6 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
 
     ensure_charters(org_id)
     from app.models.application_capability import ApplicationCapabilityMapping
-    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.models.business_capabilities import BusinessCapability
@@ -224,7 +241,6 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.commands.project_capabilities import SOURCE_TABLE
     from app.models.unified_capability import UnifiedCapability
     from app.services.application_cost_accessor import state_contract, sync_cost_fact
-    from app.services.capability_ownership_service import set_capability_owner
 
     elements = {
         e.name: e
@@ -234,7 +250,6 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
         rid for (rid,) in db.session.query(ArchiMateRelationship.id)
         .filter(ArchiMateRelationship.organization_id == org_id)
     }
-    owner_name = _display_name(user)
     noted: List[Dict[str, Any]] = []
     mirrors: List[int] = []
 
@@ -251,7 +266,9 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             code="SAMPLE-%d-CAP-%d" % (org_id, index),
             organization_id=org_id,
             archimate_element_id=element.id if element else None,
-            business_owner=owner_name,
+            # No owner: the sample names no real person, so one is never invented
+            # (CLAUDE.md "never invent data" — an owner here would be the person who
+            # clicked Load the sample company, not anyone who actually owns this).
             level=1,
             current_maturity_level=current,
             target_maturity_level=target,
@@ -263,8 +280,8 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
         if element is None and row.archimate_element_id:
             mirrors.append(int(row.archimate_element_id))
         note("business_capability", row)
-        # The capability's owner goes in the one ownership record, so an answer
-        # that reaches this capability names the same person the capability page does.
+        # No owner set here either (see above): the projection is corrected, never
+        # attributed to the person loading the sample.
         projected = UnifiedCapability.query.filter_by(
             organization_id=org_id, source_table=SOURCE_TABLE, source_id=str(row.id),
         ).first()
@@ -274,12 +291,6 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             if projected.archimate_element_id is None and row.archimate_element_id:
                 # The mirror element is created after the first projection; carry its id across.
                 projected.archimate_element_id = row.archimate_element_id
-            record = set_capability_owner(
-                capability_id=projected.id, user_id=user.id, organization_id=org_id,
-                assigned_by=user.id, replace_primary=True,
-            )
-            db.session.flush()
-            note("application_owners", record)
 
     # One flush per kind of row, not one per row: every flush runs the model's change
     # listeners, which is where the load spent its time.
@@ -296,8 +307,8 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             health_status="healthy",
             archimate_element_id=element.id if element else None,
             application_code="SAMPLE-%d-" % org_id + name.upper().replace(" ", "-")[:20],
-            application_owner=owner_name,
-            business_owner=owner_name,
+            application_owner=_OWNER_BY_APPLICATION.get(name),
+            business_owner=_OWNER_BY_APPLICATION.get(name),
             license_cost_annual=licence,
             infrastructure_cost_monthly=infra,
             total_cost_of_ownership=licence + 12 * infra,
@@ -336,30 +347,9 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             db.session.add(mapping)
             mappings.append(mapping)
 
-    # Setting the owner's name on an application records its ownership rows; add the
-    # primary one only where that did not, and note every row each application has so
-    # removal takes them all.
-    owned = {}
-    for owner in ApplicationOwner.query.filter(
-        ApplicationOwner.application_id.in_([a.id for a, _ in applications])
-    ).all():
-        owned.setdefault(owner.application_id, []).append(owner)
-    added = []
-    for app, _capability in applications:
-        rows = owned.setdefault(app.id, [])
-        if not any(o.user_id == user.id and o.ownership_type == "primary" for o in rows):
-            extra = ApplicationOwner(
-                application_id=app.id, user_id=user.id, organization_id=org_id, ownership_type="primary",
-            )
-            db.session.add(extra)
-            added.append(extra)
-            rows.append(extra)
     db.session.flush()
     for mapping in mappings:
         note("application_capability_mapping", mapping)
-    for app, _capability in applications:
-        for owner in owned[app.id]:
-            note("application_owners", owner)
     applications = [a for a, _ in applications]
 
     risks = []
