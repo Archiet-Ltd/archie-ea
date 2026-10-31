@@ -5367,21 +5367,112 @@ def pricing_analytics():
 # ============================================================================
 
 
+def _render_governance_gates(overrides=None, status=200):
+    """Render the gates page from the stored gates; ``overrides`` keeps typed values."""
+    from app.models.governance_gates import GovernanceGate
+    from app.modules.solutions_strategic.v2.services.governance_gate_service import (
+        DEFAULT_GATES,
+    )
+
+    gates = GovernanceGate.query.order_by(GovernanceGate.gate_name).all()
+    return (
+        render_template(
+            "admin/governance_gates.html",
+            default_gates=DEFAULT_GATES,
+            gates=gates,
+            typed=overrides or {},
+            can_manage_governance_gates=current_user.can(Permission.ADMINISTER),
+        ),
+        status,
+    )
+
+
+def _read_gate_form(form):
+    """Parse one gate's fields from a form post; returns (values, error)."""
+    values = {
+        "gate_name": (form.get("gate_name") or "").strip(),
+        "description": (form.get("description") or "").strip(),
+        "required_sections_text": form.get("required_sections") or "",
+        "min_completeness": (form.get("min_completeness") or "").strip(),
+        "required_decisions_count": (form.get("required_decisions_count") or "").strip(),
+        "require_risk_mitigations": form.get("require_risk_mitigations") == "on",
+        "enabled": form.get("enabled") == "on",
+    }
+    try:
+        values["min_completeness_n"] = int(values["min_completeness"])
+        if not 0 <= values["min_completeness_n"] <= 100:
+            raise ValueError
+    except ValueError:
+        return values, "Minimum completeness must be a whole number between 0 and 100."
+    try:
+        values["required_decisions_n"] = int(values["required_decisions_count"] or 0)
+        if values["required_decisions_n"] < 0:
+            raise ValueError
+    except ValueError:
+        return values, "Required approved decisions must be a whole number, 0 or more."
+    values["sections"] = [
+        line.strip() for line in values["required_sections_text"].splitlines() if line.strip()
+    ]
+    return values, None
+
+
 @admin_bp_v2.route("/governance-gates")
 @timed_route
 @login_required
 @governance_gate_reader_required
 def governance_gates():
     """Governance gates configuration page."""
-    from app.modules.solutions_strategic.v2.services.governance_gate_service import (
-        DEFAULT_GATES,
-    )
+    return _render_governance_gates()
 
-    return render_template(
-        "admin/governance_gates.html",
-        default_gates=DEFAULT_GATES,
-        can_manage_governance_gates=current_user.can(Permission.ADMINISTER),
+
+@admin_bp_v2.route("/governance-gates", methods=["POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("admin_governance_gate_form_save")
+def governance_gates_form():
+    """Add one gate, or save one existing gate, from a plain form post."""
+    require_org_or_platform_admin(g.current_org_id)
+    from app.models.governance_gates import GovernanceGate
+
+    action = request.form.get("action") or "save"
+    gate_id = request.form.get("gate_id", type=int)
+    values, error = _read_gate_form(request.form)
+    key = "add" if action == "add" else str(gate_id)
+    if not error and not values["gate_name"]:
+        error = "Gate name is required."
+    if not error:
+        clash = GovernanceGate.query.filter_by(gate_name=values["gate_name"]).first()
+        if clash and (action == "add" or clash.id != gate_id):
+            error = "A gate named '%s' already exists." % values["gate_name"]
+    gate = None
+    if action != "add":
+        gate = GovernanceGate.query.get_or_404(gate_id)
+    if error:
+        flash(error, "error")
+        values["_for"] = key
+        return _render_governance_gates({key: values}, 400)
+    try:
+        if gate is None:
+            gate = GovernanceGate(gate_name=values["gate_name"])
+            db.session.add(gate)
+        gate.description = values["description"]
+        gate.required_sections = values["sections"]
+        gate.min_completeness = values["min_completeness_n"]
+        gate.required_decisions_count = values["required_decisions_n"]
+        gate.require_risk_mitigations = values["require_risk_mitigations"]
+        gate.enabled = values["enabled"]
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Error saving governance gate: %s", exc, exc_info=True)
+        flash("The gate could not be saved. Try again.", "error")
+        return _render_governance_gates({key: values}, 500)
+    flash(
+        ("Gate '%s' added." if action == "add" else "Gate '%s' saved.") % gate.gate_name,
+        "success",
     )
+    return redirect(url_for("admin.governance_gates"))
 
 
 @admin_bp_v2.route("/api/governance-gates", methods=["GET"])

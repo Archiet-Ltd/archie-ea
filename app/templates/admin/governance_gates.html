@@ -1,501 +1,176 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
-
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/input.html' import hidden_input %}
 {% block title %}Governance Gates{% endblock %}
 
+{% macro gate_fields(prefix, v, gate_name_locked) %}
+  <div class="space-y-6">
+    {% call ui.field() %}
+      {{ ui.field_label(text='Gate name', attrs={'for': prefix ~ '-name'}) }}
+      {{ ui.input(id=prefix ~ '-name', name='gate_name', type='text', value=(v.get('gate_name') or ''), required=true,
+                  placeholder='e.g. arb_submission', class='w-full font-mono', attrs=({'readonly': 'readonly'} if gate_name_locked else {})) }}
+      {{ ui.field_description(text='Lowercase with underscores. It cannot be changed once the gate exists.' if gate_name_locked else 'A short unique identifier, lowercase with underscores.') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Description', attrs={'for': prefix ~ '-description'}) }}
+      {{ ui.input(id=prefix ~ '-description', name='description', type='text', value=(v.get('description') or ''), class='w-full',
+                  placeholder='e.g. Architecture Review Board submission gate') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Required sections', attrs={'for': prefix ~ '-sections'}) }}
+      {{ ui.textarea(id=prefix ~ '-sections', name='required_sections', rows=3, class='w-full font-mono text-xs',
+                     placeholder='vision_motivation', text=(v.get('required_sections_text') or '')) }}
+      {{ ui.field_description(text='One section per line, for example vision_motivation or business_process_view.') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Minimum completeness (%)', attrs={'for': prefix ~ '-completeness'}) }}
+      {{ ui.input(id=prefix ~ '-completeness', name='min_completeness', type='number', value=(v.get('min_completeness')), class='w-full',
+                  attrs={'min': '0', 'max': '100', 'step': '1'}) }}
+      {{ ui.field_description(text='Each required section must reach this completeness, from 0 to 100.') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Required approved decisions', attrs={'for': prefix ~ '-decisions'}) }}
+      {{ ui.input(id=prefix ~ '-decisions', name='required_decisions_count', type='number', value=(v.get('required_decisions_count')), class='w-full',
+                  attrs={'min': '0', 'step': '1'}) }}
+      {{ ui.field_description(text='The fewest approved architecture decisions needed. Use 0 to skip this check.') }}
+    {% endcall %}
+    <div class="flex items-center gap-3">
+      {% call ui.switch(id=prefix ~ '-risk', checked=v.get('require_risk_mitigations'), attrs={'aria-label': 'Require risk mitigations for critical and high risks', 'data-switch-value': prefix ~ '-risk-value'}) %}{{ ui.switch_thumb() }}{% endcall %}
+      {{ ui.field_label(text='Require risk mitigations for critical and high risks', attrs={'for': prefix ~ '-risk'}) }}
+      {{ ui.input(type='hidden', name='require_risk_mitigations', id=prefix ~ '-risk-value', value=('on' if v.get('require_risk_mitigations') else 'off')) }}
+    </div>
+    <div class="flex items-center gap-3">
+      {% call ui.switch(id=prefix ~ '-enabled', checked=v.get('enabled'), attrs={'aria-label': 'Gate enabled', 'data-switch-value': prefix ~ '-enabled-value'}) %}{{ ui.switch_thumb() }}{% endcall %}
+      {{ ui.field_label(text='Gate enabled', attrs={'for': prefix ~ '-enabled'}) }}
+      {{ ui.input(type='hidden', name='enabled', id=prefix ~ '-enabled-value', value=('on' if v.get('enabled') else 'off')) }}
+    </div>
+  </div>
+{% endmacro %}
+
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"
-     data-governance-mode="{{ 'manage' if can_manage_governance_gates else 'read-only' }}"
-     x-data="governanceGates()">
+<div class="p-6 space-y-6" data-governance-mode="{{ 'manage' if can_manage_governance_gates else 'read-only' }}">
+{{ page_shell(title='Governance Gates',
+              subtitle=('Configure hard gates that block solution progression until completeness thresholds are met.'
+                        if can_manage_governance_gates else
+                        'Review the hard gates that block solution progression until completeness thresholds are met.'),
+              breadcrumb=[('Home', '/'), ('Admin', url_for('admin.index')), ('Governance Gates', none)]) }}
 
-    {{ page_header(
-        title='Governance Gates',
-        description=('Configure hard gates that block solution progression until completeness thresholds are met.'
-                     if can_manage_governance_gates else
-                     'Review the hard gates that block solution progression until completeness thresholds are met.'),
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Governance Gates'}
-        ]
-    ) }}
+<div class="max-w-2xl space-y-6">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      {% call ui.alert(variant=('destructive' if category == 'error' else 'default'), attrs={'data-testid': 'gate-message', 'role': 'status'}) %}
+        {{ ui.alert_description(text=message) }}
+      {% endcall %}
+    {% endfor %}
+  {% endwith %}
 
-    <!-- Status message -->
-    <template x-if="message">
-        <div class="mb-4 rounded-lg border px-4 py-3 text-sm"
-             :class="messageType === 'success' ? 'bg-success/10 text-success-emphasis border-success/30' : 'bg-destructive/10 text-destructive-emphasis border-destructive/30'">
-            <span x-text="message"></span>
+  {% call ui.card(attrs={'data-testid': 'gate-defaults'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='System defaults') }}
+      {{ ui.card_description(text='These apply until you add a gate of the same name below. Gates you add override them.') }}
+    {% endcall %}
+    {% call ui.card_content() %}
+      <ul class="divide-y text-sm">
+        {% for gate_name, gate in default_gates.items() %}
+        <li class="space-y-1 py-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-medium">{{ gate_name|humanize_key }}</span>
+            <span class="font-mono text-xs text-muted-foreground">{{ gate_name }}</span>
+            {{ ui.badge(text='System default', variant='outline') }}
+          </div>
+          <p class="text-muted-foreground">{{ gate.description }}</p>
+          <p class="text-muted-foreground">
+            {{ gate.min_completeness }}% minimum completeness, {{ gate.required_decisions_count }} decision(s) required{% if gate.require_risk_mitigations %}, risk mitigations required{% endif %}{% if gate.required_sections %}, {{ gate.required_sections | length }} section(s): {{ gate.required_sections | join(', ') }}{% endif %}
+          </p>
+        </li>
+        {% else %}
+        <li class="py-3 text-muted-foreground">No system defaults are defined.</li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
+  {% endcall %}
+
+  {% for gate in gates %}
+    {% set typed_gate = typed.get(gate.id|string) %}
+    {% set v = typed_gate if typed_gate else {
+        'gate_name': gate.gate_name, 'description': gate.description,
+        'required_sections_text': (gate.required_sections or []) | join('\n'),
+        'min_completeness': gate.min_completeness, 'required_decisions_count': gate.required_decisions_count,
+        'require_risk_mitigations': gate.require_risk_mitigations, 'enabled': gate.enabled } %}
+    {% call ui.card(attrs={'data-testid': 'gate-' ~ gate.gate_name}) %}
+      {% call ui.card_header() %}
+        <div class="flex flex-wrap items-center gap-2">
+          {{ ui.card_title(text=gate.gate_name, class='font-mono') }}
+          {{ ui.badge(text=('Enabled' if gate.enabled else 'Disabled'), variant=('secondary' if gate.enabled else 'outline')) }}
         </div>
-    </template>
+        {{ ui.card_description(text='Saved settings for this gate. Saving here changes only this gate.') }}
+      {% endcall %}
+      {% if can_manage_governance_gates %}
+      <form method="POST" action="{{ url_for('admin.governance_gates_form') }}" class="space-y-6" novalidate>
+        {% call ui.card_content() %}
+          {{ hidden_input('csrf_token', csrf_token()) }}
+          {{ hidden_input('action', 'save') }}
+          {{ hidden_input('gate_id', gate.id) }}
+          {{ gate_fields('g' ~ gate.id, v, true) }}
+        {% endcall %}
+        {% call ui.card_footer(class='justify-end') %}
+          {{ ui.button(text='Save ' ~ gate.gate_name, type='submit', attrs={'aria-label': 'Save gate ' ~ gate.gate_name}) }}
+        {% endcall %}
+      </form>
+      {% else %}
+        {% call ui.card_content(class='text-sm text-muted-foreground') %}
+          <p>{{ gate.description or 'No description.' }}</p>
+          <p>{{ gate.min_completeness }}% minimum completeness, {{ gate.required_decisions_count }} decision(s) required, {{ (gate.required_sections or []) | length }} section(s).</p>
+        {% endcall %}
+      {% endif %}
+    {% endcall %}
+  {% else %}
+    {% call ui.card(attrs={'data-testid': 'gate-empty'}) %}
+      {% call ui.card_content(class='text-sm text-muted-foreground') %}
+        No gates have been added, so the system defaults above are active.{% if can_manage_governance_gates %} Add a gate below to override one.{% endif %}
+      {% endcall %}
+    {% endcall %}
+  {% endfor %}
 
-    <!-- Toolbar -->
-    <div class="flex items-center justify-between mb-6">
-        <p class="text-sm text-muted-foreground">
-            DB-configured gates override system defaults.
-            <span x-show="dbGates.length === 0" x-cloak>No overrides — system defaults are active.</span>
-        </p>
-        {% if can_manage_governance_gates %}
-        <button
-            type="button"
-            @click="openCreate()"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="h-4 w-4"></i>
-            Add Gate
-        </button>
-        {% endif %}
-    </div>
-
-    <!-- System Defaults section -->
-    <div class="mb-8">
-        <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <i data-lucide="shield" class="h-4 w-4 text-muted-foreground"></i>
-            System Defaults
-        </h2>
-        <div class="rounded-xl border bg-muted/30">
-            {% for gate_name, gate in default_gates.items() %}
-            <div class="flex items-start justify-between p-4 {% if not loop.last %}border-b{% endif %}">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-sm font-medium">{{ gate_name|humanize_key }}</span>
-                        <span class="font-mono text-xs text-muted-foreground" title="Gate key">{{ gate_name }}</span>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-                            system default
-                        </span>
-                    </div>
-                    <p class="text-sm text-muted-foreground mb-2">{{ gate.description }}</p>
-                    <div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span class="flex items-center gap-1">
-                            <i data-lucide="percent" class="h-3 w-3"></i>
-                            {{ gate.min_completeness }}% min completeness
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <i data-lucide="check-circle-2" class="h-3 w-3"></i>
-                            {{ gate.required_decisions_count }} decision(s) required
-                        </span>
-                        {% if gate.require_risk_mitigations %}
-                        <span class="flex items-center gap-1">
-                            <i data-lucide="alert-triangle" class="h-3 w-3"></i>
-                            Risk mitigations required
-                        </span>
-                        {% endif %}
-                        {% if gate.required_sections %}
-                        <span class="flex items-center gap-1">
-                            <i data-lucide="layout-list" class="h-3 w-3"></i>
-                            {{ gate.required_sections | length }} section(s): {{ gate.required_sections | join(', ') }}
-                        </span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% else %}
-            <p class="text-sm text-muted-foreground p-4 text-center">No system defaults defined.</p>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- DB-Configured Gates -->
-    <div>
-        <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <i data-lucide="shield-check" class="h-4 w-4 text-muted-foreground"></i>
-            Configured Overrides
-        </h2>
-
-        <!-- Loading state -->
-        <div x-show="loading" x-cloak class="flex items-center justify-center py-12 text-muted-foreground">
-            <i data-lucide="loader-2" class="h-5 w-5 animate-spin mr-2"></i>
-            Loading gates...
-        </div>
-
-        <!-- Empty state -->
-        <div x-show="!loading && dbGates.length === 0" x-cloak
-             class="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
-            <i data-lucide="shield-off" class="h-8 w-8 mx-auto mb-3 opacity-40"></i>
-            <p class="text-sm">No configured overrides. System defaults are active.</p>
-            {% if can_manage_governance_gates %}
-            <button type="button" @click="openCreate()"
-                    class="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
-                <i data-lucide="plus" class="h-3.5 w-3.5"></i>
-                Add your first gate
-            </button>
-            {% endif %}
-        </div>
-
-        <!-- Gates table -->
-        <div x-show="!loading && dbGates.length > 0" x-cloak class="rounded-xl border bg-card overflow-hidden">
-            <table class="dense-table w-full text-sm">
-                <thead class="border-b bg-muted/50">
-                    <tr>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Gate</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Completeness</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Sections</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                        {% if can_manage_governance_gates %}<th class="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>{% endif %}
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    <template x-for="gate in dbGates" :key="gate.id">
-                        <tr class="hover:bg-muted/30 transition-colors">
-                            <td class="px-4 py-3">
-                                <div>
-                                    <span class="font-mono font-medium" x-text="gate.gate_name"></span>
-                                    <p class="text-xs text-muted-foreground mt-0.5" x-text="gate.description || '—'"></p>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span x-text="gate.min_completeness + '%'"></span>
-                                <span class="text-muted-foreground text-xs ml-1">min</span>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span x-text="gate.required_sections.length" class="font-medium"></span>
-                                <span class="text-muted-foreground text-xs ml-1">section(s)</span>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
-                                      :class="gate.enabled
-                                          ? 'bg-success/10 text-success-emphasis border border-success/30'
-                                          : 'bg-muted text-muted-foreground border border-border'">
-                                    <span x-text="gate.enabled ? 'Enabled' : 'Disabled'"></span>
-                                </span>
-                            </td>
-                            {% if can_manage_governance_gates %}
-                            <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-1">
-                                    <button type="button"
-                                            @click="openEdit(gate)"
-                                            class="p-1.5 rounded-md hover:bg-accent transition-colors"
-                                            title="Edit gate"
-                                            :aria-label="'Edit ' + gate.gate_name">
-                                        <i data-lucide="edit" class="h-4 w-4"></i>
-                                    </button>
-                                    <button type="button"
-                                            @click="toggleGate(gate)"
-                                            class="p-1.5 rounded-md hover:bg-accent transition-colors"
-                                            :title="gate.enabled ? 'Disable gate' : 'Enable gate'"
-                                            :aria-label="(gate.enabled ? 'Disable ' : 'Enable ') + gate.gate_name">
-                                        <i data-lucide="power" class="h-4 w-4" :class="gate.enabled ? 'text-success' : 'text-muted-foreground'"></i>
-                                    </button>
-                                </div>
-                            </td>
-                            {% endif %}
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    {% if can_manage_governance_gates %}
-    <!-- Create / Edit Modal -->
-    <div x-show="showModal" x-cloak
-         class="fixed inset-0 z-50"
-         role="dialog" aria-modal="true" :aria-labelledby="editingGate ? 'modal-title-edit' : 'modal-title-create'">
-        <!-- Backdrop -->
-        <div class="fixed inset-0 bg-overlay/50" @click="dismissModal()"></div>
-        <!-- Panel -->
-        <div class="fixed inset-0 flex items-center justify-center p-4">
-            <div class="bg-card rounded-lg border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto"
-                 @click.stop>
-                <div class="p-6 border-b flex items-center justify-between">
-                    <div>
-                        <h3 class="text-lg font-semibold"
-                            :id="editingGate ? 'modal-title-edit' : 'modal-title-create'"
-                            x-text="editingGate ? 'Edit Gate' : 'Add Gate'"></h3>
-                        <p class="text-sm text-muted-foreground mt-0.5">
-                            Configure the completeness thresholds for this gate.
-                        </p>
-                    </div>
-                    <button type="button" @click="dismissModal()"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close dialog">
-                        <i data-lucide="x" class="h-5 w-5"></i>
-                    </button>
-                </div>
-
-                <form @submit.prevent="saveGate()" class="p-6 space-y-5">
-                    <!-- gate_name -->
-                    <div>
-                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="gg-gate-name">
-                            Gate Name <span class="text-destructive-emphasis">*</span>
-                        </label>
-                        <input
-                            id="gg-gate-name"
-                            type="text"
-                            x-model="form.gate_name"
-                            :readonly="!!editingGate"
-                            placeholder="e.g. arb_submission"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                            :class="editingGate ? 'opacity-60 cursor-not-allowed' : ''"
-                            required>
-                        <p class="text-xs text-muted-foreground mt-1">Unique identifier, lowercase with underscores. Cannot be changed after creation.</p>
-                    </div>
-
-                    <!-- description -->
-                    <div>
-                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="gg-description">Description</label>
-                        <input
-                            id="gg-description"
-                            type="text"
-                            x-model="form.description"
-                            placeholder="e.g. Architecture Review Board submission gate"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    </div>
-
-                    <!-- required_sections -->
-                    <div>
-                        <label class="block text-sm font-medium text-muted-foreground mb-1">Required Sections</label>
-                        <div class="space-y-1.5">
-                            <template x-for="(section, idx) in form.required_sections" :key="idx">
-                                <div class="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        x-model="form.required_sections[idx]"
-                                        placeholder="e.g. vision_motivation"
-                                        class="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="e.g. vision_motivation">
-                                    <button type="button"
-                                            @click="removeSection(idx)"
-                                            class="p-1.5 rounded-md hover:bg-destructive/10 text-destructive-emphasis transition-colors" aria-label="Remove section">
-                                        <i data-lucide="x" class="h-3.5 w-3.5"></i>
-                                    </button>
-                                </div>
-                            </template>
-                        </div>
-                        <button type="button" @click="addSection()"
-                                class="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-                            <i data-lucide="plus" class="h-3.5 w-3.5"></i>
-                            Add section
-                        </button>
-                        <p class="text-xs text-muted-foreground mt-1">Section slugs like <code class="font-mono">vision_motivation</code>, <code class="font-mono">business_process_view</code>.</p>
-                    </div>
-
-                    <!-- min_completeness -->
-                    <div>
-                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="gg-min-completeness">
-                            Minimum Completeness (%)
-                        </label>
-                        <input
-                            id="gg-min-completeness"
-                            type="number"
-                            min="0"
-                            max="100"
-                            x-model.number="form.min_completeness"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <p class="text-xs text-muted-foreground mt-1">Each required section must reach this completeness threshold (0–100).</p>
-                    </div>
-
-                    <!-- required_decisions_count -->
-                    <div>
-                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="gg-decisions-count">
-                            Required Approved Decisions
-                        </label>
-                        <input
-                            id="gg-decisions-count"
-                            type="number"
-                            min="0"
-                            x-model.number="form.required_decisions_count"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <p class="text-xs text-muted-foreground mt-1">Minimum number of approved architecture decisions. Set to 0 to skip this check.</p>
-                    </div>
-
-                    <!-- require_risk_mitigations -->
-                    <div class="flex items-center gap-3">
-                        <input
-                            id="gg-risk-mitigations"
-                            type="checkbox"
-                            x-model="form.require_risk_mitigations"
-                            class="h-4 w-4 rounded border-border">
-                        <label for="gg-risk-mitigations" class="text-sm font-medium cursor-pointer">
-                            Require risk mitigations for critical/high risks
-                        </label>
-                    </div>
-
-                    <!-- enabled -->
-                    <div class="flex items-center gap-3">
-                        <input
-                            id="gg-enabled"
-                            type="checkbox"
-                            x-model="form.enabled"
-                            class="h-4 w-4 rounded border-border">
-                        <label for="gg-enabled" class="text-sm font-medium cursor-pointer">Gate enabled</label>
-                    </div>
-
-                    <!-- Form error -->
-                    <template x-if="formError">
-                        <p class="text-sm text-destructive-emphasis" x-text="formError"></p>
-                    </template>
-
-                    <!-- Actions -->
-                    <div class="flex justify-end gap-3 pt-2 border-t">
-                        <button type="button" @click="dismissModal()"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                            Cancel
-                        </button>
-                        <button type="submit"
-                                :disabled="saving"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                            <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="saving" x-cloak></i>
-                            <span x-text="saving ? 'Saving...' : (editingGate ? 'Save Changes' : 'Create Gate')"></span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
+  {% if can_manage_governance_gates %}
+  {% set add_v = typed.get('add') or {'min_completeness': 60, 'required_decisions_count': 0, 'enabled': true, 'require_risk_mitigations': false} %}
+  {% call ui.card(attrs={'data-testid': 'gate-add'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Add a gate') }}
+      {{ ui.card_description(text='A gate with the same name as a system default replaces it for your organisation.') }}
+    {% endcall %}
+    <form method="POST" action="{{ url_for('admin.governance_gates_form') }}" class="space-y-6" novalidate>
+      {% call ui.card_content() %}
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        {{ hidden_input('action', 'add') }}
+        {{ gate_fields('add', add_v, false) }}
+      {% endcall %}
+      {% call ui.card_footer(class='justify-end') %}
+        {{ ui.button(text='Add gate', type='submit') }}
+      {% endcall %}
+    </form>
+  {% endcall %}
+  {% endif %}
 </div>
+</div>
+{% endblock %}
 
-<script>
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
 (function () {
-    const CSRF = {{ csrf_token() | tojson }};
-
-    function emptyForm() {
-        return {
-            gate_name: '',
-            description: '',
-            required_sections: [],
-            min_completeness: 60,
-            required_decisions_count: 0,
-            require_risk_mitigations: false,
-            enabled: true,
-        };
-    }
-
-    window.governanceGates = function () {
-        return {
-            loading: true,
-            dbGates: [],
-            showModal: false,
-            editingGate: null,
-            form: emptyForm(),
-            saving: false,
-            message: '',
-            messageType: 'success',
-            formError: '',
-
-            async init() {
-                await this.loadGates();
-            },
-
-            async loadGates() {
-                this.loading = true;
-                try {
-                    const data = await Platform.fetch('/admin/api/governance-gates', { silent: true });
-                    if (data.success) {
-                        this.dbGates = data.gates;
-                    } else {
-                        this.showMessage('Failed to load gates: ' + (data.error || 'unknown error'), 'error');
-                    }
-                } catch (e) {
-                    this.showMessage('Network error loading gates', 'error');
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            openCreate() {
-                this.editingGate = null;
-                this.form = emptyForm();
-                this.formError = '';
-                this.showModal = true;
-            },
-
-            openEdit(gate) {
-                this.editingGate = gate;
-                this.form = {
-                    gate_name: gate.gate_name,
-                    description: gate.description || '',
-                    required_sections: Array.isArray(gate.required_sections) ? [...gate.required_sections] : [],
-                    min_completeness: gate.min_completeness,
-                    required_decisions_count: gate.required_decisions_count,
-                    require_risk_mitigations: gate.require_risk_mitigations,
-                    enabled: gate.enabled,
-                };
-                this.formError = '';
-                this.showModal = true;
-            },
-
-            dismissModal() {
-                this.showModal = false;
-                this.editingGate = null;
-                this.form = emptyForm();
-                this.formError = '';
-            },
-
-            addSection() {
-                this.form.required_sections.push('');
-            },
-
-            removeSection(idx) {
-                this.form.required_sections.splice(idx, 1);
-            },
-
-            async saveGate() {
-                this.formError = '';
-                if (!this.form.gate_name.trim()) {
-                    this.formError = 'Gate name is required.';
-                    return;
-                }
-
-                // Strip empty section entries
-                const payload = {
-                    ...this.form,
-                    required_sections: this.form.required_sections.filter(s => s.trim() !== ''),
-                };
-
-                this.saving = true;
-                try {
-                    const url = this.editingGate
-                        ? '/admin/api/governance-gates/' + this.editingGate.id
-                        : '/admin/api/governance-gates';
-                    
-                    let data;
-                    if (this.editingGate) {
-                        data = await Platform.fetch.put(url, payload, { silent: true });
-                    } else {
-                        data = await Platform.fetch.post(url, payload, { silent: true });
-                    }
-
-                    if (data.success) {
-                        const wasEditing = !!this.editingGate;
-                        this.dismissModal();
-                        await this.loadGates();
-                        this.showMessage(wasEditing ? 'Gate updated.' : 'Gate created.', 'success');
-                    } else {
-                        this.formError = data.error || 'Failed to save gate.';
-                    }
-                } catch (e) {
-                    // Platform.fetch throws on a non-2xx answer; show the server's
-                    // reason (e.g. a duplicate gate name) rather than calling it a
-                    // network error.
-                    this.formError = (e && e.data && e.data.error) || (e && e.status ? e.message : '')
-                        || 'Network error. Please try again.';
-                } finally {
-                    this.saving = false;
-                }
-            },
-
-            async toggleGate(gate) {
-                try {
-                    const data = await Platform.fetch.put('/admin/api/governance-gates/' + gate.id, { enabled: !gate.enabled }, { silent: true });
-                    if (data.success) {
-                        gate.enabled = data.gate.enabled;
-                        this.showMessage(
-                            gate.enabled ? 'Gate enabled.' : 'Gate disabled.',
-                            'success'
-                        );
-                    } else {
-                        this.showMessage(data.error || 'Failed to update gate.', 'error');
-                    }
-                } catch (e) {
-                    this.showMessage('Network error.', 'error');
-                }
-            },
-
-            showMessage(text, type) {
-                this.message = text;
-                this.messageType = type;
-                setTimeout(() => { this.message = ''; }, 4000);
-            },
-        };
-    };
+    // Each switch keeps the hidden value that is posted with its form.
+    document.querySelectorAll('[data-switch-value]').forEach(function (sw) {
+        var value = document.getElementById(sw.getAttribute('data-switch-value'));
+        if (!value) { return; }
+        sw.addEventListener('click', function () {
+            var on = sw.getAttribute('aria-checked') !== 'true';
+            sw.setAttribute('aria-checked', on ? 'true' : 'false');
+            sw.setAttribute('data-state', on ? 'checked' : 'unchecked');
+            value.value = on ? 'on' : 'off';
+        });
+    });
 })();
 </script>
 {% endblock %}
