@@ -118,3 +118,26 @@ def test_a_retry_counts_toward_the_day_and_never_stacks(make_org):
     # one reading and two retries are the day's three
     with pytest.raises(onboarding.ReadingLimited):
         onboarding.save_website(org, "127.0.0.1:12", True, None)
+
+
+def _unreadable(job):
+    job.status = "completed"
+    job.result = {"success": False, "reason": "unreachable", "status": "unreachable"}
+    db.session.commit()
+
+
+def test_trying_again_after_a_site_could_not_be_read_is_not_another_reading(make_org):
+    org = _org(make_org, "retry-connection")
+    for _ in range(5):
+        onboarding.save_website(org, "127.0.0.1:11", True, None)
+        _unreadable(_jobs(org)[0])
+    assert len(_jobs(org)) == 5  # each attempt started a reading; none was refused as the fourth of the day
+    note = onboarding.save_website(org, "127.0.0.1:11", True, None)
+    assert note is None and len(_jobs(org)) == 6
+    # readings that did read the site still count toward the three
+    for job in _jobs(org)[:3]:
+        job.status = "completed"
+        job.result = {"pages_read": 3}
+    db.session.commit()
+    with pytest.raises(onboarding.ReadingLimited):
+        onboarding.save_website(org, "127.0.0.1:12", True, None)
