@@ -512,6 +512,12 @@ def website_state(org) -> Dict[str, Any]:
                 "the facts we find will be waiting on your Overview to confirm" % (host, max(read, 1), limit)) if read else None
         return {"state": "reading", "text": text, "reading_line": lead, "current": _address(progress.get("current")),
                 "progress": {"read": read, "limit": limit, "percent": percent}}
+    from app.services.job_queue_service import get_job_queue_service
+
+    if isinstance(job.payload, dict) and job.payload.get("interrupted_from"):
+        return {"state": "waiting", "text": _WEBSITE_REASONS["interrupted"] % host}
+    if get_job_queue_service().all_workers_busy():
+        return {"state": "waiting", "text": "Company website is connected. Other companies' websites are being read first, so yours starts a little later; carry on."}
     return {"state": "waiting", "text": "Company website is connected. Reading starts in a moment; carry on."}
 
 

@@ -286,3 +286,18 @@ def test_the_status_page_carries_the_progress_and_the_next_step_for_the_script(a
     login_as(client, _person(user_id))
     row = next(r for r in client.get("/account/welcome/status").get_json()["sources"] if r["key"] == "website")
     assert row["progress"] == {"read": 15, "limit": 30, "percent": 50}
+
+
+def test_a_waiting_read_says_other_readings_come_first_only_when_every_worker_is_busy(app, make_org, monkeypatch):
+    from app.services.job_queue_service import get_job_queue_service
+
+    org, _ = _signed_up(make_org, "https://acme.example", "prog-busy@example.com")
+    service = get_job_queue_service()
+    with app.test_request_context():
+        _job(org.id, "pending")
+        monkeypatch.setattr(service, "all_workers_busy", lambda: True)
+        busy = _state(org)["text"]
+        monkeypatch.setattr(service, "all_workers_busy", lambda: False)
+        free = _state(org)["text"]
+    assert "read first" in busy and "starts in a moment" not in busy, busy
+    assert "Reading starts in a moment" in free and "read first" not in free, free

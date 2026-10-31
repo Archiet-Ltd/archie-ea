@@ -287,3 +287,84 @@ def test_a_site_that_cannot_be_read_says_why_and_every_way_forward_lands_on_a_pa
         shoot(page, "cannot-read-sample", width)
     finally:
         context.close()
+
+
+@pytest.fixture(scope="module")
+def very_slow_sites():
+    """Two companies whose websites answer slowly: each reading keeps a worker thread busy for about a minute."""
+    sites = []
+    for name in ("Sloth Freight", "Tortoise Haulage"):
+        pages = {
+            "/": _html("<html><head><title>%s - slow and steady</title></head><body><h1>%s</h1>"
+                       "<p>We carry %s parcels.</p><a href='/about'>About</a><a href='/products'>Products</a>"
+                       "<a href='/contact'>Contact</a></body></html>" % (name, name, name)),
+            "/about": _html("<p>About %s</p>" % name), "/products": _html("<p>%s Parcel</p>" % name),
+            "/contact": _html("<p>Contact %s</p>" % name),
+            "/robots.txt": (200, "text/plain", ROBOTS),
+        }
+        sites.append((name, _Site(pages, delay=10.0)))
+    yield sites
+    for _name, site in sites:
+        site.stop()
+
+
+def test_a_sign_up_never_waits_behind_other_organisations_website_reads(browser, server, people, app, very_slow_sites):
+    """Two organisations' slow readings keep two workers busy; a third person's fast facts still arrive in seconds."""
+    import time as _time
+
+    from app.models.job import Job, JobStatus
+
+    contexts = []
+    try:
+        slow_pages = []
+        for name, site in very_slow_sites:
+            context, page = new_page(browser, 1440)
+            contexts.append(context)
+            sign_up(page, str(server), people)
+            _give_the_website(page, site.url)
+            expect(page.get_by_test_id("signup-status-website")).to_contain_text(READING, timeout=PAGE_TIMEOUT)
+            slow_pages.append((name, page))
+
+        quick_context, quick = new_page(browser, 1440)
+        contexts.append(quick_context)
+        sign_up(quick, str(server), people)
+        fast = _Site({
+            "/": _html("<html><head><title>Swift Couriers - same day</title></head><body><h1>Swift Couriers</h1></body></html>"),
+            "/robots.txt": (200, "text/plain", ROBOTS)})
+        try:
+            _give_the_website(quick, fast.url)
+            asked = _time.monotonic()
+            quick.get_by_test_id("signup-continue").click()
+            quick.wait_for_url("**/account/welcome?step=3")
+            facts = quick.locator("[data-fact]")
+            name_row = facts.filter(has=quick.get_by_test_id("fact-label").get_by_text("Company name", exact=True))
+            seen = False
+            while _time.monotonic() - asked < 10:
+                if name_row.count():
+                    seen = True
+                    break
+                quick.wait_for_timeout(2000)
+                quick.reload(wait_until="domcontentloaded")
+            waited = _time.monotonic() - asked
+            print("WAITED_SECONDS=%.1f" % waited)
+            with app.app_context():
+                still_reading = Job.query.filter(
+                    Job.task == "website_profile_crawl", Job.status == JobStatus.IN_PROGRESS.value).count()
+            assert seen, "the third person's company name had not appeared after %.0f seconds" % waited
+            assert still_reading >= 2, "the slow readings had finished, so nothing was proved (%d reading)" % still_reading
+            expect(name_row.locator("[data-fact-value]")).to_have_value(re.compile("Swift Couriers"))
+            # Nobody sees another organisation's facts.
+            body = quick.locator("main").inner_text() + " ".join(
+                quick.locator("[data-fact-value]").evaluate_all("els => els.map(e => e.value || e.textContent)"))
+            for name, _site in very_slow_sites:
+                assert name not in body, name
+            for name, page in slow_pages:
+                page.goto(str(server) + "/account/welcome?step=3", wait_until="domcontentloaded")
+                text = page.locator("main").inner_text() + " ".join(
+                    page.locator("[data-fact-value]").evaluate_all("els => els.map(e => e.value || e.textContent)"))
+                assert "Swift Couriers" not in text
+        finally:
+            fast.stop()
+    finally:
+        for context in contexts:
+            context.close()

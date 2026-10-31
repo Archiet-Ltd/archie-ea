@@ -199,6 +199,10 @@ def test_two_threads_never_take_the_same_job_and_a_first_read_comes_before_a_mod
     assert service._claim(first_read.id) is True
     assert service._claim(first_read.id) is False, "a second thread took the same job"
     assert db_session.get(Job, first_read.id).status == "in_progress"
+    # Sharpened (websiteread02): one organisation runs one job at a time, so the model pass of the organisation whose
+    # read is in progress waits for it; it is next once the read has finished.
+    assert service._next_job() is None, "a second job of an organisation with a job in progress was picked"
+    service.update_job_status(first_read.id, "completed", result={})
     assert service._next_job().id == long_job.id
 
 
@@ -280,7 +284,10 @@ def test_an_organisation_with_a_cut_off_read_is_not_left_reading_for_ever(app, d
     db_session.expire_all()
     with app.test_request_context("/"):
         state = onboarding_service.website_state(db_session.get(Organization, org.id))
-    assert state["state"] == "waiting" and "starts in a moment" in state["text"], state  # the read was queued again
+    # Sharpened (jobsweep01): the read queued again says why it is waiting, with the sentence about the restart,
+    # instead of the generic "starts in a moment".
+    assert state["state"] == "waiting", state
+    assert "cut off by a restart" in state["text"] and "queued to run again" in state["text"], state
     assert db_session.get(Job, stale.id).status == "failed"
 
 

@@ -8,6 +8,7 @@ Provides proper job lifecycle management, status tracking, and worker processes.
 import logging
 import threading
 import time
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -20,13 +21,19 @@ import_all_models()
 
 logger = logging.getLogger(__name__)
 
-WORKER_THREADS = 2  # a long job holds one thread; another organisation's first read has the other
+# Worker threads when the app sets no JOB_WORKER_THREADS: a long job holds one, and another organisation's first read
+# always finds a free one. Set JOB_WORKER_THREADS in the environment (read by Config) to change it.
+WORKER_THREADS = 3
 # A job that has been running for longer than its task allows was cut off (a restart, a crash); one table holds the limits.
 STALE_AFTER_MINUTES = {"website_profile_crawl": 15, "website_profile_crawl_more": 15}
 DEFAULT_STALE_AFTER_MINUTES = 30
 SWEEP_EVERY_SECONDS = 60
 # Jobs that take long and can wait: they are picked after every first read that is waiting.
 LONG_TASKS = ("website_profile_crawl_more",)
+# Names this process. A claim records it in the job's payload ("worker"); a job in progress under any other token was
+# claimed by a process that has since ended, so nothing is running it.
+PROCESS_TOKEN = uuid.uuid4().hex
+INTERRUPTED_MESSAGE = "The work was cut off by a restart before it finished, and has been queued again."
 
 
 class JobQueueService:
@@ -40,6 +47,23 @@ class JobQueueService:
         self._worker_threads: List[threading.Thread] = []
         self._last_sweep = 0.0
         self._sweep_lock = threading.Lock()
+        self._claim_lock = threading.Lock()  # next-job and claim happen together, so two threads never pick one organisation twice
+
+    def worker_threads(self, requested: Optional[int] = None) -> int:
+        """How many worker threads to run: the argument, else the app's JOB_WORKER_THREADS, else WORKER_THREADS."""
+        if requested is None and self.app is not None:
+            requested = self.app.config.get("JOB_WORKER_THREADS")
+        try:
+            return max(1, int(requested)) if requested is not None else WORKER_THREADS
+        except (TypeError, ValueError):
+            return WORKER_THREADS
+
+    def all_workers_busy(self) -> bool:
+        """True when every worker thread has a job in progress (or no worker is running), so a new job must wait."""
+        total = self.worker_threads()
+        now = datetime.utcnow()
+        busy = sum(1 for j in Job.query.filter_by(status=JobStatus.IN_PROGRESS.value).all() if not self._is_stale(j, now))
+        return busy >= total
 
     def create_job(
         self,
@@ -139,7 +163,7 @@ class JobQueueService:
         logger.info(f"Cancelled job {job_id}")
         return True
 
-    def start_worker(self):
+    def start_worker(self, threads: Optional[int] = None):
         """Start the background worker threads (after recovering the jobs a restart cut off)."""
         if any(t.is_alive() for t in self._worker_threads):
             logger.warning("Worker threads already running")
@@ -147,12 +171,13 @@ class JobQueueService:
 
         self._shutdown_event.clear()
         try:
+            self.requeue_dead_worker_jobs()
             self.recover_stale_jobs()
         except Exception:
             logger.warning("could not recover interrupted jobs at worker start", exc_info=True)
         self._worker_threads = [
             threading.Thread(target=self._worker_loop, name="job-worker-%d" % number, daemon=True)
-            for number in range(1, WORKER_THREADS + 1)
+            for number in range(1, self.worker_threads(threads) + 1)
         ]
         for thread in self._worker_threads:
             thread.start()
@@ -166,6 +191,53 @@ class JobQueueService:
             for thread in self._worker_threads:
                 thread.join(timeout=5)
             logger.info("Job queue worker stopped")
+
+    @staticmethod
+    def _is_stale(job: Job, now: Optional[datetime] = None) -> bool:
+        """An in-progress job nothing is running: claimed by another process than this one, or running past its limit."""
+        from datetime import timedelta
+
+        now = now or datetime.utcnow()
+        payload = job.payload if isinstance(job.payload, dict) else {}
+        worker = payload.get("worker")
+        if worker and worker != PROCESS_TOKEN:
+            return True
+        allowed = STALE_AFTER_MINUTES.get(job.task, DEFAULT_STALE_AFTER_MINUTES)
+        return job.started_at is not None and job.started_at <= now - timedelta(minutes=allowed)
+
+    def _fail_interrupted(self, job: Job, now: datetime, error: str, requeue: bool) -> None:
+        """Mark one in-progress job interrupted and, when asked, queue it again once (not if one already waits)."""
+        job.status = JobStatus.FAILED.value
+        job.finished_at = now
+        job.result = {
+            "success": False, "reason": "interrupted",
+            "message": INTERRUPTED_MESSAGE if requeue else "The work was cut off by a restart before it finished.",
+        }
+        job.error = error
+        org_id = (job.payload or {}).get("organization_id") if isinstance(job.payload, dict) else None
+        if not requeue or org_id is None:
+            return
+        if self.list_jobs(org_id, limit=5, task=job.task, statuses=[JobStatus.PENDING.value]):
+            return
+        payload = {k: v for k, v in (job.payload or {}).items() if k not in ("job_id", "not_before", "worker")}
+        payload["interrupted_from"] = job.id
+        self.create_job(job.name, job.task, payload)
+
+    def requeue_dead_worker_jobs(self) -> int:
+        """At worker start-up, before the first claim: every job still in progress was claimed by a process that has
+        ended (this one has claimed nothing yet). Mark each interrupted and queue it again as a new pending job."""
+        now = datetime.utcnow()
+        count = 0
+        with self.app.app_context():
+            for job in Job.query.filter_by(status=JobStatus.IN_PROGRESS.value).all():
+                if (job.payload or {}).get("worker") == PROCESS_TOKEN:
+                    continue
+                self._fail_interrupted(job, now, "interrupted: the worker that claimed it no longer exists", True)
+                count += 1
+            db.session.commit()
+        if count:
+            logger.warning("queued %d job(s) again that a restart cut off", count)
+        return count
 
     def recover_stale_jobs(self, now: Optional[datetime] = None) -> int:
         """Fail the jobs a restart or a crash cut off, and read the websites again.
@@ -187,21 +259,9 @@ class JobQueueService:
                 allowed = STALE_AFTER_MINUTES.get(job.task, DEFAULT_STALE_AFTER_MINUTES)
                 if job.started_at is None or job.started_at > now - timedelta(minutes=allowed):
                     continue
-                job.status = JobStatus.FAILED.value
-                job.finished_at = now
-                job.result = {
-                    "success": False, "reason": "interrupted",
-                    "message": "The work was cut off by a restart before it finished, and has been queued again."
-                    if job.task in STALE_AFTER_MINUTES else "The work was cut off by a restart before it finished.",
-                }
-                job.error = "interrupted: running for more than %d minutes" % allowed
+                self._fail_interrupted(
+                    job, now, "interrupted: running for more than %d minutes" % allowed, job.task in STALE_AFTER_MINUTES)
                 recovered += 1
-                org_id = (job.payload or {}).get("organization_id") if isinstance(job.payload, dict) else None
-                if job.task in STALE_AFTER_MINUTES and org_id is not None:
-                    waiting = self.list_jobs(org_id, limit=5, task=job.task, statuses=[JobStatus.PENDING.value])
-                    if not waiting:
-                        payload = {k: v for k, v in (job.payload or {}).items() if k not in ("job_id", "not_before")}
-                        self.create_job(job.name, job.task, payload)
             db.session.commit()
         if recovered:
             logger.warning("failed %d job(s) that were cut off by a restart", recovered)
@@ -224,9 +284,12 @@ class JobQueueService:
 
     def _claim(self, job_id: int) -> bool:
         """Take a pending job for this thread: exactly one thread's update finds it still pending."""
+        current = db.session.get(Job, job_id)
+        payload = dict(current.payload) if current is not None and isinstance(current.payload, dict) else {}
+        payload["worker"] = PROCESS_TOKEN  # who holds it: a later start-up finds this token gone
         result = db.session.execute(
             db.update(Job).where(Job.id == job_id, Job.status == JobStatus.PENDING.value)
-            .values(status=JobStatus.IN_PROGRESS.value, started_at=datetime.utcnow())
+            .values(status=JobStatus.IN_PROGRESS.value, started_at=datetime.utcnow(), payload=payload)
         )
         db.session.commit()
         return bool(result.rowcount)
@@ -235,6 +298,17 @@ class JobQueueService:
         """The oldest due pending job; first reads come before the long jobs that can wait."""
         pending = Job.query.filter_by(status=JobStatus.PENDING.value).order_by(Job.id).limit(50).all()
         due = [j for j in pending if self._is_due(j)]
+        # One organisation runs one job at a time (a read and its model pass never overlap); others proceed in parallel.
+        busy = {
+            (j.payload or {}).get("organization_id")
+            for j in Job.query.filter_by(status=JobStatus.IN_PROGRESS.value).all()
+            if isinstance(j.payload, dict) and (j.payload or {}).get("organization_id") is not None
+            and not self._is_stale(j)
+        }
+        due = [
+            j for j in due
+            if not (isinstance(j.payload, dict) and j.payload.get("organization_id") in busy)
+        ]
         due.sort(key=lambda j: (j.task in LONG_TASKS, j.id))
         return due[0] if due else None
 
@@ -256,9 +330,11 @@ class JobQueueService:
                 # Use application context for database operations
                 self._sweep_if_due()
                 with self.app.app_context():
-                    job = self._next_job()
+                    with self._claim_lock:
+                        job = self._next_job()
+                        claimed = bool(job) and self._claim(job.id)
 
-                    if job and self._claim(job.id):
+                    if claimed:
                         self._process_job(job)
                     else:
                         # No jobs (or another thread took it first), sleep briefly
