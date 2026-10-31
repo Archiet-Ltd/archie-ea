@@ -430,9 +430,12 @@ class WizardQualityGateService:
             from app.models.archimate_core import ArchiMateRelationship
 
             element_ids = set()
-            rows = db.session.execute(db.text(  # tenant-filtered: scoped via solution_id FK
+            from app.utils.tenant_sql import org_scope
+            _org_clause, _org_params = org_scope()
+            rows = db.session.execute(db.text(
                 "SELECT element_id FROM solution_archimate_elements WHERE solution_id = :sid"
-            ), {"sid": solution_id}).fetchall()
+                + _org_clause
+            ), {"sid": solution_id, **_org_params}).fetchall()
             element_ids = {r[0] for r in rows if r[0]}
 
             if not element_ids:

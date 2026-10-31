@@ -9765,9 +9765,12 @@ def api_suggest_elements(solution_id):
         "SELECT 1 FROM solution_applications WHERE solution_id = :sid LIMIT 1"
     ), {"sid": solution_id}).fetchone() is not None
 
-    has_caps = db.session.execute(db.text(  # tenant-exempt: scoped via solution FK
-        "SELECT 1 FROM solution_capability_mappings WHERE solution_id = :sid LIMIT 1"
-    ), {"sid": solution_id}).fetchone() is not None
+    from app.utils.tenant_sql import org_scope
+    _org_clause, _org_params = org_scope()
+    has_caps = db.session.execute(db.text(
+        "SELECT 1 FROM solution_capability_mappings WHERE solution_id = :sid"
+        + _org_clause + " LIMIT 1"
+    ), {"sid": solution_id, **_org_params}).fetchone() is not None
 
     has_domain = bool(getattr(solution, "business_domain", None))
 

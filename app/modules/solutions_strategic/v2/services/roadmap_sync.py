@@ -12,6 +12,7 @@ from typing import Any, Dict  # dead-code-ok
 from sqlalchemy import text  # dead-code-ok
 
 from app import db
+from app.utils.tenant_sql import org_scope
 from app.models.roadmap_models import (  # dead-code-ok
     ImplementationGap,
     PlanningDeliverable,
@@ -540,7 +541,8 @@ class RoadmapDataSync:
 
         if source_type == "capability":
             # Find work packages for deleted capabilities
-            orphaned_wps = db.session.execute(  # tenant-filtered: scoped via parent FK (source_id → unified_capabilities)
+            _org_clause, _org_params = org_scope(prefix="wp.")
+            orphaned_wps = db.session.execute(
                 text(
                     """
                 -- ImplementationWorkPackage is an alias for RoadmapWorkPackage
@@ -555,7 +557,9 @@ class RoadmapDataSync:
                 AND uc.id IS NULL
                 AND wp.status != 'archived'
             """
-                )
+                    + _org_clause
+                ),
+                _org_params,
             ).fetchall()
 
             for wp_id in orphaned_wps:

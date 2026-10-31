@@ -2880,9 +2880,11 @@ def api_element_usage(element_id):
         )
     ).count()
 
-    solution_count = db.session.execute(  # tenant-filtered: scoped via parent FK (element_id)
-        db.text("SELECT COUNT(*) FROM solution_archimate_elements WHERE element_id = :eid"),  # tenant-filtered
-        {"eid": element_id},
+    from app.utils.tenant_sql import org_scope
+    _org_clause, _org_params = org_scope()
+    solution_count = db.session.execute(
+        db.text("SELECT COUNT(*) FROM solution_archimate_elements WHERE element_id = :eid" + _org_clause),
+        {"eid": element_id, **_org_params},
     ).scalar() or 0
 
     viewpoint_count = SavedDiagramElement.query.filter_by(element_id=element_id).count()

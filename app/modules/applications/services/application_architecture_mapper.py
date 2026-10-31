@@ -1241,17 +1241,22 @@ RESPOND WITH VALID JSON:
 
         # Create BusinessProcess elements from mapped APQC PCF processes (idempotent)
 
-        process_mappings = db.session.execute(  # tenant-filtered: scoped via parent FK (application_id)
+        from app.utils.tenant_sql import org_scope
+        _org_clause, _org_params = org_scope(prefix="pam.")
+        process_mappings = db.session.execute(
             text(
                 """
             SELECT ap.id, ap.process_name, ap.process_code, ap.category_level_1, ap.category_level_2
             FROM apqc_process ap
             JOIN process_application_mapping pam ON ap.id = pam.apqc_process_id
             WHERE pam.application_id = :app_id
+        """
+                + _org_clause
+                + """
             ORDER BY ap.process_code
         """
             ),
-            {"app_id": application_id},
+            {"app_id": application_id, **_org_params},
         ).fetchall()
 
         logger.info(

@@ -1593,11 +1593,13 @@ def _delete_archimate_element(element_id, rel_type="realization"):
             {"id": eid},
         )
         # relationship_suggestions (both columns are NOT NULL)
+        # tenancy-ok: keyed on the same ownership-checked eid
         db.session.execute(
             text("DELETE FROM relationship_suggestions WHERE source_element_id = :id OR target_element_id = :id"),
             {"id": eid},
         )
         # saved_diagram_elements
+        # tenancy-ok: keyed on the same ownership-checked eid
         db.session.execute(
             text("DELETE FROM saved_diagram_elements WHERE element_id = :id"),
             {"id": eid},

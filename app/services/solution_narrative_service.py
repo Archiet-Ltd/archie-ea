@@ -316,15 +316,17 @@ def _query_roadmap(solution_id: int) -> list:
 def _query_risks(solution_id: int) -> list:
     """Return risk snapshots linked to the solution."""
     from sqlalchemy import text
-    rows = _safe(lambda: db.session.execute(text(  # tenant-filtered: scoped via parent FK (solution_id)
+    _org_clause, _org_params = org_scope()
+    rows = _safe(lambda: db.session.execute(text(
         # Column names checked against the live table, not guessed: this query
         # asked for risk_description/likelihood/status, none of which exist here
         # (they are notes/probability/mitigation_status). All three raised
         # UndefinedColumn, _safe swallowed it, and every narrative rendered an
         # empty risk register.
         "SELECT id, risk_name, notes, probability, impact, mitigation_status "
-        "FROM solution_risk_snapshots WHERE solution_id = :sid ORDER BY id LIMIT 100"
-    ), {"sid": solution_id}).fetchall(), default=[])
+        "FROM solution_risk_snapshots WHERE solution_id = :sid" + _org_clause +
+        " ORDER BY id LIMIT 100"
+    ), {"sid": solution_id, **_org_params}).fetchall(), default=[])
     return [
         {
             "id": r[0], "name": r[1], "description": r[2] or "",

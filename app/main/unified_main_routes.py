@@ -42,7 +42,7 @@ from app import db
 
 # Import main blueprint
 from app.main.views import main
-from app.utils.tenant_sql import org_scope
+from app.utils.tenant_sql import current_org_id, org_scope
 
 logger = logging.getLogger(__name__)
 
@@ -303,12 +303,14 @@ def unmapped_capabilities():
             FROM unified_capabilities uc
             LEFT JOIN unified_application_capability_mapping uacm
                 ON uc.id = uacm.unified_capability_id
+                AND (CAST(:org_id AS INTEGER) IS NULL OR uacm.organization_id = :org_id)
             LEFT JOIN business_domains bd
                 ON uc.domain_id = bd.id
             WHERE uacm.unified_capability_id IS NULL
             ORDER BY bd.strategic_weight DESC, uc.strategic_importance DESC, uc.name
         """
-            )
+            ),
+            {"org_id": current_org_id()},
         )
         unmapped_capabilities = unmapped_result.fetchall()
 
@@ -321,8 +323,10 @@ def unmapped_capabilities():
                 """
             SELECT COUNT(DISTINCT unified_capability_id)
             FROM unified_application_capability_mapping
+            WHERE (CAST(:org_id AS INTEGER) IS NULL OR unified_application_capability_mapping.organization_id = :org_id)
         """
-            )
+            ),
+            {"org_id": current_org_id()},
         ).scalar()
 
         # Get domain statistics
@@ -338,10 +342,12 @@ def unmapped_capabilities():
             FROM business_domains bd
             LEFT JOIN unified_capabilities uc ON bd.id = uc.domain_id
             LEFT JOIN unified_application_capability_mapping uacm ON uc.id = uacm.unified_capability_id
+                AND (CAST(:org_id AS INTEGER) IS NULL OR uacm.organization_id = :org_id)
             GROUP BY bd.id, bd.name, bd.code
             ORDER BY bd.strategic_weight DESC, bd.name
         """
-            )
+            ),
+            {"org_id": current_org_id()},
         )
         domain_stats = domain_stats.fetchall()
 
@@ -355,6 +361,7 @@ def unmapped_capabilities():
             FROM unified_capabilities uc
             LEFT JOIN unified_application_capability_mapping uacm
                 ON uc.id = uacm.unified_capability_id
+                AND (CAST(:org_id AS INTEGER) IS NULL OR uacm.organization_id = :org_id)
             WHERE uacm.unified_capability_id IS NULL
             GROUP BY uc.strategic_importance
             ORDER BY
@@ -365,7 +372,8 @@ def unmapped_capabilities():
                     WHEN 'low' THEN 4
                 END
         """
-            )
+            ),
+            {"org_id": current_org_id()},
         )
         priority_breakdown = priority_breakdown.fetchall()
 
@@ -480,11 +488,13 @@ def _capability_roadmap_legacy():
             FROM unified_capabilities uc
             LEFT JOIN unified_application_capability_mapping uacm
                 ON uc.id = uacm.unified_capability_id
+                AND (CAST(:org_id AS INTEGER) IS NULL OR uacm.organization_id = :org_id)
             LEFT JOIN business_domains bd ON uc.domain_id = bd.id
             WHERE uacm.unified_capability_id IS NULL
             ORDER BY bd.strategic_weight DESC, uc.strategic_importance DESC, uc.name
         """
-            )
+            ),
+            {"org_id": current_org_id()},
         )
         unmapped_capabilities = unmapped_result.fetchall()
 
@@ -992,6 +1002,7 @@ def get_unmapped_capabilities():
             LEFT JOIN business_domains bd ON uc.domain_id = bd.id
             WHERE NOT EXISTS (
                 SELECT 1 FROM unified_application_capability_mapping uacm WHERE uacm.unified_capability_id = uc.id
+                AND (CAST(:org_id AS INTEGER) IS NULL OR uacm.organization_id = :org_id)
             )
             AND NOT EXISTS (
                 SELECT 1 FROM capability_vendor_product_mapping cvpm WHERE cvpm.unified_capability_id = uc.id
@@ -1001,7 +1012,8 @@ def get_unmapped_capabilities():
             )
             ORDER BY bd.strategic_weight DESC, uc.strategic_importance DESC, uc.name
         """
-            )
+            ),
+            {"org_id": current_org_id()},
         )
         return [dict(row) for row in result]
     except Exception as e:

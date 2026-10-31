@@ -402,8 +402,10 @@ class PageGuideService:
                         FROM vendor_organizations vo
                         LEFT JOIN vendor_products vp ON vp.vendor_organization_id = vo.id
                         LEFT JOIN application_vendor_product_mappings m ON m.vendor_product_id = vp.id
+                            AND (CAST(:org_id AS INTEGER) IS NULL OR m.organization_id = :org_id)
                         """
-                    )
+                    ),
+                    {"org_id": current_org_id()},
                 ).fetchone()
                 if row:
                     return (

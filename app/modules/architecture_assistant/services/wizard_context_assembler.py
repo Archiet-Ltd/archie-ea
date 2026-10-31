@@ -110,11 +110,13 @@ class WizardContextAssembler:
             ]
 
         # Fall back to DB junction
-        rows = db.session.execute(db.text(  # tenant-filtered: scoped via solution_id FK
+        from app.utils.tenant_sql import org_scope
+        _org_clause, _org_params = org_scope(prefix="bcm.")
+        rows = db.session.execute(db.text(
             "SELECT bcm.capability_id "
             "FROM solution_capability_mappings bcm "
-            "WHERE bcm.solution_id = :sid"
-        ), {"sid": solution_id}).fetchall()
+            "WHERE bcm.solution_id = :sid" + _org_clause
+        ), {"sid": solution_id, **_org_params}).fetchall()
         cap_ids = [r[0] for r in rows]
         if not cap_ids:
             return []
@@ -132,10 +134,12 @@ class WizardContextAssembler:
         """Summarize linked ArchiMate elements."""
         from app.models.archimate_core import ArchiMateElement
 
-        rows = db.session.execute(db.text(  # tenant-filtered: scoped via solution_id FK
+        from app.utils.tenant_sql import org_scope
+        _org_clause, _org_params = org_scope()
+        rows = db.session.execute(db.text(
             "SELECT element_id FROM solution_archimate_elements "
-            "WHERE solution_id = :sid"
-        ), {"sid": solution_id}).fetchall()
+            "WHERE solution_id = :sid" + _org_clause
+        ), {"sid": solution_id, **_org_params}).fetchall()
         element_ids = [r[0] for r in rows if r[0]]
         if not element_ids:
             return []
@@ -157,10 +161,12 @@ class WizardContextAssembler:
         """Summarize build/buy decisions from ArchiMate element properties."""
         from app.models.archimate_core import ArchiMateElement
 
-        rows = db.session.execute(db.text(  # tenant-filtered: scoped via solution_id FK
+        from app.utils.tenant_sql import org_scope
+        _org_clause, _org_params = org_scope()
+        rows = db.session.execute(db.text(
             "SELECT element_id FROM solution_archimate_elements "
-            "WHERE solution_id = :sid"
-        ), {"sid": solution_id}).fetchall()
+            "WHERE solution_id = :sid" + _org_clause
+        ), {"sid": solution_id, **_org_params}).fetchall()
         element_ids = [r[0] for r in rows if r[0]]
         if not element_ids:
             return []

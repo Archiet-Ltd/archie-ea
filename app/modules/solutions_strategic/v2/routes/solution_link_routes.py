@@ -1615,13 +1615,15 @@ def solution_link_integration_pattern(solution_id, flow_id):
     pattern = IntegrationPattern.query.get_or_404(pattern_id)
 
     try:
+        from app.utils.tenant_sql import org_scope
+        _org_clause, _org_params = org_scope()
         db.session.execute(
             db.text(
                 "UPDATE solution_integration_flows "
                 "SET pattern_id = :pid, governance_status = :gs "
-                "WHERE id = :fid"
+                "WHERE id = :fid" + _org_clause
             ),
-            {"pid": pattern.id, "gs": pattern.approval_status, "fid": flow.id},
+            {"pid": pattern.id, "gs": pattern.approval_status, "fid": flow.id, **_org_params},
         )
         db.session.commit()
     except Exception as exc:

@@ -203,12 +203,8 @@ class IndustryAPQCService:
     def seed_default_frameworks(self) -> List[IndustryAPQCFramework]:
         """Load any default framework that is missing (the one loader the
         migration and a new organisation also use). Returns those added."""
-        from app.modules.industry_apqc.framework_data import (
-            FRAMEWORKS,
-            load_default_frameworks,
-        )
+        from app.modules.industry_apqc.framework_data import load_default_frameworks
 
-        codes_before_seeding = {fw.industry_code for fw in self.get_all_frameworks(active_only=False)}
         try:
             _, newly_added_codes = load_default_frameworks(db.session.connection())
             db.session.commit()
