@@ -47,7 +47,6 @@ def test_the_121st_read_in_a_minute_is_refused_on_a_styled_page_with_its_nonce(b
                             "document.documentElement.classList.add('dark');")
     page = ctx.new_page()
     try:
-        refused = None
         for _ in range(130):
             reply = ctx.request.get(limits_server + "/account/login")
             if reply.status == 429:
