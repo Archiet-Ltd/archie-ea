@@ -8,7 +8,7 @@
 {% block content %}
 <div class="p-6 space-y-6" x-data="personaAdmin" x-init="loadPersonas">
   {{ page_shell(title='AI Chat Persona Management',
-                subtitle='Edit the system prompt, description and sample prompts each chat persona uses. A saved prompt replaces the built-in one in every new chat.',
+                subtitle='Edit the system prompt, description and sample prompts each chat persona uses. A saved prompt replaces the built-in one in every new chat; the evidence rules always apply.',
                 breadcrumb=[('Home', '/'), ('Admin', url_for('admin.index')), ('AI Chat Persona Management', none)]) }}
 
   <div x-show="errorMsg" x-cloak role="alert" data-testid="prompts-error">

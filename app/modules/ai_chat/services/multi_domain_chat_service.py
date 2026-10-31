@@ -3611,10 +3611,15 @@ class MultiDomainChatService:
             return ""
 
         # A platform administrator's saved system prompt (AI chat persona
-        # management page) replaces the built-in one for this persona.
+        # management page) replaces the built-in prompt text for this persona,
+        # never the governed charter's evidence and no-fabrication rules.
         saved = self._saved_persona_system_prompt(persona)
         if saved:
-            return saved
+            from app.modules.ai_chat.services.architect_persona_charters import (
+                _EVIDENCE_RULES,
+            )
+
+            return saved + "\n\n" + _EVIDENCE_RULES.strip()
 
         # A95-013 + AI-1: solutions_architect keeps its ArchiMate 3.2 metamodel
         # base and gains the architect charter + live governance data block.

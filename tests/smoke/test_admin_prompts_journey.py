@@ -124,3 +124,30 @@ def test_the_page_holds_no_horizontal_scroll_on_a_phone(browser, live_server, se
         assert overflow <= 0, f"page scrolls sideways by {overflow}px"
     finally:
         page.close()
+
+
+def test_a_saved_prompt_never_drops_the_evidence_rules(app, browser, live_server, seeded):
+    """An override replaces the persona's tone, not the rule that keeps answers cited."""
+    from app.modules.ai_chat.services.architect_persona_charters import _EVIDENCE_RULES
+
+    _clear_override(app)
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, seeded["emails"]["platform_admin"])
+        _open(page, live_server)
+        marker = "journey-" + uuid.uuid4().hex[:8]
+        page.get_by_label("System prompt").fill("You answer only in haiku. " + marker)
+        page.get_by_role("button", name=re.compile("save changes", re.I)).click()
+        expect(page.locator("body")).to_contain_text("updated", timeout=PAGE_TIMEOUT)
+        prompt = _chat_prompt(app)
+        assert marker in prompt, "the chat did not use the saved prompt"
+        assert "NO FABRICATION" in prompt and _EVIDENCE_RULES.strip() in prompt, (
+            "the saved prompt dropped the evidence and no-fabrication rules"
+        )
+
+        expect(page.locator("body")).to_contain_text(
+            "A saved prompt replaces the built-in one in every new chat; the evidence rules always apply."
+        )
+    finally:
+        page.close()
+        _clear_override(app)
