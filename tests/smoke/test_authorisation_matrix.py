@@ -40,13 +40,14 @@ DENIED = "denied"
 # and test_no_archetype_reaches_another_personas_section_unauthenticated now also
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
-    "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
-    # licences/spend are a finance persona's own numbers. Deliberately NOT
-    # extended to contracts/renewals/compliance below, which stay
-    # requires_procurement-only.
-    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
-    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
+    # The contract, licence and spend pages follow the one cost-visibility rule:
+    # whoever may see cost figures (cto, portfolio_manager, platform_admin) may
+    # read them, besides the procurement roles (contracts) and the spend roles
+    # (licences, spend: procurement, portfolio_manager, finance). So the CTO is
+    # expected to reach all three. Creating and editing stay with procurement.
+    "/procurement/contracts":  {"procurement", "portfolio_manager", "cto"},
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance", "cto"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance", "cto"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
     # R1-B34 (TB-0135): viewing the register is @login_required only (every
     # archetype can see a formula's active version); activating a new one
