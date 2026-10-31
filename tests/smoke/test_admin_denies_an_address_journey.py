@@ -214,7 +214,7 @@ def test_deny_an_address_then_lift_it(browser, limits_server, width, theme):
         # Its next request is refused, in a sentence and in the API envelope.
         status, _, body = _client_until(limits_server, "/account/login", 403)
         assert status == 403 and DENIED_SENTENCE in body, (status, body[:300])
-        status, _, body = _client_get(limits_server, "/api/v1/capabilities/", headers={"Accept": "application/json"})
+        status, _, body = _client_until(limits_server, "/api/v1/capabilities/", 403, headers={"Accept": "application/json"})
         assert status == 403
         envelope = json.loads(body)
         assert envelope["success"] is False and DENIED_SENTENCE in envelope["error"]
