@@ -209,6 +209,8 @@ def refuse(retry_after, rule, verdict=None):
                 render_template(
                     "errors/429.html", retry_after=retry_after,
                     wait_text=wait_phrase(retry_after) if retry_after else None,
+                    # The general allowance holds every page for this address, so no link would land.
+                    held=verdict is None,
                 )
             )
         except Exception:
@@ -324,6 +326,14 @@ def init_rate_limiting(app):
             retry_after = int(retry_after) if retry_after else None
         except (TypeError, ValueError):
             retry_after = None
+        if not retry_after:
+            # The limiter's own refusal carries no Retry-After yet; its window knows when it resets.
+            try:
+                import time
+
+                retry_after = max(1, int(limiter.current_limit.reset_at - time.time()))
+            except Exception:
+                retry_after = None
         return refuse(retry_after, getattr(err, "description", None) or "rate limit")
 
     app.logger.info(

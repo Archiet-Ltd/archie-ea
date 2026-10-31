@@ -13,6 +13,7 @@ administrator's browser (127.0.0.1) is never the address being denied.
 import http.client
 import json
 import os
+import re
 import uuid
 
 import pytest
@@ -241,6 +242,10 @@ def test_a_blocked_person_sees_the_refusal_page_in_their_own_theme(browser, limi
 
         response = page_a.goto(limits_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert response.status == 403 and DENIED_SENTENCE in page_a.content()
+        header_nonce = set(re.findall(r"'nonce-([^']*)'", response.headers.get("content-security-policy", "")))
+        assert len(header_nonce) == 1 and "" not in header_nonce, header_nonce
+        assert set(re.findall(r'nonce="([^"]*)"', response.text())) == header_nonce
+        assert page_a.get_by_role("link").count() == 0
         luminance = page_a.evaluate(
             """() => {
                 const m = getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g).map(Number);

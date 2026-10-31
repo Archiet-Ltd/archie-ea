@@ -32,7 +32,8 @@
             </div>
             <h1 class="code">429</h1>
             <h2 class="title">Too Many Requests</h2>
-            <p class="copy">You have sent too many requests in a short period and have been temporarily throttled to keep the service responsive for everyone. {% if wait_text %}Try again in about {{ wait_text }}.{% elif retry_after %}Try again in about {{ retry_after }} seconds.{% else %}Wait a moment, then try again.{% endif %}{% if not current_user.is_authenticated %} If you already have an account, you can sign in.{% endif %}</p>
+            <p class="copy">You have sent too many requests in a short period and have been temporarily throttled to keep the service responsive for everyone. {% if wait_text %}Try again in about {{ wait_text }}.{% elif retry_after %}Try again in about {{ retry_after }} seconds.{% else %}Wait a moment, then try again.{% endif %}{% if not held and not current_user.is_authenticated %} If you already have an account, you can sign in.{% endif %}</p>
+            {% if not held %}
             <div class="actions">
                 {% if current_user.is_authenticated %}
                 <a href="/" class="button button-primary">
@@ -50,8 +51,11 @@
                     Go Back
                 </button>
             </div>
+            {% endif %}
         </div>
     </main>
+    {% if not held %}
     <script nonce="{{ csp_nonce }}">document.getElementById('btn-go-back-429').addEventListener('click', function(){ history.back(); });</script>
+    {% endif %}
 </body>
 </html>

@@ -7,6 +7,7 @@ form creates no account, and Sign in lands on a page with the sign-in form.
 """
 
 import os
+import re
 import tempfile
 import uuid
 
@@ -86,6 +87,9 @@ def _sign_up(browser, base, width, theme, email):
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_the_sixth_sign_up_in_an_hour_is_refused_with_the_next_step(browser, limits_server, width, theme):
     _clear_counters()
+    # The accounts stay. Sign-up writes append-only audit rows that point at each person (four per
+    # account), and the audit log is never deleted, so a person cannot be removed without them.
+    # Every address carries a fresh tag, so a run never meets the last run's accounts.
     tag = "%s%d%s" % (uuid.uuid4().hex[:6], width, theme[0])
     os.makedirs(WALK, exist_ok=True)
     emails = ["signup-walk-%s-%d@example.com" % (tag, n) for n in range(6)]
@@ -102,6 +106,9 @@ def test_the_sixth_sign_up_in_an_hour_is_refused_with_the_next_step(browser, lim
         for name in ("ratelimit-limit", "ratelimit-remaining", "ratelimit-reset"):
             assert response.headers.get(name), (name, response.headers)
         assert response.headers["ratelimit-remaining"] == "0"
+        header_nonce = set(re.findall(r"'nonce-([^']*)'", response.headers.get("content-security-policy", "")))
+        assert len(header_nonce) == 1 and "" not in header_nonce, header_nonce
+        assert set(re.findall(r'nonce="([^"]*)"', response.text())) == header_nonce
         expect(page.get_by_role("heading", name="Too Many Requests")).to_be_visible()
         expect(page.locator("main")).to_contain_text("Try again in about 1 hour")
         expect(page.get_by_role("link", name="Go to Dashboard")).to_have_count(0)

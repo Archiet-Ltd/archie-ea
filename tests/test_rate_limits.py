@@ -320,6 +320,9 @@ def test_the_default_limit_refusal_carries_the_nonce_the_header_names(app, clean
     header, body = _nonces(refused)
     assert len(header) == 1 and "" not in header, header
     assert body == header, (header, body)
+    # The general allowance holds every page, so the page offers no sign-in or dashboard link.
+    html = refused.get_data(as_text=True)
+    assert "Sign in" not in html and "Go to Dashboard" not in html and 'href="' not in html.split("<main")[1]
 
 
 def test_the_blocked_address_page_carries_the_nonce_and_offers_only_what_it_can_reach(app, clean_between_requests, limiting_on):
