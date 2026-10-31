@@ -22,13 +22,29 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 MONEY = re.compile(r"^€\d[\d,]*\.\d{2}$")
 
 
-def _set_currency(org_id, code):
+USD_TO_EUR = "0.80000000"
+
+
+def _set_currency(org_id, code, rate=USD_TO_EUR):
+    """Set the reporting currency and put a dated dollar rate on file (None: no rate)."""
+    from datetime import date
+
     from app import create_app, db
+    from app.models.cost_fact import ExchangeRate
     from app.models.organization import Organization
 
     app = create_app("testing")
     with app.app_context():
         db.session.get(Organization, org_id).reporting_currency = code
+        if rate is not None and code != "USD":
+            row = db.session.execute(db.select(ExchangeRate).where(
+                ExchangeRate.from_currency == "USD", ExchangeRate.to_currency == code,
+                ExchangeRate.effective_date == date(2026, 1, 1))).scalar_one_or_none()
+            if row is None:
+                db.session.add(ExchangeRate(from_currency="USD", to_currency=code, rate=rate,
+                                            effective_date=date(2026, 1, 1), source="test"))
+            else:
+                row.rate = rate
         db.session.commit()
         db.session.remove()
 
@@ -199,4 +215,84 @@ def test_batches_table_headers_are_fully_visible_on_a_phone(browser, live_server
         return out;
     }""")
     assert not problems, "Batches headers at 390: %s" % problems
+    context.close()
+
+
+def _fill_new_import(page, live_server, tmp_path):
+    csv = tmp_path / "two-apps.csv"
+    csv.write_text("name,description\nCostApp1,First\nCostApp2,Second\n", encoding="utf-8")
+    page.goto(live_server + "/batch-import/new", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_selector('[role="tab"]', timeout=PAGE_TIMEOUT)
+    page.locator("#jobName").fill("Rate %s" % uuid.uuid4().hex[:6])
+    page.locator("#fileUpload").set_input_files(str(csv))
+    est = page.get_by_text("Estimated Cost", exact=True).locator("xpath=following-sibling::span").first
+    expect(est).to_be_visible(timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+    return est
+
+
+def _job_id_from_url(page):
+    return re.search(r"/batch-import/jobs/(\d+)", page.url).group(1)
+
+
+def test_a_euro_figure_is_the_dollar_figure_converted_and_the_budget_is_stored_in_dollars(
+    browser, live_server, tmp_path
+):
+    org = create_fresh_org("data_architect", org_admin=True)
+    _set_currency(org["org_id"], "EUR")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["data_architect"])
+    est = _fill_new_import(page, live_server, tmp_path)
+    shown = float(re.sub(r"[^\d.]", "", est.inner_text()))
+    usd = page.evaluate(
+        """async () => (await (await fetch('/api/batch-import/cost-estimate?rows=2&ai_generation=true')).json()).estimated_total_usd""")
+    assert abs(shown - usd * 0.8) < 0.006, "page shows EUR %s for a USD %s estimate at 0.80" % (shown, usd)
+
+    page.locator("button", has_text="Set limit").first.click()
+    page.locator('input[type="number"][min="1"]').first.fill("10")
+    page.get_by_role("button", name="Create Import Job").first.click()
+    page.wait_for_url(lambda url: "/batch-import/jobs/" in url, timeout=PAGE_TIMEOUT)
+    job = page.evaluate(
+        """async (id) => (await (await fetch('/api/batch-import/jobs/' + id)).json())""", _job_id_from_url(page))
+    job = job.get("data", job)
+    stored = float(job.get("budget_limit_usd"))
+    assert abs(stored - 12.5) < 0.01, "a EUR 10 limit at 0.80 must be stored as USD 12.50, got %s" % stored
+    page.wait_for_timeout(2500)
+    assert re.search(r"Budget:\s*€10\.00", _main_text(page)), "job page does not show the typed limit back as EUR 10.00"
+    context.close()
+
+
+def test_ai_off_on_the_page_creates_a_job_with_ai_off_and_no_ai_cost(browser, live_server, tmp_path):
+    org = create_fresh_org("data_architect", org_admin=True)
+    _set_currency(org["org_id"], "EUR")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["data_architect"])
+    _fill_new_import(page, live_server, tmp_path)
+    page.get_by_text("Use AI to generate", exact=False).first.scroll_into_view_if_needed()
+    toggle = page.locator("button[class*='w-11']").first
+    toggle.click()
+    expect(page.get_by_text("AI generation is disabled")).to_be_visible(timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="Create Import Job").first.click()
+    page.wait_for_url(lambda url: "/batch-import/jobs/" in url, timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(2500)
+    job = page.evaluate(
+        """async (id) => (await (await fetch('/api/batch-import/jobs/' + id)).json())""", _job_id_from_url(page))
+    job = job.get("data", job)
+    assert job.get("enable_ai_generation") is False, "job was created with AI on: %s" % job.get("enable_ai_generation")
+    assert float(job.get("estimated_cost_usd") or 0) == 0.0, "job carries an AI cost estimate %s" % job.get("estimated_cost_usd")
+    assert not re.search(r"€\s*0\.[1-9]|€[1-9]", _main_text(page).split("Actual Cost")[0]), "job page shows an AI cost"
+    context.close()
+
+
+def test_with_no_rate_on_file_the_page_says_why_and_never_relabels_dollars(browser, live_server, tmp_path):
+    org = create_fresh_org("data_architect", org_admin=True)
+    _set_currency(org["org_id"], "JPY", rate=None)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["data_architect"])
+    est = _fill_new_import(page, live_server, tmp_path)
+    assert est.inner_text().strip() == "—", "estimate %r shown with no rate on file" % est.inner_text()
+    expect(page.get_by_text("No exchange rate from US dollars to JPY is on file")).to_be_visible(timeout=PAGE_TIMEOUT)
     context.close()

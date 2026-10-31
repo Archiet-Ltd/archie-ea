@@ -374,19 +374,21 @@
                                 <div class="border-t pt-4">
                                     <div class="flex items-center justify-between">
                                         <span class="font-medium">Estimated Cost</span>
-                                        <span class="text-xl font-bold text-primary" data-testid="import-estimated-cost" x-text="estimateDisplay || 'Estimate after upload'"></span>
+                                        <span class="text-xl font-bold text-primary" data-testid="import-estimated-cost" x-text="estimateError ? 'Estimate unavailable' : (estimateDisplay || 'Estimate after upload')"></span>
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
                                         Based on current token prices. Actual cost may vary.
                                     </p>
+                                    {% if money_format.rate_note %}<p class="text-xs text-muted-foreground mt-1" data-testid="import-rate-note">{{ money_format.rate_note }}</p>{% endif %}
+                                    <p x-show="estimateError" x-cloak class="text-xs text-destructive mt-1">The estimate could not be fetched. {% call button(variant="link", size="xs", attrs_dict={"@click": "refreshEstimate()"}) %}Try again{% endcall %}</p>
                                 </div>
 
-                                <template x-if="form.budget_limit && estimateUsd !== null && estimateUsd > form.budget_limit">
+                                <template x-if="form.budget_limit && estimateUsd !== null && BatchMoney.fromUsd(estimateUsd) > form.budget_limit">
                                     <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2">
                                         <div class="flex items-start gap-2">
                                             <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5" aria-hidden="true"></i>
                                             <p class="text-xs text-warning-emphasis">
-                                                Estimated cost exceeds your budget limit of <span x-text="BatchMoney.format(form.budget_limit)"></span>. Processing will pause when the budget is reached.
+                                                Estimated cost exceeds your budget limit of <span x-text="BatchMoney.format(BatchMoney.toUsd(form.budget_limit))"></span>. Processing will pause when the budget is reached.
                                             </p>
                                         </div>
                                     </div>
@@ -509,6 +511,7 @@ function newImportForm() {
 
         estimateDisplay: '',
         estimateUsd: null,
+        estimateError: false,
         estimateKey: '',
 
         // The server's estimator is the only one; this asks it for the figure.
@@ -521,6 +524,7 @@ function newImportForm() {
             }
             const key = rows + '|' + this.form.archimate_mode;
             this.estimateKey = key;
+            this.estimateError = false;
             try {
                 const q = new URLSearchParams({
                     rows: rows,
@@ -535,12 +539,14 @@ function newImportForm() {
             } catch (error) {
                 this.estimateDisplay = '';
                 this.estimateUsd = null;
+                this.estimateError = true;
             }
         },
 
         get canSubmit() {
             if (!this.form.name.trim()) return false;
             if (this.totalApplications === 0) return false;
+            if (this.form.budget_limit && BatchMoney.toUsd(this.form.budget_limit) === null) return false;
             return true;
         },
 
@@ -720,11 +726,11 @@ function newImportForm() {
                     formData.append('programme_initiative_id', this.form.programme_initiative_id);
                 }
                 formData.append('batch_size', this.form.batch_size);
-                formData.append('ai_generation', this.form.ai_generation);
-                formData.append('auto_commit', this.form.auto_commit);
+                formData.append('enable_ai_generation', this.form.ai_generation);
+                formData.append('auto_approve_high_confidence', this.form.auto_commit);
 
                 if (this.form.budget_limit) {
-                    formData.append('budget_limit_usd', this.form.budget_limit);
+                    formData.append('budget_limit_usd', BatchMoney.toUsd(this.form.budget_limit));
                 }
 
                 if (this.form.source_type === 'file' && this.form.file) {

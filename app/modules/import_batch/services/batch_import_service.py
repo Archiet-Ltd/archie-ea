@@ -825,36 +825,59 @@ class BatchImportService:
         }
 
 
-def format_estimate_money(amount) -> str:
-    """Format an estimate in the signed-in organisation's currency, the way every
-    server-rendered money figure is formatted."""
+def _org_currency_code():
+    """The currency actually shown (symbol and placement come from the same code)."""
     from app.middleware.tenant_context import current_org
-    from app.services.currency_service import CurrencyService
     from config import CurrencyConfig
 
     try:
         code = CurrencyConfig.get_org_currency_code(current_org())
     except Exception:  # noqa: BLE001 - a figure must still render
         code = None
-    return CurrencyService().format_currency(float(amount or 0), code)
+    return CurrencyConfig.get_currency_config(code).get("code") or code
+
+
+def usd_rate_for_org():
+    """Units of the organisation's currency per US dollar today, or None when no
+    rate is on file. LLM spend is billed in dollars; it is converted, never relabelled."""
+    from app.services.currency_service import get_exchange_rate
+
+    code = _org_currency_code() or "USD"
+    try:
+        rate = get_exchange_rate("USD", code)
+    except Exception:  # noqa: BLE001 - a missing table is a missing rate
+        rate = None
+    return float(rate) if rate is not None else None
+
+
+def format_estimate_money(amount) -> str:
+    """Format a US-dollar amount in the signed-in organisation's currency, converted at
+    the current rate. With no rate on file answers an em dash, never a relabelled figure."""
+    from app.services.currency_service import CurrencyService
+
+    rate = usd_rate_for_org()
+    if rate is None:
+        return "\u2014"
+    return CurrencyService().format_currency(float(amount or 0) * rate, _org_currency_code())
 
 
 def org_money_format() -> dict:
     """The signed-in organisation's money format (symbol, placement, decimals,
-    thousands separator), the same configuration `format_estimate_money` uses, so
-    figures painted by script after a poll are placed the same way as server ones."""
-    from app.middleware.tenant_context import current_org
+    thousands separator) plus the dollar rate, so figures painted by script are
+    converted and placed the same way as server ones. `rate` is None with no rate on file."""
     from config import CurrencyConfig
 
-    try:
-        code = CurrencyConfig.get_org_currency_code(current_org())
-    except Exception:  # noqa: BLE001 - a figure must still render
-        code = None
+    code = _org_currency_code()
     cfg = CurrencyConfig.get_currency_config(code)
+    shown = cfg.get("code") or code or "USD"
+    rate = usd_rate_for_org()
     return {
-        "code": cfg.get("code") or code,
+        "code": shown,
         "symbol": cfg["symbol"],
         "position": cfg["position"],
         "decimals": cfg["decimal_places"],
         "thousands": cfg["thousands_separator"],
+        "rate": rate,
+        "rate_note": None if rate is not None else
+            f"No exchange rate from US dollars to {shown} is on file, so costs cannot be shown in {shown}.",
     }

@@ -12,7 +12,9 @@
     function format(amount, options) {
         var cfg = config();
         var value = Number(amount);
-        if (!cfg || !isFinite(value)) return '—';
+        // Amounts are US dollars (what the model bills in); convert at the server's rate.
+        if (!cfg || !isFinite(value) || cfg.rate == null) return '—';
+        value = value * cfg.rate;
         var signed = !!(options && options.signed);
         var decimals = (options && options.decimals != null) ? options.decimals : cfg.decimals;
         var abs = Math.abs(value);
@@ -24,5 +26,19 @@
         return (signed && value > 0 ? '+' : '') + text;
     }
 
-    window.BatchMoney = { format: format };
+    function toUsd(amount) {
+        var cfg = config();
+        var value = Number(amount);
+        if (!cfg || cfg.rate == null || !isFinite(value) || cfg.rate <= 0) return null;
+        return value / cfg.rate;
+    }
+
+    function fromUsd(amount) {
+        var cfg = config();
+        var value = Number(amount);
+        if (!cfg || cfg.rate == null || !isFinite(value)) return null;
+        return value * cfg.rate;
+    }
+
+    window.BatchMoney = { format: format, toUsd: toUsd, fromUsd: fromUsd };
 })();
