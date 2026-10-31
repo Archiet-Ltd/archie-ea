@@ -182,7 +182,7 @@
            measure() { return this.$refs.box.clientWidth + ':' + [...this.$refs.box.querySelectorAll('[data-canvas-note]')].map(n => n.offsetHeight).join(','); },
            fit() {
              const box = this.$refs.box;
-             box.classList.remove('max-h-32', 'overflow-y-auto', 'overflow-y-hidden'); box.removeAttribute('tabindex'); box.style.maxHeight = '';
+             box.classList.remove('max-h-32', 'overflow-y-auto', 'max-h-[var(--canvas-cut)]', 'overflow-y-hidden'); box.removeAttribute('tabindex'); box.style.removeProperty('--canvas-cut');
              if (!box.getClientRects().length) return;
              this.sig = this.measure();
              const notes = [...box.querySelectorAll('[data-canvas-note]')], top = () => box.getBoundingClientRect().top;
@@ -195,8 +195,8 @@
                this.extra = gone.length;
                if (this.open || !gone.length) return;
                const last = notes.filter(n => !gone.includes(n)).pop();
-               box.style.maxHeight = Math.ceil(last.getBoundingClientRect().bottom - top()) + 'px';
-               box.classList.add('overflow-y-hidden');
+               box.style.setProperty('--canvas-cut', Math.ceil(last.getBoundingClientRect().bottom - top()) + 'px');
+               box.classList.add('max-h-[var(--canvas-cut)]', 'overflow-y-hidden');
              });
            },
            toggle() { this.open = !this.open; this.fit(); },
