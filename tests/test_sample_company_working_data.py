@@ -115,3 +115,37 @@ def test_loading_twice_adds_the_working_data_once(client, login_as, make_org):
     login_as(client, user)
     client.post("/architecture/sample-company/load")
     assert _counts(org.id) == first
+
+
+def test_removing_the_sample_after_accepting_a_suggested_capability(client, login_as, make_org):
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+
+    org, other = make_org(), make_org()
+    user = _architect(org, "founder-e@example.com")
+    before = _counts(org.id)
+    login_as(client, user)
+    client.post("/architecture/sample-company/load")
+    app_id = db.session.execute(
+        db.text("SELECT id FROM application_components WHERE organization_id = :o ORDER BY id LIMIT 1"),
+        {"o": org.id},
+    ).scalar()
+    capability_id = db.session.execute(
+        db.text("SELECT id FROM unified_capabilities WHERE organization_id = :o ORDER BY id LIMIT 1"),
+        {"o": org.id},
+    ).scalar()
+    db.session.add(UnifiedApplicationCapabilityMapping(
+        unified_capability_id=capability_id, application_component_id=app_id,
+        support_level="full", relationship_type="supports",
+    ))
+    db.session.commit()
+
+    login_as(client, user)
+    response = client.post("/architecture/sample-company/remove", follow_redirects=True)
+    assert response.status_code == 200
+    assert "Sample company removed" in response.get_data(as_text=True)
+    assert _counts(org.id) == before
+    left = db.session.execute(
+        db.text("SELECT count(*) FROM unified_application_capability_mapping WHERE application_component_id = :a"),
+        {"a": app_id},
+    ).scalar()
+    assert left == 0
