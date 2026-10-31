@@ -30,7 +30,7 @@ from app.models.mixins.core import _default_org_id
 from .. import db
 
 
-class TechnologyRoadmapInitiative(db.Model):
+class TechnologyRoadmapInitiative(TenantMixin, db.Model):
     """ENH-013: Multi-year technology roadmap initiative.
 
     Represents a planned initiative spanning one or more fiscal years,
@@ -38,6 +38,7 @@ class TechnologyRoadmapInitiative(db.Model):
     """
 
     __tablename__ = "technology_roadmap_initiatives"
+    __tenant_parent__ = (('architecture_id', 'architecture_models'), ('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

@@ -55,13 +55,14 @@ class WorkflowArtifactMixin:
         }
 
 
-class ArchitectureVisionDocument(WorkflowArtifactMixin, db.Model):
+class ArchitectureVisionDocument(TenantMixin, WorkflowArtifactMixin, db.Model):
     """TOGAF ADM Phase A output: the Architecture Vision Document.
 
     Produced by the ADM_PHASE_A_VISION workflow upon completion.
     """
 
     __tablename__ = "architecture_vision_documents"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -114,7 +115,7 @@ class ArchitectureVisionDocument(WorkflowArtifactMixin, db.Model):
         return f"<ArchitectureVisionDocument {self.id}: {self.title}>"
 
 
-class ArchitectureReviewFinding(WorkflowArtifactMixin, db.Model):
+class ArchitectureReviewFinding(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Individual finding from an AI-Assisted Architecture Review.
 
     Produced by the ARCH_REVIEW workflow. Each finding is a discrete,
@@ -122,6 +123,7 @@ class ArchitectureReviewFinding(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "architecture_review_findings"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -206,7 +208,7 @@ class ArchitectureReviewFinding(WorkflowArtifactMixin, db.Model):
         return f"<ArchitectureReviewFinding {self.id}: {self.finding_type}/{self.severity}>"
 
 
-class VendorSelectionReport(WorkflowArtifactMixin, db.Model):
+class VendorSelectionReport(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Formal output of the Vendor Selection workflow.
 
     Produced by the VENDOR_SELECTION workflow upon board approval.
@@ -214,6 +216,7 @@ class VendorSelectionReport(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "vendor_selection_reports"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -266,13 +269,14 @@ class VendorSelectionReport(WorkflowArtifactMixin, db.Model):
         return f"<VendorSelectionReport {self.id}: {self.title}>"
 
 
-class ComplianceScanReport(WorkflowArtifactMixin, db.Model):
+class ComplianceScanReport(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Output of a compliance scan workflow run.
 
     Produced by the COMPLIANCE_SCAN workflow upon completion.
     """
 
     __tablename__ = "compliance_scan_reports"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -321,7 +325,7 @@ class ComplianceScanReport(WorkflowArtifactMixin, db.Model):
         return f"<ComplianceScanReport {self.id}: {self.total_violations} violations>"
 
 
-class WorkflowCompletionSummary(WorkflowArtifactMixin, db.Model):
+class WorkflowCompletionSummary(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Universal completion summary for any workflow type.
 
     Created automatically when any workflow reaches 'completed' status.
@@ -329,6 +333,7 @@ class WorkflowCompletionSummary(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "workflow_completion_summaries"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -377,7 +382,7 @@ class WorkflowCompletionSummary(WorkflowArtifactMixin, db.Model):
         return f"<WorkflowCompletionSummary {self.id}: {self.workflow_code}>"
 
 
-class MigrationPlanDocument(WorkflowArtifactMixin, db.Model):
+class MigrationPlanDocument(TenantMixin, WorkflowArtifactMixin, db.Model):
     """TOGAF ADM Phase E/F output: Migration Plan.
 
     Produced by ADM_PHASE_E_OPPORTUNITIES or ADM_PHASE_F_MIGRATION workflows.
@@ -385,6 +390,7 @@ class MigrationPlanDocument(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "migration_plan_documents"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -435,7 +441,7 @@ class MigrationPlanDocument(WorkflowArtifactMixin, db.Model):
         return f"<MigrationPlanDocument {self.id}: Phase {self.adm_phase} — {self.title}>"
 
 
-class ComplianceGovernanceReport(WorkflowArtifactMixin, db.Model):
+class ComplianceGovernanceReport(TenantMixin, WorkflowArtifactMixin, db.Model):
     """TOGAF ADM Phase G output: Implementation Governance Report.
 
     Produced by ADM_PHASE_G_GOVERNANCE workflow. Contains compliance scan
@@ -443,6 +449,7 @@ class ComplianceGovernanceReport(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "compliance_governance_reports"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -491,7 +498,7 @@ class ComplianceGovernanceReport(WorkflowArtifactMixin, db.Model):
         return f"<ComplianceGovernanceReport {self.id}: {self.total_violations} violations>"
 
 
-class ChangeManagementRecord(WorkflowArtifactMixin, db.Model):
+class ChangeManagementRecord(TenantMixin, WorkflowArtifactMixin, db.Model):
     """TOGAF ADM Phase H output: Change Management Record.
 
     Produced by ADM_PHASE_H_CHANGE workflow. Records change triggers,
@@ -499,6 +506,7 @@ class ChangeManagementRecord(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "change_management_records"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -549,7 +557,7 @@ class ChangeManagementRecord(WorkflowArtifactMixin, db.Model):
         return f"<ChangeManagementRecord {self.id}: routed to Phase {self.routed_to_phase}>"
 
 
-class RequirementsTraceabilityMatrix(WorkflowArtifactMixin, db.Model):
+class RequirementsTraceabilityMatrix(TenantMixin, WorkflowArtifactMixin, db.Model):
     """TOGAF ADM Requirements Management output.
 
     Produced by ADM_REQUIREMENTS_MGMT workflow. Maps captured requirements
@@ -557,6 +565,7 @@ class RequirementsTraceabilityMatrix(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "requirements_traceability_matrices"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -607,7 +616,7 @@ class RequirementsTraceabilityMatrix(WorkflowArtifactMixin, db.Model):
         return f"<RequirementsTraceabilityMatrix {self.id}: {self.requirements_count} requirements>"
 
 
-class GapRemediationReport(WorkflowArtifactMixin, db.Model):
+class GapRemediationReport(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Output of a gap remediation workflow run (GLB-WF-012).
 
     Produced by the GAP_REMEDIATION workflow upon completion.
@@ -615,6 +624,7 @@ class GapRemediationReport(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "gap_remediation_reports"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -717,7 +727,7 @@ class ApplicationDispositionRecord(TenantMixin, WorkflowArtifactMixin, db.Model)
         return f"<ApplicationDispositionRecord {self.id}: {self.total_apps_in_scope} apps>"
 
 
-class PlatformMigrationScope(WorkflowArtifactMixin, db.Model):
+class PlatformMigrationScope(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Output of PLATFORM_MIGRATION_SCOPING workflow.
 
     Captures integration inventory, custom object register, process
@@ -727,6 +737,7 @@ class PlatformMigrationScope(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "platform_migration_scopes"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -783,7 +794,7 @@ class PlatformMigrationScope(WorkflowArtifactMixin, db.Model):
         return f"<PlatformMigrationScope {self.id}: {self.source_platform_name}>"
 
 
-class ARBSubmissionPack(WorkflowArtifactMixin, db.Model):
+class ARBSubmissionPack(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Output of ARB_PACK_GENERATION workflow.
 
     Structured ARB submission document replacing manual 2-3 day assembly.
@@ -793,6 +804,7 @@ class ARBSubmissionPack(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "arb_submission_packs"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -853,7 +865,7 @@ class ARBSubmissionPack(WorkflowArtifactMixin, db.Model):
         return f"<ARBSubmissionPack {self.id}: {self.solution_name} ({self.submission_status})>"
 
 
-class CapabilityInvestmentPlan(WorkflowArtifactMixin, db.Model):
+class CapabilityInvestmentPlan(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Output of CAPABILITY_INVESTMENT_PLANNING workflow.
 
     Maps capability gaps to build/buy/partner investment options with
@@ -862,6 +874,7 @@ class CapabilityInvestmentPlan(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "capability_investment_plans"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -912,7 +925,7 @@ class CapabilityInvestmentPlan(WorkflowArtifactMixin, db.Model):
         return f"<CapabilityInvestmentPlan {self.id}: {self.capabilities_addressed} gaps addressed>"
 
 
-class IntegrationImpactRegister(WorkflowArtifactMixin, db.Model):
+class IntegrationImpactRegister(TenantMixin, WorkflowArtifactMixin, db.Model):
     """Output of INTEGRATION_IMPACT_ASSESSMENT workflow.
 
     Captures direct + transitive integration impacts when a platform changes,
@@ -922,6 +935,7 @@ class IntegrationImpactRegister(WorkflowArtifactMixin, db.Model):
     """
 
     __tablename__ = "integration_impact_registers"
+    __tenant_parent__ = (('workflow_instance_id', 'ea_workflow_instances'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

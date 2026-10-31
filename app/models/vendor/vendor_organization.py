@@ -25,7 +25,7 @@ from typing import Dict, List
 from app.models.business_capabilities import BusinessCapability
 
 from .. import db
-from ..mixins import TenantMixin
+from ..mixins import HybridTenantMixin, TenantMixin
 
 # ============================================================================
 # SEMANTIC EA INTELLIGENCE - JUNCTION TABLES
@@ -547,7 +547,7 @@ class VendorOrganization(db.Model):
         return f"<VendorOrganization {self.name}>"
 
 
-class VendorProduct(db.Model):
+class VendorProduct(HybridTenantMixin, db.Model):
     """
     Individual vendor product/solution.
 
@@ -1240,7 +1240,7 @@ class VendorDataSource(db.Model):
         return f"<VendorDataSource {self.vendor.name if self.vendor else 'Unknown'}: {self.data_field}>"
 
 
-class VendorProductPricing(db.Model):
+class VendorProductPricing(HybridTenantMixin, db.Model):
     """Detailed pricing information for vendor products (PRD-V02)."""
 
     __tablename__ = "vendor_product_pricing"
@@ -1292,7 +1292,6 @@ class VendorProductPricing(db.Model):
     # Staleness detection
     last_verified_at = db.Column(db.DateTime, nullable=True)
     # Multi-tenancy hook — bare integer, NO FK
-    organization_id = db.Column(db.Integer, nullable=True, index=True)
 
     # Relationships
     product = db.relationship("VendorProduct", backref="pricing_tiers")
@@ -1331,10 +1330,11 @@ class VendorProductPricing(db.Model):
 # ============================================================================
 
 
-class TCOCalculation(db.Model):
+class TCOCalculation(TenantMixin, db.Model):
     """TCO calculation results with 12 - category breakdown (PRD-V03)."""
 
     __tablename__ = "tco_calculations"
+    __tenant_parent__ = (('created_by_id', 'users'), ('vendor_product_id', 'vendor_products'),)
 
     id = db.Column(db.Integer, primary_key=True)
     vendor_product_id = db.Column(
@@ -1437,10 +1437,11 @@ class TCOCalculation(db.Model):
 # ============================================================================
 
 
-class VendorRiskAssessment(db.Model):
+class VendorRiskAssessment(TenantMixin, db.Model):
     """Multi-dimensional risk scoring for vendor products (PRD-V05)."""
 
     __tablename__ = "vendor_risk_assessments"
+    __tenant_parent__ = (('created_by_id', 'users'), ('vendor_product_id', 'vendor_products'),)
 
     id = db.Column(db.Integer, primary_key=True)
     vendor_product_id = db.Column(
@@ -1553,7 +1554,7 @@ class VendorRiskAssessment(db.Model):
         return f"<VendorRiskAssessment {self.vendor_product.name if self.vendor_product else 'Unknown'}: {self.risk_level} risk>"
 
 
-class VendorArchiMateTemplate(db.Model):
+class VendorArchiMateTemplate(TenantMixin, db.Model):
     """
     Canonical vendor→ArchiMate element mapping.
 
@@ -1566,6 +1567,7 @@ class VendorArchiMateTemplate(db.Model):
     """
 
     __tablename__ = "vendor_archimate_templates"
+    __tenant_parent__ = (('element_id', 'archimate_elements'),)
 
     # Canonical vendor keys — must match VENDOR_KEY_MAP in VendorTemplateService
     VENDOR_KEYS = ["SAP", "MICROSOFT_POWER", "MICROSOFT_DYNAMICS"]

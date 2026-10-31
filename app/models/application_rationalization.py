@@ -846,7 +846,7 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
 # ============================================================================
 
 
-class RationalizationPolicy(db.Model):
+class RationalizationPolicy(TenantMixin, db.Model):
     """
     Scoped policy overlay for rationalization scoring.
 
@@ -1059,7 +1059,7 @@ class RationalizationPolicy(db.Model):
 # ============================================================================
 
 
-class VendorConcentrationAnalysis(db.Model):
+class VendorConcentrationAnalysis(TenantMixin, db.Model):
     """
     Portfolio-level analysis of vendor concentration and risk.
 
@@ -1203,7 +1203,7 @@ class VendorConcentrationAnalysis(db.Model):
 # ============================================================================
 
 
-class ReplacementPlan(db.Model):
+class ReplacementPlan(TenantMixin, db.Model):
     """
     Replacement/consolidation planning record linked to a rationalization decision.
 
@@ -1218,6 +1218,7 @@ class ReplacementPlan(db.Model):
     """
 
     __tablename__ = "replacement_plans"
+    __tenant_parent__ = (('source_app_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -1539,7 +1540,7 @@ class ScoringConfiguration(db.Model):
 # ============================================================================
 
 
-class RationalizationAuditEntry(db.Model):
+class RationalizationAuditEntry(TenantMixin, db.Model):
     """Immutable audit trail for rationalization decisions.
 
     RAT-114: Records every state change, approval, override, evidence update,
@@ -1547,6 +1548,7 @@ class RationalizationAuditEntry(db.Model):
     """
 
     __tablename__ = "rationalization_audit_entries"
+    __tenant_parent__ = (('application_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
     application_id = db.Column(
@@ -1600,7 +1602,7 @@ class RationalizationAuditEntry(db.Model):
 # ============================================================================
 
 
-class DecommissionPlan(db.Model):
+class DecommissionPlan(TenantMixin, db.Model):
     """RAT-116: Structured decommission plan for retire/replace recommendations.
 
     Requires explicit planning for migration, cutover, validation, rollback,
@@ -1608,6 +1610,7 @@ class DecommissionPlan(db.Model):
     """
 
     __tablename__ = "decommission_plans"
+    __tenant_parent__ = (('application_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
     application_id = db.Column(
@@ -1663,10 +1666,11 @@ class DecommissionPlan(db.Model):
         return f"<DecommissionPlan app:{self.application_id} status:{self.plan_status}>"
 
 
-class RationalizationBenefitsTracker(db.Model):
+class RationalizationBenefitsTracker(TenantMixin, db.Model):
     """RAT-117: Track projected vs realized benefits for rationalization decisions."""
 
     __tablename__ = "rationalization_benefits"
+    __tenant_parent__ = (('application_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
     application_id = db.Column(

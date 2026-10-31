@@ -9,10 +9,12 @@ Table created via db.create_all() — no Alembic migration needed (migration fre
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class PublishedAPISpec(db.Model):
+class PublishedAPISpec(TenantMixin, db.Model):
     __tablename__ = "published_api_specs"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

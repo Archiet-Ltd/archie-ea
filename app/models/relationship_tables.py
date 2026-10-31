@@ -22,6 +22,7 @@ from datetime import datetime
 
 from .. import db
 from .mixins import TenantMixin
+from .mixins.core import parent_organization_default
 
 # ============================================================================
 # Vendor Product Association Tables (Option B+)
@@ -45,6 +46,15 @@ application_component_vendor_products = db.Table(
         db.ForeignKey("vendor_products.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    ),
+    # The application's organisation, filled at insert from the application component.
+    db.Column(
+        "organization_id",
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=parent_organization_default("application_components", "application_component_id"),
     ),
     # Relationship metadata
     db.Column(
@@ -381,7 +391,7 @@ class ProcessActorRaci(db.Model):
 # ============================================================================
 
 
-class ProcessRoleRaci(db.Model):
+class ProcessRoleRaci(TenantMixin, db.Model):
     """
     RACI Matrix: Links BusinessProcess to BusinessRole with responsibility level
 
@@ -390,6 +400,7 @@ class ProcessRoleRaci(db.Model):
     """
 
     __tablename__ = "process_role_raci"
+    __tenant_parent__ = (('process_id', 'business_processes'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -547,7 +558,7 @@ class CapabilityActorRaci(db.Model):
 # ============================================================================
 
 
-class ServiceDependency(db.Model):
+class ServiceDependency(TenantMixin, db.Model):
     """
     Service Dependency: BusinessService depends on another BusinessService
 
@@ -564,6 +575,7 @@ class ServiceDependency(db.Model):
     """
 
     __tablename__ = "service_dependency"
+    __tenant_parent__ = (('dependent_service_id', 'business_services'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -601,7 +613,7 @@ class ServiceDependency(db.Model):
 # ============================================================================
 
 
-class ServiceRealization(db.Model):
+class ServiceRealization(TenantMixin, db.Model):
     """
     Service Realization: BusinessProcess realizes BusinessService
 
@@ -610,6 +622,7 @@ class ServiceRealization(db.Model):
     """
 
     __tablename__ = "service_realization"
+    __tenant_parent__ = (('process_id', 'business_processes'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -642,7 +655,7 @@ class ServiceRealization(db.Model):
 # ============================================================================
 
 
-class InterfaceConsumer(db.Model):
+class InterfaceConsumer(TenantMixin, db.Model):
     """
     Interface Consumer: ApplicationComponent consumes ApplicationInterface
 
@@ -651,6 +664,7 @@ class InterfaceConsumer(db.Model):
     """
 
     __tablename__ = "interface_consumer"
+    __tenant_parent__ = (('interface_id', 'application_interfaces'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -752,7 +766,7 @@ class DataObjectStorage(TenantMixin, db.Model):
 # ============================================================================
 
 
-class ApplicationRequirementMapping(db.Model):
+class ApplicationRequirementMapping(TenantMixin, db.Model):
     """
     Application ↔ Requirement: Which requirements are implemented by which applications
 
@@ -761,6 +775,7 @@ class ApplicationRequirementMapping(db.Model):
     """
 
     __tablename__ = "application_requirement_mapping"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -819,7 +834,7 @@ class ApplicationRequirementMapping(db.Model):
 # ============================================================================
 
 
-class ApplicationProcessSupport(db.Model):
+class ApplicationProcessSupport(TenantMixin, db.Model):
     """
     Application ↔ Business Process: Which applications support/automate which business processes
 
@@ -835,6 +850,7 @@ class ApplicationProcessSupport(db.Model):
     """
 
     __tablename__ = "application_process_support"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -907,7 +923,7 @@ class ApplicationProcessSupport(db.Model):
 # ============================================================================
 
 
-class ApplicationTechnologyMapping(db.Model):
+class ApplicationTechnologyMapping(TenantMixin, db.Model):
     """
     Application ↔ Technology: Which applications use which technology stacks
 
@@ -916,6 +932,7 @@ class ApplicationTechnologyMapping(db.Model):
     """
 
     __tablename__ = "application_technology_mapping"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -966,7 +983,7 @@ class ApplicationTechnologyMapping(db.Model):
 # ============================================================================
 
 
-class ApplicationBusinessActorMapping(db.Model):
+class ApplicationBusinessActorMapping(TenantMixin, db.Model):
     """
     Application ↔ Business Actor: Which actors use/own which applications
 
@@ -975,6 +992,7 @@ class ApplicationBusinessActorMapping(db.Model):
     """
 
     __tablename__ = "application_business_actor_mapping"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -1022,7 +1040,7 @@ class ApplicationBusinessActorMapping(db.Model):
 # ============================================================================
 
 
-class ApplicationInterfaceMapping(db.Model):
+class ApplicationInterfaceMapping(TenantMixin, db.Model):
     """
     Application Component ↔ Application Interface: Which components expose/consume interfaces
 
@@ -1030,6 +1048,7 @@ class ApplicationInterfaceMapping(db.Model):
     """
 
     __tablename__ = "application_interface_mapping"
+    __tenant_parent__ = (('application_component_id', 'application_components'),)
 
     id = db.Column(db.Integer, primary_key=True)
 

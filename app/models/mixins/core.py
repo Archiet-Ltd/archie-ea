@@ -186,3 +186,21 @@ class StatusMixin:
 
 
 __all__ = ["OptimisticLockMixin", "SoftDeleteMixin", "TimestampMixin", "AuditMixin", "HierarchyMixin", "StatusMixin"]
+
+
+def parent_organization_default(parent_table, fk_param):
+    """Column default for a table with no model class (a db.Table junction): the organisation of
+    the parent row named by ``fk_param`` in the insert. None when the parent has none or is absent."""
+
+    def _default(context):
+        from sqlalchemy import text
+
+        parent_id = context.get_current_parameters().get(fk_param)
+        if parent_id is None:
+            return None
+        return context.connection.execute(
+            text(f'SELECT organization_id FROM "{parent_table}" WHERE id = :i'),  # nosec B608 - literal table name
+            {"i": parent_id},
+        ).scalar()
+
+    return _default

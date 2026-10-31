@@ -9,14 +9,16 @@ Design doc: docs/plans/2026-03-02-solution-sad-models-design.md
 from datetime import datetime, date
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class SolutionIntegrationFlow(db.Model):
+class SolutionIntegrationFlow(TenantMixin, db.Model):
     """Data/integration flow between applications within a solution.
 
     Junction model: auto-creates ArchiMateRelationship(type='flow') on creation.
     """
     __tablename__ = "solution_integration_flows"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = (
         db.UniqueConstraint("solution_id", "source_app_id", "target_app_id", "flow_name",
                             name="uq_solution_integration_flow"),
@@ -85,9 +87,10 @@ class SolutionIntegrationFlow(db.Model):
         }
 
 
-class SolutionComposition(db.Model):
+class SolutionComposition(TenantMixin, db.Model):
     """How components interlock within the solution."""
     __tablename__ = "solution_compositions"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = (
         db.UniqueConstraint("solution_id", "component_type", "component_id",
                             name="uq_solution_composition"),
@@ -119,9 +122,10 @@ class SolutionComposition(db.Model):
         }
 
 
-class RiskSnapshot(db.Model):
+class RiskSnapshot(TenantMixin, db.Model):
     """Time-series risk tracking across ADM phases."""
     __tablename__ = "solution_risk_snapshots"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -151,9 +155,10 @@ class RiskSnapshot(db.Model):
         }
 
 
-class SolutionQualityAttribute(db.Model):
+class SolutionQualityAttribute(TenantMixin, db.Model):
     """Maps architecture principles/constraints to testable quality criteria."""
     __tablename__ = "solution_quality_attributes"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -182,9 +187,10 @@ class SolutionQualityAttribute(db.Model):
         }
 
 
-class SolutionSLA(db.Model):
+class SolutionSLA(TenantMixin, db.Model):
     """Solution-level performance contract."""
     __tablename__ = "solution_slas"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -219,9 +225,10 @@ class SolutionSLA(db.Model):
         }
 
 
-class MigrationDependency(db.Model):
+class MigrationDependency(TenantMixin, db.Model):
     """Ordering constraints between transition plateaus."""
     __tablename__ = "solution_migration_dependencies"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = (
         db.UniqueConstraint("solution_id", "from_plateau_id", "to_plateau_id",
                             name="uq_migration_dependency"),
@@ -249,9 +256,10 @@ class MigrationDependency(db.Model):
         }
 
 
-class SolutionInvestmentPhase(db.Model):
+class SolutionInvestmentPhase(TenantMixin, db.Model):
     """Funding allocation per plateau/tranche."""
     __tablename__ = "solution_investment_phases"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -286,9 +294,10 @@ class SolutionInvestmentPhase(db.Model):
         }
 
 
-class SolutionGovernanceException(db.Model):
+class SolutionGovernanceException(TenantMixin, db.Model):
     """Approved deviations from architecture principles."""
     __tablename__ = "solution_governance_exceptions"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -320,9 +329,10 @@ class SolutionGovernanceException(db.Model):
         }
 
 
-class SolutionComplianceMapping(db.Model):
+class SolutionComplianceMapping(TenantMixin, db.Model):
     """Solution components mapped to regulatory/compliance controls."""
     __tablename__ = "solution_compliance_mappings"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -355,9 +365,10 @@ class SolutionComplianceMapping(db.Model):
         }
 
 
-class SolutionChangeRequest(db.Model):
+class SolutionChangeRequest(TenantMixin, db.Model):
     """Architecture change tracking through ADM lifecycle."""
     __tablename__ = "solution_change_requests"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -394,9 +405,10 @@ class SolutionChangeRequest(db.Model):
         }
 
 
-class SolutionFeasibilityReview(db.Model):
+class SolutionFeasibilityReview(TenantMixin, db.Model):
     """Formal gate with decision rationale per ADM phase."""
     __tablename__ = "solution_feasibility_reviews"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -430,9 +442,10 @@ class SolutionFeasibilityReview(db.Model):
         }
 
 
-class SolutionBenefitRealization(db.Model):
+class SolutionBenefitRealization(TenantMixin, db.Model):
     """Tracks actual value delivery against targets."""
     __tablename__ = "solution_benefit_realizations"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -474,9 +487,10 @@ class SolutionBenefitRealization(db.Model):
         }
 
 
-class SolutionOrgImpact(db.Model):
+class SolutionOrgImpact(TenantMixin, db.Model):
     """Organization design change impacts."""
     __tablename__ = "solution_org_impacts"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -510,9 +524,10 @@ class SolutionOrgImpact(db.Model):
         }
 
 
-class SolutionLessonLearned(db.Model):
+class SolutionLessonLearned(TenantMixin, db.Model):
     """Organizational learning registry."""
     __tablename__ = "solution_lessons_learned"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -543,9 +558,10 @@ class SolutionLessonLearned(db.Model):
         }
 
 
-class SolutionStakeholderSAD(db.Model):
+class SolutionStakeholderSAD(TenantMixin, db.Model):
     """Stakeholder register for a solution (SAD layer)."""
     __tablename__ = "solution_stakeholders_sad"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -572,9 +588,10 @@ class SolutionStakeholderSAD(db.Model):
         }
 
 
-class SolutionPrincipleSAD(db.Model):
+class SolutionPrincipleSAD(TenantMixin, db.Model):
     """Architecture principles governing a solution."""
     __tablename__ = "solution_principles_sad"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -592,9 +609,10 @@ class SolutionPrincipleSAD(db.Model):
         }
 
 
-class SolutionAssessmentSAD(db.Model):
+class SolutionAssessmentSAD(TenantMixin, db.Model):
     """Architecture assessment / gap findings for a solution."""
     __tablename__ = "solution_assessments_sad"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -613,9 +631,10 @@ class SolutionAssessmentSAD(db.Model):
         }
 
 
-class SolutionBusinessElement(db.Model):
+class SolutionBusinessElement(TenantMixin, db.Model):
     """Business-layer ArchiMate element captured in a solution."""
     __tablename__ = "solution_business_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -634,9 +653,10 @@ class SolutionBusinessElement(db.Model):
         }
 
 
-class SolutionAppElement(db.Model):
+class SolutionAppElement(TenantMixin, db.Model):
     """Application-layer ArchiMate element captured in a solution."""
     __tablename__ = "solution_app_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -661,9 +681,10 @@ class SolutionAppElement(db.Model):
         }
 
 
-class SolutionTechElement(db.Model):
+class SolutionTechElement(TenantMixin, db.Model):
     """Technology-layer ArchiMate element captured in a solution."""
     __tablename__ = "solution_tech_elements"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -682,9 +703,10 @@ class SolutionTechElement(db.Model):
         }
 
 
-class SolutionADRDirect(db.Model):
+class SolutionADRDirect(TenantMixin, db.Model):
     """Direct link between a solution and an Architecture Decision Record."""
     __tablename__ = "solution_adr_direct"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -706,9 +728,10 @@ class SolutionADRDirect(db.Model):
         }
 
 
-class SolutionAPQCProcess(db.Model):
+class SolutionAPQCProcess(TenantMixin, db.Model):
     """Direct link between a solution and an APQC process."""
     __tablename__ = "solution_apqc_processes"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False, index=True)

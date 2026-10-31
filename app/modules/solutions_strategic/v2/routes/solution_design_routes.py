@@ -9849,8 +9849,9 @@ def api_accept_suggestions(solution_id):
             if existing is None:
                 db.session.execute(db.text(  # tenant-exempt: scoped via solution FK
                     "INSERT INTO solution_archimate_elements "
-                    "(solution_id, element_id, element_role, created_at) "
-                    "VALUES (:sid, :eid, 'ai_derived', CURRENT_TIMESTAMP)"
+                    "(solution_id, element_id, element_role, organization_id, created_at) "
+                    "SELECT :sid, :eid, 'ai_derived', s.organization_id, CURRENT_TIMESTAMP "
+                    "FROM solutions s WHERE s.id = :sid"
                 ), {"sid": solution_id, "eid": element_id})
                 junction_rows += 1
 
@@ -9872,8 +9873,9 @@ def api_accept_suggestions(solution_id):
             # Create junction
             db.session.execute(db.text(  # tenant-exempt: scoped via solution FK
                 "INSERT INTO solution_archimate_elements "
-                "(solution_id, element_id, element_role, created_at) "
-                "VALUES (:sid, :eid, 'ai_derived', CURRENT_TIMESTAMP)"
+                "(solution_id, element_id, element_role, organization_id, created_at) "
+                "SELECT :sid, :eid, 'ai_derived', s.organization_id, CURRENT_TIMESTAMP "
+                "FROM solutions s WHERE s.id = :sid"
             ), {"sid": solution_id, "eid": new_el.id})
 
             created_count += 1

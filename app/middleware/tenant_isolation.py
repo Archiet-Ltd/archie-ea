@@ -8,7 +8,9 @@ Layer 3: before_flush event auto-sets organization_id on new TenantMixin
           records when the caller didn't set it explicitly.
 
 Both layers are NO-OPs when g.current_org_id is None (CLI, migrations,
-background tasks, unauthenticated requests).
+background tasks, unauthenticated requests), except that a new row of a model that names
+``__tenant_parent__`` takes its organisation from that parent (organization_from_parent), and is
+refused (TenantParentMismatch) when a signed-in organisation differs from the parent's.
 """
 
 import logging
@@ -19,12 +21,52 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import with_loader_criteria
 
 from app.extensions import db
-from app.models.mixins.core import TenantMixin
+from app.models.mixins.core import HybridTenantMixin, TenantMixin
 
 logger = logging.getLogger(__name__)
 
 
 _TENANT_CONTEXT_KEY = "archie_tenant_context_held"
+
+
+class TenantParentMismatch(ValueError):
+    """A new row would link to a parent record owned by a different organisation."""
+
+
+def organization_from_parent(session, obj, include_actors=True, refuse_unseen=False):
+    """The organisation that owns the record ``obj`` hangs from, or None.
+
+    A model names its parents in ``__tenant_parent__``, a tuple of ``(attribute, parent_table)``
+    pairs tried in order: ``(("solution_id", "solutions"),)`` says "my organisation is my
+    solution's". Used when nothing signed in supplies one, so a background job or a seeder that
+    creates a child row cannot leave it unowned (and, once the table is fenced, cannot fail on it).
+
+    With ``refuse_unseen`` a parent id that names no row this session can read raises
+    TenantParentMismatch. Under row-level security another organisation's parent is invisible, so
+    "not found" is exactly what a foreign parent looks like and must never count as no evidence.
+    """
+    for attribute, parent_table in getattr(type(obj), "__tenant_parent__", ()):
+        if parent_table == "users" and not include_actors:
+            continue  # a creator is an actor, not a parent: it is not evidence of a cross-company link
+        parent_id = getattr(obj, attribute, None)
+        if parent_id is None:
+            continue
+        with session.no_autoflush:
+            row = session.execute(
+                text(f'SELECT organization_id FROM "{parent_table}" WHERE id = :id'),  # nosec B608 - literal table name from the model
+                {"id": parent_id},
+            ).first()
+        if row is None:
+            if refuse_unseen:
+                raise TenantParentMismatch(
+                    f"{type(obj).__name__} names {parent_table} record {parent_id}, "
+                    "which this organisation cannot see"
+                )
+            continue
+        if row[0] is not None:
+            return row[0]
+    return None
+
 
 
 def set_database_tenant_context(connection, organization_id):
@@ -195,11 +237,40 @@ def install_tenant_filter(app):
 
     @db.event.listens_for(db.session, "before_flush")
     def _set_tenant_on_new(session, flush_context, instances):
-        if not hasattr(g, "current_org_id") or g.current_org_id is None:
-            return
-        set_database_tenant_context(session.connection(), g.current_org_id)
+        org_id = getattr(g, "current_org_id", None) if has_app_context() else None
+        if org_id is not None:
+            set_database_tenant_context(session.connection(), org_id)
         for obj in session.new:
-            if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
-                obj.organization_id = g.current_org_id
+            if isinstance(obj, HybridTenantMixin) and getattr(obj, "organization_id", None) is None:
+                # A shared-plus-override row never takes the signed-in organisation by default (NULL
+                # means shared), but a child of a company's row belongs to that company.
+                derived = organization_from_parent(session, obj)
+                if derived is not None:
+                    obj.organization_id = derived
+                continue
+            if not isinstance(obj, TenantMixin):
+                continue
+            named = getattr(obj, "organization_id", None)
+            # The row belongs to the organisation that owns the parent record it hangs from.
+            owner = named if named is not None else org_id
+            derived = organization_from_parent(
+                session,
+                obj,
+                include_actors=(named or org_id) is None,
+                refuse_unseen=owner is not None,
+            )
+            if derived is not None and owner is not None and derived != owner:
+                # Never let a signed-in or a named organisation win over a parent that belongs to
+                # another company: the child would link to a record that is not theirs.
+                raise TenantParentMismatch(
+                    f"{type(obj).__name__} hangs from a record of organisation {derived}, "
+                    f"but the row is for organisation {owner}"
+                )
+            if named is None:
+                if org_id is not None:
+                    obj.organization_id = org_id
+                elif derived is not None:
+                    # No signed-in organisation (a job, a seeder, a command).
+                    obj.organization_id = derived
 
     app.logger.info("Tenant isolation filters installed (do_orm_execute + before_flush)")

@@ -15,6 +15,7 @@ from typing import Optional  # dead-code-ok: used by type hints
 from sqlalchemy import Index, Text, UniqueConstraint
 
 from app import db
+from app.models.mixins import HybridTenantMixin
 from app.models.mixins.core import TenantMixin, _default_org_id
 
 HAS_PGVECTOR = False
@@ -37,13 +38,14 @@ def get_vector_column(dimensions=384):
     return db.JSON
 
 
-class VendorProductEmbedding(db.Model):
+class VendorProductEmbedding(HybridTenantMixin, db.Model):
     """
     Vector embeddings for vendor products.
     Used for semantic similarity search and vendor discovery.
     """
 
     __tablename__ = "vendor_product_embeddings"
+    __tenant_parent__ = (("vendor_product_id", "vendor_products"),)
     __table_args__ = (
         UniqueConstraint("vendor_product_id", name="uq_vendor_product_embedding"),
         Index("ix_vendor_product_embedding_created", "created_at"),
@@ -180,13 +182,14 @@ class ChatMessageEmbedding(db.Model):
         return f"<ChatMessageEmbedding session={self.chat_session_id} role={self.message_role}>"
 
 
-class SolutionEmbedding(db.Model):
+class SolutionEmbedding(TenantMixin, db.Model):
     """
     Vector embeddings for solutions.
     Used for solution discovery and recommendation.
     """
 
     __tablename__ = "solution_embeddings"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     __table_args__ = (
         UniqueConstraint("solution_id", name="uq_solution_embedding"),
         Index("ix_solution_embedding_created", "created_at"),

@@ -297,7 +297,7 @@ class SolutionStakeholderConcern(db.Model):
 # ============================================================================
 
 
-class SolutionStakeholderMapping(db.Model):
+class SolutionStakeholderMapping(TenantMixin, db.Model):
     """
     Junction table linking stakeholders to solutions and analysis sessions.
 
@@ -310,6 +310,7 @@ class SolutionStakeholderMapping(db.Model):
     """
 
     __tablename__ = "solution_stakeholder_mappings"
+    __tenant_parent__ = (('stakeholder_id', 'solution_stakeholders'), ('solution_id', 'solutions'),)
 
     id = Column(Integer, primary_key=True)
     stakeholder_id = Column(

@@ -14,9 +14,10 @@ from datetime import datetime
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class SolutionAIReasoningState(db.Model):
+class SolutionAIReasoningState(TenantMixin, db.Model):
     """
     Persistent AI reasoning state per solution + ADM phase.
     
@@ -37,6 +38,7 @@ class SolutionAIReasoningState(db.Model):
     """
     
     __tablename__ = 'solution_ai_reasoning_states'
+    __tenant_parent__ = (('solution_id', 'solutions'),)
     
     # Primary Key
     id = Column(Integer, primary_key=True)

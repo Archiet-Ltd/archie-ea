@@ -208,11 +208,20 @@ class IndustryAPQCService:
             load_default_frameworks,
         )
 
-        before = {fw.industry_code for fw in self.get_all_frameworks(active_only=False)}
-        load_default_frameworks(db.session.connection())
-        db.session.commit()
-        added = [f["industry_code"] for f in FRAMEWORKS if f["industry_code"] not in before]
-        return [self.get_framework_by_code(code) for code in added]
+        codes_before_seeding = {fw.industry_code for fw in self.get_all_frameworks(active_only=False)}
+        try:
+            _, newly_added_codes = load_default_frameworks(db.session.connection())
+            db.session.commit()
+            db.session.remove()
+        except Exception as e:
+            current_app.logger.error(f"Error seeding default frameworks: {e}")
+            raise
+        newly_added_framework_objects = []
+        if newly_added_codes:
+            newly_added_framework_objects = db.session.query(IndustryAPQCFramework).filter(
+                IndustryAPQCFramework.industry_code.in_(list(newly_added_codes))
+            ).all()
+        return newly_added_framework_objects
 
     # =========================================================================
     # INDUSTRY PROCESS MANAGEMENT

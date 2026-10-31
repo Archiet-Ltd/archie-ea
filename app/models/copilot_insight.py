@@ -8,6 +8,7 @@ LLM is NOT called during insight generation — rule-based analysis only.
 import enum
 from datetime import datetime, timedelta
 from app import db
+from app.models.mixins import TenantMixin
 
 
 class InsightSeverity(str, enum.Enum):
@@ -24,8 +25,9 @@ class InsightType(str, enum.Enum):
     PATTERN_AVAILABLE = "pattern_available"     # High-completeness solution shares apps/caps
 
 
-class CopilotInsight(db.Model):
+class CopilotInsight(TenantMixin, db.Model):
     __tablename__ = "copilot_insights"
+    __tenant_parent__ = (('solution_id', 'solutions'),)
 
     id = db.Column(db.Integer, primary_key=True)
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id"), nullable=False, index=True)

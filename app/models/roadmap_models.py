@@ -61,10 +61,11 @@ work_package_capabilities = Table(
 )
 
 
-class RoadmapWorkPackage(db.Model):
+class RoadmapWorkPackage(TenantMixin, db.Model):
     """Enhanced Work Package model with automation support (renamed to avoid conflict)"""
 
     __tablename__ = "roadmap_work_packages"
+    __tenant_parent__ = (('created_by', 'users'),)
     __table_args__ = {"extend_existing": True}
 
     # Core fields
