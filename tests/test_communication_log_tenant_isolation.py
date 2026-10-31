@@ -125,9 +125,10 @@ def test_own_organisation_still_reads_and_writes_and_is_stamped_from_the_user(
     assert [e["subject"] for e in listed.get_json()] == ["Kick-off"]
 
     _login(client, login_as, db_session, ids["user_a"])
+    # the old log page now sends its own organisation on to the notes on the solution record
     page = client.get(f"/solutions/{ids['sol_a']}/communications")
-    assert page.status_code == 200
-    assert b"Kick-off" in page.data
+    assert page.status_code == 302
+    assert page.headers["Location"].endswith(f"/solutions/{ids['sol_a']}#record-notes")
 
 
 def test_table_filters_reads_by_organisation(app, db_session, make_org, tenant_ctx):

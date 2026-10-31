@@ -120,6 +120,51 @@ def test_a_signed_in_organisation_cannot_hang_a_row_from_another_organisations_p
     assert left == 0
 
 
+def test_a_row_naming_its_own_organisation_cannot_hang_from_another_organisations_parent(app, world):
+    """Organisation A is signed in and sets organization_id to A itself, but names B's solution.
+    Setting the column must not switch the parent check off: the write is refused."""
+    from flask import g
+    from sqlalchemy import text
+
+    from app import db
+    from app.middleware.tenant_isolation import TenantParentMismatch
+    from app.models.solution_sad_models import SolutionQualityAttribute
+
+    with app.test_request_context():
+        g.current_org_id = world["org_a"]
+        db.session.add(
+            SolutionQualityAttribute(
+                solution_id=world["sol_b"], attribute_name="planted", organization_id=world["org_a"]
+            )
+        )
+        with pytest.raises(TenantParentMismatch):
+            db.session.flush()
+        db.session.rollback()
+        left = db.session.execute(
+            text("SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s"),
+            {"s": world["sol_b"]},
+        ).scalar()
+    assert left == 0
+
+
+def test_a_row_naming_its_parents_organisation_is_accepted(app, world):
+    """The check refuses a mismatch only: a row that names the organisation its parent belongs to
+    is written as before."""
+    from flask import g
+
+    from app import db
+    from app.models.solution_sad_models import SolutionQualityAttribute
+
+    with app.test_request_context():
+        g.current_org_id = world["org_a"]
+        row = SolutionQualityAttribute(
+            solution_id=world["sol_a"], attribute_name="latency", organization_id=world["org_a"]
+        )
+        db.session.add(row)
+        db.session.commit()
+        assert row.organization_id == world["org_a"]
+
+
 def test_a_creator_from_another_organisation_does_not_block_the_signed_in_organisation(app, world):
     """A user named as creator is an actor, not a parent: a platform admin working inside
     organisation A creates a row under A even though their own account sits in B."""

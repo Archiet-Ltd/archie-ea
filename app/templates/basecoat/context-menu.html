@@ -1,0 +1,100 @@
+{# context-menu: port of shadcn/ui context-menu.tsx (pinned in compliance/upstream). Macros: context_menu, context_menu_trigger, context_menu_group, context_menu_portal, context_menu_sub, context_menu_radio_group, context_menu_content, context_menu_item, context_menu_sub_trigger, context_menu_sub_content, context_menu_checkbox_item, context_menu_radio_item, context_menu_label, context_menu_separator, context_menu_shortcut, context_menu_checkbox_item_indicator, context_menu_radio_item_indicator #}
+
+{#- ContextMenu: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro context_menu(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- ContextMenuTrigger -#}
+{% macro context_menu_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuGroup -#}
+{% macro context_menu_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuPortal: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro context_menu_portal(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- ContextMenuSub: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro context_menu_sub(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- ContextMenuRadioGroup -#}
+{% macro context_menu_radio_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-radio-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuContent -#}
+{% macro context_menu_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuItem -#}
+{% macro context_menu_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuSubTrigger -#}
+{% macro context_menu_sub_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-sub-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuSubContent -#}
+{% macro context_menu_sub_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-sub-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuCheckboxItem -#}
+{% macro context_menu_checkbox_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-checkbox-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuRadioItem -#}
+{% macro context_menu_radio_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-radio-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuLabel -#}
+{% macro context_menu_label(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-label', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuSeparator -#}
+{% macro context_menu_separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuShortcut -#}
+{% macro context_menu_shortcut(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-shortcut', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuCheckboxItem -#}
+{% macro context_menu_checkbox_item_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-checkbox-item-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ContextMenuRadioItem -#}
+{% macro context_menu_radio_item_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('context-menu-radio-item-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

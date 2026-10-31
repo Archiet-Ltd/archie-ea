@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Dict, List
 
 import pytest
 
@@ -95,7 +96,7 @@ def test_open_alex_rebuilds_the_abstract_in_order():
 def test_reddit_hackernews_bluesky_mastodon_each_keep_link_and_date():
     [r] = run(src.reddit, "https://www.reddit.com/", load("reddit"))
     assert r.url == "https://reddit.com/r/logistics/comments/abc/northwind/" and r.published.startswith("2025-10-19")
-    [h] = run(src.hackernews, "https://hn.algolia.com/", load("hackernews"))
+    [h] = run(src.hackernews, "https://hn.algolia.com/", load("hackernews"), ctx={"page_limit": 1})
     assert h.url == "https://news.ycombinator.com/item?id=4242" and h.published.startswith("2026-10-15")
     [b] = run(src.bluesky, "https://public.api.bsky.app/", load("bluesky"))
     assert b.url == "https://bsky.app/profile/fan.bsky.social/post/3kabc" and b.title.startswith("@fan.bsky.social: Northwind")
@@ -146,7 +147,7 @@ def test_a_source_needing_a_key_is_skipped_plainly_until_the_key_is_set(monkeypa
 def test_registry_is_every_operateiq_source():
     assert {s.key for s in src.REGISTRY} == {
         "news_api", "brave_search", "sec_edgar", "uspto", "open_alex", "reddit", "hackernews", "bluesky", "mastodon",
-        "rss", "yahoo_finance", "alpha_vantage"}
+        "rss", "yahoo_finance", "alpha_vantage", "llmlayer"}
 
 
 def test_http_retries_then_says_what_happened():
@@ -180,6 +181,157 @@ def test_factor_and_quadrant_rules():
     assert service.swot_quadrant(True, 0.6) == "strength" and service.swot_quadrant(True, -0.7) == "weakness"
     assert service.swot_quadrant(False, 0.6) == "threat" and service.swot_quadrant(False, -0.7) == "opportunity"
     assert service.swot_quadrant(True, 0.1) is None and service.swot_quadrant(True, None) is None
+
+
+# ----------------------------------------------------------------------------- new mode tests (pagination, subreddit, sort, top/ask, author feed, timeline, key rotation, LLMLayer)
+
+class SequenceFakeHttp:
+    """FakeHttp that returns sequential responses for the same prefix."""
+    def __init__(self, sequences: Dict[str, List[Any]]):
+        self.sequences = {k: list(v) for k, v in sequences.items()}
+        self.call_counts: Dict[str, int] = {}
+
+    def _body(self, url: str, kw):
+        for prefix, responses in self.sequences.items():
+            if url.startswith(prefix):
+                idx = self.call_counts.get(prefix, 0)
+                if idx >= len(responses):
+                    raise AssertionError("no more responses for " + prefix)
+                self.call_counts[prefix] = idx + 1
+                body = responses[idx]
+                if isinstance(body, Exception):
+                    raise body
+                return body
+        raise AssertionError("unexpected address " + url)
+
+    def json(self, url: str, **kw):
+        return self._body(url, kw)
+
+    def text(self, url: str, **kw):
+        return self._body(url, kw)
+
+
+def test_reddit_pagination_subreddit_sort(monkeypatch):
+    """Reddit: pagination (page_limit), per-subreddit search, and sort order."""
+    # Pagination: two pages
+    http = SequenceFakeHttp({
+        "https://www.reddit.com/r/all/": [load("reddit_pagination"), load("reddit_page2")],
+    })
+    items = src.reddit(http, COMPANY, {"page_limit": 2})
+    assert len(items) == 2
+    assert items[0].title == "Northwind Freight page 1 post"
+    assert items[1].title == "Northwind Freight page 2 post"
+    # Subreddit
+    http = FakeHttp({"https://www.reddit.com/r/logistics/": load("reddit_subreddit")})
+    items = src.reddit(http, COMPANY, {"subreddit": "logistics", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].details["subreddit"] == "logistics"
+    # Sort order
+    http = FakeHttp({"https://www.reddit.com/r/all/": load("reddit_sort")})
+    items = src.reddit(http, COMPANY, {"reddit_sort": "top", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].details["score"] == 100
+
+
+def test_hackernews_top_ask_pagination(monkeypatch):
+    """Hacker News: top stories, Ask HN, and pagination."""
+    # Top stories
+    http = SequenceFakeHttp({
+        "https://hacker-news.firebaseio.com/v0/topstories.json": [[1001]],
+        "https://hacker-news.firebaseio.com/v0/item/1001.json": [load("hackernews_item")],
+    })
+    items = src.hackernews(http, COMPANY, {"hn_mode": "top", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].title == "Northwind Freight top story"
+    assert items[0].details["points"] == 200
+    # Ask HN
+    http = FakeHttp({"https://hn.algolia.com/": load("hackernews_ask")})
+    items = src.hackernews(http, COMPANY, {"hn_mode": "ask", "page_limit": 1})
+    assert len(items) == 1
+    assert items[0].title == "Ask HN: How does Northwind Freight handle routing?"
+    assert items[0].details.get("type") == "ask_hn"
+    # Search pagination (two pages)
+    http = SequenceFakeHttp({
+        "https://hn.algolia.com/": [load("hackernews"), load("hackernews_page2")],
+    })
+    items = src.hackernews(http, COMPANY, {"hn_mode": "search", "page_limit": 2})
+    assert len(items) == 2
+    assert items[0].title == "Northwind Freight publishes its routing engine"
+    assert items[1].title == "Northwind Freight page 2 story"
+
+
+def test_bluesky_author_feed(monkeypatch):
+    """Bluesky: author feed mode."""
+    http = FakeHttp({"https://public.api.bsky.app/": load("bluesky_author")})
+    items = src.bluesky(http, COMPANY, {"bluesky_mode": "author", "bluesky_author": "northwind.bsky.social"})
+    assert len(items) == 2
+    assert items[0].title.startswith("@northwind.bsky.social: Northwind Freight announces")
+    assert items[1].title.startswith("@northwind.bsky.social: Northwind Freight hiring")
+    assert items[0].url == "https://bsky.app/profile/northwind.bsky.social/post/post1"
+    # Search mode still works
+    http = FakeHttp({"https://public.api.bsky.app/": load("bluesky")})
+    items = src.bluesky(http, COMPANY, {"bluesky_mode": "search"})
+    assert len(items) == 1
+    assert items[0].title.startswith("@fan.bsky.social: Northwind")
+
+
+def test_mastodon_timeline_instance(monkeypatch):
+    """Mastodon: public timeline and configurable instance."""
+    # Public timeline
+    http = FakeHttp({"https://mastodon.social/": load("mastodon_timeline")})
+    items = src.mastodon(http, COMPANY, {"mastodon_mode": "timeline"})
+    assert len(items) == 2
+    assert items[0].title.startswith("@northwind: Northwind Freight public")
+    assert items[0].details["instance"] == "https://mastodon.social"
+    # Configurable instance
+    http = FakeHttp({"https://mastodon.example/": load("mastodon_instance")})
+    items = src.mastodon(http, COMPANY, {"mastodon_mode": "search", "mastodon_instance": "https://mastodon.example"})
+    assert len(items) == 1
+    assert items[0].details["instance"] == "https://mastodon.example"
+    assert "mastodon.example" in items[0].url
+
+
+def test_brave_key_rotation(monkeypatch):
+    """Brave: rotation over BRAVE_SEARCH_API_KEYS (comma-separated), falling back to BRAVE_SEARCH_API_KEY."""
+    # Multiple keys in BRAVE_SEARCH_API_KEYS
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEYS", "key1,key2,key3")
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    http = FakeHttp({"https://api.search.brave.com/": load("brave_search")})
+    items = src.brave_search(http, COMPANY, {})
+    assert len(items) == 1
+    assert items[0].title == "Northwind Freight logistics profile"
+    # Fallback to BRAVE_SEARCH_API_KEY
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEYS", raising=False)
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fallback-key")
+    http = FakeHttp({"https://api.search.brave.com/": load("brave_search")})
+    items = src.brave_search(http, COMPANY, {})
+    assert len(items) == 1
+    # No key at all -> skipped
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    http = FakeHttp({})
+    with pytest.raises(src.SourceFailed, match="needs BRAVE_SEARCH_API_KEY"):
+        src.brave_search(http, COMPANY, {})
+
+
+def test_llmlayer_skipped_without_key(monkeypatch):
+    """LLMLayer: fallback reader that is skipped when LLMLAYER_API_KEY is absent."""
+    monkeypatch.delenv("LLMLAYER_API_KEY", raising=False)
+    http = FakeHttp({})
+    with pytest.raises(src.SourceFailed, match="needs LLMLAYER_API_KEY"):
+        src.llmlayer(http, COMPANY, {})
+    # With key
+    monkeypatch.setenv("LLMLAYER_API_KEY", "test-key")
+    http = FakeHttp({"https://api.llmlayer.ai/": load("llmlayer")})
+    items = src.llmlayer(http, COMPANY, {})
+    assert len(items) == 1
+    assert items[0].title == "Northwind Freight LLMLayer result"
+    assert items[0].url == "https://llmlayer.example/northwind"
+    # Skipped reason
+    monkeypatch.delenv("LLMLAYER_API_KEY", raising=False)
+    reason = src.skipped_reason(src.BY_KEY["llmlayer"], {})
+    assert reason == "needs LLMLAYER_API_KEY to be set"
+    monkeypatch.setenv("LLMLAYER_API_KEY", "test-key")
+    assert src.skipped_reason(src.BY_KEY["llmlayer"], {}) is None
 
 
 # ----------------------------------------------------------------------------- service, against the database

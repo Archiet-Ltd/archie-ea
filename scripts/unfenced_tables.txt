@@ -168,7 +168,6 @@ element_templates
 enterprise_capabilities
 equipment
 error_events
-exchange_rates
 exception_process
 external_systems
 extraction_feedback
@@ -252,15 +251,14 @@ process_actor_raci
 process_application_mapping
 process_embeddings
 process_role_raci
-product_inquiries
 product_taxonomy
 production_lines
 production_orders
 project_constraints
 project_notes
 project_resources
-public_visitor_events
-quality_attributes
+published_api_specs
+
 rag_metrics
 rag_queries
 rag_results
@@ -284,7 +282,6 @@ roadmap_gaps
 roadmap_scenarios
 roadmap_work_packages
 role_permissions
-roles
 runtime_compliance_checks
 salesforce_config_metadata
 sap_metadata
@@ -295,7 +292,6 @@ scoring_configs
 scoring_configurations
 security_scans
 service_dependency
-service_incidents
 service_level_agreements
 service_realization
 sidebar_menu_items
@@ -334,7 +330,7 @@ systems
 taxonomy_mappings
 tco_benchmarks
 tco_calculations
-technical_capability_vendor_mappings
+
 technology_capabilities
 technology_capability
 technology_roadmap_initiatives
@@ -354,7 +350,7 @@ unified_capability_vendor_organization_mappings
 unified_detection_runs
 unified_duplicate_groups
 usage_analytics
-usage_events
+
 user_preferences
 user_roles
 user_sessions
@@ -390,11 +386,3 @@ workflow_nodes
 workflow_pipelines
 workflow_run_watchers
 workflow_templates
-# oauth_authorization_codes: redeemed by hash at the token endpoint before an organisation is known
-# oauth_clients: registered before any user or organisation exists (dynamic client registration)
-# oauth_tokens: looked up by token hash before the organisation is known; the row carries organization_id and every use is checked against it
-oauth_authorization_codes
-oauth_clients
-oauth_tokens
-# reference_number_counters: global allocation counters, no tenant data, runtime role insert/update only
-reference_number_counters
