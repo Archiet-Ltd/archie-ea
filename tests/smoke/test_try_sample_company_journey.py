@@ -8,6 +8,7 @@ content; the sample indicator is visible; clicks "Remove it", reads the
 preview, confirms, and the applications list and Ask are empty again. A second
 organisation's counts are unchanged throughout.
 """
+import os
 import re
 import uuid
 
@@ -90,12 +91,21 @@ def _load_sample_from_ask(page, base):
     expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
-def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seeded):
+WALK = os.environ.get("SAMPLE_WALK_DIR")
+
+
+def _shot(page, name, width):
+    if WALK:
+        page.screenshot(path=os.path.join(WALK, "%s-%d.png" % (name, width)), full_page=True)
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seeded, width):
     """The sample company journey: load, ask and read a cited answer, remove, reload, see it gone."""
     cto_email, cto_org_id = _empty_organisation_user(live_server)
     seeded_org_id = seeded["ids"]["org"]
 
-    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context = browser.new_context(viewport={"width": width, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)
     page = context.new_page()
 
@@ -116,12 +126,14 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         # Load the sample from the chat's first screen
         _load_sample_from_ask(page, live_server)
         expect(page.get_by_text("You are looking at the sample company")).to_be_visible()
+        _shot(page, "1-sample-loaded", width)
         sample_apps = _count_rows(cto_org_id, "application_components")
         assert sample_apps >= 8
 
         # Ask a question and read a cited answer
         answer = ask(page, live_server, "What breaks if Payments service fails")
         assert answer.locator("[data-answer-row]").count() >= 1
+        _shot(page, "2-cited-answer", width)
         citations = answer.locator("[data-citation]")
         assert citations.count() >= 1, "the answer cites no source"
         for citation in citations.all():
@@ -129,13 +141,14 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
 
         # The applications list agrees with what was stored
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Payments service", exact=False).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("a:visible").filter(has_text="Payments service").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Remove it: one plain confirmation
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_role("button", name="Remove it", exact=True).first.click()
         confirm = page.locator('[data-testid="sample-company-remove-confirm"]')
         expect(confirm).to_be_visible(timeout=PAGE_TIMEOUT)
+        _shot(page, "3-confirm", width)
         confirm.click()
         expect(page.get_by_text("Sample company removed")).to_be_visible(timeout=PAGE_TIMEOUT)
 
@@ -149,6 +162,7 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         expect(chart).to_contain_text("Additions logged")
         expect(chart).not_to_contain_text("Records added")
         expect(page.get_by_test_id("year-card")).to_contain_text("Additions logged in the change history")
+        _shot(page, "4-after-removal-reload", width)
         connect = page.get_by_test_id("overview-connect")
         expect(connect).to_be_visible()
         assert _count_rows(cto_org_id, "application_components") == 0
@@ -164,6 +178,7 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         page.wait_for_load_state("domcontentloaded")
         assert "/dashboard/overview" not in page.url
         assert len(page.locator("main").first.inner_text().strip()) > 40
+        _shot(page, "5-connect-landing", width)
 
         # The other organisation kept everything
         assert _count_elements(live_server, page, seeded_org_id) == seeded_elements
