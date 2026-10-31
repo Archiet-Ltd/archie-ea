@@ -49,7 +49,7 @@
   {% if owner %}
   <span class="text-sm text-muted-foreground" data-testid="record-owner">Owner <span class="font-medium text-foreground">{{ owner }}</span></span>
   {% else %}
-  <a href="{{ base }}/edit" class="text-sm text-primary hover:underline" data-testid="record-owner">No owner yet. Name one</a>
+  {% if actions.can_edit %}<a href="{{ base }}/edit" class="text-sm text-primary hover:underline" data-testid="record-owner">No owner yet. Name one</a>{% else %}<span class="text-sm text-muted-foreground" data-testid="record-owner">No owner yet. The author or an administrator can name one.</span>{% endif %}
   {% endif %}
   {% if programme %}
   <span class="text-muted-foreground/60" aria-hidden="true">·</span>
@@ -81,7 +81,7 @@
     {% call ui.dropdown_menu_trigger(variant='outline', size='sm', attrs={'data-testid': 'record-more'}) %}{{ lucide('ellipsis') }}More{% endcall %}
     {% call ui.dropdown_menu_content(align='end', class='w-56') %}
       {{ ui.dropdown_menu_item(text='Compare options', href=base ~ '/options-advisor', attrs={'data-testid': 'record-compare'}) }}
-      {{ ui.dropdown_menu_item(text='Download document', href=base ~ '/export/sad', attrs={'data-testid': 'record-download'}) }}
+      {% if actions.can_edit %}{{ ui.dropdown_menu_item(text='Download document', href=base ~ '/export/sad', attrs={'data-testid': 'record-download'}) }}{% endif %}
       {{ ui.dropdown_menu_item(text='Ask about this solution', href='/ai-chat?q=' ~ ('What does the solution "' ~ solution.name ~ '" change, what does it cost and what should happen next?')|urlencode, attrs={'data-testid': 'record-ask'}) }}
     {% endcall %}
   {% endcall %}
@@ -111,7 +111,7 @@
             <p class="text-sm leading-6 text-foreground" data-testid="record-problem">{{ problem }}</p>
             {% else %}
             <p class="text-sm text-muted-foreground" data-testid="record-problem">No problem statement yet. Say in a sentence what this solution fixes.</p>
-            <div class="mt-3">{{ button(text='Add the problem statement', variant='outline', size='sm', href=base ~ '/edit') }}</div>
+            {% if actions.can_edit %}<div class="mt-3">{{ button(text='Add the problem statement', variant='outline', size='sm', href=base ~ '/edit') }}</div>{% endif %}
             {% endif %}
           {% endcall %}
         {% endcall %}
@@ -560,7 +560,7 @@
           {% endcall %}
           {% endif %}
           {% if _unset %}
-          <p class="{{ 'mt-4 ' if _set }}text-sm text-muted-foreground" data-testid="record-properties-unset">Not set yet: {{ _unset|join(', ')|lower|capitalize }}. <a href="{{ base }}/edit" class="font-medium text-foreground hover:underline">Edit</a></p>
+          <p class="{{ 'mt-4 ' if _set }}text-sm text-muted-foreground" data-testid="record-properties-unset">Not set yet: {{ _unset|join(', ')|lower|capitalize }}.{% if actions.can_edit %} <a href="{{ base }}/edit" class="font-medium text-foreground hover:underline">Edit</a>{% endif %}</p>
           {% endif %}
         {% endcall %}
       {% endcall %}

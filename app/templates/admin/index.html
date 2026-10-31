@@ -234,6 +234,7 @@
                             </div>
                         </div>
                     </a>
+                    {% if is_platform_administrator() %}
                     <a href="{{ url_for('admin.seed_management') }}" class="block group">
                         <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-success/10 group-hover:bg-success/15 transition-colors">
@@ -245,6 +246,7 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                 </div>
             </div>
 
@@ -263,6 +265,7 @@
                     <div class="flex-1 h-px bg-border/50"></div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {% if is_platform_administrator() %}
                     <a href="{{ url_for('main.framework_management.dashboard') }}" class="block group">
                         <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
@@ -274,6 +277,8 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
+                    {% if is_platform_administrator() %}
                     <a href="{{ url_for('framework_config_ui.framework_config_dashboard') }}" class="block group">
                         <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
@@ -285,6 +290,7 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                     <a href="{{ url_for('batch_import_view.dashboard') }}" class="block group">
                         <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-warning/10 group-hover:bg-warning/15 transition-colors">

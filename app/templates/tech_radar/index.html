@@ -38,6 +38,7 @@
 <div class="p-6 space-y-6">
 {{ page_shell(title='Technology radar', subtitle='Adopt, trial, assess or hold for each technology in your model',
               breadcrumb=[('Home', url_for('main.index')), ('Technology radar', none)]) }}
+{% if not may_classify %}<p class="text-sm text-muted-foreground" data-testid="radar-readonly-note">Architects, the CTO and administrators place technologies on the radar and change their rationale.</p>{% endif %}
 
 {% if state.total_candidates == 0 %}
   {% call ui.card() %}
@@ -60,7 +61,7 @@
   {% endif %}
   {#- The detail columns only exist once something is placed; until then one sentence says how to start. -#}
   {%- set placed = state.classified_count > 0 -%}
-  {% macro _unplaced_notice() %}<span data-testid="radar-unclassified">Nothing is on the radar yet. Open the menu at the end of a row to place a technology in adopt, trial, assess or hold; its rationale, review date and requester then show here.</span>{% endmacro %}
+  {% macro _unplaced_notice() %}<span data-testid="radar-unclassified">Nothing is on the radar yet.{% if may_classify %} Open the menu at the end of a row to place a technology in adopt, trial, assess or hold; its rationale, review date and requester then show here.{% endif %}</span>{% endmacro %}
 
   {#- One list of every technology: placed ones in ring order, then the ones waiting for a ring. -#}
   {%- set all_rows = [] -%}
@@ -89,10 +90,12 @@
     {% call table_cell(class='hidden xl:table-cell max-w-[240px] truncate') %}{% if row.entry %}<span data-testid="radar-initiative-{{ el.id }}">{% if row.entry.requesting_initiative %}{{ row.entry.requesting_initiative.name }}{% else %}<span class="text-muted-foreground">Not linked</span>{% endif %}</span>{% endif %}{% endcall %}
     {% endif %}
     {% call table_cell(class='text-right') %}
+      {% if may_classify %}
       {% call row_actions(label='Actions for ' ~ (el.name or 'this technology')) %}
         {% for r in rings if r != row.ring %}{{ _move_item(el, r, ('Move to ' if row.ring else 'Place in ') ~ ring_labels[r]) }}{% endfor %}
         {{ row_action(('Edit rationale and review date' if row.entry else 'Place with a rationale'), href=url_for('tech_radar.classify_form', element_id=el.id), separator_before=true, testid='radar-place-' ~ el.id) }}
       {% endcall %}
+      {% endif %}
     {% endcall %}
   {% endcall %}
 
