@@ -199,6 +199,10 @@ def test_two_threads_never_take_the_same_job_and_a_first_read_comes_before_a_mod
     assert service._claim(first_read.id) is True
     assert service._claim(first_read.id) is False, "a second thread took the same job"
     assert db_session.get(Job, first_read.id).status == "in_progress"
+    # Sharpened (websiteread02): one organisation runs one job at a time, so the model pass of the organisation whose
+    # read is in progress waits for it; it is next once the read has finished.
+    assert service._next_job() is None, "a second job of an organisation with a job in progress was picked"
+    service.update_job_status(first_read.id, "completed", result={})
     assert service._next_job().id == long_job.id
 
 

@@ -103,6 +103,8 @@ else:
 
 
 class Config:
+    # Background job worker threads; one organisation never runs two jobs at once, different ones run in parallel.
+    JOB_WORKER_THREADS = int(os.environ.get("JOB_WORKER_THREADS", "3"))
     # Vendor detection reads the public DNS records of an organisation's own website domain.
     VENDOR_DNS_LOOKUPS = True
     # Webhook and compliance-check URLs may point at loopback/private hosts only

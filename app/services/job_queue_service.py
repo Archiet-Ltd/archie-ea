@@ -20,7 +20,9 @@ import_all_models()
 
 logger = logging.getLogger(__name__)
 
-WORKER_THREADS = 2  # a long job holds one thread; another organisation's first read has the other
+# Worker threads when the app sets no JOB_WORKER_THREADS: a long job holds one, and another organisation's first read
+# always finds a free one. Set JOB_WORKER_THREADS in the environment (read by Config) to change it.
+WORKER_THREADS = 3
 # A job that has been running for longer than its task allows was cut off (a restart, a crash); one table holds the limits.
 STALE_AFTER_MINUTES = {"website_profile_crawl": 15, "website_profile_crawl_more": 15}
 DEFAULT_STALE_AFTER_MINUTES = 30
@@ -40,6 +42,22 @@ class JobQueueService:
         self._worker_threads: List[threading.Thread] = []
         self._last_sweep = 0.0
         self._sweep_lock = threading.Lock()
+        self._claim_lock = threading.Lock()  # next-job and claim happen together, so two threads never pick one organisation twice
+
+    def worker_threads(self, requested: Optional[int] = None) -> int:
+        """How many worker threads to run: the argument, else the app's JOB_WORKER_THREADS, else WORKER_THREADS."""
+        if requested is None and self.app is not None:
+            requested = self.app.config.get("JOB_WORKER_THREADS")
+        try:
+            return max(1, int(requested)) if requested is not None else WORKER_THREADS
+        except (TypeError, ValueError):
+            return WORKER_THREADS
+
+    def all_workers_busy(self) -> bool:
+        """True when every worker thread has a job in progress (or no worker is running), so a new job must wait."""
+        total = self.worker_threads()
+        busy = Job.query.filter_by(status=JobStatus.IN_PROGRESS.value).count()
+        return busy >= total
 
     def create_job(
         self,
@@ -139,7 +157,7 @@ class JobQueueService:
         logger.info(f"Cancelled job {job_id}")
         return True
 
-    def start_worker(self):
+    def start_worker(self, threads: Optional[int] = None):
         """Start the background worker threads (after recovering the jobs a restart cut off)."""
         if any(t.is_alive() for t in self._worker_threads):
             logger.warning("Worker threads already running")
@@ -152,7 +170,7 @@ class JobQueueService:
             logger.warning("could not recover interrupted jobs at worker start", exc_info=True)
         self._worker_threads = [
             threading.Thread(target=self._worker_loop, name="job-worker-%d" % number, daemon=True)
-            for number in range(1, WORKER_THREADS + 1)
+            for number in range(1, self.worker_threads(threads) + 1)
         ]
         for thread in self._worker_threads:
             thread.start()
@@ -235,6 +253,16 @@ class JobQueueService:
         """The oldest due pending job; first reads come before the long jobs that can wait."""
         pending = Job.query.filter_by(status=JobStatus.PENDING.value).order_by(Job.id).limit(50).all()
         due = [j for j in pending if self._is_due(j)]
+        # One organisation runs one job at a time (a read and its model pass never overlap); others proceed in parallel.
+        busy = {
+            (j.payload or {}).get("organization_id")
+            for j in Job.query.filter_by(status=JobStatus.IN_PROGRESS.value).all()
+            if isinstance(j.payload, dict) and (j.payload or {}).get("organization_id") is not None
+        }
+        due = [
+            j for j in due
+            if not (isinstance(j.payload, dict) and j.payload.get("organization_id") in busy)
+        ]
         due.sort(key=lambda j: (j.task in LONG_TASKS, j.id))
         return due[0] if due else None
 
@@ -256,9 +284,11 @@ class JobQueueService:
                 # Use application context for database operations
                 self._sweep_if_due()
                 with self.app.app_context():
-                    job = self._next_job()
+                    with self._claim_lock:
+                        job = self._next_job()
+                        claimed = bool(job) and self._claim(job.id)
 
-                    if job and self._claim(job.id):
+                    if claimed:
                         self._process_job(job)
                     else:
                         # No jobs (or another thread took it first), sleep briefly
