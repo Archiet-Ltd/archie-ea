@@ -34,6 +34,7 @@ from app.services.rate_limiter import rate_limit
 from app.services.vendor_analysis.capability_based_vendor_selector import (
     CapabilityBasedVendorSelector,
 )
+from app.utils.plain_errors import render_plain_error
 
 main = Blueprint("main", __name__)
 
@@ -1121,18 +1122,18 @@ def track_plan_click():
 
 @main.errorhandler(404)
 def not_found_error(error):
-    return render_template("errors/404.html"), 404
+    return render_plain_error(404)
 
 
 @main.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
-    return render_template("errors/500.html"), 500
+    return render_plain_error(500)
 
 
 @main.errorhandler(403)
 def forbidden_error(error):
-    return render_template("errors/403.html"), 403
+    return render_plain_error(403)
 
 
 # ============================================================================

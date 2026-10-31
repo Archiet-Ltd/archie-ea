@@ -253,12 +253,9 @@
    "app/templates/architecture_assistant/archimate_model_viewer.html": 1,
    "app/templates/errors/400.html": 4,
    "app/templates/errors/401.html": 4,
-   "app/templates/errors/403.html": 4,
-   "app/templates/errors/404.html": 7,
    "app/templates/errors/429.html": 4,
-   "app/templates/errors/500.html": 7,
    "app/templates/errors/503.html": 7,
-   "app/templates/settings/index.html": 2,
+   "app/templates/errors/standalone_error.html": 7,
    "app/templates/solutions/blueprint.html": 1
   },
   "public-card/second-card-rule": {
@@ -274,10 +271,8 @@
    "app/templates/solutions/export_executive.html": 1
   },
   "public-stepper/second-stepper-rule": {
-   "app/templates/archimate_roadmap/enhanced_roadmap_fixed.html": 11,
    "app/templates/capability_roadmap/capability_roadmap.html": 1,
-   "app/templates/solutions/export_executive.html": 5,
-   "app/templates/strategic_roadmap/enhanced_roadmap_fixed.html": 11
+   "app/templates/solutions/export_executive.html": 5
   },
   "public-table/second-table-rule": {
    "app/static/css/accessibility.css": 2,

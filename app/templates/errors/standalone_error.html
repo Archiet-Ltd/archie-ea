@@ -3,24 +3,22 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Page not found</title>
+    <title>{{ error_title }}</title>
+    <script>
+        (function() {
+            var stored = null;
+            try { stored = localStorage.getItem('theme'); } catch (e) {}
+            if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shadcn_tokens.css') }}">
     <style>
-        :root {
-            color-scheme: light;
-            --background: #ffffff;
-            --foreground: #0f172a;
-            --muted-foreground: #64748b;
-            --border: #e2e8f0;
-            --input: #e2e8f0;
-            --primary: #0f172a;
-            --primary-foreground: #ffffff;
-            --accent: #f8fafc;
-            --ring: rgba(15, 23, 42, 0.18);
-        }
         * { box-sizing: border-box; }
         body {
             margin: 0; min-height: 100vh;
-            background: var(--background); color: var(--foreground);
+            background: hsl(var(--background)); color: hsl(var(--foreground));
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
         main {
@@ -30,15 +28,15 @@
         .icon-wrap {
             width: 5rem; height: 5rem; margin: 0 auto 1.5rem;
             display: flex; align-items: center; justify-content: center;
-            border-radius: 9999px; background: rgba(100, 116, 139, 0.1);
+            border-radius: 9999px; background: hsl(var(--muted));
         }
-        .icon { width: 2.5rem; height: 2.5rem; color: var(--muted-foreground); }
+        .icon { width: 2.5rem; height: 2.5rem; color: hsl(var(--muted-foreground)); }
         .code {
             margin: 0 0 0.5rem; font-size: clamp(4.5rem, 14vw, 6rem);
             line-height: 1; font-weight: 800; letter-spacing: -0.04em;
         }
         .title { margin: 0 0 0.75rem; font-size: 1.5rem; line-height: 1.25; font-weight: 600; }
-        .copy { margin: 0 0 2rem; color: var(--muted-foreground); line-height: 1.7; }
+        .copy { margin: 0 0 2rem; color: hsl(var(--muted-foreground)); line-height: 1.7; }
         .actions { display: flex; flex-direction: column; gap: 0.75rem; justify-content: center; }
         .button {
             display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
@@ -47,11 +45,11 @@
             text-decoration: none; cursor: pointer;
             transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }
-        .button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
-        .button-primary { background: var(--primary); color: var(--primary-foreground); }
+        .button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+        .button-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
         .button-primary:hover { opacity: 0.9; }
-        .button-secondary { border-color: var(--input); background: var(--background); color: var(--foreground); }
-        .button-secondary:hover { background: var(--accent); }
+        .button-secondary { border-color: hsl(var(--input)); background: hsl(var(--background)); color: hsl(var(--foreground)); }
+        .button-secondary:hover { background: hsl(var(--accent)); }
         .button-icon { width: 1rem; height: 1rem; flex: 0 0 auto; }
         @media (min-width: 640px) { .actions { flex-direction: row; } }
     </style>
@@ -61,34 +59,24 @@
         <div class="wrap">
             <div class="icon-wrap" aria-hidden="true">
                 <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m13 3 3 3-3 3"></path><path d="M2 12h13l-3-3"></path>
-                    <path d="m2 6 3-3 3 3"></path><path d="M22 12H9l3 3"></path>
+                    {{ error_icon_paths|safe }}
                 </svg>
             </div>
 
-            <h1 class="code">404</h1>
-            <h2 class="title">We could not find that page</h2>
+            <h1 class="title" data-status="{{ error_status }}">{{ error_title }}</h1>
 
-            <p class="copy">
-                It may have been moved or removed, or the link may be out of date. Use the dashboard to find what you were looking for.
-            </p>
+            <p class="copy">{{ error_message }}</p>
 
             <div class="actions">
-                <a href="/" class="button button-primary">
+                <a href="/dashboard/overview" class="button button-primary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path>
                     </svg>
-                    Go to Dashboard
+                    Go to the dashboard
                 </a>
-                <button id="btn-go-back-404" type="button" class="button button-secondary" aria-label="Go back">
-                    <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path>
-                    </svg>
-                    Go Back
-                </button>
+                <a href="/status" class="button button-secondary">Service status</a>
             </div>
         </div>
     </main>
-    <script nonce="{{ csp_nonce }}">document.getElementById('btn-go-back-404').addEventListener('click', function(){ history.back(); });</script>
 </body>
 </html>
