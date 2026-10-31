@@ -137,6 +137,17 @@ POLICY = {
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
     "/admin/billing/":         set(),
+    # Setting up two-factor sign-in from a signed-in session is @login_required only:
+    # every persona may reach their own set-up screen (a person who does not need
+    # it is sent on to the dashboard, which is still a served page). The routes
+    # that make an administrator who has not enrolled come here first are the
+    # organisation-administrator pages below (invite, single sign-on); the real
+    # enrol-first behaviour is driven in test_mfa_first_week_journey.py and
+    # tests/test_mfa_first_week.py because this suite signs in with the
+    # administrator rule switched off.
+    "/account/mfa-enrol":      set(ARCHETYPES),
+    "/admin/invite-user":      set(),
+    "/admin/sso":              set(),
     # Interface Register (SAP S/4HANA Interface Register, Task 02): gated by
     # can_access_section(current_user, "data_integration") -- the same
     # section-based predicate the sidebar uses, not a requires_role()-style

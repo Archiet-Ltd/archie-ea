@@ -164,6 +164,9 @@ def run_signed_in_enrolment():
         flash("Two-factor sign-in is on.", "success")
         return redirect(target)
 
+    if request.method == "GET" and request.args.get("return"):
+        session[RETURN_KEY] = safe_next_url(request.args.get("return"), url_for("dashboard.overview"))
+        session.pop(TRIGGER_KEY, None)
     trigger = session.get(TRIGGER_KEY)
     open_window = mfa_service.may_defer_enrolment(user)
     context = {

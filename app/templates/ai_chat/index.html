@@ -148,7 +148,7 @@
                     {% call alert('info', title='Protect your workspace') %}
                     Set up two-factor sign-in now, it takes a minute. Required from {{ two_factor_notice.ends_on.strftime('%-d %B %Y') }}, or before you invite your team.
                     <span class="mt-2 flex flex-wrap items-center gap-2">
-                        {{ button(text='Set it up', size='sm', href=url_for('account.mfa_enrol'), testid='two-factor-set-up') }}
+                        {{ button(text='Set it up', size='sm', href=url_for('account.mfa_enrol', **{'return': url_for('unified_ai_chat.index')}), testid='two-factor-set-up') }}
                         {{ button(text='Later (' ~ two_factor_notice.days_left ~ (' day left)' if two_factor_notice.days_left == 1 else ' days left)'), variant='ghost', size='sm', attrs_dict={'@click': "window.localStorage.setItem('entelim-two-factor-notice-" ~ current_user.id ~ "', '1'); hidden = true", 'data-testid': 'two-factor-later'}) }}
                     </span>
                     {% endcall %}
