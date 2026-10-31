@@ -78,7 +78,7 @@ def _maturity(cap: Any) -> Dict[str, Any]:
             "assessed": getattr(cap, "maturity_assessment_date", None)}
 
 
-def _realizing_apps(cap_id: int) -> List[Dict[str, Any]]:
+def _realizing_apps(cap_id: int, organization_id: Any = None) -> List[Dict[str, Any]]:
     """Applications that realise / cover this capability."""
     from app.models.business_capabilities import (  # noqa: PLC0415
         ApplicationCapabilityCoverage,
@@ -107,7 +107,8 @@ def _realizing_apps(cap_id: int) -> List[Dict[str, Any]]:
     mapped = (db.session.query(ApplicationCapabilityMapping, ApplicationComponent)
               .join(ApplicationComponent,
                     ApplicationCapabilityMapping.application_component_id == ApplicationComponent.id)
-              .filter(ApplicationCapabilityMapping.business_capability_id == cap_id)
+              .filter(ApplicationCapabilityMapping.business_capability_id == cap_id,
+                      ApplicationCapabilityMapping.organization_id == organization_id)
               .limit(60).all())
     for mapping, app in mapped:
         if app.id in seen:
@@ -156,7 +157,7 @@ def build_capability_fact_sheet(cap: Any) -> Dict[str, Any]:
         "cap": cap,
         "completeness": _completeness(cap),
         "maturity": _maturity(cap),
-        "apps": _realizing_apps(cap.id),
+        "apps": _realizing_apps(cap.id, cap.organization_id),
         "children": _sub_capabilities(cap.id),
         "archimate_element_id": getattr(cap, "archimate_element_id", None),
     }
