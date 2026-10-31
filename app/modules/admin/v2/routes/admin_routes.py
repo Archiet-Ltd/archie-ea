@@ -14,6 +14,7 @@ url_for("admin.api_settings"))
 All routes preserved exactly from v1 admin_routes.py.
 """
 
+import re
 import logging
 import os
 
@@ -6133,6 +6134,23 @@ def power_platform_import():
 # Slack AI Architect Integration
 # ---------------------------------------------------------------------------
 
+_SLACK_CHANNEL_ID = re.compile(r"^[CGD][A-Z0-9]{2,}$")
+
+
+def _form_on(value):
+    """A switch posts "true"/"false"; a checkbox posts "1" or "on"."""
+    return (value or "").strip().lower() in ("1", "true", "on", "yes")
+
+
+def _slack_view(config, **extra):
+    """The stored Slack settings as the page may see them: secrets are reduced to whether they exist."""
+    view = {k: v for k, v in config.items() if k not in ("bot_token", "signing_secret")}
+    view["has_token"] = bool(config.get("bot_token"))
+    view["has_signing_secret"] = bool(config.get("signing_secret"))
+    view.update(extra)
+    return view
+
+
 @admin_bp_v2.route("/integrations/slack", methods=["GET", "POST"])
 @timed_route
 @login_required
@@ -6141,20 +6159,39 @@ def slack_integration():
     """GET/POST /admin/integrations/slack — Slack bot configuration."""
     from app.services.slack_architect_service import SlackArchitectService
 
+    config = SlackArchitectService.get_config()
     if request.method == "POST":
         bot_token = (request.form.get("bot_token") or "").strip()
         signing_secret = (request.form.get("signing_secret") or "").strip()
         monitored_channels = (request.form.get("monitored_channels") or "").strip()
-        portfolio_scan = request.form.get("portfolio_scan") == "1"
-        mention_response = request.form.get("mention_response") == "1"
+        portfolio_scan = _form_on(request.form.get("portfolio_scan"))
+        mention_response = _form_on(request.form.get("mention_response"))
+        errors = {}
+        if bot_token and not bot_token.startswith("xoxb-"):
+            errors["bot_token"] = "A Slack bot token starts with xoxb-. Copy it from your Slack app's OAuth & Permissions page."
+        elif not bot_token and not config.get("bot_token"):
+            errors["bot_token"] = "Enter the bot token from your Slack app's OAuth & Permissions page."
+        ids = [c.strip() for c in monitored_channels.split(",") if c.strip()]
+        if any(not _SLACK_CHANNEL_ID.match(c) for c in ids):
+            errors["monitored_channels"] = (
+                "Use Slack channel IDs separated by commas, such as C0123ABCDEF. "
+                "Channel names are not accepted; find the ID in the channel's details in Slack."
+            )
+        if errors:
+            view = _slack_view(
+                config,
+                monitored_channels=monitored_channels,
+                portfolio_scan=portfolio_scan,
+                mention_response=mention_response,
+            )
+            return render_template("admin/integrations_slack.html", config=view, errors=errors), 400
         SlackArchitectService.save_config(
-            bot_token, signing_secret, monitored_channels, portfolio_scan, mention_response
+            bot_token, signing_secret, ", ".join(ids), portfolio_scan, mention_response
         )
         flash("Slack configuration saved.", "success")
         return redirect(url_for("admin.slack_integration"))
 
-    config = SlackArchitectService.get_config()
-    return render_template("admin/integrations_slack.html", config=config)
+    return render_template("admin/integrations_slack.html", config=_slack_view(config), errors={})
 
 
 @admin_bp_v2.route("/integrations/slack/test", methods=["POST"])
