@@ -90,6 +90,10 @@
 #                           unset, step 5 is SKIPPED with a printed warning —
 #                           never silently treated as a pass.
 #   AUTO_ROLLBACK           1 (default) or 0 — see AUTO-ROLLBACK above.
+#   DEPLOY_BACKUP_COMMAND   command run on the droplet before anything changes
+#                           (default `bash deploy/archie-backup.sh`); empty skips
+#   ALLOW_DOWNTIME_MIGRATIONS / FORCE_FULL_SCHEMA_PASS
+#                           passed to schema-deploy (see deploy-schema.sh)
 #   DEPLOY_STATE_FILE       where the last verified SHA is recorded (default
 #                           <repo>/.deploy-state/last-verified-sha, gitignored
 #                           — this is local machine state, not shared via git,
@@ -154,21 +158,19 @@ EXPECTED_SHORT=""
 # failures for the rest of it. depends_on is a startup-ordering hint for a
 # full `docker compose up`, not a guarantee under a single targeted
 # `--force-recreate <service>` call — so the one-shot chain
-# (database-bootstrap -> schema-deploy -> database-acl) is now run
-# explicitly and synchronously in the foreground first. Each is `restart:
-# "no"`, so `docker compose up <service>` (no `-d`) blocks until it exits
-# and propagates its exit code — `up database-acl` alone is enough to also
-# run its own upstream dependencies (schema-deploy, database-bootstrap) in
-# order first, since compose still resolves depends_on within one `up`
-# invocation for services actually being started this call.
+# (database-bootstrap -> schema-deploy -> database-acl) is run explicitly and
+# synchronously first, as the steps listed inside do_deploy below.
 # ---------------------------------------------------------------------------
 do_deploy() {
     local ref=$1
     say "deploying $ref to $DROPLET:$APP_DIR"
-    remote "$APP_DIR" "$ref" <<'REMOTE'
+    remote "$APP_DIR" "$ref" "${DEPLOY_BACKUP_COMMAND-bash deploy/archie-backup.sh}" "${ALLOW_DOWNTIME_MIGRATIONS:-0}" "${FORCE_FULL_SCHEMA_PASS:-0}" <<'REMOTE'
 set -euo pipefail
 APP_DIR=$1
 REF=$2
+DEPLOY_BACKUP_COMMAND=$3
+ALLOW_DOWNTIME_MIGRATIONS=$4
+FORCE_FULL_SCHEMA_PASS=$5
 cd "$APP_DIR"
 git fetch --prune origin
 # Resolve to a full SHA now, after fetch, so a branch name means its current
@@ -200,23 +202,30 @@ else
     echo "already at $TARGET; checkout skipped (verification still runs)"
 fi
 echo "RESOLVED_COMMIT=$TARGET"
-# Force a fresh run of the whole one-shot schema chain on every deploy —
-# these are restart:"no" containers, so an already-Exited container from a
-# prior deploy would otherwise satisfy depends_on's completed_successfully
-# condition without re-running against the NEW schema at all.
-#
-# --exit-code-from is required, not cosmetic: `docker compose up <service>`
-# on its own always exits 0 regardless of whether the SERVICE's container
-# exited 0 or failed — verified directly (18 Sep 2026) by a database-acl run
-# that crashed with a real RuntimeError inside configure_roles.py yet the
-# surrounding `docker compose up` command still reported exit code 0. Without
-# --exit-code-from, `set -e` above would never see the failure and this
-# script would go on to force-recreate server anyway, on a schema that may
-# not have its grants applied — the exact failure mode this whole synchronous
-# reordering exists to close.
-docker compose rm -f database-bootstrap schema-deploy database-acl
-docker compose up --exit-code-from database-acl database-acl
-docker compose up -d --force-recreate server
+# The old server keeps serving until the new one is ready to take over, so
+# every step that can fail runs BEFORE the swap and a failure leaves the old
+# server untouched (set -e stops here; nothing below the failing line runs):
+#   1. back up the database (DEPLOY_BACKUP_COMMAND);
+#   2. build the images the one-shot steps and the server use;
+#   3. run database-bootstrap, schema-deploy and database-acl in that order.
+#      `run --rm --no-deps` starts exactly one container, waits for it, and
+#      returns its exit code, so a failing step stops the script. schema-deploy
+#      takes the quick exit when the database is at head and matches the models;
+#      a pending migration marked as needing downtime stops it with exit 3
+#      (rerun with ALLOW_DOWNTIME_MIGRATIONS=1 inside an agreed window);
+#   4. only then replace the server container. --no-deps stops compose from
+#      re-running the one-shot chain through depends_on, and --force-recreate
+#      still guarantees a fresh container from current config (see incident
+#      above: neither `restart` nor a plain `up -d` does).
+if [ -n "${DEPLOY_BACKUP_COMMAND:-}" ]; then
+    echo "backup: $DEPLOY_BACKUP_COMMAND"
+    bash -c "$DEPLOY_BACKUP_COMMAND"
+fi
+docker compose build server schema-deploy
+docker compose run --rm --no-deps database-bootstrap
+docker compose run --rm --no-deps -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy
+docker compose run --rm --no-deps database-acl
+docker compose up -d --no-deps --force-recreate server
 REMOTE
 }
 

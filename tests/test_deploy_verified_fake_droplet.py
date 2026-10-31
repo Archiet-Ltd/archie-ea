@@ -59,14 +59,23 @@ S="$FAKE_STATE"
 echo "docker $*" >> "$S/docker.log"
 if [ "$1" = compose ]; then
     case "$2" in
-        rm) exit 0 ;;
+        build) exit "${FAKE_BUILD_EXIT:-0}" ;;
+        run)
+            # One-shot steps. Each is logged above; FAKE_FAIL_STEP names the one
+            # that fails, as a real schema or ACL failure would.
+            for arg in "$@"; do
+                if [ "$arg" = "${FAKE_FAIL_STEP:-none}" ]; then exit 1; fi
+            done
+            if [[ " $* " == *" database-acl "* ]]; then
+                echo "database-acl-1  | postgres://app:hunter2-SECRET@db:5432/archie"
+            fi
+            exit 0 ;;
         up)
             if [[ " $* " == *" --force-recreate "* ]]; then
                 git rev-parse HEAD > "$S/running"
                 exit 0
             fi
-            echo "database-acl-1  | postgres://app:hunter2-SECRET@db:5432/archie"
-            exit "${FAKE_ACL_EXIT:-0}" ;;
+            exit 1 ;;
     esac
     exit 0
 fi
@@ -209,6 +218,7 @@ class FakeDroplet:
         env = {
             **os.environ,
             "PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
+            "DEPLOY_BACKUP_COMMAND": "true",
             "DROPLET": "root@fake-droplet",
             "APP_DIR": self.app.as_posix(),
             "FAKE_STATE": self.state.as_posix(),
@@ -398,6 +408,39 @@ def test_the_deploy_script_itself_is_the_committed_one():
     """The wrapper must not change verification logic: these markers are what
     the workflow's classifier and the runbook depend on."""
     text = SCRIPT.read_text(encoding="utf-8")
-    for marker in ("docker compose up -d --force-recreate server", "docker compose rm -f database-bootstrap schema-deploy database-acl",
+    for marker in ("docker compose up -d --no-deps --force-recreate server", "docker compose run --rm --no-deps database-bootstrap",
+                   "docker compose build server schema-deploy",
                    "DEPLOY VERIFIED: commit", "ROLLED BACK SUCCESSFULLY", "nothing to roll back to"):
         assert marker in text
+
+
+def _compose_steps(droplet):
+    return [c for c in droplet.docker_calls() if c.startswith("docker compose")]
+
+
+def test_the_server_is_replaced_only_after_the_schema_steps_have_run(droplet):
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    steps = _compose_steps(droplet)
+    order = ["build", "run --rm --no-deps database-bootstrap", "ALLOW_DOWNTIME_MIGRATIONS", "run --rm --no-deps database-acl", "up -d --no-deps --force-recreate server"]
+    positions = [next(i for i, c in enumerate(steps) if marker in c) for marker in order]
+    assert positions == sorted(positions) and len(set(positions)) == len(order), steps
+
+
+@pytest.mark.parametrize("step", ["database-bootstrap", "schema-deploy", "database-acl"])
+def test_a_failing_schema_step_leaves_the_old_server_serving(droplet, step):
+    """No swap happens: the container keeps running the commit it was on."""
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0", FAKE_FAIL_STEP=step)
+
+    assert rc == 1, out
+    assert droplet.running() == sha(droplet, "A")
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+
+
+def test_a_failing_backup_changes_nothing(droplet):
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0", DEPLOY_BACKUP_COMMAND="false")
+
+    assert rc == 1, out
+    assert droplet.running() == sha(droplet, "A")
+    assert _compose_steps(droplet) == []
