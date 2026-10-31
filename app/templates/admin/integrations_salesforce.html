@@ -1,139 +1,141 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
 {% block title %}Salesforce Org Discovery{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" x-data="salesforceIntegration()">
-    {{ page_header(
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8" x-data="salesforceIntegration()">
+    {{ page_shell(
         title='Salesforce Org Discovery',
-        description='Scan a Salesforce org for Lightning apps and installed AppExchange packages, and import them into the Entelim application portfolio — optionally straight into a Transformation Programme baseline.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Salesforce Discovery'}
+        subtitle='Scan a Salesforce org for Lightning apps and installed AppExchange packages, and import them into the Entelim application portfolio, optionally straight into a Transformation Programme baseline.',
+        breadcrumb=[
+            ('Home', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('Salesforce Discovery', None)
         ]
     ) }}
 
-    <div x-cloak x-show="alert.message"
-         :class="alert.kind === 'error' ? 'border-destructive/30 bg-destructive/10 text-destructive-emphasis' : 'border-success/30 bg-success/10 text-success-emphasis'"
-         class="mb-6 rounded-md border p-4 text-sm" x-text="alert.message"></div>
-
-    <!-- Credentials card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div>
-                <h2 class="text-base font-semibold">Connected App Credentials</h2>
-                <p class="text-sm text-muted-foreground mt-0.5">
-                    Salesforce Connected App with the
-                    <code class="text-xs bg-muted px-1 py-0.5 rounded">Client Credentials Flow</code>
-                    enabled and an API-enabled run-as user.
-                </p>
-            </div>
-            {% if sf_config.configured %}
-            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Configured
-            </span>
-            {% else %}
-            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">Not configured</span>
-            {% endif %}
+    <div class="mb-6 space-y-2" aria-live="polite">
+        <div x-cloak x-show="notice.kind === 'saved'" data-testid="sf-saved">
+            {% call ui.alert() %}{{ ui.alert_description(attrs={'x-text': 'notice.message'}) }}{% endcall %}
         </div>
-        <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label for="sf-instance" class="block text-sm font-medium mb-1">Instance URL</label>
-                <input type="url" id="sf-instance" x-model="creds.instance_url"
-                       placeholder="https://yourorg.my.salesforce.com"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
-            <div>
-                <label for="sf-client-id" class="block text-sm font-medium mb-1">Consumer Key (Client ID)</label>
-                <input type="text" id="sf-client-id" x-model="creds.client_id"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" autocomplete="off">
-            </div>
-            <div>
-                <label for="sf-client-secret" class="block text-sm font-medium mb-1">Consumer Secret</label>
-                <input type="password" id="sf-client-secret" x-model="creds.client_secret"
-                       placeholder="{{ '••••••••  (saved)' if sf_config.configured else '' }}"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" autocomplete="new-password">
-            </div>
+        <div x-cloak x-show="notice.kind === 'ok'" data-testid="sf-result-ok">
+            {% call ui.alert() %}{{ ui.alert_description(attrs={'x-text': 'notice.message'}) }}{% endcall %}
         </div>
-        <div class="px-6 pb-5 flex items-center gap-3">
-            <button type="button" @click="saveCredentials()" :disabled="busy"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Save Credentials
-            </button>
-            <button type="button" @click="testConnection()" :disabled="busy"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Test Connection
-            </button>
+        <div x-cloak x-show="notice.kind === 'error'" data-testid="sf-result-error">
+            {% call ui.alert(variant='destructive') %}{{ ui.alert_description(attrs={'x-text': 'notice.message'}) }}{% endcall %}
         </div>
     </div>
 
-    <!-- Discovery card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div>
-                <h2 class="text-base font-semibold">Org Discovery</h2>
-                <p class="text-sm text-muted-foreground mt-0.5">Lightning apps + installed AppExchange packages.</p>
+    <form class="space-y-6" data-testid="sf-form" novalidate @submit.prevent="saveCredentials()">
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                <div class="flex items-start justify-between gap-4">
+                    <div class="space-y-1.5">
+                        {{ ui.card_title(text='Connected App credentials') }}
+                        {{ ui.card_description(text='A Salesforce Connected App with the Client Credentials Flow enabled and an API-enabled run-as user.') }}
+                    </div>
+                    {% call ui.badge(variant='outline', class='gap-1.5 font-normal text-foreground', attrs={'data-testid': 'sf-state'}) %}
+                        <span class="size-1.5 shrink-0 rounded-full" :class="configured ? 'bg-success' : 'bg-muted-foreground'" aria-hidden="true"></span>
+                        <span x-text="configured ? 'Connected' : 'Not set'">{{ 'Connected' if sf_config.configured else 'Not set' }}</span>
+                    {% endcall %}
+                </div>
+            {% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Instance URL', attrs={'for': 'sf-instance'}) }}
+                    {{ ui.input(id='sf-instance', name='instance_url', type='url', autocomplete='off', class='font-mono',
+                        placeholder='https://yourorg.my.salesforce.com',
+                        attrs={'x-model': 'creds.instance_url', ':aria-invalid': '!!errors.instance_url'}) }}
+                    {{ ui.field_error(text='', attrs={'x-cloak': '', 'x-show': 'errors.instance_url', 'x-text': 'errors.instance_url', 'data-testid': 'sf-error-instance_url'}) }}
+                {% endcall %}
+
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Consumer Key (Client ID)', attrs={'for': 'sf-client-id'}) }}
+                    {{ ui.input(id='sf-client-id', name='client_id', type='text', autocomplete='off', class='font-mono',
+                        attrs={'x-model': 'creds.client_id', ':aria-invalid': '!!errors.client_id'}) }}
+                    {{ ui.field_error(text='', attrs={'x-cloak': '', 'x-show': 'errors.client_id', 'x-text': 'errors.client_id', 'data-testid': 'sf-error-client_id'}) }}
+                {% endcall %}
+
+                {% call ui.field() %}
+                    {{ ui.field_label(text='Consumer Secret', attrs={'for': 'sf-client-secret'}) }}
+                    {{ ui.input(id='sf-client-secret', name='client_secret', type='password', autocomplete='new-password', class='font-mono',
+                        placeholder=('Leave blank to keep the existing value' if sf_config.has_secret else 'Paste the Consumer Secret'),
+                        attrs={'x-model': 'creds.client_secret', ':placeholder': "hasSecret ? 'Leave blank to keep the existing value' : 'Paste the Consumer Secret'"}) }}
+                    {{ ui.field_description(text='It is stored encrypted and never shown again.') }}
+                {% endcall %}
+            {% endcall %}
+            {% call ui.card_footer(class='justify-end gap-3') %}
+                {{ ui.button(text='Test connection', type='button', variant='outline', attrs={'@click': 'testConnection()', ':disabled': 'busy'}) }}
+                {{ ui.button(text='Save credentials', type='submit', attrs={':disabled': 'busy'}) }}
+            {% endcall %}
+        {% endcall %}
+    </form>
+
+    <div class="mt-6">
+    {% call ui.card() %}
+        {% call ui.card_header() %}
+            <div class="flex items-start justify-between gap-4">
+                <div class="space-y-1.5">
+                    {{ ui.card_title(text='Org discovery') }}
+                    {{ ui.card_description(text='Lightning apps and installed AppExchange packages.') }}
+                </div>
+                {{ ui.button(text='Discover', type='button', attrs={'@click': 'discover()', ':disabled': 'busy'}) }}
             </div>
-            <button type="button" @click="discover()" :disabled="busy"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <span x-text="busy ? 'Working…' : 'Discover'"></span>
-            </button>
-        </div>
+        {% endcall %}
+        {% call ui.card_content(class='space-y-6') %}
+            <dl x-cloak x-show="discovered.length" class="grid grid-cols-3 gap-4 text-sm">
+                <div><dt class="text-muted-foreground">Total found</dt><dd class="text-xl font-semibold tabular-nums" x-text="stats.total"></dd></div>
+                <div><dt class="text-muted-foreground">Already in Entelim</dt><dd class="text-xl font-semibold tabular-nums" x-text="stats.linked"></dd></div>
+                <div><dt class="text-muted-foreground">Ungoverned</dt><dd class="text-xl font-semibold tabular-nums" x-text="stats.ungoverned"></dd></div>
+            </dl>
 
-        <div x-cloak x-show="discovered.length" class="px-6 py-4 grid grid-cols-3 gap-4 border-b border-border">
-            <div><p class="text-xs text-muted-foreground uppercase">Total found</p><p class="text-xl font-bold" x-text="stats.total"></p></div>
-            <div><p class="text-xs text-muted-foreground uppercase">Already in Entelim</p><p class="text-xl font-bold" x-text="stats.linked"></p></div>
-            <div><p class="text-xs text-muted-foreground uppercase">Ungoverned</p><p class="text-xl font-bold text-warning" x-text="stats.ungoverned"></p></div>
-        </div>
-
-        <div x-cloak x-show="discovered.length">
-            <table class="dense-table min-w-full divide-y divide-border text-sm">
-                <thead class="bg-muted/30">
-                    <tr>
-                        <th class="px-4 py-2 w-8"><input type="checkbox" @change="toggleAll($event.target.checked)" aria-label="Select all"></th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Kind</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Namespace</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    <template x-for="a in discovered" :key="a.id">
-                        <tr class="hover:bg-accent/40">
-                            <td class="px-4 py-2"><input type="checkbox" :value="a.id" x-model="selected" :disabled="a.status === 'linked'" :aria-label="'Select ' + a.name"></td>
-                            <td class="px-4 py-2 font-medium text-foreground" x-text="a.display_name || a.name"></td>
-                            <td class="px-4 py-2 text-muted-foreground" x-text="a.kind === 'installed_package' ? 'AppExchange package' : 'Lightning app'"></td>
-                            <td class="px-4 py-2 text-muted-foreground" x-text="a.namespace || '—'"></td>
-                            <td class="px-4 py-2">
-                                <span :class="a.status === 'linked' ? 'bg-success/10 text-success-emphasis border-success/30' : 'bg-muted text-muted-foreground border-border'"
-                                      class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
-                                      x-text="a.status === 'linked' ? 'In Entelim' : 'Unregistered'"></span>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-            <div class="px-6 py-4 border-t border-border flex flex-wrap items-center gap-3">
-                <label for="sf-programme" class="text-sm font-medium">Link imports to programme:</label>
-                <select id="sf-programme" x-model="programmeId"
-                        class="h-9 rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="">— None —</option>
-                    {% for p in programmes %}
-                    <option value="{{ p.id }}">{{ p.name }} ({{ p.initiative_type }})</option>
-                    {% endfor %}
-                </select>
-                <button type="button" @click="importSelected()" :disabled="busy || !selected.length"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 ml-auto items-center">
-                    <span x-text="'Import ' + selected.length + ' selected'"></span>
-                </button>
+            <div x-cloak x-show="discovered.length">
+                {% call ui.table_container() %}{% call ui.table() %}
+                    {% call ui.table_header() %}{% call ui.table_row() %}
+                        {% call ui.table_head(class='w-8') %}{{ checkbox(attrs_dict={'@change': 'toggleAll($event.target.checked)', 'aria-label': 'Select all'}) }}{% endcall %}
+                        {{ ui.table_head(text='Name') }}
+                        {{ ui.table_head(text='Kind') }}
+                        {{ ui.table_head(text='Namespace') }}
+                        {{ ui.table_head(text='Status') }}
+                    {% endcall %}{% endcall %}
+                    {% call ui.table_body() %}
+                        <template x-for="a in discovered" :key="a.id">
+                            {% call ui.table_row() %}
+                                {% call ui.table_cell() %}{{ checkbox(attrs_dict={'x-model': 'selected', ':value': 'a.id', ':disabled': "a.status === 'linked'", ':aria-label': "'Select ' + a.name"}) }}{% endcall %}
+                                {{ ui.table_cell(class='font-medium', attrs={'x-text': 'a.display_name || a.name'}) }}
+                                {{ ui.table_cell(class='text-muted-foreground', attrs={'x-text': "a.kind === 'installed_package' ? 'AppExchange package' : 'Lightning app'"}) }}
+                                {{ ui.table_cell(class='text-muted-foreground', attrs={'x-text': "a.namespace || '—'"}) }}
+                                {% call ui.table_cell() %}
+                                    {% call ui.badge(variant='outline', class='font-normal text-foreground') %}<span x-text="a.status === 'linked' ? 'In Entelim' : 'Not in Entelim'"></span>{% endcall %}
+                                {% endcall %}
+                            {% endcall %}
+                        </template>
+                    {% endcall %}
+                {% endcall %}{% endcall %}
             </div>
-        </div>
 
-        <div x-cloak x-show="!discovered.length" class="px-6 py-10 text-center text-sm text-muted-foreground">
-            Save and test credentials, then run Discover to scan the org.
-        </div>
+            <div x-cloak x-show="!discovered.length" data-testid="sf-discovery-empty" class="text-sm text-muted-foreground">
+                Save the credentials above and test them, then choose Discover to scan the org. Nothing has been discovered yet.
+            </div>
+        {% endcall %}
+        {% call ui.card_footer(class='flex-wrap justify-between gap-3') %}
+            <div x-cloak x-show="discovered.length" class="flex flex-wrap items-center gap-3">
+                <label for="sf-programme" class="text-sm font-medium">Link imports to programme</label>
+                {% call native_select_wrapper() %}{% call native_select(id='sf-programme', attrs={'x-model': 'programmeId'}) %}
+                    {{ native_select_option('None', value='') }}
+                    {% for p in programmes %}{{ native_select_option(p.name ~ ' (' ~ p.initiative_type ~ ')', value=p.id) }}{% endfor %}
+                {% endcall %}{% endcall %}
+            </div>
+            <div x-cloak x-show="discovered.length" class="ml-auto">
+                {% call ui.button(type='button', attrs={'@click': 'importSelected()', ':disabled': 'busy || !selected.length'}) %}<span x-text="'Import ' + selected.length + ' selected'"></span>{% endcall %}
+            </div>
+        {% endcall %}
+    {% endcall %}
     </div>
 </div>
 {% endblock %}
@@ -147,49 +149,56 @@
                 client_id: {{ sf_config.client_id | default('', true) | tojson }},
                 client_secret: ''
             },
+            configured: {{ 'true' if sf_config.configured else 'false' }},
+            hasSecret: {{ 'true' if sf_config.has_secret else 'false' }},
             discovered: [],
             selected: [],
             stats: { total: 0, linked: 0, ungoverned: 0 },
             programmeId: '',
             busy: false,
-            alert: { kind: '', message: '' },
-            _csrf() { return document.querySelector('meta[name=csrf-token]')?.content || ''; },
-            _notify(kind, message) { this.alert = { kind, message }; },
+            errors: {},
+            notice: { kind: '', message: '' },
+            _notify(kind, message) { this.notice = { kind: kind, message: message }; },
             async _post(url, body) {
                 try {
                     const data = await Platform.fetch.post(url, body || {}, { silent: true });
                     return { ok: true, d: data };
                 } catch (error) {
-                    // Platform.fetch throws on non-ok responses; preserve the existing
-                    // { ok: false, d: ... } shape that callers expect.
-                    // error.data may contain the server's JSON error response.
-                    // error.message is the user-facing message (already shown via toast unless silent:true).
-                    // error.status is the HTTP status code.
-                    return {
-                        ok: false,
-                        d: error.data || { error: error.message }
-                    };
+                    // Platform.fetch throws on non-ok responses; error.data is the server's JSON answer.
+                    return { ok: false, d: error.data || { error: error.message } };
                 }
             },
             async saveCredentials() {
                 this.busy = true;
+                this.errors = {};
+                this.notice = { kind: '', message: '' };
                 try {
                     const { ok, d } = await this._post('/admin/integrations/salesforce/save', this.creds);
-                    this._notify(ok ? 'ok' : 'error', ok ? 'Credentials saved.' : (d.error || 'Save failed'));
+                    if (ok) {
+                        this.configured = true;
+                        this.hasSecret = this.hasSecret || !!this.creds.client_secret;
+                        this.creds.client_secret = '';
+                        this._notify('saved', 'Credentials saved.');
+                    } else if (d.field) {
+                        this.errors = { [d.field]: d.error };
+                    } else {
+                        this._notify('error', d.error || 'The credentials could not be saved.');
+                    }
                 } finally { this.busy = false; }
             },
             async testConnection() {
                 this.busy = true;
+                this.errors = {};
                 try {
                     const { ok, d } = await this._post('/admin/integrations/salesforce/test', this.creds);
-                    this._notify(ok ? 'ok' : 'error', ok ? ('Connected to ' + (d.instance_url || 'org')) : (d.message || d.error || 'Connection failed'));
+                    this._notify(ok ? 'ok' : 'error', ok ? ('Connected to ' + (d.instance_url || 'the org') + '.') : (d.message || d.error || 'The connection test did not finish.'));
                 } finally { this.busy = false; }
             },
             async discover() {
                 this.busy = true;
                 try {
                     const { ok, d } = await this._post('/admin/integrations/salesforce/discover');
-                    if (!ok) { this._notify('error', d.error || 'Discovery failed'); return; }
+                    if (!ok) { this._notify('error', d.error || 'Discovery did not finish.'); return; }
                     this.discovered = d.apps || [];
                     this.stats = { total: d.total, linked: d.linked, ungoverned: d.ungoverned };
                     this.selected = [];
@@ -208,12 +217,12 @@
                         app_ids: this.selected,
                         programme_initiative_id: this.programmeId || null,
                     });
-                    if (!ok) { this._notify('error', d.error || 'Import failed'); return; }
-                    this._notify('ok',
-                        'Imported ' + d.imported + ' · already in Entelim ' + d.already_exists +
+                    if (!ok) { this._notify('error', d.error || 'The import did not finish.'); return; }
+                    const summary = 'Imported ' + d.imported + ' · already in Entelim ' + d.already_exists +
                         ' · failed ' + d.failed +
-                        (d.linked_to_programme ? (' · linked to programme ' + d.linked_to_programme) : ''));
+                        (d.linked_to_programme ? (' · linked to programme ' + d.linked_to_programme) : '');
                     await this.discover();
+                    this._notify('ok', summary);
                 } finally { this.busy = false; }
             },
         };

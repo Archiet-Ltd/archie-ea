@@ -5829,6 +5829,10 @@ _PP_LABEL = "default"
 # ── Salesforce Org Discovery (PROG-003) — mirrors the Power Platform block ──
 _SF_PROVIDER = "salesforce_org"
 _SF_LABEL = "default"
+_SF_ADDRESS_REFUSED = (
+    "That address cannot be used. Enter your Salesforce org's own address, such as "
+    "https://yourorg.my.salesforce.com, and check that it can be reached."
+)
 
 
 def _sf_settings_row():
@@ -5858,6 +5862,7 @@ def salesforce_integration():
             "instance_url": row.jira_url or "",
             "client_id": row.jira_email or "",
             "configured": bool(row.jira_url),
+            "has_secret": bool(row.api_key),
         }
     # Programme picker for import targeting
     from app.modules.solutions_strategic.v2.services.programme_governance_service import (
@@ -5882,8 +5887,12 @@ def salesforce_save_credentials():
     instance_url = (data.get("instance_url") or "").strip()
     client_id = (data.get("client_id") or "").strip()
     client_secret = (data.get("client_secret") or "").strip()
-    if not instance_url or not client_id:
-        return jsonify({"status": "error", "error": "instance_url and client_id are required"}), 400
+    if not instance_url:
+        return jsonify({"status": "error", "field": "instance_url",
+                        "error": "Enter the instance URL of your Salesforce org, such as https://yourorg.my.salesforce.com."}), 400
+    if not client_id:
+        return jsonify({"status": "error", "field": "client_id",
+                        "error": "Enter the Consumer Key (Client ID) of your Connected App."}), 400
     # F-08: the form's type="url" is browser-side only and this endpoint is
     # callable directly, so the host allow-list is enforced here.
     from app.utils.ssrf_guard import BlockedOutboundURL
@@ -5891,7 +5900,7 @@ def salesforce_save_credentials():
     try:
         SalesforceDiscoveryService.save_settings(instance_url, client_id, client_secret)
     except BlockedOutboundURL as exc:
-        return jsonify({"status": "error", "error": str(exc)}), 400
+        return jsonify({"status": "error", "field": "instance_url", "error": _SF_ADDRESS_REFUSED}), 400
     return jsonify({"success": True, "status": "ok", "message": "Credentials saved."})
 
 
@@ -5908,16 +5917,21 @@ def salesforce_test_connection():
     instance_url = (data.get("instance_url") or "").strip()
     client_id = (data.get("client_id") or "").strip()
     client_secret = (data.get("client_secret") or "").strip()
+    if not client_secret:
+        # A saved secret is never sent back to the page, so a blank field means "use the saved one".
+        row = _sf_settings_row()
+        client_secret = (row.api_key or "") if row else ""
     if not all([instance_url, client_id, client_secret]):
-        return jsonify({"status": "error", "error": "instance_url, client_id, and client_secret are required"}), 400
+        return jsonify({"status": "error",
+                        "error": "Enter the instance URL, Consumer Key and Consumer Secret, then test the connection."}), 400
     # F-08: reject a non-Salesforce / non-public host before any fetch is made,
     # so the response cannot be used as a reachability oracle for internal hosts.
     from app.utils.ssrf_guard import BlockedOutboundURL, validate_salesforce_instance_url
 
     try:
         validate_salesforce_instance_url(instance_url)
-    except BlockedOutboundURL as exc:
-        return jsonify({"status": "error", "message": str(exc)}), 400
+    except BlockedOutboundURL:
+        return jsonify({"status": "error", "message": _SF_ADDRESS_REFUSED}), 400
     result = SalesforceDiscoveryService.test_connection(instance_url, client_id, client_secret)
     return jsonify(result), 200 if result.get("status") == "ok" else 400
 
@@ -5938,6 +5952,16 @@ def salesforce_discover():
     apps = SalesforceDiscoveryService.discover_apps(
         row.jira_url or "", row.jira_email or "", row.api_key or ""
     )
+    if not apps:
+        # An empty list is also what a refused login returns; say which it is rather than report "0 found".
+        check = SalesforceDiscoveryService.test_connection(
+            row.jira_url or "", row.jira_email or "", row.api_key or ""
+        )
+        if check.get("status") != "ok":
+            return jsonify({
+                "error": "Salesforce did not accept the saved credentials. "
+                         + (check.get("message") or "Check the instance URL, Consumer Key and Consumer Secret."),
+            }), 400
     linked_ids = {
         r.source_identifier
         for r in ApplicationComponent.query.filter(
