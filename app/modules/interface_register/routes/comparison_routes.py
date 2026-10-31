@@ -26,6 +26,7 @@ from app.modules.interface_register.services import (
     interface_gap_service,
     work_package_service,
 )
+from app.utils.plain_errors import render_plain_error
 
 
 @interface_register_bp.route("/comparison", methods=["GET"])
@@ -43,7 +44,7 @@ def comparison():
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     # Get plateau pair (if exists)
     plateau_pair = plateau_pair_service.get_plateau_pair(initiative_id)
@@ -90,7 +91,7 @@ def provision_comparison():
     try:
         service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         plateau_pair_service.provision_plateau_pair(initiative_id)
@@ -116,7 +117,7 @@ def raise_gap(element_id):
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         interface_gap_service.raise_interface_gap(
@@ -171,7 +172,7 @@ def attach_work_package(gap_id):
     try:
         service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         work_package_service.attach_work_package_to_gap(

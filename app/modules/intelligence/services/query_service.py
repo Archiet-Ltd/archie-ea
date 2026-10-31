@@ -580,6 +580,8 @@ def _row_origin(rel) -> Dict[str, Any]:
         text = manual_origin_text(label)
     elif kind in ("connector", "derived") and label:
         text = label
+    elif kind == "sample":
+        text = "Sample data"
     created = getattr(rel, "created_at", None)
     recorded = getattr(rel, "source_recorded_at", None) or created
     person_ids: List[int] = []

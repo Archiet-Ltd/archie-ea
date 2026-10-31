@@ -1,230 +1,176 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'macros/page_shell.html' import page_shell, empty_state, stat_card, section_card %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{# design-block: record-detail #}
+{% from 'macros/page_shell.html' import page_shell, section_card %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
-{% from 'components/select.html' import native_select %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/input.html' import input %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 
 {% block title %}Impact Analysis{% endblock %}
 
-{% block content %}
-{# Builds the href for a row's record, or an empty string when the blueprint that
-   owns the destination failed to register -- blueprints register non-fatally here,
-   so an unguarded url_for would raise BuildError and 500 every page rendering the
-   sidebar. Callers keep the <a> in the row itself so the link is visible both to a
-   reader and to scripts/check_actionable_rows.py. #}
-{% macro row_href(endpoint) %}{% if endpoint in flask.current_app.view_functions %}{{ url_for(endpoint, **kwargs) }}{% endif %}{% endmacro %}
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/enterprise/impact_page.js') }}"></script>
+{% endblock %}
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+{% block content %}
+{# The row's citation: a recorded link names where it was read from; a worked-out
+   one says so. The same wording the chat's answer cards use for the same data,
+   so the two readings of one answer never disagree. #}
+{% macro source_text(relation) -%}
+{%- if relation.kind == 'derived' -%}Worked out from the model
+{%- elif relation.origins and relation.origins.values() | list | selectattr('repository') | list -%}
+{%- set o = (relation.origins.values() | list | selectattr('repository') | list)[0] -%}{{ o.repository }}{% if o.file %} · {{ o.file }}{% endif %}
+{%- elif relation.provenance and relation.provenance.text and relation.provenance.text != 'origin not recorded' -%}{{ relation.provenance.text[:1] | upper }}{{ relation.provenance.text[1:] }}
+{%- else -%}Source not recorded{%- endif -%}
+{%- endmacro %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
     {{ page_shell(
         title='Impact Analysis',
-        subtitle='Assess downstream impact of architecture changes',
+        subtitle='Pick any element of your model and see what depends on it — the same answer the AI chat gives for "what breaks if this fails".',
         breadcrumb=[('Home', url_for('main.index')), ('Enterprise Architecture', url_for('enterprise.enterprise_dashboard')), ('Impact Analysis', None)]
     ) }}
 
-    <!-- Filter Form -->
     {% call card() %}
         {% call card_header() %}
-            {% call card_title() %}Filter by Element{% endcall %}
+            {% call card_title() %}Choose an element{% endcall %}
+            {% call card_description() %}Type the name of an application, capability or other element of your model.{% endcall %}
         {% endcall %}
         {% call card_content() %}
-            <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 gap-4">
-                <div>
-                    <label for="element_type" class="block text-sm font-medium text-muted-foreground mb-1">Element Type</label>
-                    {% call native_select(id='element_type', name='element_type', attrs_dict={'@change': 'toggleElementSelect(this.value)'}) %}
-                        <option value="">All Types</option>
-                        <option value="application" {% if selected_element_type == 'application' %}selected{% endif %}>Application</option>
-                        <option value="capability" {% if selected_element_type == 'capability' %}selected{% endif %}>Capability</option>
-                    {% endcall %}
-                </div>
+            <div class="max-w-xl"{% if not answer %} x-data="impactPageSurface()" x-init="$nextTick(() => $refs.pickerInput.focus())"{% else %} x-data="impactPageSurface()"{% endif %}>
+                {{ entity_picker('impact-page', prompt='Type a team, service or system name') }}
+            </div>
+        {% endcall %}
+    {% endcall %}
 
-                <div id="application_select_wrapper" {% if selected_element_type != 'application' %} class="hidden" {% endif %}>
-                    <label for="application_id" class="block text-sm font-medium text-muted-foreground mb-1">Application</label>
-                    {% call native_select(id='application_id', name='element_id', attrs_dict={'x-ref': 'app-select'}) %}
-                        <option value="">Select Application</option>
-                        {% for app in applications %}
-                        <option value="{{ app.id }}" {% if selected_element_type == 'application' and selected_element_id == app.id %}selected{% endif %}>
-                            {{ app.name }}
-                        </option>
-                        {% endfor %}
-                    {% endcall %}
-                </div>
+    {# One call site for the page's single empty state, whichever applies --
+       the component is the same macro call wherever it is used; branching
+       chooses its words, not a second call. #}
+    {% set empty = namespace(icon=none, title=none, description=none) %}
 
-                <div id="capability_select_wrapper" {% if selected_element_type != 'capability' %} class="hidden" {% endif %}>
-                    <label for="capability_id" class="block text-sm font-medium text-muted-foreground mb-1">Capability</label>
-                    {% call native_select(id='capability_id', name='element_id') %}
-                        <option value="">Select Capability</option>
-                        {% for cap in capabilities %}
-                        <option value="{{ cap.id }}" {% if selected_element_type == 'capability' and selected_element_id == cap.id %}selected{% endif %}>
-                            {{ cap.name }}
-                        </option>
-                        {% endfor %}
-                    {% endcall %}
-                </div>
-
-                <div class="flex items-end">
-                    {{ button(text='Apply Filter', variant='default', type='submit', class='w-full md:w-auto') }}
-                    {% if selected_element_type %}
-                    <a href="{{ url_for('enterprise.impact_analysis') }}" class="ml-2 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                        Clear
-                    </a>
-                    {% endif %}
-                </div>
+    {% if element_not_found %}
+    {% call card() %}
+        {% call card_content() %}
+            <p class="text-sm text-foreground" role="alert" data-testid="impact-element-not-found">That element could not be found in your organisation. Choose another one above.</p>
+        {% endcall %}
+    {% endcall %}
+    {% elif answer %}
+    {% set heading = 'What breaks if ' ~ (answer.elements.get(answer.params.element_id | string, {}).name or '—') ~ ' fails' %}
+    {% set summary = answer.summary %}
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}{{ heading }}{% endcall %}
+            {% call card_description() %}
+                {% if summary.total %}
+                    {{ summary.total }} connection{{ '' if summary.total == 1 else 's' }} in your records:
+                    {{ summary.explicit_count }} recorded by people{% if summary.derived_count %}, {{ summary.derived_count }} worked out from the model{% endif %}.
+                {% else %}
+                    Nothing is recorded as connected to this yet.
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
+        {% call card_footer() %}
+            <form method="post" action="{{ url_for('enterprise.impact_analysis_save') }}" class="flex items-center gap-3" data-testid="impact-save-form">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                {{ input(type='hidden', name='element', value=answer.params.element_id) }}
+                {{ button(text='Save this run', type='submit', variant='outline', size='sm', icon='save', testid='impact-save-run') }}
+                <span class="text-xs text-muted-foreground">Viewing does not record anything. Save to add it to the runs below.</span>
             </form>
         {% endcall %}
     {% endcall %}
 
-    <!-- Summary Metrics -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {% call card() %}
-            {% call card_content() %}
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-muted-foreground">Total Analyses Run</p>
-                        <p class="text-2xl font-bold text-foreground mt-1">{{ total_analyses }}</p>
-                    </div>
-                    <div class="rounded-md bg-primary/10 px-3 py-2">
-                        <i data-lucide="activity" class="w-5 h-5 text-primary" aria-hidden="true"></i>
-                    </div>
-                </div>
+    {% if not answer.rows %}
+        {% set empty.icon = 'search' %}
+        {% set empty.title = 'Nothing is recorded as depending on this yet' %}
+        {% set empty.description = 'No connections lead from here. Nothing is missing: there is simply nothing recorded.' %}
+    {% else %}
+    {% call section_card(title='What depends on it') %}
+        {% set element_rows = [] %}
+        {% for row in answer.rows %}
+            {% set element = answer.elements.get(row.element_id | string, {}) %}
+            {% set owner_names = (row.owners or []) | map(attribute='name') | select | unique | list %}
+            {% set _ = element_rows.append({
+                'id': row.element_id,
+                'name': element.name or '—',
+                'href': '%s?element=%d' % (url_for('archimate.composer_page'), row.element_id),
+                'type': element.type,
+                'relation': row.relation,
+                'owner_text': owner_names | join(', ') or 'No owner recorded',
+                'health': row.health,
+            }) %}
+        {% endfor %}
+        {% call(e) element_table(rows=element_rows, columns=[('Type', ''), ('Steps away', ''), ('Basis', ''), ('Owner', ''), ('Health', ''), ('Source', '')], caption='Everything that depends on the chosen element', testid='impact-answer-table', row_testid='impact-answer-row', link_testid='impact-answer-element-link', empty_message='Nothing is recorded as depending on this yet.') %}
+            {% call table_cell() %}{{ e.type or '—' }}{% endcall %}
+            {% call table_cell() %}{{ e.relation.depth }}{% endcall %}
+            {% call table_cell() %}{% if e.relation.kind == 'derived' %}{% call badge('warning') %}Worked out{% endcall %}{% else %}{% call badge('success') %}Recorded by people{% endcall %}{% endif %}{% endcall %}
+            {% call table_cell() %}{{ e.owner_text }}{% endcall %}
+            {% call table_cell() %}
+                {% if e.health %}{% call badge('success' if e.health == 'Healthy' else ('warning' if e.health == 'Warning' else 'danger')) %}{{ e.health }}{% endcall %}
+                {% else %}{% call badge('neutral') %}Health not recorded{% endcall %}{% endif %}
             {% endcall %}
+            {% call table_cell(class='text-xs text-muted-foreground') %}{{ source_text(e.relation) }}{% endcall %}
         {% endcall %}
-
-        {% call card() %}
-            {% call card_content() %}
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-muted-foreground">Critical Impact</p>
-                        <p class="text-2xl font-bold text-foreground mt-1">{{ critical_count }}</p>
-                    </div>
-                    <div class="rounded-md bg-destructive/10 px-3 py-2">
-                        <i data-lucide="alert-triangle" class="w-5 h-5 text-destructive" aria-hidden="true"></i>
-                    </div>
-                </div>
-            {% endcall %}
-        {% endcall %}
-
-        {% call card() %}
-            {% call card_content() %}
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-muted-foreground">High Impact</p>
-                        <p class="text-2xl font-bold text-foreground mt-1">{{ high_count }}</p>
-                    </div>
-                    <div class="rounded-md bg-warning/10 px-3 py-2">
-                        <i data-lucide="alert-circle" class="w-5 h-5 text-warning" aria-hidden="true"></i>
-                    </div>
-                </div>
-            {% endcall %}
-        {% endcall %}
-
-        {% call card() %}
-            {% call card_content() %}
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-muted-foreground">Avg Affected Apps</p>
-                        <p class="text-2xl font-bold text-foreground mt-1">{{ avg_affected_applications }}</p>
-                    </div>
-                    <div class="rounded-md bg-primary/10 px-3 py-2">
-                        <i data-lucide="layers" class="w-5 h-5 text-primary" aria-hidden="true"></i>
-                    </div>
-                </div>
-            {% endcall %}
-        {% endcall %}
-    </div>
-
-    <!-- Results Table -->
-    {% call section_card(title='Impact Analysis Results') %}
-        {% set analyses_to_display = filtered_analyses if filtered_analyses is not none else recent_analyses %}
-        {% if analyses_to_display %}
-        {% call table() %}
-            {% call table_header() %}
-                <tr>
-                    {% call table_head() %}Date{% endcall %}
-                    {% call table_head() %}Analysis Type{% endcall %}
-                    {% call table_head() %}Trigger Element{% endcall %}
-                    {% call table_head() %}Severity{% endcall %}
-                    {% call table_head(class='text-center') %}Capabilities{% endcall %}
-                    {% call table_head(class='text-center') %}Applications{% endcall %}
-                    {% call table_head(class='text-center') %}Processes{% endcall %}
-                </tr>
-            {% endcall %}
-            {% call table_body() %}
-                {% for analysis in analyses_to_display %}
-                <tr class="hover:bg-muted/30">
-                    {% call table_cell() %}
-                        <span class="whitespace-nowrap text-sm text-foreground">{{ analysis.created_at.strftime('%Y-%m-%d') if analysis.created_at else '-' }}</span>
-                    {% endcall %}
-                    {% call table_cell() %}
-                        {% call badge('info') %}{{ analysis.analysis_type or 'unknown' }}{% endcall %}
-                    {% endcall %}
-                    {% call table_cell() %}
-                        <div class="text-xs text-muted-foreground">{{ analysis.trigger_element_type or '—' }}</div>
-                        {% if analysis.trigger_element_type and analysis.trigger_element_id %}
-                        {% set _h = row_href('enterprise.impact_analysis', element_type=analysis.trigger_element_type, element_id=analysis.trigger_element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ 'ID: ' ~ analysis.trigger_element_id }}</a>{% else %}{{ 'ID: ' ~ analysis.trigger_element_id }}{% endif %}
-                        {% else %}
-                        <div>ID: &mdash;</div>
-                        {% endif %}
-                    {% endcall %}
-                    {% call table_cell() %}
-                        {% if analysis.overall_severity == 'critical' %}
-                            {% call badge('destructive') %}critical{% endcall %}
-                        {% elif analysis.overall_severity == 'high' %}
-                            {% call badge('warning') %}high{% endcall %}
-                        {% elif analysis.overall_severity == 'medium' %}
-                            {% call badge('info') %}medium{% endcall %}
-                        {% elif analysis.overall_severity == 'low' %}
-                            {% call badge('success') %}low{% endcall %}
-                        {% else %}
-                            {% call badge('neutral') %}unknown{% endcall %}
-                        {% endif %}
-                    {% endcall %}
-                    {% call table_cell(class='text-center') %}{{ analysis.affected_capabilities_count or 0 }}{% endcall %}
-                    {% call table_cell(class='text-center') %}{{ analysis.affected_applications_count or 0 }}{% endcall %}
-                    {% call table_cell(class='text-center') %}{{ analysis.affected_processes_count or 0 }}{% endcall %}
-                </tr>
-                {% endfor %}
-            {% endcall %}
-        {% endcall %}
-        {% else %}
-        {{ empty_state(
-            icon='git-branch',
-            headline='No Impact Analyses Found',
-            body='No impact analyses have been recorded yet. Select an element above to run an analysis.',
-            cta_label='Begin Assessment'
-        ) }}
-        {% endif %}
     {% endcall %}
+    {% endif %}
+
+    {% elif has_elements %}
+        {% set empty.icon = 'search' %}
+        {% set empty.title = 'Choose an element to see what depends on it' %}
+        {% set empty.description = 'Pick an application, capability or other element above.' %}
+    {% else %}
+        {% set empty.icon = 'git-branch' %}
+        {% set empty.title = 'Nothing is modelled yet' %}
+        {% set empty.description = 'Add at least one application to your model, and you can ask what breaks if it fails.' %}
+    {% endif %}
+
+    {% if recorded_runs %}
+    {% call section_card(title='Your recorded runs') %}
+        {% set run_columns = [
+            ('Run', ''),
+            ('Element', ''),
+            {'label': 'Connections', 'class': 'text-center'},
+            {'label': 'Recorded by people', 'class': 'text-center'},
+            {'label': 'Worked out', 'class': 'text-center'},
+            ('Answer', ''),
+        ] %}
+        {% call(run) list_table(rows=recorded_runs, columns=run_columns, caption='Impact analyses run for your organisation, newest first', testid='impact-runs-table', row_testid='impact-run-row', empty_message='No impact analyses have been run yet. Choose an element above.') %}
+            {% call table_cell(attrs={'data-sort': run.computed_at}) %}<span class="whitespace-nowrap text-sm text-foreground">{{ run.computed_at[:16] | replace('T', ' ') }}</span>{% endcall %}
+            {% call table_cell(class='font-medium') %}{{ run.element_name or '—' }}{% endcall %}
+            {% call table_cell(class='text-center') %}{{ run.summary.total or 0 }}{% endcall %}
+            {% call table_cell(class='text-center') %}{{ run.summary.explicit_count or 0 }}{% endcall %}
+            {% call table_cell(class='text-center') %}{{ run.summary.derived_count or 0 }}{% endcall %}
+            {% call table_cell() %}<a href="{{ run.page_url }}" class="font-medium text-primary hover:underline" data-testid="impact-run-open">Open</a>{% endcall %}
+        {% endcall %}
+    {% endcall %}
+    {% endif %}
+
+    {% if empty.title %}
+    {% call card() %}
+        {% call card_content() %}
+            {{ empty_state(icon=empty.icon, title=empty.title, description=empty.description) }}
+            {% if not has_elements and not element_not_found and not answer %}
+            <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="impact-first-steps">
+                {% if may_connect_github %}
+                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='impact-connect-github') }}
+                {% endif %}
+                {% if may_load_sample_company %}
+                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-testid="impact-load-sample-form">
+                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                    {{ button(text='Load the sample company', type='submit', variant='outline' if may_connect_github else 'default', testid='impact-load-sample') }}
+                </form>
+                {% endif %}
+                {{ button(text='Add an application', href=url_for('unified_applications.application_list'), variant='outline', testid='impact-add-application') }}
+            </div>
+            {% endif %}
+        {% endcall %}
+    {% endcall %}
+    {% endif %}
 </div>
-
-<script>
-function toggleElementSelect(elementType) {
-    const appSelect = document.getElementById('application_select_wrapper');
-    const capSelect = document.getElementById('capability_select_wrapper');
-    
-    if (elementType === 'application') {
-        appSelect.style.display = 'block';
-        capSelect.style.display = 'none';
-        document.getElementById('capability_id').value = '';
-    } else if (elementType === 'capability') {
-        appSelect.style.display = 'none';
-        capSelect.style.display = 'block';
-        document.getElementById('application_id').value = '';
-    } else {
-        appSelect.style.display = 'none';
-        capSelect.style.display = 'none';
-        document.getElementById('application_id').value = '';
-        document.getElementById('capability_id').value = '';
-    }
-}
-
-document.getElementById('startImpact')?.addEventListener('click', function() {
-    if (typeof Platform !== 'undefined' && Platform.toast) {
-        Platform.toast.show('Assessment queued — results will appear here when complete', 'info');
-    } else {
-        Platform.toast.success('Assessment queued — results will appear here when complete');
-    }
-});
-</script>
 {% endblock %}
