@@ -14,7 +14,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, boot_live_server
+from .conftest import PAGE_TIMEOUT, boot_live_server, clear_address_counters, forward_from_own_address
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -24,17 +24,8 @@ WALK = os.environ.get("SMOKE_WALK_DIR") or os.path.join(tempfile.gettempdir(), "
 
 @pytest.fixture(scope="module")
 def limits_server(request, app):
-    return boot_live_server(request, None, app, extra_env={"SMOKE_RATE_LIMITING": "1"})
-
-
-def _clear_counters():
-    from app import create_app, db
-
-    app = create_app("testing")
-    with app.app_context():
-        db.session.execute(db.text("DELETE FROM rate_limit_counters"))
-        db.session.commit()
-        db.session.remove()
+    server = boot_live_server(request, None, app, extra_env={"SMOKE_RATE_LIMITING": "1"})
+    return forward_from_own_address(request, server)
 
 
 def _body_is_dark(page):
@@ -86,7 +77,7 @@ def _sign_up(browser, base, width, theme, email):
 
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_the_sixth_sign_up_in_an_hour_is_refused_with_the_next_step(browser, limits_server, width, theme):
-    _clear_counters()
+    clear_address_counters(limits_server)
     # The accounts stay. Sign-up writes append-only audit rows that point at each person (four per
     # account), and the audit log is never deleted, so a person cannot be removed without them.
     # Every address carries a fresh tag, so a run never meets the last run's accounts.
@@ -128,4 +119,4 @@ def test_the_sixth_sign_up_in_an_hour_is_refused_with_the_next_step(browser, lim
 
     # Five accounts were made, and the refused form made none.
     assert sorted(_accounts_with(tag)) == sorted(emails[:5])
-    _clear_counters()
+    clear_address_counters(limits_server)

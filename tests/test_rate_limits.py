@@ -9,6 +9,16 @@ from limits import parse, strategies
 from sqlalchemy import create_engine, text
 
 
+# The counters these tests create are found by the identity each one counts against; nothing else
+# in the table is touched, so another run on the same database keeps its own counts.
+_COUNTER_FRAGMENTS = ("ip:192.0.2.", "ip:198.51.100.", "reset-walk-", "k:window")
+
+
+def _forget_own_counters(connection):
+    for fragment in _COUNTER_FRAGMENTS:
+        connection.execute(text("DELETE FROM rate_limit_counters WHERE key LIKE :p"), {"p": "%" + fragment + "%"})
+
+
 @pytest.fixture
 def clean(app):
     """Committed state these tests create is removed before and after."""
@@ -18,7 +28,7 @@ def clean(app):
     def wipe():
         with db.engine.begin() as connection:
             connection.execute(text("DELETE FROM rate_limit_rules"))
-            connection.execute(text("DELETE FROM rate_limit_counters"))
+            _forget_own_counters(connection)
             connection.execute(text("DELETE FROM rate_limit_violations"))
         rate_limiter._rules_cache["version"] = None
 
@@ -290,7 +300,7 @@ def clean_between_requests(app):
         with app.app_context():
             with db.engine.begin() as connection:
                 connection.execute(text("DELETE FROM rate_limit_rules"))
-                connection.execute(text("DELETE FROM rate_limit_counters"))
+                _forget_own_counters(connection)
                 connection.execute(text("DELETE FROM rate_limit_violations"))
             rate_limiter._rules_cache["version"] = None
 

@@ -13,6 +13,17 @@ import pytest
 from sqlalchemy import create_engine, text
 
 
+# Counters these tests create are found by the identity each one counts against: the documentation
+# addresses it uses, the name its decorated route counts under, and the ids it makes up. Nothing
+# else in the table is touched, so another run on the same database keeps its own counts.
+_OWN_COUNTER_FRAGMENTS = ["198.51.100.", "shared:route-test"]
+
+
+def _forget_own_counters(connection):
+    for fragment in _OWN_COUNTER_FRAGMENTS:
+        connection.execute(text("DELETE FROM rate_limit_counters WHERE key LIKE :p"), {"p": "%" + fragment + "%"})
+
+
 @pytest.fixture
 def counters(app):
     """Throttling on, an empty counter table, and two storages on separate connection pools."""
@@ -24,7 +35,7 @@ def counters(app):
 
     def wipe():
         with db.engine.begin() as connection:
-            connection.execute(text("DELETE FROM rate_limit_counters"))
+            _forget_own_counters(connection)
             connection.execute(text("DELETE FROM rate_limit_violations"))
 
     # No application context is held open for the test: one would cache the signed-in user between
@@ -104,6 +115,7 @@ def test_the_adm_limiter_shares_one_count_between_workers(app, counters):
 
     rate_limiter, pair = counters
     user_id = 900000 + uuid.uuid4().int % 90000
+    _OWN_COUNTER_FRAGMENTS.append(":%d" % user_id)
 
     def action():
         try:
@@ -303,7 +315,8 @@ def test_resending_the_confirmation_link_is_capped_per_address(app, counters, db
         login_as(client, user)
         # The route's own per-minute limit is a different one; let its minute pass between tries.
         with db.engine.begin() as connection:
-            connection.execute(text("DELETE FROM rate_limit_counters WHERE key LIKE 'route:%'"))
+            connection.execute(text("DELETE FROM rate_limit_counters WHERE key LIKE :p"),
+                               {"p": "route:%user:" + str(user.id) + ":%"})
         response = client.post("/account/confirm-account", follow_redirects=True)
         messages.append(response.get_data(as_text=True))
     assert "several times this hour" not in "".join(messages[:3])

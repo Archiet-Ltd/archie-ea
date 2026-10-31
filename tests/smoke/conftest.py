@@ -182,6 +182,88 @@ def live_server(request, ai_protocol_stub, app):
         print("\n[smoke] server log after journey failure:\n%s" % server.tail(300))
 
 
+class FromOwnAddress(str):
+    """The URL of a forwarder in front of a live server; the server sees every request come from `address`.
+
+    A browser on this machine always arrives from 127.0.0.1, so every run on the machine shares one
+    address and one set of per-address rate-limit counters. A journey about those limits goes through
+    this forwarder instead, so its counters are its own.
+    """
+
+    address = None
+
+
+def forward_from_own_address(request, server_url):
+    """Start a forwarder to `server_url` that connects from a loopback address of its own."""
+    import random
+    import select
+    import threading
+    from urllib.parse import urlparse
+
+    address = "127.%d.%d.%d" % (random.randint(1, 254), random.randint(0, 254), random.randint(1, 254))
+    target = urlparse(str(server_url))
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(64)
+    stopping = threading.Event()
+
+    def pipe(a, b):
+        try:
+            while not stopping.is_set():
+                ready, _, _ = select.select([a, b], [], [], 1)
+                for source in ready:
+                    data = source.recv(65536)
+                    if not data:
+                        return
+                    (b if source is a else a).sendall(data)
+        except OSError:
+            pass
+        finally:
+            a.close()
+            b.close()
+
+    def accept():
+        while not stopping.is_set():
+            try:
+                client, _ = listener.accept()
+            except OSError:
+                return
+            upstream = socket.socket()
+            try:
+                upstream.bind((address, 0))
+                upstream.connect((target.hostname, target.port))
+            except OSError:
+                client.close()
+                upstream.close()
+                continue
+            threading.Thread(target=pipe, args=(client, upstream), daemon=True).start()
+
+    threading.Thread(target=accept, daemon=True).start()
+
+    def stop():
+        stopping.set()
+        listener.close()
+
+    request.addfinalizer(stop)
+    url = FromOwnAddress("http://127.0.0.1:%d" % listener.getsockname()[1])
+    url.address = address
+    return url
+
+
+def clear_address_counters(server_url):
+    """Delete the rate-limit counters kept for the address a journey's requests arrive from."""
+    from app import create_app, db
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.execute(
+            db.text("DELETE FROM rate_limit_counters WHERE key LIKE :request OR key LIKE :route"),
+            {"request": "%ip:" + server_url.address + "/%", "route": "%ip:" + server_url.address + ":%"},
+        )
+        db.session.commit()
+        db.session.remove()
+
+
 def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     """Start one app subprocess and return its SmokeServer; stopped by `request`'s finalizer.
 

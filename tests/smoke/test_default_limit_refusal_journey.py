@@ -14,7 +14,7 @@ import tempfile
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, boot_live_server
+from .conftest import PAGE_TIMEOUT, boot_live_server, clear_address_counters, forward_from_own_address
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -24,22 +24,13 @@ WALK = os.environ.get("SMOKE_WALK_DIR") or os.path.join(tempfile.gettempdir(), "
 
 @pytest.fixture(scope="module")
 def limits_server(request, app):
-    return boot_live_server(request, None, app, extra_env={"SMOKE_RATE_LIMITING": "1"})
-
-
-def _clear_counters():
-    from app import create_app, db
-
-    app = create_app("testing")
-    with app.app_context():
-        db.session.execute(db.text("DELETE FROM rate_limit_counters"))
-        db.session.commit()
-        db.session.remove()
+    server = boot_live_server(request, None, app, extra_env={"SMOKE_RATE_LIMITING": "1"})
+    return forward_from_own_address(request, server)
 
 
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_the_121st_read_in_a_minute_is_refused_on_a_styled_page_with_its_nonce(browser, limits_server, width, theme):
-    _clear_counters()
+    clear_address_counters(limits_server)
     ctx = browser.new_context(viewport={"width": width, "height": 900})
     ctx.set_default_timeout(30000)
     if theme == "dark":
@@ -79,4 +70,4 @@ def test_the_121st_read_in_a_minute_is_refused_on_a_styled_page_with_its_nonce(b
         page.screenshot(path="%s/default-limit-%d-%s.png" % (WALK, width, theme), full_page=True)
     finally:
         ctx.close()
-        _clear_counters()
+        clear_address_counters(limits_server)
