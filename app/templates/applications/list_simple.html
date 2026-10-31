@@ -585,7 +585,10 @@
 </div>{# end app-portfolio-root #}
 
 {# ─ Include existing unified mapping modal ─ #}
+{# The dialog's Save, Cancel and Close are Alpine @click handlers, so it sits in a scope of its own: outside the page root above there is none. #}
+<div x-data>
 {% include 'components/unified_mapping_modal.html' %}
+</div>
 {# ─ Include import modal ─ #}
 {% include 'application_mgmt/application_import_modal.html' %}
 

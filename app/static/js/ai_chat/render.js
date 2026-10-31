@@ -616,6 +616,18 @@
         return div;
     }
 
+    /* The one way a drawn estate answer is made safe to insert as markup: sanitised, with
+       the link target kept so a citation to the source (the file on GitHub) opens in a new
+       tab and the conversation stays where it is, and every such link marked noopener
+       noreferrer. Returns '' when the sanitiser is not loaded. */
+    function sanitiseAnswerHtml(html) {
+        if (!window.DOMPurify) return '';
+        var holder = document.createElement('div');
+        holder.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+        holder.querySelectorAll('a[target="_blank"]').forEach(function (a) { a.setAttribute('rel', 'noopener noreferrer'); });
+        return holder.innerHTML;
+    }
+
     /* The cited answer cards for an estate question. The HTML is drawn on the
        server from the stored answer; it is sanitised again here because it is
        inserted as markup. */
@@ -624,12 +636,7 @@
         div.className = 'flex gap-4';
         div.setAttribute('data-testid', 'estate-answer');
         div.innerHTML = avatarHtml() +
-            '<div class="min-w-0 max-w-3xl flex-1">' +
-              (window.DOMPurify ? DOMPurify.sanitize(html, { ADD_ATTR: ['target'] }) : '') +
-            '</div>';
-        /* A link out to the source (the file on GitHub) opens in a new tab so the
-           conversation stays where it is; sanitising drops target unless it is kept. */
-        div.querySelectorAll('a[target="_blank"]').forEach(function (a) { a.setAttribute('rel', 'noopener noreferrer'); });
+            '<div class="min-w-0 max-w-3xl flex-1">' + sanitiseAnswerHtml(html) + '</div>';
         var container = messages();
         if (container) container.appendChild(div);
         scrollToBottom();
@@ -735,6 +742,7 @@
         appendSystemMessage: appendSystemMessage,
         appendError: appendError,
         appendAnswerCards: appendAnswerCards,
+        sanitiseAnswerHtml: sanitiseAnswerHtml,
         beginStreamedMessage: beginStreamedMessage,
         updateStreamedMessage: updateStreamedMessage,
         finaliseStreamedMessage: finaliseStreamedMessage,

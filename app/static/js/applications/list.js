@@ -525,6 +525,22 @@ function appPortfolio() {
     openMappingForApp(id, name, mappingType) {
       const normalizedType = mappingType || 'capability';
 
+      // Mapping capabilities to this application is the dialog's application-to-targets
+      // direction: the person picks capabilities for the named application. The other kinds
+      // below open the targets-to-applications direction.
+      if (normalizedType === 'capability' && typeof window.openUnifiedMappingModalReverse === 'function') {
+        if (typeof window.initUnifiedMappingModal === 'function') {
+          window.initUnifiedMappingModal({ context: 'capability', apiEndpoint: '/capability-map/api' });
+        }
+        window.openUnifiedMappingModalReverse({
+          context: 'capability',
+          appId: id,
+          appName: name,
+          onSaveCallback: () => window.location.reload(),
+        });
+        return;
+      }
+
       // Delegate to the unified mapping modal if registered
       if (typeof window.openUnifiedMappingModal === 'function') {
         if (typeof window.initUnifiedMappingModal === 'function') {
