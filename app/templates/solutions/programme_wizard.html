@@ -1,6 +1,6 @@
 {# design-block: onboarding #}
 {% extends "layouts/admin_base.html" %}
-{% from 'basecoat/breadcrumb.html' import breadcrumb, breadcrumb_list, breadcrumb_item, breadcrumb_link, breadcrumb_page, breadcrumb_separator %}
+{% from 'components/page_header.html' import page_header %}
 
 {% block title %}New Transformation Programme{% endblock %}
 
@@ -13,13 +13,10 @@
    landmark; a second <main> here gave the document two main landmarks. #}
 <div class="p-6 space-y-6 mx-auto max-w-4xl"
       x-data="transformationProgrammeIntake()" x-init="init()">
-  <div class="space-y-3">
-    {% call breadcrumb() %}{% call breadcrumb_list() %}{% call breadcrumb_item() %}{% call breadcrumb_link(attrs={'href': '/'}) %}Home{% endcall %}{% endcall %}{{ breadcrumb_separator() }}{% call breadcrumb_item() %}{{ breadcrumb_page(text='New transformation programme') }}{% endcall %}{% endcall %}{% endcall %}
-    <div>
-        <h1 class="text-2xl font-semibold tracking-tight">New transformation programme</h1>
-        <p class="text-sm text-muted-foreground">Start with a business objective, an accountable outcome and the first governed workstream.</p>
-    </div>
-</div>
+  {{ page_header(
+      title='New transformation programme', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'New transformation programme'}],
+      description='Start with a business objective, an accountable outcome and the first governed workstream.'
+  ) }}
 
   {% include 'solutions/programme_wizard/_step_nav.html' %}
 
