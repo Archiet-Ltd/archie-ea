@@ -46,6 +46,8 @@
       citing the file and commit behind every fact.
     </p>
 
+    <p class="home-lead mt-3 font-medium text-foreground" data-testid="home-hero-promise">Connect your company. Ask in plain language. Every answer cited.</p>
+
     <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
       {{ button(text='Start free', href=url_for('account.register'), size='lg', testid='home-hero-start') }}
       {{ button(text='See pricing', href='/pricing', variant='outline', size='lg', testid='home-hero-pricing') }}
@@ -161,73 +163,86 @@
   </div>
 </section>
 
-<!-- 3. The five groups and eighteen capabilities -->
+<!-- 3. The groups of delivered capabilities, plus a separate Coming soon block.
+     capability_groups holds only what ships today; the heading, the closing link and the FAQ
+     answer below all read capability_count_word, derived from this same list, so none of the
+     three can say a different number from what is actually listed. -->
+{% set capability_groups = [
+  {'title': 'Set direction', 'blurb': 'Where are we going, and is the money following the plan?', 'items': [
+    {'label': 'Strategy Management', 'href': '/features#strategy-management'},
+    {'label': 'Portfolio Management', 'href': '/features#portfolio-management'},
+    {'label': 'Transformation Management', 'href': '/features#transformation-management'},
+    {'label': 'Investment and Financial Management', 'href': '/features#investment-and-financial-management'},
+  ]},
+  {'title': 'Know what you run', 'blurb': 'What does the business actually run on, and who owns it?', 'items': [
+    {'label': 'Architecture Management', 'href': '/features#architecture-management'},
+    {'label': 'Data Management', 'href': '/features#data-management'},
+    {'label': 'People and Organisation Management', 'href': '/features#people-and-organisation-management'},
+    {'label': 'Operations and Service Management', 'href': '/features#operations-and-service-management'},
+  ]},
+  {'title': 'Stay in control', 'blurb': 'What could hurt us, what must we prove, and what are we committed to?', 'items': [
+    {'label': 'Risk Management', 'href': '/features#risk-management'},
+    {'label': 'Compliance and Governance', 'href': '/features#compliance-and-governance'},
+    {'label': 'Vendor and Procurement Management', 'href': '/features#vendor-and-procurement-management'},
+    {'label': 'AI Management', 'href': '/features#ai-management'},
+  ]},
+  {'title': 'Get answers before you need them', 'blurb': 'What does it mean, what happens next, and what should we do?', 'items': [
+    {'label': 'Enterprise Intelligence', 'href': '/features#enterprise-intelligence'},
+    {'label': 'Agentic Automation', 'href': '/features#agentic-automation'},
+  ]},
+  {'title': 'Connect and trust', 'blurb': 'Does it fit how we work, and can we trust it with our data?', 'items': [
+    {'label': 'Collaboration and Communication', 'href': '/features#collaboration-and-communication'},
+    {'label': 'Integration and Interoperability', 'href': '/features#integration-and-interoperability'},
+    {'label': 'Administration and Trust', 'href': '/features#administration-and-trust'},
+  ]},
+] %}
+{% set home_coming_soon_items = [
+  {'label': 'Scenarios', 'href': '/modules/scenario-modelling'},
+  {'label': 'Advisers for every role', 'href': '/modules/advisers-for-every-role'},
+  {'label': 'Predictive checks', 'href': '/modules/predictive-checks'},
+] %}
+{% set capability_count = capability_groups | map(attribute='items') | map('length') | sum %}
+{% set NUMBER_WORDS = {13: 'thirteen', 14: 'fourteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty'} %}
+{% set capability_count_word = NUMBER_WORDS.get(capability_count, capability_count) %}
 <section class="home-section">
   <div class="container px-4">
     <div class="max-w-3xl">
       <p class="home-eyebrow">Capabilities</p>
-      <h2 class="home-h2">
-        The eighteen capabilities of Enterprise Intelligence Management.
+      <h2 class="home-h2" data-testid="home-capabilities-heading">
+        The {{ capability_count_word }} capabilities of Enterprise Intelligence Management.
       </h2>
       <p class="home-section-lead">
         Grouped by the question each one answers.
       </p>
     </div>
 
-    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" data-testid="home-capabilities-list">
+      {% for group in capability_groups %}
       <div class="public-card">
-        <h3 class="public-card-title">Set direction</h3>
-        <p class="public-card-body">Where are we going, and is the money following the plan?</p>
+        <h3 class="public-card-title">{{ group.title }}</h3>
+        <p class="public-card-body">{{ group.blurb }}</p>
         <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#strategy-management" class="public-link text-foreground">Strategy Management</a></li>
-          <li><a href="/features#portfolio-management" class="public-link text-foreground">Portfolio Management</a></li>
-          <li><a href="/features#transformation-management" class="public-link text-foreground">Transformation Management</a></li>
-          <li><a href="/features#investment-and-financial-management" class="public-link text-foreground">Investment and Financial Management</a></li>
+          {% for item in group['items'] %}
+          <li><a href="{{ item.href }}" class="public-link text-foreground">{{ item.label }}</a></li>
+          {% endfor %}
         </ul>
       </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Know what you run</h3>
-        <p class="public-card-body">What does the business actually run on, and who owns it?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#architecture-management" class="public-link text-foreground">Architecture Management</a></li>
-          <li><a href="/features#data-management" class="public-link text-foreground">Data Management</a></li>
-          <li><a href="/features#people-and-organisation-management" class="public-link text-foreground">People and Organisation Management</a></li>
-          <li><a href="/features#operations-and-service-management" class="public-link text-foreground">Operations and Service Management</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Stay in control</h3>
-        <p class="public-card-body">What could hurt us, what must we prove, and what are we committed to?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#risk-management" class="public-link text-foreground">Risk Management</a></li>
-          <li><a href="/features#compliance-and-governance" class="public-link text-foreground">Compliance and Governance</a></li>
-          <li><a href="/features#vendor-and-procurement-management" class="public-link text-foreground">Vendor and Procurement Management</a></li>
-          <li><a href="/features#ai-management" class="public-link text-foreground">AI Management</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Get answers before you need them</h3>
-        <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/modules/scenario-modelling" class="public-link text-foreground">Scenarios (coming soon)</a></li>
-          <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
-        </ul>
-      </div>
-      <div class="public-card">
-        <h3 class="public-card-title">Connect and trust</h3>
-        <p class="public-card-body">Does it fit how we work, and can we trust it with our data?</p>
-        <ul class="public-card-body mt-6 space-y-2">
-          <li><a href="/features#collaboration-and-communication" class="public-link text-foreground">Collaboration and Communication</a></li>
-          <li><a href="/features#integration-and-interoperability" class="public-link text-foreground">Integration and Interoperability</a></li>
-          <li><a href="/features#administration-and-trust" class="public-link text-foreground">Administration and Trust</a></li>
-        </ul>
-      </div>
+      {% endfor %}
     </div>
 
-    <p class="public-card-body mt-10">
-      Every capability is in the product today or has a quarter on the published roadmap.
-      <a href="/features" class="public-link">See all eighteen in full</a>.
+    <div class="mt-10 rounded-lg border border-dashed border-border p-6" data-testid="home-coming-soon">
+      <p id="home-coming-soon-heading" class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Coming soon</p>
+      <p class="mt-1 text-sm text-muted-foreground">Not available yet. Join the waiting list.</p>
+      <ul class="mt-4 grid gap-2 sm:grid-cols-3" aria-labelledby="home-coming-soon-heading">
+        {% for item in home_coming_soon_items %}
+        <li><a href="{{ item.href }}" class="public-link text-foreground" data-availability="early_access">{{ item.label }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <p class="public-card-body mt-10" data-testid="home-capabilities-closing">
+      Every capability listed here is in the product today.
+      <a href="/features" class="public-link">See all {{ capability_count_word }} in full</a>.
     </p>
   </div>
 </section>
@@ -475,7 +490,7 @@
         </details>
         <details>
           <summary>What works today?{{ faq_chevron() }}</summary>
-          <p>Connect GitHub or Jira when you sign up, or import an existing architecture model, then ask the AI chat what breaks if a system fails and get a cited answer. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
+          <p>Connect GitHub or Jira when you sign up, or import an existing architecture model, then ask the AI chat what breaks if a system fails and get a cited answer. <a href="/features" class="public-link">See all {{ capability_count_word }} capabilities</a> for what each one delivers today.</p>
         </details>
         <details>
           <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>

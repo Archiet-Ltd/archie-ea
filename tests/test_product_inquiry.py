@@ -23,6 +23,8 @@ import uuid
 
 import pytest
 
+from tests._page_body_test_helpers import page_body
+
 
 def _make_user(db_session, org, *, email=None, role_name="Architect"):
     from app.models.user import Role, User
@@ -111,11 +113,14 @@ class TestOfferPagesRender:
         assert TEAM_ANNUAL_CONSENT in html
 
     def test_offer_pages_do_not_render_stripe_checkout_cta(self, client):
-        """These pages must not pick up the cta=plans checkout branch."""
+        """These pages must not pick up the cta=plans checkout branch. The
+        menu and footer carry "Join the waiting list" on every public page
+        by design, so that sentence is checked for absence in the page
+        body, not the whole page."""
         for url in (HEALTH_CHECK_URL, TEAM_ANNUAL_URL):
             html = client.get(url).data.decode()
             assert 'data-testid="pricing-buy"' not in html
-            assert "Join the waiting list" not in html
+            assert "Join the waiting list" not in page_body(html)
 
 
 class TestProductInquirySubmit:

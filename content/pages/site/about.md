@@ -33,7 +33,7 @@ applications. Each of them needs to know what it runs on, what that costs, what 
 whether its plans are working. What changes with size is the depth of the model, not the need for
 it.
 
-**Entelim defines the category.** Entelim is built around eighteen capabilities that together make
+**Entelim defines the category.** Entelim is built around seventeen capabilities that together make
 up Enterprise Intelligence Management, from strategy and portfolio management through risk,
 compliance, data, AI and vendor management to the intelligence, simulation and automation that
 reason over all of them. Every answer Entelim gives cites the records it came from and shows how
@@ -56,7 +56,7 @@ sales assistant should read about customers. That positions Entelim as the compa
 tools plug into, rather than another AI feature bolted onto an architecture tool. Read access for
 external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's
 own assistant already works this way: every action passes one permission check and every change
-waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
+waits for approval. See [Agentic Automation](/features#agentic-automation) among the seventeen
 capabilities.
 
 ## What we believe
@@ -82,7 +82,7 @@ architecture model and ask cited questions about it. **Synchronised** (Q1 2027) 
 systems you already use and opens read access for your own AI assistants. **Operational** (Q2 2027)
 brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
 **Self-maintaining** (Q1 2028) lets it keep itself current within limits you set. See
-[all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it
+[all seventeen capabilities](/features) for what each one delivers today and what quarter adds to it
 next.
 
 ## Open source, so nobody's locked in

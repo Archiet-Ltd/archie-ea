@@ -29,6 +29,7 @@ from app.services.public_pages import (
     load_feed_pages,
     load_page,
 )
+from tests._page_body_test_helpers import page_body_excluding
 
 
 def _is_merged(page) -> bool:
@@ -1335,13 +1336,16 @@ def test_waiting_list_cta_renders_feature_interest_form(app):
 
 
 def test_no_waiting_list_on_non_cta_pages(app):
-    """Pages without cta=waiting_list do not show the waiting list link."""
+    """Pages without cta=waiting_list do not show the waiting list link in
+    their own body. The navbar's Product menu (the Coming soon column) and
+    the footer carry "Join the waiting list" on every public page by
+    design -- the shell, not this page's own content -- so this checks the
+    page body, excluding, on pages that have one, the home page's own
+    labelled Coming soon block."""
     with app.test_client() as client:
         rv = client.get("/modules/applications")
         html = rv.data.decode()
-        # applications has no cta field, so no waiting list. The site menus (the
-        # Coming soon column) are the shell, not this page's content.
-        content = re.sub(r"<footer.*?</footer>", "", re.sub(r"<header.*?</header>", "", html, flags=re.DOTALL), flags=re.DOTALL)
+        content = page_body_excluding(html, exclude_testid="home-coming-soon")
         assert "Join the waiting list" not in content
 
 

@@ -17,6 +17,7 @@ import re
 import pytest
 
 from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_page
+from tests._page_body_test_helpers import page_body_excluding
 
 SITE_PAGES = [
     "about",
@@ -173,12 +174,14 @@ def test_contact_page_has_no_invented_email(app):
 
 def test_contact_page_has_no_waiting_list_or_launch_framing(app):
     """/contact answers sales questions directly; no waiting-list or
-    pre-launch framing (the product is live and priced)."""
+    pre-launch framing (the product is live and priced). The navbar's
+    Product menu (Coming soon: "Join the waiting list") and the footer are
+    the site shell on every public page by design, so the page's own
+    body -- excluding, on pages that have one, the home page's own
+    labelled Coming soon block -- is what gets checked here."""
     with app.test_client() as client:
         html = client.get("/contact").data.decode()
-        # The page's own content: the navbar menus (Coming soon: "Join the waiting
-        # list") and the footer are the site shell, read from the registry.
-        content = re.sub(r"<footer.*?</footer>", "", re.sub(r"<header.*?</header>", "", html, flags=re.DOTALL), flags=re.DOTALL)
+        content = page_body_excluding(html, exclude_testid="home-coming-soon")
         assert "waiting list" not in content.lower()
         assert "when Entelim launches" not in html
         assert "/#waitlist" not in html
