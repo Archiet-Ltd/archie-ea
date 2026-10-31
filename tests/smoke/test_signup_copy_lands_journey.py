@@ -99,6 +99,27 @@ def test_a_mistyped_email_keeps_the_passwords_and_says_why_register_is_off(brows
         context.close()
 
 
+
+def _the_bar_draws_and_the_count_is_said_once(page):
+    """The reading bar is a real bar (a track at least 200 px wide whose visible fill is the read share of it) and the
+    page count is said by exactly one element."""
+    bar = page.locator("[data-reading-bar] [role='progressbar']")
+    expect(bar).to_be_visible()
+    box = bar.bounding_box()
+    assert box and box["width"] >= 200, "the reading bar is %s px wide" % (box and box["width"])
+    now = float(bar.get_attribute("aria-valuenow"))
+    assert now > 0
+    indicator = bar.locator("[data-slot='progress-indicator']")
+    assert indicator.count() == 1, "the bar has no library fill"
+    fill = indicator.bounding_box()
+    visible = max(0.0, min(fill["x"] + fill["width"], box["x"] + box["width"]) - max(fill["x"], box["x"]))
+    assert abs(visible - box["width"] * now / 100.0) <= 2, "fill %s px of a %s px bar at %s%%" % (visible, box["width"], now)
+    assert visible >= 4
+    said = page.get_by_text(re.compile(r"page \d+ of up to \d+"))
+    assert said.count() == 1, "the page count is said %d times on step 3" % said.count()
+    assert page.get_by_text("Reading now:").count() == 0
+
+
 @pytest.mark.parametrize("width,dark", [(1440, False), (390, True)])
 def test_the_four_steps_promise_only_what_the_person_can_reach(browser, server, people, held_site, width, dark):
     context, page = new_page(browser, width)
@@ -120,6 +141,7 @@ def test_the_four_steps_promise_only_what_the_person_can_reach(browser, server, 
             re.compile(r"We are reading .+: page 1 of up to 30\. Answer the questions below now; "
                        r"the facts we find will be waiting on your Overview to confirm"), timeout=60000)
         expect(page.locator("[data-reading-bar]")).to_be_visible()
+        _the_bar_draws_and_the_count_is_said_once(page)
         assert page.locator("[data-signup-steps]").get_attribute("data-reload-when-read") is not None
         assert page.locator("[data-signup-steps]").get_attribute("data-refresh-seconds") == "10"
         marker = page.evaluate("window.__stayed = true")

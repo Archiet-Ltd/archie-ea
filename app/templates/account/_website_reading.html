@@ -3,15 +3,17 @@
    The script on the page polls the status address and rewrites this block from the same row, so the sentence,
    the bar and the links below are the one answer the server gives. #}
 {% from 'components/button.html' import button %}
-{% from 'components/progress.html' import progress %}
+{% from 'basecoat/progress.html' import progress, progress_indicator %}
 {% set row = sources | selectattr('key', 'equalto', 'website') | first %}
 <div class="space-y-2" data-reading data-testid="website-reading">
     {% if reading_lead %}<p class="text-sm font-medium {{ '' if (row.state == 'reading' and row.reading_line) else 'hidden' }}" role="status" data-reading-line data-state="{{ row.state }}" data-testid="signup-reading-line">{{ (row.reading_line or '') if row.state == 'reading' else '' }}</p>{% endif %}
     {% if not lead_only %}
-    <p class="text-sm {{ 'text-destructive-emphasis' if row.state == 'failed' else 'text-muted-foreground' }}" role="status" aria-live="polite"
-       data-say="website" data-source="website" data-state="{{ row.state }}" data-testid="signup-status-website">{{ row.text if row.state != 'not_given' else '' }}</p>
+    <p class="text-sm {{ 'text-destructive-emphasis' if row.state == 'failed' else 'text-muted-foreground' }}{{ ' hidden' if (reading_lead and row.state == 'reading' and row.reading_line) else '' }}" role="status" aria-live="polite"
+       data-say="website" data-source="website" data-state="{{ row.state }}" data-testid="signup-status-website">{{ '' if (reading_lead and row.state == 'reading' and row.reading_line) or row.state == 'not_given' else row.text }}</p>
     <div class="{{ '' if row.state == 'reading' else 'hidden' }}" data-reading-bar>
-        {{ progress(value=(row.progress.percent if row.progress else 0), max=100, class='h-2', label='Pages of the website read') }}
+        {% set pct = (row.progress.percent if row.progress else 0) %}
+        {% call progress(value=pct, max=100, class='h-2 w-full', attrs={'aria-label': 'Pages of the website read'}) %}{{ progress_indicator(value=pct, max=100) }}{% endcall %}
+        <p class="text-xs text-muted-foreground truncate" data-reading-current>{{ (row.current or '') if row.state == 'reading' else '' }}</p>
     </div>
     <div class="flex flex-wrap gap-2" data-reading-actions data-testid="website-reading-actions">
         {% if row.next %}{{ button(text=row.next.label, size='sm', href=row.next.url, icon='arrow-right', icon_position='right', testid='website-next') }}{% endif %}

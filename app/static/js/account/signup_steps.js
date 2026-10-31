@@ -63,9 +63,13 @@
             bar.classList.toggle('hidden', !shown);
             var fill = bar.querySelector('[role="progressbar"]');
             if (shown && fill) {
+                var indicator = fill.querySelector('[data-slot="progress-indicator"]');
                 fill.setAttribute('aria-valuenow', String(row.progress.percent));
-                fill.style.transform = 'translateX(-' + (100 - row.progress.percent) + '%)';
+                fill.setAttribute('data-value', String(row.progress.percent));
+                if (indicator) indicator.style.transform = 'translateX(-' + (100 - row.progress.percent) + '%)';
             }
+            var current = bar.querySelector('[data-reading-current]');
+            if (current) current.textContent = row.state === 'reading' && row.current ? row.current : '';
         }
         var lead = block.querySelector('[data-reading-line]');
         if (lead) {
@@ -128,7 +132,10 @@
             var line = root.querySelector('[data-source="' + row.key + '"]');
             if (row.key === 'website' && !line && row.state !== 'not_given') paintReading(row);
             if (!line || row.state === 'not_given') return;
-            line.textContent = row.text;
+            // With the reading line above the bar the count is said once there; this sentence keeps only its other states.
+            var counted = row.key === 'website' && row.state === 'reading' && row.reading_line && root.querySelector('[data-reading-line]');
+            line.textContent = counted ? '' : row.text;
+            line.classList.toggle('hidden', !!counted);
             line.setAttribute('data-state', row.state);
             line.classList.toggle('text-destructive-emphasis', row.state === 'failed');
             line.classList.toggle('text-muted-foreground', row.state !== 'failed');
