@@ -2,11 +2,11 @@
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}{{ vendor.name }}{% endblock %}
+{% import 'basecoat/index.html' as ui %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/card.html" import card, card_header, card_description, card_content %}
 {% from "components/data_card.html" import data_card %}
 {% from "components/status_badge.html" import status_badge %}
-{% from "components/document_analyzer.html" import document_analyzer_upload with context %}
 
 {% set product_count = vendor.products|length if vendor.products else 0 %}
 {% set capability_count = vendor_capabilities|length if vendor_capabilities else 0 %}
@@ -31,7 +31,7 @@
 {% endif %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto max-w-7xl vendor-detail" data-vendor="{{ vendor.id }}" x-data="{ analyzerOpen: false }">
+<div class="p-6 space-y-6 mx-auto max-w-7xl vendor-detail" data-vendor="{{ vendor.id }}">
     {{ page_header(
         title=vendor.name,
         description=vendor.description or 'Vendor lifecycle, product portfolio, and architecture relationships.',
@@ -85,24 +85,9 @@
             Activate Contract
         </a>
         {% endif %}
-        <button type="button" @click="openUnifiedMappingModalDiscovery({ context: 'archimate' })"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                aria-label="Map to architecture elements">
-            <i data-lucide="layers" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            Map to Architecture
-        </button>
-        <button type="button" @click="openUnifiedMappingModalDiscovery({ context: 'apqc' })"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                aria-label="Map to APQC processes">
-            <i data-lucide="git-branch" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            Map to APQC
-        </button>
-        <button type="button" @click="analyzerOpen = !analyzerOpen"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                aria-label="Toggle document analyzer">
-            <i data-lucide="scan-line" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            Analyze Document
-        </button>
+        {% call ui.button(href=url_for('unified_applications.vendors') ~ '?tab=mapping', variant='outline') %}{{ lucide('layers') }}Map to Architecture{% endcall %}
+        {% call ui.button(href=url_for('unified_applications.vendors') ~ '?tab=mapping', variant='outline') %}{{ lucide('git-branch') }}Map to APQC{% endcall %}
+        {% call ui.button(href=url_for('unified_ai_chat.document_upload_view', vendor=vendor.id), variant='outline', attrs={'data-testid': 'vendor-analyze-document'}) %}{{ lucide('file-search') }}Analyze Document{% endcall %}
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -433,10 +418,6 @@
         {% endcall %}
     {% endcall %}
 
-    <div x-show="analyzerOpen" x-cloak class="mb-6"> <!-- modal-a11y-ok -->
-        {{ document_analyzer_upload('vendor', vendor.id, vendor.name) }}
-    </div>
-
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {% call card() %}
             {% call card_header() %}
@@ -670,7 +651,6 @@
 {% endblock %}
 
 {% block modals %}
-{% include 'components/unified_mapping_modal.html' %}
 
 {% from 'components/modal.html' import modal %}
 {% if vendor.products %}
