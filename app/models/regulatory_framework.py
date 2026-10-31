@@ -41,6 +41,8 @@ class FrameworkAdoption(HybridTenantMixin, db.Model):
     adopted_at = db.Column(db.DateTime, default=_now_utc_naive)
     status = db.Column(db.String(20), default="active")  # active, inactive
     tailoring_notes = db.Column(db.Text)
+    # Where the adoption came from: "starter:<framework>" when sign-up chose it, NULL when a person adopted it.
+    source = db.Column(db.String(100), nullable=True)
 
     created_at = db.Column(db.DateTime, default=_now_utc_naive)
     updated_at = db.Column(db.DateTime, default=_now_utc_naive, onupdate=_now_utc_naive)
