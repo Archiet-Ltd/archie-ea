@@ -36157,114 +36157,6 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/main/agentic_gaps.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_table.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/filter_panel.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/pagination_controls.html",
-    "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/table.html",
-    "components/tabs.html",
-    "components/workbench_table.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "data-table",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "empty",
-    "field",
-    "input",
-    "page-header",
-    "page-shell",
-    "pagination",
-    "select",
-    "table",
-    "input-group"
-   ],
-   "confidence": "high",
-   "controls": {
-    "link": 1
-   },
-   "departures": [
-    {
-     "rule": "R10",
-     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
-    }
-   ],
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "grid": "G1",
-   "inhouse_components": [
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "macros/page_shell.html"
-   ],
-   "original": "example:tasks",
-   "page_type": "data-table",
-   "patterns": [
-    "P01-page-header",
-    "P03-data-table",
-    "P04-filter-search-toolbar",
-    "P23-status-badge",
-    "P27-evidence-line"
-   ],
-   "persona": "solution_architect",
-   "reason": "Gaps found by the agent.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
-    }
-   },
-   "spec": null,
-   "states": [
-    "loading",
-    "empty-nothing-derived",
-    "empty-filtered",
-    "empty-no-permission",
-    "error-region",
-    "populated"
-   ],
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
   "app/templates/main/agentic_generator.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -36778,6 +36670,8 @@
     "components/priority_actions.html",
     "components/progress.html",
     "components/provenance.html",
+    "components/public_footer.html",
+    "components/public_navbar.html",
     "components/review_queue_panel.html",
     "components/skeleton.html",
     "components/status_badge.html",
@@ -36786,7 +36680,7 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "dashboard",
+   "block": "public",
    "charts": [],
    "components": [
     "alert",
@@ -36809,7 +36703,7 @@
    },
    "departures": [],
    "extends": [
-    "layouts/admin_base.html"
+    "layouts/public_base.html"
    ],
    "extra_macros": [
     "components/input.html",
@@ -36822,14 +36716,11 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/button.html",
-    "components/empty_state.html",
-    "components/input.html",
-    "components/table.html",
-    "macros/page_shell.html"
+    "components/public_footer.html",
+    "components/public_navbar.html"
    ],
    "original": "dashboard-01",
-   "page_type": "dashboard",
+   "page_type": "public",
    "patterns": [
     "P01-page-header",
     "P24-kpi-row",

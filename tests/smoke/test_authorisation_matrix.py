@@ -40,13 +40,14 @@ DENIED = "denied"
 # and test_no_archetype_reaches_another_personas_section_unauthenticated now also
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
-    "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
-    # licences/spend are a finance persona's own numbers. Deliberately NOT
-    # extended to contracts/renewals/compliance below, which stay
-    # requires_procurement-only.
-    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
-    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
+    # The contract, licence and spend pages follow the one cost-visibility rule:
+    # whoever may see cost figures (cto, portfolio_manager, platform_admin) may
+    # read them, besides the procurement roles (contracts) and the spend roles
+    # (licences, spend: procurement, portfolio_manager, finance). So the CTO is
+    # expected to reach all three. Creating and editing stay with procurement.
+    "/procurement/contracts":  {"procurement", "portfolio_manager", "cto"},
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance", "cto"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance", "cto"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
     # R1-B34 (TB-0135): viewing the register is @login_required only (every
     # archetype can see a formula's active version); activating a new one
@@ -908,6 +909,80 @@ def test_oversight_post_routes_authorisation(
     actual = ALLOWED if response.status < 400 else DENIED
     assert actual == expected, (
         "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+# Role-gated ARB writes. Each is probed with an id that does not exist, except
+# the four decisions, which use a real submitted review (a missing id answers
+# 404 to everyone before the role is asked): a role the route admits reaches
+# the handler, anyone else is refused before it.
+ARB_APPROVER_ARCHETYPES = {"enterprise_architect", "arb_member", "cto", "platform_admin"}
+ARB_WRITE_POLICY = {
+    ("POST", "/arb/sessions/999999999/complete"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/sessions/999999999/cancel"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/sessions/999999999/delete"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/reviews/999999999/assign"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/reviews/999999999/delete"): ARB_APPROVER_ARCHETYPES,
+    ("PUT", "/arb/api/exceptions/999999999/approve"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/review"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/approve"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/reject"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/request-changes"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/initialize_standards"): {"platform_admin"},
+}
+
+
+@pytest.fixture(scope="module")
+def seeded_arb_review(seeded):
+    """A submitted review of the seeded organisation whose submitter is a
+    persona outside the approver set."""
+    from app import create_app, db
+    from app.models.architecture_review_board import ARBReviewItem
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        number = "REV-MATRIX-%s" % org_id
+        item = ARBReviewItem.query.filter_by(review_number=number).first()
+        if item is None:
+            submitter = User.query.filter_by(
+                email=seeded["emails"]["solution_architect"]
+            ).one()
+            item = ARBReviewItem(
+                review_number=number,
+                title="Auth-matrix probe review",
+                review_type="architecture",
+                status="submitted",
+                submitter_id=submitter.id,
+                organization_id=org_id,
+            )
+            db.session.add(item)
+            db.session.commit()
+        return item.id
+
+
+@pytest.mark.parametrize("method,path", list(ARB_WRITE_POLICY))
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_arb_write_routes_authorisation(
+    archetype, method, path, page, live_server, seeded, seeded_arb_review
+):
+    """Complete, cancel, delete, assign, exception approval, the four decisions and
+    standards setup are refused to every persona outside the approver set."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path.format(review=seeded_arb_review),
+        method=method,
+        headers={"X-CSRFToken": csrf, "Content-Type": "application/json"},
+        data="{}",
+        max_redirects=0,
+    )
+    expected = ALLOWED if archetype in ARB_WRITE_POLICY[(method, path)] else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s %s %s: expected %s, got %s" % (archetype, method, path, expected, response.status)
     )
 
 
