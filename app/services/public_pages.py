@@ -779,9 +779,27 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     }
 
 
+_LEGAL_BLOCK = re.compile(
+    r"\[\[if legal-pages\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+)
+
+
+def _apply_legal_blocks(body_md: str) -> str:
+    """Keep the first branch of ``[[if legal-pages]]a[[else]]b[[/if]]`` when
+    the held legal pages are live, otherwise the ``else`` branch (or nothing),
+    so a page never names a legal page that answers 404."""
+    from app.services.legal_pages import legal_pages_enabled
+
+    live = legal_pages_enabled()
+    return _LEGAL_BLOCK.sub(
+        lambda m: (m.group(1) if live else (m.group(2) or "")), body_md
+    )
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
+    body_md = _apply_legal_blocks(body_md)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
     body_html = _sanitize_html(_md.reset().convert(body_md))
@@ -836,7 +854,10 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
     markdown + bleach over every content file on each call."""
     if not CONTENT_ROOT.is_dir():
         return ()
-    return tuple(sorted(
+    from app.services.legal_pages import legal_pages_enabled
+
+    # The flag is part of the key: a page's body can differ with it.
+    return (("legal-pages", int(legal_pages_enabled())),) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 
