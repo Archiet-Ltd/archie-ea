@@ -77222,25 +77222,6 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/main/agentic_gaps.html::link::0",
-   "kind": "link",
-   "label": "Return to Dashboard",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/agentic-gaps"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "endpoint": "dashboard.overview",
-    "href": "url_for('dashboard.overview')"
-   },
-   "template": "app/templates/main/agentic_gaps.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
    "id": "app/templates/main/agentic_generator.html::link::0",
    "kind": "link",
    "label": "Return to Dashboard",
@@ -101419,20 +101400,20 @@
   }
  ],
  "counts": {
-  "controls": 5538,
+  "controls": 5537,
   "controls_by_kind": {
    "button": 3138,
    "form": 248,
-   "link": 1012,
+   "link": 1011,
    "modal": 193,
    "table": 374,
    "testid": 573
   },
   "controls_mutating": 745,
-  "pages": 469,
-  "pages_without_parameters": 339,
-  "routes": 3784,
-  "templates": 689,
+  "pages": 468,
+  "pages_without_parameters": 338,
+  "routes": 3783,
+  "templates": 688,
   "templates_not_reached_by_a_route": 110
  },
  "routes": [
@@ -149149,42 +149130,6 @@
   },
   {
    "blueprint": "main",
-   "closure": [
-    "app/templates/components/_breadcrumb_root.html",
-    "app/templates/components/admin_header.html",
-    "app/templates/components/admin_sidebar.html",
-    "app/templates/components/drawer.html",
-    "app/templates/components/page_guide_drawer.html",
-    "app/templates/components/sidebar_nav.html",
-    "app/templates/components/switch.html",
-    "app/templates/components/toast-container.html",
-    "app/templates/layouts/admin_base.html",
-    "app/templates/macros/page_shell.html",
-    "app/templates/main/agentic_gaps.html",
-    "app/templates/partials/_data_load_error.html",
-    "app/templates/partials/_head.html",
-    "app/templates/partials/_scripts_common.html"
-   ],
-   "endpoint": "main.agentic_gaps_ui",
-   "guards": [
-    "login_required"
-   ],
-   "has_parameters": false,
-   "id": "main.agentic_gaps_ui /agentic-gaps",
-   "login_required": true,
-   "methods": [
-    "GET"
-   ],
-   "page": true,
-   "rule": "/agentic-gaps",
-   "template_unresolved": [],
-   "templates": [
-    "app/templates/main/agentic_gaps.html"
-   ],
-   "templates_missing": []
-  },
-  {
-   "blueprint": "main",
    "closure": [],
    "endpoint": "main.api_cancel_workflow",
    "guards": [
@@ -189326,19 +189271,6 @@
    "imports": [],
    "includes": [],
    "name": "macros/shadcn_compat.html",
-   "parse_errors": [],
-   "rendered_on_count": 1,
-   "unresolved_refs": []
-  },
-  "app/templates/main/agentic_gaps.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/macros/page_shell.html"
-   ],
-   "includes": [],
-   "name": "main/agentic_gaps.html",
    "parse_errors": [],
    "rendered_on_count": 1,
    "unresolved_refs": []
