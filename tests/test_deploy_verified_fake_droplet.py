@@ -57,6 +57,9 @@ exec bash "$@"
 FAKE_DOCKER = """#!/bin/bash
 S="$FAKE_STATE"
 echo "docker $*" >> "$S/docker.log"
+# Where the call ran, and which commit the live tree (the one the running server
+# serves from) held at that moment.
+echo "$1 $2 cwd=$(pwd) live=$(git -C "$APP_DIR" rev-parse HEAD)" >> "$S/docker.where"
 if [ "$1" = compose ]; then
     case "$2" in
         build) exit "${FAKE_BUILD_EXIT:-0}" ;;
@@ -236,6 +239,11 @@ class FakeDroplet:
 
     def recorded(self) -> str | None:
         return self.runner_state.read_text().strip() if self.runner_state.exists() else None
+
+    def where(self) -> list[str]:
+        path = self.state / "docker.where"
+        lines = path.read_text().splitlines() if path.exists() else []
+        return [l for l in lines if l.startswith("compose")]
 
     def docker_calls(self) -> list[str]:
         path = self.state / "docker.log"
@@ -447,3 +455,72 @@ def test_a_failing_backup_changes_nothing(droplet):
     assert rc == 1, out
     assert droplet.running() == sha(droplet, "A")
     assert _compose_steps(droplet) == []
+
+
+FAILING_STEPS = [
+    ("backup", {"DEPLOY_BACKUP_COMMAND": "false"}),
+    ("build", {"FAKE_BUILD_EXIT": "1"}),
+    ("database-bootstrap", {"FAKE_FAIL_STEP": "database-bootstrap"}),
+    ("schema-deploy", {"FAKE_FAIL_STEP": "schema-deploy"}),
+    ("database-acl", {"FAKE_FAIL_STEP": "database-acl"}),
+]
+
+
+@pytest.mark.parametrize("name,env", FAILING_STEPS, ids=[n for n, _ in FAILING_STEPS])
+def test_a_failing_step_leaves_the_live_tree_at_the_current_commit(droplet, name, env):
+    """The old server serves code and templates from the live tree: it must still
+    be on the commit it was running, and the server must not have been replaced."""
+    rc, out = droplet.run(sha(droplet, "B"), AUTO_ROLLBACK="0", **env)
+
+    assert rc == 1, out
+    assert head(droplet) == sha(droplet, "A")
+    assert droplet.running() == sha(droplet, "A")
+    assert not any("--force-recreate" in c for c in _compose_steps(droplet))
+    assert (droplet.app / "f.txt").read_text() == "A"
+
+
+def test_the_live_tree_changes_only_at_the_swap(droplet):
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    seen = {line.split(" cwd=")[0]: line.split(" live=")[1] for line in droplet.where()}
+    for step in ("compose build", "compose run"):
+        assert seen[step] == sha(droplet, "A"), droplet.where()
+    # The swap is the last compose call and sees the new commit.
+    assert droplet.where()[-1].startswith("compose up") and droplet.where()[-1].endswith("live=" + sha(droplet, "B"))
+    assert [l for l in droplet.where() if l.endswith("live=" + sha(droplet, "B"))] == [droplet.where()[-1]]
+
+
+def test_the_build_and_schema_steps_run_from_a_copy_of_the_target_not_the_live_tree(droplet):
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    before_swap = [l for l in droplet.where() if not l.startswith("compose up")]
+    assert before_swap
+    for line in before_swap:
+        cwd = line.split(" cwd=")[1].split(" live=")[0]
+        assert cwd != droplet.app.as_posix(), line
+    swap = droplet.where()[-1]
+    assert " cwd=%s " % droplet.app.as_posix() in swap
+
+
+def test_the_old_server_serves_the_current_build_until_the_swap(droplet):
+    """Observed from the outside, as the health probe sees it: the build id the
+    running server reports is CURRENT's right up to the replacement."""
+    rc, out = droplet.run(sha(droplet, "B"))
+
+    assert rc == 0, out
+    log = droplet.docker_calls()
+    swap_at = next(i for i, c in enumerate(log) if "--force-recreate" in c)
+    assert all("--force-recreate" not in c for c in log[:swap_at])
+    assert all(line.endswith("live=" + sha(droplet, "A")) for line in droplet.where()[:-1])
+    assert droplet.running() == sha(droplet, "B")
+
+
+def test_the_backup_command_cannot_read_the_rest_of_the_deploy_script(droplet):
+    """The deploy script arrives on stdin: a backup that reads stdin would end the
+    deploy early, after the backup and before the build."""
+    rc, out = droplet.run(sha(droplet, "B"), DEPLOY_BACKUP_COMMAND="cat > /dev/null")
+
+    assert rc == 0, out
+    assert droplet.running() == sha(droplet, "B")

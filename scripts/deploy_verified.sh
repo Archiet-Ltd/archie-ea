@@ -195,38 +195,75 @@ else
     TARGET=$(git rev-parse --verify "$REF")
 fi
 CURRENT=$(git rev-parse HEAD)
+echo "RESOLVED_COMMIT=$TARGET"
+# The old server keeps serving until the new one is ready to take over, and it
+# serves its code, templates and static files from the bind-mounted live tree.
+# So nothing may change in the live tree until the swap: the build and the
+# one-shot schema steps run from a separate copy of TARGET (git archive into a
+# temporary directory, used as the compose project directory), and the live
+# tree is checked out to TARGET only just before the server is replaced. Every
+# step that can fail runs BEFORE the swap and a failure leaves the old server
+# and the live tree untouched (set -e stops here; nothing below the failing line
+# runs). The exit trap asserts that, whatever the failure.
+#   1. back up the database (DEPLOY_BACKUP_COMMAND);
+#   2. build the images the one-shot steps and the server use, from the copy;
+#   (every docker call has its stdin closed: this script arrives on stdin, and
+#   a command that reads it would swallow the steps after it and end the deploy early)
+#   3. run database-bootstrap, schema-deploy and database-acl in that order, from
+#      the copy. `run --rm --no-deps` starts exactly one container, waits for it,
+#      and returns its exit code, so a failing step stops the script. schema-deploy
+#      skips init-db, schema-upgrade and reconcile-schema when the database is at
+#      head and matches the models, and always runs the backfills; a pending
+#      migration marked as needing downtime stops it with exit 3 (rerun with
+#      ALLOW_DOWNTIME_MIGRATIONS=1 inside an agreed window);
+#   4. only then check TARGET out in the live tree and replace the server
+#      container. --no-deps stops compose from re-running the one-shot chain
+#      through depends_on, and --force-recreate still guarantees a fresh
+#      container from current config (see incident above: neither `restart` nor
+#      a plain `up -d` does).
+LIVE_DIR=$(pwd)
+# The copy is a different directory, so pin what compose derives from the
+# directory: the project name (containers, networks, volumes, image names) and
+# the default backup folder, which is not tracked.
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-$(basename "$LIVE_DIR" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')}
+export ARCHIE_BACKUP_HOST_DIR=${ARCHIE_BACKUP_HOST_DIR:-$LIVE_DIR/deploy/backups}
+BUILD_TREE=$(mktemp -d)
+SWAPPED=0
+leave() {
+    local rc=$?
+    rm -rf "$BUILD_TREE"
+    if [ "$SWAPPED" = 0 ]; then
+        local live
+        live=$(git -C "$LIVE_DIR" rev-parse HEAD 2>/dev/null || echo unknown)
+        if [ "$live" != "$CURRENT" ]; then
+            echo "DEPLOY-VERIFY FAIL: the live tree is at $live before the swap; it must stay at $CURRENT until the server is replaced" >&2
+            rc=1
+        fi
+    fi
+    exit "$rc"
+}
+trap leave EXIT
+git archive "$TARGET" | tar -x -C "$BUILD_TREE"
+if [ -f "$LIVE_DIR/.env" ]; then
+    cp -p "$LIVE_DIR/.env" "$BUILD_TREE/.env"
+fi
+if [ -n "${DEPLOY_BACKUP_COMMAND:-}" ]; then
+    echo "backup: $DEPLOY_BACKUP_COMMAND"
+    bash -c "$DEPLOY_BACKUP_COMMAND" </dev/null
+fi
+cd "$BUILD_TREE"
+docker compose build server schema-deploy </dev/null
+docker compose run --rm --no-deps -T database-bootstrap </dev/null
+docker compose run --rm --no-deps -T -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy </dev/null
+docker compose run --rm --no-deps -T database-acl </dev/null
+cd "$LIVE_DIR"
+SWAPPED=1
 if [ "$CURRENT" != "$TARGET" ]; then
     git checkout --detach "$TARGET"
     git reset --hard "$TARGET"
 else
     echo "already at $TARGET; checkout skipped (verification still runs)"
 fi
-echo "RESOLVED_COMMIT=$TARGET"
-# The old server keeps serving until the new one is ready to take over, so
-# every step that can fail runs BEFORE the swap and a failure leaves the old
-# server untouched (set -e stops here; nothing below the failing line runs):
-#   1. back up the database (DEPLOY_BACKUP_COMMAND);
-#   2. build the images the one-shot steps and the server use;
-#   (every docker call has its stdin closed: this script arrives on stdin, and
-#   a command that reads it would swallow the steps after it and end the deploy early)
-#   3. run database-bootstrap, schema-deploy and database-acl in that order.
-#      `run --rm --no-deps` starts exactly one container, waits for it, and
-#      returns its exit code, so a failing step stops the script. schema-deploy
-#      takes the quick exit when the database is at head and matches the models;
-#      a pending migration marked as needing downtime stops it with exit 3
-#      (rerun with ALLOW_DOWNTIME_MIGRATIONS=1 inside an agreed window);
-#   4. only then replace the server container. --no-deps stops compose from
-#      re-running the one-shot chain through depends_on, and --force-recreate
-#      still guarantees a fresh container from current config (see incident
-#      above: neither `restart` nor a plain `up -d` does).
-if [ -n "${DEPLOY_BACKUP_COMMAND:-}" ]; then
-    echo "backup: $DEPLOY_BACKUP_COMMAND"
-    bash -c "$DEPLOY_BACKUP_COMMAND"
-fi
-docker compose build server schema-deploy </dev/null
-docker compose run --rm --no-deps -T database-bootstrap </dev/null
-docker compose run --rm --no-deps -T -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy </dev/null
-docker compose run --rm --no-deps -T database-acl </dev/null
 docker compose up -d --no-deps --force-recreate server </dev/null
 REMOTE
 }
