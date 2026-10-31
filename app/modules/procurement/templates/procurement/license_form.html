@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/form_field.html' import field_label_marked %}
 {% from 'components/input.html' import hidden_input %}
 {% from 'components/page_header.html' import page_header %}
 {% block title %}{{ 'Edit Licence' if license else 'New Licence' }}{% endblock %}
@@ -33,7 +34,7 @@
       {% call ui.card_header() %}{{ ui.card_title(text='Licence') }}{% endcall %}
       {% call ui.card_content(class='space-y-6') %}
         {% call ui.field() %}
-          {{ ui.field_label(text='Contract', attrs={'for': 'contract_id'}) }}
+          {{ field_label_marked('Contract', 'contract_id', required=true) }}
           {% call ui.native_select_wrapper(class='w-full') %}{% call ui.native_select(id='contract_id', name='contract_id', class='w-full', required=true) %}
             {{ ui.native_select_option('Select a contract', value='') }}
             {% for contract in contracts %}

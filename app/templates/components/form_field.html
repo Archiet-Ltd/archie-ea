@@ -21,6 +21,15 @@
    {{ form_footer(submit_text='Save application', cancel_attrs={'data-modal-close': 'modal-create'}) }}
 #}
 
+{% import 'basecoat/index.html' as ui %}
+
+{# field_label_marked: the library field label with the required marker, from the one `required` argument.
+   Pass the same value to the control (`required=true`); the marker is aria-hidden because the control's own
+   required state is what a screen reader announces. #}
+{% macro field_label_marked(text, for_id, required=false, class='') %}
+{%- call ui.field_label(class=class, attrs={'for': for_id}) %}{{ text }}{% if required %} <span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}{% endcall -%}
+{% endmacro %}
+
 {% macro form_label(id, label, required=false) %}
 {% if label %}<label for="{{ id }}" class="block text-sm font-medium text-muted-foreground mb-1">{{ label }}{% if required %} <span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}</label>{% endif %}
 {% endmacro %}

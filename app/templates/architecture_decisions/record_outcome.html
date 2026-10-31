@@ -1,5 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/form_field.html' import field_label_marked %}
 {% from 'components/input.html' import hidden_input %}
 {% from "components/page_header.html" import page_header %}
 
@@ -89,7 +90,7 @@
         {% endif %}
 
         {% call ui.field() %}
-            {{ ui.field_label(text='Review Outcome', attrs={'for': 'review_outcome'}) }}
+            {{ field_label_marked('Review Outcome', 'review_outcome', required=true) }}
             {{ ui.field_description(text='What was found, and whether the decision still stands.') }}
             {{ ui.textarea(id='review_outcome', name='review_outcome', rows=5, required=true, class='resize-y', placeholder='The decision still holds; renewed the vendor contract for another 12 months...', text=decision.review_outcome or '') }}
         {% endcall %}

@@ -2,6 +2,7 @@
 {% extends "layouts/admin_base.html" %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/form_field.html' import field_label_marked %}
 {% from 'architecture_assistant/partials/_journey_home_panels.html' import journey_count_panel %}
 
 {#
@@ -337,11 +338,11 @@
 
           <form class="mt-4 space-y-3" @submit.prevent="addEvidence">
             <div>
-              <label for="evidence-name" class="block text-sm font-medium text-muted-foreground mb-1">Evidence name</label>
+              {{ field_label_marked('Evidence name', 'evidence-name', required=true) }}
               {{ ui.input(id='evidence-name', name='evidence_name', type='text', required=true, maxlength=255, placeholder='Operating model v3', class='mt-1', attrs={'x-model.trim': 'evidenceName'}) }}
             </div>
             <div>
-              <label for="evidence-reference" class="block text-sm font-medium text-muted-foreground mb-1">Document or reference</label>
+              {{ field_label_marked('Document or reference', 'evidence-reference', required=true) }}
               {{ ui.input(id='evidence-reference', name='evidence_reference', type='text', required=true, maxlength=1000, placeholder='File name, repository path or URL', class='mt-1', attrs={'x-model.trim': 'evidenceReference'}) }}
             </div>
             {% call ui.button(variant='outline', class='w-full', attrs={'type': 'submit', ':disabled': 'savingEvidence || !evidenceName || !evidenceReference'}) %}<i data-lucide="paperclip" class="h-4 w-4" aria-hidden="true"></i>Add evidence{% endcall %}

@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/form_field.html' import field_label_marked %}
 {% from 'components/input.html' import hidden_input %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -17,11 +18,11 @@
     {{ hidden_input('csrf_token', csrf_token()) }}
     {% call ui.card() %}{% call ui.card_content(class='space-y-6') %}
       {% call ui.field() %}
-        {{ ui.field_label(text='Data entity ID', attrs={'for': 'data_entity_id'}) }}
+        {{ field_label_marked('Data entity ID', 'data_entity_id', required=true) }}
         {{ ui.input(id='data_entity_id', name='data_entity_id', type='number', required=true, value=data_entity_id or '') }}
       {% endcall %}
       {% call ui.field() %}
-        {{ ui.field_label(text='Title', attrs={'for': 'title'}) }}
+        {{ field_label_marked('Title', 'title', required=true) }}
         {{ ui.input(id='title', name='title', type='text', required=true) }}
       {% endcall %}
       {% call ui.field() %}
