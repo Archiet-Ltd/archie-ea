@@ -173,31 +173,39 @@
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0') %}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3') %}
-    {#- An upper-row box holds whole entries only: Alpine hides the entries that would not fit the eight-rem budget and a "N more"
-        button under the last whole one opens the block in place. Before Alpine runs, and without it, the box scrolls inside itself. -#}
+    {#- An upper-row box shows whole entries only: Alpine ends the box at the bottom of the last entry that fits the eight-rem budget,
+        a "N more" count and a "Show all" button sit under it, and focusing an entry below the cut (or the button) opens the block in
+        place. Every entry stays in the page, so a screen reader reads them all. Before Alpine runs, and without it, the box scrolls. -#}
     {%- if scroll %}
-    <div class="flex min-h-0 flex-col gap-3 max-h-32 overflow-y-auto" tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long" data-canvas-scroll
-         x-data="{ open: false, extra: 0, width: 0,
+    <div class="flex min-h-0 flex-col gap-3"
+         x-data="{ open: false, extra: 0, sig: '',
+           measure() { return this.$refs.box.clientWidth + ':' + [...this.$refs.box.querySelectorAll('[data-canvas-note]')].map(n => n.offsetHeight).join(','); },
            fit() {
-             const box = this.$root, notes = [...box.querySelectorAll('[data-canvas-note]')];
-             box.classList.remove('max-h-32', 'overflow-y-auto'); box.removeAttribute('tabindex');
+             const box = this.$refs.box;
+             box.classList.remove('max-h-32', 'overflow-y-auto', 'overflow-y-hidden'); box.removeAttribute('tabindex'); box.style.maxHeight = '';
              if (!box.getClientRects().length) return;
-             this.width = box.clientWidth;
-             notes.forEach(n => n.classList.remove('hidden'));
-             const top = box.getBoundingClientRect().top, over = limit => notes.filter((n, i) => i > 0 && n.getBoundingClientRect().bottom - top > limit);
+             this.sig = this.measure();
+             const notes = [...box.querySelectorAll('[data-canvas-note]')], top = () => box.getBoundingClientRect().top;
+             const over = limit => notes.filter((n, i) => i > 0 && n.getBoundingClientRect().bottom - top() > limit);
              this.extra = over(128).length;
-             if (!this.extra || this.open) return;
+             if (!this.extra) return;
              this.$nextTick(() => {
-               if (this.open) return;
-               const line = box.querySelector('[data-canvas-more]');
-               const limit = 128 - line.offsetHeight - (parseFloat(getComputedStyle(box).rowGap) || 0);
-               const gone = over(limit);
-               gone.forEach(n => n.classList.add('hidden'));
+               const line = this.$refs.line, gap = parseFloat(getComputedStyle(line.parentElement).rowGap) || 0;
+               const gone = over(128 - line.offsetHeight - gap);
                this.extra = gone.length;
+               if (this.open || !gone.length) return;
+               const last = notes.filter(n => !gone.includes(n)).pop();
+               box.style.maxHeight = Math.ceil(last.getBoundingClientRect().bottom - top()) + 'px';
+               box.classList.add('overflow-y-hidden');
              });
            },
-           toggle() { this.open = !this.open; this.fit(); } }"
-         x-init="const r = $root; fit(); new ResizeObserver(() => { if (r.clientWidth !== width) fit(); }).observe(r)">
+           toggle() { this.open = !this.open; this.fit(); },
+           reach(e) {
+             const box = this.$refs.box, n = e.target.closest('[data-canvas-note]');
+             if (n && !this.open && this.extra && (box.scrollTop > 0 || n.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1)) this.toggle();
+           } }"
+         x-init="fit(); const watch = new ResizeObserver(() => { if (measure() !== sig) fit(); }); watch.observe($refs.box); $refs.box.querySelectorAll('[data-canvas-note]').forEach(n => watch.observe(n)); document.fonts.ready.then(() => { if (measure() !== sig) fit(); })">
+    <div x-ref="box" class="flex min-h-0 flex-col gap-3 max-h-32 overflow-y-auto" tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long" data-canvas-scroll @focusin="reach($event)">
     {%- else %}
     <div class="flex min-h-0 flex-col gap-3">
     {%- endif %}
@@ -217,7 +225,11 @@
     </div>
     {% endfor %}
     {%- if scroll %}
-    {{ ui.button(variant='ghost', size='xs', class='-mt-2 self-start text-muted-foreground', attrs={'x-cloak': '', 'x-show': 'extra > 0', '@click': 'toggle()', ':aria-expanded': 'open', 'x-text': "open ? 'Show fewer' : extra + ' more'", ':aria-label': "(open ? 'Show fewer entries in ' : extra + ' more entries in ') + '" ~ b.title ~ "'", 'data-canvas-more': ''}) }}
+    </div>
+    <div x-ref="line" x-cloak x-show="extra > 0" class="-mt-1 flex items-center gap-1 text-xs text-muted-foreground" data-canvas-more>
+      <span x-show="!open" x-text="extra + ' more'" data-canvas-count></span>
+      {{ ui.button(variant='ghost', size='xs', class='text-muted-foreground', attrs={'@click': 'toggle()', ':aria-expanded': 'open', 'x-text': "open ? 'Show fewer' : 'Show all'", ':aria-label': "(open ? 'Show fewer entries in ' : 'Show all entries in ') + '" ~ b.title ~ "'", 'data-canvas-toggle': ''}) }}
+    </div>
     {%- endif %}
     </div>
     {% endcall %}

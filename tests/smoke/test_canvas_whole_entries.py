@@ -15,16 +15,19 @@ expect.set_options(timeout=PAGE_TIMEOUT)
 MEASURE = """() => [...document.querySelectorAll('[data-canvas-scroll]')].map(box => {
   const frame = box.getBoundingClientRect();
   const notes = [...box.querySelectorAll('[data-canvas-note]')];
-  const shown = notes.filter(n => n.getClientRects().length);
-  const cut = shown.filter(n => { const r = n.getBoundingClientRect(); return r.bottom > frame.bottom + 1 || r.top < frame.top - 1; });
-  const more = box.querySelector('[data-canvas-more]');
+  const place = n => { const r = n.getBoundingClientRect();
+    return r.top >= frame.top - 1 && r.bottom <= frame.bottom + 1 ? 'in' : (r.top >= frame.bottom - 1 || r.bottom <= frame.top + 1 ? 'out' : 'cut'); };
+  const state = notes.map(place);
+  const count = box.parentElement.querySelector('[data-canvas-count]');
+  const toggle = box.parentElement.querySelector('[data-canvas-toggle]');
   return {
     title: box.getAttribute('aria-label'),
     total: notes.length,
-    shown: shown.length,
-    cut: cut.map(n => n.innerText.trim()),
-    more: more && more.getClientRects().length ? more.innerText.trim() : null,
-    expanded: more ? more.getAttribute('aria-expanded') : null,
+    shown: state.filter(s => s === 'in').length,
+    cut: notes.filter((n, i) => state[i] === 'cut').map(n => n.innerText.trim()),
+    more: count && count.getClientRects().length ? count.innerText.trim() : null,
+    toggle: toggle && toggle.getClientRects().length ? toggle.innerText.trim() : null,
+    expanded: toggle ? toggle.getAttribute('aria-expanded') : null,
   };
 })"""
 
@@ -39,14 +42,16 @@ def _check(page, label):
     for b in _blocks(page):
         if b["cut"]:
             failures.append(f"{label}: {b['title']} cuts an entry through its text: {b['cut']}")
-        hidden = b["total"] - b["shown"]
+        hidden = b["total"] - b["shown"] - len(b["cut"])
         if hidden:
             overflowing += 1
             match = re.fullmatch(r"(\d+) more", b["more"] or "")
             if not match or int(match.group(1)) != hidden:
                 failures.append(f"{label}: {b['title']} hides {hidden} entries but its line reads {b['more']!r}")
-        elif b["more"] and b["expanded"] != "true":
-            failures.append(f"{label}: {b['title']} shows every entry yet offers {b['more']!r}")
+            if b["toggle"] != "Show all" or b["expanded"] != "false":
+                failures.append(f"{label}: {b['title']} hides {hidden} entries but offers {b['toggle']!r} (expanded {b['expanded']})")
+        elif b["more"]:
+            failures.append(f"{label}: {b['title']} shows every entry yet counts {b['more']!r} more")
     if not overflowing:
         failures.append(f"{label}: no block holds more entries than fit, the seeded data should have at least one")
     return failures
@@ -72,14 +77,33 @@ def test_founder_reads_whole_entries_and_opens_the_rest(browser, live_server, se
         failures = _check(page, label)
         assert not failures, failures
 
-        # Activating the line by keyboard shows the rest of that block, and only that block.
-        more = page.locator("[data-canvas-more]:visible").first
-        box = more.locator("xpath=ancestor::*[@data-canvas-scroll][1]")
+        # Activating the button by keyboard shows the rest of that block, and only that block.
+        toggle = page.locator("[data-canvas-toggle]:visible").first
+        box = toggle.locator("xpath=../preceding-sibling::*[@data-canvas-scroll]")
         total = box.locator("[data-canvas-note]").count()
-        more.focus()
+        toggle.focus()
         page.keyboard.press("Enter")
-        expect(more).to_have_attribute("aria-expanded", "true")
-        shown = box.locator("[data-canvas-note]:visible").count()
-        assert shown == total, f"{label}: {shown} of {total} entries visible after opening the block"
+        expect(toggle).to_have_attribute("aria-expanded", "true")
+        assert box.evaluate("(b) => [...b.querySelectorAll('[data-canvas-note]')].every(n => { const r = n.getBoundingClientRect(), f = b.getBoundingClientRect(); return r.top >= f.top - 1 && r.bottom <= f.bottom + 1; })"), \
+            f"{label}: not every one of the {total} entries lies inside its block after opening it"
+        assert not _check_blocks_cut(page), f"{label}: opening one block cut an entry in another"
+
+        # Reaching an entry below the cut from the keyboard opens its block instead of scrolling it half into view.
+        page.goto(f"{live_server}/business-model/{ids[canvas_type]}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Revenue Streams", exact=True).first).to_be_attached()
+        page.wait_for_timeout(1500)
+        reached = page.evaluate("""() => {
+          const box = [...document.querySelectorAll('[data-canvas-scroll]')].find(b => b.parentElement.querySelector('[data-canvas-toggle]') && b.parentElement.querySelector('[data-canvas-count]') && b.parentElement.querySelector('[data-canvas-count]').getClientRects().length);
+          const f = box.getBoundingClientRect();
+          const note = [...box.querySelectorAll('[data-canvas-note]')].find(n => n.getBoundingClientRect().top >= f.bottom - 1);
+          note.querySelector('a, button').focus();
+          return new Promise(ok => setTimeout(() => { const r = note.getBoundingClientRect(), g = box.getBoundingClientRect();
+            ok({open: box.parentElement.querySelector('[data-canvas-toggle]').getAttribute('aria-expanded'), inside: r.top >= g.top - 1 && r.bottom <= g.bottom + 1}); }, 400));
+        }""")
+        assert reached == {"open": "true", "inside": True}, f"{label}: focusing a hidden entry gave {reached}"
     finally:
         context.close()
+
+
+def _check_blocks_cut(page):
+    return [b["title"] for b in _blocks(page) if b["cut"]]
