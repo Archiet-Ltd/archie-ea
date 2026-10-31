@@ -1,4 +1,4 @@
-"""Rate limits an administrator can see and set (T-limits01): shared counters, allow and deny lists,
+"""Rate limits an administrator can see and set: shared counters, allow and deny lists,
 the violation log and its scoping, and what a refused request looks like."""
 
 import uuid
@@ -53,6 +53,19 @@ def test_two_workers_count_one_limit(app, clean):
     finally:
         engine_a.dispose()
         engine_b.dispose()
+
+
+def test_reset_clears_the_count_for_a_named_key(app, clean):
+    limiter = clean.RateLimiter()
+    key = "reset-walk-%s" % uuid.uuid4().hex[:8]
+    assert limiter.check_rate_limit(key, 2, 60) == (True, None)
+    assert limiter.check_rate_limit(key, 2, 60) == (True, None)
+    allowed, retry_after = limiter.check_rate_limit(key, 2, 60)
+    assert allowed is False and retry_after
+
+    limiter.reset(key)
+
+    assert limiter.check_rate_limit(key, 2, 60) == (True, None)
 
 
 def test_a_finished_window_starts_again(app, clean):

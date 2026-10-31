@@ -96,7 +96,7 @@ class RateLimiter:
 
     def reset(self, key: str):
         """Reset rate limit for a key."""
-        counter_storage().clear(_counter_key("key", key, None))
+        counter_storage().clear(_counter_key("key", key))
 
 
 # Global rate limiter instance
@@ -241,7 +241,7 @@ def track_api_usage(user_id: int, endpoint: str):
 
 
 # ---------------------------------------------------------------------------------------------
-# Shared limit, allow and deny lists, violations (T-limits01)
+# Shared limit, allow and deny lists, violations
 #
 # The request limiter itself is Flask-Limiter, installed once for the whole application in
 # app/_bootstrap/rate_limiting.py. What lives here is everything that limiter stands on:
