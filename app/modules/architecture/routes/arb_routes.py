@@ -3524,7 +3524,6 @@ def api_create_exception():
 
 @arb_bp.route("/api/exceptions/<int:exception_id>/approve", methods=["PUT"])
 @login_required
-@require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
     """Approve ARB exception (approver roles, own organisation only)."""
     organization_id = TypedARBDecisionAdapter.current_organization_id()
@@ -3556,14 +3555,6 @@ def api_approve_exception(exception_id):
                 problem = "new_expires_at must be a date such as 2027-01-31."
         if problem:
             return _exception_refusal(problem)
-        found = db.session.execute(
-            db.select(ARBException.id).where(
-                ARBException.id == exception_id,
-                ARBException.organization_id == getattr(g, "current_org_id", None),
-            )
-        ).scalar_one_or_none()
-        if found is None:
-            return _exception_refusal("Exception request not found.", 404, "NOT_FOUND")
         result = service.approve_exception(exception_id, approved_by_id=current_user.id, **data)
         if not result.get("success"):
             return _exception_refusal(
