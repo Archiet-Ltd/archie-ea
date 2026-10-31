@@ -87,7 +87,6 @@
             </div>
             {% endcall %}
             {{ toggle_row('audit-logging', 'Record page use', 'Record which pages each person opens and whether the request succeeded, was refused or failed. This switch controls only that record. Sign-ins, failed sign-ins, two-factor and recovery-code use, password resets, exports, refused permissions and attempts to reach another organisation are always recorded.') }}
-            {{ toggle_row('data-encryption', 'Encrypt sensitive data', 'Encrypt sensitive data at rest and in transit') }}
         {% endcall %}
     {% endcall %}
     {% endcall %}
@@ -151,7 +150,7 @@ document.addEventListener('alpine:init', function () {
             defaults: {
                 'app-name': 'Enterprise Architecture Platform', 'default-language': 'en', 'timezone': 'UTC',
                 'items-per-page': '25', 'analytics': true, 'password-policy': 'standard', 'session-timeout': '60',
-                'two-factor': false, 'ip-whitelist': false, 'ip-allowlist': '', 'audit-logging': true, 'data-encryption': true,
+                'two-factor': false, 'ip-whitelist': false, 'ip-allowlist': '', 'audit-logging': true,
                 'email-notifications': true, 'system-alerts': true, 'user-activity': false,
                 'integration-updates': true, 'scheduled-reports': true, 'marketing-communications': false,
                 'sync-interval': '15', 'retry-attempts': '3', 'rate-limiting': true, 'webhook-security': true
