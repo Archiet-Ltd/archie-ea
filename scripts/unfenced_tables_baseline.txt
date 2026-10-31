@@ -277,6 +277,7 @@ production_orders
 project_constraints
 project_notes
 project_resources
+published_api_specs
 public_visitor_events
 quality_attributes
 rag_metrics
