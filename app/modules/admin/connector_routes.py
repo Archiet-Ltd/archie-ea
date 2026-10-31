@@ -389,6 +389,7 @@ def m365_config():
 
 @m365_connector_bp.route("/m365", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
 @connections_access
 def m365_config_save():
     """Persist M365 connector configuration through the change path.
@@ -549,6 +550,7 @@ def servicenow_config():
 
 @m365_connector_bp.route("/servicenow", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
 @connections_access
 def servicenow_config_save():
     """Save ServiceNow connector configuration through the change path.

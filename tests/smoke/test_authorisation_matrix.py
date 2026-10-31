@@ -149,6 +149,7 @@ POLICY = {
     "/account/mfa-enrol":      set(ARCHETYPES),
     "/admin/invite-user":      set(),
     "/admin/sso":              set(),
+    "/admin/billing/portal":   set(),
     # Interface Register (SAP S/4HANA Interface Register, Task 02): gated by
     # can_access_section(current_user, "data_integration") -- the same
     # section-based predicate the sidebar uses, not a requires_role()-style

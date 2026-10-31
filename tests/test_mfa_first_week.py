@@ -323,6 +323,8 @@ TRIGGERS = [
     ("POST", "/admin/connectors", {"connector_type": "jira", "name": "Jira"}, "connector"),
     ("POST", "/admin/connectors/not-a-connector/sync", {}, "connector"),
     ("POST", "/admin/connectors/not-a-connector/delete", {}, "connector"),
+    ("POST", "/admin/connectors/m365", {"tenant_id": "t"}, "connector"),
+    ("POST", "/admin/connectors/servicenow", {"instance_url": "https://x.service-now.com"}, "connector"),
     ("GET", "/admin/sso", None, "sso"),
     ("POST", "/admin/team/require-two-factor", {"require": "0"}, "require"),
 ]
