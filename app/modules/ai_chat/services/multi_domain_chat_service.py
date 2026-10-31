@@ -7479,9 +7479,11 @@ End with: "Type **'next'** to complete the design workflow."
             closest = result.get("closest_names") or []
             if closest:
                 lines.append("  Closest recorded names: " + ", ".join(closest) + ".")
+            else:
+                lines.append("  Nothing similar is recorded.")
             lines.append(
-                "  Next step: ask again with one of the recorded names, or record "
-                f"'{name}' in your model. No dependants are listed because none are recorded for it."
+                "  Next step: ask again with " + ("one of the recorded names" if closest else "a recorded name")
+                + f", or record '{name}' in your model. No dependants are listed because none are recorded for it."
             )
             return "\n".join(lines) + "\n"
 

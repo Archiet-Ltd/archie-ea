@@ -652,9 +652,12 @@ def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str
 
 
 def _closest_recorded_names(organization_id: int, service: str, limit: int = 5) -> List[str]:
-    """The names of this organisation's systems most like *service*, closest
-    first. Scored by the one name scorer the entity matcher and the duplicate
-    detector use; only this organisation's own records are read."""
+    """The names of this organisation's systems close to *service*, closest
+    first. A name is close only when it shares a word with *service* (stop
+    words ignored) or scores at the duplicate detector's likely-duplicate
+    threshold, using the one name scorer the duplicate detector uses; a name
+    that is neither is never listed. Only this organisation's own records are
+    read."""
     from app.models.archimate_core import ArchiMateElement
     from app.models.archimate_element_types import system_kind_types
     from app.modules.duplicate_detection.services.duplicate_detection_utils import DuplicateDetectionUtils
@@ -667,15 +670,35 @@ def _closest_recorded_names(organization_id: int, service: str, limit: int = 5) 
             ArchiMateElement.deleted_at.is_(None),
             ArchiMateElement.type.in_(system_kind_types()),
         )
-        .limit(2000)
         .all()
         if name
     }
-    scored = sorted(
-        (-DuplicateDetectionUtils.is_duplicate(service, name, mode="fuzzy", threshold=0.0)[1], name.lower(), name)
-        for name in names
-    )
-    return [name for _, _, name in scored[:limit]]
+    from difflib import SequenceMatcher
+
+    from app.modules.ai_chat.services.solution_ai_service import _STOPWORDS
+
+    wanted = DuplicateDetectionUtils.tokenize(service) - _STOPWORDS
+    scored = []
+    for name in names:
+        score = DuplicateDetectionUtils.is_duplicate(service, name, mode="fuzzy", threshold=0.0)[1]
+        shares_a_word = bool(wanted & (DuplicateDetectionUtils.tokenize(name) - _STOPWORDS))
+        if shares_a_word or score >= DuplicateDetectionUtils.LIKELY_DUPLICATE_THRESHOLD:
+            # Equal word overlap is ordered by how alike the spellings are
+            # ("Payments service" before "Notification service" for "Payment
+            # service"), then by name; it never decides who is listed.
+            spelling = SequenceMatcher(None, service.lower(), name.lower()).ratio()
+            scored.append((-score, -spelling, name.lower(), name))
+    scored.sort()
+    return [name for *_, name in scored[:limit]]
+
+
+def _applications_url() -> Optional[str]:
+    """The page listing the organisation's recorded applications."""
+    from flask import has_request_context, url_for
+
+    # A link is built only for a page being served; a call from a command or a
+    # scheduled job has no address to link to.
+    return url_for("unified_applications.application_list") if has_request_context() else None
 
 
 def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
@@ -709,8 +732,11 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
                     "Closest recorded names: %s. Ask again with one of them, or record '%s' in your model."
                     % (", ".join(closest), service)
                     if closest
-                    else "Nothing is recorded to compare it with yet. Add your systems to the model, then ask again."
+                    else "Nothing similar is recorded. Ask again with a recorded name, or record '%s' in your model."
+                    % service
                 ),
+                "next_url": None if closest else _applications_url(),
+                "next_label": "See your recorded applications" if not closest and _applications_url() else None,
             }
         # No single service was named ("the single points of failure in our
         # stack"): the systems the most other things depend on are the single

@@ -211,11 +211,51 @@ def test_an_unknown_name_is_not_given_other_systems_as_dependants(
     assert "No application called 'Legacy Fax Gateway' is recorded" in block
     assert "depend on it" not in block, block
     assert "single points of failure" not in block.lower()
-    assert "Closest recorded names:" in block
+    # No recorded name shares a word with it: nothing is offered as "closest".
+    assert "Nothing similar is recorded." in block
+    assert "Closest recorded names" not in block, block
     assert not [ln for ln in block.splitlines() if ln.strip().startswith("-")], block
-    # The closest names are this organisation's own, never the other's.
+    # Another organisation's name is never offered, even though it shares words.
     assert "Legacy Fax Archive" not in block
-    assert "Payments service" in block or "Order management system" in block or "Customer web app" in block
+    for unrelated in ("Payments service", "Order management system", "Customer web app", "Cache layer"):
+        assert unrelated not in block, block
+
+
+def test_a_name_sharing_no_word_lists_no_names_and_links_to_the_recorded_applications(
+    client, login_as, make_org, tenant_ctx
+):
+    org = make_org("whatif-none-close")
+    owner = _architect(org, "whatif-f@example.com")
+    _load_sample(client, login_as, owner)
+    from app.modules.intelligence.services.query_catalogue import run_entry
+
+    with tenant_ctx(org.id):
+        result = run_entry("what_breaks_if_fails", org.id, service="Zephyr Quillborne Ledger")
+    assert result["matched"] is False
+    assert result["closest_names"] == []
+    assert result["next_step"].startswith("Nothing similar is recorded.")
+    assert "Closest recorded names" not in result["next_step"]
+    assert result["next_label"] == "See your recorded applications"
+    page = client.get(result["next_url"])
+    assert page.status_code == 200
+    assert b"Payments service" in page.data
+
+
+def test_a_near_name_is_listed_first_and_an_unrelated_name_is_not_listed(
+    client, login_as, make_org, tenant_ctx
+):
+    org = make_org("whatif-near")
+    owner = _architect(org, "whatif-g@example.com")
+    _load_sample(client, login_as, owner)
+    from app.modules.intelligence.services.query_catalogue import run_entry
+
+    with tenant_ctx(org.id):
+        result = run_entry("what_breaks_if_fails", org.id, service="Payment service")
+    assert result["matched"] is False
+    assert result["closest_names"][0] == "Payments service"
+    assert "Cache layer" not in result["closest_names"]
+    assert len(result["closest_names"]) <= 5
+    assert not result.get("next_url")
 
 
 def test_a_matched_name_whose_catalogue_answer_carries_a_reason_never_claims_dependants(
@@ -287,3 +327,13 @@ def test_a_retirement_prompt_carries_no_second_impact_answer(monkeypatch, make_o
     assert result.get("success"), result
     assert "BLAST RADIUS" not in captured["prompt"].upper()
     assert "WHAT BREAKS IF 'Payments service' IS RETIRED" in captured["prompt"]
+
+
+def test_what_breaks_if_we_retire_a_name_reads_the_name_as_the_service():
+    from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+    for question in (
+        "What breaks if we retire Zephyr Quillborne Ledger?",
+        "What if we retire Zephyr Quillborne Ledger?",
+    ):
+        assert interpret(question)["params"] == {"service": "Zephyr Quillborne Ledger"}, question

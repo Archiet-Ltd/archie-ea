@@ -214,7 +214,8 @@ def test_a_second_organisation_sees_none_of_the_firsts_records(
         context_two.close()
 
 
-UNKNOWN_QUESTION = "What if we retire Legacy Fax Gateway?"
+UNKNOWN_QUESTION = "What breaks if we retire Zephyr Quillborne Ledger?"
+NEAR_QUESTION = "What if we retire Payment service?"
 
 
 def _unknown_answer(page, wait_for):
@@ -232,17 +233,22 @@ def _unknown_context(browser, width, height, dark):
     return context
 
 
+SAMPLE_NAMES = ("Payments service", "Customer web app", "Order management system",
+                "Cache layer", "Cloud platform", "Data warehouse", "Document management")
+
+
 @pytest.mark.parametrize("width,height,dark,shot", [
     (1440, 900, False, "whatif-unknown-1440-light.png"),
     (390, 844, True, "whatif-unknown-390-dark.png"),
 ])
-def test_what_if_an_unknown_name_says_nothing_is_recorded_and_lists_closest_names(
+def test_what_if_a_name_close_to_nothing_says_nothing_similar_and_links_to_the_recorded_applications(
     browser, echo_provider_server, width, height, dark, shot
 ):
-    """Nothing recorded is called Legacy Fax Gateway: the answer says so in
-    plain words, offers names this organisation does have, and never shows
-    other systems as that name's dependants. A second organisation with no
-    records is offered none of the first one's names."""
+    """Nothing recorded shares a word with Zephyr Quillborne Ledger: the answer
+    says nothing similar is recorded, lists no name as "closest", never shows
+    other systems as its dependants, and its link opens the organisation's own
+    recorded applications. A second organisation with no records is offered
+    none of the first one's names."""
     email, _org_id = _empty_organisation_user(echo_provider_server)
     email_two, _org_two = _empty_organisation_user(echo_provider_server)
     context = _unknown_context(browser, width, height, dark)
@@ -253,26 +259,62 @@ def test_what_if_an_unknown_name_says_nothing_is_recorded_and_lists_closest_name
         _login(page, echo_provider_server, email)
         _load_sample_from_chat(page, echo_provider_server)
         _ask_what_if(page, echo_provider_server, UNKNOWN_QUESTION)
-        text = _unknown_answer(page, "Closest recorded names")
+        text = _unknown_answer(page, "Nothing similar is recorded")
         lowered = text.lower()
-        assert "nothing recorded matches 'legacy fax gateway'" in lowered, text
+        assert "nothing recorded matches 'zephyr quillborne ledger'" in lowered, text
+        assert "closest recorded names" not in lowered, text
+        assert "cannot answer this yet" not in lowered, text
+        for name in SAMPLE_NAMES:
+            assert name not in page.get_by_test_id("estate-answer").inner_text(), text
         assert "depend on it" not in lowered, text
         assert "single points of failure" not in lowered, text
-        assert "things depend" not in lowered and "thing depends" not in lowered, text
         assert not page.locator("[data-catalogue-record]").count(), text
-        closest = text.split("Closest recorded names:", 1)[1].split(".", 1)[0]
-        names = [n.strip() for n in closest.split(",") if n.strip()]
-        assert names, text
         if WALK:
             os.makedirs(WALK, exist_ok=True)
             page.screenshot(path=os.path.join(WALK, shot))
 
+        link = page.get_by_role("link", name="See your recorded applications")
+        expect(link).to_be_visible()
+        link.click()
+        page.wait_for_load_state("networkidle")
+        expect(page.locator("body")).to_contain_text("Payments service", timeout=PAGE_TIMEOUT)
+        assert "/applications" in page.url, page.url
+        if WALK:
+            page.screenshot(path=os.path.join(WALK, shot.replace("unknown", "browse")))
+
         _login(page_two, echo_provider_server, email_two)
         _ask_what_if(page_two, echo_provider_server, UNKNOWN_QUESTION)
         text_two = _unknown_answer(page_two, "Nothing recorded matches")
-        for name in names:
+        for name in SAMPLE_NAMES:
             assert name not in text_two, "second organisation is offered %r: %s" % (name, text_two)
-        assert "Closest recorded names" not in text_two, text_two
     finally:
         context.close()
         context_two.close()
+
+
+@pytest.mark.parametrize("width,height,dark,shot", [
+    (1440, 900, False, "whatif-near-1440-light.png"),
+    (390, 844, True, "whatif-near-390-dark.png"),
+])
+def test_what_if_a_near_name_is_listed_first_and_unrelated_names_are_not(
+    browser, echo_provider_server, width, height, dark, shot
+):
+    email, _org_id = _empty_organisation_user(echo_provider_server)
+    context = _unknown_context(browser, width, height, dark)
+    page = context.new_page()
+    try:
+        _login(page, echo_provider_server, email)
+        _load_sample_from_chat(page, echo_provider_server)
+        _ask_what_if(page, echo_provider_server, NEAR_QUESTION)
+        text = _unknown_answer(page, "Closest recorded names")
+        closest = text.split("Closest recorded names:", 1)[1].split(". ", 1)[0]
+        names = [n.strip().rstrip(".") for n in closest.split(",") if n.strip()]
+        assert names[0] == "Payments service", text
+        assert len(names) <= 5, text
+        assert "Cache layer" not in names and "Data warehouse" not in names, text
+        assert "Nothing similar is recorded" not in text, text
+        if WALK:
+            os.makedirs(WALK, exist_ok=True)
+            page.screenshot(path=os.path.join(WALK, shot))
+    finally:
+        context.close()
