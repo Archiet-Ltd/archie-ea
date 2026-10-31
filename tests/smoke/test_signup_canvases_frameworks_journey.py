@@ -1,0 +1,165 @@
+"""A startup founder signs up, chooses canvases and frameworks, and finds each of them loaded.
+
+The person: a startup founder who has just signed up. They keep the canvases the step ticked for a
+startup (Lean Canvas, Business Model Canvas) after clearing OKR, and choose SOC 2 and SAFe. Their
+organisation already holds a customer, a capability and a service in its model. On the first screen
+they land on, each choice is listed and opens a page with content: the Business Model Canvas shows
+those elements in the boxes they belong to, the frameworks page shows SOC 2 and SAFe as chosen at
+sign-up, each with its own items. A second founder who chose nothing is shown none of it.
+"""
+
+import os
+import re
+import time
+
+import pytest
+from playwright.sync_api import expect
+
+from tests.smoke.conftest import PAGE_TIMEOUT
+from tests.smoke.test_signup_brings_the_company_in_journey import (  # noqa: F401  (the module's fixtures)
+    SHOTS,
+    new_page,
+    people,
+    provider,
+    server,
+    shoot,
+    sign_up,
+)
+
+pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+
+def _model_for(app, email):
+    """A customer, a capability and a service in the signed-up person's own organisation."""
+    with app.app_context():
+        from app import db
+        from app.models.user import User
+        from app.services.archimate_backbone import create_backbone_element
+
+        org_id = User.query.filter_by(email=email).one().organization_id
+        for element_type, layer, name in (
+            ("BusinessActor", "business", "Independent bakeries"),
+            ("Capability", "strategy", "Standing orders"),
+            ("BusinessService", "business", "Weekly dough delivery"),
+        ):
+            create_backbone_element(element_type=element_type, layer=layer, name=name, organization_id=org_id)
+        db.session.commit()
+        db.session.remove()
+
+
+def _wait_for(page, base, path, test_id):
+    deadline = time.monotonic() + 120
+    while True:
+        page.goto(base + path, wait_until="domcontentloaded")
+        if page.get_by_test_id(test_id).count():
+            return
+        assert time.monotonic() < deadline, "%s never showed %s: %s" % (path, test_id, page.locator("main").inner_text()[:300])
+        page.wait_for_timeout(3000)
+
+
+@pytest.mark.parametrize("width", [1440, 390], ids=["1440", "390"])
+def test_a_startup_founder_finds_the_canvases_and_frameworks_they_chose_loaded(browser, server, people, app, width):
+    base = str(server)
+    context, page = new_page(browser, width)
+    try:
+        email, _started = sign_up(page, base, people)
+        _model_for(app, email)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+
+        # A startup is offered Lean Canvas, Business Model Canvas and OKR, ticked; no framework is ticked.
+        canvases = page.get_by_test_id("signup-canvases")
+        expect(canvases.locator("[data-canvas]:checked")).to_have_count(3)
+        for name in ("Lean Canvas", "Business Model Canvas", "OKR"):
+            expect(canvases.get_by_label(name, exact=True)).to_be_checked()
+        expect(page.locator("[data-framework]:checked")).to_have_count(0)
+        canvases.get_by_label("OKR", exact=True).uncheck()
+        page.get_by_role("button", name="Show all frameworks").click()
+        for name in ("TOGAF", "ArchiMate", "SAFe", "ITIL 4", "COBIT 2019", "NIST CSF", "SOC 2"):
+            expect(page.get_by_label(name, exact=True)).to_be_visible()
+        page.get_by_label("SOC 2", exact=True).check()
+        page.get_by_label("SAFe", exact=True).check()
+        shoot(page, "signup-step-3-%d" % width) if width == 1440 else None
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+
+        # The first screen lists what was chosen, and nothing that was not.
+        _wait_for(page, base, "/dashboard/overview", "signup-loaded-card")
+        card = page.get_by_test_id("signup-loaded-card")
+        expect(card.get_by_test_id("signup-loaded-canvas")).to_have_count(2)
+        expect(card.get_by_test_id("signup-loaded-framework")).to_have_count(2)
+        expect(card).to_contain_text("Lean Canvas")
+        expect(card).to_contain_text("Business Model Canvas")
+        expect(card).not_to_contain_text("OKR")
+        expect(card.get_by_test_id("signup-loaded-framework").filter(has_text="SOC 2")).to_contain_text("items")
+        shoot(page, "dashboard-after-sign-up-%d" % width) if width == 1440 else None
+
+        # The Business Model Canvas opens with the model's own elements in the boxes they belong to.
+        card.get_by_role("link", name="Business Model Canvas").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert re.search(r"/business-model/\d+$", page.url), page.url
+        main = page.locator("main")
+        expect(main).to_contain_text("Independent bakeries")
+        expect(main).to_contain_text("Standing orders")
+        expect(main).to_contain_text("Weekly dough delivery")
+        box = lambda title: page.locator("[data-box], section, div").filter(has=page.get_by_text(title, exact=True)).last  # noqa: E731
+        expect(box("Customer Segments")).to_contain_text("Independent bakeries")
+        expect(box("Key Activities")).to_contain_text("Standing orders")
+        expect(box("Value Propositions")).to_contain_text("Weekly dough delivery")
+        shoot(page, "business-model-canvas-%d" % width)
+
+        # The Lean Canvas opens too, with the customer in its Customer Segments.
+        page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+        page.get_by_test_id("signup-loaded-card").get_by_role("link", name="Lean Canvas").click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("main")).to_contain_text("Independent bakeries")
+        shoot(page, "lean-canvas-%d" % width)
+
+        # The frameworks link opens a page that shows both as chosen at sign-up, each with its items.
+        page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+        page.get_by_test_id("signup-loaded-card").get_by_role("link", name="SAFe").click()
+        page.wait_for_url("**/frameworks/")
+        yours = page.get_by_test_id("frameworks-yours")
+        for code, items in (("SOC-2", "controls"), ("SAFE", "6 controls")):
+            card_ = yours.locator("[data-framework-card='%s']" % code)
+            expect(card_).to_contain_text("Chosen at sign-up")
+            expect(card_).to_contain_text(items)
+        expect(yours.locator("[data-framework-card]")).to_have_count(2)
+        shoot(page, "frameworks-%d" % width)
+        # Opening SAFe lands on its own items: the portfolio Kanban states.
+        yours.locator("[data-framework-card='SAFE']").click()
+        page.wait_for_url("**/dashboard/compliance")
+        row = page.locator("tr", has_text="SAFe").first
+        expect(row).to_be_visible()
+        row.click()
+        expect(page.locator("tr:visible", has_text="Portfolio Backlog").first).to_be_visible()
+        shoot(page, "safe-items-%d" % width)
+    finally:
+        context.close()
+
+
+def test_a_founder_who_clears_every_canvas_and_framework_gets_none(browser, server, people, app):
+    base = str(server)
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, base, people)
+        _model_for(app, email)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        for name in ("Lean Canvas", "Business Model Canvas", "OKR"):
+            page.get_by_test_id("signup-canvases").get_by_label(name, exact=True).uncheck()
+        expect(page.locator("[data-canvas]:checked")).to_have_count(0)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+        page.wait_for_timeout(5000)
+        page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("signup-loaded-card")).to_have_count(0)
+        page.goto(base + "/business-model/", wait_until="domcontentloaded")
+        expect(page.locator("main")).not_to_contain_text("Lean Canvas created")
+        expect(page.locator("a[href^='/business-model/']").filter(has_text=re.compile("Lean Canvas|Business Model Canvas"))).to_have_count(0)
+    finally:
+        context.close()

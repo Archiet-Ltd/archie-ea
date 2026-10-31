@@ -138,6 +138,8 @@ def remove_organisations(app, org_ids):
             "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
             "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
             "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
+            "DELETE FROM saved_diagram_elements WHERE diagram_id IN "
+            "(SELECT id FROM saved_diagrams WHERE organization_id = ANY(:ids))",
         ):
             with db.session.begin_nested():
                 db.session.execute(text(statement), ids)
