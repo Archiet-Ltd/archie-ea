@@ -206,6 +206,8 @@ def _remove_what_the_chat_wrote(app, org_ids):
         # The audit trail is append-only by application convention (no update()/delete()
         # methods are exposed), not by a database trigger, so a plain delete needs no switch.
         db.session.execute(text("DELETE FROM soc2_audit_log WHERE organization_id = ANY(:ids)"), ids)
+        # Role grants name their person twice (the holder and whoever granted it), so they go before the people.
+        db.session.execute(text("DELETE FROM org_roles WHERE user_id = ANY(:u) OR granted_by = ANY(:u)"), {"u": user_ids})
         db.session.execute(text("DELETE FROM users WHERE organization_id = ANY(:ids)"), ids)
         db.session.commit()
         db.session.remove()
