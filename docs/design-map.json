@@ -10836,7 +10836,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -10844,13 +10844,11 @@
     "badge",
     "breadcrumb",
     "button",
-    "empty",
+    "card",
     "field",
     "input",
-    "page-header",
-    "switch",
-    "tabs",
-    "card"
+    "page-shell",
+    "switch"
    ],
    "confidence": "high",
    "controls": {
@@ -10873,7 +10871,7 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "macros/page_shell.html"
    ],
    "original": "preview-02",
    "page_type": "settings",
@@ -10884,7 +10882,7 @@
     "P22-toast-feedback"
    ],
    "persona": "platform_admin",
-   "reason": "ServiceNow integration settings.",
+   "reason": "ServiceNow CMDB settings: status, test, sync and configuration. No route reaches this page; the connector page is the page of record.",
    "reference": {
     "shadcn": {
      "name": "shadcn blocks: sidebar-08 (inset section navigation)",
@@ -10895,7 +10893,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/servicenow-integration.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -10905,7 +10903,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },

@@ -1,331 +1,166 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% block title %}ServiceNow CMDB Integration{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+
+{% macro field_errors(field) -%}
+{%- for err in field.errors -%}{{ ui.field_error(text=err) }}{%- endfor -%}
+{%- endmacro %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
-        title='ServiceNow CMDB Integration', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'ServiceNow CMDB Integration'}],
-        description='Sync Configuration Items from ServiceNow CMDB to automatically discover and maintain your application portfolio.'
-    ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='ServiceNow CMDB Integration',
+              subtitle='Sync configuration items from the ServiceNow CMDB to discover and maintain your application portfolio.',
+              breadcrumb=[('Home', url_for('main.index')), ('Admin', url_for('admin.index')), ('ServiceNow CMDB Integration', none)]) }}
 
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="mb-6 space-y-2">
-                {% for category, message in messages %}
-                    <div class="rounded-md border p-4 {% if category == 'success' %}bg-primary/10 border-primary/20 text-foreground{% elif category == 'error' %}bg-destructive/10 border-destructive/20 text-destructive-emphasis{% else %}bg-accent border-border text-foreground{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
+<div class="max-w-2xl space-y-6">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      {% call ui.alert(variant=('destructive' if category == 'error' else 'default'), attrs={'data-testid': 'snow-message', 'role': 'status'}) %}
+        {{ ui.alert_description(text=message) }}
+      {% endcall %}
+    {% endfor %}
+  {% endwith %}
+
+  {% call ui.card(attrs={'data-testid': 'snow-status'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Sync status') }}
+      {{ ui.card_description(text='Whether the integration is on, and what the last sync brought in.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4 text-sm') %}
+      {% if snow_config %}
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Integration</span>
+          {{ ui.badge(text=('Enabled' if snow_config.enabled else 'Disabled'), variant=('outline' if snow_config.enabled else 'secondary'), attrs={'data-testid': 'snow-state'}) }}
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Instance URL</span>
+          <span class="min-w-0 break-all font-medium">{{ snow_config.base_url }}</span>
+        </div>
+        {% if last_sync %}
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Last sync</span>
+          <span class="font-medium">{{ last_sync.last_sync_at.strftime('%Y-%m-%d %H:%M:%S') if last_sync.last_sync_at else 'Never' }}</span>
+        </div>
         {% endif %}
-    {% endwith %}
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Status Panel -->
-        <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold flex items-center gap-2">
-                        <i data-lucide="server" class="h-5 w-5 text-primary"></i>
-                        Sync Status
-                    </h3>
-                </div>
-                <div class="p-4 sm:p-6 space-y-4">
-                    {% if snow_config %}
-                        <div>
-                            <p class="text-sm text-muted-foreground mb-2">Integration Status</p>
-                            <div class="flex items-center gap-2">
-                                {% if snow_config.enabled %}
-                                    <div class="h-3 w-3 rounded-full bg-primary"></div>
-                                    <span class="font-medium text-foreground">Enabled</span>
-                                {% else %}
-                                    <div class="h-3 w-3 rounded-full bg-muted-foreground"></div>
-                                    <span class="font-medium text-muted-foreground">Disabled</span>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div>
-                            <p class="text-sm text-muted-foreground mb-2">Instance URL</p>
-                            <p class="font-medium text-sm break-all">{{ snow_config.base_url }}</p>
-                        </div>
-
-                        {% if last_sync %}
-                            <div>
-                                <p class="text-sm text-muted-foreground mb-2">Last Sync</p>
-                                <p class="font-medium">
-                                    {% if last_sync.last_sync_at %}
-                                        {{ last_sync.last_sync_at.strftime('%Y-%m-%d %H:%M:%S') }}
-                                    {% else %}
-                                        Never
-                                    {% endif %}
-                                </p>
-                            </div>
-                        {% endif %}
-
-                        <!-- Statistics -->
-                        <div class="pt-4 border-t">
-                            <p class="text-sm text-muted-foreground mb-3">Synced Data</p>
-                            <div class="space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm">Applications</span>
-                                    <span class="font-medium" id="synced-apps-count">-</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Manual Actions -->
-                        <div class="pt-4 border-t space-y-3">
-                            <button type="button" id="test-connection-btn"
-                                    class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-                                    aria-label="Test ServiceNow connection">
-                                <i data-lucide="plug" class="h-4 w-4"></i>
-                                Test Connection
-                            </button>
-
-                            <button type="button" id="trigger-sync-btn"
-                                    class="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                                    aria-label="Trigger immediate sync"
-                                    {% if not snow_config.enabled %}disabled{% endif %}>
-                                <i data-lucide="refresh-cw" class="h-4 w-4"></i>
-                                Sync Now
-                            </button>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-6">
-                            <i data-lucide="alert-circle" class="h-12 w-12 text-muted-foreground mx-auto mb-3"></i>
-                            <p class="text-sm text-muted-foreground">Not configured</p>
-                            <p class="text-xs text-muted-foreground mt-1">Configure ServiceNow to begin syncing</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Info Card -->
-            <div data-slot="card" class="rounded-lg border border-input bg-card mt-6">
-                <div class="p-4 sm:p-6">
-                    <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <i data-lucide="info" class="h-4 w-4 text-primary"></i>
-                        What gets synced?
-                    </h4>
-                    <ul class="space-y-2 text-sm text-muted-foreground">
-                        <li class="flex items-start gap-2">
-                            <i data-lucide="check" class="h-4 w-4 text-primary mt-0.5 flex-shrink-0"></i>
-                            <span>Applications from <code class="text-xs bg-muted px-1 py-0.5 rounded">cmdb_ci_appl</code></span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <i data-lucide="check" class="h-4 w-4 text-primary mt-0.5 flex-shrink-0"></i>
-                            <span>Vendor mappings</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <i data-lucide="check" class="h-4 w-4 text-primary mt-0.5 flex-shrink-0"></i>
-                            <span>Lifecycle status &amp; criticality</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <i data-lucide="check" class="h-4 w-4 text-primary mt-0.5 flex-shrink-0"></i>
-                            <span>Cost information</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <i data-lucide="check" class="h-4 w-4 text-primary mt-0.5 flex-shrink-0"></i>
-                            <span>Ownership details</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-muted-foreground">Applications synced</span>
+          {{ ui.badge(text='—', variant='outline', class='tabular-nums', attrs={'id': 'synced-apps-count'}) }}
         </div>
+        <p class="text-muted-foreground">Each sync reads applications from <span class="font-mono">cmdb_ci_appl</span> with their vendor, lifecycle status, criticality, cost and ownership.</p>
+      {% else %}
+        <p class="text-muted-foreground">Not set up yet. Fill in the configuration below and save to start syncing.</p>
+      {% endif %}
+    {% endcall %}
+    {% if snow_config %}
+    {% call ui.card_footer(class='justify-end gap-2') %}
+      {{ ui.button(text='Test Connection', type='button', variant='outline', attrs={'id': 'test-connection-btn', 'aria-label': 'Test ServiceNow connection'}) }}
+      {{ ui.button(text='Sync Now', type='button', attrs={'id': 'trigger-sync-btn', 'aria-label': 'Trigger immediate sync', 'disabled': (none if snow_config.enabled else 'disabled')}) }}
+    {% endcall %}
+    {% endif %}
+  {% endcall %}
 
-        <!-- Settings Form -->
-        <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-lg border border-input bg-card">
-                <div class="p-4 sm:p-6 border-b">
-                    <h3 class="text-lg font-semibold">Configuration</h3>
-                </div>
-                <div class="p-4 sm:p-6">
-                    <form method="POST" action="{{ request.path }}" class="space-y-6">
-                        {{ form.hidden_tag() }}
-
-                        <!-- Instance URL -->
-                        <div>
-                            <label for="{{ form.instance_url.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
-                                {{ form.instance_url.label.text }}
-                                <span class="text-destructive-emphasis">*</span>
-                            </label>
-                            {{ form.instance_url(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", placeholder="https://yourorg.service-now.com") }}
-                            {% if form.instance_url.description %}
-                                <p class="mt-1 text-xs text-muted-foreground">{{ form.instance_url.description }}</p>
-                            {% endif %}
-                            {% if form.instance_url.errors %}
-                                <p class="mt-1 text-xs text-destructive-emphasis">{{ form.instance_url.errors[0] }}</p>
-                            {% endif %}
-                        </div>
-
-                        <!-- Username -->
-                        <div>
-                            <label for="{{ form.username.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
-                                {{ form.username.label.text }}
-                                <span class="text-destructive-emphasis">*</span>
-                            </label>
-                            {{ form.username(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", placeholder="api.user") }}
-                            {% if form.username.description %}
-                                <p class="mt-1 text-xs text-muted-foreground">{{ form.username.description }}</p>
-                            {% endif %}
-                            {% if form.username.errors %}
-                                <p class="mt-1 text-xs text-destructive-emphasis">{{ form.username.errors[0] }}</p>
-                            {% endif %}
-                        </div>
-
-                        <!-- Password / API Token -->
-                        <div>
-                            <label for="{{ form.password.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
-                                {{ form.password.label.text }}
-                                {% if snow_config %}<span class="text-muted-foreground text-xs">(optional - leave blank to keep existing)</span>{% else %}<span class="text-destructive-emphasis">*</span>{% endif %}
-                            </label>
-                            {{ form.password(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", placeholder="••••••••") }}
-                            {% if form.password.description %}
-                                <p class="mt-1 text-xs text-muted-foreground">{{ form.password.description }}</p>
-                            {% endif %}
-                            {% if form.password.errors %}
-                                <p class="mt-1 text-xs text-destructive-emphasis">{{ form.password.errors[0] }}</p>
-                            {% endif %}
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-6">
-                            <!-- Batch Size -->
-                            <div>
-                                <label for="{{ form.batch_size.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
-                                    {{ form.batch_size.label.text }}
-                                </label>
-                                {{ form.batch_size(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
-                                {% if form.batch_size.description %}
-                                    <p class="mt-1 text-xs text-muted-foreground">{{ form.batch_size.description }}</p>
-                                {% endif %}
-                            </div>
-
-                            <!-- Enable Integration -->
-                            <div class="flex items-center justify-end">
-                                <div class="flex items-center space-x-2">
-                                    {{ form.enabled(class="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background") }}
-                                    <label for="{{ form.enabled.id }}" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                        {{ form.enabled.label.text }}
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Query Filter -->
-                        <div>
-                            <label for="{{ form.query_filter.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
-                                {{ form.query_filter.label.text }}
-                            </label>
-                            {{ form.query_filter(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", placeholder="operational_status=1^install_status=1") }}
-                            {% if form.query_filter.description %}
-                                <p class="mt-1 text-xs text-muted-foreground">{{ form.query_filter.description }}</p>
-                            {% endif %}
-                            <p class="mt-1 text-xs text-muted-foreground">
-                                Use ServiceNow query syntax. Default: <code class="text-xs bg-muted px-1 py-0.5 rounded">operational_status=1^install_status=1</code>
-                            </p>
-                        </div>
-
-                        <!-- Submit Button -->
-                        <div class="flex items-center justify-end gap-3 pt-4 border-t">
-                            <a href="{{ url_for('admin.index') }}" 
-                               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                Cancel
-                            </a>
-                            <button type="submit"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                <i data-lucide="save" class="h-4 w-4"></i>
-                                Save Configuration
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+  {% call ui.card(attrs={'data-testid': 'snow-config'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Configuration') }}
+      {{ ui.card_description(text='The instance, the account that reads it, and what to read.') }}
+    {% endcall %}
+    <form method="POST" action="{{ request.path }}" class="space-y-6" x-data="{ on: {{ 'true' if form.enabled.data else 'false' }} }">
+      {% call ui.card_content() %}
+        {{ form.hidden_tag() }}
+        <div class="space-y-6">
+          {% call ui.field() %}
+            {{ ui.field_label(text=form.instance_url.label.text, attrs={'for': form.instance_url.id}) }}
+            {{ ui.input(id=form.instance_url.id, name=form.instance_url.name, type='text', required=true, value=(form.instance_url.data or ''), placeholder='https://yourorg.service-now.com', class='w-full font-mono') }}
+            {% if form.instance_url.description %}{{ ui.field_description(text=form.instance_url.description) }}{% endif %}
+            {{ field_errors(form.instance_url) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text=form.username.label.text, attrs={'for': form.username.id}) }}
+            {{ ui.input(id=form.username.id, name=form.username.name, type='text', required=true, value=(form.username.data or ''), placeholder='api.user', class='w-full') }}
+            {% if form.username.description %}{{ ui.field_description(text=form.username.description) }}{% endif %}
+            {{ field_errors(form.username) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text=form.password.label.text, attrs={'for': form.password.id}) }}
+            {{ ui.input(id=form.password.id, name=form.password.name, type='password', required=(not snow_config), autocomplete='new-password', class='w-full font-mono',
+                        placeholder=('Leave blank to keep the existing value' if snow_config else 'Paste the password or token')) }}
+            {{ ui.field_description(text=('A password is stored (encrypted). Enter a new one to replace it.' if snow_config else 'It is stored encrypted and never shown again.')) }}
+            {{ field_errors(form.password) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text=form.batch_size.label.text, attrs={'for': form.batch_size.id}) }}
+            {{ ui.input(id=form.batch_size.id, name=form.batch_size.name, type='number', value=(form.batch_size.data if form.batch_size.data is not none else 100), class='w-full') }}
+            {% if form.batch_size.description %}{{ ui.field_description(text=form.batch_size.description) }}{% endif %}
+            {{ field_errors(form.batch_size) }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text=form.query_filter.label.text, attrs={'for': form.query_filter.id}) }}
+            {{ ui.input(id=form.query_filter.id, name=form.query_filter.name, type='text', value=(form.query_filter.data or ''), placeholder='operational_status=1^install_status=1', class='w-full font-mono') }}
+            {{ ui.field_description(text='Use ServiceNow query syntax. The default reads operational, installed applications: operational_status=1^install_status=1.') }}
+            {{ field_errors(form.query_filter) }}
+          {% endcall %}
+          <div class="flex items-center justify-between gap-3 rounded-md border p-3">
+            {{ ui.field_label(text=form.enabled.label.text, attrs={'for': form.enabled.id}) }}
+            {% call ui.switch(id=form.enabled.id, attrs={'@click': 'on = !on', ':aria-checked': 'on', ':data-state': "on ? 'checked' : 'unchecked'", 'aria-label': form.enabled.label.text}) %}{{ ui.switch_thumb() }}{% endcall %}
+            {{ ui.input(type='hidden', name=form.enabled.name, attrs={':value': "on ? 'true' : 'false'"}) }}
+          </div>
         </div>
-    </div>
+      {% endcall %}
+      {% call ui.card_footer(class='justify-end gap-2') %}
+        {{ ui.button(text='Cancel', href=url_for('admin.index'), variant='outline') }}
+        {{ ui.button(text='Save configuration', type='submit') }}
+      {% endcall %}
+    </form>
+  {% endcall %}
 </div>
+</div>
+{% endblock %}
 
-<!-- JavaScript for buttons -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const testBtn = document.getElementById('test-connection-btn');
-    const syncBtn = document.getElementById('trigger-sync-btn');
-    const appsCountEl = document.getElementById('synced-apps-count');
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var testBtn = document.getElementById('test-connection-btn');
+    var syncBtn = document.getElementById('trigger-sync-btn');
+    var appsCountEl = document.getElementById('synced-apps-count');
+    var opts = { silent: true };
 
-    // Load sync status
+    // A dash where the count is unknown, never a zero: a zero would read as "nothing synced".
     function loadSyncStatus() {
-        Platform.fetch.get('{{ url_for("admin.servicenow_sync_status") }}', null, { silent: true })
-            .then(data => {
-                // An em dash where the count is unknown -- never a 0, which would be
-                // indistinguishable from a measured "nothing synced".
-                appsCountEl.textContent = (data.synced_applications !== undefined && data.synced_applications !== null)
-                    ? data.synced_applications
-                    : '—';
+        if (!appsCountEl) { return; }
+        Platform.fetch.get('{{ url_for("admin.servicenow_sync_status") }}', null, opts)
+            .then(function (data) {
+                appsCountEl.textContent = (data.synced_applications !== undefined && data.synced_applications !== null) ? data.synced_applications : '—';
             })
-            .catch(err => {
+            .catch(function () {
                 appsCountEl.textContent = '—';
                 appsCountEl.title = 'Sync status could not be loaded';
-                if (window.Platform && Platform.toast) {
-                    Platform.toast.error('Could not load the ServiceNow sync status.');
-                }
+                Platform.toast.error('Could not load the ServiceNow sync status.');
             });
     }
-
-    // Test connection
+    function run(btn, busyText, url, failPrefix, after) {
+        var label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = busyText;
+        Platform.fetch.post(url, null, opts)
+            .then(function (data) { Platform.toast.info(data.message); if (after) { after(); } })
+            .catch(function (err) { Platform.toast.error(failPrefix + err.message); })
+            .then(function () { btn.disabled = false; btn.textContent = label; });
+    }
     if (testBtn) {
-        testBtn.addEventListener('click', function() {
-            testBtn.disabled = true;
-            testBtn.innerHTML = '<i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i> Testing...';
-            lucide.createIcons();
-
-            Platform.fetch.post('{{ url_for("admin.servicenow_test_connection") }}', null, { silent: true })
-                .then(data => {
-                    Platform.toast.info(data.message);
-                    testBtn.disabled = false;
-                    testBtn.innerHTML = '<i data-lucide="plug" class="h-4 w-4"></i> Test Connection';
-                    lucide.createIcons();
-                })
-                .catch(err => {
-                    Platform.toast.error('Connection test failed: ' + err.message);
-                    testBtn.disabled = false;
-                    testBtn.innerHTML = '<i data-lucide="plug" class="h-4 w-4"></i> Test Connection';
-                    lucide.createIcons();
-                });
+        testBtn.addEventListener('click', function () {
+            run(testBtn, 'Testing…', '{{ url_for("admin.servicenow_test_connection") }}', 'Connection test failed: ');
         });
     }
-
-    // Trigger sync
     if (syncBtn) {
-        syncBtn.addEventListener('click', async function() {
-            if (!(await Platform.modal.confirm('Start ServiceNow CMDB sync? This will fetch and update applications.'))) {
-                return;
-            }
-
-            syncBtn.disabled = true;
-            syncBtn.innerHTML = '<i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i> Syncing...';
-            lucide.createIcons();
-
-            Platform.fetch.post('{{ url_for("admin.servicenow_trigger_sync") }}', null, { silent: true })
-                .then(data => {
-                    Platform.toast.info(data.message);
-                    syncBtn.disabled = false;
-                    syncBtn.innerHTML = '<i data-lucide="refresh-cw" class="h-4 w-4"></i> Sync Now';
-                    lucide.createIcons();
-                    loadSyncStatus();  // Reload stats
-                })
-                .catch(err => {
-                    Platform.toast.error('Sync failed: ' + err.message);
-                    syncBtn.disabled = false;
-                    syncBtn.innerHTML = '<i data-lucide="refresh-cw" class="h-4 w-4"></i> Sync Now';
-                    lucide.createIcons();
-                });
+        syncBtn.addEventListener('click', function () {
+            Platform.modal.confirm('Start ServiceNow CMDB sync? This will fetch and update applications.').then(function (ok) {
+                if (ok) { run(syncBtn, 'Syncing…', '{{ url_for("admin.servicenow_trigger_sync") }}', 'Sync failed: ', loadSyncStatus); }
+            });
         });
     }
-
-    // Initial load
-    loadSyncStatus();
-});
+    document.addEventListener('DOMContentLoaded', loadSyncStatus);
+})();
 </script>
 {% endblock %}
