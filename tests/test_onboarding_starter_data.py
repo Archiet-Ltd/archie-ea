@@ -194,8 +194,10 @@ def test_removed_starter_rows_leave_the_capability_map_too(client, login_as, two
 
     _choose(client, login_as, two["one_owner"], "banking", [])
     _choose(client, login_as, two["one_owner"], "software", [])
-    names = lambda: {r[0] for r in db.session.execute(
-        db.text("SELECT name FROM unified_capabilities WHERE organization_id = :o"), {"o": two["one"].id})}
+    def names():
+        return {r[0] for r in db.session.execute(
+            db.text("SELECT name FROM unified_capabilities WHERE organization_id = :o"), {"o": two["one"].id})}
+
     assert {"Sales and Service", "Develop Vision and Strategy"} <= names()
     login_as(client, two["one_owner"])
     assert client.post("/account/welcome/starter/remove", json={"model": "BIAN"}).status_code == 200
