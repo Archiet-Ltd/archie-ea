@@ -184,7 +184,6 @@ def test_every_error_screen_has_one_h1(browser, live_server, seeded, viewer_emai
         for path in ("/settings", "/admin/"):
             assert page.goto(live_server + path, wait_until="domcontentloaded").status == 403
             _one_h1(page, NO_ACCESS)
-        page.screenshot(path="/tmp/shots/b-404-signed-in-390x844-dark.png")
     else:
         for path in ("/settings", "/admin/"):
             page.goto(live_server + path, wait_until="domcontentloaded")
