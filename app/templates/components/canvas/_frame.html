@@ -186,7 +186,7 @@
              if (!box.getClientRects().length) return;
              this.sig = this.measure();
              const notes = [...box.querySelectorAll('[data-canvas-note]')], top = () => box.getBoundingClientRect().top;
-             if (!notes.length) { box.classList.add('max-h-28', 'overflow-y-auto'); box.setAttribute('tabindex', '0'); return; }
+             if (!notes.length) return;
              const over = limit => notes.filter((n, i) => i > 0 && n.getBoundingClientRect().bottom - top() > limit);
              this.extra = over(128).length;
              if (!this.extra) return;
@@ -206,7 +206,8 @@
              if (n && !this.open && this.extra && e.target.matches(':focus-visible') && (box.scrollTop > 0 || n.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1)) this.toggle();
            } }"
          x-init="fit(); const watch = new ResizeObserver(() => { if (measure() !== sig) fit(); }); watch.observe($refs.box); $refs.box.querySelectorAll('[data-canvas-note]').forEach(n => watch.observe(n)); document.fonts.ready.then(() => { if (measure() !== sig) fit(); })">
-    <div x-ref="box" class="flex min-h-0 flex-col gap-3 max-h-28 overflow-y-auto" tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long" data-canvas-scroll @focusin="reach($event)">
+    {%- set held = (boxes.get(b.key) or [])|length + (b.subs or [])|map(attribute='key')|map('extract', boxes)|map('length')|sum -%}
+    <div x-ref="box" class="flex min-h-0 flex-col gap-3{{ ' max-h-28 overflow-y-auto' if held }}"{% if held %} tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long"{% endif %} data-canvas-scroll @focusin="reach($event)">
     {%- else %}
     <div class="flex min-h-0 flex-col gap-3">
     {%- endif %}
