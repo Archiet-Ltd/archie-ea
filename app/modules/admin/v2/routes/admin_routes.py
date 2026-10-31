@@ -30,6 +30,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
@@ -451,6 +452,7 @@ def new_user():
 @admin_bp_v2.route("/invite-user", methods=["GET", "POST"])
 @timed_route
 @login_required
+@enrol_first("invite")
 @admin_required
 @audit_log("invite_user")
 def invite_user():
@@ -2311,6 +2313,7 @@ from app.models.user import VALID_ROLES as _VALID_ROLES  # noqa: E402
 @admin_bp_v2.route("/sso-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
+@enrol_first("sso")
 @admin_required
 @audit_log("update_sso_settings")
 def sso_settings():

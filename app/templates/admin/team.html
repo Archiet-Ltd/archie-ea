@@ -133,6 +133,14 @@
 {% endcall %}
 </div>
 {% endcall %}
+
+{% call section('Two-factor sign-in', ('Everyone who administers this organisation must use two-factor sign-in.' if two_factor_required else 'Require two-factor sign-in for everyone who administers this organisation. It also ends the first-week allowance at once.'), testid='team-two-factor') %}
+  <form method="POST" action="{{ url_for('team.team_require_two_factor') }}" class="max-w-2xl" data-testid="team-two-factor-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="require" value="{{ '0' if two_factor_required else '1' }}">
+    {{ ui.button(text=('Stop requiring two-factor' if two_factor_required else 'Require two-factor'), variant=('outline' if two_factor_required else 'default'), type='submit', attrs={'data-testid': 'team-two-factor-toggle'}) }}
+  </form>
+{% endcall %}
 {% endif %}
 </div>
 {% endblock %}

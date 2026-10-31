@@ -21,7 +21,7 @@ def _qr_data_uri(provisioning_uri: str) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def run_mfa_challenge(user, complete):
+def run_mfa_challenge(user, complete, form_action=None, context=None):
     """Answer one request on the challenge page for ``user``.
 
     ``complete(user)`` finishes the sign-in that was held open.
@@ -34,13 +34,16 @@ def run_mfa_challenge(user, complete):
     """
     from app.services import activity_record, mfa_service
 
+    form_action = form_action or url_for("account.mfa_challenge")
+    context = context or {}
+
     if request.method == "POST" and user.mfa_enabled and request.form.get("step") == "codes":
         # The codes are stored hashed and cannot be shown again, so this only
         # confirms they were saved and finishes the sign-in.
         if request.form.get("recovery_confirmed"):
             return complete(user)
         flash("Tick the box to confirm you have saved the recovery codes.", "form-error")
-        return redirect(url_for("account.mfa_challenge"))
+        return redirect(form_action)
 
     if not user.mfa_enabled:
         secret = session.get("_mfa_enroll_secret")
@@ -57,7 +60,8 @@ def run_mfa_challenge(user, complete):
             else:
                 session.pop("_mfa_enroll_secret", None)
                 return render_template(
-                    "account/mfa_enroll.html", step="codes", recovery_codes=recovery_codes
+                    "account/mfa_enroll.html", step="codes", recovery_codes=recovery_codes,
+                    form_action=form_action, **context,
                 )
         return render_template(
             "account/mfa_enroll.html",
@@ -66,6 +70,8 @@ def run_mfa_challenge(user, complete):
             provisioning_uri=uri,
             qr_data_uri=_qr_data_uri(uri),
             error=error,
+            form_action=form_action,
+            **context,
         )
 
     error = None
@@ -86,3 +92,83 @@ def run_mfa_challenge(user, complete):
     return render_template(
         "account/mfa_challenge.html", error=error, use_recovery=bool(request.form.get("use_recovery") or request.args.get("recovery"))
     )
+
+
+# -- enrolment from a signed-in session ---------------------------------------------------------
+
+RETURN_KEY = "_mfa_return_to"
+TRIGGER_KEY = "_mfa_trigger"
+
+# What the person was about to do, in the sentence the enrolment page opens with.
+TRIGGER_LINES = {
+    "invite": "Before you invite someone, set up two-factor sign-in. You'll come straight back here.",
+    "credential": "Before you create an API credential, set up two-factor sign-in. You'll come straight back here.",
+    "connector": "Before you change a connected source, set up two-factor sign-in. You'll come straight back here.",
+    "sso": "Before you set up single sign-on, set up two-factor sign-in. You'll come straight back here.",
+    "billing": "Before you change billing, set up two-factor sign-in. You'll come straight back here.",
+    "require": "Before you change the two-factor rule, set up two-factor sign-in. You'll come straight back here.",
+    "notice": "Set up two-factor sign-in now. It takes a minute.",
+}
+
+
+def send_to_enrolment(trigger, back):
+    """Remember where the person was going and send them to enrol first."""
+    from app.utils.safe_redirect import safe_next_url
+
+    session[RETURN_KEY] = safe_next_url(back, url_for("dashboard.overview"))
+    session[TRIGGER_KEY] = trigger
+    return redirect(url_for("account.mfa_enrol"))
+
+
+def enrol_first(trigger, back_endpoint=None):
+    """Send an administrator who has not enrolled to enrol before this action,
+    and back to ``back_endpoint`` (or this same page) afterwards. One decorator
+    on every route that reaches beyond a new workspace's sole owner."""
+    from functools import wraps
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            from flask_login import current_user
+
+            from app.services import mfa_service
+
+            if current_user.is_authenticated and mfa_service.step_up_needed(current_user):
+                back = url_for(back_endpoint) if back_endpoint else request.full_path.rstrip("?")
+                return send_to_enrolment(trigger, back)
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
+def run_signed_in_enrolment():
+    """The enrolment page for a person who is already signed in."""
+    from flask_login import current_user
+
+    from app.services import mfa_service
+    from app.utils.safe_redirect import safe_next_url
+
+    if not current_user.is_authenticated:
+        return redirect(url_for("account.login"))
+    user = current_user._get_current_object()
+    if not mfa_service.required_for(user) or (
+        user.mfa_enabled and request.form.get("step") != "codes"
+    ):
+        return redirect(url_for("dashboard.overview"))
+
+    def finish(done_user):
+        target = safe_next_url(session.pop(RETURN_KEY, ""), url_for("dashboard.overview"))
+        session.pop(TRIGGER_KEY, None)
+        flash("Two-factor sign-in is on.", "success")
+        return redirect(target)
+
+    trigger = session.get(TRIGGER_KEY)
+    open_window = mfa_service.may_defer_enrolment(user)
+    context = {
+        "reason": TRIGGER_LINES.get(trigger) if trigger else mfa_service.window_closed_reason(user),
+        "days_left": mfa_service.window_days_left(user) if open_window else None,
+        "later_url": session.get(RETURN_KEY) or url_for("dashboard.overview"),
+    }
+    return run_mfa_challenge(user, finish, form_action=url_for("account.mfa_enrol"), context=context)

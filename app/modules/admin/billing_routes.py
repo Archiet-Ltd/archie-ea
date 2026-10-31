@@ -20,6 +20,7 @@ import logging
 
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
+from app.modules.account.mfa_flow import enrol_first
 
 from app.extensions import csrf
 from app.decorators import admin_required
@@ -192,6 +193,7 @@ def billing_checkout_complete():
 
 @billing_bp.route("/change-plan", methods=["POST"])
 @login_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
 @admin_required
 def billing_change_plan():
     org = _org()
@@ -221,6 +223,7 @@ def billing_change_plan():
 
 @billing_bp.route("/cancel", methods=["POST"])
 @login_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
 @admin_required
 def billing_cancel():
     org = _org()
@@ -260,6 +263,7 @@ def billing_resume():
 
 @billing_bp.route("/details", methods=["POST"])
 @login_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
 @admin_required
 def billing_details():
     org = _org()
@@ -281,6 +285,7 @@ def billing_details():
 
 @billing_bp.route("/portal")
 @login_required
+@enrol_first("billing")
 @admin_required
 def billing_portal():
     """Redirect to the provider's customer portal for self-service billing."""

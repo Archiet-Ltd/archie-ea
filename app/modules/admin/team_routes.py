@@ -35,6 +35,7 @@ import logging
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 
 from app import db
 from app.flask_email import mail_available
@@ -108,6 +109,14 @@ def _permission_context(org_id, members):
     }
 
 
+def _two_factor_required(org_id):
+    from app.models.organization import Organization
+    from app.services import mfa_service
+
+    org = Organization.query.filter_by(id=org_id).first()
+    return bool(((org.settings if org is not None else None) or {}).get(mfa_service.REQUIRE_SETTING))
+
+
 def _render_team(org_id, error=None, status=200, tab=None, member_error=None):
     from app.modules.account.services import invitation_service
 
@@ -136,6 +145,7 @@ def _render_team(org_id, error=None, status=200, tab=None, member_error=None):
         has_account_ids=has_account_ids,
         personas=[(p, ROLE_DISPLAY_NAMES.get(p, p)) for p in invitation_service.INVITABLE_PERSONAS],
         mail_is_available=mail_available(),
+        two_factor_required=_two_factor_required(org_id),
         invite_error=error,
         member_error=member_error,
     ), status
@@ -153,6 +163,7 @@ def team():
 
 @team_bp.route("/team/invite", methods=["POST"])
 @login_required
+@enrol_first("invite", back_endpoint="team.team")
 @rate_limit(20, "1m", methods=("POST",))  # SECURITY: each POST can send mail
 def team_invite():
     """Invite someone into the org by e-mail.
@@ -265,6 +276,44 @@ def team_invitation_revoke(invitation_id):
         db.session.rollback()
         abort(404)
     flash(f"The invitation to {email} was withdrawn.", "success")
+    return redirect(url_for("team.team"))
+
+
+@team_bp.route("/team/require-two-factor", methods=["POST"])
+@login_required
+def team_require_two_factor():
+    """Turn the organisation's "require two-factor" rule on or off.
+
+    Turning it on takes the administrator to set up their own two-factor
+    sign-in at once; turning it off needs them to have set it up.
+    """
+    from app.models.organization import Organization
+    from app.modules.account import mfa_flow
+    from app.services import mfa_service
+
+    org_id = _require_org_id()
+    require_org_or_platform_admin(org_id)
+    turn_on = request.form.get("require") == "1"
+    needs_enrolment = mfa_service.step_up_needed(current_user)
+    if not turn_on and needs_enrolment:
+        return mfa_flow.send_to_enrolment("require", url_for("team.team"))
+
+    org = Organization.query.filter_by(id=org_id).first_or_404()
+    settings = dict(org.settings or {})
+    if turn_on:
+        settings[mfa_service.REQUIRE_SETTING] = True
+    else:
+        settings.pop(mfa_service.REQUIRE_SETTING, None)
+    org.settings = settings
+    db.session.commit()
+    if turn_on and needs_enrolment:
+        flash("Two-factor sign-in is now required. Set it up for your own account first.", "success")
+        return mfa_flow.send_to_enrolment("notice", url_for("team.team"))
+    flash(
+        "Everyone who administers this organisation must now use two-factor sign-in."
+        if turn_on else "The two-factor requirement is switched off.",
+        "success",
+    )
     return redirect(url_for("team.team"))
 
 

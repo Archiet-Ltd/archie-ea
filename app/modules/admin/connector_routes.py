@@ -37,6 +37,7 @@ from functools import wraps
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
+from app.modules.account.mfa_flow import enrol_first
 
 from app.decorators import admin_required
 from app.models.connector_config import _is_sensitive_key
@@ -135,6 +136,7 @@ def connectors_index():
 
 @m365_connector_bp.route("", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
 @connections_access
 def connectors_save():
     """Add or update a connector of the signed-in organisation.
@@ -256,6 +258,7 @@ def connectors_save():
 
 @m365_connector_bp.route("/<string:connector_id>/sync", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
 @connections_access
 def connectors_sync(connector_id):
     """Propose a sync for one connector of the signed-in organisation, or run
@@ -312,6 +315,7 @@ def connectors_sync(connector_id):
 
 @m365_connector_bp.route("/<string:connector_id>/delete", methods=["POST"])
 @login_required
+@enrol_first("connector", back_endpoint="m365_connector.connectors_index")
 @connections_access
 def connectors_delete(connector_id):
     """Propose removal of one connector, or remove it directly when the

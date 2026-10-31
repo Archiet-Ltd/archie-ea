@@ -109,7 +109,7 @@ def login():
             # chooses which of the two is registered, so both must agree.
             from app.services import mfa_service
 
-            if mfa_service.required_for(user):
+            if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
                 session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
@@ -223,6 +223,18 @@ def mfa_challenge():
     from app.modules.account.mfa_flow import run_mfa_challenge
 
     return run_mfa_challenge(user, _complete_login_after_mfa)
+
+
+@account_bp_v2.route("/mfa-enrol", methods=["GET", "POST"])
+@login_required
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+@timed_route
+def mfa_enrol():
+    """Set up two-factor sign-in from a signed-in session (the first-week
+    notice, an action that needs it, or a closed first week)."""
+    from app.modules.account.mfa_flow import run_signed_in_enrolment
+
+    return run_signed_in_enrolment()
 
 
 @account_bp_v2.route("/register", methods=["GET", "POST"])
@@ -711,7 +723,7 @@ def sso_callback(provider):
     from app.utils.safe_redirect import safe_next_url
 
     _post_next = session.pop("_post_login_next", "") or ""
-    if mfa_service.required_for(user):
+    if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = _post_next

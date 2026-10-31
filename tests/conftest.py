@@ -212,6 +212,21 @@ def tenant_ctx(app):
     return _ctx
 
 
+@pytest.fixture(autouse=True)
+def _enrolment_checks_off(request, monkeypatch):
+    """Signed-in requests and sensitive actions send an administrator who has
+    not enrolled for two-factor sign-in to enrol first. The hundreds of tests
+    here that sign an administrator in by writing the session directly are
+    about other things, so those two checks answer "no" unless a test is
+    marked ``mfa_first_week`` (tests/test_mfa_first_week.py), which runs them
+    for real. Sign-in itself and ``required_for`` are never touched."""
+    if request.node.get_closest_marker("mfa_first_week") is None:
+        from app.services import mfa_service
+
+        monkeypatch.setattr(mfa_service, "must_enrol_now", lambda user: False)
+        monkeypatch.setattr(mfa_service, "step_up_needed", lambda user: False)
+
+
 @pytest.fixture
 def client(app):
     """Repository-owned Flask client; do not depend on pytest-flask being installed."""

@@ -60,6 +60,8 @@
 
                     {{ f.end_form(form) }}
 
+                    <p class="mt-4 text-center text-xs text-muted-foreground" data-testid="register-first-week">Your first week: you can start without a phone app. You'll set up two-factor sign-in before you invite anyone, and within 7 days.</p>
+
                     <div class="mt-4 text-center text-sm text-muted-foreground" data-testid="register-signin">
                         Already have an account?
                         <a href="{{ url_for('account.login', **(signin_args or {})) }}" class="text-primary font-medium hover:underline">Sign in</a>

@@ -17,6 +17,7 @@ import urllib.parse
 
 from flask import Blueprint, current_app, g, jsonify, redirect, render_template, request
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 
 from app.extensions import csrf
 from app.modules.oauth_provider.models import (
@@ -98,6 +99,7 @@ def _build_redirect(redirect_uri: str, params: dict) -> str:
 
 @oauth_provider_bp.route("/authorize", methods=["GET", "POST"])
 @login_required
+@enrol_first("credential")
 def authorize():
     """Authorization endpoint.
 
