@@ -270,7 +270,10 @@ def test_a_new_company_sees_the_same_page_saying_what_will_appear(browser, live_
         for testid in ("card-run-cost", "card-relationships", "card-no-owner"):
             card = dash.locator('[data-testid="%s"]' % testid)
             expect(card).to_be_visible()
-            assert "once" in card.inner_text() or "Appear" in card.inner_text(), card.inner_text()
+            # a signed-up architect has no cost visibility, so the run-cost card says that (cost round wording)
+            # instead of "Appears here once ..."; every card still says what it is waiting for.
+            assert ("once" in card.inner_text() or "Appear" in card.inner_text()
+                    or "Cost figures are shown to roles" in card.inner_text()), card.inner_text()
             assert card.locator('[data-testid="%s-value"]' % testid).count() == 0
         text = dash.inner_text()
         assert not re.search(r"(^|\s)(—|0)(\s|$)", text), text
@@ -279,6 +282,67 @@ def test_a_new_company_sees_the_same_page_saying_what_will_appear(browser, live_
         assert len(_content(page)) > 50
     finally:
         context.close()
+
+
+def _account_rows_in_history(org_id):
+    """Change-history rows of user accounts in this organisation (the signing-up person's own account)."""
+    from app import create_app, db
+    from app.models.audit_log import AuditLog
+
+    app = create_app("testing")
+    with app.app_context():
+        count = db.session.execute(
+            db.select(db.func.count(AuditLog.id)).where(AuditLog.organization_id == org_id, AuditLog.table_name == "user")
+        ).scalar_one()
+        db.session.remove()
+        return count
+
+
+def _add_element_by_hand(org_id, name):
+    """One model record added by a person: a single element, which writes a single change-history row."""
+    from app import create_app, db
+    from app.models import ArchiMateElement
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(ArchiMateElement(name=name, type="BusinessActor", layer="Business", organization_id=org_id))
+        db.session.commit()
+        db.session.remove()
+
+
+@pytest.mark.parametrize("viewport,theme", [(FOLD, "light"), (PHONE, "dark")], ids=["1440-light", "390-dark"])
+def test_a_new_company_counts_model_records_never_its_own_account(browser, live_server, viewport, theme):
+    """A company whose only change-history row is its creator's account has added no model records.
+
+    Asserts on the numbers, not the labels. After one element is added by hand the figure reads 1.
+    (An application also writes its element, so it counts as two rows on the line; not changed here.)
+    """
+    email, org_id = _empty_organisation_user(live_server)
+    context, page = _page(browser, viewport)
+    try:
+        # the precondition that makes this red before the fix: the history does hold the person's account
+        assert _account_rows_in_history(org_id) >= 1
+        _open(page, live_server, email)
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        chart = page.locator('[data-testid="activity-chart"]')
+        expect(chart.locator('[data-testid="activity-empty"]')).to_be_visible()
+        assert chart.locator('[data-testid^="activity-total-"]').count() == 0, chart.inner_text()
+        assert "By hand" not in chart.inner_text(), chart.inner_text()
+        _shot(page, "a-overview-new-company", viewport["width"], theme)
+
+        _add_element_by_hand(org_id, "First Actor")
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        chart = page.locator('[data-testid="activity-chart"]')
+        total = chart.locator('[data-testid="activity-total-7d"]')
+        expect(total).to_be_visible()
+        assert _int(total.inner_text()) == 1, chart.inner_text()
+        by_hand = chart.locator('[data-testid="activity-summary-7d"] span.text-xl').nth(1)
+        assert _int(by_hand.inner_text()) == 1, chart.inner_text()
+        _shot(page, "a-overview-one-element", viewport["width"], theme)
+    finally:
+        context.close()
+        purge_org(org_id)
 
 
 # ---- the chart, the select, the money, the year card, the facts card and the dark welcome card ----

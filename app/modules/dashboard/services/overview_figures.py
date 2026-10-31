@@ -26,6 +26,18 @@ logger = logging.getLogger(__name__)
 
 RANGES = (("90d", "Last 3 months", 90), ("30d", "Last 30 days", 30), ("7d", "Last 7 days", 7))
 CONNECTED_KINDS = ("import", "connector")
+#: Change-history tables that hold people and access, not the organisation's model. A person's own
+#: account is written to the history when they sign up; it is never a record the model gained.
+ACCOUNT_TABLES = frozenset({"user", "user_sessions", "invitations", "organization_settings"})
+
+
+def model_record_tables():
+    """The one set of change-history tables whose rows are model records (elements, relationships,
+    applications, capabilities, owners, solutions ...): every audited table except the account tables.
+    Every figure, bar and split on the Overview selects its change rows through this set."""
+    from app.modules.intelligence.services.history_service import AUDITED_TABLES
+
+    return frozenset(AUDITED_TABLES) - ACCOUNT_TABLES
 
 
 def _currency():
@@ -266,7 +278,8 @@ def _history(org_id, now):
 
     start = datetime(now.year - 1, 1, 1)
     try:
-        return HistoryService(db.session, org_id).difference(start, now).changes
+        tables = model_record_tables()
+        return [c for c in HistoryService(db.session, org_id).difference(start, now).changes if c.table_name in tables]
     except Exception:
         db.session.rollback()
         logger.exception("overview: change history could not be read")
