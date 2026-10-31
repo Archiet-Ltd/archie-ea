@@ -797,13 +797,39 @@ def _lock_readings(org_id: int) -> None:
         db.session.execute(db.text("SELECT pg_advisory_xact_lock(:key)"), {"key": 7410000000 + int(org_id)})
 
 
+def _unreadable(job) -> bool:
+    """A reading that ended without reading the site (the job failed, or finished saying it could not read it).
+    Trying again after one is a retry of the connection, not another reading, so it is not counted."""
+    return job.status in ("failed", "cancelled") or (job.result or {}).get("success") is False
+
+
+def _queue_changed_address(org_id: int, read_url: str) -> bool:
+    """A reading that began on one address finds another saved when it ends: read the saved one next,
+    within the day's readings. Returns whether a reading was queued."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    try:
+        _org, url = _consented_site(org_id)
+    except CrawlRefused:
+        return False
+    if url == read_url:
+        return False
+    _lock_readings(org_id)
+    since = datetime.utcnow() - timedelta(hours=SAME_ADDRESS_HOURS)
+    if _readings_started_today(org_id, since) >= DAILY_READINGS:
+        return False
+    get_job_queue_service().create_job("Read the company website", WEBSITE_TASK, {"url": url}, organization_id=org_id)
+    return True
+
+
 def _readings_started_today(org_id: int, since: datetime) -> int:
     """Readings started in the last day: each site reading, and each retry of the model pass (the first
     model pass of a reading is part of that reading, not another one)."""
     from app.services.job_queue_service import get_job_queue_service
 
     queue = get_job_queue_service()
-    crawls = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK) if job.created_at and job.created_at >= since]
+    crawls = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK)
+              if job.created_at and job.created_at >= since and not _unreadable(job)]
     retries = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_RETRY_TASK)
                if job.created_at and job.created_at >= since and int((job.payload or {}).get("retry_attempt") or 0) >= 1]
     return len(crawls) + len(retries)
@@ -825,7 +851,7 @@ def request_website_crawl(org_id: int):
         return open_jobs[0], "already_open"
     since = datetime.utcnow() - timedelta(hours=SAME_ADDRESS_HOURS)
     for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK):
-        if job.created_at and job.created_at >= since and (job.payload or {}).get("url") == url and job.status != "failed":
+        if job.created_at and job.created_at >= since and (job.payload or {}).get("url") == url and not _unreadable(job):
             return job, "already_read"
     if _readings_started_today(org_id, since) >= DAILY_READINGS:
         raise ReadingLimit("You can read a website three times a day. Try again tomorrow, or confirm what we found.")
@@ -922,6 +948,10 @@ def run_website_crawl_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     if org_id is None:
         raise ValueError("%s job requires organization_id in payload" % WEBSITE_TASK)
     try:
+        read_url = _consented_site(org_id)[1]
+    except CrawlRefused:
+        read_url = None
+    try:
         summary = website_crawl.crawl_organization_website(
             org_id, llm=website_crawl.default_model(), progress=_job_progress(payload.get("job_id")),
             defer_model_pass=True)
@@ -929,6 +959,8 @@ def run_website_crawl_job(payload: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("website not read for organisation %s: %s", org_id, refused.reason)
         return {"success": False, "reason": refused.reason, "status": refused.status}
     _tell_the_bell(org_id)
+    if read_url:
+        _queue_changed_address(org_id, read_url)  # an address saved while this one was being read
     return {
         "pages_read": summary["pages_read"], "pages_rendered": len(summary["rendered"]),
         "pages_skipped_by_robots": len(summary["skipped_by_robots"]), "pages_failed": len(summary["failed"]),

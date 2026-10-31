@@ -69,12 +69,20 @@ def _sign_in_from_the_chat(page, base, client_id):
         "code_challenge_method": "S256", "scope": "mcp:read", "resource": resource, "state": "xyz",
     })
     captured = []
-    page.on("requestfailed", lambda request: captured.append(request.url) if request.url.startswith(CALLBACK) else None)
+
+    def _chat_receives(route):
+        # The chat's own callback: answered here, so the exchange is read from a real intercepted request.
+        captured.append(route.request.url)
+        route.fulfill(status=200, content_type="text/html", body="<p>connected</p>")
+
+    page.route(CALLBACK + "**", _chat_receives)
     page.goto(base + "/oauth/authorize?" + query, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.get_by_role("button", name=re.compile("^Allow", re.I)).click()
     page.wait_for_timeout(1500)
     assert captured, "the consent page did not send the chat back with a code: %s %s" % (page.url, page.locator("body").inner_text()[:300])
-    code = urllib.parse.parse_qs(urllib.parse.urlsplit(captured[0]).query)["code"][0]
+    sent = urllib.parse.parse_qs(urllib.parse.urlsplit(captured[0]).query)
+    assert sent["state"] == ["xyz"], sent
+    code = sent["code"][0]
     token = page.request.post(base + "/oauth/token", form={
         "grant_type": "authorization_code", "code": code, "redirect_uri": CALLBACK, "client_id": client_id,
         "code_verifier": VERIFIER, "resource": resource,
@@ -190,3 +198,64 @@ def test_a_second_organisation_never_sees_the_first_ones_connection(browser, ser
     finally:
         first.close()
         second.close()
+
+
+def test_the_connected_time_is_never_shown_before_it_is_in_local_time(browser, server, people, app):
+    """A person in Auckland: the step, loaded with its script held back, shows no time at all; with the script it shows local time."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True, timezone_id="Pacific/Auckland", locale="en-GB")
+    context.set_default_timeout(PAGE_TIMEOUT)
+    try:
+        page = context.new_page()
+        sign_up(page, server, people)
+        helper = context.new_page()
+        _sign_in_from_the_chat(helper, server, _register_client(app, "Claude"))
+        helper.close()
+
+        held = context.new_page()
+        held.route("**/js/account/signup_steps.js*", lambda route: route.abort())
+        block = _step_four(held, server)
+        line = block.get_by_test_id("assistant-connected")
+        expect(line).to_contain_text("Connected: Claude")
+        expect(line.locator("time")).to_be_hidden()  # no UTC time flashes while the script has not run
+        assert not re.search(r"\d\d:\d\d", line.inner_text()), line.inner_text()
+        held.close()
+
+        block = _step_four(page, server)
+        stamp = block.get_by_test_id("assistant-connected").locator("time")
+        expect(stamp).to_be_visible()
+        local = stamp.evaluate("el => new Date(el.getAttribute('datetime')).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})")
+        assert stamp.inner_text() == local, (stamp.inner_text(), local)
+        utc = stamp.evaluate("el => el.getAttribute('datetime').slice(11, 16)")
+        assert stamp.inner_text() != utc, "the time is still the UTC time: %s" % utc  # Auckland is 12 or 13 hours ahead
+    finally:
+        context.close()
+
+
+def test_the_status_poll_backs_off_and_stops_with_a_sentence(browser, server, people):
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
+    context.set_default_timeout(PAGE_TIMEOUT)
+    try:
+        page = context.new_page()
+        sign_up(page, server, people)
+        page.clock.install()
+        asked = []
+        page.on("request", lambda request: asked.append(request.url) if "/account/welcome/status" in request.url else None)
+        block = _step_four(page, server)
+        expect(block).to_be_visible()
+
+        def run(seconds):
+            for _ in range(seconds // 30):
+                page.clock.run_for(30000)
+                page.wait_for_timeout(120)
+
+        run(60)
+        in_first_minute = len(asked)
+        assert 1 <= in_first_minute <= 10, in_first_minute  # a steady three-second poll would ask twenty times
+        run(11 * 60)
+        line = block.get_by_test_id("assistant-connected")
+        expect(line).to_contain_text("Still waiting for your assistant; reload this step once you have connected it")
+        stopped_at = len(asked)
+        run(5 * 60)
+        assert len(asked) == stopped_at, (stopped_at, len(asked))
+    finally:
+        context.close()

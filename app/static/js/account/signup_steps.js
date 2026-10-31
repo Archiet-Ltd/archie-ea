@@ -113,6 +113,17 @@
         line.setAttribute('data-client', found.client);
     }
 
+    // The connected time is shown only once it is in the person's local time, so no UTC time flashes first.
+    function showLocalTime() {
+        root.querySelectorAll('[data-local-time]').forEach(function (holder) {
+            var stamp = holder.querySelector('time');
+            var when = stamp ? new Date(stamp.getAttribute('datetime')) : null;
+            if (!when || isNaN(when.getTime())) return;
+            stamp.textContent = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            holder.hidden = false;
+        });
+    }
+
     var CHAT_TAB = 'entelim-signup-chat';
     function rememberChatTab() {
         var tabs = root.querySelector('[data-chat-tabs]');
@@ -162,22 +173,48 @@
         });
     }
 
-    var timer = null;
+    // The status poll backs off (3 s, then longer, up to 30 s) and stops after ten minutes; a chat that has not
+    // connected by then is told to reload the step once it has.
+    var POLL_FIRST = 3000, POLL_LONGEST = 30000, POLL_GIVE_UP = 10 * 60 * 1000;
+    var timer = null, pollStarted = 0, pollDelay = POLL_FIRST;
+    var GIVE_UP_SENTENCE = 'Still waiting for your assistant; reload this step once you have connected it';
+
+    function stopPolling(waitingOnChat) {
+        if (timer) window.clearTimeout(timer);
+        timer = null;
+        var line = root.querySelector('[data-assistant-connected]');
+        if (waitingOnChat && line && !line.hasAttribute('data-client')) {
+            line.textContent = GIVE_UP_SENTENCE + '.';
+            line.setAttribute('data-gave-up', 'true');
+        }
+    }
+
+    function tick() {
+        window.Platform.fetch.get(URLS.status, null, { silent: true }).then(function (body) {
+            paint(body.sources);
+            paintAssistant(body.assistant_connected);
+            var site = (body.sources || []).filter(function (row) { return row.key === 'website'; })[0];
+            if (site && (site.state === 'done' || site.facts_ready) && root.hasAttribute('data-reload-when-read')) {
+                saveEverything().then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
+            }
+            var sourcesOpen = (body.sources || []).some(function (row) { return row.state === 'waiting' || row.state === 'reading'; });
+            var chatOpen = !!root.querySelector('[data-assistant-connected]') && !body.assistant_connected;
+            if (!sourcesOpen && !chatOpen) return stopPolling(false);
+            if (Date.now() - pollStarted >= POLL_GIVE_UP) return stopPolling(chatOpen);
+        }).catch(function () { /* swallow-ok: a missed poll is retried on the next tick; the last line stays on screen */
+            if (Date.now() - pollStarted >= POLL_GIVE_UP) stopPolling(!!root.querySelector('[data-assistant-connected]'));
+        }).then(function () {
+            if (!timer) return;
+            pollDelay = Math.min(POLL_LONGEST, Math.round(pollDelay * 1.5));
+            timer = window.setTimeout(tick, pollDelay);
+        });
+    }
+
     function poll() {
         if (timer) return;
-        timer = window.setInterval(function () {
-            window.Platform.fetch.get(URLS.status, null, { silent: true }).then(function (body) {
-                paint(body.sources);
-                paintAssistant(body.assistant_connected);
-                var site = (body.sources || []).filter(function (row) { return row.key === 'website'; })[0];
-                if (site && (site.state === 'done' || site.facts_ready) && root.hasAttribute('data-reload-when-read')) {
-                    saveEverything().then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
-                }
-                var open = (body.sources || []).some(function (row) { return row.state === 'waiting' || row.state === 'reading'; })
-                    || (!!root.querySelector('[data-assistant-connected]') && !body.assistant_connected);
-                if (!open) { window.clearInterval(timer); timer = null; }
-            }).catch(function () { /* swallow-ok: a missed poll is retried on the next tick; the last line stays on screen */ });
-        }, 3000);
+        pollStarted = Date.now();
+        pollDelay = POLL_FIRST;
+        timer = window.setTimeout(tick, pollDelay);
     }
 
     function give(name, url, body, button) {
@@ -303,6 +340,7 @@
         }, refreshEvery * 1000);
     }
 
+    showLocalTime();
     rememberChatTab();
     if (root.hasAttribute('data-reload-when-read') || root.querySelector('[data-assistant-connected]')) poll();
     var reading = root.querySelector('[data-state="waiting"], [data-state="reading"]');

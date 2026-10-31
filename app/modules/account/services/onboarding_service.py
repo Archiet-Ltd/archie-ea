@@ -191,7 +191,10 @@ def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int])
     _write(org, "onboarding", state)
     db.session.commit()
     try:
-        return READING_NOTES.get(_queue_reading(org.id))
+        outcome = _queue_reading(org.id)
+        if outcome == "already_open" and before and before.get("url") != url:
+            return CHANGED_ADDRESS_NOTE
+        return READING_NOTES.get(outcome)
     except ReadingLimited:
         state = _onboarding(org)  # the refused address is not kept: nothing reads it
         if before is None:
@@ -202,6 +205,8 @@ def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int])
         db.session.commit()
         raise
 
+
+CHANGED_ADDRESS_NOTE = "A reading of your website is already under way. When it finishes, we will read the new address too."
 
 READING_NOTES = {
     "already_open": "A reading of your website is already under way, so no second one was started. This page shows how far it has got.",
@@ -379,7 +384,8 @@ def assistant_connection(user) -> Optional[Dict[str, Any]]:
     connected_at = newest.get("connected_at")
     return {
         "client": newest["client_name"],
-        "connected_at": connected_at.isoformat() if connected_at else None,
+        # stored as UTC without a zone mark; the mark lets the browser show the person's own local time
+        "connected_at": (connected_at.isoformat() + ("Z" if connected_at.tzinfo is None else "")) if connected_at else None,
     }
 
 

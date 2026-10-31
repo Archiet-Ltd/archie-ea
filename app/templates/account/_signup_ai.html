@@ -41,7 +41,7 @@
                 {% endcall %}
                 <p class="text-sm" role="status" aria-live="polite" data-testid="assistant-connected" data-assistant-connected
                    {% if assistant %}data-client="{{ assistant.client }}" data-at="{{ assistant.connected_at or '' }}"{% endif %}>
-                    {% if assistant %}Connected: {{ assistant.client }}{% if assistant.connected_at %} at <time datetime="{{ assistant.connected_at }}">{{ assistant.connected_at[11:16] }}</time>{% endif %}{% else %}<span class="text-muted-foreground">Waiting for your chat to connect. This page updates by itself.</span>{% endif %}
+                    {% if assistant %}Connected: {{ assistant.client }}{% if assistant.connected_at %}<span data-local-time hidden> at <time datetime="{{ assistant.connected_at }}"></time></span>{% endif %}{% else %}<span class="text-muted-foreground">Waiting for your chat to connect. This page updates by itself.</span>{% endif %}
                 </p>
                 <p class="text-sm text-muted-foreground">Then ask: <span class="font-medium text-foreground">What should a startup write down about its software first?</span></p>
             </div>
