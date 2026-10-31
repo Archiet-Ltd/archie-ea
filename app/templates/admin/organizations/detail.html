@@ -3,6 +3,8 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'basecoat/table.html' import table_cell %}
+{% from 'components/input.html' import hidden_input %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}{{ org.name }} — Organizations — {{ config.APP_NAME }}{% endblock %}
 
@@ -57,13 +59,8 @@
                     {% endif %}
                     <form method="POST" action="{{ url_for('admin.organization_toggle', org_id=org.id) }}" class="inline"
                           data-confirm="{% if org.is_active %}Deactivate {{ org.name }}? Users will lose access until it is reactivated.{% else %}Reactivate {{ org.name }}?{% endif %}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-7 px-2.5
-                                {% if org.is_active %}bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20
-                                {% else %}bg-success/10 text-success-emphasis hover:bg-success/20{% endif %}">
-                            {{ 'Deactivate' if org.is_active else 'Activate' }}
-                        </button>
+                        {{ hidden_input('csrf_token', csrf_token()) }}
+                        {{ ui.button(text=('Deactivate' if org.is_active else 'Activate'), variant=('destructive' if org.is_active else 'outline'), size='sm', attrs={'type': 'submit'}) }}
                     </form>
                 </dd>
             </div>
@@ -79,11 +76,8 @@
             {% if org.slug != 'default' %}
             <form method="POST" action="{{ url_for('admin.organization_delete', org_id=org.id) }}"
                   data-confirm="Delete {{ org.name }}? All users will be moved to the Default organization.">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-7 px-2.5 bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i> Delete Organization
-                </button>
+                {{ hidden_input('csrf_token', csrf_token()) }}
+                {% call ui.button(variant='destructive', size='sm', attrs={'type': 'submit'}) %}<i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i> Delete organization{% endcall %}
             </form>
             {% endif %}
         </div>
