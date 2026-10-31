@@ -9,9 +9,11 @@ Deleting an organisation never depends on another organisation existing:
     the name when the column allows it.
 
 Every other row that belongs to the organisation is removed first, in the order the database's own
-foreign keys require: a row is removed only after every row that points at it. What belongs to the
+foreign keys and the models' declared relationships require: a row is removed only after every row that points at it. What belongs to the
 organisation is read from the database, not from a hand-kept list:
-  - a row of any table with a foreign key to ``organizations`` that names this organisation;
+  - a row of any table with an ``organization_id`` column that names this organisation, whether or
+    not the database holds a foreign key on that column (a database whose column was added later
+    has none);
   - a row of a table with no such key that points (through its own foreign keys, at any depth) at
     one of those rows, such as a sync log of the organisation's connector.
 
@@ -30,8 +32,7 @@ from app.extensions import db
 # People are handled on their own: detached when they belong elsewhere, removed when they do not.
 PEOPLE = "users"
 
-# Delete-refusing append-only tables (re-listed from pg_trigger; see
-# ADR-org-deletion-01): a cycle-breaking UPDATE must never target one of these —
+# Delete-refusing append-only tables (re-listed from pg_trigger): a cycle-breaking UPDATE must never target one of these —
 # their guard admits a DELETE, never an UPDATE, no matter what the marker says.
 # A row here resolves only by being deleted, in order; never by nulling a column.
 _APPEND_ONLY_TABLES = frozenset({
@@ -61,6 +62,18 @@ _FOREIGN_KEYS = text(
     """
 )
 
+# Every table that carries an organization_id column, with or without a key on it.
+_ORGANIZATION_COLUMNS = text(
+    """
+    SELECT c.relname
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace ns ON ns.oid = c.relnamespace
+    WHERE a.attname = 'organization_id' AND a.attnum > 0 AND NOT a.attisdropped
+      AND ns.nspname = current_schema() AND c.relkind IN ('r', 'p')
+    """
+)
+
 
 class OrganizationDeletionRefused(ValueError):
     """The organisation may not be deleted (the Default organisation, or one that no longer exists)."""
@@ -77,11 +90,21 @@ class _Plan:
         # parent table -> [(child table, child column, parent column, child column is NOT NULL,
         #                    the constraint is INITIALLY DEFERRED)]
         self.referrers = defaultdict(list)
-        self.org_columns = defaultdict(list)  # table -> columns that point at organizations.id
+        self.org_columns = defaultdict(list)  # table -> columns that name an organisation
         for child, child_col, parent, parent_col, not_null, deferred in sess.execute(_FOREIGN_KEYS):
             self.referrers[parent].append((child, child_col, parent_col, not_null, deferred))
-            if parent == "organizations" and parent_col == "id" and child != "organizations":
-                self.org_columns[child].append(child_col)
+        for (table,) in sess.execute(_ORGANIZATION_COLUMNS):
+            if table != "organizations":
+                self.org_columns[table].append("organization_id")
+        # Foreign keys the models declare that this database does not hold. They add no cycle-breaking
+        # NULL (the database has no constraint to satisfy); they only order the deletes.
+        self.declared = defaultdict(set)  # parent table -> {child table}
+        held = {(child, parent) for parent, rows in self.referrers.items() for child, *_ in rows}
+        for table in db.metadata.tables.values():
+            for fk in table.foreign_keys:
+                pair = (table.name, fk.column.table.name)
+                if pair not in held and pair[0] != pair[1]:
+                    self.declared[pair[1]].add(pair[0])
 
     def _build(self):
         """Compute the deletion order and the cycle-breaking NULLs it needs, once.
@@ -113,6 +136,11 @@ class _Plan:
             for child, _, _, _, _ in self.referrers[parent]:
                 if child in tables and child != parent:
                     # child must be deleted before parent: an edge in deletion order.
+                    graph.add_edge(child, parent)
+        for parent in tables:
+            for child in self.declared[parent]:
+                # Only where it cannot make a cycle the database has no constraint to resolve.
+                if child in tables and not nx.has_path(graph, parent, child):
                     graph.add_edge(child, parent)
         breaks = []
         for members in list(nx.strongly_connected_components(graph)):
@@ -307,15 +335,6 @@ class OrganizationDeletionService:
                 where = " OR ".join("%s = :org_id" % _q(col) for col in plan.org_columns[table])
                 _remove_pointing_rows(sess, plan, table, where, params, {table}, counts)
                 _delete(sess, table, where, params, counts)
-
-            # entity_history.organization_id deliberately carries no foreign key to
-            # organizations (app/models/entity_history.py -- some archimate_elements/
-            # _relationships rows predate that key ever being enforced), so the
-            # foreign-key-driven plan above never discovers it as one of this organisation's
-            # tables. Removed explicitly here, by the same DELETE-and-count mechanism as
-            # every table the plan does discover, so no row of the deleted organisation
-            # survives in it either.
-            _delete(sess, "entity_history", "organization_id = :org_id", params, counts)
 
             _remove_people(sess, plan, leaving)
 
