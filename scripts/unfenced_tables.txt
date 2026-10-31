@@ -1,6 +1,7 @@
 # Database tables whose model has no tenant fence (no TenantMixin).
 # Checked by scripts/check_untenanted_reads.py --new-tables. A new table must either
 # inherit TenantMixin or be added here, which shows up in review.
+
 acceptance_criteria
 acm_cross_domain_rules
 acm_domain_templates
@@ -142,7 +143,6 @@ element_templates
 enterprise_capabilities
 equipment
 error_events
-exchange_rates
 exception_process
 external_systems
 extraction_feedback
@@ -216,15 +216,13 @@ policy_enforcement
 policy_exemptions
 process_actor_raci
 process_embeddings
-product_inquiries
 product_taxonomy
 production_lines
 production_orders
 project_constraints
 project_notes
 project_resources
-public_visitor_events
-quality_attributes
+published_api_specs
 rag_metrics
 rag_queries
 rag_results
@@ -240,13 +238,11 @@ roadmap_audit
 roadmap_gaps
 roadmap_scenarios
 role_permissions
-roles
 salesforce_config_metadata
 sap_metadata
 savings_realizations
 scoring_configs
 security_scans
-service_incidents
 service_level_agreements
 sidebar_menu_items
 simple_detection_runs
@@ -279,7 +275,6 @@ system_settings
 systems
 taxonomy_mappings
 tco_benchmarks
-technical_capability_vendor_mappings
 technology_capabilities
 technology_capability
 technology_stacks
@@ -296,7 +291,6 @@ unified_capability_technology_mapping
 unified_detection_runs
 unified_duplicate_groups
 usage_analytics
-usage_events
 user_preferences
 user_roles
 user_sessions
@@ -319,11 +313,3 @@ workflow_nodes
 workflow_pipelines
 workflow_run_watchers
 workflow_templates
-# oauth_authorization_codes: redeemed by hash at the token endpoint before an organisation is known
-# oauth_clients: registered before any user or organisation exists (dynamic client registration)
-# oauth_tokens: looked up by token hash before the organisation is known; the row carries organization_id and every use is checked against it
-oauth_authorization_codes
-oauth_clients
-oauth_tokens
-# reference_number_counters: global allocation counters, no tenant data, runtime role insert/update only
-reference_number_counters

@@ -1,395 +1,169 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/modal.html' import modal %}
 
-{% block title %}Solution AI Prompts{% endblock %}
+{% block title %}AI prompts{% endblock %}
 
 {% block content %}
-<div x-data="solutionPromptAdmin()" x-init="loadPrompts()">
-    <!-- Page Header -->
-    {% macro _ps_actions() %}
-<div class="flex items-center gap-2">
-            <span x-show="loading" x-cloak class="text-sm text-muted-foreground">Loading...</span>
-            <button type="button" @click="loadPrompts()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="refresh-cw" class="h-4 w-4 mr-2"></i>
-                Refresh
-            </button>
-        </div>
-    {% endmacro %}
-    {{ page_shell(title='Solution AI Prompts', breadcrumb=[('Home', '/'), ('Solution AI Prompts', none)], subtitle='Customize the prompts used by the Architecture Journey to generate ArchiMate elements. Overrides are stored in the database and take precedence over defaults.', actions_caller=_ps_actions) }}
+{% set prompts = prompts|default([]) %}
+<div class="p-6 space-y-6">
+{%- set custom = prompts|selectattr('has_override')|list|length -%}
+{{ page_shell(title='AI prompts', subtitle=('What the Architecture Journey tells the AI in each phase; ' ~ ('every prompt uses its default text' if not custom else (custom|string ~ ' of ' ~ prompts|length|string ~ ' use your own text, the rest the default'))),
+              breadcrumb=[('Admin', url_for('admin.index')), ('AI prompts', none)]) }}
 
-    <!-- Error banner -->
-    <div x-show="errorMsg" x-cloak
-         class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"
-         role="alert">
-        <span x-text="errorMsg"></span>
-    </div>
+{% if load_error %}
+{% call ui.alert(variant='destructive', attrs={'role': 'alert'}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=load_error) }}{% endcall %}
+{% endif %}
+{% call ui.alert(variant='destructive', class='hidden', attrs={'role': 'alert', 'data-prompt-error': ''}) %}{{ lucide('circle-alert') }}<div data-slot="alert-description" data-prompt-error-text></div>{% endcall %}
 
-    <!-- Success banner -->
-    <div x-show="successMsg" x-cloak
-         class="mb-4 rounded-md border border-success/50 bg-success/10 px-3 py-2 text-sm text-success-emphasis"
-         role="status">
-        <span x-text="successMsg"></span>
-    </div>
-
-    <!-- Prompts Table -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b border-border bg-muted/50">
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Prompt</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Phase</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                        <th class="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="prompt in prompts" :key="prompt.key">
-                        <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                            <td class="px-4 py-3 font-medium text-foreground" x-text="prompt.name"></td>
-                            <td class="px-4 py-3">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-primary/10 text-info-emphasis border border-primary/30"
-                                      x-text="prompt.category">
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-muted-foreground max-w-sm truncate" x-text="prompt.description"></td>
-                            <td class="px-4 py-3">
-                                <span x-show="prompt.has_override" x-cloak
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-warning/10 text-warning-emphasis border border-warning/30">
-                                    Custom
-                                </span>
-                                <span x-show="!prompt.has_override" x-cloak
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
- bg-success/10 text-success-emphasis border border-success/30">
-                                    Default
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <button type="button" @click="openEdit(prompt)"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                        <i data-lucide="pencil" class="h-3.5 w-3.5 mr-1.5"></i>
-                                        Edit
-                                    </button>
-                                    <button type="button" x-show="prompt.has_override" x-cloak
-                                            @click="openReset(prompt)"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-destructive/50 text-destructive-emphasis hover:bg-destructive/10
- h-8 px-3">
-                                        <i data-lucide="rotate-ccw" class="h-3.5 w-3.5 mr-1.5"></i>
-                                        Reset
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
-                    <tr x-show="!loading && prompts.length === 0" x-cloak>
-                        <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-                            No prompt configurations found.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+{% call(p) list_table(rows=prompts, columns=[('Prompt', ''), {'label': 'Phase', 'sortable': true}, {'label': '', 'class': 'w-12'}],
+                      caption='AI prompts', testid='prompts-table', row_testid='prompt-row', search_placeholder='Filter prompts...', toolbar=true,
+                      empty_message=('No prompts to show.' if load_error else 'No prompts are configured for the Architecture Journey.')) %}
+  {% call table_cell(class='max-w-[560px]') %}
+    <span class="flex items-center gap-2"><span class="truncate font-medium">{{ p.name }}</span>{% if p.has_override %}{{ state_badge('Customised', tone='caution', testid='prompt-status') }}{% endif %}</span>
+    {% if p.description %}<span class="block truncate text-xs text-muted-foreground">{{ p.description }}</span>{% endif %}
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ p.category or 'Any phase' }}{% endcall %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% call row_actions('Actions for ' ~ p.name) %}
+        {{ ui.dropdown_menu_item(text='Edit', attrs={'data-prompt-edit': p.key, 'data-testid': 'prompt-edit'}) }}
+        {% if p.has_override %}
+        {{ ui.dropdown_menu_separator() }}
+        {{ ui.dropdown_menu_item(text='Reset to default', variant='destructive', attrs={'data-prompt-reset': p.key, 'data-testid': 'prompt-reset'}) }}
+        {% endif %}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
 </div>
+<script type="application/json" id="solution-prompts-data" nonce="{{ csp_nonce }}">{{ prompts|tojson }}</script>
 {% endblock %}
 
 {% block modals %}
-<!-- Edit Prompt Modal -->
-{% call modal(id='edit-prompt-modal', title='Edit Solution AI Prompt', size='xl') %}
-<div>
-    <form id="edit-prompt-form">
-        <!-- Prompt Name (read-only) -->
-        <div class="mb-4">
-            <label for="edit-prompt-name" class="block text-sm font-medium text-muted-foreground mb-1">Prompt Name</label>
-            <input type="text" id="edit-prompt-name" readonly
-                   class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed">
+{% call modal(id='edit-prompt-modal', title='Edit prompt', size='xl') %}
+<form id="edit-prompt-form" class="space-y-4">
+    <div class="grid gap-4 sm:grid-cols-3">
+        <div class="space-y-2 sm:col-span-2">
+            {{ ui.label(text='Prompt', attrs={'for': 'edit-prompt-name'}) }}
+            {{ ui.input(type='text', id='edit-prompt-name', readonly=true) }}
         </div>
-
-        <!-- Phase & Description -->
-        <div class="grid grid-cols-1 gap-4 mb-4">
-            <div>
-                <label for="edit-prompt-category" class="block text-sm font-medium text-muted-foreground mb-1">ADM Phase</label>
-                <input type="text" id="edit-prompt-category" readonly
-                       class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-                <div id="edit-prompt-status" class="flex items-center h-9 px-3 text-sm"></div>
-            </div>
+        <div class="space-y-2">
+            {{ ui.label(text='Phase', attrs={'for': 'edit-prompt-category'}) }}
+            {{ ui.input(type='text', id='edit-prompt-category', readonly=true) }}
         </div>
-
-        <!-- Available Variables -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Available Variables</label>
-            <p class="text-xs text-muted-foreground mb-2">
-                Use these variables in your prompt with <code class="bg-muted px-1 rounded">{% raw %}{variable_name}{% endraw %}</code> syntax. Double braces <code class="bg-muted px-1 rounded">{% raw %}{{{% endraw %}</code> for literal braces in JSON schemas.
-            </p>
-            <div id="edit-prompt-variables" class="flex flex-wrap gap-1.5"></div>
+    </div>
+    <div class="space-y-2">
+        <p class="text-sm font-medium">Variables you can use</p>
+        <p class="text-sm text-muted-foreground">Write a variable as <code class="font-mono">{% raw %}{variable_name}{% endraw %}</code>. Use double braces <code class="font-mono">{% raw %}{{{% endraw %}</code> for a literal brace in a JSON example.</p>
+        <div id="edit-prompt-variables" class="flex flex-wrap gap-1.5"></div>
+    </div>
+    <div class="space-y-2">
+        <div class="flex items-center justify-between">
+            {{ ui.label(text='Prompt text', attrs={'for': 'edit-prompt-text'}) }}
+            {{ ui.button(text='Restore the default text', type='button', variant='link', size='sm', id='btn-restore-default', class='h-auto p-0') }}
         </div>
-
-        <!-- Prompt Text -->
-        <div class="mb-4">
-            <div class="flex items-center justify-between mb-1">
-                <label for="edit-prompt-text" class="block text-sm font-medium text-muted-foreground mb-1">Prompt Text</label>
-                <button type="button" id="btn-restore-default"
-                        class="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Restore default text
-                </button>
-            </div>
-            <textarea id="edit-prompt-text"
-                      rows="20"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground font-mono leading-relaxed
- placeholder:text-muted-foreground
- focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                      placeholder="Enter your prompt template..."></textarea>
-            <p class="text-xs text-muted-foreground mt-1">
-                <span id="edit-prompt-charcount">0</span> characters
-            </p>
-        </div>
-
-        <!-- Footer -->
-        <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-            <button type="button"
-                    data-modal-close="edit-prompt-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    id="btn-save-prompt"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="save" class="h-3.5 w-3.5 mr-1.5"></i>
-                Save Changes
-            </button>
-        </div>
-    </form>
-</div>
+        {{ ui.textarea(id='edit-prompt-text', rows=20, class='font-mono leading-relaxed', placeholder='Enter the prompt') }}
+        <p class="text-sm text-muted-foreground"><span id="edit-prompt-charcount" class="tabular-nums">0</span> characters</p>
+    </div>
+    <div class="flex items-center justify-end gap-2 pt-2">
+        {{ ui.button(text='Cancel', type='button', variant='ghost', attrs={'data-modal-close': 'edit-prompt-modal'}) }}
+        {% call ui.button(type='submit', id='btn-save-prompt') %}{{ lucide('save') }}Save changes{% endcall %}
+    </div>
+</form>
 {% endcall %}
 
-<!-- Reset Confirmation Modal -->
-{% call modal(id='reset-prompt-modal', title='Reset Prompt to Default', size='sm') %}
-<div>
-    <p class="text-sm text-muted-foreground mb-4">
-        Are you sure you want to reset <strong id="reset-prompt-name"></strong> to its default configuration?
-        This will remove your custom override.
-    </p>
-    <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-        <button type="button"
-                data-modal-close="reset-prompt-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Cancel
-        </button>
-        <button type="button"
-                id="btn-confirm-reset"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            Reset to Default
-        </button>
-    </div>
+{% call modal(id='reset-prompt-modal', title='Reset to the default prompt?', size='sm') %}
+<p class="text-sm text-muted-foreground">Your customised text for <strong id="reset-prompt-name" class="text-foreground"></strong> is removed and the default is used from the next generation.</p>
+<div class="flex items-center justify-end gap-2 pt-4">
+    {{ ui.button(text='Cancel', type='button', variant='outline', attrs={'data-modal-close': 'reset-prompt-modal'}) }}
+    {{ ui.button(text='Reset to default', type='button', variant='destructive', id='btn-confirm-reset') }}
 </div>
 {% endcall %}
 {% endblock %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('alpine:init', function() {
-    Alpine.data('solutionPromptAdmin', function() {
-        return {
-            prompts: [],
-            loading: false,
-            errorMsg: '',
-            successMsg: '',
-            editKey: '',
-            editDefaultPrompt: '',
-            resetKey: '',
-            resetName: '',
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var prompts = [];
+    try { prompts = JSON.parse(document.getElementById('solution-prompts-data').textContent) || []; } catch (_) { prompts = []; }
+    function find(key) { for (var i = 0; i < prompts.length; i++) { if (prompts[i].key === key) return prompts[i]; } return null; }
+    var editKey = null, resetKey = null;
+    var textEl = document.getElementById('edit-prompt-text');
+    var countEl = document.getElementById('edit-prompt-charcount');
+    function showError(message) {
+        var box = document.querySelector('[data-prompt-error]');
+        var text = document.querySelector('[data-prompt-error-text]');
+        if (box && text) { text.textContent = message; box.classList.remove('hidden'); }
+        else { Platform.toast.error(message); }
+    }
+    function count() { if (textEl && countEl) countEl.textContent = textEl.value.length.toLocaleString(); }
+    if (textEl) textEl.addEventListener('input', count);
 
-            async loadPrompts() {
-                this.loading = true;
-                this.errorMsg = '';
-                try {
-                    let data = await Platform.fetch('/admin/solution-prompts/data');
-                    this.prompts = data.prompts || [];
-                    this.$nextTick(function() {
-                        if (typeof lucide !== 'undefined') lucide.createIcons();
-                    });
-                } catch (err) {
-                    // Platform.fetch throws on non-ok responses; we need to handle 403 specially
-                    if (err.status === 403) {
-                        this.errorMsg = 'Access denied. Admin privileges required.';
-                        return;
-                    }
-                    this.errorMsg = err.message || 'Failed to load prompt data';
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            openEdit(prompt) {
-                this.errorMsg = '';
-                this.successMsg = '';
-                this.editKey = prompt.key;
-                this.editDefaultPrompt = prompt.default_prompt;
-
-                let nameEl = document.getElementById('edit-prompt-name');
-                const catEl = document.getElementById('edit-prompt-category');
-                let textEl = document.getElementById('edit-prompt-text');
-                const statusEl = document.getElementById('edit-prompt-status');
-                const varsEl = document.getElementById('edit-prompt-variables');
-                let countEl = document.getElementById('edit-prompt-charcount');
-
-                if (nameEl) nameEl.value = prompt.name;
-                if (catEl) catEl.value = prompt.category;
-                if (textEl) {
-                    textEl.value = prompt.current_prompt;
-                    if (countEl) countEl.textContent = prompt.current_prompt.length;
-                }
-                if (statusEl) {
-                    statusEl.innerHTML = prompt.has_override
-                        ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Custom</span>'
-                        : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Default</span>';
-                }
-                if (varsEl) {
-                    varsEl.innerHTML = '';
-                    const vars = (prompt.variables || '').split(', ');
-                    vars.forEach(function(v) {
-                        const tag = document.createElement('code');
-                        tag.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-muted text-muted-foreground border border-border';
-                        tag.textContent = '{' + v.trim() + '}';
-                        varsEl.appendChild(tag);
-                    });
-                }
-
-                Platform.modal.open('edit-prompt-modal');
-                this.$nextTick(function() {
-                    if (typeof lucide !== 'undefined') lucide.createIcons();
-                });
-            },
-
-            // CSRF token is automatically handled by Platform.fetch; no need for manual extraction
-            // This method is kept for compatibility but not used in migrated code
-            _csrfToken: function() {
-                const el = document.querySelector('meta[name=csrf-token]');
-                return el ? el.content : '';
-            },
-
-            async savePrompt() {
-                let textEl = document.getElementById('edit-prompt-text');
-                const promptText = textEl ? textEl.value.trim() : '';
-
-                if (!promptText) {
-                    this.errorMsg = 'Prompt text cannot be empty';
-                    return;
-                }
-
-                try {
-                    // Platform.fetch automatically serializes plain objects to JSON and adds CSRF token
-                    let data = await Platform.fetch.post('/admin/solution-prompts/' + this.editKey + '/update', 
-                        { prompt_text: promptText },
-                        { silent: true }  // We show our own success/error messages inline
-                    );
-                    let idx = this.prompts.findIndex(function(p) { return p.key === data.prompt.key; });
-                    if (idx >= 0) this.prompts[idx] = data.prompt;
-                    Platform.modal.close('edit-prompt-modal');
-                    this.successMsg = 'Prompt "' + data.prompt.name + '" updated successfully. Changes take effect on the next generation.';
-                    let self = this;
-                    setTimeout(function() { self.successMsg = ''; }, 5000);
-                } catch (err) {
-                    // Platform.fetch throws on non-ok responses; we need to extract error details
-                    // The error object may have a .data property with server-provided error info
-                    const serverError = err.data && (err.data.error || err.data.message);
-                    this.errorMsg = serverError || err.message || 'Network error saving prompt';
-                }
-            },
-
-            openReset(prompt) {
-                this.errorMsg = '';
-                this.successMsg = '';
-                this.resetKey = prompt.key;
-                this.resetName = prompt.name;
-                let nameEl = document.getElementById('reset-prompt-name');
-                if (nameEl) nameEl.textContent = prompt.name;
-                Platform.modal.open('reset-prompt-modal');
-            },
-
-            async confirmReset() {
-                try {
-                    // Platform.fetch automatically adds CSRF token and serializes body (none in this case)
-                    let data = await Platform.fetch.post('/admin/solution-prompts/' + this.resetKey + '/reset', 
-                        null,
-                        { silent: true }  // We show our own success/error messages inline
-                    );
-                    let idx = this.prompts.findIndex(function(p) { return p.key === data.prompt.key; });
-                    if (idx >= 0) this.prompts[idx] = data.prompt;
-                    Platform.modal.close('reset-prompt-modal');
-                    this.successMsg = 'Prompt "' + this.resetName + '" reset to default.';
-                    let self = this;
-                    setTimeout(function() { self.successMsg = ''; }, 5000);
-                } catch (err) {
-                    // Platform.fetch throws on non-ok responses; extract server error details
-                    const serverError = err.data && (err.data.error || err.data.message);
-                    this.errorMsg = serverError || err.message || 'Network error resetting prompt';
-                }
-            }
-        };
+    document.addEventListener('click', function (e) {
+        var edit = e.target.closest('[data-prompt-edit]');
+        var reset = e.target.closest('[data-prompt-reset]');
+        if (edit) {
+            var p = find(edit.dataset.promptEdit);
+            if (!p) return;
+            editKey = p.key;
+            document.getElementById('edit-prompt-name').value = p.name;
+            document.getElementById('edit-prompt-category').value = p.category || '';
+            var vars = document.getElementById('edit-prompt-variables');
+            vars.textContent = '';
+            (p.variables || '').split(',').forEach(function (v) {
+                v = v.trim();
+                if (!v) return;
+                var tag = document.createElement('code');
+                tag.className = 'rounded-md border px-1.5 py-0.5 font-mono text-xs text-muted-foreground';
+                tag.textContent = '{' + v + '}';
+                vars.appendChild(tag);
+            });
+            textEl.value = p.current_prompt || '';
+            count();
+            Platform.modal.open('edit-prompt-modal');
+        } else if (reset) {
+            var r = find(reset.dataset.promptReset);
+            if (!r) return;
+            resetKey = r.key;
+            document.getElementById('reset-prompt-name').textContent = r.name;
+            Platform.modal.open('reset-prompt-modal');
+        }
     });
-});
 
-/* Wire modal form events after DOM ready */
-document.addEventListener('DOMContentLoaded', function() {
-    /* Character count on textarea input */
-    let textEl = document.getElementById('edit-prompt-text');
-    let countEl = document.getElementById('edit-prompt-charcount');
-    if (textEl && countEl) {
-        textEl.addEventListener('input', function() {
-            countEl.textContent = textEl.value.length;
-        });
-    }
+    var restore = document.getElementById('btn-restore-default');
+    if (restore) restore.addEventListener('click', function () {
+        var p = find(editKey);
+        if (p) { textEl.value = p.default_prompt || ''; count(); }
+    });
 
-    /* Save button */
-    const form = document.getElementById('edit-prompt-form');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            let adminEl = document.querySelector('[x-data*="solutionPromptAdmin"]');
-            if (adminEl && adminEl._x_dataStack) {
-                adminEl._x_dataStack[0].savePrompt();
-            }
-        });
-    }
+    var form = document.getElementById('edit-prompt-form');
+    if (form) form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var text = textEl.value.trim();
+        if (!text) { Platform.toast.error('The prompt text cannot be empty.'); return; }
+        try {
+            await Platform.fetch.post('/admin/solution-prompts/' + editKey + '/update', { prompt_text: text }, { silent: true });
+            location.reload();
+        } catch (err) {
+            Platform.modal.close('edit-prompt-modal');
+            showError((err.data && (err.data.error || err.data.message)) || err.message || 'The prompt could not be saved.');
+        }
+    });
 
-    /* Restore default text button */
-    const restoreBtn = document.getElementById('btn-restore-default');
-    if (restoreBtn) {
-        restoreBtn.addEventListener('click', function() {
-            let adminEl = document.querySelector('[x-data*="solutionPromptAdmin"]');
-            if (adminEl && adminEl._x_dataStack) {
-                const defaultText = adminEl._x_dataStack[0].editDefaultPrompt;
-                if (textEl) {
-                    textEl.value = defaultText;
-                    if (countEl) countEl.textContent = defaultText.length;
-                }
-            }
-        });
-    }
-
-    /* Reset confirm button */
-    const resetBtn = document.getElementById('btn-confirm-reset');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', function() {
-            let adminEl = document.querySelector('[x-data*="solutionPromptAdmin"]');
-            if (adminEl && adminEl._x_dataStack) {
-                adminEl._x_dataStack[0].confirmReset();
-            }
-        });
-    }
-});
+    var confirmReset = document.getElementById('btn-confirm-reset');
+    if (confirmReset) confirmReset.addEventListener('click', async function () {
+        try {
+            await Platform.fetch.post('/admin/solution-prompts/' + resetKey + '/reset', null, { silent: true });
+            location.reload();
+        } catch (err) {
+            Platform.modal.close('reset-prompt-modal');
+            showError((err.data && (err.data.error || err.data.message)) || err.message || 'The prompt could not be reset.');
+        }
+    });
+})();
 </script>
 {% endblock %}

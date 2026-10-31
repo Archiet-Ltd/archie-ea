@@ -1665,6 +1665,99 @@ def _seed_data_model(org_id) -> dict:
     return stats
 
 
+# Where the demonstration organisation's customer data goes: which applications
+# create, read, update or delete each entity (ArchiMate access relationships,
+# the one store for that), the copy into the warehouse (a lineage row), which
+# entities hold personal data, the systems of record and the domain stewards.
+_DATA_STEWARDS = {
+    "Customer": "Customer Operations lead",
+    "Orders and Fulfilment": "Fulfilment Operations lead",
+    "Finance": "Financial Controller",
+    "Analytics": "Head of Data",
+}
+_PERSONAL_DATA = ("Customer", "Contact", "Delivery Address", "Consent", "Customer Analytics Profile")
+_SYSTEMS_OF_RECORD = {"Customer": "Customer Portal", "Invoice": "Finance System", "Sales Order": "Dispatch Planner"}
+_DATA_ACCESS = [
+    # (application, entity, C/R/U/D letters)
+    ("Customer Portal", "Customer", "CRU"),
+    ("Customer Portal", "Contact", "CRUD"),
+    ("Customer Portal", "Consent", "CRU"),
+    ("Customer Portal", "Delivery Address", "CRUD"),
+    ("Dispatch Planner", "Customer", "R"),
+    ("Dispatch Planner", "Delivery Address", "R"),
+    ("Dispatch Planner", "Sales Order", "CRU"),
+    ("Finance System", "Customer", "R"),
+    ("Finance System", "Invoice", "CRU"),
+    ("Finance System", "Payment", "CRU"),
+    ("Integration Bus", "Customer", "R"),
+    ("Data Warehouse", "Customer Analytics Profile", "CU"),
+    ("Reporting Engine", "Customer Analytics Profile", "R"),
+]
+# (source entity, target entity, kind of copy)
+_DATA_COPIES = [("Customer", "Customer Analytics Profile", "Batch")]
+
+
+def _seed_data_flows(org_id) -> dict:
+    """Record where the demonstration organisation's data flows. Idempotent: an
+    access relationship or lineage row that exists is left as it is."""
+    from app.models.all_missing_models import DataLineage
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.process_data import DataDomain, DataEntity
+    from app.modules.architecture.services import data_erd_service as erd
+    from app.modules.architecture.services.data_architecture_service import record_entity_access
+
+    stats = {"data_accesses_recorded": 0, "data_copies_recorded": 0}
+    analytics = DataDomain.query.filter_by(organization_id=org_id, name="Analytics").first()
+    if analytics is None:
+        analytics = DataDomain(name="Analytics", organization_id=org_id,
+                               description="The analytics data of Lantern Quay Systems")
+        db.session.add(analytics)
+        db.session.flush()
+    if DataEntity.query.filter_by(organization_id=org_id, name="Customer Analytics Profile").first() is None:
+        erd.create_entity(analytics, "Customer Analytics Profile", [
+            {"name": "customer_id", "data_type": "uuid", "is_primary_key": True, "is_foreign_key": False, "is_nullable": False},
+            {"name": "segment", "data_type": "varchar", "is_primary_key": False, "is_foreign_key": False, "is_nullable": True},
+            {"name": "lifetime_value", "data_type": "decimal", "is_primary_key": False, "is_foreign_key": False, "is_nullable": True},
+        ])
+    for domain in DataDomain.query.filter_by(organization_id=org_id).all():
+        if domain.name in _DATA_STEWARDS and not domain.data_steward:
+            domain.data_steward = _DATA_STEWARDS[domain.name]
+    entities = {e.name: e for e in DataEntity.query.filter_by(organization_id=org_id).all()}
+    apps = {a.name: a for a in ApplicationComponent.query.filter_by(organization_id=org_id).all()}
+    for name in _PERSONAL_DATA:
+        if name in entities:
+            entities[name].contains_pii = True
+            entities[name].data_classification = entities[name].data_classification or "confidential"
+    for entity_name, app_name in _SYSTEMS_OF_RECORD.items():
+        entity, app = entities.get(entity_name), apps.get(app_name)
+        if entity is not None and app is not None and entity.system_of_record_application_id is None:
+            entity.system_of_record_application_id = app.id
+            entity.system_of_record = app.name
+    db.session.flush()
+    for app_name, entity_name, letters in _DATA_ACCESS:
+        entity, app = entities.get(entity_name), apps.get(app_name)
+        if entity is None or app is None or not entity.archimate_element_id or not app.archimate_element_id:
+            continue
+        record_entity_access(entity, app, list(letters))
+        stats["data_accesses_recorded"] += 1
+    for source_name, target_name, kind in _DATA_COPIES:
+        source, target = entities.get(source_name), entities.get(target_name)
+        if source is None or target is None or not source.archimate_element_id or not target.archimate_element_id:
+            continue
+        exists = DataLineage.query.filter_by(
+            organization_id=org_id, archimate_element_id=source.archimate_element_id,
+            target_archimate_element_id=target.archimate_element_id).first()
+        if exists is None:
+            db.session.add(DataLineage(
+                name=f"{source.name} -> {target.name}", organization_id=org_id,
+                archimate_element_id=source.archimate_element_id,
+                target_archimate_element_id=target.archimate_element_id,
+                lineage_type=kind, source_system="Customer Portal", target_system="Data Warehouse"))
+            stats["data_copies_recorded"] += 1
+    db.session.flush()
+    return stats
+
+
 def _seed_boards(org_id, demo_user_id) -> dict:
     """SAFe kinds, ADM-board solutions, a value stream and a requirements
     backlog for the demonstration organisation.
@@ -2879,6 +2972,18 @@ def _seed_demo_company() -> dict:
         db.session.flush()
         stats["capability_elements_created"] = elements_made
 
+        # Link each business capability to its unified twin (ADR 0008's FK),
+        # so vendor discovery's capability bridge (vendor_analysis_routes.py)
+        # resolves a selection through the FK instead of resting on name
+        # equality alone. The pair created or confirmed just above shares a
+        # code, which is the stable join key (two capabilities can share a
+        # display name; they cannot share a code within this seed).
+        for code, ucap in unified_by_code.items():
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.deprecated_in_favor_of_id is None:
+                bc.deprecated_in_favor_of_id = ucap.id
+        db.session.flush()
+
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
 
@@ -3319,6 +3424,7 @@ def _seed_demo_company() -> dict:
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_data_model(org_id))
+        stats.update(_seed_data_flows(org_id))
 
         db.session.commit()
 

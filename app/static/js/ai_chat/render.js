@@ -210,7 +210,11 @@
         var cited = Array.isArray(sources) && sources.length > 0;
 
         var state, summary;
-        if (ran) {
+        if (o.paused) {
+            /* The platform's pause: nothing was read, nothing answered, so no source is claimed. */
+            state = 'paused';
+            summary = 'Answers are paused; nothing was read for this reply.';
+        } else if (ran) {
             state = 'retrieved';
             summary = trail.length + (trail.length === 1 ? ' lookup' : ' lookups')
                     + (cited ? ', ' + sources.length + ' record' + (sources.length === 1 ? '' : 's') + ' cited' : '');
@@ -244,7 +248,7 @@
            Unretrieved states have to reach a screen-reader user with the same
            prominence as Retrieved, because those are the ones that change
            whether an answer can be taken to an ARB. */
-        var icon = state === 'retrieved' ? 'database' : (state === 'context' ? 'layers' : 'help-circle');
+        var icon = state === 'retrieved' ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
         return '<div class="mt-3 pt-2 border-t border-border text-xs">' +
                  '<button type="button" class="js-evidence-toggle inline-flex items-center gap-1.5 ' +
                     'text-muted-foreground hover:text-foreground transition-colors" ' +
@@ -431,6 +435,7 @@
         return renderApiSettingsNotice(m.error) +
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
+                   paused: m.paused,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +

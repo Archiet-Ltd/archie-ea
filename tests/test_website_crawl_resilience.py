@@ -75,12 +75,15 @@ def providers(monkeypatch):
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     calls: list = []
+    extras: list = []
     script: dict = {}
     keyed = {"openrouter", "nvidia", "mistral", "cerebras", "groq", "gemini"}
 
     def caller(provider):
-        def call(prompt, model, api_key, max_tokens=None, timeout=None):
+        def call(prompt, model, api_key, max_tokens=None, timeout=None, **extra):
             calls.append((provider, model))
+            if provider == "openrouter":
+                extras.append(extra)
             outcome = script.get(provider, ["answer from " + provider])
             index = sum(1 for name, _ in calls if name == provider) - 1
             result = outcome[index] if index < len(outcome) else outcome[-1]
@@ -91,11 +94,14 @@ def providers(monkeypatch):
 
     for name in ("openrouter", "nvidia", "mistral", "cerebras", "groq", "gemini"):
         monkeypatch.setattr(LLMService, "_call_" + name, staticmethod(caller(name)), raising=False)
+    # a public-input call reaches NVIDIA through the one-attempt caller; it is the same stand-in
+    monkeypatch.setattr(LLMService, "_call_nvidia_once", staticmethod(caller("nvidia")), raising=False)
     monkeypatch.setattr(LLMService, "_get_all_api_keys",
                         staticmethod(lambda provider: ["key-for-" + provider] if provider in keyed else []))
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_GEMINI", "5")  # the platform's paid provider, within its ceiling
     monkeypatch.setattr(LLMService, "_persist_interaction_record", staticmethod(lambda interaction: None))
     monkeypatch.setattr(LLMService, "_sleep", staticmethod(lambda seconds: None))
-    return SimpleNamespaceLike(calls=calls, script=script, keyed=keyed, service=LLMService)
+    return SimpleNamespaceLike(calls=calls, extras=extras, script=script, keyed=keyed, service=LLMService)
 
 
 class SimpleNamespaceLike:
@@ -113,13 +119,14 @@ def test_a_rate_limited_model_then_an_error_then_an_answer_takes_the_third_model
     assert _public(providers) == "third model's facts"
     assert [(p, m) for p, m in providers.calls if p == "openrouter"] == [("openrouter", m) for m in OPENROUTER]
     assert providers.calls[-1] == ("openrouter", OPENROUTER[2]), "stops at the first answer"
+    assert providers.extras and all(extra == {"public_input": True} for extra in providers.extras), providers.extras
 
 
-def test_the_chain_is_nvidia_then_openrouter_then_mistral_cerebras_groq_then_gemini(providers):
+def test_the_public_input_chain_is_openrouter_then_nvidia_then_mistral_cerebras_groq_then_gemini(providers):
     from app.modules.ai_chat.services.model_defaults import fallback_models_for
 
     boom = RuntimeError("unavailable")
-    for name in ("nvidia", "openrouter", "mistral", "cerebras"):
+    for name in ("openrouter", "nvidia", "mistral", "cerebras"):
         providers.script[name] = [boom]
     providers.script["groq"] = ["groq answers"]
     assert _public(providers) == "groq answers"
@@ -127,9 +134,10 @@ def test_the_chain_is_nvidia_then_openrouter_then_mistral_cerebras_groq_then_gem
     for name, _model in providers.calls:
         if not order or order[-1] != name:
             order.append(name)
-    assert order == ["nvidia", "openrouter", "mistral", "cerebras", "groq"]
+    assert order == ["openrouter", "nvidia", "mistral", "cerebras", "groq"]
     assert [m for p, m in providers.calls if p == "openrouter"] == fallback_models_for("openrouter", "")
     assert [m for p, m in providers.calls if p == "nvidia"] == fallback_models_for("nvidia", "")
+    assert providers.extras and all(extra == {"public_input": True} for extra in providers.extras), providers.extras
     assert ("gemini", "gemini-2.0-flash") not in providers.calls, "stopped at the first answer"
 
 
@@ -176,3 +184,5 @@ def test_a_call_carrying_organisation_data_never_reaches_a_free_model(providers)
     assert answer == "answer from gemini", "it fell over to a paid provider, not a free one"
     assert [m for p, m in providers.calls if p == "openrouter"] == [OPENROUTER[0]], "no free backup model tried"
     assert not {p for p, _ in providers.calls} & {"nvidia", "mistral", "cerebras", "groq"}
+    assert providers.extras == [{}], "a call with organisation data keeps the original signature, no public-input flag"
+

@@ -237,17 +237,21 @@ def install_tenant_filter(app):
                 if derived is not None:
                     obj.organization_id = derived
                 continue
-            if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
-                # The row belongs to the organisation that owns the parent record it hangs from.
-                derived = organization_from_parent(session, obj, include_actors=org_id is None)
+            if not isinstance(obj, TenantMixin):
+                continue
+            named = getattr(obj, "organization_id", None)
+            # The row belongs to the organisation that owns the parent record it hangs from.
+            derived = organization_from_parent(session, obj, include_actors=(named or org_id) is None)
+            owner = named if named is not None else org_id
+            if derived is not None and owner is not None and derived != owner:
+                # Never let a signed-in or a named organisation win over a parent that belongs to
+                # another company: the child would link to a record that is not theirs.
+                raise TenantParentMismatch(
+                    f"{type(obj).__name__} hangs from a record of organisation {derived}, "
+                    f"but the row is for organisation {owner}"
+                )
+            if named is None:
                 if org_id is not None:
-                    if derived is not None and derived != org_id:
-                        # Never let the signed-in organisation win over a parent that belongs to
-                        # another company: the child would link to a record that is not theirs.
-                        raise TenantParentMismatch(
-                            f"{type(obj).__name__} hangs from a record of organisation {derived}, "
-                            f"but the signed-in organisation is {org_id}"
-                        )
                     obj.organization_id = org_id
                 elif derived is not None:
                     # No signed-in organisation (a job, a seeder, a command).

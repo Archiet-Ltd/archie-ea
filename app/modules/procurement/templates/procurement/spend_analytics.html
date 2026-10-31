@@ -1,174 +1,140 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
-{% block title %}Spend Analytics{% endblock %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import stat_cards, state_badge, section, money_short with context %}
+{% block title %}Costs{% endblock %}
+
+{#- A headline amount the way the Overview writes it: the symbol once, abbreviated, no trailing pence. -#}
+
+
+{% macro _recommend_action() %}
+{% if ai_available %}
+<form method="get" action="{{ url_for('procurement.spend_analytics') }}" data-testid="spend-recommendations-form">
+  <input type="hidden" name="recommendations" value="1">
+  {% call ui.button(type='submit', variant='outline', size='sm') %}{{ lucide('sparkles') }}{{ 'Generate again' if recommendations else 'Generate suggestions' }}{% endcall %}
+</form>
+{% endif %}
+{% endmacro %}
 
 {% block content %}
 <div class="p-6 space-y-6">
-    {{ page_header(
-        title='Spend Analytics',
-        description='Vendor spend analysis and cost breakdown',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Spend Analytics'}
-        ]
-    ) }}
+{{ page_shell(title='Costs', subtitle='What your active vendor contracts cost each year, by type and by vendor',
+              breadcrumb=[('Home', url_for('main.index')), ('Costs', none)]) }}
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-card border border-border rounded-lg p-6">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="file-text" class="w-5 h-5 text-primary"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Active Contracts</div>
-            </div>
-            <div class="text-3xl font-bold">{{ summary.total_contracts }}</div>
-        </div>
-        <div class="bg-card border border-border rounded-lg p-6">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="dollar-sign" class="w-5 h-5 text-success-emphasis"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Total Contract Value</div>
-            </div>
-            <div class="text-3xl font-bold">{{ summary.total_value|format_currency(show_code=True) if summary.total_value is not none else '—' }}</div>
-            {% if summary.contracts_without_value %}
-            <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.contracts_without_value }} contract{{ '' if summary.contracts_without_value == 1 else 's' }} without a contract value</p>
-            {% endif %}
-        </div>
-        <div class="bg-card border border-border rounded-lg p-6">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="calendar" class="w-5 h-5 text-info-emphasis"></i>
-                </div>
-                <div class="text-sm text-muted-foreground">Annual Recurring Cost</div>
-            </div>
-            <div class="text-3xl font-bold">{{ summary.total_annual_cost|format_currency(show_code=True) if summary.total_annual_cost is not none else '—' }}</div>
-            {% if summary.contracts_without_annual_cost %}
-            <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.contracts_without_annual_cost }} contract{{ '' if summary.contracts_without_annual_cost == 1 else 's' }} without an annual cost</p>
-            {% endif %}
-        </div>
-    </div>
+{% if summary.total_contracts == 0 %}
+  {% call ui.card(attrs={'data-testid': 'spend-empty'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('chart-pie') }}</span>
+      <p class="text-base font-semibold">No active vendor contracts yet</p>
+      <p class="max-w-[60ch] text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>
+      {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Go to contracts{% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% else %}
+  {%- set n = summary.total_contracts -%}
+  {%- set no_annual = summary.contracts_without_annual_cost or 0 -%}
+  {%- set no_value = summary.contracts_without_value or 0 -%}
+  {%- if summary.total_annual_cost is not none -%}
+    {%- set annual_card = {'label': 'Annual recurring cost', 'value': money_short(summary.total_annual_cost), 'icon': 'calendar', 'testid': 'spend-annual-cost',
+        'sentence': (('Leaves out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else 'Every active contract states its annual cost')} -%}
+  {%- else -%}
+    {%- set annual_card = {'label': 'No annual cost recorded yet', 'value': none, 'icon': 'calendar', 'testid': 'spend-annual-cost',
+        'sentence': 'Add the annual cost to a contract and the yearly total shows here'} -%}
+  {%- endif -%}
+  {%- if summary.total_value is not none -%}
+    {%- set value_card = {'label': 'Total contract value', 'value': money_short(summary.total_value), 'icon': 'banknote', 'testid': 'spend-total-value',
+        'sentence': (('Leaves out ' ~ no_value ~ ' contract' ~ ('' if no_value == 1 else 's') ~ ' with no stated value') if no_value else 'The full value of every active contract')} -%}
+  {%- else -%}
+    {%- set value_card = {'label': 'No contract value recorded yet', 'value': none, 'icon': 'banknote', 'testid': 'spend-total-value',
+        'sentence': 'Add the total value to a contract and the sum shows here'} -%}
+  {%- endif -%}
+  {%- set top = (summary.top_vendors|first) if summary.top_vendors else none -%}
+  {%- if top and top[1].annual_cost is not none and (summary.total_annual_cost or 0) > 0 -%}
+    {%- set top_card = {'label': 'Largest vendor: ' ~ top[0], 'value': '%.0f'|format(top[1].annual_cost / summary.total_annual_cost * 100) ~ '%', 'icon': 'building-2', 'testid': 'spend-top-vendor',
+        'sentence': 'Share of annual spend, ' ~ money_short(top[1].annual_cost) ~ ' a year', 'href': url_for('unified_applications.vendors')} -%}
+  {%- else -%}
+    {%- set top_card = {'label': 'No vendor costs to rank yet', 'value': none, 'icon': 'building-2', 'testid': 'spend-top-vendor',
+        'sentence': 'Name the vendor and annual cost on each contract to see who you spend most with'} -%}
+  {%- endif -%}
+  {{ stat_cards([
+      {'label': 'Active contracts', 'value': n, 'icon': 'file-text', 'testid': 'spend-active-contracts',
+       'sentence': 'Vendor agreements in force today', 'href': url_for('procurement.contracts_list', status='active')},
+      annual_card, value_card, top_card], testid='spend-stat-cards') }}
 
-    <div class="bg-card border border-border rounded-lg p-6 space-y-4"
-         x-data="{
-            open: false,
-            loading: false,
-            error: null,
-            result: null,
-            generate() {
-                const self = this;
-                this.loading = true;
-                this.error = null;
-                return Platform.fetch.post('{{ url_for('procurement.spend_ai_recommendations') }}', null, { silent: true })
-                    .then(function (data) {
-                        self.result = data;
-                        self.loading = false;
-                    })
-                    .catch(function (e) {
-                        self.result = null;
-                        self.error = e.message || 'AI spend recommendations failed - check your connection and try again.';
-                        self.loading = false;
-                    });
-            }
-         }">
-        <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Spend Recommendations (AI)</h2>
-            <button type="button" @click="open = !open; if (open && !result && !loading) generate()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <i data-lucide="sparkles" class="w-4 h-4"></i>
-                <span x-text="open ? 'Hide' : 'Generate recommendations'"></span>
-            </button>
-        </div>
+    {% call section('Top vendors by annual spend', 'The vendors that cost the most each year, as a share of the total', testid='spend-top-vendors') %}
+      {% if summary.top_vendors %}
+      <ul class="space-y-3">
+        {% for vendor_name, data in summary.top_vendors %}
+        {%- set pct = (data.annual_cost / summary.total_annual_cost * 100) if (data.annual_cost is not none and (summary.total_annual_cost or 0) > 0) else none -%}
+        <li class="flex items-center gap-3 text-sm" data-testid="spend-vendor-row">
+          <span class="w-32 shrink-0 truncate font-medium sm:w-48">{{ vendor_name }}</span>
+          {% if pct is not none %}
+          <progress class="h-2 min-w-0 flex-1 appearance-none overflow-hidden rounded-full bg-secondary [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value="{{ '%.1f'|format(pct) }}" max="100" aria-label="{{ vendor_name }} share of annual spend"></progress>
+          <span class="w-28 shrink-0 whitespace-nowrap text-right tabular-nums">{{ money_short(data.annual_cost) }} a year</span>
+          <span class="w-12 shrink-0 text-right tabular-nums text-muted-foreground">{{ '%.0f'|format(pct) }}%</span>
+          {% else %}
+          <span class="flex-1 text-right text-muted-foreground">No annual cost stated</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-muted-foreground">No active contract names its vendor yet. Pick the vendor on each contract to see who you spend most with.</p>
+      {% endif %}
+    {% endcall %}
 
-        <div x-show="open" x-cloak class="space-y-3">
-            <div x-show="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
-                <span class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-                Generating recommendations…
-            </div>
-            <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
-            <template x-if="result">
-                <div class="space-y-3 text-sm">
-                    <p x-text="result.summary"></p>
-                    <div class="space-y-2">
-                        <template x-for="rec in result.recommendations" :key="rec.title">
-                            <div class="border border-border rounded-md p-3">
-                                <div class="flex items-center justify-between gap-2">
-                                    <span class="font-medium" x-text="rec.title"></span>
-                                    <span class="text-xs text-muted-foreground uppercase tracking-wide" x-text="rec.category"></span>
-                                </div>
-                                <p class="text-muted-foreground mt-1" x-text="rec.detail"></p>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </template>
-        </div>
-    </div>
+  <div class="grid items-stretch gap-4 md:gap-6 lg:grid-cols-2 [&>*]:h-full">
+    {% call section('Spend by contract type', 'Annual cost of active contracts, grouped by type', testid='spend-by-type') %}
+      <ul class="divide-y">
+        {% for type, data in summary.by_type.items() %}
+        {%- set label = ('Type not set' if type in [none, '', 'unknown'] else type|replace('_', ' ')) -%}
+        <li class="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0" data-testid="spend-type-row">
+          <span class="min-w-0">
+            <span class="block truncate font-medium">{{ label[:1]|upper ~ label[1:] }}</span>
+            <span class="block text-muted-foreground">{{ data.count }} contract{{ '' if data.count == 1 else 's' }}</span>
+          </span>
+          {% if data.annual_cost is not none %}
+          <span class="whitespace-nowrap tabular-nums">{{ money_short(data.annual_cost) }} a year</span>
+          {% else %}
+          <span class="whitespace-nowrap text-muted-foreground">No annual cost stated</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Spend by Contract Type -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <h2 class="text-lg font-semibold mb-4">Spend by Contract Type</h2>
-            {% if summary.by_type %}
-            <div class="space-y-4">
-                {% for type, data in summary.by_type.items() %}
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-primary"></div>
-                        <span class="capitalize">{{ type.replace('_', ' ') }}</span>
-                        <span class="text-sm text-muted-foreground">({{ data.count }} contracts)</span>
-                    </div>
-                    <span class="font-medium">{% if data.annual_cost is not none %}{{ data.annual_cost|format_currency }}/yr{% else %}—{% endif %}</span>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-muted-foreground">No contract type data available</p>
-            {% endif %}
-        </div>
-
-        <!-- Top Vendors by Spend -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <h2 class="text-lg font-semibold mb-4">Top Vendors by Annual Spend</h2>
-            {% if summary.top_vendors %}
-            <div class="space-y-4">
-                {% for vendor_name, data in summary.top_vendors %}
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="font-medium">{{ vendor_name }}</span>
-                        <span class="text-sm">{% if data.annual_cost is not none %}{{ data.annual_cost|format_currency }}/yr{% else %}—{% endif %}</span>
-                    </div>
-                    {% if data.annual_cost is not none %}
-                    <div class="flex items-center gap-2">
-                        <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            {% set pct = (data.annual_cost / summary.total_annual_cost * 100) if (summary.total_annual_cost or 0) > 0 else 0 %}
-                            <div class="h-full bg-primary rounded-full" style="width: {{ pct }}%"></div>
-                        </div>
-                        <span class="text-xs text-muted-foreground w-12 text-right">{{ "{:.1f}".format(pct) }}%</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-muted-foreground">No vendor spend data available</p>
-            {% endif %}
-        </div>
-    </div>
-
-    {% if summary.total_contracts == 0 %}
-    {{ empty_state(
-        icon='pie-chart',
-        title='No spend data available',
-        description='Spend analytics will appear once vendor contracts are added to the system.',
-        cta_text='View Contracts',
-        cta_href=url_for('procurement.contracts_list'),
-        cta_icon='arrow-right'
-    ) }}
+  {% call section('Ways to spend less', 'Suggestions drawn from your contracts, licences and renewal dates', action=_recommend_action, testid='spend-recommendations') %}
+    {% if not ai_available %}
+      {%- set _admin = current_user.is_authenticated and ((current_user.is_admin() if current_user.is_admin is callable else current_user.is_admin) if current_user.is_admin is defined else false) -%}
+      {% if _admin and 'admin.api_settings' in flask.current_app.view_functions %}
+      <div class="flex flex-col items-start gap-3">
+        <p class="text-sm text-muted-foreground">Suggestions need an AI provider; connect one and they appear here.</p>
+        {{ ui.button(text='Connect an AI provider', href=url_for('admin.api_settings'), variant='outline', size='sm') }}
+      </div>
+      {% else %}
+      <p class="text-sm text-muted-foreground">Suggestions need an AI provider; ask your administrator to connect one and they appear here.</p>
+      {% endif %}
+    {% elif recommendations_error %}
+      <p class="text-sm text-muted-foreground" role="status">The suggestions could not be generated just now. Try again in a minute.</p>
+    {% elif recommendations %}
+      {% if recommendations.summary %}<p class="text-sm">{{ recommendations.summary }}</p>{% endif %}
+      <ul class="mt-4 divide-y rounded-md border">
+        {% for rec in recommendations.recommendations %}
+        <li class="space-y-1 p-4" data-testid="spend-recommendation">
+          <div class="flex items-start justify-between gap-2">
+            <span class="text-sm font-medium">{{ rec.title }}</span>
+            {% if rec.category %}{{ state_badge(rec.category, tone='neutral') }}{% endif %}
+          </div>
+          <p class="text-sm text-muted-foreground">{{ rec.detail }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-muted-foreground">Generate suggestions to see where you could consolidate vendors, drop unused licences or renegotiate before a renewal.</p>
     {% endif %}
+  {% endcall %}
+  </div>
+{% endif %}
 </div>
-
-<script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 {% endblock %}

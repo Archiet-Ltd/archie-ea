@@ -103,6 +103,8 @@ else:
 
 
 class Config:
+    # Vendor detection reads the public DNS records of an organisation's own website domain.
+    VENDOR_DNS_LOOKUPS = True
     # Webhook and compliance-check URLs may point at loopback/private hosts only
     # where this is True. It is False everywhere by default; Development and
     # Testing can opt in with the environment variable of the same name. No
@@ -136,6 +138,16 @@ class Config:
             "for this session. Sessions will NOT persist across restarts. "
             "Set SECRET_KEY in your .env file for production use."
         )
+    # The Entelim GitHub App: lets a person connect GitHub with one click
+    # instead of pasting a token. All three must be set for the one-click
+    # button to appear; with any unset, the connect pages fall back to the
+    # token form, which always works. The id and slug are not secret; the
+    # private key is a file path, never the key's contents.
+    GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID", "")
+    GITHUB_APP_SLUG = os.environ.get("GITHUB_APP_SLUG", "")
+    GITHUB_APP_PRIVATE_KEY_PATH = os.environ.get("GITHUB_APP_PRIVATE_KEY_PATH", "")
+    GITHUB_APP_CLIENT_ID = os.environ.get("GITHUB_APP_CLIENT_ID", "")
+    GITHUB_APP_CLIENT_SECRET = os.environ.get("GITHUB_APP_CLIENT_SECRET", "")
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     # Separate from SECRET_KEY so database command capabilities can be rotated
     # without invalidating sessions. This value is shared only by the schema
@@ -582,6 +594,8 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    # Tests use recorded DNS answers, never live lookups.
+    VENDOR_DNS_LOOKUPS = False
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
         "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
     ).lower() in ("1", "true", "yes")
@@ -606,8 +620,11 @@ class TestingConfig(Config):
     # design (it must not silently store a credential in plaintext). Generated
     # at import time rather than a literal, so nothing here reads as a real key.
     from cryptography.fernet import Fernet as _Fernet
-    CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
-    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
+    # A key set in the environment wins, so a preview server and the scripts
+    # that connect a source to it (or several worker processes) share one
+    # vault key; without one, each process gets its own generated key.
+    CREDENTIAL_ENCRYPTION_KEY = os.environ.get("CREDENTIAL_ENCRYPTION_KEY") or _Fernet.generate_key().decode()
+    ORG_ENCRYPTION_MASTER_KEY = os.environ.get("ORG_ENCRYPTION_MASTER_KEY") or _Fernet.generate_key().decode()
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per
