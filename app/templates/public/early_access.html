@@ -37,7 +37,7 @@
         {{ ui.input(id='early-access-email', name='email', type='email', required=true, autocomplete='email') }}
       {% endcall %}
       {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
-        {{ ui.checkbox(id='early-access-consent', name='consent', value='1', required=true) }}
+        {{ ui.input(id='early-access-consent', name='consent', type='checkbox', value='1', required=true, class='mt-0.5 h-4 w-4 shrink-0 p-0 accent-primary') }}
         {{ ui.field_label(text='Used to tell you when this becomes available, and for nothing else.', attrs={'for': 'early-access-consent'}) }}
       {% endcall %}
       {{ ui.button(text='Join the waiting list', type='submit', attrs={'data-testid': 'early-access-submit'}) }}
