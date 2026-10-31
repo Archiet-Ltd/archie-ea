@@ -79,3 +79,34 @@ def test_the_run_cost_the_list_and_the_record_state_one_figure_with_its_source(b
         _shot(page, "record", viewport["width"], "dark")
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
+def test_an_architect_who_may_not_see_spend_is_shown_no_cost_on_any_of_the_three_screens(browser, live_server, demo_org, viewport):  # noqa: F811
+    context, page = _page(browser, viewport)
+    money = re.compile(r"[£$€]\s?\d")
+    try:
+        _login(page, live_server, demo_org["architect"])
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="overview-dashboard"]')).to_be_visible()
+        assert page.locator('[data-testid="card-run-cost-value"]').count() == 0
+        assert not money.search(page.locator('[data-testid="overview-dashboard"]').inner_text())
+        _shot(page, "architect-overview", viewport["width"])
+
+        page.goto(live_server + "/applications/?page_size=100", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        link = page.locator('[data-testid^="app-row-"] a[href*="/applications/"]:visible, '
+                            '[data-testid^="mobile-card-"] a[href*="/applications/"]:visible').first
+        expect(link).to_be_visible()
+        assert page.locator('[data-testid^="app-cost-"]').count() == 0
+        assert not money.search(page.locator("main").inner_text())
+        _shot(page, "architect-applications", viewport["width"])
+
+        link.click()
+        page.wait_for_url(re.compile(r"/applications/\d+"), timeout=PAGE_TIMEOUT)
+        page.goto(page.url.split("?")[0] + "?tab=cost", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        assert page.locator('[data-testid="annual-cost-value"]').count() == 0
+        assert not money.search(page.locator("main").inner_text())
+        assert page.locator("main").inner_text().strip()
+        _shot(page, "architect-record", viewport["width"])
+    finally:
+        context.close()

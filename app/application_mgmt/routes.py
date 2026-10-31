@@ -2227,6 +2227,9 @@ def render_application_detail(id):
         value = getattr(app_obj, attr, None)
         return None if value is None else float(value) * scale
 
+    from flask_login import current_user as _viewer
+    from app.decorators.requires_role import may_see_spend_pages
+
     cost_breakdown = {
         "license_annual": _recorded("license_cost_annual"),
         "infrastructure_monthly": _recorded("infrastructure_cost_monthly"),
@@ -2237,6 +2240,9 @@ def render_application_detail(id):
         "annual_cost": annual_cost["value"],
         "annual_cost_source": annual_cost["source"],
     }
+    if not may_see_spend_pages(_viewer):
+        # The one cost-visibility rule: a role that may not see spend is shown no figure on the record.
+        cost_breakdown = dict.fromkeys(cost_breakdown)
 
     health_metrics = {
         "monitoring_enabled": getattr(app_obj, "monitoring_enabled", False),  # model-safety-ok
