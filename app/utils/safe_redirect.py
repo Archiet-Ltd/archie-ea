@@ -15,7 +15,8 @@ path - rather than a list of the tricks known today.
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
+import posixpath
+from urllib.parse import unquote, urlparse
 
 __all__ = ["is_safe_next_url", "safe_next_url"]
 
@@ -44,6 +45,19 @@ def is_safe_next_url(candidate: str | None) -> bool:
 
     parsed = urlparse(cleaned)
     if parsed.scheme or parsed.netloc:
+        return False
+
+    # The connector's OAuth area is reachable through a sign-in only at its authorise step. Decode
+    # and normalise the path first so an encoded or dot-segment path cannot reach another endpoint.
+    decoded = unquote(unquote(parsed.path))
+    if "\\" in decoded:
+        return False
+    normalised = posixpath.normpath(decoded)
+    if parsed.path.lower().startswith("/oauth") and (".." in decoded.split("/") or decoded != parsed.path):
+        return False
+    if normalised.lower().startswith("/oauth") and (
+        normalised != "/oauth/authorize" or decoded != normalised
+    ):
         return False
 
     # Anything that is not rooted could still be relative to the current path,
