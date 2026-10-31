@@ -33,13 +33,17 @@ class TenantParentMismatch(ValueError):
     """A new row would link to a parent record owned by a different organisation."""
 
 
-def organization_from_parent(session, obj, include_actors=True):
+def organization_from_parent(session, obj, include_actors=True, refuse_unseen=False):
     """The organisation that owns the record ``obj`` hangs from, or None.
 
     A model names its parents in ``__tenant_parent__``, a tuple of ``(attribute, parent_table)``
     pairs tried in order: ``(("solution_id", "solutions"),)`` says "my organisation is my
     solution's". Used when nothing signed in supplies one, so a background job or a seeder that
     creates a child row cannot leave it unowned (and, once the table is fenced, cannot fail on it).
+
+    With ``refuse_unseen`` a parent id that names no row this session can read raises
+    TenantParentMismatch. Under row-level security another organisation's parent is invisible, so
+    "not found" is exactly what a foreign parent looks like and must never count as no evidence.
     """
     for attribute, parent_table in getattr(type(obj), "__tenant_parent__", ()):
         if parent_table == "users" and not include_actors:
@@ -48,12 +52,19 @@ def organization_from_parent(session, obj, include_actors=True):
         if parent_id is None:
             continue
         with session.no_autoflush:
-            found = session.execute(
+            row = session.execute(
                 text(f'SELECT organization_id FROM "{parent_table}" WHERE id = :id'),  # nosec B608 - literal table name from the model
                 {"id": parent_id},
-            ).scalar()
-        if found is not None:
-            return found
+            ).first()
+        if row is None:
+            if refuse_unseen:
+                raise TenantParentMismatch(
+                    f"{type(obj).__name__} names {parent_table} record {parent_id}, "
+                    "which this organisation cannot see"
+                )
+            continue
+        if row[0] is not None:
+            return row[0]
     return None
 
 
@@ -234,8 +245,13 @@ def install_tenant_filter(app):
                 continue
             named = getattr(obj, "organization_id", None)
             # The row belongs to the organisation that owns the parent record it hangs from.
-            derived = organization_from_parent(session, obj, include_actors=(named or org_id) is None)
             owner = named if named is not None else org_id
+            derived = organization_from_parent(
+                session,
+                obj,
+                include_actors=(named or org_id) is None,
+                refuse_unseen=owner is not None,
+            )
             if derived is not None and owner is not None and derived != owner:
                 # Never let a signed-in or a named organisation win over a parent that belongs to
                 # another company: the child would link to a record that is not theirs.
