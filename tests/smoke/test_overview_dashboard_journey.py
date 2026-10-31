@@ -345,6 +345,66 @@ def test_a_new_company_counts_model_records_never_its_own_account(browser, live_
         purge_org(org_id)
 
 
+def _history_rows(org_id):
+    """(table, action) of every model-record change-history row this organisation has, oldest first."""
+    from app import create_app, db
+    from app.models.audit_log import AuditLog
+    from app.modules.dashboard.services.overview_figures import model_record_tables
+
+    app = create_app("testing")
+    with app.app_context():
+        rows = db.session.execute(
+            db.select(AuditLog.table_name, AuditLog.action).where(AuditLog.organization_id == org_id)
+            .order_by(AuditLog.id)
+        ).all()
+        db.session.remove()
+        return [tuple(r) for r in rows if r[0] in model_record_tables()]
+
+
+@pytest.mark.parametrize("viewport,theme", [(FOLD, "light"), (PHONE, "dark")], ids=["1440-light", "390-dark"])
+def test_a_new_company_counts_an_application_added_by_hand_once(browser, live_server, viewport, theme):
+    """One application added through the Systems list is one record on every Overview figure.
+
+    The application also writes its ArchiMate element in the same request; the Overview reads the
+    pair as the one action it was. The change history itself still holds both rows.
+    """
+    email, org_id = _empty_organisation_user(live_server)
+    context, page = _page(browser, viewport)
+    try:
+        _open(page, live_server, email)
+        page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("btn-add-application").click()
+        dialog = page.locator("#modal-create")
+        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+        dialog.locator("#ca-name").fill("Ledger Core")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            dialog.get_by_role("button", name="Add Application", exact=True).click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        tables = [t for t, _ in _history_rows(org_id)]
+        assert "application_component" in tables and "archimate_elements" in tables, tables  # the history keeps both
+
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        chart = page.locator('[data-testid="activity-chart"]')
+        for key in ("7d", "30d", "90d"):
+            total = chart.locator('[data-testid="activity-total-%s"]' % key)
+            assert _int(total.inner_text()) == 1, (key, chart.inner_text())
+        by_hand = chart.locator('[data-testid="activity-summary-7d"] span.text-xl').nth(1)
+        assert _int(by_hand.inner_text()) == 1, chart.inner_text()
+        year = page.locator('[data-testid="year-card"]')
+        assert _int(year.locator('[data-testid="year-value"]').first.inner_text()) == 1, year.inner_text()
+        recent = page.locator('[data-testid="recent-changes"]')
+        assert recent.locator('[role="listitem"]').count() == 1, recent.inner_text()
+        assert "Ledger Core" in recent.inner_text()
+        week = page.get_by_text("Changes this week", exact=True).locator("xpath=ancestor::*[@data-slot='card'][1]")
+        added = week.get_by_text("Added", exact=True).locator("xpath=ancestor::*[@role='listitem'][1]")
+        assert _int(added.inner_text()) == 1, week.inner_text()
+        _shot(page, "b-overview-one-application", viewport["width"], theme)
+    finally:
+        context.close()
+        purge_org(org_id)
+
+
 # ---- the chart, the select, the money, the year card, the facts card and the dark welcome card ----
 
 BARS = "svg .recharts-bar-rectangle"

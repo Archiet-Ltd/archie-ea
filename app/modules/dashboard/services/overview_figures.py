@@ -40,6 +40,42 @@ def model_record_tables():
     return frozenset(AUDITED_TABLES) - ACCOUNT_TABLES
 
 
+def fold_paired_element_rows(org_id, changes):
+    """One action by a person is one record: drop the element row written in the same request as its application.
+
+    Adding an application writes two change-history rows, the application and the ArchiMate element created
+    with it. The element row is folded into the application's row when it is a create by the same actor in the
+    same request (same correlation id) and the application's element reference points at it. An element a
+    person adds on their own, a relationship, or an element linked to an application from another request still
+    counts once each. Only the Overview's reading changes; the change history keeps every row.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    app_rows = [c for c in changes if c.table_name == "application_component" and c.action == "insert"]
+    if not app_rows:
+        return changes
+    ids = {c.record_id for c in app_rows}
+    linked = dict(
+        db.session.execute(
+            db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.id.in_(ids), ApplicationComponent.organization_id == org_id
+            )
+        ).all()
+    )
+    paired = set()
+    for c in app_rows:
+        element_id = (c.snapshot or {}).get("archimate_element_id") or linked.get(c.record_id)
+        if element_id is not None and c.correlation_id is not None:
+            paired.add((c.changed_by_id, c.correlation_id, element_id))
+    return [
+        c for c in changes
+        if not (
+            c.table_name == "archimate_elements" and c.action == "insert"
+            and (c.changed_by_id, c.correlation_id, c.record_id) in paired
+        )
+    ]
+
+
 def _currency():
     """The organisation's currency symbol and whether it comes before the amount."""
     from flask import has_request_context
@@ -279,7 +315,8 @@ def _history(org_id, now):
     start = datetime(now.year - 1, 1, 1)
     try:
         tables = model_record_tables()
-        return [c for c in HistoryService(db.session, org_id).difference(start, now).changes if c.table_name in tables]
+        changes = [c for c in HistoryService(db.session, org_id).difference(start, now).changes if c.table_name in tables]
+        return fold_paired_element_rows(org_id, changes)
     except Exception:
         db.session.rollback()
         logger.exception("overview: change history could not be read")
