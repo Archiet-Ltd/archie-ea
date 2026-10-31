@@ -1366,6 +1366,12 @@ def settings():
     return render_template("settings/index.html")
 
 
+def _settings_org_id():
+    from flask import g
+
+    return getattr(g, "current_org_id", None) or current_user.organization_id
+
+
 @main.route("/api/system-settings", methods=["GET"])
 @login_required
 # system_settings is a GLOBAL table with no organization_id, so this is not
@@ -1398,7 +1404,18 @@ def get_system_settings():
             except (ValueError, TypeError):
                 return v
 
-        result = {row[0]: _parse(row[1]) for row in rows}
+        # Keys of the form "org:<id>:<name>" belong to one organisation each and
+        # data-encryption was a switch with no implementation: neither is part
+        # of the platform-wide answer. The signed-in administrator's own
+        # organisation supplies the sign-in switches.
+        result = {
+            row[0]: _parse(row[1])
+            for row in rows
+            if not row[0].startswith("org:") and row[0] != "data-encryption"
+        }
+        from app.services import org_security
+
+        result.update(org_security.read_all(_settings_org_id()))
         return jsonify({"settings": result, "status": "ok"})
     except Exception as e:
         current_app.logger.exception(f"Error loading system settings: {e}")
@@ -1439,7 +1456,16 @@ def save_system_settings():
                 "fields": blank,
             }), 400
 
+        from app.services import org_security
+
+        org_error = org_security.validate_and_store(_settings_org_id(), settings_data)
+        if org_error:
+            db.session.rollback()
+            return jsonify({"status": "error", "message": org_error, "fields": [org_security.ADDRESS_LIST]}), 400
+
         for key, value in settings_data.items():
+            if key in org_security.ORG_KEYS or key == "data-encryption":
+                continue
             db.session.execute(
                 db.text(
                     "INSERT INTO system_settings (key, value, updated_at) "

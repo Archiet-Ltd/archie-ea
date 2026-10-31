@@ -63,7 +63,11 @@ def required_for(user) -> bool:
         or rbac_service.is_org_admin_anywhere(user)
     )
     if not is_admin:
-        return False
+        # An organisation's two-factor switch (Settings, Security) requires a
+        # code from every member of that organisation.
+        from app.services import org_security
+
+        return org_security.two_factor_required_for(user) and not _admin_mfa_bypass_active()
     return not _admin_mfa_bypass_active()
 
 
