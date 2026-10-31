@@ -353,11 +353,15 @@ def _delete_mirror_archimate_element(element_id):
     (a diagram node, a parent link) still holds a foreign key, the delete fails
     inside its SAVEPOINT and is *reported* rather than cascaded through.
 
+    ``element_id`` may also be a list of ids, which are removed together in one savepoint.
+
     Returns ``{"elements_deleted": int, "relationships_deleted": int,
     "errors": [str]}``. Never raises.
     """
     result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": []}
-    if not element_id:
+    element_ids = list(element_id) if isinstance(element_id, (list, tuple, set, frozenset)) else [element_id]
+    element_ids = [i for i in element_ids if i]
+    if not element_ids:
         return result
 
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
@@ -369,15 +373,15 @@ def _delete_mirror_archimate_element(element_id):
         # Tenant-filtered by do_orm_execute inside a request.
         relationships = ArchiMateRelationship.query.filter(
             db.or_(
-                ArchiMateRelationship.source_id == element_id,
-                ArchiMateRelationship.target_id == element_id,
+                ArchiMateRelationship.source_id.in_(element_ids),
+                ArchiMateRelationship.target_id.in_(element_ids),
             )
         ).all()
         for relationship in relationships:
             db.session.delete(relationship)
         db.session.flush()
         result["relationships_deleted"] = len(relationships)
-        elements = ArchiMateElement.query.filter(ArchiMateElement.id == element_id).all()
+        elements = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
         for element in elements:
             db.session.delete(element)
         db.session.flush()
@@ -388,7 +392,7 @@ def _delete_mirror_archimate_element(element_id):
         result["relationships_deleted"] = 0
         result["elements_deleted"] = 0
         result["errors"].append(
-            f"ArchiMate element {element_id} could not be removed "
+            f"ArchiMate element(s) {element_ids} could not be removed "
             f"({exc.__class__.__name__}); it is still referenced elsewhere"
         )
         logger.warning(

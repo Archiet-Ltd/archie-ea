@@ -833,7 +833,9 @@ def _remove_unchanged_elements(org_id: int, mirrored) -> None:
             unchanged.append(element)
     if not unchanged:
         return
-    for element in unchanged:
-        outcome = _delete_mirror_archimate_element(element.id)
-        for problem in outcome["errors"]:
-            _log.warning("%s (organisation %s)", problem, org_id)
+    outcome = _delete_mirror_archimate_element([element.id for element in unchanged])
+    if outcome["errors"]:
+        # One element something else still refers to must not keep the others; take them one at a time.
+        for element in unchanged:
+            for problem in _delete_mirror_archimate_element(element.id)["errors"]:
+                _log.warning("%s (organisation %s)", problem, org_id)

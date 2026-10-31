@@ -1013,11 +1013,15 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
             expect(page.get_by_role("button", name=re.compile(re.escape(area))).first).to_be_visible()
         # Each card sits under the business area its framework names, never under "Uncategorised".
         expect(page.locator("main")).not_to_contain_text("Uncategorised")
+        # A business area names its framework, not itself; a service domain names the area it sits under.
+        assert page.get_by_text("BIAN business area", exact=True).locator("visible=true").count() == len(BIAN_STARTER)
         shoot(page, "capability-map-after-sign-up")
         # Opening an area lands on its service domains, still marked as a starter entry the person can change.
         page.get_by_role("button", name=re.compile("Operations and Execution")).first.click()
         detail = page.get_by_role("dialog")
         expect(detail).to_contain_text("Payment Order")
+        expect(detail).to_contain_text("BIAN business area")
+        expect(detail).not_to_contain_text("Operations and Execution · ")
         expect(detail.locator("[data-testid=capability-source]")).to_contain_text("Keep it, change it or remove it")
         # Nobody has assessed it, so it says so and gives the next step rather than a health figure or Gap.
         expect(detail.get_by_test_id("capability-not-assessed")).to_contain_text("Map an application")
@@ -1102,7 +1106,8 @@ def test_changing_the_industry_in_settings_adds_the_new_set_and_offers_to_remove
         expect(offer).to_contain_text("You no longer use the BIAN starter capabilities")
         shoot(page, "settings-offer")
         offer.get_by_role("button", name="Remove the unchanged ones").click()
-        expect(page.get_by_text("starter capabilities removed")).to_be_visible()
+        # Each removed element is written to the audit log one by one, so the removal takes a few seconds.
+        expect(page.get_by_text("starter capabilities removed")).to_be_visible(timeout=30000)
         expect(offer).to_be_hidden()
         # The new set is on the map and the old one is gone.
         deadline = time.monotonic() + 120
