@@ -23,12 +23,13 @@ _log = logging.getLogger(__name__)
 
 GITHUB_TASK = "onboarding_github_import"
 JIRA_TASK = "onboarding_jira_import"
+STARTER_TASK = "onboarding_starter_data"
 WEBSITE_TASK = "website_profile_crawl"
 MORE_FACTS_LATER = "More facts will be added when our reading service is less busy."
 MORE_FACTS_FOLLOW = "More facts follow in a few minutes, as we finish working out what your pages say."
 
-# (key, label, starter capability model). The model is the one starter set the industry picks
-# later; this round only records the choice.
+# (key, label, starter capability model). The model is the starter set the industry loads into the
+# organisation's capability model (see load_starter_data).
 INDUSTRIES = (
     ("banking", "Banking and payments", "BIAN"),
     ("insurance", "Insurance", "APQC"),
@@ -42,17 +43,15 @@ INDUSTRIES = (
     ("other", "Something else", "APQC"),
 )
 
+# Only frameworks the product holds a catalogue of controls for are offered; one with no catalogue
+# would be a choice that does nothing. SAFe, TOGAF, ArchiMate, ITIL 4, COBIT 2019 and NIST CSF have
+# none today. The third column of FRAMEWORK_CATALOGUES is the code of the framework in the catalogue.
 FRAMEWORKS = (
     ("iso27001", "ISO 27001", "Information security management"),
     ("soc2", "SOC 2", "Trust services criteria for service providers"),
-    ("nistcsf", "NIST CSF", "Cybersecurity risk management"),
     ("gdpr", "GDPR", "Personal data protection in the EU"),
-    ("safe", "SAFe", "Scaled agile delivery"),
-    ("togaf", "TOGAF", "Enterprise architecture method"),
-    ("archimate", "ArchiMate", "Enterprise architecture modelling language"),
-    ("itil4", "ITIL 4", "IT service management"),
-    ("cobit2019", "COBIT 2019", "IT governance"),
 )
+FRAMEWORK_CATALOGUES = {"iso27001": "ISO - 27001", "soc2": "SOC-2", "gdpr": "GDPR"}
 
 KINDS = (("startup", "Startup"), ("scaleup", "Scale-up"), ("enterprise", "Enterprise"))
 
@@ -74,7 +73,7 @@ FRAMEWORKS_FOR_KIND = {
 def suggested_frameworks(kind: Optional[str], goal: Optional[str]) -> List[str]:
     """The framework keys worth offering for this goal and company kind, goal first."""
     keys = list(FRAMEWORKS_FOR_GOAL.get(goal or "understand", ())) + list(FRAMEWORKS_FOR_KIND.get(kind or "startup", ()))
-    return list(dict.fromkeys(keys))
+    return [key for key in dict.fromkeys(keys) if key in _FRAMEWORK_KEYS]
 
 
 _KIND_KEYS = {key for key, _label in KINDS}
@@ -114,6 +113,7 @@ def settings_card(org) -> Dict[str, Any]:
 
     return {
         "kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org),
+        "removable": removable_starter_rows(org),
         "profile": confirm.profile_entries(org),
         "company_name": public_signals.company_name(org),
         "signals": public_signals.signals_for_profile(org.id), "signals_state": public_signals.refresh_state(org),
@@ -141,7 +141,22 @@ def save_choices(
     context["frameworks"] = wanted
     _write(org, "company_context", context)
     db.session.commit()
+    if industry or wanted:
+        _queue_starter_data(org.id)
     return choices(org)
+
+
+def _queue_starter_data(org_id: int) -> None:
+    """Load what the choices name in the background. A queue that is down never stops the person moving on."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    try:
+        get_job_queue_service().create_job(
+            "Starter model and frameworks", STARTER_TASK, {}, organization_id=org_id
+        )
+    except Exception:
+        db.session.rollback()
+        _log.warning("could not queue the starter data for organisation %s", org_id, exc_info=True)
 
 
 def normalise_website(raw: Optional[str]) -> Optional[str]:
@@ -530,3 +545,297 @@ def own_key_provider() -> Optional[str]:
         APISettings.provider.in_([p for p, _ in PROVIDERS]), APISettings.enabled.is_(True)
     ).first()
     return dict(PROVIDERS).get(row.provider) if row else None
+
+
+# --------------------------------------------------------------------------------------------- #
+# Starter data: the capability model the industry names and the catalogues of the frameworks      #
+# --------------------------------------------------------------------------------------------- #
+
+
+def _refresh_capability_map(org_id: int) -> None:
+    """The capability map keeps an organisation's hierarchy for a few minutes; drop it so a change shows at once."""
+    from app.extensions.cache import invalidate_cache
+
+    try:
+        invalidate_cache("capability_map:*:%s" % org_id)
+    except Exception:
+        _log.warning("could not refresh the capability map for organisation %s", org_id, exc_info=True)
+
+
+def _mark_elements_as_starter(org_id: int) -> None:
+    """The model elements mirrored from starter capabilities and adopted controls say they are starter elements,
+    so the overview does not mistake them for what the person brought."""
+    db.session.execute(
+        db.text(
+            "UPDATE archimate_elements SET source_kind = 'starter' "
+            "WHERE organization_id = :org AND source_kind IS NULL AND id IN ("
+            " SELECT archimate_element_id FROM business_capability WHERE organization_id = :org"
+            "  AND discovery_source LIKE 'starter:%' AND archimate_element_id IS NOT NULL"
+            " UNION SELECT c.archimate_element_id FROM application_compliance_controls c"
+            "  JOIN framework_adoptions a ON a.id = c.adoption_id WHERE a.organization_id = :org"
+            "  AND c.organization_id = :org AND a.source LIKE 'starter:%' AND c.archimate_element_id IS NOT NULL)"
+        ),
+        {"org": org_id},
+    )
+    db.session.commit()
+
+
+def _starter_source(model: str) -> str:
+    return "starter:%s" % model
+
+
+def _starter_model(industry: Optional[str]) -> Optional[str]:
+    return next((model for key, _label, model in INDUSTRIES if key == industry), None)
+
+
+def _bian_entries() -> List[Dict[str, Any]]:
+    """(name, description, level, parent name, domain) for each BIAN starter capability, parents first."""
+    from app.seed_data.bian_starter import BIAN_AREA_CODES, BIAN_STARTER
+
+    entries = []
+    for area, domains in BIAN_STARTER:
+        code = BIAN_AREA_CODES[area]
+        entries.append({"name": area, "description": None, "level": 1, "parent": None, "domain": area, "domain_code": code})
+        for name, description in domains:
+            entries.append(
+                {"name": name, "description": description, "level": 2, "parent": area, "domain": area, "domain_code": code}
+            )
+    return entries
+
+
+def _apqc_entries() -> List[Dict[str, Any]]:
+    """The APQC categories (level 1) and process groups (level 2), from the framework the product holds."""
+    from app.modules.industry_apqc.framework_data import CATEGORIES, PROCESS_GROUPS
+
+    categories = dict(CATEGORIES)
+    codes = {name: "APQC-%s" % code.split(".")[0] for code, name in CATEGORIES}
+    entries = [
+        {"name": name, "description": None, "level": 1, "parent": None, "domain": name, "domain_code": codes[name]}
+        for _code, name in CATEGORIES
+    ]
+    for code, name in PROCESS_GROUPS:
+        parent = categories[code.split(".")[0] + ".0"]
+        entries.append(
+            {"name": name, "description": None, "level": 2, "parent": parent, "domain": parent, "domain_code": codes[parent]}
+        )
+    return entries
+
+
+_ENTRIES = {"BIAN": _bian_entries, "APQC": _apqc_entries}
+
+
+def _load_capabilities(org_id: int, model: str) -> int:
+    """Add the starter capabilities of ``model`` the organisation does not have yet; returns how many were added.
+    A capability is the same one when its name, level and starter source are, so loading twice adds nothing."""
+    from app.models.business_capabilities import BusinessCapability
+
+    source = _starter_source(model)
+    have = {
+        (row.name, row.level): row.id
+        for row in BusinessCapability.query.filter_by(organization_id=org_id, discovery_source=source).all()
+    }
+    added = 0
+    for entry in _ENTRIES[model]():
+        key = (entry["name"], entry["level"])
+        if key in have:
+            continue
+        parent_id = have.get((entry["parent"], entry["level"] - 1)) if entry["parent"] else None
+        row = BusinessCapability(
+            organization_id=org_id, name=entry["name"], description=entry["description"], level=entry["level"],
+            business_domain=entry["domain"], parent_capability_id=parent_id, discovery_source=source,
+        )
+        db.session.add(row)
+        db.session.flush()
+        have[key] = row.id
+        added += 1
+    return added
+
+
+def _insert_domain(code: str, name: str):
+    from sqlalchemy.dialects.postgresql import insert
+
+    from app.models.unified_capability import BusinessDomain
+
+    return insert(BusinessDomain.__table__).values(code=code, name=name).on_conflict_do_nothing(index_elements=["code"])
+
+
+def _shared_domain(code: str, name: str):
+    """The shared domain row for a framework item's stable code, created if it is not there yet. The insert
+    does nothing when the code exists, so two organisations loading at once end up with one row."""
+    from app.models.unified_capability import BusinessDomain
+
+    db.session.execute(_insert_domain(code, name))
+    return BusinessDomain.query.filter_by(code=code).one()
+
+
+def _place_on_the_map(org_id: int, model: str) -> None:
+    """Give the map rows projected from this organisation's starter capabilities the domain their framework
+    names (the BIAN business area, the APQC category), so no card reads Uncategorised."""
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    entries = {(e["name"], e["level"]): e for e in _ENTRIES[model]()}
+    domains: Dict[str, int] = {}
+    ids_by_domain: Dict[str, List[str]] = {}
+    for row in BusinessCapability.query.filter_by(organization_id=org_id, discovery_source=_starter_source(model)).all():
+        entry = entries.get((row.name, row.level))
+        if entry is None:
+            continue
+        if entry["domain_code"] not in domains:
+            domain = _shared_domain(entry["domain_code"], entry["domain"])
+            domains[entry["domain_code"]] = domain.id
+        ids_by_domain.setdefault(entry["domain_code"], []).append(str(row.id))
+    for code, source_ids in ids_by_domain.items():
+        UnifiedCapability.query.filter(
+            UnifiedCapability.organization_id == org_id,
+            UnifiedCapability.source_table == "business_capability",
+            UnifiedCapability.source_id.in_(source_ids),
+            UnifiedCapability.domain_id.is_(None),
+        ).update({"domain_id": domains[code]}, synchronize_session=False)
+    db.session.commit()
+
+
+def _adopt_frameworks(org_id: int, keys: List[str]) -> int:
+    """Adopt each chosen framework that has a catalogue and is not adopted yet; returns how many were adopted."""
+    from app.models.compliance_models import RegulatoryFramework
+    from app.models.regulatory_framework import FrameworkAdoption
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+    from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+
+    codes = [FRAMEWORK_CATALOGUES[key] for key in keys if key in FRAMEWORK_CATALOGUES]
+    if not codes:
+        return 0
+    RegulatoryFrameworkService.seed_manufacturing_frameworks(codes=set(codes))
+    adopted = 0
+    for key in keys:
+        code = FRAMEWORK_CATALOGUES.get(key)
+        framework = RegulatoryFramework.query.filter_by(code=code).first() if code else None
+        if framework is None:
+            continue
+        if FrameworkAdoption.query.filter_by(organization_id=org_id, framework_id=framework.id).first():
+            continue
+        ApplicabilityService.adopt_framework(
+            org_id, framework.id, adopted_by_id=None,
+            source="starter:%s" % dict((k, label) for k, label, _n in FRAMEWORKS)[key],
+        )
+        adopted += 1
+    return adopted
+
+
+def run_starter_data(org_id: int) -> Dict[str, Any]:
+    """Load, for one organisation, the capability model its industry names and the catalogues of the
+    frameworks it chose. Safe to run again: whatever is there already is left alone."""
+    from app.models.organization import Organization
+
+    org = db.session.get(Organization, org_id)
+    if org is None:
+        raise ValueError("Organisation %s not found" % org_id)
+    chosen = choices(org)
+    model = _starter_model(chosen["industry"])
+    capabilities = _load_capabilities(org_id, model) if model else 0
+    db.session.commit()
+    if model:
+        _place_on_the_map(org_id, model)
+    _refresh_capability_map(org_id)
+    adopted = _adopt_frameworks(org_id, chosen["frameworks"])
+    _mark_elements_as_starter(org_id)
+    return {"success": True, "model": model, "capabilities_added": capabilities, "frameworks_adopted": adopted}
+
+
+def _unedited(row, entry: Dict[str, Any]) -> bool:
+    """A starter row nobody has changed: still the catalogue's name, text and level, with nothing recorded on it."""
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    if (row.description or None) != entry["description"] or row.business_domain != entry["domain"]:
+        return False
+    if any(getattr(row, field) is not None for field in ("business_owner", "it_owner", "current_maturity_level", "target_maturity_level", "strategic_importance")):
+        return False
+    return ApplicationCapabilityMapping.query.filter_by(business_capability_id=row.id).first() is None
+
+
+def _removable_rows(org_id: int, model: str):
+    """The starter rows of ``model`` that can go, deepest first: nobody has changed them and no row
+    that stays hangs under them."""
+    from app.models.business_capabilities import BusinessCapability
+
+    entries = {(e["name"], e["level"]): e for e in _ENTRIES[model]()}
+    everything = BusinessCapability.query.filter_by(organization_id=org_id).all()
+    children: Dict[int, List[Any]] = {}
+    for row in everything:
+        if row.parent_capability_id:
+            children.setdefault(row.parent_capability_id, []).append(row)
+    starter = [r for r in everything if r.discovery_source == _starter_source(model) and (r.name, r.level) in entries]
+    goes: Dict[int, bool] = {}
+    for row in sorted(starter, key=lambda r: -r.level):
+        goes[row.id] = _unedited(row, entries[(row.name, row.level)]) and all(
+            goes.get(child.id, False) for child in children.get(row.id, [])
+        )
+    return [row for row in sorted(starter, key=lambda r: -r.level) if goes[row.id]]
+
+
+def removable_starter_rows(org) -> List[Dict[str, Any]]:
+    """The starter models other than the one the industry now names that still have rows nobody changed:
+    what Settings offers to remove after the industry is changed."""
+    current = _starter_model(choices(org)["industry"])
+    offers = []
+    for model in _ENTRIES:
+        if model == current:
+            continue
+        count = len(_removable_rows(org.id, model))
+        if count:
+            offers.append({"model": model, "count": count})
+    return offers
+
+
+def remove_unedited_starter_rows(org, model: str) -> int:
+    """Remove the starter rows of ``model`` nobody changed, and keep any row that still has a changed
+    one under it. Returns how many were removed."""
+    if model not in _ENTRIES or model == _starter_model(choices(org)["industry"]):
+        raise ValueError("Choose a starter model you are no longer using.")
+    removed = 0
+    mirrored = []
+    for row in _removable_rows(org.id, model):
+        if row.archimate_element_id:
+            mirrored.append((row.archimate_element_id, row.name, row.description))
+        db.session.delete(row)
+        db.session.flush()
+        removed += 1
+    _remove_unchanged_elements(org.id, mirrored)
+    db.session.commit()
+    _refresh_capability_map(org.id)
+    return removed
+
+
+def _remove_unchanged_elements(org_id: int, mirrored) -> None:
+    """Remove the model elements mirrored from removed starter capabilities, unless somebody has changed one
+    or linked it to something. Each goes through the one element-removal helper, which deletes through the
+    session, so the audit log records every removed element."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.modules.applications.routes._helpers import _delete_mirror_archimate_element
+
+    if not mirrored:
+        return
+    wanted = {element_id: (name, description) for element_id, name, description in mirrored}
+    linked = set()
+    for source_id, target_id in db.session.query(ArchiMateRelationship.source_id, ArchiMateRelationship.target_id).filter(
+        db.or_(ArchiMateRelationship.source_id.in_(wanted), ArchiMateRelationship.target_id.in_(wanted))
+    ):
+        linked.update((source_id, target_id))
+    unchanged = []
+    for element in ArchiMateElement.query.filter(
+        ArchiMateElement.organization_id == org_id, ArchiMateElement.id.in_(wanted)
+    ).all():
+        name, description = wanted[element.id]
+        if (
+            element.source_kind == "starter" and element.name == name and element.id not in linked
+            and (element.description or None) in (description or None, "Business capability: %s" % name)
+        ):
+            unchanged.append(element)
+    if not unchanged:
+        return
+    outcome = _delete_mirror_archimate_element([element.id for element in unchanged])
+    if outcome["errors"]:
+        # One element something else still refers to must not keep the others; take them one at a time.
+        for element in unchanged:
+            for problem in _delete_mirror_archimate_element(element.id)["errors"]:
+                _log.warning("%s (organisation %s)", problem, org_id)
