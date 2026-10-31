@@ -7,6 +7,7 @@ check they share one count, then drive the real routes as signed-in people of tw
 """
 
 import inspect
+import os
 import uuid
 
 import pytest
@@ -16,7 +17,16 @@ from sqlalchemy import create_engine, text
 # Counters these tests create are found by the identity each one counts against: the documentation
 # addresses it uses, the name its decorated route counts under, and the ids it makes up. Nothing
 # else in the table is touched, so another run on the same database keeps its own counts.
-_OWN_COUNTER_FRAGMENTS = ["198.51.100.", "shared:route-test"]
+# The addresses are in one block no other process uses (named by this process's id), and the route
+# counter carries a token of its own.
+_BLOCK = "10.%d.%d" % ((os.getpid() >> 8) & 255, os.getpid() & 255)
+_TOKEN = uuid.uuid4().hex[:8]
+_ROUTE_KEY = "shared:route-test-" + _TOKEN
+_OWN_COUNTER_FRAGMENTS = [":" + _BLOCK + ".", _ROUTE_KEY]
+
+
+def _own(last):
+    return "%s.%s" % (_BLOCK, last)
 
 
 def _forget_own_counters(connection):
@@ -36,7 +46,9 @@ def counters(app):
     def wipe():
         with db.engine.begin() as connection:
             _forget_own_counters(connection)
-            connection.execute(text("DELETE FROM rate_limit_violations"))
+            connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+            connection.execute(text("DELETE FROM rate_limit_violations WHERE address LIKE :p"),
+                               {"p": _BLOCK + ".%"})
 
     # No application context is held open for the test: one would cache the signed-in user between
     # requests and key every sign-up by a different person.
@@ -80,7 +92,7 @@ def _refused(call):
 def test_the_route_decorator_shares_one_count_between_workers(app, counters):
     rate_limiter, pair = counters
 
-    @rate_limiter.rate_limit(4, "1m", key_func=lambda: "shared:" + "route-test")
+    @rate_limiter.rate_limit(4, "1m", key_func=lambda: _ROUTE_KEY)
     def view():
         return "ok"
 
@@ -93,7 +105,7 @@ def test_the_import_limiter_shares_one_count_between_workers(app, counters):
     from app.utils.import_rate_limiter import check_import_limit
 
     rate_limiter, pair = counters
-    with app.test_request_context("/import", environ_base={"REMOTE_ADDR": "198.51.100.7"}):
+    with app.test_request_context("/import", environ_base={"REMOTE_ADDR": _own(7)}):
         outcomes = _alternate(
             rate_limiter, pair, 5, lambda: check_import_limit(3, 100, 500)[0].allowed
         )
@@ -104,7 +116,7 @@ def test_the_import_limiter_honours_the_allowance_each_route_declares(app, count
     from app.utils.import_rate_limiter import check_import_limit
 
     rate_limiter, pair = counters
-    with app.test_request_context("/import", environ_base={"REMOTE_ADDR": "198.51.100.8"}):
+    with app.test_request_context("/import", environ_base={"REMOTE_ADDR": _own(8)}):
         rate_limiter._storage_override["storage"] = pair[0]
         verdicts = [check_import_limit(2, 100, 500)[0].allowed for _ in range(3)]
     assert verdicts == [True, True, False]
@@ -151,9 +163,9 @@ def test_the_sidebar_and_composer_limits_share_one_count_between_workers(app, co
 
         return action
 
-    with app.test_request_context("/api/sidebar/x", environ_base={"REMOTE_ADDR": "198.51.100.9"}):
+    with app.test_request_context("/api/sidebar/x", environ_base={"REMOTE_ADDR": _own(9)}):
         assert _alternate(rate_limiter, pair, 5, status(sidebar)) == [200, 200, 200, 429, 429]
-    with app.test_request_context("/composer", environ_base={"REMOTE_ADDR": "198.51.100.10"}):
+    with app.test_request_context("/composer", environ_base={"REMOTE_ADDR": _own(10)}):
         assert _alternate(rate_limiter, pair, 12, status(composer)) == [200] * 10 + [429, 429]
 
 
@@ -219,10 +231,12 @@ def test_an_import_burst_is_refused_plainly_with_the_allowance_in_headers(app, c
     member_a, member_b = two_members
     client_a, client_b = app.test_client(), app.test_client()
     rule = next(r for r in app.url_map.iter_rules() if r.rule.endswith("/analyze-import-stream") and "POST" in r.methods)
+    # The address is counted too (repeated refusals block it), so this run uses one of its own.
+    environ = {"REMOTE_ADDR": _own(31)}
     seen = []
     for _ in range(7):
         login_as(client_a, member_a)
-        seen.append(client_a.post(rule.rule, data={}))
+        seen.append(client_a.post(rule.rule, data={}, environ_overrides=environ))
     codes = [response.status_code for response in seen]
     assert 429 not in codes[:5] and codes[5:] == [429, 429], codes
     refused = seen[5]
@@ -231,7 +245,7 @@ def test_an_import_burst_is_refused_plainly_with_the_allowance_in_headers(app, c
     body = refused.get_json()
     assert body["success"] is False and "Too many imports" in body["error"] and "Try again in" in body["error"]
     login_as(client_b, member_b)
-    assert client_b.post(rule.rule, data={}).status_code != 429
+    assert client_b.post(rule.rule, data={}, environ_overrides=environ).status_code != 429
 
 
 # ---- sign-up ------------------------------------------------------------------------------------
@@ -266,7 +280,7 @@ def _signup_form(email):
 def test_the_sixth_sign_up_from_one_address_is_refused_and_creates_no_user(app, counters, signed_up_cleanup):
     from app import db
 
-    environ = {"REMOTE_ADDR": "198.51.100.%d" % (20 + uuid.uuid4().int % 200)}
+    environ = {"REMOTE_ADDR": _own(20 + uuid.uuid4().int % 200)}
     tag = uuid.uuid4().hex[:8]
     emails = ["signup-limit-%s-%02d@example.com" % (tag, n) for n in range(40)]
     responses = []
@@ -287,7 +301,7 @@ def test_the_sixth_sign_up_from_one_address_is_refused_and_creates_no_user(app, 
 
 
 def test_the_refusal_page_offers_a_signed_out_visitor_sign_in_not_the_dashboard(app, counters):
-    environ = {"REMOTE_ADDR": "198.51.100.%d" % (20 + uuid.uuid4().int % 200)}
+    environ = {"REMOTE_ADDR": _own(20 + uuid.uuid4().int % 200)}
     tag = uuid.uuid4().hex[:8]
     for n in range(5):
         app.test_client().post("/account/register", data=_signup_form("signup-limit-%s-%d@example.com" % (tag, n)),
