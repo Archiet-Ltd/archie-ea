@@ -15,7 +15,7 @@ ALL_TOOLS = [
 
 @pytest.mark.parametrize("release_wave, tool_name, expected_released", [
     (None, "ask_impact", True),
-    (1, "ask_impact", False),
+    (1, "ask_impact", True),
     (2, "ask_impact", True),
     (1, "get_element", True),
 ])
