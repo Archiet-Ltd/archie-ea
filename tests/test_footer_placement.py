@@ -109,7 +109,7 @@ def test_footer_ends_the_page_content_on_every_sidebar_page(
         ("platform_admin", "/applications/"),
         ("platform_admin", "/arb/"),
         ("platform_admin", "/procurement/compliance"),
-        ("platform_admin", "/dashboard/applications/vendors"),
+        ("platform_admin", "/applications/vendors"),  # the retired /dashboard/applications/vendors redirects here
         ("platform_admin", "/enterprise/requirements-backlog"),
         ("platform_admin", "/capability-map/"),
     ]

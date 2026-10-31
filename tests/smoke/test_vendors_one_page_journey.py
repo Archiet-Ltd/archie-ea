@@ -7,6 +7,7 @@ status, and opens Edit on a row. The count agrees with the vendor the Spend page
 names and with the AI chat's vendors link, and never includes the other
 organisation's vendor.
 """
+import os
 import re
 import uuid
 from datetime import date, timedelta
@@ -98,6 +99,10 @@ def test_administrator_reads_one_vendors_page_with_only_their_vendors(browser, l
         expect(page.get_by_test_id("vendor-row")).to_have_count(1, timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("vendor-row").first).to_contain_text(me["vendors"][0][0])
 
+        shots = os.environ.get("VENDOR_SHOTS_DIR")
+        if shots:
+            page.screenshot(path="%s/a-vendors-filtered-%s-1440-light.png" % (shots, key), full_page=True)
+
         # Edit opens on a page with the vendor's own name in the form.
         row = page.get_by_test_id("vendor-row").first
         row.get_by_role("button", name=re.compile("Actions for")).click()
@@ -122,5 +127,7 @@ def test_administrator_reads_one_vendors_page_with_only_their_vendors(browser, l
         page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
         page.evaluate("document.documentElement.classList.add('dark')")
         expect(page.get_by_test_id("vendor-row").first).to_be_visible()
+        if shots:
+            page.screenshot(path="%s/a-vendors-%s-390-dark.png" % (shots, key), full_page=True)
     finally:
         page.close()

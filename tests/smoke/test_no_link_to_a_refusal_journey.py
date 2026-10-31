@@ -184,7 +184,9 @@ def test_architect_is_offered_and_can_use_model_changing_controls(page, live_ser
     assert "Only a platform administrator can add the default workflows" in reason
     assert page.get_by_role("button", name="Seed Defaults").is_disabled()
     page.goto(live_server + "/dashboard/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert page.locator("#add-vendor-reason").inner_text().startswith("Only a platform administrator")
+    # The retired vendor list redirects to the one Vendors page, which opens with content for this person.
+    assert page.url.split("?")[0].rstrip("/").endswith("/applications/vendors"), page.url
+    assert page.get_by_role("heading", name="Vendors").first.is_visible()
 
 
 def test_architect_opens_the_solution_and_its_seven_sub_pages_with_content(page, live_server, demo):
