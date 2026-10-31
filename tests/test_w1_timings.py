@@ -147,3 +147,39 @@ def test_runner_writes_a_row_for_every_w1_route_per_persona(seeded_server):
     admin = {r["persona"]: r["status"] for r in parsed if r["route"] == "/admin/users"}
     assert admin["org_admin"] == "200"
     assert admin["invited_viewer"] == "403"
+
+
+class _Reply:
+    def __init__(self, status, retry_after=None):
+        self.status_code = status
+        self.url = "http://127.0.0.1/x"
+        self.headers = {"Retry-After": str(retry_after)} if retry_after is not None else {}
+
+
+class _Limited:
+    """A page that answers 429 for its first ``limited`` requests, then 200."""
+
+    def __init__(self, limited):
+        self.limited, self.calls = limited, 0
+
+    def get(self, url, timeout=0):
+        self.calls += 1
+        return _Reply(429, 7) if self.calls <= self.limited else _Reply(200)
+
+
+def test_a_rate_limited_answer_is_waited_out_and_asked_again_not_timed_as_the_page():
+    w1_timings = _load_runner()
+
+    waited = []
+    # the first request is the uncounted warm-up, so three limited answers are the warm-up and two timed asks
+    status, durations = w1_timings.time_route(_Limited(3), "http://127.0.0.1", "/pricing", 3, sleep=waited.append)
+    assert status == "200" and len(durations) == 3
+    assert waited == [7.0, 7.0], "it should wait the Retry-After the server gave, once per limited answer"
+
+
+def test_a_page_that_stays_limited_keeps_the_429_status_so_the_row_can_say_so():
+    w1_timings = _load_runner()
+
+    waited = []
+    status, durations = w1_timings.time_route(_Limited(10_000), "http://127.0.0.1", "/pricing", 1, sleep=waited.append)
+    assert status == "429" and len(waited) == w1_timings.RATE_LIMIT_RETRIES

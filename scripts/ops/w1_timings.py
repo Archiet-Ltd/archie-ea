@@ -208,20 +208,34 @@ def discover_samples(session, base_url: str, extra: dict[str, str]) -> w1_routes
     return w1_routes.Samples(found)
 
 
-def time_route(session, base_url: str, path: str, requests_per_route: int) -> tuple[str, list[float]]:
+RATE_LIMIT_RETRIES = 3
+RATE_LIMIT_MAX_WAIT = 65.0
+
+
+def time_route(session, base_url: str, path: str, requests_per_route: int, sleep=time.sleep) -> tuple[str, list[float]]:
+    """Time N GETs of a page. A 429 is the rate limiter answering, not the page, so it is waited out
+    (``Retry-After``, at most a minute) and asked again; the wait is not part of the timing. If the page is still
+    limited after the retries the status stays ``429`` and the caller says the timing is not the page's."""
     session.get(base_url + path, timeout=60)  # warm-up, not counted
     durations: list[float] = []
     status = "error"
     for _ in range(requests_per_route):
-        t0 = time.perf_counter()
-        try:
-            r = session.get(base_url + path, timeout=60)
-            status = str(r.status_code)
-            if "/account/login" in r.url and not path.startswith("/account/"):
-                status += " (sign-in)"
-        except Exception as exc:  # noqa: BLE001
-            status = type(exc).__name__
-        durations.append(time.perf_counter() - t0)
+        duration = 0.0
+        for attempt in range(RATE_LIMIT_RETRIES + 1):
+            t0 = time.perf_counter()
+            try:
+                r = session.get(base_url + path, timeout=60)
+                status = str(r.status_code)
+                if "/account/login" in r.url and not path.startswith("/account/"):
+                    status += " (sign-in)"
+            except Exception as exc:  # noqa: BLE001
+                status = type(exc).__name__
+                r = None
+            duration = time.perf_counter() - t0
+            if r is None or r.status_code != 429 or attempt == RATE_LIMIT_RETRIES:
+                break
+            sleep(min(float(r.headers.get("Retry-After", 30) or 30), RATE_LIMIT_MAX_WAIT))
+        durations.append(duration)
     return status, durations
 
 
@@ -245,6 +259,8 @@ def run(base_url: str, creds: dict[str, tuple[str, str, str | None]], extra_samp
                 row.update(status=status, requests=len(ms),
                            p50_ms="%.0f" % statistics.median(ms),
                            p95_ms="%.0f" % percentile(ms, 95), max_ms="%.0f" % max(ms))
+                if status == "429":
+                    row["note"] = "still rate limited after retries: these timings are the limiter's, not the page's"
             rows.append(row)
     return rows
 
