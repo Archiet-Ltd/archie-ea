@@ -1,8 +1,8 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
-{% from 'components/card.html' import card, card_content, card_header, card_title %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'basecoat/card.html' import card, card_content, card_header, card_title %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/status_badge.html' import status_badge_auto %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -22,7 +22,7 @@
 
     {% call card() %}
         {% call card_header() %}
-            {% call card_title() %}Blocked work packages{% endcall %}
+            {% call card_title(tag='h3') %}Blocked work packages{% endcall %}
         {% endcall %}
         {% call card_content() %}
             {% if blocked %}
@@ -38,7 +38,7 @@
                 {% call table_body() %}
                     {% for item in blocked %}
                     {% for blocker in item.blocked_by %}
-                    {% call table_row(attrs_dict={'data-work-package-id': item.work_package.id}) %}
+                    {% call table_row(attrs={'data-work-package-id': item.work_package.id}) %}
                         {% call table_cell() %}<a class="text-primary hover:underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a>{% endcall %}
                         {% call table_cell() %}{{ programme_names.get(item.work_package.enterprise_initiative_id, '') }}{% endcall %}
                         {% call table_cell() %}{{ blocker.name }} ({{ status_badge_auto(blocker.status) }}){% endcall %}

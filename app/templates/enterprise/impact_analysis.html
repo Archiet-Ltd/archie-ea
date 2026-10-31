@@ -1,10 +1,10 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell, empty_state, stat_card, section_card %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
-{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 
 {% block title %}Impact Analysis{% endblock %}
 
@@ -26,7 +26,7 @@
     <!-- Filter Form -->
     {% call card() %}
         {% call card_header() %}
-            {% call card_title() %}Filter by Element{% endcall %}
+            {% call card_title(tag='h3') %}Filter by Element{% endcall %}
         {% endcall %}
         {% call card_content() %}
             <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 gap-4">

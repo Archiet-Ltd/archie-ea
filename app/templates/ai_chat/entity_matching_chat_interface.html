@@ -411,7 +411,6 @@
 {% endblock %}
 
 {% block content %}
-{% from 'components/drawer.html' import drawer with context %}
 <script>
   document.addEventListener('alpine:init', () => {
     if (!Alpine.store('chat')) {

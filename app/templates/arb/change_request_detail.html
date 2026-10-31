@@ -3,8 +3,8 @@
 {% from 'components/status_badge.html' import status_badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/form_field.html' import form_field %}
 
 {% block title %}{{ cr.acr_reference }} — Change Request{% endblock %}
@@ -92,7 +92,7 @@
             <!-- Core Info -->
             {% call card() %}
                 {% call card_header() %}
-                    {% call card_title() %}Change Request Details{% endcall %}
+                    {% call card_title(tag='h3') %}Change Request Details{% endcall %}
                 {% endcall %}
                 {% call card_content() %}
                     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">

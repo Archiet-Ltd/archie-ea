@@ -1,6 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/figures.html' import stat_cards %}
 
 {% block title %}Capability Applications{% endblock %}
 
@@ -21,10 +21,12 @@
     {% endfor %}
     {% set active_count = ns.active %}
     {% set mapped_count = applications|selectattr('capability_mappings')|list|length %}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {{ metrics_card(title='Total', value=total, icon='monitor') }}
-        {{ metrics_card(title='Active', value=active_count, icon='check-circle', value_class='text-success') }}
-        {{ metrics_card(title='Mapped to Capabilities', value=mapped_count, icon='link', value_class='text-primary') }}
+    <div class="mb-6">
+        {{ stat_cards([
+            {'label': 'Total', 'value': total, 'icon': 'monitor'},
+            {'label': 'Active', 'value': active_count, 'icon': 'circle-check'},
+            {'label': 'Mapped to Capabilities', 'value': mapped_count, 'icon': 'link'}
+        ], testid='capability-applications-stats') }}
     </div>
 
     <!-- Client-side text filter -->

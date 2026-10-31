@@ -2,8 +2,8 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% from 'components/progress.html' import progress %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/progress.html' import progress, progress_indicator %}
 
 {% block title %}Framework Instances{% endblock %}
 
@@ -51,7 +51,7 @@
                             {% call table_cell() %}
                                 <div class="flex items-center gap-2">
                                     <div class="w-24">
-                                        {{ progress(value=(instance.implementation_percentage or 0)|int, class='h-1.5') }}
+                                        {% call progress(class='h-1.5', attrs={'role': 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': (instance.implementation_percentage or 0)|int}) %}{{ progress_indicator(value=(instance.implementation_percentage or 0)|int) }}{% endcall %}
                                     </div>
                                     <span class="text-xs text-muted-foreground">{{ (instance.implementation_percentage or 0) | int }}%</span>
                                 </div>
@@ -75,7 +75,7 @@
                             {% endcall %}
                         {% endcall %}
                         {% else %}
-                        {{ table_empty_state(message='No framework instances found', icon='layers') }}
+                        {% call table_row() %}{% call table_cell(class='px-6 py-12 text-center text-sm text-muted-foreground', attrs={'colspan': 99}) %}<span class="mx-auto mb-2 flex justify-center text-muted-foreground">{{ lucide('layers') }}</span>No framework instances found{% endcall %}{% endcall %}
                         {% endfor %}
                     {% endcall %}
                 {% endcall %}

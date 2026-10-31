@@ -1,10 +1,10 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/figures.html' import stat_cards %}
 {% from 'components/empty_state.html' import empty_state %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {# Consolidated governance queue - typed queue is the single code path.
    Make queue available to all blocks (content, extra_head_js, etc.) #}
@@ -77,7 +77,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
                     <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-                    {% call card_title(class='text-lg') %}AI queue triage{% endcall %}
+                    {% call card_title(tag='h3', class='text-lg') %}AI queue triage{% endcall %}
                     <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-info-emphasis">AI-suggested draft</span>
                 </div>
                 {% call button(type='button', attrs_dict={'@click': 'generate()', ':disabled': 'loading', 'aria_label': 'Generate AI queue triage'}) %}
@@ -132,31 +132,13 @@
     {% set completed_reviews = dashboard_data.metrics.approved_items + dashboard_data.metrics.rejected_items %}
     {% set approval_rate_display = (("%.1f"|format(dashboard_data.metrics.approval_rate)) ~ '%') if completed_reviews > 0 else '—' %}
     {% set cycle_time_display = (("%.1f"|format(cycle_time.avg_days)) ~ ' days') if cycle_time.get('total_reviews', 0) > 0 else '—' %}
-    <section aria-label="Governance performance" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {{ metrics_card(
-            title='Total reviews',
-            value=dashboard_data.metrics.total_items,
-            icon='clipboard-list',
-            description='Governed review items in your organisation'
-        ) }}
-        {{ metrics_card(
-            title='Pending',
-            value=dashboard_data.metrics.pending_items,
-            icon='clock',
-            description='Awaiting an ARB decision'
-        ) }}
-        {{ metrics_card(
-            title='Approval rate',
-            value=approval_rate_display,
-            icon='trending-up',
-            description='Approved decisions among completed reviews'
-        ) }}
-        {{ metrics_card(
-            title='Cycle time',
-            value=cycle_time_display,
-            icon='timer',
-            description='Average elapsed time across completed reviews'
-        ) }}
+    <section aria-label="Governance performance">
+        {{ stat_cards([
+            {'label': 'Total reviews', 'value': dashboard_data.metrics.total_items, 'icon': 'clipboard-list', 'sentence': 'Governed review items in your organisation'},
+            {'label': 'Pending', 'value': dashboard_data.metrics.pending_items, 'icon': 'clock', 'sentence': 'Awaiting an ARB decision'},
+            {'label': 'Approval rate', 'value': approval_rate_display, 'icon': 'trending-up', 'sentence': 'Approved decisions among completed reviews'},
+            {'label': 'Cycle time', 'value': cycle_time_display, 'icon': 'timer', 'sentence': 'Average elapsed time across completed reviews'}
+        ], testid='arb-governance-stats') }}
     </section>
 
     <section class="rounded-lg border border-border bg-card p-6" aria-labelledby="arb-status-heading">

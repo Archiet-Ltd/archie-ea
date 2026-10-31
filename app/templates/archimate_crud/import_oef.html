@@ -1,5 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/dense_table.html' import dense_table %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/button.html' import button %}
 {% from 'components/radio_group.html' import radio_group %}
 {% from 'components/checkbox.html' import checkbox %}
@@ -234,7 +234,9 @@
                             </ul>
                         </div>
 
-                        {% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Why', '')]) %}
+                        {% call table() %}
+                          {% call table_header() %}{% call table_row() %}{% call table_head() %}Name{% endcall %}{% call table_head() %}Type{% endcall %}{% call table_head() %}Status{% endcall %}{% call table_head() %}Why{% endcall %}{% endcall %}{% endcall %}
+                          {% call table_body() %}
                             <template x-for="(elem, idx) in (preview ? preview.elements : [])" :key="elem.identifier + '-' + idx">
                                 <tr>
                                     <td class="px-2 font-medium text-foreground break-words" x-text="elem.name"></td>
@@ -247,6 +249,7 @@
                                         x-text="elem.application_kind_decision || ''"></td>
                                 </tr>
                             </template>
+                          {% endcall %}
                         {% endcall %}
                     </div>
                 </div>

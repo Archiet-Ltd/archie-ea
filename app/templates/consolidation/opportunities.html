@@ -1,6 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'macros/shadcn_compat.html' import metric_card %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_description, card_content %}
 
 {% block title %}Consolidation Opportunities{% endblock %}
 
@@ -27,14 +27,16 @@
     {% elif forecast_by_year %}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
         {% for year, amount in forecast_by_year.items() %}
-        {{ metric_card(
-            label='FY ' ~ year,
-            value=(amount|round(0)|int)|currency,
-            delta='',
-            trend='up',
-            footer_label='Projected annual savings',
-            footer_text='From ' ~ opportunities_included ~ (' opportunities' if opportunities_included != 1 else ' opportunity')
-        ) }}
+        {% call card() %}
+            {% call card_header(class='pb-2') %}
+                {{ card_description(text='FY ' ~ year) }}
+                {{ card_title(tag='h3', text=(amount|round(0)|int)|currency, class='text-2xl font-semibold tabular-nums') }}
+            {% endcall %}
+            {% call card_content(class='flex flex-col gap-1 text-sm') %}
+                <span class="font-medium">Projected annual savings</span>
+                <span class="text-muted-foreground">From {{ opportunities_included }}{{ ' opportunities' if opportunities_included != 1 else ' opportunity' }}</span>
+            {% endcall %}
+        {% endcall %}
         {% endfor %}
     </div>
     {% endif %}

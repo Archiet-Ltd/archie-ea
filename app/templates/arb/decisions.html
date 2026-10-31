@@ -1,11 +1,11 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from 'components/status_badge.html' import status_badge %}
-{% from 'components/data_card.html' import data_card %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/figures.html' import stat_cards %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/select.html' import native_select %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/badge.html' import badge %}
 
@@ -33,12 +33,12 @@
     {% set active = decisions | selectattr('status', 'in', ['accepted', 'under_review', 'proposed']) | list | length %}
     {% set superseded_count = decisions | selectattr('status', 'equalto', 'superseded') | list | length %}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {{ data_card(label='Total Decisions', value=total, icon='file-text') }}
-        {{ data_card(label='Enterprise Decisions', value=enterprise, icon='building-2') }}
-        {{ data_card(label='Active Decisions', value=active, icon='check-circle') }}
-        {{ data_card(label='Superseded', value=superseded_count, icon='archive') }}
-    </div>
+    {{ stat_cards([
+        {'label': 'Total Decisions', 'value': total, 'icon': 'file-text'},
+        {'label': 'Enterprise Decisions', 'value': enterprise, 'icon': 'building-2'},
+        {'label': 'Active Decisions', 'value': active, 'icon': 'circle-check'},
+        {'label': 'Superseded', 'value': superseded_count, 'icon': 'archive'}
+    ], testid='decision-stats') }}
 
     <!-- Filter Controls + Table -->
     <div x-data="{
@@ -96,7 +96,7 @@
                 {% endcall %}
                 {% call table_body() %}
                     {% for d in decisions %}
-                    {% call table_row(attrs_dict={'x-show': "(filterHorizon === '' || '" ~ (d.horizon or '') ~ "' === filterHorizon) && (filterAuthority === '' || '" ~ (d.authority_level or '') ~ "' === filterAuthority) && (filterStatus === '' || '" ~ (d.status or '') ~ "' === filterStatus) && (!enterpriseOnly || " ~ ('true' if d.enterprise_level else 'false') ~ ")", 'data-row': ''}) %}
+                    {% call table_row(attrs={'x-show': "(filterHorizon === '' || '" ~ (d.horizon or '') ~ "' === filterHorizon) && (filterAuthority === '' || '" ~ (d.authority_level or '') ~ "' === filterAuthority) && (filterStatus === '' || '" ~ (d.status or '') ~ "' === filterStatus) && (!enterpriseOnly || " ~ ('true' if d.enterprise_level else 'false') ~ ")", 'data-row': ''}) %}
                         {% call table_cell() %}
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-mono text-muted-foreground">{{ d.decision_id }}</span>

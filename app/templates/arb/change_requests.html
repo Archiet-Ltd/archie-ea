@@ -3,8 +3,8 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/badge.html" import badge %}
-{% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
-{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from "basecoat/card.html" import card, card_header, card_title, card_description, card_content %}
+{% from "basecoat/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/select.html" import native_select %}
 {% from "components/pagination_controls.html" import pagination_controls %}
@@ -36,25 +36,25 @@
         {% call card() %}
             {% call card_header() %}
                 {% call card_description() %}Total{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ total }}{% endcall %}
+                {% call card_title(tag='h3', class='tabular-nums') %}{{ total }}{% endcall %}
             {% endcall %}
         {% endcall %}
         {% call card() %}
             {% call card_header() %}
                 {% call card_description() %}Open{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ open_count }}{% endcall %}
+                {% call card_title(tag='h3', class='tabular-nums') %}{{ open_count }}{% endcall %}
             {% endcall %}
         {% endcall %}
         {% call card() %}
             {% call card_header() %}
                 {% call card_description() %}Assessing{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ assessing_count }}{% endcall %}
+                {% call card_title(tag='h3', class='tabular-nums') %}{{ assessing_count }}{% endcall %}
             {% endcall %}
         {% endcall %}
         {% call card() %}
             {% call card_header() %}
                 {% call card_description() %}Closed{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ closed_count }}{% endcall %}
+                {% call card_title(tag='h3', class='tabular-nums') %}{{ closed_count }}{% endcall %}
             {% endcall %}
         {% endcall %}
     </div>

@@ -1,9 +1,9 @@
 {% extends "layouts/admin_base.html" %}
-{% import 'components/card.html' as card %}
+{% import 'basecoat/card.html' as card %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
-{% from 'components/input.html' import input %}
+{% from 'basecoat/input.html' import input %}
 
 {% block title %}Security Control Matrix{% endblock %}
 
@@ -22,7 +22,7 @@
   {% call card.card_content(class='space-y-4') %}
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <div class="space-y-1">
-        {% call card.card_title(class='text-lg') %}Control-to-requirement evidence table{% endcall %}
+        {% call card.card_title(tag='h3', class='text-lg') %}Control-to-requirement evidence table{% endcall %}
         {% call card.card_description() %}
           Deterministic, zero-LLM. Derived from the
           <span class="font-mono">compliance_requirements</span> store, scoped to organisation
@@ -30,8 +30,8 @@
         {% endcall %}
       </div>
       <form method="get" action="{{ url_for('enterprise_genome.security_matrix') }}">
-        {% if org_id is not none %}{{ input(name='org_id', type='hidden', value=org_id) }}{% endif %}
-        {{ input(name='generate', type='hidden', value='1') }}
+        {% if org_id is not none %}{{ input(attrs={'name': 'org_id', 'type': 'hidden', 'value': org_id}) }}{% endif %}
+        {{ input(attrs={'name': 'generate', 'type': 'hidden', 'value': '1'}) }}
         {{ button(text='Generate control matrix', type='submit') }}
       </form>
     </div>

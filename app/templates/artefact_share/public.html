@@ -18,10 +18,10 @@
 #}
 {% set suppress_public_analytics = true %}
 {% extends 'layouts/public_base.html' %}
-{% import 'components/card.html' as card %}
+{% import 'basecoat/card.html' as card %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}{{ artefact_title }}{% endblock %}
 
@@ -148,7 +148,7 @@
     {% for group in data.groups %}
     {% call card.card(class='overflow-hidden') %}
       {% call card.card_header(class='border-b border-border') %}
-        {% call card.card_title(class='text-lg') %}{{ group.name }}{% endcall %}
+        {% call card.card_title(tag='h3', class='text-lg') %}{{ group.name }}{% endcall %}
         {% call card.card_description() %}{{ group.capabilities|length }} capabilities{% endcall %}
       {% endcall %}
       <div class="overflow-x-auto">
@@ -198,7 +198,7 @@
     {% for group in data.groups %}
     {% call card.card() %}
       {% call card.card_header(class='border-b border-border') %}
-        {% call card.card_title(class='text-lg') %}{{ group.name }}{% endcall %}
+        {% call card.card_title(tag='h3', class='text-lg') %}{{ group.name }}{% endcall %}
         {% call card.card_description() %}{{ group.capabilities|length }} capabilities{% endcall %}
       {% endcall %}
       <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -238,7 +238,7 @@
     {% for horizon in data.horizons %}
     {% call card.card() %}
       {% call card.card_header(class='border-b border-border') %}
-        {% call card.card_title(class='text-lg') %}
+        {% call card.card_title(tag='h3', class='text-lg') %}
           {% if horizon.year %}{{ horizon.year }}{% else %}Unscheduled{% endif %}
         {% endcall %}
         {% call card.card_description() %}{{ horizon.items|length }} items{% endcall %}
