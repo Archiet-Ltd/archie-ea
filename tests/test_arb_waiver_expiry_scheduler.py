@@ -165,11 +165,20 @@ def test_every_job_the_scheduler_registers_is_listed_here():
     from app._bootstrap.extensions import init_scheduler
 
     tree = ast.parse(inspect.getsource(init_scheduler))
-    registered = {
-        keyword.value.value
+    calls = [
+        call
         for call in ast.walk(tree)
         if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "add_job"
-        for keyword in call.keywords
-        if keyword.arg == "id" and isinstance(keyword.value, ast.Constant)
-    }
+    ]
+    ids = [
+        next((keyword.value for keyword in call.keywords if keyword.arg == "id"), None)
+        for call in calls
+    ]
+    unreadable = [
+        f"line {call.lineno}: {ast.unparse(call)[:80]}"
+        for call, job_id in zip(calls, ids)
+        if not (isinstance(job_id, ast.Constant) and isinstance(job_id.value, str))
+    ]
+    assert not unreadable, f"add_job calls whose id is not a literal string: {unreadable}"
+    registered = {job_id.value for job_id in ids}
     assert registered == ESTABLISHED_JOBS | CONFIG_GATED_JOBS | {WAIVER_JOB}
