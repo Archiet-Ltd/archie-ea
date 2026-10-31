@@ -795,8 +795,10 @@ def remove_unedited_starter_rows(org, model: str) -> int:
 
 def _remove_unchanged_elements(org_id: int, mirrored) -> None:
     """Remove the model elements mirrored from removed starter capabilities, unless somebody has changed one
-    or linked it to something. They go through the session, one flush, so the audit log records each."""
+    or linked it to something. Each goes through the one element-removal helper, which deletes through the
+    session, so the audit log records every removed element."""
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.modules.applications.routes._helpers import _delete_mirror_archimate_element
 
     if not mirrored:
         return
@@ -818,20 +820,7 @@ def _remove_unchanged_elements(org_id: int, mirrored) -> None:
             unchanged.append(element)
     if not unchanged:
         return
-    ids = [element.id for element in unchanged]
-    try:
-        # One statement, scoped to the organisation. The database records each deleted row in the entity
-        # history itself, so the audit trail is the same as for a row deleted through the session.
-        with db.session.begin_nested():
-            ArchiMateElement.query.filter(
-                ArchiMateElement.organization_id == org_id, ArchiMateElement.id.in_(ids)
-            ).delete(synchronize_session=False)
-        db.session.expire_all()
-    except Exception:
-        _log.info("bulk removal of the model elements failed for organisation %s; removing one by one", org_id, exc_info=True)
-        for element in unchanged:
-            try:
-                with db.session.begin_nested():
-                    db.session.delete(element)
-            except Exception:
-                _log.warning("could not remove model element %s for organisation %s", element.id, org_id, exc_info=True)
+    for element in unchanged:
+        outcome = _delete_mirror_archimate_element(element.id)
+        for problem in outcome["errors"]:
+            _log.warning("%s (organisation %s)", problem, org_id)

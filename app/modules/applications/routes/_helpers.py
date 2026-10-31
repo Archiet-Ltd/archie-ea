@@ -364,16 +364,24 @@ def _delete_mirror_archimate_element(element_id):
 
     _sp = db.session.begin_nested()
     try:
-        # ORM bulk delete: tenant-filtered by do_orm_execute inside a request.
-        result["relationships_deleted"] = ArchiMateRelationship.query.filter(
+        # Delete through the session, not a bulk statement: the session fires the audit listeners, so
+        # every removed element and relationship gets its delete row in the audit log.
+        # Tenant-filtered by do_orm_execute inside a request.
+        relationships = ArchiMateRelationship.query.filter(
             db.or_(
                 ArchiMateRelationship.source_id == element_id,
                 ArchiMateRelationship.target_id == element_id,
             )
-        ).delete(synchronize_session=False)
-        result["elements_deleted"] = ArchiMateElement.query.filter(
-            ArchiMateElement.id == element_id
-        ).delete(synchronize_session=False)
+        ).all()
+        for relationship in relationships:
+            db.session.delete(relationship)
+        db.session.flush()
+        result["relationships_deleted"] = len(relationships)
+        elements = ArchiMateElement.query.filter(ArchiMateElement.id == element_id).all()
+        for element in elements:
+            db.session.delete(element)
+        db.session.flush()
+        result["elements_deleted"] = len(elements)
         _sp.commit()
     except Exception as exc:
         _sp.rollback()

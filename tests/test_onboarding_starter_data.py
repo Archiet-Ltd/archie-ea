@@ -270,6 +270,30 @@ def test_removing_the_old_starter_model_removes_its_model_repository_elements(cl
     assert _elements(two["two"]) == two_before, "another organisation's elements are untouched"
 
 
+def test_every_removed_starter_element_has_a_delete_audit_row(client, login_as, two):
+    from app import db
+
+    for key in ("one", "two"):
+        _choose(client, login_as, two["%s_owner" % key], "banking", [])
+    ids = [r.id for r in db.session.execute(
+        db.text("SELECT id FROM archimate_elements WHERE organization_id = :o AND source_kind = 'starter'"),
+        {"o": two["one"].id}).all()]
+    assert len(ids) > 5
+    other_ids = [r.id for r in db.session.execute(
+        db.text("SELECT id FROM archimate_elements WHERE organization_id = :o"), {"o": two["two"].id}).all()]
+    _choose(client, login_as, two["one_owner"], "software", [])
+    login_as(client, two["one_owner"])
+    assert client.post("/account/welcome/starter/remove", json={"model": "BIAN"}).status_code == 200
+    gone = [i for i in ids if not db.session.execute(
+        db.text("SELECT 1 FROM archimate_elements WHERE id = :i"), {"i": i}).first()]
+    assert len(gone) > 5
+    audited = {r.record_id for r in db.session.execute(
+        db.text("SELECT record_id FROM soc2_audit_log WHERE action = 'delete' AND table_name = 'archimate_elements' "
+                "AND organization_id = :o"), {"o": two["one"].id}).all()}
+    assert set(gone) <= audited, "removed elements with no delete audit row: %s" % sorted(set(gone) - audited)
+    assert not audited & set(other_ids), "another organisation's elements were not removed"
+
+
 def test_the_bian_starter_names_are_service_domains_of_the_published_landscape():
     from app.seed_data.bian_starter import BIAN_STARTER
 
