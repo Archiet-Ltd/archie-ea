@@ -4,7 +4,8 @@ Wall time on a shared machine moves with whatever else is running; CPU time, the
 database time per request move much less, so this is the run that says which page is heavy and why. It
 complements the locust scenario (``locustfile.py``), which measures what a person waiting would see.
 
-    ARCHIE_LOAD_PASSWORD=... ARCHIE_W1_IDS=ids.json FLASK_CONFIG=smoke \\
+    ARCHIE_W1_PASSWORD=... ARCHIE_W1_<PERSONA>_EMAIL=... ARCHIE_W1_SAMPLES="user_id=20,application_id=27,..." \\
+    FLASK_CONFIG=smoke \\
     python tests/load/w1_profile.py --repeat 7 --out profile.json
 
 Reads only. Results hold routes and timings, no names.
@@ -21,13 +22,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import w1_scenario  # noqa: E402
-
-EMAILS = {
-    "cto": "perf.cto@lantern-quay.example.com",
-    "viewer": "perf.viewer@lantern-quay.example.com",
-    "admin": "perf.admin@lantern-quay.example.com",
-}
+import w1_routes  # noqa: E402
 
 
 def measure(client, path, engine):
@@ -69,22 +64,27 @@ def main():
     from app.extensions import db
 
     app = create_app(os.environ.get("FLASK_CONFIG", "smoke"))
-    password = os.environ["ARCHIE_LOAD_PASSWORD"]
-    ids = w1_scenario.load_ids()
-    routes = w1_scenario.resolve(ids)
+    password = os.environ["ARCHIE_W1_PASSWORD"]
+    samples = w1_routes.Samples(dict(
+        pair.split("=", 1) for pair in os.environ.get("ARCHIE_W1_SAMPLES", "").split(",") if "=" in pair
+    ))
     results = []
     with app.app_context():
         engine = db.engine
-    for persona in w1_scenario.PERSONAS:
+    people = [("anonymous", None)] + [(p.key, os.environ.get("ARCHIE_W1_%s_EMAIL" % p.key.upper()))
+                                      for p in w1_routes.PERSONAS]
+    for persona, email in people:
         client = app.test_client()
-        if persona != "anonymous":
-            client.post("/account/login", data={"email": EMAILS[persona], "password": password})
-        for page_id, path, access, template in routes:
-            if not w1_scenario.can_open(persona, access):
+        if email:
+            client.post("/account/login", data={"email": email, "password": password})
+        for page_id, pattern in w1_routes.W1_ROUTES:
+            path, reason = w1_routes.resolve_route(pattern, samples)
+            if path is None:
+                results.append({"persona": persona, "page": page_id, "route": pattern, "status": reason})
                 continue
             status, _w, _c, _n, _d = measure(client, path, engine)  # warm-up, not counted
             if not 200 <= status < 300:
-                results.append({"persona": persona, "page": page_id, "route": template, "status": status})
+                results.append({"persona": persona, "page": page_id, "route": pattern, "status": status})
                 continue
             walls, cpus, counts, dbs = [], [], [], []
             for _ in range(args.repeat):
@@ -94,7 +94,7 @@ def main():
                 counts.append(count)
                 dbs.append(dbms)
             results.append({
-                "persona": persona, "page": page_id, "route": template, "status": status,
+                "persona": persona, "page": page_id, "route": pattern, "status": status,
                 "wall_ms_median": statistics.median(walls), "wall_ms_max": max(walls),
                 "cpu_ms_median": statistics.median(cpus), "statements": int(statistics.median(counts)),
                 "db_ms_median": statistics.median(dbs),
