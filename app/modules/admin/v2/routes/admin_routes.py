@@ -5750,9 +5750,13 @@ def organization_delete(org_id):
     except OrganizationDeletionRefused as refused:
         flash(str(refused), "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
-    except Exception:  # noqa: BLE001 - rolled back by the service; the reason is logged, the person told
+    except Exception as exc:  # noqa: BLE001 - rolled back by the service; the reason is logged and shown
         current_app.logger.exception("Organisation %s could not be deleted", org_id)
-        flash("The organisation could not be deleted. Nothing was changed. The reason is in the server log.", "error")
+        flash(
+            "The organisation could not be deleted. Nothing was changed. The reason: %s"
+            % (str(getattr(exc, "orig", exc)).strip().splitlines() or ["no reason given"])[0],
+            "error",
+        )
         return redirect(url_for("admin.organization_detail", org_id=org_id))
     return redirect(url_for("admin.organizations_list"))
 

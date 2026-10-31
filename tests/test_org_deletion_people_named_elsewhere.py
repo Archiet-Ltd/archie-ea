@@ -31,8 +31,8 @@ def _rows_of(db, org_id, leave_out=()):
     return json.dumps(snapshot, sort_keys=True)
 
 
-# The detached person's own home row (and its audit entry) legitimately changes; nothing else may.
-MOVED = ("users", "soc2_audit_log")
+# The detached person's own home row legitimately changes; nothing else may, the audit log included.
+MOVED = ("users",)
 
 
 def _cleanup(app, *org_ids):
