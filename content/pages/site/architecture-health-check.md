@@ -102,7 +102,7 @@ The health check is a fixed scope, and the model stays in your workspace when it
 
 ### Do you sign an NDA, and how is our data handled?
 
-Everyone we authorise to handle personal data is bound by a duty of confidentiality, set out in our [data processing agreement](/data-processing-agreement). If you want a mutual NDA signed before any file is sent, say so when you request the health check: nothing is imported until after the scoping call. See the [privacy page](/privacy) for how Entelim handles personal data.
+Everyone we authorise to handle personal data is bound by a duty of confidentiality[[if legal-pages]], set out in our [data processing agreement](/data-processing-agreement)[[/if]]. If you want a mutual NDA signed before any file is sent, say so when you request the health check: nothing is imported until after the scoping call. See the [privacy page](/privacy) for how Entelim handles personal data.
 
 ### What exactly is fixed for $4,500, and is anything guaranteed?
 

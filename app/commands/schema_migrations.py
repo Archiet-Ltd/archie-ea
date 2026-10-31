@@ -33,6 +33,11 @@ The pattern every revision after the baseline follows:
 - **Contract** - in a later revision, once the backfill has been measured:
   ``tighten_not_null`` or ``narrow_varchar``. Both check the data first and
   raise ``ContractBlocked`` instead of discarding a value.
+
+A revision that cannot run while the old code is serving (for example a
+contract step the old code would break on) declares ``REQUIRES_DOWNTIME = True``
+at module level. ``schema-status`` reports it, and the deploy stops before
+changing anything until it is rerun with ``ALLOW_DOWNTIME_MIGRATIONS=1``.
 """
 from __future__ import annotations
 
@@ -322,6 +327,56 @@ def known_revisions(config=None) -> set[str]:
     return {rev.revision for rev in script.walk_revisions()}
 
 
+def pending_revisions(bind, config=None) -> tuple[list[str], list[str]]:
+    """(pending revision ids, those of them marked ``REQUIRES_DOWNTIME``).
+
+    Pending means reachable from head and not an ancestor of anything recorded.
+    A recorded id the chain does not know (a pre-baseline stamp) leaves every
+    revision pending, so such a database never takes a quick exit.
+    """
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory.from_config(config or _alembic_config())
+    recorded = recorded_revisions(bind)
+    applied: set[str] = set()
+    known = {r.revision for r in script.walk_revisions()}
+    for rev_id in recorded:
+        if rev_id in known:
+            applied.update(r.revision for r in script.iterate_revisions(rev_id, "base"))
+    pending = [r for r in script.walk_revisions() if r.revision not in applied]
+    pending.reverse()  # oldest first
+    downtime = [
+        r.revision for r in pending
+        if getattr(r.module, "REQUIRES_DOWNTIME", False) is True
+    ]
+    return [r.revision for r in pending], downtime
+
+
+@click.command("schema-status")
+@with_appcontext
+def schema_status():
+    """Say whether the database is at head, without changing it.
+
+    Exit 0 and ``schema-status: at head`` when nothing is pending. Otherwise
+    exit 10 and list the pending revisions; a revision that declares
+    ``REQUIRES_DOWNTIME = True`` (it cannot run beside the old code) makes the
+    line ``schema-status: downtime-required`` and the exit code 11.
+    """
+    with db.engine.connect() as conn:
+        pending, downtime = pending_revisions(conn)
+    if not pending:
+        click.echo("schema-status: at head")
+        return
+    click.echo(f"schema-status: {len(pending)} pending: {', '.join(pending)}")
+    if downtime:
+        click.echo(
+            "schema-status: downtime-required: " + ", ".join(downtime)
+            + " cannot run beside the old code; schedule a downtime window"
+        )
+        raise SystemExit(11)
+    raise SystemExit(10)
+
+
 @click.command("schema-upgrade")
 @click.option("--to", "target", default="head", show_default=True,
               help="Revision to upgrade to.")
@@ -366,5 +421,6 @@ def schema_upgrade(target):
 
 
 def init_app(app):
-    """Register the schema-upgrade CLI command."""
+    """Register the schema-upgrade and schema-status CLI commands."""
     app.cli.add_command(schema_upgrade)
+    app.cli.add_command(schema_status)

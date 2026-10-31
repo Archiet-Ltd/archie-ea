@@ -35,6 +35,8 @@ WEBSITE_TASK = "website_profile_crawl"
 WEBSITE_RETRY_TASK = "website_profile_crawl_more"
 # when the model pass found every provider busy: one more try in 15 minutes, and one in an hour
 RETRY_DELAYS_SECONDS = (15 * 60, 60 * 60)
+DAILY_READINGS = 3  # readings an organisation may start in a day; a changed address counts
+SAME_ADDRESS_HOURS = 24  # an address read within this many hours is not read again
 PROPOSAL_SOURCE = "website_crawler"
 OP_PROFILE_FACT = "website_profile_fact"
 PROPOSAL_DUE_DAYS = 14
@@ -92,6 +94,13 @@ class CrawlRefused(ValueError):
         super().__init__(message)
         self.reason = reason
         self.status = status
+
+
+class ReadingLimit(CrawlRefused):
+    """The organisation has started its readings for the day."""
+
+    def __init__(self, message: str):
+        super().__init__(message, "daily_limit")
 
 
 # ----------------------------------------------------------------------------- model
@@ -771,20 +780,63 @@ def _queue_retry(org_id: int, attempt: int) -> str:
     Returns when it is due (UTC, ISO)."""
     from app.services.job_queue_service import get_job_queue_service
 
+    queue = get_job_queue_service()
+    for job in queue.list_jobs(org_id, limit=5, task=WEBSITE_RETRY_TASK, statuses=["pending"]):
+        if int((job.payload or {}).get("retry_attempt") or 0) == attempt:  # this retry is already waiting: never stack a copy
+            return (job.payload or {}).get("not_before") or datetime.utcnow().isoformat(timespec="seconds")
     due = (datetime.utcnow() + timedelta(seconds=RETRY_DELAYS_SECONDS[attempt - 1])).isoformat(timespec="seconds")
-    get_job_queue_service().create_job(
+    queue.create_job(
         "Read the company website again", WEBSITE_RETRY_TASK,
         {"retry_attempt": attempt, "not_before": due}, organization_id=org_id)
     return due
 
 
-def queue_website_crawl(org_id: int):
-    """Queue the reading as a background job for one organisation (refused unless it consented)."""
+def _lock_readings(org_id: int) -> None:
+    """Serialise the reading rules for one organisation, so saves sent together are counted one after another."""
+    if db.session.get_bind().dialect.name == "postgresql":
+        db.session.execute(db.text("SELECT pg_advisory_xact_lock(:key)"), {"key": 7410000000 + int(org_id)})
+
+
+def _readings_started_today(org_id: int, since: datetime) -> int:
+    """Readings started in the last day: each site reading, and each retry of the model pass (the first
+    model pass of a reading is part of that reading, not another one)."""
     from app.services.job_queue_service import get_job_queue_service
 
-    _consented_site(org_id)
-    return get_job_queue_service().create_job(
-        "Read the company website", WEBSITE_TASK, {}, organization_id=org_id)
+    queue = get_job_queue_service()
+    crawls = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK) if job.created_at and job.created_at >= since]
+    retries = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_RETRY_TASK)
+               if job.created_at and job.created_at >= since and int((job.payload or {}).get("retry_attempt") or 0) >= 1]
+    return len(crawls) + len(retries)
+
+
+def request_website_crawl(org_id: int):
+    """Queue the reading for one organisation unless a rule says not to; returns ``(job, outcome)``.
+
+    ``outcome`` is ``queued`` (a new reading), ``already_open`` (one is queued or running, so its job is
+    returned) or ``already_read`` (this address was read in the last day, so that reading's job is returned).
+    A fourth reading in a day raises ``ReadingLimit``."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    _org, url = _consented_site(org_id)
+    _lock_readings(org_id)
+    queue = get_job_queue_service()
+    open_jobs = queue.list_jobs(org_id, limit=1, task=WEBSITE_TASK, statuses=["pending", "in_progress"])
+    if open_jobs:
+        return open_jobs[0], "already_open"
+    since = datetime.utcnow() - timedelta(hours=SAME_ADDRESS_HOURS)
+    for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK):
+        if job.created_at and job.created_at >= since and (job.payload or {}).get("url") == url and job.status != "failed":
+            return job, "already_read"
+    if _readings_started_today(org_id, since) >= DAILY_READINGS:
+        raise ReadingLimit("You can read a website three times a day. Try again tomorrow, or confirm what we found.")
+    job = queue.create_job("Read the company website", WEBSITE_TASK, {"url": url}, organization_id=org_id)
+    return job, "queued"
+
+
+def queue_website_crawl(org_id: int):
+    """Queue the reading as a background job for one organisation (refused unless it consented).
+    A reading already open, or of the same address within a day, is returned instead of a new one."""
+    return request_website_crawl(org_id)[0]
 
 
 def _job_progress(job_id: Optional[int]) -> Optional[Callable[[Dict[str, Any]], None]]:

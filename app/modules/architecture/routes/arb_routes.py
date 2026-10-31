@@ -19,6 +19,7 @@ import uuid as _uuid
 
 from flask import (
     Blueprint,
+    abort,
     current_app,
     flash,
     g,
@@ -35,6 +36,7 @@ from app import db
 from app.models.architecture_review_board import (
     ARBBoardMember,
     ARBCapabilityImpact,
+    ARBException,
     ARBGovernanceStandard,
     ARBReviewComment,
     ARBReviewItem,
@@ -43,6 +45,11 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
+from app.modules.transformation_room.arb_decision_service import (
+    DECISION_ROLES,
+    may_decide_review,
+)
+from app.models.user import User
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
 from app.services.rate_limiter import rate_limit
@@ -67,6 +74,26 @@ from app.modules.transformation_room.domain import (
 arb_bp = Blueprint("arb", __name__, url_prefix="/arb")
 arb_service = ARBGovernanceService()
 arb_analytics = ARBAnalyticsService()
+
+# Who may run a board or approve an exception: the persona set the typed
+# decision service accepts as a decider (its one source), plus the "admin"
+# name the role check folds Administrator into.
+ARB_APPROVER_ROLES = ("admin", *sorted(DECISION_ROLES))
+
+
+def _viewer_may_run_board():
+    """Whether the signed-in user passes the approver role check.
+
+    Asks the one existing role check rather than restating its rules, so the
+    buttons a page shows are the buttons the routes accept.
+    """
+    from werkzeug.exceptions import HTTPException
+
+    try:
+        require_roles(*ARB_APPROVER_ROLES)(lambda: True)()
+    except HTTPException:
+        return False
+    return True
 
 
 # V-03 (S1, 17 Aug 2026 QA register): a Viewer created two ARB reviews
@@ -1043,7 +1070,11 @@ def sessions():
         sessions = EmptyPagination()
 
     return render_template(
-        "arb/sessions.html", sessions=sessions, status=status, users=_chair_candidates()
+        "arb/sessions.html",
+        sessions=sessions,
+        status=status,
+        users=_chair_candidates(),
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -1139,6 +1170,7 @@ def create_session():
 @login_required
 def session_detail(id):
     """View ARB session details."""
+    _own_session_or_404(id)
     session = ArchitectureReviewBoard.query.options(
         joinedload(ArchitectureReviewBoard.review_items),
         joinedload(ArchitectureReviewBoard.board_members).joinedload(
@@ -1148,17 +1180,22 @@ def session_detail(id):
         joinedload(ArchitectureReviewBoard.secretary),
     ).get_or_404(id)
 
-    return render_template("arb/session_detail.html", session=session)
+    return render_template(
+        "arb/session_detail.html",
+        session=session,
+        may_run_board=_viewer_may_run_board(),
+    )
 
 
 @arb_bp.route("/sessions/<int:id>/complete", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_session_complete")
 def complete_session(id):
     """Complete an ARB session."""
+    arb_session = _own_session_or_404(id)
     try:
         # AUDIT-ARB-002: Quorum validation - require at least 3 board members
-        arb_session = ArchitectureReviewBoard.query.get_or_404(id)
         member_count = (
             len(arb_session.board_members) if arb_session.board_members else 0
         )
@@ -1185,6 +1222,7 @@ def complete_session(id):
 
 @arb_bp.route("/sessions/<int:id>/cancel", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_session_cancel")
 def cancel_session(id):
     """Cancel a scheduled/draft ARB session.
@@ -1194,8 +1232,8 @@ def cancel_session(id):
     implemented, so every detail page for scheduled/draft sessions 500'd
     on the url_for BuildError.
     """
+    arb_session = _own_session_or_404(id)
     try:
-        arb_session = ArchitectureReviewBoard.query.get_or_404(id)
         if arb_session.status not in ("scheduled", "draft"):
             flash("Only scheduled or draft sessions can be cancelled.", "error")
             return redirect(url_for("arb.session_detail", id=id))
@@ -1212,15 +1250,26 @@ def cancel_session(id):
 
 @arb_bp.route("/sessions/<int:session_id>/add_member", methods=["POST"])
 @login_required
-@require_roles("admin", "enterprise_architect")
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_member_add")
 def add_board_member(session_id):
     """Add a member to an ARB session."""
+    arb_session = _own_session_or_404(session_id)
     try:
         data = request.form.to_dict()
+        member_id = int(data.get("user_id"))
+        member = db.session.execute(
+            db.select(User).where(
+                User.id == member_id,
+                User.organization_id == arb_session.organization_id,
+            )
+        ).scalar_one_or_none()
+        if member is None:
+            flash("That person is not a member of this organisation.", "error")
+            return redirect(url_for("arb.session_detail", id=session_id))
         (arb_service.add_board_member(
             arb_session_id=session_id,
-            user_id=int(data.get("user_id")),
+            user_id=member.id,
             role=data.get("role"),
             voting_member=data.get("voting_member") == "on",
         ))
@@ -1267,6 +1316,7 @@ def reviews():
         review_type=review_type,
         is_reviews_view=True,
         users=_chair_candidates(),
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -1495,18 +1545,7 @@ def create_review():
 @login_required
 def review_detail(id):
     """View review item details."""
-    review = ARBReviewItem.query.options(
-        joinedload(ARBReviewItem.submitter),
-        joinedload(ARBReviewItem.reviewer),
-        joinedload(ARBReviewItem.decided_by),
-        joinedload(ARBReviewItem.solution),
-        joinedload(ARBReviewItem.adr),
-        joinedload(ARBReviewItem.architecture_model),
-        joinedload(ARBReviewItem.capability_links).joinedload(
-            ARBCapabilityImpact.capability
-        ),
-        joinedload(ARBReviewItem.comments).joinedload(ARBReviewComment.user),
-    ).get_or_404(id)
+    review = _own_review_or_404(id)
 
     # Resolve application names from capability_impacts.application_ids
     application_names = []
@@ -1645,7 +1684,7 @@ def review_audit_trail_csv(id):
 
     from flask import Response
 
-    review = ARBReviewItem.query.get_or_404(id)
+    review = _own_review_or_404(id)
 
     from app.services.arb_audit_service import ARBAuditService
 
@@ -1695,7 +1734,7 @@ def review_typed_history_csv(id):
 
     from flask import Response
 
-    review = ARBReviewItem.query.get_or_404(id)
+    review = _own_review_or_404(id)
 
     actor = _typed_actor()
     history = []
@@ -1734,14 +1773,69 @@ def review_typed_history_csv(id):
     )
 
 
+def _own_review_or_404(review_item_id):
+    """The review item of the signed-in organisation, or a 404.
+
+    Resolved with an explicit (id, organization_id) predicate through
+    ``TypedARBDecisionAdapter.load_review``: ``Query.get_or_404`` is tenant
+    scoped only on an identity-map miss, and a 404 raised inside a route's
+    own ``try`` block is swallowed by its ``except Exception``.
+    """
+    review = TypedARBDecisionAdapter.load_review(review_item_id)
+    if review is None:
+        abort(404)
+    return review
+
+
+def _untyped_decision_refusal(item):
+    """A 403 response when the viewer may not decide this untyped review.
+
+    Same two rules the typed decision service applies: its decision-authority
+    rule (deciding role or a voting seat on the review's board), and a
+    submitter never decides their own submission. The approver role check
+    still admits the "admin" name it folds Administrator into.
+    """
+    if not _viewer_may_run_board() and not may_decide_review(
+        db.session, current_user, item
+    ):
+        return jsonify({
+            "success": False,
+            "error": "Your role cannot make ARB decisions.",
+            "reason_codes": ["arb_decision_not_authorised"],
+        }), 403
+    if item.submitter_id == current_user.id:
+        return jsonify({
+            "success": False,
+            "error": "You cannot decide a review you submitted.",
+            "reason_codes": ["arb_decision_separation_of_duties"],
+        }), 403
+    return None
+
+
+def _own_session_or_404(session_id):
+    """The ARB session of the signed-in organisation, or a 404 (see above)."""
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    session = None
+    if organization_id is not None:
+        session = db.session.execute(
+            db.select(ArchitectureReviewBoard).where(
+                ArchitectureReviewBoard.id == session_id,
+                ArchitectureReviewBoard.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+    if session is None:
+        abort(404)
+    return session
+
+
 @arb_bp.route("/reviews/<int:id>/submit", methods=["POST"])
 @login_required
 @audit_log("arb_review_submit")
 @rate_limit(10, "1h")
 def submit_review(id):
     """Submit a draft review item for ARB consideration."""
+    review = _own_review_or_404(id)
     try:
-        review = ARBReviewItem.query.get_or_404(id)
         if review.solution_id or review.adr_id or review.architecture_model_id:
             flash(
                 "Typed reviews must be submitted from their governed evidence dossier.",
@@ -1759,12 +1853,19 @@ def submit_review(id):
 
 @arb_bp.route("/reviews/<int:id>/assign", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_review_assign")
 def assign_to_session(id):
     """Assign review item to an ARB session."""
+    _own_review_or_404(id)
+    data = request.form.to_dict()
     try:
-        data = request.form.to_dict()
-        arb_service.assign_to_session(id, int(data.get("arb_session_id")))
+        target_id = int(data.get("arb_session_id"))
+    except (TypeError, ValueError):
+        target_id = 0
+    target_session = _own_session_or_404(target_id)
+    try:
+        arb_service.assign_to_session(id, target_session.id)
         flash("Review item assigned to ARB session", "success")
         return redirect(url_for("arb.review_detail", id=id))
     except Exception as e:
@@ -2044,11 +2145,13 @@ def reopen_decision(id):
 @audit_log("arb_comment_add")
 def add_comment(id):
     """Add comment to review item."""
+    review = _own_review_or_404(id)
     try:
         data = request.form.to_dict()
 
         comment = ARBReviewComment(
-            review_item_id=id,
+            review_item_id=review.id,
+            organization_id=review.organization_id,
             user_id=current_user.id,
             comment_type=data.get("comment_type", "general"),
             content=data.get("content"),
@@ -2235,7 +2338,7 @@ def api_update_checklist(id):
         data = request.get_json()
         checklist_items = data.get("checklist", {})
 
-        review = db.session.get(ARBReviewItem, id)
+        review = TypedARBDecisionAdapter.load_review(id)
         if not review:
             return jsonify({"success": False, "error": "Review not found"}), 404
 
@@ -2765,7 +2868,7 @@ def api_adm_kanban_move_card():
                 {"success": False, "error": f"Invalid phase: {target_phase}"}
             ), 400
 
-        review = db.session.get(ARBReviewItem, review_id)
+        review = TypedARBDecisionAdapter.load_review(review_id)
         if not review:
             return jsonify({"success": False, "error": "Review item not found"}), 404
 
@@ -2793,12 +2896,12 @@ def api_adm_kanban_move_card():
 
 @arb_bp.route("/sessions/<int:id>/delete", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_session_delete")
 def delete_session(id):
     """Delete an ARB session. Only draft/cancelled sessions can be deleted."""
+    session = _own_session_or_404(id)
     try:
-        session = ArchitectureReviewBoard.query.get_or_404(id)
-
         # Only allow deletion of draft or cancelled sessions
         if session.status not in ("draft", "cancelled"):
             flash(
@@ -2840,12 +2943,12 @@ def delete_session(id):
 
 @arb_bp.route("/reviews/<int:id>/delete", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_review_delete")
 def delete_review(id):
     """Delete an ARB review item. Only draft/withdrawn items can be deleted."""
+    review = _own_review_or_404(id)
     try:
-        review = ARBReviewItem.query.get_or_404(id)
-
         # Only allow deletion of draft or withdrawn reviews
         if review.status not in ("draft", "withdrawn"):
             flash(
@@ -2899,6 +3002,7 @@ logger = logging.getLogger(__name__)
 
 @arb_bp.route("/initialize_standards", methods=["POST"])
 @login_required
+@require_roles("admin", "platform_admin")
 def initialize_standards():
     """Initialize default governance standards."""
     try:
@@ -2970,7 +3074,10 @@ def api_arb_begin_review(item_id: int):
     if typed_result.typed:
         return _typed_decision_json(typed_result)
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status not in ("submitted", "draft", "pending"):
         return jsonify({
@@ -3012,7 +3119,10 @@ def api_arb_approve(item_id: int):
     if typed_result.typed:
         return _typed_decision_json(typed_result)
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3072,7 +3182,10 @@ def api_arb_reject(item_id: int):
             extra={"rejection_reason": data.get("reason")},
         )
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3135,7 +3248,10 @@ def api_arb_request_changes(item_id: int):
     if typed_result.typed:
         return _typed_decision_json(typed_result)
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3193,7 +3309,7 @@ def api_arb_get_implementation_status(item_id: int):
     except NotFound:
         return jsonify({"success": False, "reason_codes": ["review_not_found"]}), 404
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
     return jsonify({
         "success": True,
         "item_id": item.id,
@@ -3238,7 +3354,7 @@ def api_arb_update_implementation_status(item_id: int):
     except NotFound:
         return jsonify({"success": False, "reason_codes": ["review_not_found"]}), 404
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
     if item.status not in ("approved", "approved_with_conditions"):
         return jsonify({
             "success": False,
@@ -3286,13 +3402,13 @@ def api_arb_update_implementation_status(item_id: int):
 
 
 # ===================================================================
-# FRAG-037: ARB exception management routes
+# ARB exception management routes
 # ===================================================================
 
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
-    """FRAG-037: List ARB exceptions."""
+    """List ARB exceptions."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
@@ -3306,7 +3422,7 @@ def api_list_exceptions():
 @arb_bp.route("/api/exceptions", methods=["POST"])
 @login_required
 def api_create_exception():
-    """FRAG-037: Create ARB exception request."""
+    """Create ARB exception request."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
@@ -3320,12 +3436,26 @@ def api_create_exception():
 
 @arb_bp.route("/api/exceptions/<int:exception_id>/approve", methods=["PUT"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
-    """FRAG-037: Approve ARB exception."""
+    """Approve ARB exception (approver roles, own organisation only)."""
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    owned = None
+    if organization_id is not None:
+        owned = db.session.execute(
+            db.select(ARBException.id).where(
+                ARBException.id == exception_id,
+                ARBException.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+    if owned is None:
+        return jsonify({"success": False, "error": "Exception not found"}), 404
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
+        # The approver is the signed-in user, never a name taken from the body.
+        data["approved_by_id"] = current_user.id
         result = service.approve_exception(exception_id, **data)
         return jsonify(result)
     except Exception as e:
