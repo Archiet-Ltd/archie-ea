@@ -1,4 +1,4 @@
-<p>Dear {{ user.full_name() }},</p>
+<p>Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},</p>
 
 {% if organisation_name %}
 <p>{% if inviter %}{{ inviter.full_name() }} invited you{% else %}You are invited{% endif %} to join <b>{{ organisation_name }}</b> on {{ config.APP_NAME }}.</p>
@@ -20,6 +20,4 @@
 
 {% if not has_account %}<p>Then sign in as {{ user.email }} with the password you chose.</p>{% endif %}
 
-<p>The {{ config.APP_NAME }} Team</p>
-
-<p><small>Note: replies to this email address are not monitored.</small></p>
+{% include 'account/email/_help.html' %}

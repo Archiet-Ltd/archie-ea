@@ -322,6 +322,8 @@ class Config:
         "TRANSFORMATION_PORTFOLIO_STEWARD_ID"
     )
     EMAIL_SUBJECT_PREFIX = "[{}]".format(APP_NAME)
+    # Where account and billing messages tell people to write for help; unset until the address is chosen.
+    SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL") or None
     EMAIL_SENDER = "{app_name} Admin <{email}>".format(
         app_name=APP_NAME, email=MAIL_USERNAME
     )

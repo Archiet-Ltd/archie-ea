@@ -1,4 +1,4 @@
-Dear {{ user.full_name() }},
+Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},
 
 {% if organisation_name %}{% if inviter %}{{ inviter.full_name() }} invited you{% else %}You are invited{% endif %} to join {{ organisation_name }} on {{ config.APP_NAME }}.{% else %}You are invited to join {{ config.APP_NAME }}!{% endif %}
 
@@ -10,6 +10,5 @@ The link works once and until {{ expires_at.strftime('%d %b %Y %H:%M') }} UTC.
 {% endif %}
 {% if not has_account %}Then sign in as {{ user.email }} with the password you chose.
 {% endif %}
-The {{ config.APP_NAME }} Team
 
-Note: replies to this email address are not monitored.
+{% include 'account/email/_help.txt' %}

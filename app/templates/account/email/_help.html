@@ -1,0 +1,3 @@
+<p>Need help? {% if support_email %}Write to <a href="mailto:{{ support_email }}">{{ support_email }}</a>{% if help_url %} or visit <a href="{{ help_url }}">{{ help_url }}</a>{% endif %}.{% elif help_url %}Visit <a href="{{ help_url }}">{{ help_url }}</a> and tell us what you need.{% endif %}</p>
+
+<p>The {{ config.APP_NAME }} Team</p>

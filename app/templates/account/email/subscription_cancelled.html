@@ -1,0 +1,11 @@
+<p>Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},</p>
+
+<p>Your {{ plan_name }} subscription for <b>{{ organisation_name }}</b> is cancelled. It will not renew.</p>
+
+<p>{% if ends_on %}The {{ plan_name }} plan stays in place until {{ ends_on.strftime('%d %b %Y') }}.{% else %}The {{ plan_name }} plan stays in place until the end of the period you have paid for.{% endif %} After that, {{ organisation_name }} moves to the Community plan.</p>
+
+<p>Changed your mind? You can <a href="{{ billing_link }}">keep your subscription from the billing page</a> before then, or paste this into your browser's address bar:</p>
+
+<p>{{ billing_link }}</p>
+
+{% include 'account/email/_help.html' %}

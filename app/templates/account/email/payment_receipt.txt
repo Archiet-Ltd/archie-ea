@@ -1,0 +1,14 @@
+Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},
+
+Thank you. We have received your payment, and {{ organisation_name }} is now on the {{ plan_name }} plan.
+
+Plan: {{ plan_name }}{% if interval_label %} ({{ interval_label }}){% endif %}
+{% if amount %}Amount: {{ amount }}
+{% endif %}Date: {{ paid_on.strftime('%d %b %Y') }}
+{% if renews_on %}Renews on: {{ renews_on.strftime('%d %b %Y') }}
+{% endif %}
+You can see your plan, your invoices and how to cancel on the billing page:
+
+{{ billing_link }}
+
+{% include 'account/email/_help.txt' %}

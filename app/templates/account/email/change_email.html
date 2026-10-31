@@ -1,0 +1,7 @@
+<p>Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},</p>
+
+<p>To confirm your new e-mail address, <a href="{{ change_email_link }}">open this link</a>, or paste it into your browser's address bar:</p>
+
+<p>{{ change_email_link }}</p>
+
+{% include 'account/email/_help.html' %}

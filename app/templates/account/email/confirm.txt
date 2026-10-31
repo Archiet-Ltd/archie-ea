@@ -1,4 +1,4 @@
-Dear {{ user.full_name() }},
+Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},
 
 Welcome to {{ config.APP_NAME }}!
 
@@ -8,6 +8,4 @@ To confirm your e-mail address, open this link:
 
 The link works once{% if expires_at %} and until {{ expires_at.strftime('%d %b %Y %H:%M') }} UTC{% endif %}.
 
-The {{ config.APP_NAME }} Team
-
-Note: replies to this email address are not monitored.
+{% include 'account/email/_help.txt' %}

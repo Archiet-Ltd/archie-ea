@@ -1,0 +1,3 @@
+Need help? {% if support_email %}Write to {{ support_email }}{% if help_url %} or visit {{ help_url }}{% endif %}.{% elif help_url %}Visit {{ help_url }} and tell us what you need.{% endif %}
+
+The {{ config.APP_NAME }} Team

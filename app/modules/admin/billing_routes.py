@@ -35,6 +35,24 @@ def _org():
     return current_org()
 
 
+def _send_billing_mail(org, subject, template, **context):
+    """Tell the signed-in administrator what just happened to the plan. A message that does not go
+    out is logged and never undoes the payment or the cancellation it reports."""
+    from flask_login import current_user
+
+    from app.flask_email import deliver_email
+
+    try:
+        delivered, error = deliver_email(
+            current_user.email, subject, template, user=current_user, organisation_name=org.name,
+            billing_link=url_for("billing.billing_index", _external=True), **context)
+    except Exception:  # noqa: BLE001 — mail must not turn a finished payment into an error page
+        logger.exception("billing message %r was not sent", subject)
+        return
+    if not delivered:
+        logger.warning("billing message %r was not sent: %s", subject, error)
+
+
 def _seats(raw):
     if raw in (None, ""):
         return None
@@ -170,6 +188,25 @@ def billing_upgrade():
     return redirect(checkout_url, code=303)
 
 
+def _send_receipt(org, plan):
+    from datetime import datetime, timezone
+
+    from app.services import billing_plans
+    from app.services.billing_service import BillingService
+
+    subscription = billing_plans.current_subscription(org)
+    interval = getattr(subscription, "billing_interval", None)
+    price = BillingService.price_summary(plan.key, interval) if interval else None
+    amount = None
+    if price and price.get("amount") is not None and price.get("currency"):
+        amount = "%s %.2f" % (price["currency"], price["amount"])
+    _send_billing_mail(
+        org, "Payment received for the %s plan" % plan.name, "account/email/payment_receipt",
+        plan_name=plan.name, amount=amount, paid_on=datetime.now(timezone.utc),
+        interval_label={"year": "billed yearly", "month": "billed monthly"}.get(interval),
+        renews_on=getattr(subscription, "current_period_end", None))
+
+
 @billing_bp.route("/checkout/complete")
 @login_required
 @admin_required
@@ -186,6 +223,7 @@ def billing_checkout_complete():
     except BillingError as exc:
         flash(str(exc), "error")
         return redirect(url_for("billing.billing_index"))
+    _send_receipt(org, plan)
     flash(f"Payment received. Your organisation is on the {plan.name} plan.", "success")
     return redirect(url_for("billing.billing_index"))
 
@@ -234,6 +272,11 @@ def billing_cancel():
     except BillingError as exc:
         flash(str(exc), "error")
         return redirect(url_for("billing.billing_index"))
+    from app.services import billing_plans
+
+    _send_billing_mail(
+        org, "Your subscription is cancelled", "account/email/subscription_cancelled",
+        plan_name=billing_plans.effective_plan(billing_plans.current_subscription(org)).name, ends_on=ends)
     when = ends.strftime("%d %b %Y") if ends else "the end of the paid period"
     flash(f"Your subscription is cancelled. The plan stays in place until {when}.", "success")
     return redirect(url_for("billing.billing_index"))

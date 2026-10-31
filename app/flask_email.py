@@ -2,7 +2,7 @@ import logging
 import os
 import smtplib
 
-from flask import after_this_request, current_app, has_request_context, render_template
+from flask import after_this_request, current_app, has_request_context, render_template, request
 from flask_mail import Connection, Message
 
 from app import create_app, mail
@@ -45,7 +45,18 @@ class _BoundedConnection(Connection):
         return host
 
 
+def _help_details(app):
+    """Where a person writes for help: a support address when one is set, and the site's contact page."""
+    base = request.host_url if has_request_context() else (app.config.get("PUBLIC_BASE_URL") or "")
+    return {
+        "support_email": app.config.get("SUPPORT_EMAIL") or None,
+        "help_url": base.rstrip("/") + "/contact" if base else None,
+    }
+
+
 def _compose(app, recipient, subject, template, **kwargs):
+    for key, value in _help_details(app).items():
+        kwargs.setdefault(key, value)
     msg = Message(
         app.config.get("EMAIL_SUBJECT_PREFIX", "") + " " + subject,
         sender=mail_sender(app),

@@ -1,0 +1,14 @@
+<p>Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},</p>
+
+<p>Thank you. We have received your payment, and <b>{{ organisation_name }}</b> is now on the {{ plan_name }} plan.</p>
+
+<p>Plan: {{ plan_name }}{% if interval_label %} ({{ interval_label }}){% endif %}<br>
+{% if amount %}Amount: {{ amount }}<br>
+{% endif %}Date: {{ paid_on.strftime('%d %b %Y') }}{% if renews_on %}<br>
+Renews on: {{ renews_on.strftime('%d %b %Y') }}{% endif %}</p>
+
+<p>You can see your plan, your invoices and how to cancel on <a href="{{ billing_link }}">the billing page</a>, or paste this into your browser's address bar:</p>
+
+<p>{{ billing_link }}</p>
+
+{% include 'account/email/_help.html' %}
