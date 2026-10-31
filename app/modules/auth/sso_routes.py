@@ -308,8 +308,10 @@ def admin_sso():
     config = SSOConfig.query.filter_by(organization_id=org_id).first() if org_id else None
 
     def _refused():
-        # Show the form again with what was typed, so it can be corrected, not retyped.
-        return render_template("admin/sso.html", config=config, form=request.form)
+        # Redirect as before, but keep what was typed (never the client secret) so the form
+        # comes back filled in and can be corrected, not retyped.
+        session["sso_form_values"] = {k: v for k, v in request.form.items() if k != "client_secret"}
+        return redirect(url_for("sso.admin_sso"))
 
     if request.method == "POST":
         protocol = request.form.get("protocol", "oidc")
@@ -379,7 +381,7 @@ def admin_sso():
 
         return redirect(url_for("sso.admin_sso"))
 
-    return render_template("admin/sso.html", config=config)
+    return render_template("admin/sso.html", config=config, form=session.pop("sso_form_values", None))
 
 
 @sso_bp.route("/admin/sso/test", methods=["GET"])

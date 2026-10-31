@@ -16,7 +16,7 @@
 <div class="p-6 space-y-6">
 {{ page_shell(title='SSO / Identity Federation',
               subtitle='Single sign-on with SAML 2.0 or OIDC. Once enabled, people with a matching email domain are sent to your identity provider at sign-in.',
-              breadcrumb=[('Home', url_for('main.index')), ('Admin', url_for('admin.index')), ('SSO Configuration', none)]) }}
+              breadcrumb=[('Home', '/'), ('Admin', url_for('admin.index')), ('SSO Configuration', none)]) }}
 
 <div class="max-w-2xl space-y-6">
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -32,14 +32,14 @@
       {{ ui.card_title(text='Identity provider') }}
       {{ ui.card_description(text='OIDC works with Entra ID, Okta, Google Workspace and any standards-compliant provider. SAML 2.0 verifies signed assertions.') }}
     {% endcall %}
-    <form method="POST" action="{{ url_for('sso.admin_sso') }}" class="space-y-6" x-data="{ protocol: '{{ 'saml' if protocol == 'saml' else 'oidc' }}', on: {{ 'true' if sso_on else 'false' }} }">
+    <form method="POST" action="{{ url_for('sso.admin_sso') }}" class="space-y-6" id="sso-form">
       {% call ui.card_content() %}
         {{ hidden_input('csrf_token', csrf_token()) }}
         <div class="space-y-6">
           {% call ui.field() %}
             {{ ui.field_label(text='Protocol', attrs={'for': 'protocol'}) }}
             {% call ui.native_select_wrapper(class='relative w-full') %}
-              {% call ui.native_select(id='protocol', name='protocol', class='w-full', attrs={'x-model': 'protocol'}) %}
+              {% call ui.native_select(id='protocol', name='protocol', class='w-full', attrs={'data-protocol-toggle': ''}) %}
                 {{ ui.native_select_option(text='OIDC / OpenID Connect (recommended)', value='oidc', selected=(protocol == 'oidc')) }}
                 {{ ui.native_select_option(text='SAML 2.0', value='saml', selected=(protocol == 'saml')) }}
               {% endcall %}
@@ -52,7 +52,7 @@
             {{ ui.field_description(text='People with these email domains are sent to your identity provider at sign-in. Separate several with commas.') }}
           {% endcall %}
 
-          <div class="space-y-6" x-show="protocol !== 'saml'" data-testid="sso-oidc-fields">
+          <div class="space-y-6{{ ' hidden' if protocol == 'saml' else '' }}" id="oidc-fields" data-testid="sso-oidc-fields">
             {% call ui.field() %}
               {{ ui.field_label(text='IdP Discovery URL', attrs={'for': 'idp_metadata_url'}) }}
               {{ ui.input(id='idp_metadata_url', name='idp_metadata_url', type='url', value=current('idp_metadata_url'), placeholder='https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration', class='w-full font-mono') }}
@@ -71,7 +71,7 @@
             {% endcall %}
           </div>
 
-          <div class="space-y-6" x-show="protocol === 'saml'" x-cloak data-testid="sso-saml-fields">
+          <div class="space-y-6{{ '' if protocol == 'saml' else ' hidden' }}" id="saml-fields" data-testid="sso-saml-fields">
             <p class="text-sm text-muted-foreground">Your identity provider must send a persistent NameID, or a subject-id or pairwise-id attribute. A temporary NameID is refused.</p>
             {% call ui.field() %}
               {{ ui.field_label(text='IdP SSO URL', attrs={'for': 'idp_sso_url'}) }}
@@ -90,9 +90,9 @@
           </div>
 
           <div class="flex items-center gap-3">
-            {% call ui.switch(id='enabled', attrs={'@click': 'on = !on', ':aria-checked': 'on', ':data-state': "on ? 'checked' : 'unchecked'", 'aria-label': 'Enable SSO for this organisation'}) %}{{ ui.switch_thumb() }}{% endcall %}
+            {% call ui.switch(id='enabled', checked=sso_on, attrs={'aria-label': 'Enable SSO for this organisation'}) %}{{ ui.switch_thumb() }}{% endcall %}
             {{ ui.field_label(text='Enable SSO for this organisation', attrs={'for': 'enabled'}) }}
-            {{ ui.input(type='hidden', name='enabled', attrs={':value': "on ? 'on' : 'off'"}) }}
+            {{ ui.input(type='hidden', name='enabled', id='enabled-value', value=('on' if sso_on else 'off')) }}
           </div>
         </div>
       {% endcall %}
@@ -139,4 +139,34 @@
   {% endif %}
 </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    // The enable switch and the protocol choice are plain page behaviour, so they work without any
+    // other script on the page.
+    var form = document.getElementById('sso-form');
+    if (!form) { return; }
+    var sw = document.getElementById('enabled');
+    var value = document.getElementById('enabled-value');
+    var select = document.getElementById('protocol');
+    var oidc = document.getElementById('oidc-fields');
+    var saml = document.getElementById('saml-fields');
+    if (sw && value) {
+        sw.addEventListener('click', function () {
+            var on = sw.getAttribute('aria-checked') !== 'true';
+            sw.setAttribute('aria-checked', on ? 'true' : 'false');
+            sw.setAttribute('data-state', on ? 'checked' : 'unchecked');
+            value.value = on ? 'on' : 'off';
+        });
+    }
+    function showProtocol() {
+        var isSaml = select && select.value === 'saml';
+        if (oidc) { oidc.classList.toggle('hidden', isSaml); }
+        if (saml) { saml.classList.toggle('hidden', !isSaml); }
+    }
+    if (select) { select.addEventListener('change', showProtocol); showProtocol(); }
+})();
+</script>
 {% endblock %}

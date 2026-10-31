@@ -95,6 +95,10 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
                     '{% block extra_js %}{% endblock %}'}),
         FileSystemLoader(str(Path(__file__).resolve().parents[1] / "app/templates")),
     ])
+    # The page is built from the shared component library, whose Jinja globals the real
+    # application registers at boot; this isolated application needs them to render it.
+    from app.basecoat_kit import init_basecoat
+    init_basecoat(application)
     application.add_url_rule("/admin", "admin.index", lambda: "Admin")
     application.register_blueprint(sso_routes.sso_bp)
 

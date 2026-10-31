@@ -20,7 +20,7 @@
 <div class="p-6 space-y-6">
 {{ page_shell(title='Jira Push Integration',
               subtitle='Push enriched application portfolio data to Jira so other teams can work on architecture decisions together.',
-              breadcrumb=[('Home', url_for('main.index')), ('Admin', url_for('admin.index')), ('Jira Push Integration', none)]) }}
+              breadcrumb=[('Home', '/'), ('Admin', url_for('admin.index')), ('Jira Push Integration', none)]) }}
 
 <div class="max-w-2xl space-y-6">
   {% with messages = get_flashed_messages(with_categories=true) %}
