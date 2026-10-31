@@ -247,7 +247,8 @@
         {% endcall %}
 
         <!-- BIZBOK Capability x Stage Grid -->
-        {% call card.card(id='capability-grid') %}
+        <div id="capability-grid">
+        {% call card.card() %}
             {% call card.card_header(class='border-b border-border') %}
             <div class="flex w-full flex-wrap items-center justify-between gap-3">
                 <div>
@@ -341,6 +342,7 @@
                 </div>
             {% endcall %}
         {% endcall %}
+        </div>
     </div>
 
     <!-- Cell edit modal -->
