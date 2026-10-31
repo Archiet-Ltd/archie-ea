@@ -1009,12 +1009,20 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
         assert sources.count() == len(BIAN_STARTER), sources.count()
         for area, _domains in BIAN_STARTER:
             expect(page.get_by_role("button", name=re.compile(re.escape(area))).first).to_be_visible()
+        # Each card sits under the business area its framework names, never under "Uncategorised".
+        expect(page.locator("main")).not_to_contain_text("Uncategorised")
         shoot(page, "capability-map-after-sign-up")
         # Opening an area lands on its service domains, still marked as a starter entry the person can change.
         page.get_by_role("button", name=re.compile("Operations and Execution")).first.click()
         detail = page.get_by_role("dialog")
         expect(detail).to_contain_text("Payment Order")
         expect(detail.locator("[data-testid=capability-source]")).to_contain_text("Keep it, change it or remove it")
+        # Nobody has assessed it, so it says so and gives the next step rather than a health figure or Gap.
+        expect(detail.get_by_test_id("capability-not-assessed")).to_contain_text("Map an application")
+        expect(detail).to_contain_text("Not assessed yet")
+        expect(detail).not_to_contain_text("Health 30%")
+        expect(detail).not_to_contain_text("30%")
+        expect(detail).not_to_contain_text("Gap")
         shoot(page, "capability-detail-after-sign-up")
 
         # The compliance page lists ISO 27001 as adopted from sign-up, and opening it shows its controls.
@@ -1028,6 +1036,8 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
         expect(row.get_by_test_id("framework-adopted")).to_contain_text("starter, chosen at sign-up")
         expect(page.get_by_test_id("framework-adopted")).to_have_count(1)
         expect(page.locator("main")).not_to_contain_text("planned: 3")  # adopted controls are not application mappings
+        # Three of the standard's 93 controls are loaded, and the page says so rather than reading as a full adoption.
+        expect(row.get_by_test_id("controls-loaded")).to_contain_text("3 of 93 controls loaded")
         row.click()
         controls = page.locator("tr:visible", has_text="Use of Cryptography")
         expect(controls.first).to_be_visible()
@@ -1037,6 +1047,7 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
         page.goto(str(server) + "/frameworks/", wait_until="domcontentloaded")
         card = page.locator("[data-framework-card='ISO - 27001']")
         expect(card).to_contain_text("Chosen at sign-up")
+        expect(card.get_by_test_id("controls-loaded")).to_have_text("3 of 93 controls loaded")
         card.click()
         page.wait_for_url("**/dashboard/compliance")
         expect(page.get_by_test_id("framework-adopted")).to_have_count(1)
@@ -1078,7 +1089,7 @@ def test_changing_the_industry_in_settings_adds_the_new_set_and_offers_to_remove
 
     context, page = new_page(browser)
     try:
-        _choose_at_sign_up(page, server, people, app, "Banking and payments", [])
+        email = _choose_at_sign_up(page, server, people, app, "Banking and payments", [])
         _capability_map(page, server, True)
         page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
         expect(page.get_by_test_id("starter-offer")).to_be_hidden()
@@ -1100,6 +1111,16 @@ def test_changing_the_industry_in_settings_adds_the_new_set_and_offers_to_remove
             page.wait_for_timeout(3000)
         expect(page.locator("[data-testid=capability-source]:visible").first).to_have_text("Starter capability from APQC, chosen at sign-up")
         expect(page.locator("main")).not_to_contain_text("Sales and Service")
+        # The model repository no longer holds the removed capabilities either.
+        with app.app_context():
+            from app import db
+
+            left = set(db.session.execute(db.text(
+                "SELECT e.name FROM archimate_elements e JOIN users u ON u.organization_id = e.organization_id "
+                "WHERE u.email = :e"), {"e": email}).scalars().all())
+            db.session.remove()
+        assert not {"Sales and Service", "Current Account", "Payment Execution"} & left
+        assert "Develop Vision and Strategy" in left
         # Reloading Settings does not offer it again.
         page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
         expect(page.get_by_test_id("starter-offer")).to_be_hidden()

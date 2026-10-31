@@ -787,30 +787,51 @@ def remove_unedited_starter_rows(org, model: str) -> int:
         db.session.delete(row)
         db.session.flush()
         removed += 1
-    for element_id, name, description in mirrored:
-        _remove_unchanged_element(org.id, element_id, name, description)
+    _remove_unchanged_elements(org.id, mirrored)
     db.session.commit()
     _refresh_capability_map(org.id)
     return removed
 
 
-def _remove_unchanged_element(org_id: int, element_id: int, name: str, description: Optional[str]) -> None:
-    """Remove the model element mirrored from a removed starter capability, unless somebody has changed it
-    or linked it to something. The element goes through the session, so the audit log records it."""
+def _remove_unchanged_elements(org_id: int, mirrored) -> None:
+    """Remove the model elements mirrored from removed starter capabilities, unless somebody has changed one
+    or linked it to something. They go through the session, one flush, so the audit log records each."""
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-    element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
-    if element is None or element.source_kind != "starter" or element.name != name:
+    if not mirrored:
         return
-    if (element.description or None) not in (description or None, "Business capability: %s" % name):
+    wanted = {element_id: (name, description) for element_id, name, description in mirrored}
+    linked = set()
+    for source_id, target_id in db.session.query(ArchiMateRelationship.source_id, ArchiMateRelationship.target_id).filter(
+        db.or_(ArchiMateRelationship.source_id.in_(wanted), ArchiMateRelationship.target_id.in_(wanted))
+    ):
+        linked.update((source_id, target_id))
+    unchanged = []
+    for element in ArchiMateElement.query.filter(
+        ArchiMateElement.organization_id == org_id, ArchiMateElement.id.in_(wanted)
+    ).all():
+        name, description = wanted[element.id]
+        if (
+            element.source_kind == "starter" and element.name == name and element.id not in linked
+            and (element.description or None) in (description or None, "Business capability: %s" % name)
+        ):
+            unchanged.append(element)
+    if not unchanged:
         return
-    linked = ArchiMateRelationship.query.filter(
-        db.or_(ArchiMateRelationship.source_id == element_id, ArchiMateRelationship.target_id == element_id)
-    ).first()
-    if linked is not None:
-        return
+    ids = [element.id for element in unchanged]
     try:
+        # One statement, scoped to the organisation. The database records each deleted row in the entity
+        # history itself, so the audit trail is the same as for a row deleted through the session.
         with db.session.begin_nested():
-            db.session.delete(element)
+            ArchiMateElement.query.filter(
+                ArchiMateElement.organization_id == org_id, ArchiMateElement.id.in_(ids)
+            ).delete(synchronize_session=False)
+        db.session.expire_all()
     except Exception:
-        _log.warning("could not remove model element %s for organisation %s", element_id, org_id, exc_info=True)
+        _log.info("bulk removal of the model elements failed for organisation %s; removing one by one", org_id, exc_info=True)
+        for element in unchanged:
+            try:
+                with db.session.begin_nested():
+                    db.session.delete(element)
+            except Exception:
+                _log.warning("could not remove model element %s for organisation %s", element.id, org_id, exc_info=True)
