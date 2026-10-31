@@ -406,3 +406,88 @@ def test_deleting_an_organisation_whose_person_another_organisation_names_is_ref
         person = db.session.get(User, made["person_id"])
         assert person is not None and person.organization_id == made["doomed_id"]
         db.session.remove()
+
+
+@pytest.fixture
+def doomed_named_in_a_comment(app):
+    """An organisation whose only member commented on an element of a second organisation."""
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed_org = Organization(name="Journey Comment A %s" % marker, slug="journey-comment-a-%s" % marker)
+        other = Organization(name="Journey Comment B %s" % marker, slug="journey-comment-b-%s" % marker)
+        db.session.add_all([doomed_org, other])
+        db.session.flush()
+        person = User(first_name="Casey", last_name="Commenter%s" % marker, email="casey-%s@example.test" % marker,
+                      password="test-password-123", confirmed=True, organization_id=doomed_org.id)
+        element = ArchiMateElement(name="Order to Cash %s" % marker, type="BusinessProcess", layer="Business",
+                                   organization_id=other.id)
+        db.session.add_all([person, element])
+        db.session.flush()
+        db.session.execute(db.text(
+            "INSERT INTO archimate_element_comments (element_id, user_id, comment_text, created_at) "
+            "VALUES (:e, :u, :t, now())"), {"e": element.id, "u": person.id, "t": "Needs a named owner %s" % marker})
+        db.session.commit()
+        made = {"doomed_id": doomed_org.id, "doomed_name": doomed_org.name, "other_id": other.id,
+                "other_name": other.name, "person_id": person.id, "text": "Needs a named owner %s" % marker}
+        db.session.remove()
+    yield made
+    with app.app_context():
+        from app.services.org_deletion_service import OrganizationDeletionService
+
+        db.session.execute(db.text("DELETE FROM archimate_element_comments WHERE comment_text = :t"),
+                           {"t": made["text"]})
+        db.session.commit()
+        for key in ("other_id", "doomed_id"):
+            if db.session.get(Organization, made[key]) is not None:
+                OrganizationDeletionService.delete_organization(made[key])
+        db.session.remove()
+
+
+def test_deleting_an_organisation_whose_person_commented_on_another_organisations_element_is_refused(
+    page, live_server, seeded, app, doomed_named_in_a_comment,
+):
+    """The comment sits in a table with no organisation column. The page names the other organisation,
+    the comment is still there, and the organisation is still listed."""
+    import os
+
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    made = doomed_named_in_a_comment
+    walk = os.environ.get("WALK_DIR")
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+    page.goto(live_server + "/admin/organizations/%d" % made["doomed_id"], wait_until="domcontentloaded")
+    page.locator("form[action$='/organizations/%d/delete']" % made["doomed_id"]).get_by_role(
+        "button", name="Delete organisation"
+    ).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_url("**/admin/organizations/%d" % made["doomed_id"], timeout=PAGE_TIMEOUT)
+
+    text = page.get_by_text("is named by records of", exact=False).first.inner_text()
+    assert "1 person in %s is named by records of %s" % (made["doomed_name"], made["other_name"]) in text, text
+    assert "Nothing was deleted" in text
+    if walk:
+        for scheme in ("light", "dark"):
+            page.emulate_media(color_scheme=scheme)
+            page.evaluate("s => document.documentElement.classList.toggle('dark', s === 'dark')", scheme)
+            for width, height in ((1440, 900), (390, 844)):
+                page.set_viewport_size({"width": width, "height": height})
+                page.wait_for_timeout(800)
+                page.screenshot(path=os.path.join(walk, "comment-refusal-%s-%d.png" % (scheme, width)), full_page=True)
+        page.set_viewport_size({"width": 1440, "height": 900})
+
+    page.goto(live_server + "/admin/organizations", wait_until="domcontentloaded")
+    assert page.get_by_role("link", name=made["doomed_name"]).count() >= 1, "the organisation vanished from the list"
+    with app.app_context():
+        assert db.session.get(Organization, made["doomed_id"]) is not None
+        assert db.session.get(User, made["person_id"]) is not None
+        kept = db.session.execute(db.text(
+            "SELECT count(*) FROM archimate_element_comments WHERE comment_text = :t"), {"t": made["text"]}).scalar()
+        assert kept == 1, "the other organisation's comment was removed"
+        db.session.remove()
