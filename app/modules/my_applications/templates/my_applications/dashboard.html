@@ -2,7 +2,7 @@
 {# smoke-coverage-ok: covered by tests/smoke/test_my_applications_dashboard_journey.py #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
-{% import 'dashboards/_overview_parts.html' as d %}
+{% import 'dashboards/_overview_parts.html' as d with context %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'macros/page_shell.html' import page_shell %}
