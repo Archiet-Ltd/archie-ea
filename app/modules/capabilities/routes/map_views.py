@@ -15,7 +15,7 @@ Helpers:
 """
 
 from flask import abort, current_app, flash, g, jsonify, redirect, render_template, request, url_for  # dead-code-ok
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.extensions.cache import cached
 from app import db
@@ -86,7 +86,20 @@ def index():
         current_app.logger.exception("Could not count business capabilities")
         total_capabilities = None
 
-    return render_template("capability_map/consolidated.html", total_capabilities=total_capabilities)
+    try:
+        from app.modules.account.services import onboarding_service
+
+        # Only when nothing is on the map at all: with capabilities present, an empty result is a filter.
+        no_industry_chosen = not total_capabilities and not onboarding_service.choices(current_user.organization)["industry"]
+    except Exception:
+        current_app.logger.exception("Could not read the industry chosen at sign-up")
+        no_industry_chosen = False
+
+    return render_template(
+        "capability_map/consolidated.html",
+        total_capabilities=total_capabilities,
+        no_industry_chosen=no_industry_chosen,
+    )
 
 
 # Redirects from old capability pages to the consolidated page with lens/view params.

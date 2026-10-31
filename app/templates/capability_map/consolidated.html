@@ -12,6 +12,7 @@
 {% block title %}Capability Map{% endblock %}
 
 {% block content %}
+{% set no_industry_text = 'No industry was chosen at sign-up, so no starter capabilities were loaded. Choose your industry in Settings to load them, or add your own capabilities.' %}
 <div x-data="capabilityMap()" x-init="init()" class="flex-1 overflow-auto">
     <!-- Page Header -->
     {{ page_shell(
@@ -159,11 +160,11 @@
         <template x-if="filteredDomains.length === 0">
             {{ empty_state(
                 icon='layout-grid',
-                title='No capabilities found',
-                description='No capabilities match your current filters. Try adjusting your search or lens.',
-                cta_text='Clear filters',
-                cta_href='#',
-                cta_icon='x'
+                title='No capabilities yet' if no_industry_chosen else 'No capabilities found',
+                description=no_industry_text if no_industry_chosen else 'No capabilities match your current filters. Try adjusting your search or lens.',
+                cta_text='Open Settings' if no_industry_chosen else 'Clear filters',
+                cta_href=url_for('account.manage') if no_industry_chosen else '#',
+                cta_icon='settings' if no_industry_chosen else 'x'
             ) }}
         </template>
 
@@ -459,11 +460,11 @@
                             <td colspan="11" class="px-4 py-8 text-center text-muted-foreground">
                                 {{ empty_state(
                                     icon='search-x',
-                                    title='No capabilities found',
-                                    description='No capabilities match your current filters.',
-                                    cta_text='Clear filters',
-                                    cta_href='#',
-                                    cta_icon='x'
+                                    title='No capabilities yet' if no_industry_chosen else 'No capabilities found',
+                                    description=no_industry_text if no_industry_chosen else 'No capabilities match your current filters.',
+                                    cta_text='Open Settings' if no_industry_chosen else 'Clear filters',
+                                    cta_href=url_for('account.manage') if no_industry_chosen else '#',
+                                    cta_icon='settings' if no_industry_chosen else 'x'
                                 ) }}
                             </td>
                         </tr>

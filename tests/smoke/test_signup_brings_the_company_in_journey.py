@@ -1082,7 +1082,15 @@ def test_software_loads_apqc_and_another_organisation_sees_none_of_it(browser, s
         expect(other.get_by_test_id("capability-source")).to_have_count(0)
         expect(other.locator("main")).not_to_contain_text("Develop Vision and Strategy")
         expect(other.locator("main")).not_to_contain_text("Sales and Service")
+        # The map says why it is empty and offers the way to fix it, never a filter that was not set.
+        expect(other.locator("main")).to_contain_text("No industry was chosen at sign-up")
+        expect(other.locator("main")).not_to_contain_text("No capabilities match your current filters")
         shoot(other, "capability-map-nothing-chosen")
+        other.get_by_role("link", name="Open Settings").first.click()
+        other.wait_for_load_state("domcontentloaded")
+        assert "/account/manage" in other.url, other.url
+        expect(other.get_by_test_id("company-choices-card")).to_be_visible()
+        expect(other.get_by_test_id("company-choices-card")).to_contain_text("Your industry picks the starter capability model")
         other.goto(str(server) + "/dashboard/compliance", wait_until="domcontentloaded")
         expect(other.get_by_test_id("framework-adopted")).to_have_count(0)
     finally:
