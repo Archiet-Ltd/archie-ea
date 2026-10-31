@@ -1,7 +1,7 @@
 {# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
@@ -67,7 +67,7 @@
                 {% for node in tree %}{{ pcf_node(node) }}{% endfor %}
             </ul>
             {% else %}
-            {{ empty_state(icon='workflow', title='This framework has no processes loaded', description='Ask a platform administrator to check the installation.') }}
+            {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='This framework has no processes loaded') }}{{ ui.empty_description(text='Ask a platform administrator to check the installation.') }}{% endcall %}{% endcall %}
             {% endif %}
         </div>
         {% endcall %}
@@ -111,7 +111,7 @@
                 {% endfor %}
             </ul>
             {% else %}
-            {{ empty_state(icon='lightbulb', title='No processes are particular to this framework', description='The cross-industry framework is the baseline every other framework builds on. Adopt processes from an industry framework, or browse the hierarchy.') }}
+            {% call ui.empty() %}{% call ui.empty_header() %}{{ ui.empty_title(text='No processes are particular to this framework') }}{{ ui.empty_description(text='The cross-industry framework is the baseline every other framework builds on. Adopt processes from an industry framework, or browse the hierarchy.') }}{% endcall %}{% endcall %}
             {% endif %}
 
             {% if pending %}
