@@ -1,6 +1,7 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state as shell_empty %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -16,9 +17,14 @@
            ('Diagram', url_for('business_architecture.processes', view='diagram'), view == 'diagram')]) }}
 
   {% if not items %}
-    {{ shell_empty(icon='workflow', headline='No business processes yet',
-       body='Processes appear here once they are in the model. Add one from the architecture elements, then draw how it runs.',
-       cta_label='Open architecture elements', cta_href=url_for('archimate_crud.dashboard', layer='business', element_type='BusinessProcess')) }}
+    {% call ui.empty(class='p-6 md:p-10') %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('git-branch') }}{% endcall %}
+        {{ ui.empty_title(text='No business processes yet') }}
+        {{ ui.empty_description(text='Processes appear here once they are in the model. Add one from the architecture elements, then draw how it runs.') }}
+      {% endcall %}
+      {% call ui.empty_content() %}{% call ui.button(href=url_for('archimate_crud.dashboard', layer='business', element_type='BusinessProcess')) %}Open architecture elements{% endcall %}{% endcall %}
+    {% endcall %}
   {% elif view == 'list' %}
     <div class="overflow-hidden rounded-lg border border-border bg-card">
     {% call table(attrs_dict={'data-testid': 'processes-table'}) %}
