@@ -11,7 +11,7 @@
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/alert.html' import alert %}
 {% set step = step | default(1) %}
-{% set sign_up_steps = [{'num': 1, 'label': 'Your account'}, {'num': 2, 'label': 'Your sources'}, {'num': 3, 'label': 'Your company'}, {'num': 4, 'label': 'Your AI provider'}] %}
+{% set sign_up_steps = [{'num': 1, 'label': 'Your account'}, {'num': 2, 'label': 'Your sources'}, {'num': 3, 'label': 'Your company'}, {'num': 4, 'label': 'Your AI chat'}] %}
 {% block content %}
 {# layouts/public_base.html already renders the sole <main id="main-content">
    landmark. Wrapping the page in a second one gave the document two main

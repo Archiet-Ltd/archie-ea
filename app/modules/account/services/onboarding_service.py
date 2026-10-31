@@ -353,6 +353,28 @@ def _source_state(org_id: int, task: str, label: str, done_text) -> Dict[str, An
     return {"state": "waiting", "text": "%s is connected. Reading starts in a moment; carry on." % label}
 
 
+def assistant_connection(user) -> Optional[Dict[str, Any]]:
+    """The person's own AI chat, once it has signed in: the newest grant Connected assistants lists for them."""
+    from app.modules.oauth_provider.assistants_routes import connected_grants
+
+    grants = connected_grants(user.id) if user is not None else []
+    if not grants:
+        return None
+    newest = grants[0]
+    connected_at = newest.get("connected_at")
+    return {
+        "client": newest["client_name"],
+        "connected_at": connected_at.isoformat() if connected_at else None,
+    }
+
+
+def mcp_address() -> str:
+    """The address the person adds to their chat: this workspace's /mcp."""
+    from flask import request
+
+    return request.host_url.rstrip("/") + "/mcp"
+
+
 def sources(org) -> List[Dict[str, Any]]:
     """How far each source the person gave has got, one line each, for sign-up and the dashboard."""
     rows = []

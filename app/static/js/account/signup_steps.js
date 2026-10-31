@@ -79,6 +79,43 @@
         wanted.forEach(function (anchor) { if (anchor) actions.appendChild(anchor); });
     }
 
+    // The person's own AI chat: the status poll carries the first sign-in, and the step says so without a reload.
+    function paintAssistant(found) {
+        var line = root.querySelector('[data-assistant-connected]');
+        if (!line || !found) return;
+        var when = found.connected_at ? new Date(found.connected_at) : null;
+        var at = when && !isNaN(when.getTime()) ? ' at ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        line.textContent = 'Connected: ' + found.client + at;
+        line.classList.remove('text-muted-foreground');
+        line.setAttribute('data-client', found.client);
+    }
+
+    var CHAT_TAB = 'entelim-signup-chat';
+    function rememberChatTab() {
+        var tabs = root.querySelector('[data-chat-tabs]');
+        if (!tabs) return;
+        var saved = null;
+        try { saved = window.localStorage.getItem(CHAT_TAB); } catch (e) { saved = null; /* swallow-ok: storage is a convenience; the first tab shows */ }
+        var wanted = saved && tabs.querySelector('[data-slot="tabs-trigger"][data-value="' + saved + '"]');
+        if (wanted) wanted.click();
+        tabs.addEventListener('click', function (event) {
+            var trigger = event.target.closest('[data-slot="tabs-trigger"]');
+            if (!trigger) return;
+            try { window.localStorage.setItem(CHAT_TAB, trigger.getAttribute('data-value')); } catch (e) { /* swallow-ok: remembering the tab is a convenience */ }
+        });
+    }
+
+    function copyAddress(button) {
+        var holder = root.querySelector('[data-mcp-address]');
+        var address = holder ? holder.getAttribute('data-mcp-address') : '';
+        if (!address || !navigator.clipboard) return;
+        navigator.clipboard.writeText(address).then(function () {
+            var original = button.textContent;
+            button.textContent = 'Copied';
+            window.setTimeout(function () { button.textContent = original; }, 2000);
+        }).catch(function () { say('chat', 'Select the address and copy it by hand.', true); });
+    }
+
     var announced = false;
     function paint(sources) {
         (sources || []).forEach(function (row) {
@@ -104,11 +141,13 @@
         timer = window.setInterval(function () {
             window.Platform.fetch.get(URLS.status, null, { silent: true }).then(function (body) {
                 paint(body.sources);
+                paintAssistant(body.assistant_connected);
                 var site = (body.sources || []).filter(function (row) { return row.key === 'website'; })[0];
                 if (site && (site.state === 'done' || site.facts_ready) && root.hasAttribute('data-reload-when-read')) {
                     saveEverything().then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
                 }
-                var open = (body.sources || []).some(function (row) { return row.state === 'waiting' || row.state === 'reading'; });
+                var open = (body.sources || []).some(function (row) { return row.state === 'waiting' || row.state === 'reading'; })
+                    || (!!root.querySelector('[data-assistant-connected]') && !body.assistant_connected);
                 if (!open) { window.clearInterval(timer); timer = null; }
             }).catch(function () { /* swallow-ok: a missed poll is retried on the next tick; the last line stays on screen */ });
         }, 3000);
@@ -171,7 +210,9 @@
         var button = event.target.closest('[data-action]');
         if (!button) return;
         var action = button.getAttribute('data-action');
-        if (action === 'github') {
+        if (action === 'copy-address') {
+            copyAddress(button);
+        } else if (action === 'github') {
             give('github', URLS.github, { organization: value('welcome-github-org'), token: value('welcome-github-token') }, button);
         } else if (action === 'jira') {
             give('jira', URLS.jira, {
@@ -216,7 +257,8 @@
         }
     });
 
-    if (root.hasAttribute('data-reload-when-read')) poll();
+    rememberChatTab();
+    if (root.hasAttribute('data-reload-when-read') || root.querySelector('[data-assistant-connected]')) poll();
     var reading = root.querySelector('[data-state="waiting"], [data-state="reading"]');
     if (reading) poll();
 }());

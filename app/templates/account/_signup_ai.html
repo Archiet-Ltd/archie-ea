@@ -1,4 +1,5 @@
-{# Sign-up step 3: the AI provider. The built-in AI needs nothing; an own key is tested before it is kept. #}
+{# Sign-up step 4: the person's own AI chat. The built-in chat needs nothing; an own key is tested before it is kept. #}
+{% import 'basecoat/index.html' as ui %}
 {% set provider_names = providers | map(attribute=1) | join(' or ') %}
 <div data-signup-steps data-url-ai-test="{{ url_for('account.welcome_ai_test') }}" data-url-status="{{ url_for('account.welcome_status') }}"
      {% if own_key %}data-key-saved="true"{% endif %}
@@ -6,11 +7,46 @@
      x-data="{ ownKey: {{ 'true' if (paying or own_key) else 'false' }} }">
     {% call card() %}
         {% call card_header() %}
-            {% call card_title(class='text-xl') %}Your AI provider{% endcall %}
-            {% call card_description() %}Optional. {{ config.APP_NAME }} answers your questions either way.{% endcall %}
+            {% call card_title(class='text-xl') %}Your AI chat{% endcall %}
+            {% call card_description() %}Optional. Ask about your company inside the AI chat you already use, or use {{ config.APP_NAME }}'s own chat.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}
             {% if website %}{% include 'account/_website_reading.html' %}{% endif %}
+            {% if mcp_address %}
+            <div class="space-y-4" data-testid="signup-ai-chat" data-mcp-address="{{ mcp_address }}">
+                <p class="text-sm text-muted-foreground">Add your workspace to the AI chat you already use. Sign in when it asks, allow read access, and ask your first question there. Until a source is connected, answers come from the sample company or the facts read from your website.</p>
+                {% call ui.code_block(attrs={'data-testid': 'mcp-address'}) %}
+                    {% call ui.code_block_header() %}
+                        {% call ui.code_block_title() %}Your workspace address{% endcall %}
+                        {% call ui.code_block_actions() %}
+                            {{ ui.code_block_copy_button(text='Copy address', class='w-auto px-2', attrs={'data-action': 'copy-address', 'type': 'button'}) }}
+                        {% endcall %}
+                    {% endcall %}
+                    {% call ui.code_block_content() %}{{ ui.code_block_code(text=mcp_address) }}{% endcall %}
+                {% endcall %}
+                {% call ui.tabs(attrs={'data-chat-tabs': ''}) %}
+                    {% call ui.tabs_list() %}
+                        {{ ui.tabs_trigger(text='Claude', attrs={'data-value': 'claude'}) }}
+                        {{ ui.tabs_trigger(text='ChatGPT', attrs={'data-value': 'chatgpt'}) }}
+                        {{ ui.tabs_trigger(text='Cursor', attrs={'data-value': 'cursor'}) }}
+                    {% endcall %}
+                    {% call ui.tabs_content(class='pt-3 text-sm text-muted-foreground', attrs={'data-value': 'claude'}) %}
+                        <ol class="list-decimal space-y-1 pl-5"><li>Open Settings, then Connectors, and choose Add custom connector.</li><li>Paste the address above and save.</li><li>Sign in to {{ config.APP_NAME }} when asked, then choose Allow.</li></ol>
+                    {% endcall %}
+                    {% call ui.tabs_content(class='pt-3 text-sm text-muted-foreground', attrs={'data-value': 'chatgpt'}) %}
+                        <ol class="list-decimal space-y-1 pl-5"><li>Open Settings, then Connectors, and add a new connector.</li><li>Paste the address above and save.</li><li>Sign in to {{ config.APP_NAME }} when asked, then choose Allow.</li></ol>
+                    {% endcall %}
+                    {% call ui.tabs_content(class='pt-3 text-sm text-muted-foreground', attrs={'data-value': 'cursor'}) %}
+                        <ol class="list-decimal space-y-1 pl-5"><li>Open Settings, then MCP, and choose Add new server.</li><li>Paste the address above as the server address and save.</li><li>Sign in to {{ config.APP_NAME }} when asked, then choose Allow.</li></ol>
+                    {% endcall %}
+                {% endcall %}
+                <p class="text-sm" role="status" aria-live="polite" data-testid="assistant-connected" data-assistant-connected
+                   {% if assistant %}data-client="{{ assistant.client }}" data-at="{{ assistant.connected_at or '' }}"{% endif %}>
+                    {% if assistant %}Connected: {{ assistant.client }}{% if assistant.connected_at %} at <time datetime="{{ assistant.connected_at }}">{{ assistant.connected_at[11:16] }}</time>{% endif %}{% else %}<span class="text-muted-foreground">Waiting for your chat to connect. This page updates by itself.</span>{% endif %}
+                </p>
+                <p class="text-sm text-muted-foreground">Then ask: <span class="font-medium text-foreground">What should a startup write down about its software first?</span></p>
+            </div>
+            {% endif %}
             {% macro own_key_card() %}
             <div class="space-y-3" data-testid="signup-own-key" x-show="ownKey" x-cloak>
                 <h2 class="text-sm font-semibold">Add your own AI key</h2>
@@ -32,8 +68,8 @@
             {% endmacro %}
             {% macro built_in_card() %}
             <div class="space-y-2" data-testid="signup-built-in">
-                <h2 class="text-sm font-semibold">Use the built-in AI</h2>
-                <p class="text-sm text-muted-foreground">Nothing to set up. Questions are answered by {{ config.APP_NAME }}'s own provider, and you can add your own key later in Settings.</p>
+                <h2 class="text-sm font-semibold">Prefer {{ config.APP_NAME }}'s built-in chat?</h2>
+                <p class="text-sm text-muted-foreground">Use it as it is, or add your own provider key in <a class="underline underline-offset-4" href="{{ url_for('account.manage') }}">Account settings</a>.</p>
             </div>
             {% endmacro %}
             {% if paying %}
@@ -53,4 +89,5 @@
         {% endcall %}
     {% endcall %}
 </div>
+<script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-ui.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>

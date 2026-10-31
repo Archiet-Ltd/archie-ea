@@ -71,6 +71,8 @@ def add_routes(bp, access) -> None:
             providers=onboarding.PROVIDERS,
             paying=onboarding.on_paying_plan(org),
             own_key=onboarding.own_key_provider(),
+            mcp_address=onboarding.mcp_address() if step == 4 else None,
+            assistant=onboarding.assistant_connection(current_user) if step == 4 else None,
             signin_args={},
         )
 
@@ -78,7 +80,7 @@ def add_routes(bp, access) -> None:
     @login_required
     @access
     def welcome_status():
-        return jsonify(_state_payload(_org()))
+        return jsonify({**_state_payload(_org()), "assistant_connected": onboarding.assistant_connection(current_user)})
 
     @bp.route("/welcome/github", methods=["POST"])
     @login_required

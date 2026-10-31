@@ -258,7 +258,7 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
 
         # Step 4: Community, so the built-in AI comes first.
         page.wait_for_url("**/account/welcome?step=4")
-        expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
+        expect(page.get_by_role("heading", name="Your AI chat")).to_be_visible()
         expect(page.get_by_test_id("signup-built-in")).to_be_visible()
         expect(page.get_by_test_id("signup-own-key")).to_be_hidden()
         shoot(page, "step3-community")

@@ -43,7 +43,7 @@ def live_server(server):
 WALK = os.environ.get("ONB_WALK_DIR")
 QUESTION = "What breaks if Payments service fails"
 SIZES = [("1440", {"width": 1440, "height": 900}), ("390", {"width": 390, "height": 844})]
-STEPS = ("Your account", "Your sources", "Your company", "Your AI provider")
+STEPS = ("Your account", "Your sources", "Your company", "Your AI chat")
 
 
 def _open(browser, viewport):
@@ -142,7 +142,7 @@ def test_new_owner_is_welcomed_in_four_steps_in_their_own_organisation(browser, 
         _shot(page, "step3-company", name)
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=4")
-        expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
+        expect(page.get_by_role("heading", name="Your AI chat")).to_be_visible()
         expect(page.get_by_test_id("signup-built-in")).to_be_visible()
         _shot(page, "step4-ai", name)
         page.get_by_role("button", name="Finish").click()
