@@ -1,4 +1,4 @@
-"""Tenant-fence batch: Vendor tables (T-sec03 slice A).
+"""Tenant-fence batch: Vendor tables.
 
 Each table below belongs to one organisation but had no organization_id (or had one with no
 fence), so it relied on every route remembering an owner check. This revision, per table:

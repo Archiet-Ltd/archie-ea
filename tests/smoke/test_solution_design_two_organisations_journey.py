@@ -1,4 +1,4 @@
-"""A solution design shows only its own organisation's rows (T-sec03 batch 4).
+"""A solution design shows only its own organisation's rows.
 
 The person: an architect opening the design of their own solution. The goal: read the
 design and be sure its stakeholders, its roadmap work package and its capability belong to

@@ -1,4 +1,4 @@
-"""The tenant-fence generator writes a compiling, well-formed batch migration (T-sec03).
+"""The tenant-fence generator writes a compiling, well-formed batch migration.
 
 Runs scripts/tenant_fence_gen.py in a scratch tree: a model gets the tenant mixin and names its parent,
 the migration is emitted with the table in BACKFILL and TENANT_TABLES, and the table leaves the unfenced

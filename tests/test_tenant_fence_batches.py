@@ -1,5 +1,5 @@
 """Every tenant-fence batch migration backfills from the parent, reports what it cannot reach,
-and fences each table (T-sec03 slice A).
+and fences each table.
 
 A batch is any revision in ``migrations/versions`` that defines ``BACKFILL``. Each is run against a
 throw-away database holding the legacy shape of its tables (an id and the parent columns, no
@@ -59,6 +59,8 @@ def legacy_db(request):
         for parent in sorted(external):
             c.execute(text(f"CREATE TABLE {parent} (id serial primary key, organization_id integer)"))
         for table, cols in tables.items():
+            # A table with no parent to derive from already carries its own organisation column.
+            cols = cols or ["organization_id"]
             defs = "".join(f", {col} integer" for col in dict.fromkeys(cols))
             c.execute(text(f"CREATE TABLE {table} (id serial primary key{defs})"))
     yield module, engine
@@ -88,6 +90,11 @@ def _seed(module, engine):
                 if parent not in in_batch and not c.execute(text(f"SELECT count(*) FROM {parent}")).scalar():
                     c.execute(text(f"INSERT INTO {parent} (organization_id) VALUES (1), (2)"))
         for table, sources in module.BACKFILL:
+            if not sources:
+                # No parent names an owner: the rows carry their organisation directly.
+                c.execute(text(f"INSERT INTO {table} (organization_id) VALUES (1), (2)"))
+                expected[table] = [1, 2]
+                continue
             first = sources[0][1]
             c.execute(text(f"INSERT INTO {table} ({first}) VALUES (1), (2), (NULL)"))
             rows = [1, 2, None]
@@ -111,7 +118,10 @@ def test_backfills_from_the_parent_leaves_orphans_unowned_and_fences(legacy_db):
             nullable = c.execute(text(
                 "SELECT is_nullable FROM information_schema.columns WHERE table_name = :t "
                 "AND column_name = 'organization_id'"), {"t": table}).scalar()
-            assert nullable == "YES", f"{table}: an orphan row is left NULL, so the column stays nullable"
+            # An orphan row is left NULL, so a table with a parent stays nullable; a table seeded only
+            # with owned rows (no parent) is tightened, unless the batch keeps it nullable on purpose.
+            keeps = bool(dict(module.BACKFILL)[table]) or table in getattr(module, "KEEP_NULLABLE", ())
+            assert nullable == ("YES" if keeps else "NO"), f"{table}: nullable is {nullable}"
             rls = c.execute(text("SELECT relrowsecurity FROM pg_class WHERE relname = :t"), {"t": table}).scalar()
             policies = c.execute(text("SELECT count(*) FROM pg_policies WHERE tablename = :t"), {"t": table}).scalar()
             assert rls is True and policies == 4, table
@@ -127,10 +137,12 @@ def test_empty_tables_end_not_null_and_fenced(legacy_db):
     module, engine = legacy_db
     _upgrade(module, engine)
     with engine.connect() as c:
+        keep = set(getattr(module, "KEEP_NULLABLE", ()))
         for table, _ in module.BACKFILL:
             assert c.execute(text(
                 "SELECT is_nullable FROM information_schema.columns WHERE table_name = :t "
-                "AND column_name = 'organization_id'"), {"t": table}).scalar() == "NO", table
+                "AND column_name = 'organization_id'"), {"t": table}).scalar() == (
+                    "YES" if table in keep else "NO"), table
             assert c.execute(text("SELECT count(*) FROM pg_policies WHERE tablename = :t"), {"t": table}).scalar() == 4
 
 

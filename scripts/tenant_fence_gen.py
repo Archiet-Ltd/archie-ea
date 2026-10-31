@@ -86,7 +86,7 @@ def tup(items):
     return "(\n" + "".join("    %r,\n" % (i,) for i in items) + ")"
 
 tables_spec = [(t["table"], tuple(tuple(x) for x in t["sources"])) for t in spec["tables"]]
-body = '''"""Tenant-fence batch: __TITLE__ (T-sec03 slice A).
+body = '''"""Tenant-fence batch: __TITLE__.
 
 Each table below belongs to one organisation but had no organization_id (or had one with no
 fence), so it relied on every route remembering an owner check. This revision, per table:

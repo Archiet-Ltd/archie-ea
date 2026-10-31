@@ -1,4 +1,4 @@
-"""The capability, relationship and application tables are fenced per organisation (T-sec03 batch 4).
+"""The capability, relationship and application tables are fenced per organisation.
 
 Two real organisations, each with its own application, solution and capabilities, and a child row in
 each of a spread of the batch's tables (the application-to-capability mapping, capability coverage,

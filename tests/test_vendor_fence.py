@@ -1,4 +1,4 @@
-"""Vendor products are shared-plus-override, and the tables hanging from them are fenced (T-sec03 batch 3).
+"""Vendor products are shared-plus-override, and the tables hanging from them are fenced.
 
 vendor_products is hybrid: a row with no organisation is a shared catalogue row every organisation
 reads and only a platform administrator changes; a row with one belongs to that company. The two

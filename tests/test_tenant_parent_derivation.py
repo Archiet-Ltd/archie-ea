@@ -1,5 +1,4 @@
-"""A new row of a fenced child takes its organisation from its parent when nothing is signed in
-(T-sec03 slice A).
+"""A new row of a fenced child takes its organisation from its parent when nothing is signed in.
 
 Once a table carries organization_id NOT NULL, every writer that runs outside a request (a job, a
 seeder, a command, a test fixture) would fail on it. A model names its parent in
