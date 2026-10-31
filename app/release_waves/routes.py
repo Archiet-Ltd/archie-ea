@@ -15,12 +15,15 @@ CONSENT_TEXT = "Used to tell you when this becomes available, and for nothing el
 
 
 def coming_groups() -> list[dict]:
-    """The capabilities that open in a later release, once each, in alphabetical order."""
+    """The capabilities that open in a later release, once each, in alphabetical order.
+
+    A capability with a page open in the first release is not listed as coming: the person can already use it."""
     doc = wave_map()
+    open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"}
     seen: dict[str, dict] = {}
     for entry in doc["rules"].values():
         wave, code = entry[0], entry[1]
-        if wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
+        if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
         if info and info["title"] not in seen:

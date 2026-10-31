@@ -38242,8 +38242,6 @@
   "app/templates/public/early_access.html": {
    "allowed_macros": [
     "components/button.html",
-    "components/checkbox.html",
-    "components/input.html",
     "components/public_footer.html",
     "components/public_navbar.html"
    ],
@@ -38252,8 +38250,7 @@
    "charts": [],
    "components": [
     "button",
-    "checkbox",
-    "input",
+    "field",
     "public-footer",
     "public-navbar",
     "card",
@@ -38269,10 +38266,7 @@
    "extends": [
     "layouts/public_base.html"
    ],
-   "extra_macros": [
-    "components/checkbox.html",
-    "components/input.html"
-   ],
+   "extra_macros": [],
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [
@@ -38280,9 +38274,6 @@
     "public-navbar:Compose"
    ],
    "macros": [
-    "components/button.html",
-    "components/checkbox.html",
-    "components/input.html",
     "components/public_footer.html",
     "components/public_navbar.html"
    ],

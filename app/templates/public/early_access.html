@@ -5,9 +5,7 @@
    no figure, no claim that it works today. Receives group (title, blurb), group_slug, form_action,
    thanks and error. #}
 {% extends 'layouts/public_base.html' %}
-{% from 'components/button.html' import button %}
-{% from 'components/input.html' import input, hidden_input %}
-{% from 'components/checkbox.html' import checkbox %}
+{% import 'basecoat/index.html' as ui %}
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}{{ group.title }}: early access{% endblock %}
 {% block meta_description %}
@@ -33,13 +31,16 @@
     <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
     {% endif %}
     <form method="POST" action="{{ form_action }}" class="space-y-4" data-testid="early-access-form">
-      {{ hidden_input('csrf_token', csrf_token()) }}
-      <div>
-        <label for="early-access-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
-        {{ input(id='early-access-email', name='email', type='email', required=true) }}
-      </div>
-      {{ checkbox(id='early-access-consent', name='consent', value='1', required=true, label='Used to tell you when this becomes available, and for nothing else.') }}
-      {{ button(text='Join the waiting list', type='submit', testid='early-access-submit') }}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% call ui.field() %}
+        {{ ui.field_label(text='Email', attrs={'for': 'early-access-email'}) }}
+        {{ ui.input(id='early-access-email', name='email', type='email', required=true, autocomplete='email') }}
+      {% endcall %}
+      {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
+        {{ ui.checkbox(id='early-access-consent', name='consent', value='1', required=true) }}
+        {{ ui.field_label(text='Used to tell you when this becomes available, and for nothing else.', attrs={'for': 'early-access-consent'}) }}
+      {% endcall %}
+      {{ ui.button(text='Join the waiting list', type='submit', attrs={'data-testid': 'early-access-submit'}) }}
     </form>
     {% endif %}
   </section>

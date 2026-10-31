@@ -152,6 +152,10 @@ def group_for(entry: list | None) -> tuple[str, dict]:
     return code, groups.get(code) or {"title": "This capability", "blurb": ""}
 
 
+# The group a page with no entry of its own answers under: "this capability", on the waiting list.
+GENERIC_GROUP = "PG-EA"
+
+
 def code_slug(code: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", code.lower()).strip("-")
 

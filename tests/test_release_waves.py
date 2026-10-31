@@ -336,7 +336,7 @@ def test_no_early_access_group_title_or_blurb_carries_plan_wording(wave1):
         assert not banned.search(g["title"]), g["title"]
         assert not banned.search(g["blurb"] or ""), g["blurb"]
     html = wave1.test_client().get("/early-access").get_data(as_text=True)
-    assert "Connectors and integrations" in html
+    assert "Connectors and integrations" not in html  # Connections is open, so it is not listed as coming
     # every group a closed address can answer with reads the same way
     for code, info in wave_map()["groups"].items():
         assert not banned.search(info["title"]), (code, info["title"])
@@ -398,3 +398,20 @@ def test_every_route_an_assistant_tool_reads_is_open_at_wave_one(wave1):
     for name in ("ask_strategy", "ask_portfolio", "ask_programme", "ask_risk", "ask_accountability"):
         assert tool_released(name), name
     assert set(TOOL_ROUTE_PATHS) >= {"ask_impact"}
+
+
+def test_the_hub_does_not_list_a_capability_that_already_has_a_page_open(wave1):
+    from app.release_waves.routes import coming_groups
+
+    titles = {g["title"] for g in coming_groups()}
+    assert "Connectors and integrations" not in titles, "Connections is open in the sidebar, so it is not coming"
+    assert "Capability map, maturity and capability records" not in titles
+    assert titles, "later capabilities are still listed"
+    html = wave1.test_client().get("/early-access").get_data(as_text=True)
+    assert "Connectors and integrations" not in html
+
+
+def test_the_waiting_list_form_labels_its_fields(wave1):
+    html = wave1.test_client().get("/modules/diagrams").get_data(as_text=True)
+    assert 'for="early-access-email"' in html and 'id="early-access-email"' in html
+    assert 'for="early-access-consent"' in html and 'id="early-access-consent"' in html
