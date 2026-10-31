@@ -45,7 +45,10 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
-from app.modules.transformation_room.arb_decision_service import _DECISION_ROLES
+from app.modules.transformation_room.arb_decision_service import (
+    DECISION_ROLES,
+    may_decide_review,
+)
 from app.models.user import User
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
@@ -75,7 +78,7 @@ arb_analytics = ARBAnalyticsService()
 # Who may run a board or approve an exception: the persona set the typed
 # decision service accepts as a decider (its one source), plus the "admin"
 # name the role check folds Administrator into.
-ARB_APPROVER_ROLES = ("admin", *sorted(_DECISION_ROLES))
+ARB_APPROVER_ROLES = ("admin", *sorted(DECISION_ROLES))
 
 
 def _viewer_may_run_board():
@@ -1542,18 +1545,7 @@ def create_review():
 @login_required
 def review_detail(id):
     """View review item details."""
-    review = ARBReviewItem.query.options(
-        joinedload(ARBReviewItem.submitter),
-        joinedload(ARBReviewItem.reviewer),
-        joinedload(ARBReviewItem.decided_by),
-        joinedload(ARBReviewItem.solution),
-        joinedload(ARBReviewItem.adr),
-        joinedload(ARBReviewItem.architecture_model),
-        joinedload(ARBReviewItem.capability_links).joinedload(
-            ARBCapabilityImpact.capability
-        ),
-        joinedload(ARBReviewItem.comments).joinedload(ARBReviewComment.user),
-    ).get_or_404(id)
+    review = _own_review_or_404(id)
 
     # Resolve application names from capability_impacts.application_ids
     application_names = []
@@ -1798,10 +1790,14 @@ def _own_review_or_404(review_item_id):
 def _untyped_decision_refusal(item):
     """A 403 response when the viewer may not decide this untyped review.
 
-    Same two rules the typed decision service applies: the approver role set,
-    and a submitter never decides their own submission.
+    Same two rules the typed decision service applies: its decision-authority
+    rule (deciding role or a voting seat on the review's board), and a
+    submitter never decides their own submission. The approver role check
+    still admits the "admin" name it folds Administrator into.
     """
-    if not _viewer_may_run_board():
+    if not _viewer_may_run_board() and not may_decide_review(
+        db.session, current_user, item
+    ):
         return jsonify({
             "success": False,
             "error": "Your role cannot make ARB decisions.",
@@ -3406,13 +3402,13 @@ def api_arb_update_implementation_status(item_id: int):
 
 
 # ===================================================================
-# FRAG-037: ARB exception management routes
+# ARB exception management routes
 # ===================================================================
 
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
-    """FRAG-037: List ARB exceptions."""
+    """List ARB exceptions."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
@@ -3426,7 +3422,7 @@ def api_list_exceptions():
 @arb_bp.route("/api/exceptions", methods=["POST"])
 @login_required
 def api_create_exception():
-    """FRAG-037: Create ARB exception request."""
+    """Create ARB exception request."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
@@ -3442,7 +3438,7 @@ def api_create_exception():
 @login_required
 @require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
-    """FRAG-037: Approve ARB exception (approver roles, own organisation only)."""
+    """Approve ARB exception (approver roles, own organisation only)."""
     organization_id = TypedARBDecisionAdapter.current_organization_id()
     owned = None
     if organization_id is not None:
