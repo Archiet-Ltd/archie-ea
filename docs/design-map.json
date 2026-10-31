@@ -6772,19 +6772,19 @@
     "badge",
     "breadcrumb",
     "button",
-    "empty",
+    "card",
+    "checkbox",
     "field",
     "input",
-    "page-header",
+    "native-select",
     "switch",
-    "tabs",
-    "card"
+    "table"
    ],
    "confidence": "high",
    "controls": {
-    "button": 17,
-    "form": 3,
-    "link": 3,
+    "button": 16,
+    "form": 6,
+    "link": 2,
     "table": 1
    },
    "departures": [
@@ -6798,11 +6798,10 @@
    ],
    "frame": "dashboard-01",
    "grid": "G3",
-   "inhouse_components": [
-    "page-header:Replace"
-   ],
+   "inhouse_components": [],
    "macros": [
-    "components/page_header.html"
+    "macros/page_shell.html",
+    "components/input.html"
    ],
    "original": "preview-02",
    "page_type": "settings",
@@ -6827,11 +6826,9 @@
    "spec": null,
    "states": [
     "loading",
-    "empty-no-permission",
+    "empty",
     "error-field",
     "error-region",
-    "confirm-error",
-    "read-only",
     "populated"
    ],
    "status": "mapped",

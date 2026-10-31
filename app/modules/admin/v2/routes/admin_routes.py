@@ -1554,6 +1554,103 @@ def feature_flags_create_from_sidebar():
 # ============================================================================
 
 
+def _save_abacus_section(section, abacus_config):
+    """Save one section of the Abacus settings; returns (error, typed_values).
+
+    ``error`` is None when the section was saved. Each section changes only its own
+    fields, so saving the schedule never touches the connection and the reverse.
+    """
+    import os
+
+    from app.models.models import ExternalSystem
+    from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+    f = request.form
+    typed = {}
+    if section == "connection":
+        base_url = (f.get("base_url") or "").strip()
+        client_id = (f.get("client_id") or "").strip()
+        secret = (f.get("client_secret") or "").strip()
+        typed = {"base_url": base_url, "client_id": client_id}
+        if not base_url or not client_id:
+            return "Base URL and Client ID are required.", typed
+        try:
+            clean_url = validate_connector_url(base_url)
+        except ConnectorURLRefused as exc:
+            return str(exc), typed
+        old = {}
+        if abacus_config is not None and abacus_config.credentials:
+            try:
+                old = json.loads(abacus_config.credentials) or {}
+            except (json.JSONDecodeError, TypeError):
+                old = {}
+        secret = secret or old.get("client_secret", "")
+        if not secret:
+            return "Client secret is required for a new connection.", typed
+        if abacus_config is None:
+            abacus_config = ExternalSystem(
+                system_name="abacus", system_type="ea_tool", enabled=False, sync_enabled=False
+            )
+            db.session.add(abacus_config)
+        abacus_config.base_url = clean_url
+        abacus_config.api_endpoint = f"{clean_url}/api"
+        abacus_config.auth_type = "oauth2"
+        abacus_config.credentials = json.dumps({"client_id": client_id, "client_secret": secret})
+    else:
+        if abacus_config is None:
+            return "Save the connection first, then set the sync schedule or what to import.", typed
+        if section == "schedule":
+            raw = (f.get("sync_interval_minutes") or "").strip()
+            typed = {
+                "enabled": f.get("enabled") == "on",
+                "sync_enabled": f.get("sync_enabled") == "on",
+                "sync_interval_minutes": raw,
+            }
+            if raw not in {"60", "240", "720", "1440", "10080"}:
+                return "Choose one of the listed sync intervals.", typed
+            abacus_config.enabled = typed["enabled"]
+            abacus_config.sync_enabled = typed["sync_enabled"]
+            abacus_config.sync_interval_minutes = int(raw)
+        else:  # import
+            filter_countries = (f.get("filter_countries") or "").strip()
+            typed = {
+                "filter_countries": filter_countries,
+                "sync_relationships": f.get("sync_relationships") == "on",
+            }
+            try:
+                config_data = json.loads(abacus_config.config_json or "{}") or {}
+            except (json.JSONDecodeError, TypeError):
+                config_data = {}
+            config_data["filter_countries"] = filter_countries
+            config_data["sync_relationships"] = typed["sync_relationships"]
+            for field, key in (("sync_entity_types", "sync_entity_types"), ("dynamic_filters", "filters")):
+                raw = f.get(field, "")
+                if raw:
+                    try:
+                        config_data[key] = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        return "The selected %s could not be read. Choose them again." % field.replace("_", " "), typed
+            abacus_config.config_json = json.dumps(config_data)
+            os.environ["ABACUS_FILTER_COUNTRIES"] = filter_countries
+    abacus_config.updated_by_id = current_user.id
+    abacus_config.updated_at = datetime.utcnow()
+    try:
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Error saving Abacus settings: %s", exc, exc_info=True)
+        return "The settings could not be saved. Try again.", typed
+    flash(
+        {
+            "connection": "Connection saved.",
+            "schedule": "Sync schedule saved.",
+            "import": "Import choices saved.",
+        }[section],
+        "success",
+    )
+    return None, typed
+
+
 @admin_bp_v2.route("/abacus-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
@@ -1589,7 +1686,17 @@ def abacus_settings():
 
     form = AbacusSettingsForm()
 
-    if form.validate_on_submit() and _base_url_field_allowed(form):
+    section = request.form.get("section") if request.method == "POST" else None
+    typed = {}
+    refused = False
+    if section in ("connection", "schedule", "import"):
+        error, typed = _save_abacus_section(section, abacus_config)
+        if error is None:
+            return redirect(url_for("admin.abacus_settings"))
+        flash(error, "error")
+        refused = True
+
+    if not refused and form.validate_on_submit() and _base_url_field_allowed(form):
         import os
 
         credentials = {}
@@ -1691,9 +1798,10 @@ def abacus_settings():
         return redirect(url_for("admin.abacus_settings"))
 
     env_config = None
+    filter_dimensions = {}
     imported_stats = {"applications": 0, "capabilities": 0}
 
-    if request.method == "GET":
+    if request.method == "GET" or refused:
         if abacus_config or env_config:
             try:
                 from app.models.application_portfolio import ApplicationComponent
@@ -1736,12 +1844,14 @@ def abacus_settings():
 
         # Load filter dimensions from config_json if previously discovered
         filter_dimensions = {}
-        if abacus_config and abacus_config.config_json:
-            try:
-                cfg = json.loads(abacus_config.config_json)
-                filter_dimensions = cfg.get("discovered_dimensions", {})
-            except (json.JSONDecodeError, TypeError):
-                pass
+        if abacus_config:
+            # Stored settings win; the environment only fills the form when nothing is stored.
+            if abacus_config.config_json:
+                try:
+                    cfg = json.loads(abacus_config.config_json)
+                    filter_dimensions = cfg.get("discovered_dimensions", {})
+                except (json.JSONDecodeError, TypeError):
+                    pass
         else:
             import os
 
@@ -1766,13 +1876,28 @@ def abacus_settings():
                     "filter_countries": env_filter_countries,
                 }
 
-    return render_template(
-        "admin/abacus_settings.html",
-        form=form,
-        abacus_config=abacus_config,
-        env_config=env_config,
-        imported_stats=imported_stats,
-        filter_dimensions=filter_dimensions,
+    if refused:
+        # Keep what the person typed in the section that was refused.
+        for name in ("base_url", "client_id", "filter_countries"):
+            if name in typed:
+                getattr(form, name).data = typed[name]
+        for name in ("enabled", "sync_enabled"):
+            if name in typed:
+                getattr(form, name).data = typed[name]
+        if typed.get("sync_interval_minutes", "").isdigit():
+            form.sync_interval_minutes.data = int(typed["sync_interval_minutes"])
+
+    return (
+        render_template(
+            "admin/abacus_settings.html",
+            form=form,
+            abacus_config=abacus_config,
+            env_config=env_config,
+            imported_stats=imported_stats,
+            filter_dimensions=filter_dimensions,
+            typed=typed,
+        ),
+        400 if refused else 200,
     )
 
 
