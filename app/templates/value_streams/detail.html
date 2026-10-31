@@ -1,7 +1,6 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/modal.html' import modal %}
-{% from 'components/empty_state.html' import empty_state %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/status_badge.html' import status_badge %}
 {% from 'components/button.html' import button %}
@@ -9,7 +8,6 @@
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/radio_group.html' import radio_group %}
 {% from 'components/form_field.html' import form_group, form_footer %}
-{% from 'components/dense_table.html' import dense_table %}
 {% import 'components/card.html' as card %}
 
 {% block title %}{{ value_stream.name }} — Value Stream{% endblock %}
@@ -38,19 +36,20 @@
 <div class="flex-1 overflow-auto"
      x-data="bizbokGrid({ valueStreamId: {{ value_stream.id }} })"
      x-init="init()" x-cloak>
-    {{ page_header(
+    {% macro _vs_actions() %}
+        {{ button(text='Add Stage', icon='plus', variant='outline', on_click="Platform.modal.open('stage-create-modal')") }}
+        {{ button(text='Edit', icon='pencil', variant='outline', on_click="Platform.modal.open('vs-edit-modal')") }}
+        {{ button(text='Delete', icon='trash-2', variant='destructive', on_click="Platform.modal.open('vs-delete-modal')") }}
+    {% endmacro %}
+    {{ page_shell(
         title=value_stream.name,
-        description=value_stream.description or 'End-to-end value delivery flow.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Value Streams', 'href': url_for('value_stream.index')},
-            {'label': value_stream.name}
+        subtitle=value_stream.description or 'End-to-end value delivery flow.',
+        breadcrumb=[
+            ('Home', url_for('main.index')),
+            ('Value Streams', url_for('value_stream.index')),
+            (value_stream.name, none)
         ],
-        actions=[
-            {'text': 'Add Stage', 'icon': 'plus', 'onclick': "Platform.modal.open('stage-create-modal')", 'variant': 'outline'},
-            {'text': 'Edit', 'icon': 'pencil', 'onclick': "Platform.modal.open('vs-edit-modal')", 'variant': 'outline'},
-            {'text': 'Delete', 'icon': 'trash-2', 'onclick': "Platform.modal.open('vs-delete-modal')", 'variant': 'destructive'}
-        ]
+        actions_caller=_vs_actions
     ) }}
 
     <div class="p-6 space-y-6">
@@ -185,14 +184,14 @@
                     </div>
                 </div>
                 {% else %}
-                {{ empty_state(
-                    icon='layers',
-                    title='No stages defined',
-                    description='Add the sequential stages that make up this value stream.',
-                    cta_text='Add Stage',
-                    cta_onclick="Platform.modal.open('stage-create-modal')",
-                    cta_icon='plus'
-                ) }}
+                {% call ui.empty(class='py-4 md:py-8', attrs={'role': 'status'}) %}
+                    {% call ui.empty_header() %}
+                        {% call ui.empty_icon(variant='icon') %}{{ lucide('layers') }}{% endcall %}
+                        {{ ui.empty_title(text='No stages defined') }}
+                        {{ ui.empty_description(text='Add the sequential stages that make up this value stream.') }}
+                    {% endcall %}
+                    {% call ui.empty_content() %}{{ button(text='Add Stage', icon='plus', on_click="Platform.modal.open('stage-create-modal')") }}{% endcall %}
+                {% endcall %}
                 {% endif %}
             {% endcall %}
         {% endcall %}
@@ -299,35 +298,38 @@
 
                 <!-- Populated grid -->
                 <template x-if="!loading && !loadError && stages.length > 0 && capabilities.length > 0">
-                    {% set grid_header %}
-                        <th scope="col" class="h-10 px-3 text-left sticky left-0 bg-card">Capability</th>
-                        <th scope="col" class="h-10 px-3 text-center whitespace-nowrap">Maturity</th>
-                        <th scope="col" class="h-10 px-3 text-center whitespace-nowrap">Health</th>
-                        <template x-for="stage in stages" :key="stage.id">
-                            <th scope="col" class="h-10 px-3 text-center whitespace-nowrap" x-text="stage.name"></th>
-                        </template>
-                    {% endset %}
-                    {% call dense_table(header=grid_header, caption='Capability by stage support', flush=true) %}
+                    {% call ui.table_container() %}{% call ui.table() %}
+                        {{ ui.table_caption(text='Capability by stage support', class='sr-only') }}
+                        {% call ui.table_header(class='sticky top-0 z-10 bg-card') %}{% call ui.table_row() %}
+                            {% call ui.table_head(class='h-10 px-3 text-left sticky left-0 bg-card', attrs={'scope': 'col'}) %}Capability{% endcall %}
+                            {% call ui.table_head(class='h-10 px-3 text-center whitespace-nowrap', attrs={'scope': 'col'}) %}Maturity{% endcall %}
+                            {% call ui.table_head(class='h-10 px-3 text-center whitespace-nowrap', attrs={'scope': 'col'}) %}Health{% endcall %}
+                            <template x-for="stage in stages" :key="stage.id">
+                                {{ ui.table_head(class='h-10 px-3 text-center whitespace-nowrap', attrs={'scope': 'col', 'x-text': 'stage.name'}) }}
+                            </template>
+                        {% endcall %}{% endcall %}
+                        {% call ui.table_body() %}
                         <template x-for="cap in capabilities" :key="cap.id">
-                            <tr>
-                                <td class="sticky left-0 bg-card text-sm font-medium text-foreground px-3 py-2 whitespace-nowrap">
+                            {% call ui.table_row() %}
+                                {% call ui.table_cell(class='sticky left-0 bg-card text-sm font-medium text-foreground px-3 py-2 whitespace-nowrap') %}
                                     <a x-show="cap.fact_sheet_url" class="text-primary hover:underline" :href="cap.fact_sheet_url" x-text="cap.name"></a>
                                     <span x-show="!cap.fact_sheet_url" x-text="cap.name"></span>
-                                </td>
-                                <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap" data-maturity :title="'Current / target maturity of ' + cap.name" x-text="maturityLabel(cap)"></td>
-                                <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap" data-health :title="healthTitle(cap)" x-text="healthLabel(cap)"></td>
+                                {% endcall %}
+                                {{ ui.table_cell(class='text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap', attrs={'data-maturity': '', ':title': "'Current / target maturity of ' + cap.name", 'x-text': 'maturityLabel(cap)'}) }}
+                                {{ ui.table_cell(class='text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap', attrs={'data-health': '', ':title': 'healthTitle(cap)', 'x-text': 'healthLabel(cap)'}) }}
                                 <template x-for="stage in stages" :key="stage.id">
-                                    <td class="text-center px-2 py-2">
+                                    {% call ui.table_cell(class='text-center px-2 py-2') %}
                                         {% call button(variant='outline', class='w-16 border text-xs font-semibold',
                                                        on_click='openCellModal(cap, stage)',
                                                        attrs_dict={':aria-label': "'Set support for ' + cap.name + ' at ' + stage.name", ':class': 'cellClass(cap.id, stage.id)'}) %}
                                             <span x-text="cellLabel(cap.id, stage.id)"></span>
                                         {% endcall %}
-                                    </td>
+                                    {% endcall %}
                                 </template>
-                            </tr>
+                            {% endcall %}
                         </template>
-                    {% endcall %}
+                        {% endcall %}
+                    {% endcall %}{% endcall %}
                 </template>
 
                 <!-- Legend -->
@@ -344,7 +346,11 @@
     </div>
 
     <!-- Cell edit modal -->
-    {% call modal(id='cell-edit-modal', title='Capability Support', size='default') %}
+    <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+    <template x-teleport="body">
+    {% call ui.dialog_content(id='cell-edit-modal', class='max-h-[90vh] overflow-y-auto') %}
+    {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}{{ ui.dialog_title(text='Capability Support') }}{% endcall %}
     <template x-if="activeCell">
         <form @submit.prevent="saveCell()" class="space-y-4">
             <div class="text-sm">
@@ -380,9 +386,14 @@
         </form>
     </template>
     {% endcall %}
+    </template>
 
     <!-- Stage create modal -->
-    {% call modal(id='stage-create-modal', title='Add Stage', size='default') %}
+    <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+    <template x-teleport="body">
+    {% call ui.dialog_content(id='stage-create-modal', class='max-h-[90vh] overflow-y-auto') %}
+    {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}{{ ui.dialog_title(text='Add Stage') }}{% endcall %}
     <form method="POST" action="{{ url_for('value_stream.create_stage', value_stream_id=value_stream.id) }}" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {% call form_group(id='stage-name', label='Name') %}{{ input(id='stage-name', name='name', required=true, class='h-9') }}{% endcall %}
@@ -400,9 +411,14 @@
         {{ form_footer(submit_text='Add Stage', cancel_attrs={'data-modal-close': 'stage-create-modal'}) }}
     </form>
     {% endcall %}
+    </template>
 
     <!-- Stage edit modal -->
-    {% call modal(id='stage-edit-modal', title='Edit Stage', size='default') %}
+    <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+    <template x-teleport="body">
+    {% call ui.dialog_content(id='stage-edit-modal', class='max-h-[90vh] overflow-y-auto') %}
+    {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}{{ ui.dialog_title(text='Edit Stage') }}{% endcall %}
     <form method="POST" x-bind:action="stageEditForm.id ? '{{ url_for('value_stream.edit_stage', stage_id=0) }}'.replace('/0/', '/' + stageEditForm.id + '/') : '#'" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {{ input(type='hidden', name='value_stream_id', value=value_stream.id) }}
@@ -421,9 +437,14 @@
         {{ form_footer(cancel_attrs={'data-modal-close': 'stage-edit-modal'}) }}
     </form>
     {% endcall %}
+    </template>
 
     <!-- Stage delete modal -->
-    {% call modal(id='stage-delete-modal', title='Delete Stage?', size='sm') %}
+    <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+    <template x-teleport="body">
+    {% call ui.dialog_content(id='stage-delete-modal', class='max-h-[90vh] overflow-y-auto sm:max-w-sm') %}
+    {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}{{ ui.dialog_title(text='Delete Stage?') }}{% endcall %}
     <template x-if="stageDeleteForm.id">
         <div class="space-y-4">
             <p class="text-sm text-muted-foreground">
@@ -437,9 +458,14 @@
         </div>
     </template>
     {% endcall %}
+    </template>
 
     <!-- Value stream edit modal -->
-    {% call modal(id='vs-edit-modal', title='Edit Value Stream', size='default') %}
+    <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+    <template x-teleport="body">
+    {% call ui.dialog_content(id='vs-edit-modal', class='max-h-[90vh] overflow-y-auto') %}
+    {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}{{ ui.dialog_title(text='Edit Value Stream') }}{% endcall %}
     <form method="POST" action="{{ url_for('value_stream.edit', value_stream_id=value_stream.id) }}" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {% call form_group(id='vs-edit-name', label='Name') %}{{ input(id='vs-edit-name', name='name', value=value_stream.name, required=true, class='h-9') }}{% endcall %}
@@ -461,9 +487,14 @@
         {{ form_footer(cancel_attrs={'data-modal-close': 'vs-edit-modal'}) }}
     </form>
     {% endcall %}
+    </template>
 
     <!-- Value stream delete modal -->
-    {% call modal(id='vs-delete-modal', title='Delete Value Stream?', size='sm') %}
+    <template x-teleport="body">{{ ui.dialog_overlay() }}</template>
+    <template x-teleport="body">
+    {% call ui.dialog_content(id='vs-delete-modal', class='max-h-[90vh] overflow-y-auto sm:max-w-sm') %}
+    {% call ui.dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+    {% call ui.dialog_header() %}{{ ui.dialog_title(text='Delete Value Stream?') }}{% endcall %}
     <div class="space-y-4">
         <p class="text-sm text-muted-foreground">
             Delete <span class="font-medium text-foreground">{{ value_stream.name }}</span> along with all its stages and capability mappings? This cannot be undone.
@@ -474,6 +505,7 @@
         </form>
     </div>
     {% endcall %}
+    </template>
 </div>
 
 <script src="{{ url_for('static', filename='js/value_stream/grid.js') }}"></script>
