@@ -7,6 +7,7 @@ form creates no account, and Sign in lands on a page with the sign-in form.
 """
 
 import os
+import tempfile
 import uuid
 
 import pytest
@@ -17,7 +18,7 @@ from .conftest import PAGE_TIMEOUT, boot_live_server
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 VIEWS = [(1440, "light"), (390, "light"), (1440, "dark"), (390, "dark")]
-WALK = "/home/ubuntu/verify/seats/limits01b/walk"
+WALK = os.environ.get("SMOKE_WALK_DIR") or os.path.join(tempfile.gettempdir(), "signup-limit-walk")
 
 
 @pytest.fixture(scope="module")
@@ -33,6 +34,17 @@ def _clear_counters():
         db.session.execute(db.text("DELETE FROM rate_limit_counters"))
         db.session.commit()
         db.session.remove()
+
+
+def _body_is_dark(page):
+    """True when the page the person sees has a dark background (relative luminance under 0.2)."""
+    return page.evaluate(
+        """() => {
+            const m = getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g).map(Number);
+            const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+            return 0.2126 * lin(m[0]) + 0.7152 * lin(m[1]) + 0.0722 * lin(m[2]) < 0.2;
+        }"""
+    )
 
 
 def _accounts_with(tag):
@@ -95,6 +107,7 @@ def test_the_sixth_sign_up_in_an_hour_is_refused_with_the_next_step(browser, lim
         expect(page.get_by_role("link", name="Go to Dashboard")).to_have_count(0)
         signin = page.get_by_role("link", name="Sign in")
         expect(signin).to_be_visible()
+        assert _body_is_dark(page) == (theme == "dark")
         page.screenshot(path="%s/signup-refused-%d-%s.png" % (WALK, width, theme), full_page=True)
 
         # The next step lands on a page with the sign-in form on it.

@@ -1,4 +1,4 @@
-"""An administrator can see and set the rate limits (T-limits01).
+"""An administrator can see and set the rate limits.
 
 The person: the platform administrator, who has found one address hammering the service. The
 goal: deny that address on the Rate limits page, see its next request refused with a plain
@@ -219,4 +219,41 @@ def test_an_organisation_administrator_reads_only_its_own_refusals(browser, limi
     finally:
         _clear_lists()
         for ctx in (ctx_admin, ctx_a, ctx_b):
+            ctx.close()
+
+
+@pytest.mark.parametrize("width,theme", VIEWS)
+def test_a_blocked_person_sees_the_refusal_page_in_their_own_theme(browser, limits_server, width, theme):
+    admin = _platform_admin()
+    a = create_fresh_org("architect", org_admin=True)
+    _clear_lists()
+    ctx_admin, ctx_a = _context(browser, 1440, "light"), _context(browser, width, theme)
+    page_admin, page_a = ctx_admin.new_page(), ctx_a.new_page()
+    try:
+        sign_in(page_admin, limits_server, admin["emails"]["platform_admin"])
+        sign_in(page_a, limits_server, a["emails"]["architect"])
+        page_admin.goto(limits_server + "/admin/rate-limits", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _open_add_entry(page_admin)
+        page_admin.select_option("#rule-kind", "user")
+        page_admin.fill("#rule-value", a["emails"]["architect"])
+        page_admin.get_by_test_id("rate-limit-rule-save").click()
+        expect(page_admin.get_by_test_id("rate-limit-rule-row").filter(has_text=a["emails"]["architect"])).to_be_visible()
+
+        response = page_a.goto(limits_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert response.status == 403 and DENIED_SENTENCE in page_a.content()
+        luminance = page_a.evaluate(
+            """() => {
+                const m = getComputedStyle(document.body).backgroundColor.match(/[\\d.]+/g).map(Number);
+                const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+                return 0.2126 * lin(m[0]) + 0.7152 * lin(m[1]) + 0.0722 * lin(m[2]);
+            }"""
+        )
+        assert (luminance < 0.2) == (theme == "dark"), luminance
+        walk = os.environ.get("SMOKE_WALK_DIR")
+        if walk:
+            os.makedirs(walk, exist_ok=True)
+            page_a.screenshot(path="%s/blocked-%d-%s.png" % (walk, width, theme), full_page=True)
+    finally:
+        _clear_lists()
+        for ctx in (ctx_admin, ctx_a):
             ctx.close()

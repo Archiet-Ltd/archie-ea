@@ -175,8 +175,14 @@ def _install_access_lists(app):
         if _wants_json():
             resp = _json_refusal(DENIED_MESSAGE, "address_blocked")
         else:
+            import secrets
+
             from flask import render_template
 
+            # This hook can run before the one that issues the page's script and style nonce; without
+            # one the page's own style block is blocked and the refusal shows unstyled.
+            if not getattr(g, "csp_nonce", ""):
+                g.csp_nonce = secrets.token_urlsafe(32)
             try:
                 resp = current_app.make_response(
                     render_template("errors/403.html", error_title="This address is blocked",
