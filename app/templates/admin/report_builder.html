@@ -4,6 +4,9 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/button.html' import button %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Application Report Builder{% endblock %}
 
@@ -22,43 +25,18 @@
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.report_builder') }}" class="mt-6 rounded-xl border bg-card p-4">
         <div class="grid grid-cols-1 gap-3">
-            <div>
-                <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
-                <input type="text" id="q" name="q" value="{{ search_q }}" placeholder="Name or description..."
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-            </div>
-            <div>
-                <label for="lifecycle" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Stage</label>
-                <select id="lifecycle" name="lifecycle"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="">All Stages</option>
-                    {% for lc in lifecycle_options %}
-                    <option value="{{ lc }}" {{ 'selected' if lifecycle == lc else '' }}>{{ lc }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="date_from" class="block text-sm font-medium text-muted-foreground mb-1">Created From</label>
-                <input type="date" id="date_from" name="date_from" value="{{ date_from }}"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-            </div>
-            <div>
-                <label for="date_to" class="block text-sm font-medium text-muted-foreground mb-1">Created To</label>
-                <input type="date" id="date_to" name="date_to" value="{{ date_to }}"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-            </div>
-            <div>
-                <label for="vendor" class="block text-sm font-medium text-muted-foreground mb-1">Vendor Name</label>
-                <!-- entity-picker-ok: search filter, not entity creation -->
-                <input type="text" id="vendor" name="vendor" value="{{ vendor_filter }}" placeholder="Filter by vendor..."
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-            </div>
+            {{ form_field(id='q', label='Search', value=search_q, placeholder='Name or description...', class='space-y-2') }}
+            {% set lc_opts = [('', 'All Stages')] %}{% for lc in lifecycle_options %}{% set _ = lc_opts.append((lc, lc)) %}{% endfor %}
+            {% call form_group(id='lifecycle', label='Lifecycle Stage', class='space-y-2') %}
+                {{ native_select(id='lifecycle', name='lifecycle', class='w-full', options=lc_opts, selected=lifecycle or '') }}
+            {% endcall %}
+            {{ form_field(id='date_from', label='Created From', type='date', value=date_from, class='space-y-2') }}
+            {{ form_field(id='date_to', label='Created To', type='date', value=date_to, class='space-y-2') }}
+            {# entity-picker-ok: search filter, not entity creation #}
+            {{ form_field(id='vendor', label='Vendor Name', value=vendor_filter, placeholder='Filter by vendor...', class='space-y-2') }}
         </div>
         <div class="flex items-center gap-3 mt-3">
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
-            </button>
+            {% call ui.button(attrs={'type': 'submit'}) %}<i data-lucide="search" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Filter{% endcall %}
             <a href="{{ url_for('admin.report_builder') }}"
                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
