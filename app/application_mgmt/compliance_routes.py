@@ -8,6 +8,7 @@ from app.application_mgmt import application_mgmt
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+from app.seed_data.standard_control_totals import controls_loaded_text
 from app.utils.route_guards import require_entity
 
 
@@ -34,8 +35,21 @@ def compliance_frameworks_dashboard():
         .all()
     )
 
+    from flask import g
+
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    adopted = {
+        a.framework_id: a.source
+        for a in FrameworkAdoption.query.filter_by(
+            organization_id=getattr(g, "current_org_id", None), status="active"
+        ).all()
+    }
+    counts = {f.id: f.controls.count() for f in frameworks}
     framework_rows = [
         {
+            "adopted": f.id in adopted,
+            "source": adopted.get(f.id),
             "id": f.id,
             "code": f.code,
             "name": f.name,
@@ -43,7 +57,8 @@ def compliance_frameworks_dashboard():
             "jurisdiction": f.jurisdiction,
             "enforcement_level": f.enforcement_level,
             "penalty_risk": f.penalty_risk,
-            "control_count": f.controls.count(),
+            "control_count": counts[f.id],
+            "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
         }
         for f in frameworks
     ]
@@ -51,7 +66,8 @@ def compliance_frameworks_dashboard():
     total_controls = ComplianceControl.query.filter_by(is_active=True).count()
 
     # Org-scoped mapping coverage (TenantMixin auto-filters inside the request).
-    mappings = ApplicationComplianceControl.query.all()
+    # A control adopted with its framework is not yet mapped to an application, so it is not counted here.
+    mappings = ApplicationComplianceControl.query.filter(ApplicationComplianceControl.application_id.isnot(None)).all()
     mapped_by_status = {}
     for m in mappings:
         status = m.implementation_status or "planned"
