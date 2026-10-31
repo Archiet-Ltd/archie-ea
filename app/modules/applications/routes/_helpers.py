@@ -337,6 +337,32 @@ def _cleanup_application_relationships(app_id):
     _cascade_delete_application(app_id)
 
 
+def _elements_still_referenced(element_ids):
+    """``{element_id: ["2 principles", ...]}`` for the elements some other row still points at.
+
+    Reads every foreign key into ``archimate_elements`` from the model metadata, so a table added
+    later is covered without touching this. The element's own relationships are removed with it and
+    database-cascaded rows are part of the element, so neither counts.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    found = {}
+    for table in db.metadata.tables.values():
+        for fk in table.foreign_keys:
+            if fk.column.table.name != ArchiMateElement.__table__.name or fk.column.name != "id":
+                continue
+            if table.name == "archimate_relationships" or (fk.ondelete or "").upper() == "CASCADE":
+                continue
+            column = fk.parent
+            rows = db.session.execute(
+                db.select(column, db.func.count()).where(column.in_(element_ids)).group_by(column)
+            ).all()
+            for referenced_id, count in rows:
+                label = table.name.replace("_", " ")
+                found.setdefault(referenced_id, []).append(f"{count} in {label}")
+    return found
+
+
 def _delete_mirror_archimate_element(element_id):
     """Delete the ArchiMateElement that mirrors a deleted application.
 
@@ -349,22 +375,38 @@ def _delete_mirror_archimate_element(element_id):
     Deliberately narrow: only the element the application itself points at, and
     only the ArchiMate relationships in which that element is an endpoint (those
     relationships describe the deleted application, so they cannot survive it).
-    Nothing else that references the element is touched — if some other row
-    (a diagram node, a parent link) still holds a foreign key, the delete fails
-    inside its SAVEPOINT and is *reported* rather than cascaded through.
+    Nothing else that references the element is touched. An element that any other row
+    still refers to (a principle, a risk assessment, a diagram node, a parent link) is
+    not removed and nothing is unlinked: it is *reported* with a plain reason saying what
+    refers to it. Rows that exist only as part of the element (database-cascaded) do not count.
 
     ``element_id`` may also be a list of ids, which are removed together in one savepoint.
 
     Returns ``{"elements_deleted": int, "relationships_deleted": int,
-    "errors": [str]}``. Never raises.
+    "errors": [str], "blocked": {element_id: [str]}}``. Never raises.
     """
-    result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": []}
+    result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": [], "blocked": {}}
     element_ids = list(element_id) if isinstance(element_id, (list, tuple, set, frozenset)) else [element_id]
     element_ids = [i for i in element_ids if i]
     if not element_ids:
         return result
 
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    try:
+        result["blocked"] = _elements_still_referenced(element_ids)
+    except Exception:
+        logger.warning("Could not check what refers to ArchiMate element(s) %s", element_ids, exc_info=True)
+        result["errors"].append("ArchiMate element(s) could not be checked for references, so none were removed")
+        return result
+    if result["blocked"]:
+        for blocked_id, reasons in result["blocked"].items():
+            result["errors"].append(
+                f"ArchiMate element {blocked_id} was kept because it is still used by {', '.join(reasons)}"
+            )
+        element_ids = [i for i in element_ids if i not in result["blocked"]]
+        if not element_ids:
+            return result
 
     _sp = db.session.begin_nested()
     try:

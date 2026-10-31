@@ -748,8 +748,8 @@ def application_delete(id):
         db.session.commit()
         if mirror["errors"]:
             flash(
-                f'Application Component "{app_name}" deleted, but its ArchiMate '
-                "element could not be removed — it is still referenced elsewhere.",
+                f'Application Component "{app_name}" deleted. '
+                + " ".join(mirror["errors"]),
                 "warning",
             )
         else:
