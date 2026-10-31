@@ -146,7 +146,9 @@ def people(app):
 
 
 def new_page(browser, width=1440):
-    context = browser.new_context(viewport={"width": width, "height": 900})
+    context = browser.new_context(
+        viewport={"width": width, "height": 900}, color_scheme=os.environ.get("SIGNUP_JOURNEY_SCHEME", "light")
+    )
     context.add_init_script(SKIP_WELCOME)
     context.set_default_timeout(PAGE_TIMEOUT)
     context.set_default_navigation_timeout(PAGE_TIMEOUT)

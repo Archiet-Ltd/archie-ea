@@ -98,8 +98,7 @@ def get_compliance_frameworks():
                 "description": f.description,
                 "category": f.category,
                 "enforcement_level": f.enforcement_level,
-                "control_count": counts[f.id],
-            "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
+                "control_count": f.controls.count(),
             }
             for f in frameworks
         ]
