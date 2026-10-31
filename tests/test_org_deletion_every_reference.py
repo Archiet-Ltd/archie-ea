@@ -64,7 +64,7 @@ def test_another_organisations_application_pointing_at_an_element_of_the_deleted
                "before": _snapshot(db)}
         db.session.remove()
     try:
-        _refused(app, ids, "1 record of Org B %s refers to it" % marker)
+        _refused(app, ids, "Org B %s: 1 application component" % marker)
         with app.app_context():
             row = db.session.execute(text(
                 "SELECT organization_id, archimate_element_id FROM application_components WHERE id = :i"),
@@ -94,7 +94,7 @@ def test_a_platform_template_pointing_at_an_element_of_the_deleted_one_refuses_t
         ids = {"a": a.id, "b": b.id, "marker": marker, "template": template.id, "before": _snapshot(db)}
         db.session.remove()
     try:
-        _refused(app, ids, "1 record of shared platform records refers to it")
+        _refused(app, ids, "Shared platform records: 1 vendor archimate template")
     finally:
         with app.app_context():
             db.session.execute(text("DELETE FROM vendor_archimate_templates WHERE id = :i"), {"i": ids["template"]})
@@ -118,7 +118,7 @@ def test_another_organisations_relationship_targeting_an_element_of_the_deleted_
         ids = {"a": a.id, "b": b.id, "marker": marker, "rel": relationship.id, "before": _snapshot(db)}
         db.session.remove()
     try:
-        _refused(app, ids, "Org B %s" % marker)
+        _refused(app, ids, "Org B %s: 1 archimate relationship" % marker)
     finally:
         with app.app_context():
             db.session.execute(text("DELETE FROM archimate_relationships WHERE id = :i"), {"i": ids["rel"]})

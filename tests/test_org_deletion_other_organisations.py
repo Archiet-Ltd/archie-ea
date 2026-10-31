@@ -52,7 +52,7 @@ def test_a_person_a_surviving_organisation_must_name_refuses_the_deletion(app):
         with app.app_context():
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["doomed"])
-            assert "Doomed %s cannot be deleted: 1 record of %s refers to it" % (marker, ids["name"]) in str(refused.value)
+            assert "Doomed %s cannot be deleted: records outside it still refer to it. %s: 1 " % (marker, ids["name"]) in str(refused.value)
             assert "Remove or reassign those references first. Nothing was deleted." in str(refused.value)
             db.session.remove()
 
@@ -151,7 +151,7 @@ def test_a_platform_template_pointing_at_an_element_of_the_deleted_organisation_
         with app.app_context():
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["doomed"])
-            assert "1 record of shared platform records refers to it" in str(refused.value)
+            assert "Shared platform records: 1 " in str(refused.value)
             db.session.remove()
         with app.app_context():
             assert db.session.get(Organization, ids["doomed"]) is not None

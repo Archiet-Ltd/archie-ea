@@ -379,17 +379,67 @@ def _in_set(plan, table, alias, path=frozenset()):
     return "(" + inside + ")"
 
 
+# Columns that say what a row is, in the order tried, for the examples in a refusal.
+_LABEL_COLUMNS = ("name", "title", "element_name", "email")
+
+
+def _plural(word):
+    if word.endswith("y") and word[-2:-1] not in "aeiou":
+        return word[:-1] + "ies"
+    return word + ("es" if word.endswith(("s", "x", "ch", "sh")) else "s")
+
+
+def _kind(table, number):
+    """A plain label for a kind of record, from its table name: "business capability", "people"."""
+    if table == PEOPLE:
+        return "person" if number == 1 else "people"
+    words = table.replace("_", " ")
+    if words.endswith("ies"):
+        words = words[:-3] + "y"
+    elif words.endswith("s") and not words.endswith(("ss", "us")):
+        words = words[:-1]
+    return words if number == 1 else _plural(words)
+
+
+class _Holder:
+    """What one organisation (or the platform) still holds that refers into the deleted one."""
+
+    def __init__(self):
+        self.counts = defaultdict(int)  # table -> number of rows
+        self.examples = []  # (table, label) at most _EXAMPLES
+
+    def describe(self):
+        kinds = ", ".join("%d %s" % (number, _kind(table, number)) for table, number in sorted(self.counts.items()))
+        if self.examples:
+            kinds += " (for example %s)" % ", ".join(
+                '%s "%s"' % (_kind(table, 1), label) for table, label in self.examples)
+        return kinds
+
+
+_EXAMPLES = 3
+
+
+def _example_select(sess, table):
+    """SQL for the column that says what a row of ``table`` is (as ``c``), or NULL where it has none."""
+    columns = {name for (name,) in sess.execute(text(
+        "SELECT a.attname FROM pg_attribute a WHERE a.attrelid = CAST(:t AS regclass) "
+        "AND a.attnum > 0 AND NOT a.attisdropped"), {"t": _q(table)})}
+    label = next((c for c in _LABEL_COLUMNS if c in columns), None)
+    return "c.%s" % _q(label) if label else "NULL"
+
+
 def _references_into_set(sess, plan, org_id, leaving, homes):
-    """Count the rows outside the deletion's set that refer to a row in it, per owning organisation.
+    """Find the rows outside the deletion's set that refer to a row in it, per owning organisation.
 
     One reverse-reference query per foreign key in the database, whatever its ON DELETE action.
-    Reads only. Returns {organisation id (None: a platform row): number of rows}. The two ruled
+    Reads only. Returns {organisation id (None: a platform row): _Holder}. The two ruled
     kinds are not counted: a key to the organisation row itself, and a person who belongs elsewhere
-    (their home is moved by the service, not by the database).
+    (their home is moved by the service, not by the database). A person is attributed to the
+    organisation they belong to, which is the new home of a person being detached.
     """
     params = {"org_id": org_id, "leaving": list(leaving)}
     has_rows = {}
-    found = defaultdict(int)
+    found = defaultdict(_Holder)
     for child, parent, child_cols, parent_cols, _ in plan.all_keys:
         if parent == "organizations":
             continue
@@ -405,12 +455,17 @@ def _references_into_set(sess, plan, org_id, leaving, homes):
         inside_child = _in_set(plan, child, "c") or "FALSE"
         link = " AND ".join("p.%s = c.%s" % (_q(p), _q(c)) for c, p in zip(child_cols, parent_cols))
         outside = "NOT COALESCE(%s, FALSE)" % inside_child
+        label = _example_select(sess, child)
         if child == PEOPLE:
             rows = sess.execute(text(
-                "SELECT c.id, COUNT(*) FROM users c JOIN %s p ON %s AND %s WHERE %s GROUP BY c.id"
-                % (_q(parent), link, inside_parent, outside)), params).all()
-            for person, number in rows:
-                found[homes.get(person)] += number
+                "SELECT c.id, c.organization_id, %s, COUNT(*) FROM users c JOIN %s p ON %s AND %s WHERE %s "
+                "GROUP BY c.id, c.organization_id, 3 ORDER BY c.id"
+                % (label, _q(parent), link, inside_parent, outside)), params).all()
+            for person, home, name, number in rows:
+                holder = found[homes.get(person, home)]
+                holder.counts[child] += number
+                if name and len(holder.examples) < _EXAMPLES:
+                    holder.examples.append((child, name))
             continue
         if child in plan.org_columns:
             owner, lateral = "c.organization_id", ""
@@ -421,8 +476,16 @@ def _references_into_set(sess, plan, org_id, leaving, homes):
         rows = sess.execute(text(
             "SELECT %s, COUNT(DISTINCT c.ctid) FROM %s c JOIN %s p ON %s AND %s %s WHERE %s GROUP BY 1"
             % (owner, _q(child), _q(parent), link, inside_parent, lateral, outside)), params).all()
+        if not rows:
+            continue
+        named = sess.execute(text(
+            "SELECT DISTINCT %s, %s FROM %s c JOIN %s p ON %s AND %s %s WHERE %s ORDER BY 2 NULLS LAST LIMIT 10"
+            % (owner, label, _q(child), _q(parent), link, inside_parent, lateral, outside)), params).all()
         for other, number in rows:
-            found[other] += number
+            found[other].counts[child] += number
+        for other, name in named:
+            if name and len(found[other].examples) < _EXAMPLES:
+                found[other].examples.append((child, name))
     return found
 
 
@@ -526,6 +589,49 @@ def _release_organisation_pointers(sess, plan, org_id, counts):
     return cleared
 
 
+def _refuse_unremovable_rows(sess, plan, org, org_id, leaving):
+    """Refuse, before any write, when a row would be left that the deletion cannot follow.
+
+    The deletion removes a row that hangs from the organisation through a key of one column. A row
+    that hangs from it only through a key of several columns cannot be followed that way, so the
+    database would refuse in the middle of the deletion; say so up front instead.
+    """
+    params = {"org_id": org_id, "leaving": list(leaving)}
+    for child, parent, child_cols, parent_cols, not_null in plan.all_keys:
+        if len(child_cols) < 2 or not not_null or parent == "organizations":
+            continue
+        if child in plan.org_columns or child == PEOPLE:
+            continue
+        inside_parent = _in_set(plan, parent, "p")
+        if inside_parent is None:
+            continue
+        link = " AND ".join("p.%s = c.%s" % (_q(p), _q(c)) for c, p in zip(child_cols, parent_cols))
+        if sess.execute(text("SELECT 1 FROM %s c JOIN %s p ON %s AND %s LIMIT 1" % (
+                _q(child), _q(parent), link, inside_parent)), params).first() is not None:
+            raise OrganizationDeletionRefused(
+                "%s cannot be deleted: some %s depend on it through a link of several columns that cannot be "
+                "removed automatically. Remove or reassign those references first. Nothing was deleted."
+                % (org.name, _kind(child, 2))
+            )
+
+
+def _refuse_missing_roles(detaching):
+    """Refuse, before any write, when a person being detached needs an account role that does not exist."""
+    from app.models.org_role import OrgRole
+    from app.models.user import Role
+
+    for user, home in detaching:
+        org_role = OrgRole.get_role(home, user.id)
+        if org_role == "org_admin":
+            continue
+        name = _ACCOUNT_ROLE.get(org_role, "Viewer")
+        if Role.query.filter_by(name=name).first() is None:
+            raise OrganizationDeletionRefused(
+                "The deletion cannot go ahead: the account role \"%s\" that a person leaving it would take "
+                "in their other organisation does not exist. Nothing was deleted." % name
+            )
+
+
 class OrganizationDeletionService:
     """Delete an organisation and every row that belongs to it."""
 
@@ -581,18 +687,20 @@ class OrganizationDeletionService:
         homes = {user.id: home for user, home in detaching}
         referring = _references_into_set(sess, plan, org_id, leaving, homes)
         if referring:
-            other_ids = sorted(other for other in referring if other is not None)
-            where = [name for (name,) in sess.query(Organization.name).filter(
-                Organization.id.in_(other_ids)).order_by(Organization.name)]
-            if None in referring:
-                where.append("shared platform records")
-            total = sum(referring.values())
+            names = dict(sess.query(Organization.id, Organization.name).filter(
+                Organization.id.in_([other for other in referring if other is not None])).all())
+            holders = sorted(
+                ((names.get(other, "Another organisation") if other is not None else None, holder)
+                 for other, holder in referring.items()),
+                key=lambda item: (item[0] is None, item[0] or ""))
+            detail = "; ".join(
+                "%s: %s" % (name or "Shared platform records", holder.describe()) for name, holder in holders)
             raise OrganizationDeletionRefused(
-                "%s cannot be deleted: %d %s of %s %s to it. Remove or reassign those references first. "
-                "Nothing was deleted." % (
-                    org.name, total, "record" if total == 1 else "records", ", ".join(where),
-                    "refers" if total == 1 else "refer")
+                "%s cannot be deleted: records outside it still refer to it. %s. "
+                "Remove or reassign those references first. Nothing was deleted." % (org.name, detail)
             )
+        _refuse_unremovable_rows(sess, plan, org, org_id, leaving)
+        _refuse_missing_roles(detaching)
 
         org_name, org_slug = org.name, org.slug
         try:

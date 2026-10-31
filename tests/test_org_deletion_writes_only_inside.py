@@ -72,8 +72,10 @@ def _cleanup(app, *org_ids):
 def _two_organisations(db, marker):
     from app.models.archimate_core import ArchiMateElement
     from app.models.organization import Organization
-    from app.models.user import User
+    from app.models.user import Role, User
 
+    # A detached person takes the account role of their other organisation, so the roles must exist.
+    Role.insert_roles()
     a = Organization(name="Org A %s" % marker, slug="org-a-%s" % marker)
     b = Organization(name="Org B %s" % marker, slug="org-b-%s" % marker)
     db.session.add_all([a, b])
@@ -109,7 +111,7 @@ def test_a_comment_on_another_organisations_element_naming_a_removed_person_refu
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["a"])
             message = str(refused.value)
-            assert "Org B %s" % marker in message and "1 record" in message, message
+            assert "Org B %s: 1 archimate element comment." % marker in message, message
             assert "Nothing was deleted" in message
             db.session.remove()
         with app.app_context():
@@ -147,7 +149,7 @@ def test_a_platform_row_naming_a_removed_person_refuses_the_deletion(app):
             with pytest.raises(OrganizationDeletionRefused) as refused:
                 OrganizationDeletionService.delete_organization(ids["a"])
             message = str(refused.value)
-            assert "shared platform records" in message and "1 record" in message, message
+            assert "Shared platform records: 1 notification" in message, message
             db.session.remove()
         with app.app_context():
             assert _snapshot(db) == before

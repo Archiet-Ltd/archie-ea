@@ -382,7 +382,7 @@ def test_deleting_an_organisation_whose_person_another_organisation_names_is_ref
     reason = page.get_by_text("cannot be deleted:", exact=False).first
     assert reason.is_visible(), "the page does not say why the organisation was not deleted"
     text = reason.inner_text()
-    assert "%s cannot be deleted: 1 record of %s refers to it" % (made["doomed_name"], made["other_name"]) in text, text
+    assert "%s cannot be deleted: records outside it still refer to it. %s: 1 notification." % (made["doomed_name"], made["other_name"]) in text, text
     assert "Remove or reassign those references first" in text
     assert "Nothing was deleted" in text
     assert page.get_by_text("reason is in the server log", exact=False).count() == 0
@@ -470,7 +470,7 @@ def test_deleting_an_organisation_whose_person_commented_on_another_organisation
     page.wait_for_url("**/admin/organizations/%d" % made["doomed_id"], timeout=PAGE_TIMEOUT)
 
     text = page.get_by_text("cannot be deleted:", exact=False).first.inner_text()
-    assert "%s cannot be deleted: 1 record of %s refers to it" % (made["doomed_name"], made["other_name"]) in text, text
+    assert "%s cannot be deleted: records outside it still refer to it. %s: 1 archimate element comment." % (made["doomed_name"], made["other_name"]) in text, text
     assert "Nothing was deleted" in text
     if walk:
         for scheme in ("light", "dark"):
@@ -691,7 +691,10 @@ def test_deleting_an_organisation_whose_element_another_organisation_uses_is_ref
     reason = page.get_by_text("cannot be deleted:", exact=False).first
     assert reason.is_visible(), "the page does not say why the organisation was not deleted"
     text = reason.inner_text()
-    assert "%s cannot be deleted: 1 record of %s refers to it." % (made["doomed_name"], made["other_name"]) in text, text
+    expected = ("%s cannot be deleted: records outside it still refer to it. %s: 1 application component "
+                '(for example application component "Ref app %s").'
+                % (made["doomed_name"], made["other_name"], made["other_name"].split()[-1]))
+    assert expected in text, text
     assert "Remove or reassign those references first. Nothing was deleted." in text, text
     for database_text in ("foreign key", "violates", "constraint"):
         assert database_text not in page.locator("body").inner_text()
