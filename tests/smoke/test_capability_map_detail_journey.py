@@ -36,19 +36,28 @@ def detail_tenants(live_server, request):
 
     app = create_app("testing")
     suffix = uuid.uuid4().hex[:6]
-    out = {"suffix": suffix, "ids": {}, "names": {}, "owner": "Owner %s" % suffix, "app": "Billing App %s" % suffix}
+    out = {"suffix": suffix, "ids": {}, "names": {}, "owner": "Owner %s" % suffix, "app": "Billing App %s" % suffix,
+           "foreign_app": "Foreign App %s" % suffix}
     created = {"caps": [], "apps": [], "maps": []}
 
     def org_and_user(label):
-        org = Organization(name="Smoke Detail %s %s" % (label, suffix), slug="smoke-detail-%s-%s" % (label, suffix))
-        db.session.add(org)
-        db.session.flush()
-        email = "smoke.detail-%s.%s@example.com" % (label, suffix)
-        user = User(email=email, first_name="Smoke", last_name="detail-" + label, organization_id=org.id,
-                    enterprise_role="cto", confirmed=True, role=Role.query.filter_by(name="Architect").one())
-        user.password = PASSWORD
-        db.session.add(user)
-        db.session.flush()
+        # The two organisations and their users are fixed and found again on every run: an organisation's
+        # creation is written to append-only tables (the audit trail and the transformation outbox), so it
+        # cannot be deleted, and a fresh pair per run would add two organisations and two users each time.
+        slug = "smoke-detail-%s" % label
+        org = Organization.query.filter_by(slug=slug).first()
+        if org is None:
+            org = Organization(name="Smoke Detail %s" % label, slug=slug)
+            db.session.add(org)
+            db.session.flush()
+        email = "smoke.detail-%s@example.com" % label
+        user = User.query.filter_by(email=email).first()
+        if user is None:
+            user = User(email=email, first_name="Smoke", last_name="detail-" + label, organization_id=org.id,
+                        enterprise_role="cto", confirmed=True, role=Role.query.filter_by(name="Architect").one())
+            user.password = PASSWORD
+            db.session.add(user)
+            db.session.flush()
         out["email_" + label] = email
         return org
 
@@ -70,7 +79,7 @@ def detail_tenants(live_server, request):
         l1 = cap(org, "l1", 1)
         l2 = cap(org, "l2", 2, l1)
         l3 = cap(org, "l3", 3, l2)
-        foreign = cap(other, "foreign", 1)
+        cap(other, "foreign", 1)
         component = ApplicationComponent(name=out["app"], organization_id=org.id)
         db.session.add(component)
         db.session.flush()
@@ -81,23 +90,50 @@ def detail_tenants(live_server, request):
             db.session.add(m)
             db.session.flush()
             created["maps"].append(m.id)
+        # another organisation's application mapped to the first organisation's capability id: the
+        # record page must never list it (see test_another_organisations_mapping_is_not_listed)
+        foreign_component = ApplicationComponent(name=out["foreign_app"], organization_id=other.id)
+        db.session.add(foreign_component)
+        db.session.flush()
+        created["apps"].append(foreign_component.id)
+        # The ORM refuses a mapping across organisations, so this row is written by SQL, as a bad import would.
+        foreign_map_id = db.session.execute(
+            db.text("INSERT INTO application_capability_mapping (organization_id, application_component_id, "
+                    "business_capability_id) VALUES (:o, :a, :c) RETURNING id"),
+            {"o": other.id, "a": foreign_component.id, "c": l1.id}).scalar_one()
+        created["maps"].append(foreign_map_id)
         db.session.commit()
 
     def remove_rows():
+        """Remove every row the fixture created, through the ORM, in dependency order.
+
+        A bulk query delete skips the ORM events, so the mirror row an insert wrote into
+        unified_application_capability_mapping would outlive its mapping and block the component delete.
+        Rows are loaded and deleted one by one; the mirror rows (which have no delete event of their own)
+        go first. The fixed organisations and users stay (see org_and_user).
+        """
+        from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+
         with app.app_context():
             db.session.remove()
-            if created["maps"]:
-                db.session.query(ApplicationCapabilityMapping).filter(
-                    ApplicationCapabilityMapping.id.in_(created["maps"])).delete(synchronize_session=False)
-            if created["caps"]:
-                db.session.query(BusinessCapability).filter(
-                    BusinessCapability.id.in_(created["caps"])).update(
-                    {"parent_capability_id": None}, synchronize_session=False)
-                db.session.query(BusinessCapability).filter(
-                    BusinessCapability.id.in_(created["caps"])).delete(synchronize_session=False)
             if created["apps"]:
-                db.session.query(ApplicationComponent).filter(
-                    ApplicationComponent.id.in_(created["apps"])).delete(synchronize_session=False)
+                for row in UnifiedApplicationCapabilityMapping.query.filter(
+                        UnifiedApplicationCapabilityMapping.application_component_id.in_(created["apps"])).all():
+                    db.session.delete(row)
+                db.session.flush()
+            for row in ApplicationCapabilityMapping.query.filter(
+                    ApplicationCapabilityMapping.id.in_(created["maps"] or [0])).all():
+                db.session.delete(row)
+            db.session.flush()
+            # children before parents: the deepest level goes first
+            for row in BusinessCapability.query.filter(
+                    BusinessCapability.id.in_(created["caps"] or [0])).order_by(BusinessCapability.level.desc()).all():
+                db.session.delete(row)
+                db.session.flush()
+            for row in ApplicationComponent.query.filter(
+                    ApplicationComponent.id.in_(created["apps"] or [0])).all():
+                db.session.delete(row)
+            db.session.flush()
             db.session.commit()
             db.session.remove()
 
@@ -168,6 +204,19 @@ def test_another_organisations_capability_cannot_be_opened(browser, live_server,
         context.close()
 
 
+def test_record_lists_its_own_applications_and_never_another_organisations(browser, live_server, detail_tenants):
+    """A CTO opens a capability and sees the applications of their own organisation only, even when another
+    organisation's application is mapped to the same capability id."""
+    context, page = _open_map(browser, live_server, detail_tenants["email_main"])
+    try:
+        _box_button(page, detail_tenants["names"]["l1"]).click()
+        _assert_record(page, detail_tenants, "l1")
+        body = page.locator("body")
+        expect(body).to_contain_text(detail_tenants["app"])
+        assert detail_tenants["foreign_app"] not in page.content()
+    finally:
+        context.close()
+
 
 @pytest.mark.parametrize("viewport,scheme,tag", [
     ({"width": 1440, "height": 900}, "light", "1440-light"), (NARROW, "dark", "390-dark"),
@@ -176,7 +225,7 @@ def test_map_and_opened_record_have_no_serious_accessibility_issue(browser, live
     import os
     from axe_playwright_python.sync_playwright import Axe
 
-    shots = os.environ.get("CAPMAP03D_SHOTS")
+    shots = os.environ.get("CAPABILITY_MAP_SHOTS")
 
     def serious(p):
         report = Axe().run(p, options={"runOnly": {"type": "tag", "values": ["wcag2a", "wcag2aa", "wcag22aa"]}})
