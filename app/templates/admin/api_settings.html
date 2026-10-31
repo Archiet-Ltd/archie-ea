@@ -458,7 +458,7 @@
                             <!-- IBM watsonx.ai Fields (only show for IBM watsonx.ai provider) -->
                             <div id="watsonx-fields" class="hidden space-y-4" data-testid="watsonx-fields">
                                 {{ form_field(id='watsonx_url', label='Service address', value=form.watsonx_url.data or '', placeholder='https://us-south.ml.cloud.ibm.com',
-                                              help_text='The regional address of your watsonx.ai service. Leave the platform address in place if your administrator set one.') }}
+                                              help_text='The regional address of your watsonx.ai service, for example https://us-south.ml.cloud.ibm.com. Leave it blank to use the address your platform administrator set.') }}
                                 {{ form_field(id='watsonx_project_id', label='Project ID', value=form.watsonx_project_id.data or '',
                                               help_text='The id of the watsonx.ai project the Granite model runs in.') }}
                                 {% call form_group(id='watsonx-model', label='Granite model', help_text='Granite instruct models the service offers. Load them after entering the service address.') %}

@@ -667,7 +667,7 @@ class LLMService:
             exclude_providers = []
 
         # Provider fallback priority order (used when no preference is set)
-        provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
+        provider_priority = ["openai", "anthropic", "gemini", "watsonx", "openrouter", "nvidia", "azure", "huggingface"]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
@@ -713,6 +713,11 @@ class LLMService:
 
         settings_by_provider = {s.provider: s for s in all_enabled_settings}
 
+        def watsonx_entitled():
+            from app.modules.ai_chat.services import watsonx_client
+
+            return watsonx_client.entitled()
+
         # Helper: check if a provider has working config (DB or .env)
         def _provider_is_usable(pname):
             if pname in exclude_providers:
@@ -722,8 +727,10 @@ class LLMService:
                 model = settings.default_model.strip() if settings.default_model and settings.default_model.strip() else None
                 if model:
                     return True, model
-            # Check .env fallback
+            # Check .env fallback (IBM watsonx.ai is paid: the platform's key only for a paid plan)
             env_key = os.getenv(f"{pname.upper()}_API_KEY")
+            if pname == "watsonx" and not watsonx_entitled():
+                env_key = None
             if env_key and len(env_key) > 0:
                 model = default_models.get(pname)
                 if model:
@@ -784,6 +791,8 @@ class LLMService:
                 continue
             env_key = os.getenv(f"{provider_name.upper()}_API_KEY")
             if not (env_key and len(env_key) > 0):
+                continue
+            if provider_name == "watsonx" and not watsonx_entitled():
                 continue
             model = default_models.get(provider_name)
             if not model:
@@ -2480,6 +2489,11 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             # Skip providers we've already tried in this call chain to prevent infinite loops
             if fallback_provider in _already_tried:
                 continue
+            if fallback_provider == "watsonx":
+                from app.modules.ai_chat.services import watsonx_client
+
+                if not watsonx_client.entitled(organization_id):
+                    continue
             fallback_keys = LLMService._get_all_api_keys(fallback_provider)
             if not fallback_keys:
                 continue
