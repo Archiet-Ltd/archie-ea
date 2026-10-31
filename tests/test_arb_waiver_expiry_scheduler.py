@@ -161,24 +161,47 @@ def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch)
     assert {job["id"] for job in scheduler.jobs} == ESTABLISHED_JOBS
 
 
+def _add_job_calls(source, first_line=1):
+    """Each add_job call in `source`, with its id node and its line in the file the source came from."""
+    calls = [
+        call
+        for call in ast.walk(ast.parse(source))
+        if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "add_job"
+    ]
+    return [
+        (
+            call,
+            next((keyword.value for keyword in call.keywords if keyword.arg == "id"), None),
+            call.lineno + first_line - 1,
+        )
+        for call in calls
+    ]
+
+
+def _unreadable_job_ids(source, first_line=1):
+    def named(call):
+        func = next((k.value for k in call.keywords if k.arg == "func"), None)
+        return f" func={ast.unparse(func)}" if func is not None else ""
+
+    return [
+        f"line {line}:{named(call)} id={ast.unparse(job_id) if job_id is not None else 'missing'}"
+        for call, job_id, line in _add_job_calls(source, first_line)
+        if not (isinstance(job_id, ast.Constant) and isinstance(job_id.value, str))
+    ]
+
+
+def test_an_unreadable_job_id_is_reported_at_its_file_line_with_the_call_and_the_computed_id():
+    source = "def init():\n    x = 1\n    sched.add_job(\n        func=run_digest,\n        id=f'digest_{x}',\n    )\n"
+    assert _unreadable_job_ids(source, first_line=100) == ["line 102: func=run_digest id=f'digest_{x}'"]
+    assert _unreadable_job_ids("s.add_job(func=run_digest)\n") == ["line 1: func=run_digest id=missing"]
+
+
 def test_every_job_the_scheduler_registers_is_listed_here():
     from app._bootstrap.extensions import init_scheduler
 
-    tree = ast.parse(inspect.getsource(init_scheduler))
-    calls = [
-        call
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "add_job"
-    ]
-    ids = [
-        next((keyword.value for keyword in call.keywords if keyword.arg == "id"), None)
-        for call in calls
-    ]
-    unreadable = [
-        f"line {call.lineno}: {ast.unparse(call)[:80]}"
-        for call, job_id in zip(calls, ids)
-        if not (isinstance(job_id, ast.Constant) and isinstance(job_id.value, str))
-    ]
+    lines, first_line = inspect.getsourcelines(init_scheduler)
+    source = inspect.getsource(init_scheduler)
+    unreadable = _unreadable_job_ids(source, first_line)
     assert not unreadable, f"add_job calls whose id is not a literal string: {unreadable}"
-    registered = {job_id.value for job_id in ids}
+    registered = {job_id.value for _, job_id, _ in _add_job_calls(source, first_line)}
     assert registered == ESTABLISHED_JOBS | CONFIG_GATED_JOBS | {WAIVER_JOB}

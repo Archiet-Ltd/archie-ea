@@ -41892,8 +41892,7 @@
    "tier": "B",
    "type_changed": false,
    "patterns": [
-    "P01-page-header",
-    "P04-filter-search-toolbar"
+    "P01-page-header"
    ],
    "states": [
     "loading",
@@ -44394,8 +44393,7 @@
    "tier": "B",
    "type_changed": false,
    "patterns": [
-    "P01-page-header",
-    "P23-status-badge"
+    "P01-page-header"
    ],
    "states": [
     "loading",
