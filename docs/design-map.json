@@ -7648,7 +7648,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -7717,7 +7717,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/admin-rowforms.md",
    "states": [
     "loading",
     "empty-nothing-derived",
@@ -7727,7 +7727,7 @@
     "partial-failure",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": true
   },
@@ -7766,7 +7766,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -7824,7 +7824,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/admin-rowforms.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -7833,7 +7833,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -8198,7 +8198,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [],
    "components": [
@@ -8255,7 +8255,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/admin-rowforms.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -8263,7 +8263,7 @@
     "error-region",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -9784,7 +9784,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "record-detail",
    "charts": [],
    "components": [
@@ -9846,7 +9846,7 @@
      "image": "docs/design/reference/basecoat-product-detail.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/admin-rowforms.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -9856,7 +9856,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
@@ -10521,7 +10521,7 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "dashboard",
    "charts": [],
    "components": [
@@ -10583,7 +10583,7 @@
      "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/admin-rowforms.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -10593,7 +10593,7 @@
     "export-running",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": true
   },
@@ -11175,7 +11175,7 @@
     "macros/form_macros.html",
     "macros/page_shell.html"
    ],
-   "basis": "rule",
+   "basis": "reviewed",
    "block": "settings",
    "charts": [],
    "components": [
@@ -11235,7 +11235,7 @@
      "image": "docs/design/reference/basecoat-profile.webp"
     }
    },
-   "spec": null,
+   "spec": "docs/design/specs/admin-rowforms.md",
    "states": [
     "loading",
     "empty-first-use",
@@ -11245,7 +11245,7 @@
     "confirm-error",
     "populated"
    ],
-   "status": "mapped",
+   "status": "implemented",
    "tier": "B",
    "type_changed": false
   },
