@@ -80,7 +80,13 @@ def test_a_mistyped_email_keeps_the_passwords_and_says_why_register_is_off(brows
         expect(page.locator("main")).to_contain_text("We cannot send to this address")
         expect(page.locator("#password")).to_have_value(PASSWORD)
         expect(page.locator("#password2")).to_have_value(PASSWORD)
-        _shot(page, "register-refused-email")
+        _shot(page, "register-refused-email-1440-light")
+        page.emulate_media(color_scheme="dark")
+        page.evaluate("document.documentElement.classList.add('dark')")
+        page.set_viewport_size({"width": 390, "height": 844})
+        _shot(page, "register-refused-email-390-dark")
+        page.evaluate("document.documentElement.classList.remove('dark')")
+        page.set_viewport_size({"width": 1440, "height": 900})
         # With the password cleared the button is off and the page says why, under the button.
         page.fill("#password", "")
         expect(page.locator("#submit")).to_be_disabled()
@@ -123,7 +129,7 @@ def test_the_four_steps_promise_only_what_the_person_can_reach(browser, server, 
         while time.monotonic() < deadline and not navigations:
             page.wait_for_timeout(1000)
         assert navigations, "step 3 did not refresh itself while the website was being read"
-        _shot(page, "step3-reading-%d" % width)
+        _shot(page, "step3-reading-%d-%s" % (width, "dark" if dark else "light"))
         page.wait_for_load_state("domcontentloaded")
         _no_accessibility_violations(page)
 
@@ -140,7 +146,7 @@ def test_the_four_steps_promise_only_what_the_person_can_reach(browser, server, 
         assert page.get_by_test_id("website-reading").count() == 0
         assert page.locator("[data-source='website']").count() == 0
         assert "We are reading" not in page.locator("main").inner_text()
-        _shot(page, "step4-%d" % width)
+        _shot(page, "step4-%d-%s" % (width, "dark" if dark else "light"))
         _no_accessibility_violations(page)
         links += _crawl_the_links(page, str(server))
         link = page.get_by_role("link", name="Account settings")
