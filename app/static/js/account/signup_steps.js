@@ -114,15 +114,22 @@
         }, 3000);
     }
 
+    // Sources being given right now: Continue waits for them, so leaving the page cannot cut a save short.
+    var giving = [];
+
     function give(name, url, body, button) {
         busy(button, true);
         say(name, 'Connecting…', false);
-        post(url, body).then(function (result) {
+        var sent = post(url, body).then(function (result) {
             paint(result.sources);
             poll();
         }).catch(function (error) {
             say(name, error.message || 'That did not work. Check it and try again.', true);
-        }).then(function () { busy(button, false); });
+        }).then(function () {
+            busy(button, false);
+            giving = giving.filter(function (item) { return item !== sent; });
+        });
+        giving.push(sent);
     }
 
     function chosen() {
@@ -178,7 +185,7 @@
             give('website', URLS.website, { url: value('welcome-website'), consent: !!(consent && consent.checked) }, button);
         } else if (action === 'continue') {
             busy(button, true);
-            saveEverything().then(function () {
+            Promise.all(giving).then(saveEverything).then(function () {
                 window.location.assign(button.getAttribute('data-next'));
             }).catch(function (error) {
                 busy(button, false);
