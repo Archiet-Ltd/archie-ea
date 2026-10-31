@@ -248,17 +248,14 @@ def test_keyboard_reaches_a_box_with_a_visible_focus_ring(browser, live_server, 
         context.close()
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Open: a map box's drill-down looks for #tab-heatmap, which the lens select replaced, so Enter "
-    "opens nothing and shows a toast that says it did. The old grid opened its detail panel here."))
 def test_enter_on_a_box_opens_its_detail(browser, live_server, map_tenants):
     names = map_tenants["names"]
     context, page = _open(browser, live_server, map_tenants["emails"]["mixed"])
     try:
         _focus_box(page, names["unassessed"])
         page.keyboard.press("Enter")
-        expect(page.locator("#heatmap-detail")).to_be_visible(timeout=5000)
-        expect(page.locator("#heatmap-detail-name")).to_have_text(names["unassessed"])
+        expect(page).to_have_url(re.compile(r"/capabilities/\d+/fact-sheet$"), timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text(names["unassessed"])
     finally:
         context.close()
 
