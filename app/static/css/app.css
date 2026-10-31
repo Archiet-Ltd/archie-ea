@@ -142,3 +142,9 @@ table.selectable tr:hover {
 .heat-3{background-color:hsl(var(--heat-3))}
 .heat-4{background-color:hsl(var(--heat-4))}
 .heat-5{background-color:hsl(var(--heat-5))}
+
+/* Sign-up steps: the card's footer sticks to the bottom of the screen, so anything scrolled or focused into view
+   stops short of it instead of landing underneath (5rem is the footer's height with room to spare). */
+html:has([data-signup-steps]) {
+    scroll-padding-bottom: 5rem;
+}

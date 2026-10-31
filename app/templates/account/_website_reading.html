@@ -12,7 +12,7 @@
        data-say="website" data-source="website" data-state="{{ row.state }}" data-testid="signup-status-website">{{ '' if (reading_lead and row.state == 'reading' and row.reading_line) or row.state == 'not_given' else row.text }}</p>
     <div class="{{ '' if row.state == 'reading' else 'hidden' }}" data-reading-bar>
         {% set pct = (row.progress.percent if row.progress else 0) %}
-        {% call progress(value=pct, max=100, class='h-2 w-full rounded-full bg-secondary overflow-hidden', attrs={'aria-label': 'Pages of the website read'}) %}{{ progress_indicator(value=pct, max=100, class='rounded-full bg-primary') }}{% endcall %}
+        {% call progress(value=pct, max=100, class='h-2 w-full rounded-full bg-primary/20 overflow-hidden', attrs={'aria-label': 'Pages of the website read'}) %}{{ progress_indicator(value=pct, max=100, class='rounded-full bg-primary') }}{% endcall %}
         <p class="text-xs text-muted-foreground truncate" data-reading-current>{{ (row.current or '') if row.state == 'reading' else '' }}</p>
     </div>
     <div class="flex flex-wrap gap-2" data-reading-actions data-testid="website-reading-actions">

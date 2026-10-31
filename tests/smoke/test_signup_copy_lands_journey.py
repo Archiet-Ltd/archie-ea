@@ -204,3 +204,91 @@ def _no_accessibility_violations(page):
     data = report.response if hasattr(report, "response") else report
     found = [(v["id"], [n["target"] for n in v["nodes"]][:3]) for v in data.get("violations", [])]
     assert not found, found
+
+
+def _luminance(rgb):
+    """Relative luminance of an 'rgb(...)' / 'rgba(...)' / 'color(srgb ...)' string, 0 (black) to 1 (white)."""
+    nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", rgb)[:3]]
+    if rgb.startswith("color("):
+        nums = [n * 255 for n in nums]
+    lin = [(c / 255 / 12.92) if c / 255 <= 0.03928 else (((c / 255) + 0.055) / 1.055) ** 2.4 for c in nums]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def _flatten_background(page, handle):
+    """The colour a person sees at the element: its background painted over every ancestor's, as 'rgb(r, g, b)'."""
+    return page.evaluate("""(el) => {
+        const layers = [];
+        for (let n = el; n; n = n.parentElement) {
+            const m = getComputedStyle(n).backgroundColor.match(/[\\d.]+/g);
+            if (m && m.length >= 3) layers.push([+m[0], +m[1], +m[2], m.length > 3 ? +m[3] : 1]);
+        }
+        let out = [255, 255, 255];
+        for (const [r, g, b, a] of layers.reverse()) out = [r * a + out[0] * (1 - a), g * a + out[1] * (1 - a), b * a + out[2] * (1 - a)];
+        return 'rgb(' + out.map(Math.round).join(', ') + ')';
+    }""", handle)
+
+
+def _the_track_shows_against_the_card(page):
+    """In dark the empty part of the bar must be told apart from the card behind it, and the fill from the track."""
+    bar = page.locator("[data-reading-bar] [role='progressbar']")
+    expect(bar).to_be_visible()
+    track = _flatten_background(page, bar.element_handle())
+    card = _flatten_background(page, page.locator("[data-testid='signup-company'] [data-slot='card']").first.element_handle())
+    fill = _flatten_background(page, bar.locator("[data-slot='progress-indicator']").element_handle())
+    contrast = lambda a, b: (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    lt, lc, lf = _luminance(track), _luminance(card), _luminance(fill)
+    assert contrast(lt, lc) >= 1.15, "the bar's track %s is lost against the card %s (contrast %.2f)" % (track, card, contrast(lt, lc))
+    assert contrast(lf, lt) >= 1.5, "the fill %s does not stand out from the track %s" % (fill, track)
+
+
+def _nothing_hides_behind_the_footer(page, step):
+    """Every control and link in the step's card can be brought fully into view with no overlap with the footer."""
+    footer = page.locator("[data-slot='card-footer']").first
+    controls = page.locator("[data-signup-steps] [data-slot='card-content'] :is(a[href], button, input:not([type=hidden]), select, textarea, [role=checkbox], [role=switch])")
+    seen = 0
+    for i in range(controls.count()):
+        control = controls.nth(i)
+        if not control.is_visible():
+            continue
+        seen += 1
+        # Put the control as low on the screen as a person can: the end of the page, then the control at the lowest
+        # edge scrolling allows. Both extremes must be clear of the footer.
+        for block in ("end", "center"):
+            control.evaluate("(el, block) => el.scrollIntoView({block, inline: 'nearest'})", block)
+            page.wait_for_timeout(50)
+            a, f = control.bounding_box(), footer.bounding_box()
+            height = page.evaluate("window.innerHeight")
+            assert a["y"] >= 0 and a["y"] + a["height"] <= height, "step %s: a control cannot be scrolled fully into view: %s" % (step, a)
+            overlap = min(a["y"] + a["height"], f["y"] + f["height"]) - max(a["y"], f["y"])
+            assert overlap <= 0, "step %s: the footer covers %s by %.0f px (control %s, footer %s)" % (
+                step, control.evaluate("el => el.outerHTML.slice(0, 80)"), overlap, a, f)
+    assert seen >= 2, "step %s has fewer than two controls to check" % step
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_the_reading_track_shows_in_dark_and_the_footer_never_covers_the_form(browser, server, people, held_site, width):
+    context, page = new_page(browser, width)
+    try:
+        page.set_viewport_size({"width": width, "height": 844 if width == 390 else 900})
+        page.emulate_media(color_scheme="dark")
+        page.add_init_script("document.documentElement.classList.add('dark')")
+        sign_up(page, str(server), people)
+        page.get_by_label("Website address").fill(held_site)
+        page.get_by_label("You may read this website").check()
+        page.get_by_role("button", name="Save website").click()
+        if width == 390:
+            _nothing_hides_behind_the_footer(page, 2)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        expect(page.get_by_test_id("signup-reading-line")).to_contain_text(re.compile(r"page 1 of up to 30"), timeout=60000)
+        assert page.evaluate("document.documentElement.classList.contains('dark')")
+        _the_track_shows_against_the_card(page)
+        if width == 390:
+            _nothing_hides_behind_the_footer(page, 3)
+        if SHOTS:
+            for name, step in (("d-step3", 3),):
+                page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+                page.screenshot(path=os.path.join(SHOTS, "%s-%d-dark.png" % (name, width)))
+    finally:
+        context.close()
