@@ -19,6 +19,7 @@ import uuid as _uuid
 
 from flask import (
     Blueprint,
+    abort,
     current_app,
     flash,
     g,
@@ -1139,6 +1140,7 @@ def create_session():
 @login_required
 def session_detail(id):
     """View ARB session details."""
+    _own_session_or_404(id)
     session = ArchitectureReviewBoard.query.options(
         joinedload(ArchitectureReviewBoard.review_items),
         joinedload(ArchitectureReviewBoard.board_members).joinedload(
@@ -1156,9 +1158,9 @@ def session_detail(id):
 @audit_log("arb_session_complete")
 def complete_session(id):
     """Complete an ARB session."""
+    arb_session = _own_session_or_404(id)
     try:
         # AUDIT-ARB-002: Quorum validation - require at least 3 board members
-        arb_session = ArchitectureReviewBoard.query.get_or_404(id)
         member_count = (
             len(arb_session.board_members) if arb_session.board_members else 0
         )
@@ -1194,8 +1196,8 @@ def cancel_session(id):
     implemented, so every detail page for scheduled/draft sessions 500'd
     on the url_for BuildError.
     """
+    arb_session = _own_session_or_404(id)
     try:
-        arb_session = ArchitectureReviewBoard.query.get_or_404(id)
         if arb_session.status not in ("scheduled", "draft"):
             flash("Only scheduled or draft sessions can be cancelled.", "error")
             return redirect(url_for("arb.session_detail", id=id))
@@ -1216,6 +1218,7 @@ def cancel_session(id):
 @audit_log("arb_member_add")
 def add_board_member(session_id):
     """Add a member to an ARB session."""
+    _own_session_or_404(session_id)
     try:
         data = request.form.to_dict()
         (arb_service.add_board_member(
@@ -1734,14 +1737,44 @@ def review_typed_history_csv(id):
     )
 
 
+def _own_review_or_404(review_item_id):
+    """The review item of the signed-in organisation, or a 404.
+
+    Resolved with an explicit (id, organization_id) predicate through
+    ``TypedARBDecisionAdapter.load_review``: ``Query.get_or_404`` is tenant
+    scoped only on an identity-map miss, and a 404 raised inside a route's
+    own ``try`` block is swallowed by its ``except Exception``.
+    """
+    review = TypedARBDecisionAdapter.load_review(review_item_id)
+    if review is None:
+        abort(404)
+    return review
+
+
+def _own_session_or_404(session_id):
+    """The ARB session of the signed-in organisation, or a 404 (see above)."""
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    session = None
+    if organization_id is not None:
+        session = db.session.execute(
+            db.select(ArchitectureReviewBoard).where(
+                ArchitectureReviewBoard.id == session_id,
+                ArchitectureReviewBoard.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+    if session is None:
+        abort(404)
+    return session
+
+
 @arb_bp.route("/reviews/<int:id>/submit", methods=["POST"])
 @login_required
 @audit_log("arb_review_submit")
 @rate_limit(10, "1h")
 def submit_review(id):
     """Submit a draft review item for ARB consideration."""
+    review = _own_review_or_404(id)
     try:
-        review = ARBReviewItem.query.get_or_404(id)
         if review.solution_id or review.adr_id or review.architecture_model_id:
             flash(
                 "Typed reviews must be submitted from their governed evidence dossier.",
@@ -1762,9 +1795,15 @@ def submit_review(id):
 @audit_log("arb_review_assign")
 def assign_to_session(id):
     """Assign review item to an ARB session."""
+    _own_review_or_404(id)
+    data = request.form.to_dict()
     try:
-        data = request.form.to_dict()
-        arb_service.assign_to_session(id, int(data.get("arb_session_id")))
+        target_id = int(data.get("arb_session_id"))
+    except (TypeError, ValueError):
+        target_id = 0
+    target_session = _own_session_or_404(target_id)
+    try:
+        arb_service.assign_to_session(id, target_session.id)
         flash("Review item assigned to ARB session", "success")
         return redirect(url_for("arb.review_detail", id=id))
     except Exception as e:
@@ -2044,11 +2083,13 @@ def reopen_decision(id):
 @audit_log("arb_comment_add")
 def add_comment(id):
     """Add comment to review item."""
+    review = _own_review_or_404(id)
     try:
         data = request.form.to_dict()
 
         comment = ARBReviewComment(
-            review_item_id=id,
+            review_item_id=review.id,
+            organization_id=review.organization_id,
             user_id=current_user.id,
             comment_type=data.get("comment_type", "general"),
             content=data.get("content"),
@@ -2796,9 +2837,8 @@ def api_adm_kanban_move_card():
 @audit_log("arb_session_delete")
 def delete_session(id):
     """Delete an ARB session. Only draft/cancelled sessions can be deleted."""
+    session = _own_session_or_404(id)
     try:
-        session = ArchitectureReviewBoard.query.get_or_404(id)
-
         # Only allow deletion of draft or cancelled sessions
         if session.status not in ("draft", "cancelled"):
             flash(
@@ -2843,9 +2883,8 @@ def delete_session(id):
 @audit_log("arb_review_delete")
 def delete_review(id):
     """Delete an ARB review item. Only draft/withdrawn items can be deleted."""
+    review = _own_review_or_404(id)
     try:
-        review = ARBReviewItem.query.get_or_404(id)
-
         # Only allow deletion of draft or withdrawn reviews
         if review.status not in ("draft", "withdrawn"):
             flash(
