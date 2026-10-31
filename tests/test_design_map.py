@@ -178,7 +178,9 @@ def test_every_row_carries_the_port_map_fields_and_the_tier_totals_are_the_desig
         totals[entry["tier"]] = totals.get(entry["tier"], 0) + 1
     assert totals == TIER_TOTALS
     assert sum(1 for e in pages.values() if e["type_changed"]) == 72
-    assert sum(1 for e in pages.values() if e["confidence"] == "low") == 91
+    assert sum(1 for e in pages.values() if e["confidence"] == "low") == 133
+    assert sum(1 for e in pages.values() if e.get("derived_fields")) == 55
+    assert all(e["confidence"] == "low" for e in pages.values() if e.get("derived_fields"))
 
 
 def test_the_port_map_wins_on_persona_and_components_and_the_vocabulary_knows_every_component(design_map):
@@ -204,6 +206,33 @@ def test_a_row_with_an_illegal_tier_or_confidence_or_no_reason_is_an_error(tool,
     assert any(rel in e and "tier 'D'" in e for e in errors)
     assert any(rel in e and "confidence 'maybe'" in e for e in errors)
     assert any(rel in e and "no reason" in e for e in errors)
+
+
+def test_a_row_with_fields_filled_from_other_rows_must_say_so_and_be_low_confidence(tool, design_map):
+    import copy
+
+    broken = copy.deepcopy(design_map)
+    rel = LIST_PAGE
+    pages = {rel: {"extends": ["layouts/base.html"], "macros": [], "marker": broken["pages"][rel]["block"]}}
+    broken["pages"][rel].update(derived_fields=["patterns", "grid"], confidence="high")
+    errors = tool.measure(broken, pages)["errors"]
+    assert any(rel in e and "confidence must be low" in e for e in errors)
+    broken["pages"][rel].update(derived_fields=["colour"], confidence="low")
+    errors = tool.measure(broken, pages)["errors"]
+    assert any(rel in e and "'colour'" in e for e in errors)
+    broken["pages"][rel].update(derived_fields=["patterns", "grid"], confidence="low")
+    errors = tool.measure(broken, pages)["errors"]
+    assert not any(rel in e and "derived" in e for e in errors)
+
+
+def test_the_transformation_room_decision_and_the_investment_prerequisite_page_list_only_what_they_have(design_map):
+    pages = design_map["pages"]
+    for rel in ("app/templates/solutions/transformation_room/decision.html",
+                "app/templates/strategic/investment_matrix_prereq.html"):
+        row = pages[rel]
+        assert row["confidence"] == "low" and "patterns" in row["derived_fields"], rel
+        assert not {"P24-kpi-row", "P03-data-table"} & set(row["patterns"]), rel
+        assert not [d for d in row["departures"] if d["rule"] == "R10"], rel
 
 
 # ---- each page is measured against the checks of its tier
@@ -271,7 +300,7 @@ def test_every_row_carries_patterns_states_departures_and_a_grid_in_the_counts_o
     assert len(design_map["pages"]) == PAGES_IN_MAP
     assert all(r["states"] and isinstance(r["departures"], list) and "grid" in r for r in rows)
     departures = Counter(d["rule"] for r in rows for d in r["departures"])
-    assert departures == {"R10": 221, "C-form": 49, "R9": 39, "brand": 24}
+    assert departures == {"R10": 199, "C-form": 49, "R9": 39, "brand": 24}
     empty = sorted(rel for rel, r in design_map["pages"].items() if not r["patterns"])
     assert len(empty) == 7 and all(design_map["pages"][rel]["pattern_gap"] for rel in empty)
     assert sum(1 for r in rows if r["grid"] == "G4") == sum(1 for r in rows if r["tier"].startswith("C"))
