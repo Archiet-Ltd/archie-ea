@@ -240,8 +240,8 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
     email = _EMAIL.search(text)
     put("contact_email", email.group(0) if email else None, 0.7)
 
-    # every candidate carries where it was linked from: the site's own header and footer, or its structured data,
-    # speak for the company; a link in body text or a post may be anyone's
+    # every candidate carries where it was linked from, so a link in the site's header, footer or structured data
+    # can be preferred; whether a handle is the company's own is decided once, in the service
     candidates: List[Tuple[Any, bool]] = [(c, True) for c in organisation.get("sameAs") or []] \
         if isinstance(organisation.get("sameAs"), list) else []
     for anchor in soup.find_all("a", href=True):
@@ -254,9 +254,6 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
             social.append({"platform": root[0], "url": root[1], "handle": root[2], "chrome": chrome,
                            "confidence": 1.0})
     out["social"] = social
-    for item in sorted(social, key=lambda i: not i["chrome"]):
-        if item["platform"] == "LinkedIn":
-            put("linkedin_url", item["url"], 1.0)
     out["technologies"] = detect_technologies(soup)
     out["links"] = page_links(html, url, site)
     out["text_length"] = len(text)
