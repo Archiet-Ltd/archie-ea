@@ -88,7 +88,7 @@
       {% endif %}
       {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change < 0) if cost.change is not none and cost.change != 0 else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
-      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once an application states its annual cost.' if not cost.applications else (cost.applications ~ (' application has' if cost.applications == 1 else ' applications have') ~ ' no annual cost recorded yet.'), links.spend) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Cost figures are shown to roles that include cost visibility.' if cost.withheld else 'Appears here once an application states its annual cost.' if not cost.applications else (cost.applications ~ (' application has' if cost.applications == 1 else ' applications have') ~ ' no annual cost recorded yet.'), links.spend) }}
     {% endif %}
 
     {# Relationships #}

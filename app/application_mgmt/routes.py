@@ -2221,7 +2221,12 @@ def render_application_detail(id):
 
     from app.services.application_cost_accessor import annual_cost_for_application
 
-    annual_cost = annual_cost_for_application(app_obj)
+    from flask_login import current_user
+
+    from app.decorators.requires_role import may_see_spend_pages
+
+    # The same rule as the Overview and the list: a role that may not see cost is shown none here either.
+    annual_cost = annual_cost_for_application(app_obj) if may_see_spend_pages(current_user) else {"value": None, "source": None}
 
     def _recorded(attr, scale=1):
         value = getattr(app_obj, attr, None)

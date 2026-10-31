@@ -1750,6 +1750,7 @@
   {# ═══════════════════════════════════════════════════════════════════════════
      TAB: COST
   ═══════════════════════════════════════════════════════════════════════════ #}
+  {% if cost_breakdown.annual_cost is not none %}
   {% call tab_panel('cost', active=(resolved_tab == 'cost')) %}
   <div class="space-y-6">
     <div class="flex justify-end">
@@ -1793,6 +1794,7 @@
 
   </div>
   {% endcall %}{# /tab_panel cost #}
+  {% endif %}
 
   {# ═══════════════════════════════════════════════════════════════════════════
      TAB: DEPENDENCIES
