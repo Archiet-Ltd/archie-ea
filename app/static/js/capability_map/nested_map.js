@@ -10,7 +10,7 @@
  * Data source: GET /capability-map/api/unified-capabilities, the same endpoint the
  * Heat Map lens uses. Each entry carries `parent_id` and `band`.
  *
- * Click behaviour is unchanged: it opens the Heat Map lens' own capability detail.
+ * A box is a button; click, Enter or Space opens the capability's own record page.
  */
 (function () {
     'use strict';
@@ -100,7 +100,9 @@
         var pad = level === 1 ? 'px-3 py-1.5' : 'px-2 py-1';
         var size = level === 1 ? 'text-sm font-medium' : 'text-xs';
         var html = '<div class="space-y-1" data-testid="cap-box" data-level="' + level + '" data-cap-id="' + escapeHtml(cap.id) + '" data-assessed="' + st.assessed + '">';
-        html += '<button type="button" class="nm-cap-box flex w-full items-start justify-between gap-2 ' + pad + ' ' + boxClasses(st) + '" data-cap="' + escapeHtml(JSON.stringify(cap)) + '">';
+        var measureWords = st.assessed ? MEASURES[_measure].name + ': ' + st.mark : MEASURES[_measure].name + ': not assessed';
+        var label = cap.name + ', level ' + level + ', ' + measureWords + '. Opens the capability record.';
+        html += '<button type="button" class="nm-cap-box flex w-full items-start justify-between gap-2 ' + pad + ' ' + boxClasses(st) + '" data-cap-id="' + escapeHtml(cap.id) + '" aria-label="' + escapeHtml(label) + '">';
         html += '<span class="' + size + ' break-words">' + escapeHtml(cap.name) + '</span>';
         html += (st.assessed
             ? '<span class="shrink-0 text-xs font-medium tabular-nums">' + escapeHtml(st.mark) + '</span>'
@@ -252,18 +254,11 @@
         container.addEventListener('click', function (e) {
             var btn = e.target.closest('.nm-cap-box');
             if (!btn) return;
-            var cap;
-            try { cap = JSON.parse(btn.getAttribute('data-cap')); } catch (err) { return; }
-            // Reuse the Heat Map lens' own drill-down: switch to that lens
-            // (its @click loads and marks it active), then open the detail.
-            var heatmapTabBtn = document.getElementById('tab-heatmap');
-            if (heatmapTabBtn) heatmapTabBtn.click();
-            if (typeof window.showHeatmapDetail === 'function') {
-                window.showHeatmapDetail(cap);
-            }
-            if (window.Platform && Platform.toast && typeof Platform.toast.info === 'function') {
-                Platform.toast.info('Opened "' + cap.name + '" in the Heat Map detail panel.');
-            }
+            var id = btn.getAttribute('data-cap-id');
+            var template = container.getAttribute('data-detail-url');
+            if (!id || !template) return;
+            // A box opens the capability's own record page: owner, maturity, applications, assessment date.
+            window.location.assign(template.replace('__ID__', encodeURIComponent(id)));
         });
         _delegated = true;
     }
