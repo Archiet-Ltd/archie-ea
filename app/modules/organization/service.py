@@ -229,6 +229,20 @@ def list_raci_assignments():
     return EnterpriseRaciAssignment.query.all()
 
 
+class StakeholderNotInOrganisation(ValueError):
+    """The person named as a stakeholder is not one of the signed-in organisation's own people."""
+
+
+def require_organisation_user(stakeholder_type, stakeholder_id):
+    """A stakeholder of type ``user`` must be a member of the current organisation: the same membership
+    rule the stakeholder picker searches by and the team page uses (``User.organization_id``)."""
+    if stakeholder_type != "user" or not stakeholder_id:
+        return
+    member = User.query.filter_by(id=stakeholder_id, organization_id=g.current_org_id).first()
+    if member is None:
+        raise StakeholderNotInOrganisation("Person not found in your organisation")
+
+
 def upsert_raci_cell(stakeholder_type, stakeholder_id, stakeholder_name, capability_id, raci, notes=None):
     """Create or update the RACI designation for one (stakeholder, capability)
     cell. Returns the saved EnterpriseRaciAssignment."""
@@ -238,6 +252,7 @@ def upsert_raci_cell(stakeholder_type, stakeholder_id, stakeholder_name, capabil
         raise ValueError(f"Invalid raci value: {raci}. Must be one of {RACI_VALUES}")
     if not stakeholder_id or not capability_id:
         raise ValueError("stakeholder_id and capability_id are required")
+    require_organisation_user(stakeholder_type, stakeholder_id)
 
     assignment = EnterpriseRaciAssignment.query.filter_by(
         stakeholder_type=stakeholder_type,
@@ -271,6 +286,7 @@ def keep_raci_stakeholder(stakeholder_type, stakeholder_id, stakeholder_name):
         raise ValueError(f"Invalid stakeholder_type: {stakeholder_type}")
     if not stakeholder_id:
         raise ValueError("stakeholder_id is required")
+    require_organisation_user(stakeholder_type, stakeholder_id)
     assignment = EnterpriseRaciAssignment.query.filter_by(
         stakeholder_type=stakeholder_type, stakeholder_id=stakeholder_id
     ).first()

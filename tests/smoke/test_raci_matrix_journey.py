@@ -200,3 +200,57 @@ def test_phone_scrolls_sideways_and_keeps_the_first_column(browser, live_server,
         _shot(page, "populated-390-dark.png")
     finally:
         context.close()
+
+
+def test_a_stakeholder_kept_on_the_matrix_is_always_one_of_the_organisations_own_people(browser, live_server):
+    """Organisation A's architect cannot put organisation B's person on A's matrix, by the cell or by the keep path;
+    the refusal is a 404 in the organisation's terms, nothing is written, and A's own member is kept."""
+    from .fresh_org import api, create_fresh_org
+
+    a = create_fresh_org("business_architect", extra_roles=("data_architect",))
+    b = create_fresh_org("business_architect")
+    _seed_capability(a["org_id"])
+    from app import create_app
+    from app.models.unified_capability import UnifiedCapability
+
+    with create_app("testing").app_context():
+        cap = UnifiedCapability.query.filter_by(organization_id=a["org_id"]).one().id
+    outsider = b["user_ids"]["business_architect"]
+    own = a["user_ids"]["data_architect"]
+    context, page = _open(browser, live_server, a["emails"]["business_architect"])
+    try:
+        refusals = []
+        cell = {"stakeholder_type": "user", "stakeholder_id": outsider, "stakeholder_name": "Outsider",
+                "capability_id": cap, "raci": "A"}
+        keep = {"stakeholder_type": "user", "stakeholder_id": outsider, "stakeholder_name": "Outsider"}
+        for path, body in (("/organization/raci/api/cell", cell), ("/organization/raci/api/stakeholder/keep", keep)):
+            status, reply = api(page, "POST", path, body)
+            assert status == 404, (path, status, reply)
+            refusals.append(str(reply))
+        assert all("not found" in r.lower() for r in refusals), refusals
+        status, data = api(page, "GET", "/organization/raci/api/data")
+        assert status == 200
+        assert not any(x["stakeholder_id"] == outsider and x["stakeholder_type"] == "user"
+                       for x in data["data"]["assignments"]), data
+        # The page itself shows nobody from the other organisation.
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_selector("[data-testid=raci-matrix]")
+        expect(page.locator("[data-testid=raci-matrix]")).not_to_contain_text("Outsider")
+        # A's own member is kept, and appears on the matrix after a reload.
+        status, reply = api(page, "POST", "/organization/raci/api/stakeholder/keep",
+                            {"stakeholder_type": "user", "stakeholder_id": own, "stakeholder_name": "Launch data_archite"})
+        assert status == 200, (status, reply)
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_selector("[data-testid=raci-matrix]")
+        expect(page.locator("[data-testid=raci-matrix] thead th", has_text="Launch data_archite")).to_be_visible()
+        page.set_viewport_size({"width": 1440, "height": 900})
+        _shot(page, "c-keep-1440-light.png")
+    finally:
+        context.close()
+    # B's matrix is untouched too.
+    context, bpage = _open(browser, live_server, b["emails"]["business_architect"])
+    try:
+        status, data = api(bpage, "GET", "/organization/raci/api/data")
+        assert data["data"]["assignments"] == [], data
+    finally:
+        context.close()

@@ -308,6 +308,8 @@ def raci_cell_save():
             raci=raci_value,
             notes=notes,
         )
+    except service.StakeholderNotInOrganisation as exc:
+        return error_response(str(exc), code="NOT_FOUND", status_code=404)
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
@@ -359,6 +361,8 @@ def raci_stakeholder_keep():
             stakeholder_id=payload.get("stakeholder_id"),
             stakeholder_name=payload.get("stakeholder_name"),
         )
+    except service.StakeholderNotInOrganisation as exc:
+        return error_response(str(exc), code="NOT_FOUND", status_code=404)
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
     return success_response(assignment.to_dict())
