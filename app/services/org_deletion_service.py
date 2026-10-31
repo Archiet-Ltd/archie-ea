@@ -4,12 +4,19 @@ Deleting an organisation never depends on another organisation existing:
   - a person who belongs to other organisations too (as their home organisation or through an
     organisation role) is detached from this one and keeps the others; their home organisation
     moves to the one where they have held a role longest (named in the message; the move is recorded
-    in the platform record of the deletion, never in that organisation), and an Administrator of this organisation is no longer one;
+    in the platform record of the deletion, never in that organisation). An Administrator of this
+    organisation does not carry that right across: role and administrator flag are set from the
+    person's existing role in the new home, and the before and after are recorded;
   - a person who belongs only to this organisation is removed with it, with the rows that are theirs
     alone (sessions, tokens). If any row that is not this organisation's names such a person, in any
     column of any table (another organisation's, a platform row, or a row of a table with no
     organisation column that hangs from either), the whole deletion is refused before anything is
     written;
+  - a row outside this organisation that points at the organisation row itself through a column
+    other than ``organization_id`` (such as the organisation that named a vendor) is deleted with it
+    when nothing outside the organisation uses it, and otherwise keeps its row with the pointer
+    cleared by this service, not by the database's ON DELETE action; each cleared pointer (table,
+    id, column, old value) is recorded in the platform record of the deletion;
   - an organisation that is the home of a platform administrator is not deleted at all; the
     administrator is moved first.
 
@@ -22,7 +29,9 @@ organisation is read from the database, not from a hand-kept list:
   - a row of a table with no such key that points (through its own foreign keys, at any depth) at
     one of those rows, such as a sync log of the organisation's connector.
 
-Nothing is disabled on the way: no trigger is switched off, no ``session_replication_role`` is set,
+The delete-refusing guards admit a DELETE only while this transaction has written a
+deletion-in-progress row for the organisation as well as the marker; the row is removed before the
+commit. Nothing is disabled on the way: no trigger is switched off, no ``session_replication_role`` is set,
 and a statement the database refuses is not skipped. The whole deletion is one transaction; if any
 statement fails, it is rolled back and the error is raised to the caller with the database's reason.
 """
@@ -67,6 +76,26 @@ _FOREIGN_KEYS = text(
     """
 )
 
+# Every foreign key to organizations other than on a column named organization_id (such as
+# vendor_organizations.named_by_organization_id), whatever its ON DELETE action: the database would
+# otherwise clear or cascade these silently, so each is handled and recorded by the service.
+_ORGANISATION_POINTERS = text(
+    """
+    SELECT child.relname AS child_table, child_col.attname AS child_column,
+           child_col.attnotnull AS not_null, c.confdeltype AS on_delete,
+           (SELECT pk_col.attname FROM pg_index i
+              JOIN pg_attribute pk_col ON pk_col.attrelid = i.indrelid AND pk_col.attnum = i.indkey[0]
+             WHERE i.indrelid = child.oid AND i.indisprimary AND i.indnatts = 1) AS pk_column
+    FROM pg_constraint c
+    JOIN pg_class child ON child.oid = c.conrelid
+    JOIN pg_namespace ns ON ns.oid = child.relnamespace
+    JOIN pg_attribute child_col ON child_col.attrelid = c.conrelid AND child_col.attnum = c.conkey[1]
+    WHERE c.contype = 'f' AND ns.nspname = current_schema() AND array_length(c.conkey, 1) = 1
+      AND c.confrelid = 'organizations'::regclass AND child_col.attname <> 'organization_id'
+    ORDER BY 1, 2
+    """
+)
+
 # Every table that carries an organization_id column, with or without a key on it.
 _ORGANIZATION_COLUMNS = text(
     """
@@ -105,6 +134,8 @@ class _Plan:
         for (table,) in sess.execute(_ORGANIZATION_COLUMNS):
             if table != "organizations":
                 self.org_columns[table].append("organization_id")
+        # (table, column, column is NOT NULL, ON DELETE action, primary key column)
+        self.organisation_pointers = [tuple(row) for row in sess.execute(_ORGANISATION_POINTERS)]
         # Foreign keys the models declare that this database does not hold. They add no cycle-breaking
         # NULL (the database has no constraint to satisfy); they only order the deletes.
         self.declared = defaultdict(set)  # parent table -> {child table}
@@ -345,6 +376,62 @@ def _remove_people(sess, plan, people_ids):
     sess.execute(text("DELETE FROM users WHERE id = ANY(:people)"), params)
 
 
+def _rights(sess, user_id):
+    """A person's home organisation, role and administrator flag, read straight from the row."""
+    row = sess.execute(
+        text("SELECT organization_id, role_id, is_org_admin FROM users WHERE id = :id"), {"id": user_id}
+    ).one()
+    return {"organization_id": row[0], "role_id": row[1], "is_org_admin": bool(row[2])}
+
+
+def _release_organisation_pointers(sess, plan, org_id, counts):
+    """Handle every row outside the deleted organisation that points at the organisation row itself.
+
+    Runs after the organisation's own rows are gone, so a row's remaining referrers are exactly the
+    rows that are not the organisation's. A row that nothing outside the organisation uses is the
+    organisation's own and is deleted with it; any other row keeps existing and has its pointer
+    cleared here, explicitly, rather than by the database's ON DELETE action. Returns one record per
+    cleared pointer: table, id, column and old value. A row owned by another organisation is never
+    deleted.
+    """
+    cleared = []
+    params = {"org_id": org_id}
+    for table, column, not_null, _on_delete, pk in plan.organisation_pointers:
+        if pk is None:
+            continue
+        base = "SELECT %s FROM %s WHERE %s = :org_id" % (_q(pk), _q(table), _q(column))
+        if table in plan.org_columns:
+            # Another organisation's row is never deleted here; only a platform row (no organisation) can be.
+            platform = [row_id for (row_id,) in sess.execute(text(base + " AND organization_id IS NULL"), params)]
+            owned_elsewhere = [row_id for (row_id,) in sess.execute(
+                text(base + " AND organization_id IS NOT NULL AND organization_id <> :org_id"), params)]
+        else:
+            platform = [row_id for (row_id,) in sess.execute(text(base), params)]
+            owned_elsewhere = []
+        for row_id, deletable in [(r, True) for r in platform] + [(r, False) for r in owned_elsewhere]:
+            used_elsewhere = not deletable or any(
+                _exists(sess, referrer, "%s = :row_id%s" % (
+                    _q(referrer_col), " AND organization_id IS DISTINCT FROM :org_id"
+                    if referrer in plan.org_columns else ""), {"row_id": row_id, "org_id": org_id})
+                for referrer, referrer_col, _, _, _ in plan.referrers[table]
+            )
+            if not used_elsewhere:
+                _remove_pointing_rows(sess, plan, table, "%s = :row_id" % _q(pk), {"row_id": row_id}, {table}, counts)
+                _delete(sess, table, "%s = :row_id" % _q(pk), {"row_id": row_id}, counts)
+                continue
+            if not_null or table in _APPEND_ONLY_TABLES:
+                raise OrganizationDeletionRefused(
+                    "%s %s still uses this organisation and cannot be detached from it. Nothing was deleted."
+                    % (table.replace("_", " ").capitalize(), row_id)
+                )
+            sess.execute(
+                text("UPDATE %s SET %s = NULL WHERE %s = :row_id" % (_q(table), _q(column), _q(pk))),
+                {"row_id": row_id},
+            )
+            cleared.append({"table": table, "id": row_id, "column": column, "old_value": org_id})
+    return cleared
+
+
 class OrganizationDeletionService:
     """Delete an organisation and every row that belongs to it."""
 
@@ -415,22 +502,39 @@ class OrganizationDeletionService:
 
         org_name, org_slug = org.name, org.slug
         try:
+            # Proof that this transaction is deleting this organisation: the guards on append-only
+            # history admit a DELETE only with this row as well as the marker. It is removed again
+            # before the commit, so no other transaction ever sees it.
+            sess.execute(
+                text("INSERT INTO organization_deletions_in_progress (target_organization_id) VALUES (:org_id)"),
+                {"org_id": org_id},
+            )
             sess.execute(
                 text("SELECT set_config('archie.deleting_organisation', :org_id, true)"),
                 {"org_id": str(org_id)},
             )
             # People whose home is this organisation and who belong elsewhere are detached.
-            detached, moved_to = 0, {}
+            detached, moved_to, rights_changed = 0, {}, {}
             for user, home in detaching:
                 moved_to[str(user.id)] = home
                 if user.is_admin():
-                    user.revoke_org_admin()
-                sess.flush()  # a demotion is recorded against this organisation, which is going
+                    before = _rights(sess, user.id)
+                    # Administrator rights in this organisation do not travel: the person is what
+                    # their existing role in the new home says, and nothing more.
+                    if OrgRole.get_role(home, user.id) == "org_admin":
+                        user.grant_org_admin()
+                    else:
+                        user.revoke_org_admin()
+                    sess.flush()  # a demotion is recorded against this organisation, which is going
+                    rights_changed[str(user.id)] = {"before": before, "after_role_change": _rights(sess, user.id)}
                 # A statement, not an attribute change: the audit hook would file the move under the
                 # new home organisation. The platform record of this deletion carries it instead.
                 sess.execute(
                     text("UPDATE users SET organization_id = :home WHERE id = :id"), {"home": home, "id": user.id}
                 )
+                if str(user.id) in rights_changed:
+                    rights_changed[str(user.id)]["after"] = _rights(sess, user.id)
+                    del rights_changed[str(user.id)]["after_role_change"]
                 sess.expire(user)
                 detached += 1
             sess.flush()
@@ -449,8 +553,13 @@ class OrganizationDeletionService:
                 _delete(sess, table, where, params, counts)
 
             _remove_people(sess, plan, leaving)
+            pointers_cleared = _release_organisation_pointers(sess, plan, org_id, counts)
 
             sess.expunge(org)
+            sess.execute(
+                text("DELETE FROM organization_deletions_in_progress WHERE target_organization_id = :org_id"),
+                params,
+            )
             sess.execute(text("DELETE FROM organizations WHERE id = :org_id"), params)
 
             sess.add(AuditLog(
@@ -466,6 +575,8 @@ class OrganizationDeletionService:
                     "people_removed": len(leaving),
                     "people_detached": detached,
                     "people_detached_to": moved_to,
+                    "administrators_detached": rights_changed,
+                    "pointers_cleared": pointers_cleared,
                 },
             ))
             sess.commit()
@@ -485,4 +596,8 @@ class OrganizationDeletionService:
             homes = [name for (name,) in sess.query(Organization.name).filter(
                 Organization.id.in_(set(moved_to_ids))).order_by(Organization.name)]
             parts[-1] = parts[-1][:-1] + ", and now %s to %s." % ("belongs" if detached == 1 else "belong", ", ".join(homes))
+            demoted = sum(1 for rights in rights_changed.values() if not rights["after"]["is_org_admin"])
+            if demoted:
+                parts.append("%d of them administered it and %s no longer %s." % (
+                    demoted, "is" if demoted == 1 else "are", "an administrator" if demoted == 1 else "administrators"))
         return " ".join(parts)

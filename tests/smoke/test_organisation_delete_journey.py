@@ -491,3 +491,78 @@ def test_deleting_an_organisation_whose_person_commented_on_another_organisation
             "SELECT count(*) FROM archimate_element_comments WHERE comment_text = :t"), {"t": made["text"]}).scalar()
         assert kept == 1, "the other organisation's comment was removed"
         db.session.remove()
+
+
+@pytest.fixture
+def doomed_with_a_detached_administrator(app):
+    """An organisation whose administrator also holds a viewer role in a second organisation."""
+    from app import db
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    marker = uuid.uuid4().hex[:8]
+    with app.app_context():
+        doomed_org = Organization(name="Journey Admin Doomed %s" % marker, slug="journey-admin-doomed-%s" % marker)
+        other = Organization(name="Journey Admin Elsewhere %s" % marker, slug="journey-admin-elsewhere-%s" % marker)
+        db.session.add_all([doomed_org, other])
+        db.session.flush()
+        person = User(first_name="Shared", last_name="Admin", email="shared-admin-%s@example.test" % marker,
+                      password="test-password-123", confirmed=True, organization_id=doomed_org.id)
+        person.role = Role.query.filter_by(name="Administrator").one()
+        person.grant_org_admin()
+        db.session.add(person)
+        db.session.flush()
+        db.session.add(OrgRole(organization_id=other.id, user_id=person.id, role="viewer"))
+        db.session.commit()
+        made = {"doomed_id": doomed_org.id, "doomed_name": doomed_org.name, "other_id": other.id,
+                "other_name": other.name, "person_id": person.id}
+        db.session.remove()
+    yield made
+    with app.app_context():
+        from app.services.org_deletion_service import OrganizationDeletionService
+
+        for key in ("doomed_id", "other_id"):
+            if db.session.get(Organization, made[key]) is not None:
+                OrganizationDeletionService.delete_organization(made[key])
+        db.session.remove()
+
+
+def test_deleting_an_organisation_moves_its_administrator_home_without_administrator_rights(
+    page, live_server, seeded, app, doomed_with_a_detached_administrator,
+):
+    """The administrator also belongs to another organisation as a viewer. After the delete the
+    page says so, and in that organisation they are a viewer, not an administrator."""
+    import os
+
+    from app import db
+    from app.models.user import User
+
+    made = doomed_with_a_detached_administrator
+    walk = os.environ.get("WALK_DIR")
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+    page.goto(live_server + "/admin/organizations/%d" % made["doomed_id"], wait_until="domcontentloaded")
+    page.locator("form[action$='/organizations/%d/delete']" % made["doomed_id"]).get_by_role(
+        "button", name="Delete organisation"
+    ).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_url("**/admin/organizations", timeout=PAGE_TIMEOUT)
+
+    text = page.get_by_text('Organisation "%s" deleted.' % made["doomed_name"], exact=False).first.inner_text()
+    assert "1 person who also belongs elsewhere was detached, and now belongs to %s." % made["other_name"] in text, text
+    assert "1 of them administered it and is no longer an administrator." in text, text
+    if walk:
+        for width, height in ((1440, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.wait_for_timeout(800)
+            page.screenshot(path=os.path.join(walk, "detached-administrator-%d.png" % width), full_page=True)
+        page.set_viewport_size({"width": 1440, "height": 900})
+
+    # The other organisation's page lists the person, and they are not an administrator there.
+    page.goto(live_server + "/admin/organizations/%d" % made["other_id"], wait_until="domcontentloaded")
+    assert page.get_by_text("Shared Admin", exact=False).count() >= 1, "the detached person is missing from their new home"
+    with app.app_context():
+        person = db.session.get(User, made["person_id"])
+        assert person.organization_id == made["other_id"]
+        assert person.is_admin() is False and person.is_org_admin is False
+        db.session.remove()
