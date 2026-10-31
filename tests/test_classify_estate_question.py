@@ -2,8 +2,7 @@
 
 Pure function, no app or database needed: ``classify_estate_question`` only
 pattern-matches the message text (app/modules/intelligence/services/
-answer_envelope.py). Added for rv-chat-whatif01b: the function matched "if X
-is retired" and "if X is decommissioned" but not "what if we retire X",
+answer_envelope.py). The function matched "if X is retired" and "if X is decommissioned" but not "what if we retire X",
 "what if we decommission X", "what if we remove X", "what if X is removed"
 or "what if we replace X" -- the phrasing a person actually typed in the
 chat box, which is what sent that question to the model uncited instead of

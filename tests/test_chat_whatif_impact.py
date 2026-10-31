@@ -1,6 +1,5 @@
 """'What if we retire X?' in the chat answers from the one impact answer, with a
-citation on every fact -- never a fixed value from the frozen scenario service
-(ADR-003 addendum). The portfolio health block carries no fixed value either:
+citation on every fact -- never a fixed value from the frozen scenario service. The portfolio health block carries no fixed value either:
 the unprinted trend computation is removed with it.
 """
 import re
@@ -179,3 +178,112 @@ def test_impact_hub_page_still_renders(client, login_as, make_org):
     login_as(client, user)
     response = client.get("/dashboard/impact-analysis")
     assert response.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# A name no recorded element matches: the answer says so, offers this
+# organisation's own names, and never shows other systems as its dependants.
+# --------------------------------------------------------------------------- #
+
+
+def test_an_unknown_name_is_not_given_other_systems_as_dependants(
+    client, login_as, make_org, tenant_ctx
+):
+    org, other = make_org("whatif-unknown-mine"), make_org("whatif-unknown-theirs")
+    owner = _architect(org, "whatif-d@example.com")
+    _architect(other, "whatif-e@example.com")
+    _load_sample(client, login_as, owner)
+
+    with tenant_ctx(other.id):
+        from app import db
+        from app.models.archimate_core import ArchiMateElement
+
+        db.session.add(ArchiMateElement(
+            name="Legacy Fax Archive", type="ApplicationComponent", layer="application",
+            organization_id=other.id,
+        ))
+        db.session.flush()
+
+    with tenant_ctx(org.id):
+        block = _service()._build_cited_impact_block({"name": "Legacy Fax Gateway"})
+
+    assert block is not None
+    assert "No application called 'Legacy Fax Gateway' is recorded" in block
+    assert "depend on it" not in block, block
+    assert "single points of failure" not in block.lower()
+    assert "Closest recorded names:" in block
+    assert not [ln for ln in block.splitlines() if ln.strip().startswith("-")], block
+    # The closest names are this organisation's own, never the other's.
+    assert "Legacy Fax Archive" not in block
+    assert "Payments service" in block or "Order management system" in block or "Customer web app" in block
+
+
+def test_a_matched_name_whose_catalogue_answer_carries_a_reason_never_claims_dependants(
+    monkeypatch, make_org, tenant_ctx
+):
+    org = make_org("whatif-reason")
+
+    def fake(entry_id, org_id, **params):
+        return {
+            "rows": [{"id": 1, "name": "Order management system", "truth_class": "derived"}],
+            "total": 1,
+            "citations": [{"id": 1, "name": "Order management system"}],
+            "reason": "nothing recorded matches 'Legacy Fax Gateway'",
+            "matched": False,
+            "closest_names": ["Order management system"],
+        }
+
+    monkeypatch.setattr("app.modules.intelligence.services.query_catalogue.run_entry", fake)
+    with tenant_ctx(org.id):
+        block = _service()._build_cited_impact_block({"name": "Legacy Fax Gateway"})
+    assert "depend on it" not in block
+    assert "Closest recorded names: Order management system." in block
+
+
+def test_the_as_of_date_is_the_rows_own_date_not_the_time_of_rendering(
+    monkeypatch, make_org, tenant_ctx
+):
+    org = make_org("whatif-asof")
+
+    def fake(entry_id, org_id, **params):
+        return {
+            "answer": "what breaks if 'X' fails",
+            "total": 2,
+            "rows": [
+                {"id": 1, "name": "A", "truth_class": "derived", "as_of": "2026-03-04T10:00:00"},
+                {"id": 2, "name": "B", "truth_class": "drawn", "as_of": None},
+            ],
+            "citations": [{"id": 1, "name": "A"}, {"id": 2, "name": "B"}],
+            "computed_at": "2026-05-06T08:00:00Z",
+            "reason": None,
+        }
+
+    monkeypatch.setattr("app.modules.intelligence.services.query_catalogue.run_entry", fake)
+    with tenant_ctx(org.id):
+        block = _service()._build_cited_impact_block({"name": "X"})
+    assert "- A (derived from your model, as of 4 Mar 2026)" in block
+    assert "- B (drawn from your model, as of 6 May 2026)" in block
+
+
+def test_a_retirement_prompt_carries_no_second_impact_answer(monkeypatch, make_org, tenant_ctx):
+    captured = {}
+
+    def fake_call(prompt, **kwargs):
+        captured["prompt"] = prompt
+        return "ok", None
+
+    from app.modules.ai_chat.services import multi_domain_chat_service as module
+
+    monkeypatch.setattr(module.LLMService, "_call_llm", staticmethod(fake_call))
+    monkeypatch.setattr(module.LLMService, "_get_configured_provider", staticmethod(lambda: ("test", "test-model")))
+    service = _service()
+    context = {
+        "resolved_entities": {"applications": [{"id": 1, "name": "Payments service"}]},
+        "impact_analysis_result": {"application": {"name": "Payments service"}},
+        "scenario_analysis": "\nWHAT BREAKS IF 'Payments service' IS RETIRED:\n",
+    }
+    with tenant_ctx(make_org("whatif-prompt").id):
+        result = service._process_general_message("What if we retire Payments service?", context, None)
+    assert result.get("success"), result
+    assert "BLAST RADIUS" not in captured["prompt"].upper()
+    assert "WHAT BREAKS IF 'Payments service' IS RETIRED" in captured["prompt"]

@@ -1072,26 +1072,6 @@ class MultiDomainChatService:
             if any(resolved_entities[k] for k in resolved_entities):
                 domain_context["resolved_entities"] = resolved_entities
 
-            # AIC-018: retirement/impact keyword detection — call impact analysis if matched
-            _IMPACT_KEYWORDS = ("retire", "retiring", "retirement", "consolidate",
-                                "blast radius", "impact of retiring", "impact analysis")
-            _msg_lower = message.lower()
-            if any(kw in _msg_lower for kw in _IMPACT_KEYWORDS):
-                _impact_app_id = None
-                for _app in resolved_entities.get("applications", []):
-                    if _app.get("id"):
-                        _impact_app_id = _app["id"]
-                        break
-                if _impact_app_id:
-                    try:
-                        from app.modules.ai_chat.services.ai_impact_analysis_service import AIImpactAnalysisService
-                        _impact_result = AIImpactAnalysisService.analyze_application_impact(
-                            _impact_app_id, scenario="retirement", include_ai_analysis=False
-                        )
-                        domain_context["impact_analysis_result"] = _impact_result
-                    except Exception:
-                        logger.debug("AIC-018: impact analysis skipped", exc_info=True)
-
             # ENT-083: Governance / ARB intent classification (keyword scoring)
             _intent_svc = IntentClassifierService()
             _intent_result = _intent_svc.classify_intent(message)
@@ -6658,23 +6638,8 @@ Instructions:
             # AIC-307: Inject prior decisions if recall detected
             decision_block = context.get("prior_decisions", "")
 
-            # AIC-308: Inject scenario analysis if detected
+            # Inject scenario analysis if detected
             scenario_block = context.get("scenario_analysis", "")
-
-            # AIC-301: Inject blast radius analysis when retirement/impact keywords detected
-            blast_radius_block = ""
-            impact_data = context.get("impact_analysis_result")
-            if impact_data and isinstance(impact_data, dict):
-                blast_radius_block = self._format_blast_radius_block(impact_data)
-            elif not impact_data:
-                # If no impact data but user asks about retirement, try capability-based analysis
-                _msg_lower = message.lower()
-                _RETIRE_KW = ("retire", "decommission", "sunset", "remove", "shut down", "blast radius")
-                if any(kw in _msg_lower for kw in _RETIRE_KW):
-                    resolved = context.get("resolved_entities", {})
-                    _apps = resolved.get("applications", [])
-                    if _apps:
-                        blast_radius_block = self._compute_capability_blast_radius(_apps[0])
 
             prompt = f"""You are Entelim, an AI Architecture Assistant for Enterprise Architecture. You have deep knowledge of TOGAF, ArchiMate 3.2, and the organisation's live portfolio data.
 
@@ -6682,16 +6647,16 @@ USER QUESTION: {message}
 
 LIVE PORTFOLIO SUMMARY:
 {summary_str}
-{entity_str}{cross_entity_block}{semantic_block}{health_block}{blast_radius_block}{decision_block}{scenario_block}
+{entity_str}{cross_entity_block}{semantic_block}{health_block}{decision_block}{scenario_block}
 Instructions:
 1. Answer the question using the live portfolio data above — be specific about counts and names.
 2. If the user asks about specific applications, capabilities, or vendors, use the resolved entity data.
 3. If cross-domain semantic matches are provided, incorporate the most relevant ones into your answer and cite the entity type.
 4. Apply TOGAF and ArchiMate 3.2 frameworks where relevant.
-5. If BLAST RADIUS data is provided, structure your response around: (a) affected applications and their criticality, (b) capabilities at risk of losing support, (c) risk score and level, (d) recommended mitigation steps.
-5. Suggest which domain to switch to for deeper analysis (e.g. "Switch to Gap Analysis domain for a detailed breakdown").
-6. Be concise but precise — this is an enterprise tool, not a chatbot.
-7. If you don't have enough data to answer, say so clearly and suggest the right slash command or domain."""
+5. For a retirement or failure question, answer only from the cited block above and keep its citations.
+6. Suggest which domain to switch to for deeper analysis (e.g. "Switch to Gap Analysis domain for a detailed breakdown").
+7. Be concise but precise — this is an enterprise tool, not a chatbot.
+8. If you don't have enough data to answer, say so clearly and suggest the right slash command or domain."""
 
             provider_name, model = LLMService._get_configured_provider()
 
@@ -6868,7 +6833,7 @@ Instructions:
         # (query_catalogue.run_entry("what_breaks_if_fails"), built on
         # IntelligenceQueryService.cross_layer_impact) -- the same catalogue
         # entry the MCP tool and the Ask surface already run. Never the
-        # frozen fixed-value scenario service (ADR-003 addendum).
+        # frozen fixed-value scenario service.
         if any(kw in msg_lower for kw in self._SCENARIO_KEYWORDS):
             resolved = context.get("resolved_entities", {})
             apps = resolved.get("applications", [])
@@ -7485,7 +7450,7 @@ End with: "Type **'next'** to complete the design workflow."
         built on ``IntelligenceQueryService.cross_layer_impact`` -- and
         formats its answer envelope (facts, citations) into the chat block.
         Nothing here is computed independently and the frozen fixed-value
-        scenario service (ADR-003 addendum) is never called. When the fact
+        scenario service is never called. When the fact
         is missing (no element resolved, or nothing recorded depends on it),
         the block says so plainly with a next step rather than guessing.
         """
@@ -7500,7 +7465,7 @@ End with: "Type **'next'** to complete the design workflow."
 
             result = run_entry("what_breaks_if_fails", org_id, service=name)
         except Exception as e:
-            logger.debug("AIC-308: impact answer lookup failed: %s", e)
+            logger.debug("impact answer lookup failed: %s", e)
             return None
 
         rows = result.get("rows") or []
@@ -7508,6 +7473,17 @@ End with: "Type **'next'** to complete the design workflow."
             c.get("id"): c for c in (result.get("citations") or []) if isinstance(c, dict)
         }
         lines = [f"\nWHAT BREAKS IF '{name}' IS RETIRED:"]
+
+        if result.get("matched") is False:
+            lines.append(f"  No application called '{name}' is recorded: nothing recorded matches that name.")
+            closest = result.get("closest_names") or []
+            if closest:
+                lines.append("  Closest recorded names: " + ", ".join(closest) + ".")
+            lines.append(
+                "  Next step: ask again with one of the recorded names, or record "
+                f"'{name}' in your model. No dependants are listed because none are recorded for it."
+            )
+            return "\n".join(lines) + "\n"
 
         if not rows:
             reason = result.get("reason") or "nothing is recorded as depending on this application yet"
@@ -7523,14 +7499,21 @@ End with: "Type **'next'** to complete the design workflow."
         lines.append(f"  {result.get('total', len(rows))} record(s) depend on it:")
         # The record's own name and truth class, never the internal API path
         # the citation's "target" carries -- a person reads a page, not a route.
-        computed_at = datetime.now(timezone.utc)
-        as_of = "%d %s" % (computed_at.day, computed_at.strftime("%b %Y"))
+        def _day(value):
+            try:
+                when = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                return None
+            return "%d %s" % (when.day, when.strftime("%b %Y"))
+
         for row in rows[:15]:
             citation = citations_by_id.get(row.get("id"))
             record_name = (citation or {}).get("name") or row.get("name") or "Unnamed record"
             truth_class = row.get("truth_class") or "derived"
             source = "drawn from your model" if truth_class == "drawn" else "derived from your model"
-            cite = f" ({source}, as of {as_of})" if citation else " (source not recorded)"
+            as_of = _day(row.get("as_of")) or _day(result.get("computed_at"))
+            when = f", as of {as_of}" if as_of else ", date not recorded"
+            cite = f" ({source}{when})" if citation else " (source not recorded)"
             lines.append(f"    - {record_name}{cite}")
         if len(rows) > 15:
             lines.append(f"    ...and {len(rows) - 15} more, each with its own citation.")

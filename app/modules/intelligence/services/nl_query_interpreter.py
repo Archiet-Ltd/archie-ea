@@ -96,6 +96,8 @@ _KEYWORD_RULES = [
             "goes down", "what depends on", "break if", "breaks if", "breaks for",
             "single point", "single points of failure", "unavailable", "is down",
             "stops working", "fails, which", "if the", "what else stops",
+            "what if we retire", "what if we decommission", "what if we remove",
+            "what if we replace", "what if we shut down",
         ),
         "what_breaks_if_fails",
         {},
@@ -151,6 +153,7 @@ def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
 # names the service, else nothing (and the entry then asks the person to name
 # the service rather than guess).
 _SERVICE_PATTERNS = [
+    re.compile(r"\bwhat (?:if|happens if) (?:we |you )?(?:retire|decommission|remove|replace|shut down) (?:the |our )?(.+?)\s*[?.!]*\s*$", re.I),
     re.compile(r"\bif (?:the |our )?(.+?) (?:goes down|is down|fails|is unavailable)\b", re.I),
     re.compile(r"\bwhat depends on (?:the |our )?(.+?)\s*[?.]?\s*$", re.I),
     re.compile(r"\bif (?:the |our )?(.+?) (?:is|are) (?:down|unavailable)\b", re.I),

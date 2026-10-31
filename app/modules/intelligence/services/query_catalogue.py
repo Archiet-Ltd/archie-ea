@@ -651,6 +651,33 @@ def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str
     }
 
 
+def _closest_recorded_names(organization_id: int, service: str, limit: int = 5) -> List[str]:
+    """The names of this organisation's systems most like *service*, closest
+    first. Scored by the one name scorer the entity matcher and the duplicate
+    detector use; only this organisation's own records are read."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.archimate_element_types import system_kind_types
+    from app.modules.duplicate_detection.services.duplicate_detection_utils import DuplicateDetectionUtils
+
+    names = {
+        name
+        for (name,) in db.session.query(ArchiMateElement.name)
+        .filter(
+            ArchiMateElement.organization_id == organization_id,
+            ArchiMateElement.deleted_at.is_(None),
+            ArchiMateElement.type.in_(system_kind_types()),
+        )
+        .limit(2000)
+        .all()
+        if name
+    }
+    scored = sorted(
+        (-DuplicateDetectionUtils.is_duplicate(service, name, mode="fuzzy", threshold=0.0)[1], name.lower(), name)
+        for name in names
+    )
+    return [name for _, _, name in scored[:limit]]
+
+
 def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
     """"What breaks if this service fails?" (UC-S2-01) — the one impact
     envelope, called for the named service. Impact is never recomputed here:
@@ -664,15 +691,27 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     element = _resolve_service_element(organization_id, service)
     if element is None:
         if service:
-            # A service was named but matched nothing: fall back to the most
-            # depended-on systems (single points of failure) so the answer is
-            # still a cited one from the organisation's own records.
-            result = _single_points_of_failure(organization_id)
-            if result.get("rows"):
-                result["reason"] = "nothing recorded matches '%s' — showing the most depended-on systems instead" % service
-            else:
-                result["reason"] = "nothing recorded matches '%s' and nothing in this organisation has more than one thing depending on it yet" % service
-            return result
+            # A service was named but matched nothing: say so, and offer the
+            # names this organisation does record. The organisation's most
+            # depended-on systems are never returned here -- they are not the
+            # named service's dependants, and listed as rows they read as such.
+            closest = _closest_recorded_names(organization_id, service)
+            return {
+                "answer": "what breaks if '%s' fails" % service,
+                "service": service,
+                "matched": False,
+                "rows": [],
+                "total": 0,
+                "citations": [],
+                "closest_names": closest,
+                "reason": "nothing recorded matches '%s'" % service,
+                "next_step": (
+                    "Closest recorded names: %s. Ask again with one of them, or record '%s' in your model."
+                    % (", ".join(closest), service)
+                    if closest
+                    else "Nothing is recorded to compare it with yet. Add your systems to the model, then ask again."
+                ),
+            }
         # No single service was named ("the single points of failure in our
         # stack"): the systems the most other things depend on are the single
         # points of failure. Count how many relationships point at each
@@ -699,12 +738,17 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     rows = []
     for row in envelope["rows"]:
         eid = row.get("element_id")
+        relation = row.get("relation") or {}
+        provenance = relation.get("provenance") if isinstance(relation.get("provenance"), dict) else {}
         rows.append(
             {
                 "id": eid,
                 "name": element_names.get(str(eid)),
                 "truth_class": row.get("truth_class"),
                 "source_table": "archimate_elements",
+                # The date this connection was worked out (a derived one) or
+                # recorded (a drawn one); None when the row carries neither.
+                "as_of": relation.get("computed_at") or provenance.get("recorded_at"),
             }
         )
     # The impact envelope already cites every relationship and element the
@@ -723,6 +767,7 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
         "rows": rows,
         "total": len(rows),
         "citations": citations,
+        "computed_at": envelope.get("computed_at"),
         "reason": None if rows else f"nothing recorded depends on '{element.name}' yet",
     }
 

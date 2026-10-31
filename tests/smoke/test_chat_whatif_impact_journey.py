@@ -1,7 +1,7 @@
 """"What if we retire Payments service?" reaches the chat's own impact tool.
 
-rv-chat-whatif01b: round a fixed the what-if branch in multi_domain_chat_service.py,
-but the ordinary /ai-chat compose box never reaches it -- it is served by
+The what-if branch in multi_domain_chat_service.py is not what the ordinary
+/ai-chat compose box reaches -- that box is served by
 AgentRunner (app/modules/ai_chat/services/agent_runner.py) through the
 /ai-chat/estate-answer route, which nudges the model to call the chat's own
 canonical impact tool only when answer_envelope.classify_estate_question()
@@ -211,4 +211,68 @@ def test_a_second_organisation_sees_none_of_the_firsts_records(
         assert set(names_one) & set(DEPENDENTS) == set(DEPENDENTS)
     finally:
         context_one.close()
+        context_two.close()
+
+
+UNKNOWN_QUESTION = "What if we retire Legacy Fax Gateway?"
+
+
+def _unknown_answer(page, wait_for):
+    container = page.locator("#messages-container")
+    expect(container).to_contain_text(wait_for, timeout=PAGE_TIMEOUT * 2)
+    return container.inner_text()
+
+
+def _unknown_context(browser, width, height, dark):
+    context = browser.new_context(viewport={"width": width, "height": height})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    if dark:
+        context.add_init_script("try { localStorage.setItem('theme', 'dark') } catch (e) {}")
+    context.set_default_timeout(PAGE_TIMEOUT)
+    return context
+
+
+@pytest.mark.parametrize("width,height,dark,shot", [
+    (1440, 900, False, "whatif-unknown-1440-light.png"),
+    (390, 844, True, "whatif-unknown-390-dark.png"),
+])
+def test_what_if_an_unknown_name_says_nothing_is_recorded_and_lists_closest_names(
+    browser, echo_provider_server, width, height, dark, shot
+):
+    """Nothing recorded is called Legacy Fax Gateway: the answer says so in
+    plain words, offers names this organisation does have, and never shows
+    other systems as that name's dependants. A second organisation with no
+    records is offered none of the first one's names."""
+    email, _org_id = _empty_organisation_user(echo_provider_server)
+    email_two, _org_two = _empty_organisation_user(echo_provider_server)
+    context = _unknown_context(browser, width, height, dark)
+    context_two = _unknown_context(browser, width, height, dark)
+    page = context.new_page()
+    page_two = context_two.new_page()
+    try:
+        _login(page, echo_provider_server, email)
+        _load_sample_from_chat(page, echo_provider_server)
+        _ask_what_if(page, echo_provider_server, UNKNOWN_QUESTION)
+        text = _unknown_answer(page, "Closest recorded names")
+        lowered = text.lower()
+        assert "nothing recorded matches 'legacy fax gateway'" in lowered, text
+        assert "depend on it" not in lowered, text
+        assert "single points of failure" not in lowered, text
+        assert "things depend" not in lowered and "thing depends" not in lowered, text
+        assert not page.locator("[data-catalogue-record]").count(), text
+        closest = text.split("Closest recorded names:", 1)[1].split(".", 1)[0]
+        names = [n.strip() for n in closest.split(",") if n.strip()]
+        assert names, text
+        if WALK:
+            os.makedirs(WALK, exist_ok=True)
+            page.screenshot(path=os.path.join(WALK, shot))
+
+        _login(page_two, echo_provider_server, email_two)
+        _ask_what_if(page_two, echo_provider_server, UNKNOWN_QUESTION)
+        text_two = _unknown_answer(page_two, "Nothing recorded matches")
+        for name in names:
+            assert name not in text_two, "second organisation is offered %r: %s" % (name, text_two)
+        assert "Closest recorded names" not in text_two, text_two
+    finally:
+        context.close()
         context_two.close()
