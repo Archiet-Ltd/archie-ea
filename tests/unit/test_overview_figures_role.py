@@ -66,16 +66,16 @@ def test_the_context_carries_the_cost_figures_only_for_a_role_that_may_see_spend
     # the finance lead reads every cost figure
     assert shown["may_see_spend"] is True
     cost = shown["run_cost"]
-    assert cost["total"] == 250000.0 and cost["contracts"] == 2
-    assert cost["top"]["percent"] == 80 and cost["top"]["name"].startswith("Northbeam")
-    assert cost["basis"] == "from 2 active contracts"
-    assert "50k" in cost["difference"] and "not yet tied" in cost["difference"]
+    assert cost["total"] == 200000.0 and cost["with_cost"] == 2 and cost["applications"] == 3
+    assert cost["top"]["percent"] == 60 and cost["top"]["name"].startswith("Ledger Core")
+    assert cost["basis"] == "from the annual cost of 2 applications"
+    assert cost["difference"] == "1 application has no cost recorded."
     assert [row["cost"] for row in shown["table"]["rows"]] == [120000.0, 80000.0, None]
     assert shown["table"]["cost_total"] == 200000.0
 
     # the solution architect reads none of them, in the shape the page renders as not shown
     assert withheld["may_see_spend"] is False
-    assert withheld["run_cost"] == {"total": None, "contracts": 0, "withheld": True}
+    assert withheld["run_cost"] == {"total": None, "applications": 0, "with_cost": 0, "withheld": True}
     assert withheld["table"]["cost_total"] is None
     assert withheld["links"]["spend"] is None
     rows = withheld["table"]["rows"]

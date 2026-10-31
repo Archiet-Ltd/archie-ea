@@ -2219,19 +2219,23 @@ def render_application_detail(id):
     def _f(attr):
         return float(getattr(app_obj, attr, None) or 0)
 
+    from app.services.application_cost_accessor import annual_cost_for_application
+
+    annual_cost = annual_cost_for_application(app_obj)
+
+    def _recorded(attr, scale=1):
+        value = getattr(app_obj, attr, None)
+        return None if value is None else float(value) * scale
+
     cost_breakdown = {
-        "license_annual": _f("license_cost_annual"),
-        "infrastructure_monthly": _f("infrastructure_cost_monthly"),
-        "infrastructure_annual": _f("infrastructure_cost_monthly") * 12,
-        "development_annual": _f("development_cost_annual"),
-        "maintenance_annual": _f("maintenance_cost"),
-        "total_tco": _f("total_cost_of_ownership"),
-        "calculated_total": (
-            _f("license_cost_annual")
-            + _f("infrastructure_cost_monthly") * 12
-            + _f("development_cost_annual")
-            + _f("maintenance_cost")
-        ),
+        "license_annual": _recorded("license_cost_annual"),
+        "infrastructure_monthly": _recorded("infrastructure_cost_monthly"),
+        "infrastructure_annual": _recorded("infrastructure_cost_monthly", 12),
+        "development_annual": _recorded("development_cost_annual"),
+        "maintenance_annual": _recorded("maintenance_cost"),
+        "total_tco": _recorded("total_cost_of_ownership"),
+        "annual_cost": annual_cost["value"],
+        "annual_cost_source": annual_cost["source"],
     }
 
     health_metrics = {

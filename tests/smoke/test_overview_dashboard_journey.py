@@ -133,8 +133,8 @@ def test_overview_figures_chart_table_and_every_card_opens(browser, live_server,
             assert dash.locator('[data-testid="card-run-cost-value"]').count() == 0
             assert not re.search(r"[£$€]\s?\d", body), body
         else:
-            assert "Northbeam" in cost_sentence and "80%" in cost_sentence, cost_sentence
-            assert dash.locator('[data-testid="card-run-cost-value"]').inner_text().strip() == "£250k"
+            assert "Ledger Core" in cost_sentence and "60%" in cost_sentence, cost_sentence
+            assert dash.locator('[data-testid="card-run-cost-value"]').inner_text().strip() == "£200k"
         for testid in ("card-run-cost", "card-relationships", "card-no-owner"):
             text = dash.locator('[data-testid="%s"]' % testid).inner_text()
             assert not re.search(r"(^|\s)(—|-|0)(\s|$)", text), (testid, text)
@@ -223,8 +223,11 @@ def test_figures_agree_with_the_pages_they_summarise(browser, live_server, orgs)
         assert listed == welcome
         page.goto(live_server + "/applications/?no_owner=1", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         assert page.locator("table tbody tr").count() == no_owner
-        page.goto(live_server + "/procurement/spend", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        assert cost in _content(page), (cost, _content(page)[:400])
+        # the run cost is the sum of the cost column of the applications list
+        page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        column = page.locator('[data-testid^="app-cost-"]').all_inner_texts()
+        listed_cost = sum(int(re.sub(r"[^0-9]", "", c)) for c in column if re.search(r"\d", c))
+        assert cost == "£{:,.0f}".format(listed_cost), (cost, column)
     finally:
         context.close()
 
@@ -240,12 +243,14 @@ def test_another_company_never_appears(browser, live_server, orgs):
         assert "Zeta Intake" in text and "Sales" in text
         assert _int(page.locator('[data-testid="welcome-applications"] span').first.inner_text()) == 2
         assert _int(page.locator('[data-testid="card-no-owner-value"]').inner_text()) == 2
-        assert "Harlow" not in page.locator('[data-testid="card-run-cost-sentence"]').inner_text()
-        # the owner may see spend: the run cost names the company's own vendor and no other
+        assert "Harlow" not in page.locator('[data-testid="card-run-cost"]').inner_text()
+        # the owner may see spend: the card says the company's own applications state no cost, naming no other company's
         context.close()
         context, page = _page(browser, FOLD)
         _open(page, live_server, b["emails"]["owner"])
-        assert "Harlow" in page.locator('[data-testid="card-run-cost-sentence"]').inner_text()
+        card = page.locator('[data-testid="card-run-cost"]').inner_text()
+        assert "2 applications have no annual cost recorded yet." in card
+        assert "Ledger Core" not in card
     finally:
         context.close()
 
@@ -360,11 +365,11 @@ def test_money_is_short_on_cards_and_whole_pounds_in_the_table(browser, live_ser
     try:
         _open(page, live_server, email)
         run = page.locator('[data-testid="card-run-cost-value"]')
-        assert run.inner_text().strip() == "£250k"
-        assert run.get_attribute("title") == "£250,000"
+        assert run.inner_text().strip() == "£200k"
+        assert run.get_attribute("title") == "£200,000"
         month = page.locator('[data-testid="monthly-cost-value"]')
-        assert month.inner_text().strip() == "£20.8k"
-        assert month.get_attribute("title") == "£20,833"
+        assert month.inner_text().strip() == "£16.7k"
+        assert month.get_attribute("title") == "£16,667"
         table = page.locator('[data-testid="applications-table"]').inner_text()
         assert "£120,000" in table and "£80,000" in table
         assert ".00" not in table
@@ -408,24 +413,25 @@ def test_year_card_sets_last_year_beside_this_year(browser, live_server, orgs):
 
 
 def test_run_cost_and_the_applications_table_agree_or_say_why(browser, live_server, orgs):
-    """The run cost comes from contracts, the table from per-application cost; the page says how they differ."""
+    """The run cost is the sum of the applications' own costs, the same figures the table lists; the card says how many."""
     context, page = _page(browser, FOLD)
     try:
         _open(page, live_server, orgs["a"]["emails"]["owner"])  # the owner may see spend
         card = page.locator('[data-testid="card-run-cost"]').inner_text()
-        assert "From 2 active contracts" in card
+        assert "From the annual cost of 2 applications" in card
+        assert "1 application has no cost recorded." in card
         costs = page.locator('[data-testid="applications-row"] td:last-child').all_inner_texts()
         listed = sum(int(re.sub(r"[^0-9]", "", c)) for c in costs if re.search(r"\d", c))
         assert listed == 200000
         assert "Annual cost recorded for the application" in page.locator('[data-testid="applications-table"]').inner_text()
-        assert "£50k of contract cost is not yet tied to an application" in card
-        assert 250000 - listed == 50000
-        # a company whose applications state no cost has nothing to reconcile and is not told a difference
+        assert page.locator('[data-testid="card-run-cost-value"]').get_attribute("title") == "£200,000"
+        # a company whose applications state no cost is told so, and shown no figure
         context.close()
         context, page = _page(browser, FOLD)
         _open(page, live_server, orgs["b"]["emails"]["owner"])
         text = page.locator('[data-testid="card-run-cost"]').inner_text()
-        assert "From 1 active contract" in text and "not yet tied" not in text
+        assert "2 applications have no annual cost recorded yet." in text
+        assert page.locator('[data-testid="card-run-cost-value"]').count() == 0
     finally:
         context.close()
 

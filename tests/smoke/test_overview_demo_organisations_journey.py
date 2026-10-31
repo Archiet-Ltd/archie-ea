@@ -81,10 +81,10 @@ def _assert_a_full_overview(page, dash):
     run = dash.locator('[data-testid="card-run-cost-value"]')
     expect(run).to_be_visible()
     assert re.fullmatch(r"£\d[\d.,]*[kmM]?", run.inner_text().strip()), run.inner_text()
-    assert "Appears here once a contract" not in dash.inner_text()
-    assert "contract" in dash.locator('[data-testid="card-run-cost-sentence"]').inner_text()
+    assert "Appears here once" not in dash.inner_text()
+    assert "applications" in dash.locator('[data-testid="card-run-cost-sentence"]').inner_text()
     assert dash.locator('[data-testid="monthly-cost-value"]').inner_text().strip()
-    assert "appears once a contract" not in dash.locator('[data-testid="monthly-cost-value"]').locator("xpath=../..").inner_text()
+    assert "appears once an application" not in dash.locator('[data-testid="monthly-cost-value"]').locator("xpath=../..").inner_text()
     # the chart has bars on at least three different days of the last 30
     page.select_option('[data-testid="activity-range"]', "30d")
     panel = dash.locator('[data-testid="activity-range-30d"]')
@@ -111,6 +111,7 @@ def test_the_demonstration_company_overview_is_full_and_its_figures_agree_with_t
     """The Lantern Quay architect reads a run cost that the Spend page and the canvas state, at both widths."""
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.services.application_cost_accessor import annual_cost_figures, counted_applications_query
 
     for viewport in (FOLD, PHONE):
         context, page = _page(browser, viewport)
@@ -132,16 +133,21 @@ def test_the_demonstration_company_overview_is_full_and_its_figures_agree_with_t
         names = {a.id: a.name for a in ApplicationComponent.query.filter_by(organization_id=demo_org["org_id"]).all()}
         db.session.remove()
     assert len(set(costs.values())) >= 5, "the contracts state differing annual costs"
-    assert exact == "£{:,.0f}".format(sum(costs.values())), (exact, sum(costs.values()))
+    with app.app_context():
+        counted = db.session.execute(counted_applications_query(demo_org["org_id"])).scalars().all()
+        run_cost = sum(f["value"] for f in annual_cost_figures(counted).values() if f["value"] is not None)
+        db.session.remove()
+    assert run_cost > 0
+    assert exact == "£{:,.0f}".format(run_cost), (exact, run_cost)
 
-    # the portfolio manager opens the Spend page from the card and reads the same figure
+    # the portfolio manager opens the Spend page from the card and reads the contracts there
     context, page = _page(browser, FOLD)
     try:
         _login(page, live_server, demo_org["manager"])
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         page.locator('[data-testid="card-run-cost"]').click()
         page.wait_for_url("**/procurement/spend**", timeout=PAGE_TIMEOUT)
-        assert exact in page.locator("main").first.inner_text()
+        assert "Annual Recurring Cost" in page.locator("main").first.inner_text()
     finally:
         context.close()
 

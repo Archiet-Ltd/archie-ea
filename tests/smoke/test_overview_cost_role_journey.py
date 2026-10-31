@@ -151,12 +151,12 @@ def test_a_finance_lead_of_the_same_company_reads_the_run_cost_and_the_top_vendo
         dash = page.locator('[data-testid="overview-dashboard"]')
         expect(dash.get_by_text("%s, Fay" % _greeting(org["emails"]["finance"]))).to_be_visible()
         run = dash.locator('[data-testid="card-run-cost-value"]')
-        assert run.inner_text().strip() == "£250k"
-        assert run.get_attribute("title") == "£250,000"
+        assert run.inner_text().strip() == "£200k"
+        assert run.get_attribute("title") == "£200,000"
         sentence = dash.locator('[data-testid="card-run-cost-sentence"]').inner_text()
-        assert "From 2 active contracts" in sentence and "Northbeam" in sentence and "80%" in sentence, sentence
-        assert "£50k of contract cost is not yet tied to an application" in sentence
-        assert dash.locator('[data-testid="monthly-cost-value"]').inner_text().strip() == "£20.8k"
+        assert "From the annual cost of 2 applications" in sentence and "Ledger Core" in sentence and "60%" in sentence, sentence
+        assert "1 application has no cost recorded." in sentence
+        assert dash.locator('[data-testid="monthly-cost-value"]').inner_text().strip() == "£16.7k"
         table = dash.locator('[data-testid="applications-table"]').inner_text()
         assert "£120,000" in table and "£80,000" in table and "Not shown for your role" not in table
         assert "Annual cost recorded for the application" in table

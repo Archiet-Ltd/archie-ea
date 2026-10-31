@@ -1064,8 +1064,14 @@ class ToolExecutor:
         # truth) and never emitting an ambiguous "status" key.
         from app.models.application_portfolio import ApplicationComponent
 
+        from app.services.application_cost_accessor import annual_cost_figures, counted_applications_criteria
+
         limit = min(args.get("limit", 15), 50)
-        q = ApplicationComponent.query
+        # Decommissioned applications are out of the portfolio unless asked for or filtered by status.
+        include_decommissioned = bool(args.get("include_decommissioned")) or bool(
+            args.get("lifecycle_status") or args.get("status")
+        )
+        q = ApplicationComponent.query.filter(*counted_applications_criteria(include_decommissioned))
 
         name_filter = args.get("name_contains")
         if name_filter:
@@ -1101,8 +1107,15 @@ class ToolExecutor:
         # Count the matching set BEFORE applying the limit, so the model can be
         # told what it is not seeing.
         total = q.count()
-        apps = q.limit(limit).all()
+        apps = q.order_by(ApplicationComponent.name).limit(limit).all()
         owner_fields = self._application_owner_fields(apps)
+        # Annual cost is stated only to people who may see costs, read through the one cost accessor.
+        from app.decorators.requires_role import may_see_spend_pages
+
+        acting_user = _load_acting_user(getattr(self, "user_id", None))
+        with_cost = bool(acting_user and may_see_spend_pages(acting_user))
+        matching = q.all() if with_cost else []
+        figures = annual_cost_figures(matching) if with_cost else {}
         rows = [
             {
                 "id": a.id,
@@ -1113,15 +1126,22 @@ class ToolExecutor:
                 # technical-deployment concept and is labelled as such.
                 "lifecycle_status": a.lifecycle_status,
                 "deployment_status": a.deployment_status,
+                **({"annual_cost": figures[a.id]["value"], "annual_cost_source": figures[a.id]["source"]}
+                   if with_cost else {}),
                 **owner_fields[a.id],
             }
             for a in apps
         ]
-        return {
+        result = {
             "success": True,
             "result": rows,
             **self._coverage(rows, total, "application(s)"),
         }
+        if with_cost:
+            costed = [f["value"] for f in figures.values() if f["value"] is not None]
+            result["annual_cost_total"] = sum(costed) if costed else None
+            result["applications_with_cost"] = len(costed)
+        return result
 
 
     # ------------------------------------------------------------------ #

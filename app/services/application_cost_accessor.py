@@ -585,3 +585,121 @@ def state_contract(app: ApplicationComponent, vendor_name: str, annual_cost, mon
     db.session.add(contract)
     db.session.flush()
     return contract
+
+
+# ---------------------------------------------------------------------------
+# One read path for the annual cost every screen shows.
+# ---------------------------------------------------------------------------
+
+SOURCE_RECORDED_TOTAL = "recorded annual total"
+SOURCE_COMPONENT_COSTS = "the application's licence, infrastructure, development and maintenance costs"
+SOURCE_CONTRACTS = "its active contracts"
+
+
+def counted_applications_criteria(include_decommissioned: bool = False):
+    """The conditions that make an application count: not a flagged duplicate, and not decommissioned
+    unless the caller asks for those too. Every count and cost total takes its rule from here."""
+    from sqlalchemy import func, or_
+
+    criteria = [~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\")]
+    if not include_decommissioned:
+        criteria.append(or_(
+            ApplicationComponent.lifecycle_status.is_(None),
+            func.lower(ApplicationComponent.lifecycle_status) != "5. decommissioned",
+        ))
+    return criteria
+
+
+def counted_applications_query(org_id: Optional[int] = None):
+    """A select of the counted applications; with ``org_id`` limited to that organisation, else the caller scopes it."""
+    from app import db
+
+    query = db.select(ApplicationComponent).where(*counted_applications_criteria())
+    if org_id is not None:
+        query = query.where(ApplicationComponent.organization_id == org_id)
+    return query
+
+
+def _component_cost(app: ApplicationComponent) -> Optional[float]:
+    """The sum of the application's own cost columns, or None when none is recorded."""
+    def num(column):
+        value = getattr(app, column, None)
+        return None if value is None else float(value)
+
+    licence = num("license_cost_annual")
+    if licence is None:
+        licence = num("license_cost")
+    monthly = num("infrastructure_cost_monthly")
+    infrastructure = monthly * 12 if monthly is not None else num("infrastructure_cost")
+    parts = [licence, infrastructure, num("development_cost_annual"), num("maintenance_cost")]
+    if all(p is None for p in parts):
+        return None
+    return sum(p or 0.0 for p in parts)
+
+
+def annual_cost_figures(apps) -> Dict[int, Dict[str, Any]]:
+    """{application id: {"value": float or None, "source": str or None}} for each application.
+
+    Every screen that states an application's annual cost reads this: the recorded annual
+    total first, else the sum of the application's own cost columns, else what its active
+    contracts state. A cost with no source is None, never zero.
+    """
+    from app import db
+    from app.models.application_portfolio import VendorContract
+
+    apps = list(apps)
+    figures: Dict[int, Dict[str, Any]] = {}
+    missing = []
+    for app in apps:
+        canonical = get_annual_cost(app)
+        if canonical is not None and canonical > 0:
+            figures[app.id] = {"value": float(canonical), "source": SOURCE_RECORDED_TOTAL}
+            continue
+        parts = _component_cost(app)
+        if parts is not None and parts > 0:
+            figures[app.id] = {"value": parts, "source": SOURCE_COMPONENT_COSTS}
+            continue
+        figures[app.id] = {"value": None, "source": None}
+        missing.append(app)
+    if missing:
+        org_ids = {a.organization_id for a in missing}
+        rows = db.session.execute(
+            db.select(VendorContract.organization_id, VendorContract.application_id,
+                      db.func.sum(VendorContract.annual_cost))
+            .where(
+                VendorContract.organization_id.in_(org_ids),
+                VendorContract.application_id.in_([a.id for a in missing]),
+                VendorContract.status == "active",
+                VendorContract.annual_cost.isnot(None),
+            )
+            .group_by(VendorContract.organization_id, VendorContract.application_id)
+        ).all()
+        by_app = {(org, app_id): float(total) for org, app_id, total in rows if total and total > 0}
+        for app in missing:
+            stated = by_app.get((app.organization_id, app.id))
+            if stated:
+                figures[app.id] = {"value": stated, "source": SOURCE_CONTRACTS}
+    return figures
+
+
+def annual_cost_for_application(app: ApplicationComponent) -> Dict[str, Any]:
+    """The one annual-cost figure for a single application, with its source."""
+    return annual_cost_figures([app])[app.id]
+
+
+def organisation_annual_cost(org_id: int) -> Dict[str, Any]:
+    """The organisation's annual run cost: the sum of the counted applications' figures.
+
+    ``total`` is None when no counted application has a cost, never zero.
+    """
+    from app import db
+
+    apps = db.session.execute(counted_applications_query(org_id)).scalars().all()
+    figures = annual_cost_figures(apps)
+    costed = [f["value"] for f in figures.values() if f["value"] is not None]
+    return {
+        "total": sum(costed) if costed else None,
+        "applications": len(apps),
+        "applications_with_cost": len(costed),
+        "figures": figures,
+    }

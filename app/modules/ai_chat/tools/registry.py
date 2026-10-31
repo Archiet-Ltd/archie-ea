@@ -301,6 +301,11 @@ TOOL_SCHEMAS = [
             "read from the same ownership records the Applications pages show; "
             "use ownership=unowned for 'which applications have no owner' and "
             "ownership=owned for 'who owns what'. "
+            "Decommissioned applications are left out unless include_decommissioned is set "
+            "or a lifecycle_status is given. For people who may see costs, each row states "
+            "annual_cost and annual_cost_source and the result states annual_cost_total over "
+            "every matching application, read from the same figure the Overview, the list "
+            "and the record show; a null cost means none is recorded, not zero. "
             "Returns lifecycle_status (planning/development/testing/operational/"
             "deprecated/retired — matches the Applications UI and "
             "/applications/api/list exactly) for each row. "
@@ -331,6 +336,10 @@ TOOL_SCHEMAS = [
                     "type": "string",
                     "description": "owned: only applications with an accountable owner; unowned: only those without one.",
                     "enum": ["owned", "unowned"],
+                },
+                "include_decommissioned": {
+                    "type": "boolean",
+                    "description": "Also return decommissioned applications (left out by default).",
                 },
                 "limit": {
                     "type": "integer",
