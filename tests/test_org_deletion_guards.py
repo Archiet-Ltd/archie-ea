@@ -242,3 +242,37 @@ def test_the_deletion_record_without_the_marker_admits_nothing(db_session, make_
     assert db_session.execute(
         text("SELECT 1 FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
     ).first() is not None
+
+
+def test_a_deletion_record_written_by_another_transaction_admits_nothing(db_session, make_org):
+    """The record must have been written by the transaction that deletes. One committed by another
+    session, plus the marker in this one, opens nothing."""
+    from app import db
+
+    org = make_org("guard-other-transaction")
+    row_id = _insert_outbox_event(db_session, org.id)
+    with db.engine.begin() as other:
+        other.execute(
+            text(
+                "INSERT INTO organization_deletions_in_progress (target_organization_id) "
+                "VALUES (:org_id) ON CONFLICT DO NOTHING"
+            ),
+            {"org_id": org.id},
+        )
+    try:
+        _set_marker(db_session, org.id, proven=False)
+        with pytest.raises(Exception, match="append-only"):
+            with db_session.begin_nested():
+                db_session.execute(
+                    text("DELETE FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
+                )
+        _clear_marker(db_session)
+        assert db_session.execute(
+            text("SELECT 1 FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
+        ).first() is not None, "another transaction's record plus the marker deleted a history row"
+    finally:
+        with db.engine.begin() as other:
+            other.execute(
+                text("DELETE FROM organization_deletions_in_progress WHERE target_organization_id = :org_id"),
+                {"org_id": org.id},
+            )

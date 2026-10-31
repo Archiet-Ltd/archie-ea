@@ -1407,9 +1407,13 @@ BEGIN
     IF to_regclass('public.organization_deletions_in_progress') IS NULL THEN
         RETURN FALSE;
     END IF;
+    -- And this transaction must have written that row: a row another transaction wrote (committed
+    -- or not) does not count. The row records the id of the transaction that wrote it, which
+    -- stays the same inside a savepoint.
     RETURN EXISTS (
         SELECT 1 FROM public.organization_deletions_in_progress
         WHERE target_organization_id = old_org
+          AND written_by_txid = txid_current()
     );
 END;
 $$

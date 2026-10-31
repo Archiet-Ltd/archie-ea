@@ -79,3 +79,5 @@ class OrganizationDeletionInProgress(db.Model):  # migration-exempt
 
     target_organization_id = db.Column(db.Integer, primary_key=True, autoincrement=False)
     started_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+    # The transaction that wrote the row; the guards admit a delete only to that transaction.
+    written_by_txid = db.Column(db.BigInteger, nullable=False, server_default=db.text("txid_current()"))
