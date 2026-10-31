@@ -136,11 +136,14 @@
         var sent = post(url, body).then(function (result) {
             paint(result.sources);
             poll();
+            return true;
         }).catch(function (error) {
             say(name, error.message || 'That did not work. Check it and try again.', true);
-        }).then(function () {
+            return false;
+        }).then(function (saved) {
             busy(button, false);
             giving = giving.filter(function (item) { return item !== sent; });
+            return saved;
         });
         giving.push(sent);
     }
@@ -203,6 +206,15 @@
             }).catch(function (error) {
                 busy(button, false);
                 say('choices', (error.message || 'Your choices were not saved.') + ' You can set them later in Settings.', true);
+            });
+        } else if (action === 'next') {
+            // The sources step's Continue is a link: it waits for a source still being saved, and stays
+            // (with the reason on the source's own line) when one could not be.
+            event.preventDefault();
+            busy(button, true);
+            Promise.all(giving).then(function (results) {
+                if (results.indexOf(false) !== -1) { busy(button, false); return; }
+                window.location.assign(button.getAttribute('href'));
             });
         } else if (action === 'save-choices') {
             busy(button, true);
