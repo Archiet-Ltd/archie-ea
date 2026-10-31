@@ -53,8 +53,8 @@
         {% if sessions.items %}
             {% for session in sessions.items %}
             <div class="bg-card border border-border rounded-lg p-4 transition-shadow">
-                <div class="flex justify-between items-start">
-                    <div class="flex-1">
+                <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+                    <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-3 mb-2">
                             <span class="text-sm font-mono text-primary">{% if is_reviews_view %}{{ session.review_number or ('REV-' ~ session.id) }}{% else %}{{ session.board_number or ('SESSION-' ~ session.id) }}{% endif %}</span>
                             {% if is_reviews_view %}
@@ -89,7 +89,7 @@
                         </div>
                         <h3 class="font-semibold text-foreground">{{ (session.title if is_reviews_view else session.name) or ('Review Item' if is_reviews_view else 'ARB Session') }}</h3>
                         <p class="text-sm text-muted-foreground mt-1">{{ session.description | truncate(150) if session.description else 'No description' }}</p>
-                        <div class="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-sm text-muted-foreground">
                             {% if is_reviews_view %}
                             <span class="flex items-center gap-1"><i data-lucide="file-text" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.review_type|default('General', true)|replace('_', ' ')|title }}</span>
                             <span class="flex items-center gap-1"><i data-lucide="flag" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ session.priority|default('Medium', true)|title }}</span>
@@ -107,7 +107,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="flex gap-2 ml-4" x-data>
+                    <div class="flex flex-wrap gap-2 sm:pl-4" x-data>
                         <a href="{{ url_for('arb.review_detail', id=session.id) if is_reviews_view else url_for('arb.session_detail', id=session.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"><i data-lucide="eye" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>View</a>
                         {% if may_run_board and not is_reviews_view and session.status == 'scheduled' %}
                         {{ button(text='Complete', type='button', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'@click': "Platform.fetch.post('/arb/sessions/" ~ session.id ~ "/complete', {}, {silent: true}).then(function(){location.reload()})", 'aria_label': 'Complete Session'}) }}
