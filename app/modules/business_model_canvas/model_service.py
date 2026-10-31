@@ -225,7 +225,7 @@ def add_entry(canvas, box_key, element_id=None, name=None, segment_id=None, fits
         raise CanvasError("That element is already in another box on this canvas.")
     from . import vpc_service
 
-    if box_key in vpc_service.ZONES:
+    if box_key not in zones(canvas) and box_key in vpc_service.ZONES:
         vpc_service.add_links(canvas, el, box_key, segment_id, fits_id)
     db.session.commit()
     return el
