@@ -69,7 +69,7 @@
             </template>
             <template x-if="stakeholders.length === 0">
               {% call ui.table_row() %}
-                {% call ui.table_cell(attrs={'colspan': '3', 'data-testid': 'raci-add-first'}) %}
+                {% call ui.table_cell(class='whitespace-normal', attrs={'colspan': '3', 'data-testid': 'raci-add-first'}) %}
                   {{ empty_state(
                       icon='users',
                       title='Who is involved?',

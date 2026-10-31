@@ -108,6 +108,19 @@ def test_empty_matrix_keeps_its_shape_and_takes_the_first_stakeholder(browser, l
         expect(matrix.get_by_role("button")).to_have_count(1)
         expect(matrix).to_contain_text("Add the roles involved")
         _shot(page, "empty-1440-light.png")
+        phone = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+        try:
+            small = phone.new_page()
+            sign_in(small, live_server, email)
+            small.goto(live_server + RACI, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            expect(small.locator("[data-testid=raci-example-row]")).to_be_visible()
+            expect(small.locator("[data-testid=raci-legend]")).to_be_visible()
+            prompt = small.locator("[data-testid=raci-add-first]")
+            box, frame = prompt.bounding_box(), small.locator("[data-testid=raci-scroll]").bounding_box()
+            assert box["x"] + box["width"] <= frame["x"] + frame["width"] + 1, "the prompt runs past the matrix"
+            _shot(small, "empty-390-dark.png")
+        finally:
+            phone.close()
 
         add.click()
         page.fill("#raci-stakeholder-search", "Finance Lead")
@@ -175,6 +188,7 @@ def test_phone_scrolls_sideways_and_keeps_the_first_column(browser, live_server,
         first = page.locator("[data-testid=raci-matrix] tbody tr").first.locator("th, td").first
         pos = first.evaluate("el => getComputedStyle(el).position")
         assert pos == "sticky", pos
+        _shot(page, "populated-390-dark-start.png")
         before = first.bounding_box()["x"]
         scroller.evaluate("el => { el.scrollLeft = 200; }")
         page.wait_for_timeout(200)
