@@ -268,3 +268,32 @@ def test_removing_what_an_audit_row_points_at_behaves_as_on_production(scratch_d
     # Removing a board, card, approval or phase keeps the row and empties that key.
     assert out["kept"] == {k: 1 for k in out["kept"]}
     assert out["nulled"] == {k: None for k in out["nulled"]}
+
+
+def test_removing_a_user_through_the_admin_service_removes_their_audit_rows(db_session, make_org):
+    from app.models.adm_audit_log import ADMAuditAction, ADMAuditLog
+    from app.models.user import User
+    from app.modules.admin.services.admin_user_service import AdminUserService
+    from app.services.adm_audit_service import adm_audit_service
+
+    org_a, org_b = make_org("admaudela"), make_org("admaudelb")
+    leaver = User(first_name="Ada", last_name="Leaver", email="leaver-admaudel@example.test",
+                  confirmed=True, organization_id=org_a.id)
+    other = User(first_name="Bob", last_name="Other", email="other-admaudel@example.test",
+                 confirmed=True, organization_id=org_b.id)
+    db_session.add_all([leaver, other])
+    db_session.flush()
+
+    def row(user):
+        return adm_audit_service.log_event(
+            action=ADMAuditAction.CARD_CREATED, entity_type="card", entity_id=1,
+            actor_id=user.id, organization_id=user.organization_id).audit_id
+
+    leaver_row, other_row = row(leaver), row(other)
+    db_session.commit()
+
+    ok, _message = AdminUserService.delete_user(leaver)
+
+    assert ok
+    assert ADMAuditLog.query.filter_by(audit_id=leaver_row).count() == 0
+    assert ADMAuditLog.query.filter_by(audit_id=other_row).count() == 1

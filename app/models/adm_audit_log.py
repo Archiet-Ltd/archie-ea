@@ -11,7 +11,7 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 from app import db
 
@@ -137,13 +137,13 @@ class ADMAuditLog(db.Model):
     recorded_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    board = relationship("KanbanBoard", backref="audit_logs")
-    card = relationship("KanbanCard", backref="audit_logs")
-    approval = relationship("ADMPhaseApproval", backref="audit_logs")
+    board = relationship("KanbanBoard", backref=backref("audit_logs", passive_deletes=True))
+    card = relationship("KanbanCard", backref=backref("audit_logs", passive_deletes=True))
+    approval = relationship("ADMPhaseApproval", backref=backref("audit_logs", passive_deletes=True))
     phase = relationship("ADMPhase", foreign_keys=[phase_id])
     source_phase = relationship("ADMPhase", foreign_keys=[source_phase_id])
     target_phase = relationship("ADMPhase", foreign_keys=[target_phase_id])
-    actor = relationship("User", backref="adm_audit_actions")
+    actor = relationship("User", backref=backref("adm_audit_actions", passive_deletes=True))
 
     def __repr__(self):
         return f"<ADMAuditLog {self.audit_id}: {self.action} on {self.entity_type}>"

@@ -14,6 +14,11 @@ the table, is unchanged.
 The foreign keys carry the rules production has: removing a user removes their
 audit rows, removing a board, card, approval or phase leaves the row with that
 key empty.
+
+A database that already has the table keeps the foreign keys it was created
+with. If those are the older no-action keys, this revision does not replace
+them, and removing a user who has audit rows is refused there until the keys
+are changed by hand.
 """
 import sqlalchemy as sa
 from alembic import op
