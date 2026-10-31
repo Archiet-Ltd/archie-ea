@@ -158,31 +158,56 @@ def normalise_website(raw: Optional[str]) -> Optional[str]:
     return "%s://%s%s" % (parts.scheme, parts.netloc, parts.path.rstrip("/"))
 
 
+class ReadingLimited(ValueError):
+    """The organisation has used its readings for the day; the message says what to do instead."""
+
+
 def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int]) -> Optional[str]:
-    """Record the site and the person's consent to read it. The reading itself comes later."""
+    """Record the site and the person's consent to read it. The reading itself comes later.
+    Returns a sentence when no new reading was started, saying why, and None otherwise."""
     url = normalise_website(raw)
     if url is None:
         return None
     if not consent:
         raise ValueError("Tick the box to let us read this site.")
     state = _onboarding(org)
+    before = state.get("website")
     state["website"] = {"url": url, "consent_by": user_id, "consent_at": datetime.utcnow().isoformat()}
     _write(org, "onboarding", state)
     db.session.commit()
-    _queue_reading(org.id)
-    return url
+    try:
+        return READING_NOTES.get(_queue_reading(org.id))
+    except ReadingLimited:
+        state = _onboarding(org)  # the refused address is not kept: nothing reads it
+        if before is None:
+            state.pop("website", None)
+        else:
+            state["website"] = before
+        _write(org, "onboarding", state)
+        db.session.commit()
+        raise
 
 
-def _queue_reading(org_id: int) -> None:
-    """Start reading the site in the background. A queue that is down never stops the person moving on."""
-    from app.modules.organization.website_crawl import CrawlRefused, queue_website_crawl
+READING_NOTES = {
+    "already_open": "A reading of your website is already under way, so no second one was started. This page shows how far it has got.",
+    "already_read": "We read this address within the last day, so we did not read it again. What we found is ready to confirm.",
+}
+
+
+def _queue_reading(org_id: int) -> Optional[str]:
+    """Start reading the site in the background; returns the outcome (queued, already_open or already_read).
+    A queue that is down never stops the person moving on; the daily limit is told to the person."""
+    from app.modules.organization.website_crawl import CrawlRefused, ReadingLimit, request_website_crawl
 
     try:
-        queue_website_crawl(org_id)
+        return request_website_crawl(org_id)[1]
+    except ReadingLimit as limit:
+        raise ReadingLimited(str(limit))
     except CrawlRefused:
         _log.info("website not read for organisation %s", org_id, exc_info=True)
     except Exception:
         _log.warning("could not queue the website reading for organisation %s", org_id, exc_info=True)
+    return None
 
 
 def mark_finished(org) -> None:
