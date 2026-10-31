@@ -16,6 +16,16 @@
       {% endcall %}
       {% call ui.card_content() %}
         {% if headers %}
+        {# Phone: each value sits under its header name. From md up: the two-column table. #}
+        <dl class="space-y-4 text-sm md:hidden" data-component="fact-list" data-testid="security-headers-list">
+          {% for k, v in headers.items() %}
+          <div class="space-y-1">
+            <dt class="font-mono text-muted-foreground break-all">{{ k }}</dt>
+            <dd class="min-w-0 font-mono text-foreground break-all" data-testid="property-{{ k }}">{{ v }}</dd>
+          </div>
+          {% endfor %}
+        </dl>
+        <div class="hidden md:block">
         {% call ui.table_container() %}
           {% call ui.table() %}
             {% call ui.table_header() %}
@@ -34,6 +44,7 @@
             {% endcall %}
           {% endcall %}
         {% endcall %}
+        </div>
         {% else %}
         <p class="text-sm text-muted-foreground">Not determined: this app has no registered security-header handler, so there is nothing to report.</p>
         {% endif %}

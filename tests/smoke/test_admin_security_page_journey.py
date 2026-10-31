@@ -61,3 +61,44 @@ def test_the_page_holds_no_horizontal_scroll_on_a_phone(browser, live_server, se
         assert overflow <= 0, f"page scrolls sideways by {overflow}px"
     finally:
         page.close()
+
+
+def test_every_header_value_sits_inside_its_card_on_a_phone(browser, live_server, seeded):
+    """A person on a phone reads each header's whole value: no cell is clipped by its card.
+
+    The page-width check above measures the page, not a clipped cell, so this one measures
+    every visible header value's box against its card and the card against the viewport.
+    """
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    try:
+        _login(page, live_server, seeded["emails"]["platform_admin"])
+        page.goto(live_server + "/admin/security", timeout=PAGE_TIMEOUT)
+        result = page.evaluate(
+            """() => {
+              const vw = document.documentElement.clientWidth;
+              const card = document.querySelector('[data-testid="security-headers"]');
+              const c = card.getBoundingClientRect();
+              const visible = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+              const values = [...card.querySelectorAll('dd, td')].filter(visible);
+              const outside = values.filter(e => {
+                const r = e.getBoundingClientRect();
+                return r.left < c.left - 0.5 || r.right > c.right + 0.5;
+              }).map(e => e.textContent.trim().slice(0, 40));
+              const clipped = values.filter(e => e.scrollWidth > e.clientWidth + 1)
+                .map(e => e.textContent.trim().slice(0, 40));
+              const wide = [...document.querySelectorAll('main *')].filter(visible)
+                .filter(e => e.getBoundingClientRect().right > vw + 0.5).length;
+              return {vw, cardLeft: c.left, cardRight: c.right, n: values.length, outside, clipped, wide};
+            }"""
+        )
+        assert result["n"] >= 3, f"too few header values rendered on a phone: {result}"
+        assert result["cardLeft"] >= 0 and result["cardRight"] <= result["vw"], f"card leaves the viewport: {result}"
+        assert not result["outside"], f"header values outside their card: {result['outside']}"
+        assert not result["clipped"], f"header values cut off inside their cell: {result['clipped']}"
+        assert result["wide"] == 0, f"{result['wide']} elements wider than the viewport"
+        # Each value is read under its header name, in one column.
+        first = page.locator('[data-testid="security-headers"] dl dt').first.bounding_box()
+        value = page.locator('[data-testid="security-headers"] dl dd').first.bounding_box()
+        assert value["y"] >= first["y"] + first["height"] - 1, "the value is not under its header name"
+    finally:
+        page.close()
