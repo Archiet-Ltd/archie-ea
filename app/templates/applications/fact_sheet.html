@@ -1,31 +1,58 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/metrics_card.html" import metrics_card %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/status_badge.html" import status_badge_auto %}
+{% from "components/fact_list.html" import fact_list %}
 
 {% block title %}{{ app.name }} — Fact Sheet{% endblock %}
 
-{# A definition row: label + value, with an em-dash when the value is missing.
-   Never render blank or 0 for an unknown value (DESIGN.md system-of-record rule). #}
-{% macro drow(label, value) %}
-<div class="flex items-start justify-between gap-4 py-2.5 border-t border-border first:border-t-0">
-  <dt class="text-sm text-muted-foreground">{{ label }}</dt>
-  <dd class="text-sm text-foreground font-medium text-right">
-    {%- if value is not none and (value | string) | trim != '' -%}{{ value }}{%- else -%}<span class="text-muted-foreground">&mdash;</span>{%- endif -%}
-  </dd>
-</div>
+{# Where an empty fact sends the reader: the strip that lists what the record still needs, or
+   the edit form when nothing is missing. #}
+{% macro not_set() %}
+<a href="{{ '#missing-record' if completeness.missing else url_for('unified_applications.application_edit', id=app.id) }}" class="text-muted-foreground hover:underline">Not set</a>
+{% endmacro %}
+
+{# One fact's value: the value when recorded, otherwise "Not set" with its link. #}
+{% macro fact_value(p) %}
+{%- if p.key == 'owners' -%}
+  {%- if application_owners -%}
+  <div class="space-y-1">
+    {% for o in application_owners %}
+    <div class="flex items-center justify-end gap-2">
+      <span class="text-xs text-muted-foreground">{{ o.ownership_type_label }}</span>
+      <span class="font-medium">{{ o.user_name }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {%- else -%}{{ not_set() }}{%- endif -%}
+{%- elif p.value is not none and (p.value | string) | trim != '' -%}
+  <span class="font-medium">{{ p.value }}</span>
+{%- else -%}{{ not_set() }}{%- endif -%}
+{% endmacro %}
+
+{% macro facts(testid, items) %}
+{% call(p) fact_list(items=items, testid=testid) %}{{ fact_value(p) }}{% endcall %}
 {% endmacro %}
 
 {% macro panel(title, icon) %}
-<section data-slot="card" class="rounded-lg border border-border bg-card">
-  <header class="flex items-center gap-2 px-6 py-4 border-b border-border">
-    <i data-lucide="{{ icon }}" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-    <h2 class="text-sm font-semibold text-foreground tracking-tight">{{ title }}</h2>
-  </header>
-  <div class="px-6 py-4">{{ caller() }}</div>
-</section>
+{%- set body = caller -%}
+{% call ui.card() %}
+  {% call ui.card_header() %}{{ ui.card_title(text=title) }}{% endcall %}
+  {% call ui.card_content() %}{{ body() }}{% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{# One of the four figures along the top: a label, the figure, and the sentence that explains it. #}
+{% macro stat(label, value, sentence, sentence_class='text-muted-foreground') %}
+{% call ui.card(attrs={'data-testid': 'stat-card'}) %}
+  {% call ui.card_header() %}{{ ui.card_description(text=label) }}{% endcall %}
+  {% call ui.card_content(class='flex flex-col gap-1') %}
+    <span class="text-2xl font-semibold tabular-nums">{% if value %}{{ value }}{% else %}{{ not_set() }}{% endif %}</span>
+    <span class="text-sm {{ sentence_class }}">{{ sentence }}</span>
+  {% endcall %}
+{% endcall %}
 {% endmacro %}
 
 {% block content %}
@@ -44,62 +71,26 @@
   ) }}
 
   {# ── Top band: completeness + headline signals ──────────────────────── #}
-  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-
-    {# Completeness ring — the score that shames the gaps #}
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
-      {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
-      <div class="relative shrink-0 h-20 w-20">
-        <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="3"></circle>
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring }}" stroke-width="3"
-                  stroke-linecap="round" stroke-dasharray="{{ completeness.pct }} 100"></circle>
-        </svg>
-        <div class="absolute inset-0 flex items-center justify-center">
-          <span class="text-lg font-bold tabular-nums text-foreground">{{ completeness.pct }}<span class="text-xs">%</span></span>
-        </div>
-      </div>
-      <div>
-        <p class="text-sm font-medium text-foreground">Record completeness</p>
-        <p class="text-xs text-muted-foreground mt-0.5">{{ completeness.filled }} of {{ completeness.of }} key fields recorded</p>
-      </div>
-    </div>
-
-    {{ metrics_card(
-        title='Total cost of ownership',
-        value=annual_cost_formatted,
-        icon='banknote',
-        footer_text='License/yr: ' ~ license_cost_formatted
-    ) }}
-
-    {{ metrics_card(
-        title='Business criticality',
-        value=(app.business_criticality | capitalize if app.business_criticality else '—'),
-        icon='shield-alert',
-        footer_text=('DR enabled' if app.disaster_recovery_enabled else 'No DR recorded')
-    ) }}
-
-    {# Lifecycle / end-of-life signal #}
-    {% set lc = lifecycle %}
-    <div data-slot="card" class="rounded-xl border p-6
- {{ 'border-destructive/40 bg-destructive/5' if lc.tone == 'crit' else 'border-warning/40 bg-warning/5' if lc.tone == 'warn' else 'border-border bg-card' }}">
-      <div class="flex items-center gap-2">
-        <i data-lucide="{{ 'alarm-clock' if lc.is_sunset else 'circle-check' }}" class="h-4 w-4 {{ 'text-destructive' if lc.tone == 'crit' else 'text-warning' if lc.tone == 'warn' else 'text-success' }}" aria-hidden="true"></i>
-        <p class="text-sm font-medium text-foreground">Lifecycle</p>
-      </div>
-      <p class="text-2xl font-bold text-foreground mt-2">{{ lc.stage | capitalize if lc.stage else '—' }}</p>
-      <p class="text-xs mt-1 {{ 'text-destructive-emphasis' if lc.tone == 'crit' else 'text-warning-emphasis' if lc.tone == 'warn' else 'text-muted-foreground' }}">
-        {%- if lc.days_left is not none and lc.days_left >= 0 -%}Retires in {{ lc.days_left }} days
-        {%- elif lc.days_left is not none -%}Retirement date passed
-        {%- elif lc.is_sunset -%}Flagged for sunset
-        {%- else -%}No retirement planned{%- endif -%}
-      </p>
-    </div>
+  {% set lc = lifecycle %}
+  {% set no_cost = annual_cost_formatted | trim == '—' %}
+  {% set no_licence = license_cost_formatted | trim == '—' %}
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 mb-6" data-testid="fact-sheet-stats">
+    {{ stat('Record completeness', completeness.pct ~ '%', completeness.filled ~ ' of ' ~ completeness.of ~ ' key fields recorded') }}
+    {{ stat('Total cost of ownership', none if no_cost else annual_cost_formatted,
+            'No licence cost recorded' if no_licence else 'License/yr: ' ~ license_cost_formatted) }}
+    {{ stat('Business criticality', app.business_criticality | capitalize if app.business_criticality else none,
+            'DR enabled' if app.disaster_recovery_enabled else 'No DR recorded') }}
+    {{ stat('Lifecycle', lc.stage | capitalize if lc.stage else none,
+            ('Retires in ' ~ lc.days_left ~ ' days' if lc.days_left is not none and lc.days_left >= 0
+             else 'Retirement date passed' if lc.days_left is not none
+             else 'Flagged for sunset' if lc.is_sunset
+             else 'No retirement planned'),
+            'text-destructive-emphasis' if lc.tone == 'crit' else 'text-warning-emphasis' if lc.tone == 'warn' else 'text-muted-foreground') }}
   </div>
 
   {# ── Gaps to fill — only when the record is incomplete ───────────────── #}
   {% if completeness.missing %}
-  <div class="rounded-md border border-warning/40 bg-warning/10 px-5 py-2 mb-6 flex items-start gap-3">
+  <div id="missing-record" class="scroll-mt-24 rounded-md border border-warning/40 bg-warning/10 px-5 py-2 mb-6 flex items-start gap-3" data-testid="missing-record">
     <i data-lucide="clipboard-list" class="h-4 w-4 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
     <div>
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
@@ -113,83 +104,73 @@
   {% endif %}
 
   {# ── Detail panels ──────────────────────────────────────────────────── #}
+  {% set yes_no = {True: 'Yes', False: 'No'} %}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
     {% call panel('Identity & ownership', 'id-card') %}
-    <dl>
-      {{ drow('Type', app.component_type) }}
-      <dt class="text-sm text-muted-foreground">Owners</dt>
-      <dd class="text-sm text-foreground font-medium text-right">
-        {% if application_owners %}
-          <div class="space-y-1">
-          {% for o in application_owners %}
-            <div class="flex items-center justify-end gap-2">
-              <span class="text-xs text-muted-foreground">{{ o.ownership_type_label }}</span>
-              <span>{{ o.user_name }}</span>
-            </div>
-          {% endfor %}
-          </div>
-        {% else %}
-          <span class="text-muted-foreground">&mdash;</span>
-        {% endif %}
-      </dd>
-      {{ drow('Business owner (legacy)', app.business_owner) }}
-      {{ drow('Technical owner (legacy)', app.technical_owner) }}
-      {{ drow('Business domain', app.business_domain) }}
-      {{ drow('Vendor', app.vendor_name) }}
-    </dl>
+    {% set identity = [
+      {'label': 'Type', 'key': 'type', 'value': app.component_type},
+      {'label': 'Owners', 'key': 'owners'},
+    ] %}
+    {% if app.business_owner %}{% set _ = identity.append({'label': 'Business owner (legacy)', 'key': 'business-owner-legacy', 'value': app.business_owner}) %}{% endif %}
+    {% if app.technical_owner %}{% set _ = identity.append({'label': 'Technical owner (legacy)', 'key': 'technical-owner-legacy', 'value': app.technical_owner}) %}{% endif %}
+    {% set _ = identity.extend([
+      {'label': 'Business domain', 'key': 'business-domain', 'value': app.business_domain},
+      {'label': 'Vendor', 'key': 'vendor', 'value': app.vendor_name},
+    ]) %}
+    {{ facts('identity-facts', identity) }}
     {% if app.tags %}
     <p class="text-xs text-muted-foreground mt-3 mb-1.5">Tags</p>
     <div class="flex flex-wrap gap-1.5">
       {% for tag in app.tags %}
-      <span class="text-xs text-foreground bg-muted border border-border rounded px-2 py-0.5">{{ tag }}</span>
+      {{ ui.badge(variant='secondary', text=tag) }}
       {% endfor %}
     </div>
     {% endif %}
     {% endcall %}
 
     {% call panel('Purpose & notes', 'file-text') %}
-    <dl>
-      {{ drow('Business purpose', app.business_purpose) }}
-      {{ drow('Notes', app.notes) }}
-      {{ drow('Assessment notes', app.assessment_notes) }}
-    </dl>
+    {{ facts('purpose-facts', [
+      {'label': 'Business purpose', 'key': 'business-purpose', 'value': app.business_purpose},
+      {'label': 'Notes', 'key': 'notes', 'value': app.notes},
+      {'label': 'Assessment notes', 'key': 'assessment-notes', 'value': app.assessment_notes},
+    ]) }}
     {% endcall %}
 
     {% call panel('Technology', 'cpu') %}
-    <dl>
-      {{ drow('Technology stack', app.technology_stack) }}
-      {{ drow('Primary database', app.primary_database) }}
-      {{ drow('Deployment model', app.deployment_model) }}
-      {{ drow('Cloud provider', app.cloud_provider) }}
-      {{ drow('Deployment region', app.deployment_region) }}
-      {{ drow('Technology age', (app.technology_age_years ~ ' yrs') if app.technology_age_years is not none else none) }}
-      {{ drow('Database platforms', app.database_platforms) }}
-      {{ drow('Programming languages', app.programming_languages) }}
-      {{ drow('Integration methods', app.integration_methods) }}
-    </dl>
+    {{ facts('technology-facts', [
+      {'label': 'Technology stack', 'key': 'technology-stack', 'value': app.technology_stack},
+      {'label': 'Primary database', 'key': 'primary-database', 'value': app.primary_database},
+      {'label': 'Deployment model', 'key': 'deployment-model', 'value': app.deployment_model},
+      {'label': 'Cloud provider', 'key': 'cloud-provider', 'value': app.cloud_provider},
+      {'label': 'Deployment region', 'key': 'deployment-region', 'value': app.deployment_region},
+      {'label': 'Technology age', 'key': 'technology-age', 'value': (app.technology_age_years ~ ' yrs') if app.technology_age_years is not none else none},
+      {'label': 'Database platforms', 'key': 'database-platforms', 'value': app.database_platforms},
+      {'label': 'Programming languages', 'key': 'programming-languages', 'value': app.programming_languages},
+      {'label': 'Integration methods', 'key': 'integration-methods', 'value': app.integration_methods},
+    ]) }}
     {% endcall %}
 
     {% call panel('Deployment', 'server') %}
-    <dl>
-      {{ drow('Version control URL', app.version_control_url) }}
-      {{ drow('Main branch', app.main_branch) }}
-      {{ drow('Container image', app.container_image) }}
-      {{ drow('Kubernetes namespace', app.kubernetes_namespace) }}
-    </dl>
+    {{ facts('deployment-facts', [
+      {'label': 'Version control URL', 'key': 'version-control-url', 'value': app.version_control_url},
+      {'label': 'Main branch', 'key': 'main-branch', 'value': app.main_branch},
+      {'label': 'Container image', 'key': 'container-image', 'value': app.container_image},
+      {'label': 'Kubernetes namespace', 'key': 'kubernetes-namespace', 'value': app.kubernetes_namespace},
+    ]) }}
     {% endcall %}
 
     {% call panel('Security & compliance', 'lock') %}
-    <dl>
-      {{ drow('Data classification', app.data_classification) }}
-      {{ drow('Encryption at rest', 'Yes' if app.encryption_at_rest else ('No' if app.encryption_at_rest is not none else none)) }}
-      {{ drow('Encryption in transit', 'Yes' if app.encryption_in_transit else ('No' if app.encryption_in_transit is not none else none)) }}
-      {{ drow('Availability target', (app.availability_target ~ '%') if app.availability_target is not none else none) }}
-      {{ drow('SLA availability', (app.sla_availability_percentage ~ '%') if app.sla_availability_percentage is not none else none) }}
-      {{ drow('Compliance', app.compliance_requirements) }}
-      {{ drow('Security certifications', app.security_certifications) }}
-      {{ drow('Authentication method', app.authentication_method) }}
-    </dl>
+    {{ facts('security-facts', [
+      {'label': 'Data classification', 'key': 'data-classification', 'value': app.data_classification},
+      {'label': 'Encryption at rest', 'key': 'encryption-at-rest', 'value': yes_no[app.encryption_at_rest] if app.encryption_at_rest is not none else none},
+      {'label': 'Encryption in transit', 'key': 'encryption-in-transit', 'value': yes_no[app.encryption_in_transit] if app.encryption_in_transit is not none else none},
+      {'label': 'Availability target', 'key': 'availability-target', 'value': (app.availability_target ~ '%') if app.availability_target is not none else none},
+      {'label': 'SLA availability', 'key': 'sla-availability', 'value': (app.sla_availability_percentage ~ '%') if app.sla_availability_percentage is not none else none},
+      {'label': 'Compliance', 'key': 'compliance', 'value': app.compliance_requirements},
+      {'label': 'Security certifications', 'key': 'security-certifications', 'value': app.security_certifications},
+      {'label': 'Authentication method', 'key': 'authentication-method', 'value': app.authentication_method},
+    ]) }}
     {% endcall %}
 
     {% call panel('Risk posture', 'shield-alert') %}
@@ -198,12 +179,12 @@
        could read as the same thing disagreeing, the way /applications/{id}
        vs /applications/{id}/fact-sheet's completeness score used to (M3). #}
     <p class="text-xs text-muted-foreground mb-2">Manually set — not derived from the Risk Register.</p>
-    <dl>
-      {{ drow('Business risk', app.business_risk | capitalize if app.business_risk else none) }}
-      {{ drow('Technical risk', app.technical_risk | capitalize if app.technical_risk else none) }}
-      {{ drow('Vendor risk', app.vendor_risk | capitalize if app.vendor_risk else none) }}
-      {{ drow('Obsolescence risk', app.obsolescence_risk | capitalize if app.obsolescence_risk else none) }}
-    </dl>
+    {{ facts('risk-posture-facts', [
+      {'label': 'Business risk', 'key': 'business-risk', 'value': app.business_risk | capitalize if app.business_risk else none},
+      {'label': 'Technical risk', 'key': 'technical-risk', 'value': app.technical_risk | capitalize if app.technical_risk else none},
+      {'label': 'Vendor risk', 'key': 'vendor-risk', 'value': app.vendor_risk | capitalize if app.vendor_risk else none},
+      {'label': 'Obsolescence risk', 'key': 'obsolescence-risk', 'value': app.obsolescence_risk | capitalize if app.obsolescence_risk else none},
+    ]) }}
     {% endcall %}
 
     {% call panel('Linked risks', 'shield-alert') %}
@@ -215,7 +196,7 @@
       <li class="py-2 flex items-center justify-between gap-3">
         <div class="min-w-0">
           <a href="{{ url_for('risk.risk_register') }}" class="text-sm font-medium text-foreground hover:underline truncate block">{{ risk.title }}</a>
-          <span class="text-xs text-muted-foreground">{{ risk.status | capitalize }} · Owner: {{ risk.owner or '—' }}</span>
+          <span class="text-xs text-muted-foreground">{{ risk.status | capitalize }} · {{ ('Owner: ' ~ risk.owner) if risk.owner else 'No owner' }}</span>
         </div>
         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium shrink-0
           {% if risk.risk_level == 'critical' %}bg-destructive/10 text-destructive-emphasis
@@ -289,7 +270,7 @@
           </li>
           {% endfor %}
         </ul>
-        {% else %}<p class="text-sm text-muted-foreground">&mdash;</p>{% endif %}
+        {% else %}<p class="text-sm text-muted-foreground">None recorded</p>{% endif %}
       </div>
       <div>
         <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Depends on ({{ dependencies.downstream | length }})</p>
@@ -303,7 +284,7 @@
           </li>
           {% endfor %}
         </ul>
-        {% else %}<p class="text-sm text-muted-foreground">&mdash;</p>{% endif %}
+        {% else %}<p class="text-sm text-muted-foreground">None recorded</p>{% endif %}
       </div>
     </div>
     {% endif %}

@@ -70,7 +70,7 @@ STATUSES = ("mapped", "specified", "implemented", "verified")
 DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components",
                    "tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
                    "confidence", "reason", "patterns", "states", "departures", "grid", "pattern_gap",
-                   "data_types")
+                   "data_types", "derived_fields")
 # The designers' port map: how close each page is to a shadcn original. A is the original verbatim,
 # B is composed inside the nearest original's frame, C1 to C5 are the five forms shadcn has no original for.
 TIERS = ("A", "B", "C1", "C2", "C3", "C4", "C5")
@@ -483,6 +483,13 @@ def measure(design_map=None, pages=None):
                 errors.append(f"{rel}: no {field.replace('_', ' ')} from the port map")
         if not (entry.get("reason") or "").strip():
             errors.append(f"{rel}: no reason from the port map")
+        derived = entry.get("derived_fields") or []
+        for field in derived:
+            if field not in DESIGNED_FIELDS or field == "derived_fields":
+                errors.append(f"{rel}: derived_fields names {field!r}, which is not a port-map field")
+        if derived and entry.get("confidence") != "low":
+            errors.append(f"{rel}: fields {', '.join(derived)} were derived from other rows, not set by the designers, "
+                          f"so confidence must be low")
         errors.extend(port_map_problems(rel, entry, design_map))
         listed = entry.get("components") or []
         if not listed:
