@@ -103,6 +103,49 @@ def social_platform(url: str) -> Optional[str]:
     return SOCIAL_HOSTS.get(host)
 
 
+_NOT_A_HANDLE = {
+    "x.com": {"intent", "share", "home", "i", "search", "hashtag", "explore", "settings", "login", "signup", "tos",
+              "privacy", "messages", "notifications", "compose", "status"},
+    "github.com": {"features", "sponsors", "orgs", "topics", "about", "pricing", "login", "join", "marketplace",
+                   "enterprise", "settings", "collections", "explore", "customer-stories", "readme", "security",
+                   "apps", "users", "search", "trending", "events"},
+    "instagram.com": {"p", "reel", "reels", "explore", "stories", "accounts", "tv", "direct"},
+    "facebook.com": {"sharer", "sharer.php", "share.php", "share", "dialog", "groups", "events", "watch", "login",
+                     "plugins", "policies", "help", "marketplace", "pages", "profile.php", "story.php", "photo",
+                     "photos", "hashtag", "people"},
+}
+
+
+def social_profile_root(url: str) -> Optional[Tuple[str, str, str]]:
+    """(network, profile address, handle) when the address is a network's profile root, else None.
+
+    A person's profile, a post, a share link, a video, a repository or any page inside one is not an account."""
+    platform = social_platform(url)
+    if not platform:
+        return None
+    parts = urlparse(url)
+    host = (parts.hostname or "").lower()
+    host = host[4:] if host.startswith("www.") else host
+    segments = [s for s in parts.path.split("/") if s]
+    handle = None
+    if host == "linkedin.com":
+        if len(segments) == 2 and segments[0].lower() in ("company", "school"):
+            handle = segments[1]
+            segments = [segments[0].lower(), handle]
+    elif host == "youtube.com":
+        if len(segments) == 1 and segments[0].startswith("@") and len(segments[0]) > 1:
+            handle = segments[0][1:]
+        elif len(segments) == 2 and segments[0].lower() in ("c", "channel", "user"):
+            handle = segments[1]
+    else:
+        key = "x.com" if host in ("x.com", "twitter.com") else host
+        if len(segments) == 1 and segments[0].lower() not in _NOT_A_HANDLE.get(key, set()):
+            handle = segments[0]
+    if not handle:
+        return None
+    return platform, "https://%s/%s" % ((parts.hostname or "").lower(), "/".join(segments)), handle
+
+
 def same_site(url: str, site: str) -> bool:
     """The same host (www. aside) on the same port."""
     def origin(u):
@@ -197,17 +240,20 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
     email = _EMAIL.search(text)
     put("contact_email", email.group(0) if email else None, 0.7)
 
-    profiles: Dict[str, str] = {}
-    candidates = list(organisation.get("sameAs") or []) if isinstance(organisation.get("sameAs"), list) else []
-    candidates += [a["href"] for a in soup.find_all("a", href=True)]
-    for candidate in candidates:
-        absolute = urljoin(url, str(candidate).strip())
-        platform = social_platform(absolute)
-        if platform:
-            profiles.setdefault(platform, absolute.rstrip("/"))
-            if platform == "LinkedIn" and re.search(r"/(company|school)/", absolute):
-                put("linkedin_url", absolute.rstrip("/"), 1.0)
-    out["social"] = [{"platform": p, "url": u, "confidence": 1.0} for p, u in profiles.items()]
+    # every candidate carries where it was linked from, so a link in the site's header, footer or structured data
+    # can be preferred; whether a handle is the company's own is decided once, in the service
+    candidates: List[Tuple[Any, bool]] = [(c, True) for c in organisation.get("sameAs") or []] \
+        if isinstance(organisation.get("sameAs"), list) else []
+    for anchor in soup.find_all("a", href=True):
+        chrome = anchor.find_parent(["header", "footer", "nav"]) is not None
+        candidates.append((anchor["href"], chrome))
+    social: List[Dict[str, Any]] = []
+    for candidate, chrome in candidates:
+        root = social_profile_root(urljoin(url, str(candidate).strip()))
+        if root:
+            social.append({"platform": root[0], "url": root[1], "handle": root[2], "chrome": chrome,
+                           "confidence": 1.0})
+    out["social"] = social
     out["technologies"] = detect_technologies(soup)
     out["links"] = page_links(html, url, site)
     out["text_length"] = len(text)
