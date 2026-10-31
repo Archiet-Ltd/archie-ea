@@ -83,6 +83,21 @@ def test_drift_the_models_would_add_runs_the_full_pass(tmp_path):
     assert any("schema-upgrade" in c for c in calls), calls
 
 
+def test_log_noise_from_background_jobs_does_not_defeat_the_quick_exit(tmp_path):
+    noise = "[2026-10-31 13:02:14] ERROR in tenant_safe_job: event-log-relay FAILED for organization_id=32\n" + CLEAN
+    result, calls = _run_script(tmp_path, status=AT_HEAD, drift=noise)
+
+    assert "already at the latest revision" in result.stdout
+    assert not any("schema-upgrade" in c for c in calls), calls
+
+
+@pytest.mark.parametrize("line", ["1 column(s) FAILED:", "3 table(s) absent - run 'flask init-db'"])
+def test_a_reconcile_failure_or_missing_table_runs_the_full_pass(tmp_path, line):
+    result, calls = _run_script(tmp_path, status=AT_HEAD, drift=CLEAN + "\n\n" + line)
+
+    assert any("schema-upgrade" in c for c in calls), calls
+
+
 def test_a_forced_pass_ignores_the_quick_exit(tmp_path):
     _, calls = _run_script(tmp_path, status=AT_HEAD, FORCE_FULL_SCHEMA_PASS="1")
 

@@ -15,6 +15,8 @@ set -eu
 # column to add and no table missing. Anything else, including a status command
 # that prints nothing, runs the full pass below. A pending revision is never
 # skipped: it makes schema-status exit non-zero, and the full pass applies it.
+# The drift check reads only reconcile-schema's own summary lines: other
+# output (background job logs say FAILED for one organisation) must not defeat it.
 # FORCE_FULL_SCHEMA_PASS=1 runs the full pass regardless (use it when a deploy
 # adds a backfill step below without a revision).
 #
@@ -35,7 +37,7 @@ if [ "${FORCE_FULL_SCHEMA_PASS:-0}" != "1" ] && [ "$status_rc" -eq 0 ] \
     drift_out=$(flask --app manage reconcile-schema --dry-run 2>&1) && drift_rc=0 || drift_rc=$?
     case "$drift_out" in
         *"reconcile-schema: 0 column(s) would add."*)
-            if [ "$drift_rc" -eq 0 ] && ! printf '%s' "$drift_out" | grep -q 'table(s) absent\|FAILED'; then
+            if [ "$drift_rc" -eq 0 ] && ! printf '%s\n' "$drift_out" | grep -Eq '^[0-9]+ (table\(s\) absent|column\(s\) FAILED)'; then
                 echo 'schema-deploy: database is already at the latest revision and matches the models; nothing to do.'
                 exit 0
             fi ;;
