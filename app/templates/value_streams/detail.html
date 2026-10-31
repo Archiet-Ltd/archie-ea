@@ -1,7 +1,7 @@
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/empty_state.html' import empty_state %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/status_badge.html' import status_badge %}
 {% from 'components/button.html' import button %}
@@ -185,14 +185,16 @@
                     </div>
                 </div>
                 {% else %}
-                {{ empty_state(
-                    icon='layers',
-                    title='No stages defined',
-                    description='Add the sequential stages that make up this value stream.',
-                    cta_text='Add Stage',
-                    cta_onclick="Platform.modal.open('stage-create-modal')",
-                    cta_icon='plus'
-                ) }}
+                {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'value-stream-stages-empty', 'role': 'status'}) %}
+                  {% call ui.empty_header() %}
+                    {% call ui.empty_icon(variant='icon') %}{{ lucide('layers') }}{% endcall %}
+                    {{ ui.empty_title(text='No stages defined') }}
+                    {{ ui.empty_description(text='Add the sequential stages that make up this value stream.') }}
+                  {% endcall %}
+                  {% call ui.empty_content() %}
+                    {% call ui.button(type='button', attrs={'data-modal-open': 'stage-create-modal'}) %}{{ lucide('plus') }}Add Stage{% endcall %}
+                  {% endcall %}
+                {% endcall %}
                 {% endif %}
             {% endcall %}
         {% endcall %}
@@ -206,14 +208,19 @@
                     {% call card.card_title(class='text-sm') %}AI Mapping Suggestions{% endcall %}
                     {{ status_badge('AI-suggested draft', 'info') }}
                 </div>
+                {% if ai_suggestions_available %}
                 {% call button(variant='default', aria_label='Suggest capability mappings', on_click='suggestMappings()',
                                attrs_dict={':disabled': 'aiLoading'}) %}
                     <span x-show="aiLoading" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                     <span x-text="aiLoading ? 'Suggesting…' : (aiSuggestions.length ? 'Regenerate suggestions' : 'Suggest mappings')"></span>
+                {% endcall %}
+                {% else %}
+                {% call button(variant='default', aria_label='Suggest capability mappings') %}Suggest mappings{% endcall %}
+                {% endif %}
             </div>
                 {% endcall %}
-            {% endcall %}
             {% call card.card_content(class='pt-4') %}
+                {% if ai_suggestions_available %}
                 <p class="text-xs text-muted-foreground">
                     AI-suggested capability &times; stage pairs from this stream's real stages and the org capability
                     catalog. Advisory only — nothing is mapped until you click Apply, which writes through the same
@@ -243,6 +250,20 @@
                         </li>
                     </template>
                 </ul>
+                {% else %}
+                {% call ui.empty(class='p-6', attrs={'data-testid': 'ai-suggestions-unavailable', 'role': 'status'}) %}
+                  {% call ui.empty_header() %}
+                    {% call ui.empty_icon(variant='icon') %}{{ lucide('sparkles') }}{% endcall %}
+                    {{ ui.empty_title(text=ai_suggestions_notice.intro, attrs={'data-testid': 'ai-suggestions-unavailable-title'}) }}
+                    {{ ui.empty_description(text=ai_suggestions_notice.description, attrs={'data-testid': 'ai-suggestions-unavailable-description'}) }}
+                  {% endcall %}
+                  {% if ai_suggestions_notice.cta_text %}
+                  {% call ui.empty_content() %}
+                    {% call ui.button(href=ai_suggestions_notice.cta_href, variant='outline') %}{{ lucide('key') }}{{ ai_suggestions_notice.cta_text }}{% endcall %}
+                  {% endcall %}
+                  {% endif %}
+                {% endcall %}
+                {% endif %}
             {% endcall %}
         {% endcall %}
 

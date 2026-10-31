@@ -11,14 +11,14 @@ Routes:
 import logging
 
 from flask import current_app, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.services.ai_architecture_service import CognitiveArchitectureService
 from app.services.business_output_service import BusinessOutputService, StakeholderRole
 from app.services.chat_entity_matching_service import ChatEntityMatchingService
 from app.utils.duplicate_guard import find_similar_entities
-from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+from app.modules.ai_chat.services.failure_messages import ai_unavailable_notice
 from . import unified_ai_chat_bp
 
 logger = logging.getLogger(__name__)
@@ -319,11 +319,15 @@ def entity_matching_message():
     if not result.get("success"):
         error_text = str(result.get("error") or "Entity matching failed")
         if _is_llm_not_configured_error(error_text):
+            is_admin = bool(getattr(current_user, "is_org_admin", False))
+            notice = ai_unavailable_notice("entity_matching", is_admin)
             return jsonify(
                 {
                     "success": False,
-                    "error": ASSISTANT_UNAVAILABLE,
+                    "error": notice["sentence"],
                     "code": "LLM_NOT_CONFIGURED",
+                    "cta_text": notice["cta_text"],
+                    "cta_href": notice["cta_href"],
                 }
             ), 503
         current_app.logger.error(f"[AI_CHAT] Entity matching failed: {error_text}")
