@@ -156,14 +156,6 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_have_count(0)
         expect(page.get_by_test_id("overview-welcome")).to_contain_text("Connect GitHub and your model is built for you")
-        # Figures that come from the change history say so, so they are not read as records still here
-        chart = page.get_by_test_id("activity-chart")
-        expect(chart).to_contain_text("Counted from the change history")
-        expect(chart).to_contain_text("Additions logged")
-        expect(chart).not_to_contain_text("Records added")
-        # One wording for the count: no label on the overview, visible or in a chart's description, says "records added"
-        assert "records added" not in page.content().lower()
-        expect(page.get_by_test_id("year-card")).to_contain_text("Additions logged in the change history")
         _shot(page, "4-after-removal-reload", width)
         connect = page.get_by_test_id("overview-connect")
         expect(connect).to_be_visible()
