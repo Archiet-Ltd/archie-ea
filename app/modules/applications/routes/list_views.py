@@ -84,6 +84,31 @@ def application_roadmap():
     return redirect(url_for("main.capability_roadmap"))
 
 
+def _completeness_by_application(applications) -> dict:
+    """Record completeness (0-100) for each application on the page, from one owner count for the whole page.
+
+    ``ApplicationComponent.completeness_score`` counts a row's owners with its own query every time it is read, and
+    the list reads it for every row in both layouts. Same rubric (``compute_completeness``), the owner count handed in."""
+    from app.models.application_owner import ApplicationOwner
+    from app.services.application_fact_sheet import compute_completeness
+
+    items = list(applications)
+    ids = [a.id for a in items]
+    counts = {}
+    if ids:
+        rows = (
+            db.session.query(ApplicationOwner.application_id, ApplicationOwner.organization_id, func.count())
+            .filter(ApplicationOwner.application_id.in_(ids))
+            .group_by(ApplicationOwner.application_id, ApplicationOwner.organization_id)
+            .all()
+        )
+        counts = {(app_id, org_id): n for app_id, org_id, n in rows}
+    return {
+        a.id: compute_completeness(a, owner_count=counts.get((a.id, a.organization_id), 0) if a.organization_id else 0)["pct"]
+        for a in items
+    }
+
+
 @unified_applications_bp.route("/")
 @login_required
 @with_import_security
@@ -583,6 +608,7 @@ def application_list():
         return render_template(
             "applications/list_simple.html",
             applications=pagination.items,
+            completeness_pct=_completeness_by_application(pagination.items),
             total_count=total_count,
             portfolio_total=portfolio_total,
             current_page=page,
