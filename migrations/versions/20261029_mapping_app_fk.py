@@ -14,9 +14,11 @@ exists.
 Orphan rows (a mapping whose ``application_component_id`` matches no
 ``application_components.id``) cannot coexist with the constraint; a database carrying one from
 before this fix is cleaned up first, since a dangling reference to an application that no longer
-exists answers no question a reader could rely on.
+exists answers no question a reader could rely on. Every orphan row is first copied, whole, into
+``unified_application_capability_mapping_removed`` (with the time it was archived), so the removal
+can be reversed by copying the rows back.
 
-Revision ID: 20261029_mapping_app_component_fk
+Revision ID: 20261029_mapping_app_fk
 Revises: 20261029_org_deletion_guards
 Create Date: 2026-10-29
 """
@@ -29,6 +31,7 @@ down_revision = "20261029_org_deletion_guards"
 branch_labels = None
 depends_on = None
 
+_ARCHIVE = "unified_application_capability_mapping_removed"
 _CONSTRAINT = "unified_application_capability_ma_application_component_id_fkey"
 
 
@@ -41,15 +44,30 @@ def upgrade():
     ).scalar()
     if existing:
         return
-    removed = connection.exec_driver_sql(
-        "DELETE FROM unified_application_capability_mapping AS mapping "
+    orphans = (
+        "FROM unified_application_capability_mapping AS mapping "
         "WHERE NOT EXISTS ("
         "  SELECT 1 FROM application_components AS app "
         "  WHERE app.id = mapping.application_component_id"
         ")"
-    ).rowcount
-    if removed:
-        print(f"unified_application_capability_mapping: {removed} orphan row(s) removed before the foreign key")
+    )
+    if connection.exec_driver_sql(f"SELECT 1 {orphans} LIMIT 1").first():
+        connection.exec_driver_sql(
+            f"CREATE TABLE IF NOT EXISTS {_ARCHIVE} "
+            f"(LIKE unified_application_capability_mapping, archived_at TIMESTAMP NOT NULL DEFAULT now())"
+        )
+        archived = connection.exec_driver_sql(
+            f"INSERT INTO {_ARCHIVE} SELECT mapping.* {orphans}"
+        ).rowcount
+        removed = connection.exec_driver_sql(
+            "DELETE FROM unified_application_capability_mapping AS mapping WHERE NOT EXISTS ("
+            "  SELECT 1 FROM application_components AS app "
+            "  WHERE app.id = mapping.application_component_id)"
+        ).rowcount
+        print(
+            f"unified_application_capability_mapping: {removed} orphan row(s) removed before the "
+            f"foreign key, {archived} copied first into {_ARCHIVE}"
+        )
     connection.exec_driver_sql(
         f"ALTER TABLE unified_application_capability_mapping "
         f"ADD CONSTRAINT {_CONSTRAINT} "
