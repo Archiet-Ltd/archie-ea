@@ -376,7 +376,11 @@ def _sanitize_html(html: str) -> Markup:
 
 
 def _released_wave() -> int | None:
-    """The released wave number, or None when the switch is off."""
+    """The released wave number, or None when the switch is off.
+
+    The RELEASE_WAVE fallback below stays until the wave-switch branch lands; the round that lands
+    ``configured_wave`` removes the fallback and keeps only the import.
+    """
     try:
         from app.release_waves import configured_wave
     except ImportError:

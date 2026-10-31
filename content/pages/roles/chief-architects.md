@@ -118,7 +118,7 @@ for people who change the model: recording a decision, classifying technology, t
 ### Who needs a paid seat?
 
 Editors on the Team plan, priced at $29 per editor a month. Community covers one organisation of up to three
-people at no cost, and Enterprise, from $24,000 a year, adds SAML sign-in and unlimited editors.
+people at no cost, and Enterprise, from $24,000 a year, adds {{sso:SAML sign-in and }}unlimited editors.
 
 ## Start free
 

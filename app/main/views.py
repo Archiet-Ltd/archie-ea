@@ -841,6 +841,7 @@ def public_role(slug):
         load_page,
         role_siblings,
         get_role_more_screens,
+        apply_wave_copy,
     )
 
     merge_target = MERGED_PAGES.get(f"/roles/{slug}")
@@ -851,6 +852,7 @@ def public_role(slug):
     if page is None:
         from flask import abort
         abort(404)
+    page = apply_wave_copy(page)
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
@@ -875,6 +877,7 @@ def public_connector(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        apply_wave_copy,
         get_page_screenshot,
         load_page,
     )
@@ -887,6 +890,7 @@ def public_connector(slug):
     if page is None:
         from flask import abort
         abort(404)
+    page = apply_wave_copy(page)
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -1022,7 +1026,6 @@ def public_site_page(slug):
         build_jsonld,
         load_feed_pages,
         load_page,
-        self_serve_plans_offered,
     )
 
     page = load_page("site", slug=slug)
@@ -1061,8 +1064,7 @@ def public_site_page(slug):
         template = "public/pricing.html"
         from app.services import billing_plans
         plan_data = {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS}
-        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data,
-                               self_serve_plans=self_serve_plans_offered())
+        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data)
     return render_template(template, page=page, jsonld=build_jsonld(page))
 
 

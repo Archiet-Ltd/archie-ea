@@ -25,7 +25,7 @@ If you are not sure yet, start on the free Community plan, or buy the [architect
 
 ## What you get
 
-**The Team plan, committed annually.** Entelim's Team plan is priced per editor, and people who only ask questions are free. An editor is a member of your workspace who is not set to read-only. Team adds {{sso:single sign-on, }}the architecture review board workflow, and your own model key for the AI features.{{not-sso: Single sign-on is coming.}} Every plan includes every question Entelim answers, the twin map, the Business Model Canvas and file import.
+**The Team plan, committed annually.** Entelim's Team plan is priced per editor, and people who only ask questions are free. An editor is a member of your workspace who is not set to read-only. Team adds {{sso:single sign-on, }}the architecture review board workflow, and your own model key for the AI features. {{not-sso:Single sign-on is coming.}} Every plan includes every question Entelim answers, the twin map, the Business Model Canvas and file import.
 
 **Onboarding, as working sessions.** Onboarding is working sessions with your people, not a generic webinar. It has three parts:
 
@@ -81,7 +81,7 @@ Yes. Add them whenever you need to. If you add seats part-way through a period, 
 
 ### What happens at renewal?
 
-The plan renews for another annual period unless an organisation administrator cancels before then{{billing:, from the billing page or by contacting us}}{{not-billing: , by contacting us}}. The $1,500 onboarding is one time and does not recur. The editor count you renew with is the one you have then, so remove editors you no longer need before the renewal date.
+The plan renews for another annual period unless an organisation administrator cancels before then{{billing:, from the billing page or by contacting us}}{{not-billing:, by contacting us}}. The $1,500 onboarding is one time and does not recur. The editor count you renew with is the one you have then, so remove editors you no longer need before the renewal date.
 
 ### Is onboarding repeated if we add people later?
 
@@ -89,7 +89,7 @@ No. Onboarding is charged once, and editors who join later are not charged for i
 
 ### What if we need to pause or cancel, and what happens to our data?
 
-You can cancel at any time, and cancelling stops the plan renewing. You keep full access until the end of the period you have paid for, and you can export your data for 30 days after it ends, including the model as an ArchiMate Open Exchange file. After that period, we delete your data. Backups expire on their normal cycle within 90 days. Dates for the working sessions are agreed on the scoping call, so say then if a busy period is coming.
+{{billing:You can cancel at any time, and cancelling stops the plan renewing.}}{{not-billing:Entelim is free while it is in early access, so there is nothing to cancel yet. Plans open for purchase soon.}} You keep full access until the end of the period you have paid for, and you can export your data for 30 days after it ends, including the model as an ArchiMate Open Exchange file. After that period, we delete your data. Backups expire on their normal cycle within 90 days. Dates for the working sessions are agreed on the scoping call, so say then if a busy period is coming.
 
 ### How does this differ from the architecture health check?
 

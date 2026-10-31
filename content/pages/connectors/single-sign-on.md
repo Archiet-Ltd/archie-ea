@@ -12,6 +12,10 @@ source: app/services/sso_service.py, app/services/saml_service.py, app/modules/a
 
 # Single sign-on for enterprise architecture software
 
+{{not-sso:Single sign-on is coming. It is not available yet, and this page will describe it once it is.}}
+
+{{sso:
+
 Entelim supports SAML single sign-on, alongside OpenID Connect, so your people sign in with the
 identity your organisation already manages rather than a separate Entelim password. Your
 administrator sets this up once, on the single sign-on settings screen, and from then on anyone
@@ -115,6 +119,8 @@ organisation's account cannot sign in through your configuration; that attempt i
 OpenID Connect single sign-on is included from the Team plan. SAML 2.0 is included on Enterprise.
 [See Entelim pricing](/pricing).
 
+}}
+
 ## Related connectors and modules
 
 - [Connectors](/connectors)
@@ -122,7 +128,11 @@ OpenID Connect single sign-on is included from the Team plan. SAML 2.0 is includ
 - [Security architects](/roles/security-architects)
 - [Team annual plan with onboarding](/team-annual-onboarding)
 
+{{sso:
+
 ## Plan
 
 Single sign-on is included from the Team plan, with SAML 2.0 added on Enterprise.
 [See Entelim pricing](/pricing).
+
+}}

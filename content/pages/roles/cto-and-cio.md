@@ -84,9 +84,9 @@ opex, three-year TCO, ROI, payback and NPV; and a review board decision with its
 
 ## Works with
 
-Sign your whole technology leadership team in the way they already sign in everywhere else: connect
+{{sso:Sign your whole technology leadership team in the way they already sign in everywhere else: connect
 [single sign-on](/connectors/single-sign-on) over OpenID Connect or SAML, included from the Team
-plan. Carry the same questions into a conversation you're already having by connecting an
+plan. }}Carry the same questions into a conversation you're already having by connecting an
 [AI assistant](/connectors/ai-assistants) such as Claude, read-only and scoped to your own
 organisation's data, on every plan including the free one.
 
@@ -106,7 +106,7 @@ judgement.
 Community is free for one organisation of up to three people, with the CTO scorecard, health
 scorecard and rationalisation all included. A growing technology team moves to Team, priced at $29
 per editor a month, where anyone who only reads a dashboard or asks a question stays free. Enterprise
-is sold by contract, from $24,000 a year, and adds SAML single sign-on and unlimited editors.
+is sold by contract, from $24,000 a year, and adds {{sso:SAML single sign-on and }}unlimited editors.
 
 ### Can the board see the numbers without a paid seat?
 

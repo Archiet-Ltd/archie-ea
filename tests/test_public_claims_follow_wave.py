@@ -21,6 +21,13 @@ def _text(client, path):
 
 def _sentences_with(pattern, text):
     return [s for s in re.split(r"(?<=[.!?])\s+", text) if pattern.search(s)]
+# Wider than SELF_SERVE: any sentence on any page that says a visitor can buy, change or cancel a plan.
+PLAN_ACTION = re.compile(
+    r"\b(buy|buys|buying|change|changes|changing|cancel|cancels|cancelling)\b[^.]{0,60}\b(plan|subscription)\b"
+    r"|\bcancel (at any time|before)\b|\bcancelling stops\b|from the billing page|Buy (Startup|Team), billed",
+    re.I,
+)
+DEFERRED = re.compile(r"coming|not yet|soon", re.I)
 
 
 @pytest.fixture
@@ -67,3 +74,38 @@ def test_wave_four_or_switch_off_the_lines_return(client, monkeypatch, wave):
     assert "SAML sign-in" in pricing
     assert "Plans open for purchase soon" not in pricing
     assert "Single sign-on and the review-board workflow" in _text(client, "/")
+
+
+def _every_served_public_page(client):
+    """Every content page under content/pages that answers 200, by url, as body text."""
+    from app.services.public_pages import load_all_pages
+
+    served = {}
+    for page in load_all_pages():
+        resp = client.get(page.url)
+        if resp.status_code == 200:
+            html = resp.get_data(as_text=True)
+            html = re.sub(r"<(head|script|style)\b.*?</\1>", " ", html, flags=re.S | re.I)
+            served[page.url] = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+    return served
+
+
+def test_wave_one_no_public_content_page_offers_single_sign_on_or_a_plan_purchase(client, monkeypatch):
+    monkeypatch.setenv("RELEASE_WAVE", "1")
+    served = _every_served_public_page(client)
+    assert len(served) > 80, "the scan must cover the whole content tree"
+    offending = []
+    for url, text in sorted(served.items()):
+        for sentence in _sentences_with(SSO_WORDS, text):
+            if not DEFERRED.search(sentence):
+                offending.append(f"{url}: {sentence}")
+        for sentence in _sentences_with(PLAN_ACTION, text):
+            if not sentence.rstrip().endswith("?"):
+                offending.append(f"{url}: {sentence}")
+    assert not offending, "\n".join(offending)
+
+
+def test_wave_one_a_removed_span_never_runs_two_sentences_together(client, monkeypatch):
+    monkeypatch.setenv("RELEASE_WAVE", "1")
+    for url, text in _every_served_public_page(client).items():
+        assert not re.search(r"[a-z][.!?][A-Z][a-z]", text.replace("e.g.", "").replace("i.e.", "")), url
