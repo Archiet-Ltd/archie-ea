@@ -236,7 +236,7 @@
         {% endcall %}
 
         {{ ui.input(type='hidden', name='dynamic_filters', id='dynamic_filters', value='') }}
-        <input type="hidden" id="discover-filters-url" value="{{ url_for('admin.discover_abacus_filters') }}">
+        {{ ui.input(type='hidden', id='discover-filters-url', value=url_for('admin.discover_abacus_filters')) }}
         {% if not filter_dimensions %}
           {% call ui.alert() %}
             {{ ui.alert_title(text='No filter dimensions yet') }}
